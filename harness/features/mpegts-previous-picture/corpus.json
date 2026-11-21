@@ -201,6 +201,51 @@
       }
     },
     {
+      "id": "avc-clock-epoch-ts188-previous-split",
+      "profile": "avc-clock-epoch-ts188-previous-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-clock-epoch.ts",
+      "sha256": "b563d76bc837bc3811fcf1fe87e0b7dc7992e207f9e33d1b0c77f06eb9642b9b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=1:2",
+        "epoch-start=11656",
+        "split=11844"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 12525530057161271231
+      }
+    },
+    {
+      "id": "avc-clock-epoch-ts188-previous-split-indexed",
+      "profile": "avc-clock-epoch-ts188-previous-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-clock-epoch.ts",
+      "sha256": "b563d76bc837bc3811fcf1fe87e0b7dc7992e207f9e33d1b0c77f06eb9642b9b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=1:2",
+        "epoch-start=11656",
+        "split=11844",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 12567875487324029543
+      }
+    },
+    {
       "id": "avc-clock-epoch-ts188-preroll",
       "profile": "avc-clock-epoch-ts188-preroll",
       "file": "harness/features/mpegts-previous-picture/inputs/avc-clock-epoch.ts",
@@ -219,6 +264,51 @@
         "packets": 8,
         "bytes": 5917,
         "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-clock-epoch-ts188-preroll-split",
+      "profile": "avc-clock-epoch-ts188-preroll-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-clock-epoch.ts",
+      "sha256": "b563d76bc837bc3811fcf1fe87e0b7dc7992e207f9e33d1b0c77f06eb9642b9b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=1:2",
+        "epoch-start=11656",
+        "split=11844"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-clock-epoch-ts188-preroll-split-indexed",
+      "profile": "avc-clock-epoch-ts188-preroll-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-clock-epoch.ts",
+      "sha256": "b563d76bc837bc3811fcf1fe87e0b7dc7992e207f9e33d1b0c77f06eb9642b9b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=1:2",
+        "epoch-start=11656",
+        "split=11844",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 7315994549743845999
       }
     },
     {
@@ -243,6 +333,51 @@
       }
     },
     {
+      "id": "avc-clock-epoch-m2ts-previous-split",
+      "profile": "avc-clock-epoch-m2ts-previous-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-clock-epoch.m2ts",
+      "sha256": "61aae95c517759aade64e087fb5b1fb960d4df231655100ce325326e37b94bbc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=1:2",
+        "epoch-start=11904",
+        "split=12096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 12525530057161271231
+      }
+    },
+    {
+      "id": "avc-clock-epoch-m2ts-previous-split-indexed",
+      "profile": "avc-clock-epoch-m2ts-previous-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-clock-epoch.m2ts",
+      "sha256": "61aae95c517759aade64e087fb5b1fb960d4df231655100ce325326e37b94bbc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=1:2",
+        "epoch-start=11904",
+        "split=12096",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 12567875487324029543
+      }
+    },
+    {
       "id": "avc-clock-epoch-m2ts-preroll",
       "profile": "avc-clock-epoch-m2ts-preroll",
       "file": "harness/features/mpegts-previous-picture/inputs/avc-clock-epoch.m2ts",
@@ -261,6 +396,51 @@
         "packets": 8,
         "bytes": 5917,
         "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-clock-epoch-m2ts-preroll-split",
+      "profile": "avc-clock-epoch-m2ts-preroll-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-clock-epoch.m2ts",
+      "sha256": "61aae95c517759aade64e087fb5b1fb960d4df231655100ce325326e37b94bbc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=1:2",
+        "epoch-start=11904",
+        "split=12096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-clock-epoch-m2ts-preroll-split-indexed",
+      "profile": "avc-clock-epoch-m2ts-preroll-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-clock-epoch.m2ts",
+      "sha256": "61aae95c517759aade64e087fb5b1fb960d4df231655100ce325326e37b94bbc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=1:2",
+        "epoch-start=11904",
+        "split=12096",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 7315994549743845999
       }
     },
     {
@@ -285,6 +465,51 @@
       }
     },
     {
+      "id": "avc-configuration-epoch-ts188-previous-split",
+      "profile": "avc-configuration-epoch-ts188-previous-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-configuration-epoch.ts",
+      "sha256": "ed344d9d9b10c85c86a2bd0179d72366aaac82d69be9933b3cc74c7564e8b8d7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=0:3",
+        "epoch-start=11656",
+        "split=11844"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 12525530057161271231
+      }
+    },
+    {
+      "id": "avc-configuration-epoch-ts188-previous-split-indexed",
+      "profile": "avc-configuration-epoch-ts188-previous-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-configuration-epoch.ts",
+      "sha256": "ed344d9d9b10c85c86a2bd0179d72366aaac82d69be9933b3cc74c7564e8b8d7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=0:3",
+        "epoch-start=11656",
+        "split=11844",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 12567875487324029543
+      }
+    },
+    {
       "id": "avc-configuration-epoch-ts188-preroll",
       "profile": "avc-configuration-epoch-ts188-preroll",
       "file": "harness/features/mpegts-previous-picture/inputs/avc-configuration-epoch.ts",
@@ -303,6 +528,51 @@
         "packets": 8,
         "bytes": 5917,
         "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-configuration-epoch-ts188-preroll-split",
+      "profile": "avc-configuration-epoch-ts188-preroll-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-configuration-epoch.ts",
+      "sha256": "ed344d9d9b10c85c86a2bd0179d72366aaac82d69be9933b3cc74c7564e8b8d7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=0:3",
+        "epoch-start=11656",
+        "split=11844"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-configuration-epoch-ts188-preroll-split-indexed",
+      "profile": "avc-configuration-epoch-ts188-preroll-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-configuration-epoch.ts",
+      "sha256": "ed344d9d9b10c85c86a2bd0179d72366aaac82d69be9933b3cc74c7564e8b8d7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=0:3",
+        "epoch-start=11656",
+        "split=11844",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 7315994549743845999
       }
     },
     {
@@ -327,6 +597,51 @@
       }
     },
     {
+      "id": "avc-configuration-epoch-m2ts-previous-split",
+      "profile": "avc-configuration-epoch-m2ts-previous-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-configuration-epoch.m2ts",
+      "sha256": "77ab237d49f843a37d4edf20694e7df0aa8e2684726e38dcd783cd668d7dfbb1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=0:3",
+        "epoch-start=11904",
+        "split=12096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 12525530057161271231
+      }
+    },
+    {
+      "id": "avc-configuration-epoch-m2ts-previous-split-indexed",
+      "profile": "avc-configuration-epoch-m2ts-previous-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-configuration-epoch.m2ts",
+      "sha256": "77ab237d49f843a37d4edf20694e7df0aa8e2684726e38dcd783cd668d7dfbb1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=0:3",
+        "epoch-start=11904",
+        "split=12096",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 12567875487324029543
+      }
+    },
+    {
       "id": "avc-configuration-epoch-m2ts-preroll",
       "profile": "avc-configuration-epoch-m2ts-preroll",
       "file": "harness/features/mpegts-previous-picture/inputs/avc-configuration-epoch.m2ts",
@@ -345,6 +660,315 @@
         "packets": 8,
         "bytes": 5917,
         "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-configuration-epoch-m2ts-preroll-split",
+      "profile": "avc-configuration-epoch-m2ts-preroll-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-configuration-epoch.m2ts",
+      "sha256": "77ab237d49f843a37d4edf20694e7df0aa8e2684726e38dcd783cd668d7dfbb1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=0:3",
+        "epoch-start=11904",
+        "split=12096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-configuration-epoch-m2ts-preroll-split-indexed",
+      "profile": "avc-configuration-epoch-m2ts-preroll-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-configuration-epoch.m2ts",
+      "sha256": "77ab237d49f843a37d4edf20694e7df0aa8e2684726e38dcd783cd668d7dfbb1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=0:3",
+        "epoch-start=11904",
+        "split=12096",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 7315994549743845999
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-ts188-previous",
+      "profile": "avc-equal-pts-epoch-ts188-previous",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.ts",
+      "sha256": "fae960fd94b35be399c5139b3d1273725324e767bf834ac14af7b1d1b90f7fe3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=1:2",
+        "epoch-start=11656"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 12525530057161271231
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-ts188-previous-split",
+      "profile": "avc-equal-pts-epoch-ts188-previous-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.ts",
+      "sha256": "fae960fd94b35be399c5139b3d1273725324e767bf834ac14af7b1d1b90f7fe3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=1:2",
+        "epoch-start=11656",
+        "split=11656"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 12525530057161271231
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-ts188-previous-split-indexed",
+      "profile": "avc-equal-pts-epoch-ts188-previous-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.ts",
+      "sha256": "fae960fd94b35be399c5139b3d1273725324e767bf834ac14af7b1d1b90f7fe3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=1:2",
+        "epoch-start=11656",
+        "split=11656",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 12567875487324029543
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-ts188-preroll",
+      "profile": "avc-equal-pts-epoch-ts188-preroll",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.ts",
+      "sha256": "fae960fd94b35be399c5139b3d1273725324e767bf834ac14af7b1d1b90f7fe3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=1:2",
+        "epoch-start=11656"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-ts188-preroll-split",
+      "profile": "avc-equal-pts-epoch-ts188-preroll-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.ts",
+      "sha256": "fae960fd94b35be399c5139b3d1273725324e767bf834ac14af7b1d1b90f7fe3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=1:2",
+        "epoch-start=11656",
+        "split=11656"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-ts188-preroll-split-indexed",
+      "profile": "avc-equal-pts-epoch-ts188-preroll-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.ts",
+      "sha256": "fae960fd94b35be399c5139b3d1273725324e767bf834ac14af7b1d1b90f7fe3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=1:2",
+        "epoch-start=11656",
+        "split=11656",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 7315994549743845999
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-m2ts-previous",
+      "profile": "avc-equal-pts-epoch-m2ts-previous",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.m2ts",
+      "sha256": "f655aad4735c9a58e6b02c73deb1151fdf14a4644fb4a7405858e52e851262f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=1:2",
+        "epoch-start=11904"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 12525530057161271231
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-m2ts-previous-split",
+      "profile": "avc-equal-pts-epoch-m2ts-previous-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.m2ts",
+      "sha256": "f655aad4735c9a58e6b02c73deb1151fdf14a4644fb4a7405858e52e851262f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=1:2",
+        "epoch-start=11904",
+        "split=11904"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 12525530057161271231
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-m2ts-previous-split-indexed",
+      "profile": "avc-equal-pts-epoch-m2ts-previous-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.m2ts",
+      "sha256": "f655aad4735c9a58e6b02c73deb1151fdf14a4644fb4a7405858e52e851262f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "previous",
+        "epoch=1:2",
+        "epoch-start=11904",
+        "split=11904",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 12567875487324029543
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-m2ts-preroll",
+      "profile": "avc-equal-pts-epoch-m2ts-preroll",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.m2ts",
+      "sha256": "f655aad4735c9a58e6b02c73deb1151fdf14a4644fb4a7405858e52e851262f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=1:2",
+        "epoch-start=11904"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-m2ts-preroll-split",
+      "profile": "avc-equal-pts-epoch-m2ts-preroll-split",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.m2ts",
+      "sha256": "f655aad4735c9a58e6b02c73deb1151fdf14a4644fb4a7405858e52e851262f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=1:2",
+        "epoch-start=11904",
+        "split=11904"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 4160627919056116399
+      }
+    },
+    {
+      "id": "avc-equal-pts-epoch-m2ts-preroll-split-indexed",
+      "profile": "avc-equal-pts-epoch-m2ts-preroll-split-indexed",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-equal-pts-epoch.m2ts",
+      "sha256": "f655aad4735c9a58e6b02c73deb1151fdf14a4644fb4a7405858e52e851262f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "112000",
+        "preroll",
+        "epoch=1:2",
+        "epoch-start=11904",
+        "split=11904",
+        "91000"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 15138,
+        "digest": 7315994549743845999
       }
     },
     {

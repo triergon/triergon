@@ -391,65 +391,83 @@ fn layer_three_and_multi_carrier_pes_keep_indexed_replay() {
     ] {
         let mut frame = vec![0; size];
         frame[..4].copy_from_slice(&header);
-        let (ts, _) = input_frames(true, &frame);
+        let (ts, offsets) = input_frames(true, &frame);
         let mut source = Source::new(&ts.bytes, 127, 43, ReaderLimits::default());
         source
             .reader
             .request_seek_and_index(request(4), FRAMES)
             .unwrap();
         source.suffix().unwrap();
-        assert_eq!(source.reader.request_seek(request(4)).unwrap().offset, 0);
+        assert_eq!(
+            source.reader.request_seek(request(4)).unwrap().offset,
+            if size == 192 { offsets[4] } else { 0 }
+        );
         source.reads.clear();
         let (result, packets) = source.suffix().unwrap();
         assert_eq!(result.unwrap().method, SeekMethod::Index);
         assert_eq!(packets.len(), FRAMES - 4);
-        assert_eq!(source.reads.first().unwrap().start, 0);
+        assert_eq!(
+            source.reads.first().unwrap().start,
+            if size == 192 { offsets[4] } else { 0 }
+        );
     }
 }
 
 #[test]
 fn optional_checkpoint_pressure_releases_it_and_restarts_replay() {
-    let (ts, offsets) = input(true);
-    let mut source = Source::new(&ts.bytes, 4096, 8192, ReaderLimits::default());
-    source
-        .reader
-        .request_seek_and_index(request(4), FRAMES)
-        .unwrap();
-    source.suffix().unwrap();
-    let start = source.reader.request_seek(request(6)).unwrap();
-    assert_eq!(start.offset, offsets[6]);
-    let window = InputWindow::new(
-        ID,
-        start.token.clone(),
-        start.offset,
-        Bytes::copy_from_slice(&source.pool, &ts.bytes[start.offset as usize..]).unwrap(),
-    )
-    .unwrap();
-    source.reader.provide(&window).unwrap();
-    drop(window);
-    let occupied = source
-        .pool
-        .reserve(source.pool.limit() - source.pool.used())
-        .unwrap();
-    let replay = loop {
-        match source
-            .reader
-            .step(&mut WorkBudget::new(8192), &OFF)
-            .unwrap()
-        {
-            Step::Yield | Step::Ready(Event::Other(_)) => (),
-            Step::NeedInput(request) => break request,
-            step => panic!("expected fallback input: {step:?}"),
+    for format in [PacketFormat::Ts188, PacketFormat::M2ts192] {
+        let (mut ts, mut offsets) = input(true);
+        if format == PacketFormat::M2ts192 {
+            ts.bytes = ts.m2ts();
+            for offset in &mut offsets {
+                *offset = *offset / 188 * 192;
+            }
         }
-    };
-    assert_eq!(replay.offset, 0);
-    assert_ne!(replay.token.generation(), start.token.generation());
-    drop(occupied);
-    let (result, packets) = source.suffix().unwrap();
-    assert_eq!(result.unwrap().method, SeekMethod::Index);
-    assert_eq!(packets.len(), FRAMES - 6);
-    source.reader.close();
-    assert_eq!(source.pool.used(), Budget::control_storage_bytes());
+        let limits = ReaderLimits {
+            format,
+            ..ReaderLimits::default()
+        };
+        let mut source = Source::new(&ts.bytes, 4096, 8192, limits);
+        source
+            .reader
+            .request_seek_and_index(request(4), FRAMES)
+            .unwrap();
+        source.suffix().unwrap();
+        let start = source.reader.request_seek(request(6)).unwrap();
+        assert_eq!(start.offset, offsets[6]);
+        let window = InputWindow::new(
+            ID,
+            start.token.clone(),
+            start.offset,
+            Bytes::copy_from_slice(&source.pool, &ts.bytes[start.offset as usize..]).unwrap(),
+        )
+        .unwrap();
+        source.reader.provide(&window).unwrap();
+        drop(window);
+        let occupied = source
+            .pool
+            .reserve(source.pool.limit() - source.pool.used())
+            .unwrap();
+        let replay = loop {
+            match source
+                .reader
+                .step(&mut WorkBudget::new(8192), &OFF)
+                .unwrap()
+            {
+                Step::Yield | Step::Ready(Event::Other(_)) => (),
+                Step::NeedInput(request) => break request,
+                step => panic!("expected fallback input: {step:?}"),
+            }
+        };
+        assert_eq!(replay.offset, 0);
+        assert_ne!(replay.token.generation(), start.token.generation());
+        drop(occupied);
+        let (result, packets) = source.suffix().unwrap();
+        assert_eq!(result.unwrap().method, SeekMethod::Index);
+        assert_eq!(packets.len(), FRAMES - 6);
+        source.reader.close();
+        assert_eq!(source.pool.used(), Budget::control_storage_bytes());
+    }
 }
 
 #[test]
@@ -608,4 +626,122 @@ fn black_box_ffmpeg_packet_copy_matches_the_direct_suffix() {
     }
     assert_eq!(actual, reference[6 * FRAME_BYTES..]);
     assert_eq!(actual, copy(&ts.bytes[offsets[6] as usize..]));
+}
+
+#[test]
+fn m2ts_multi_carrier_restart_preserves_prefixes_and_all_coordinates() {
+    for (header, size) in [
+        ([0xff, 0xff, 0x94, 0xc0], 288),
+        ([0xff, 0xfd, 0x44, 0xc0], 192),
+        ([0xff, 0xfd, 0xe4, 0xc0], 1152),
+    ] {
+        let mut frame = vec![0; size];
+        frame[..4].copy_from_slice(&header);
+        let (ts, offsets) = input_frames(true, &frame);
+        let bytes = ts.m2ts();
+        let limits = ReaderLimits {
+            format: PacketFormat::M2ts192,
+            ..ReaderLimits::default()
+        };
+        let mut sequential = Source::new(&bytes, 4096, 8192, limits);
+        let (_, expected) = sequential.suffix().unwrap();
+        assert_eq!(expected.len(), FRAMES);
+        for (chunk, grant) in [(1, 1), (7, 43), (4096, 8192)] {
+            let mut source = Source::new(&bytes, chunk, grant, limits);
+            source
+                .reader
+                .request_seek_and_index(request(2), FRAMES)
+                .unwrap();
+            assert_eq!(source.suffix().unwrap().1, expected[2..]);
+            for index in [7, 1, 4] {
+                let offset = offsets[index] / 188 * 192;
+                assert_eq!(
+                    source.reader.request_seek(request(index)).unwrap().offset,
+                    offset
+                );
+                source.floor = offset;
+                source.reads.clear();
+                let (seek, packets) = source.suffix().unwrap();
+                assert_eq!(packets, expected[index..]);
+                assert!(!seek.unwrap().replays_from_start);
+                assert_eq!(source.reads.first().unwrap().start, offset);
+            }
+            source.reader.close();
+            assert_eq!(source.pool.used(), Budget::control_storage_bytes());
+        }
+        // Prefix bytes are opaque but are part of the physical checkpoint proof.
+        for byte in [0, 192, 384, 576, 767] {
+            let mut changed = bytes.clone();
+            let mut source = Source::new(&bytes, 7, 1, limits);
+            source
+                .reader
+                .request_seek_and_index(request(2), FRAMES)
+                .unwrap();
+            source.suffix().unwrap();
+            let offset = offsets[7] / 188 * 192;
+            assert_eq!(
+                source.reader.request_seek(request(7)).unwrap().offset,
+                offset
+            );
+            changed[offset as usize + byte] ^= 1;
+            source.bytes = &changed;
+            source.floor = offset;
+            assert!(matches!(source.suffix(), Err(Error::SourceMismatch)));
+        }
+    }
+}
+
+#[test]
+fn generated_m2ts_audio_comparisons_read_directly_after_indexing() {
+    for (bytes, step, first, repeated, carriers) in [
+        (
+            include_bytes!("../../../../harness/features/mpegts-previous-audio/inputs/mpeg1-layer1-m2ts-multi-carrier-repeated-preroll.m2ts").as_slice(),
+            720,
+            7,
+            1,
+            2,
+        ),
+        (
+            include_bytes!("../../../../harness/features/mpegts-previous-audio/inputs/mpeg1-layer2-m2ts-multi-carrier-repeated-preroll.m2ts").as_slice(),
+            2160,
+            1,
+            7,
+            7,
+        ),
+    ] {
+        let limits = ReaderLimits {
+            format: PacketFormat::M2ts192,
+            ..ReaderLimits::default()
+        };
+        let mut sequential = Source::new(bytes, 4096, 8192, limits);
+        let (_, expected) = sequential.suffix().unwrap();
+        assert_eq!(expected.len(), FRAMES);
+        let seek = |index| SeekRequest {
+            target: Time::new(90_001 + index as i128 * step, 90_000).unwrap(),
+            ..request(index)
+        };
+        for (chunk, grant) in [(1, 1), (7, 43), (4096, 8192)] {
+            let mut source = Source::new(bytes, chunk, grant, limits);
+            source
+                .reader
+                .request_seek_and_index(seek(first), FRAMES)
+                .unwrap();
+            assert_eq!(source.suffix().unwrap().1, expected[first..]);
+            let offset = ((17 + repeated * (2 + carriers)) * 192) as u64;
+            assert_eq!(
+                source.reader.request_seek(seek(repeated)).unwrap().offset,
+                offset
+            );
+            source.floor = offset;
+            source.reads.clear();
+            let (seek, packets) = source.suffix().unwrap();
+            let seek = seek.unwrap();
+            assert_eq!(seek.method, SeekMethod::Index);
+            assert!(!seek.replays_from_start);
+            assert_eq!(packets, expected[repeated..]);
+            assert_eq!(source.reads.first().unwrap().start, offset);
+            source.reader.close();
+            assert_eq!(source.pool.used(), Budget::control_storage_bytes());
+        }
+    }
 }
