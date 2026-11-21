@@ -30,7 +30,8 @@ mod tables;
 
 use std::sync::{Mutex, OnceLock, PoisonError};
 
-use crate::long::{linear_advance, mul_fix, pix_ceil, pix_round, to_i32, wrap};
+use crate::fixed::wrap32::{mul_fix, pix_ceil, pix_round, to_i32, wrap};
+use crate::sized::linear_advance;
 use hints::GlyphHints;
 use latin::Scope;
 use style::{Coverage, DIGIT, WritingSystem};

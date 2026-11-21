@@ -441,30 +441,12 @@ pub(crate) fn parse(
     Ok(subtables)
 }
 
-/// The charmap libass selects for text when it opens a face
-/// (`ass_charmap_magic`): the first Windows (3, 10), else the first (3, 1),
-/// else the first Windows charmap of another encoding, else FreeType's
-/// default, else the first charmap. Its index in `charmaps`.
-pub(crate) fn text_charmap<'f>(
-    charmaps: impl Iterator<Item = Charmap<'f>> + Clone,
-) -> Option<usize> {
-    let windows = |encoding: Option<u16>| {
-        charmaps.clone().position(|c| {
-            c.platform() == Platform::Windows && encoding.is_none_or(|e| c.encoding_id() == e)
-        })
-    };
-    windows(Some(10))
-        .or_else(|| windows(Some(1)))
-        .or_else(|| windows(None))
-        .or_else(|| freetype_default(charmaps.clone()))
-        .or_else(|| charmaps.clone().next().map(|_| 0))
-}
-
-/// The charmap FreeType selects when it opens a face (`find_unicode_charmap`):
-/// the last full-Unicode charmap, else the last of the encodings FreeType
-/// calls Unicode (every Unicode- and ISO-platform subtable, Windows 1 and 10,
-/// and the charmap built from glyph names).
-pub(crate) fn freetype_default<'f>(
+/// The index of the charmap Unicode text is read through
+/// ([`Font::unicode_charmap`](crate::Font::unicode_charmap)): the last
+/// full-Unicode charmap, else the last Unicode one (every Unicode- and
+/// ISO-platform subtable, Windows 1 and 10, and the charmap built from glyph
+/// names).
+pub(crate) fn unicode_charmap<'f>(
     charmaps: impl Iterator<Item = Charmap<'f>> + Clone,
 ) -> Option<usize> {
     let full = |c: &Charmap<'_>| match (c.platform(), c.encoding_id()) {
@@ -477,7 +459,7 @@ pub(crate) fn freetype_default<'f>(
         Platform::Windows => matches!(c.encoding_id(), 1 | 10),
         _ => false,
     };
-    // FreeType skips formats 14 and 15 there, which are not listed.
+    // Formats 14 and 15, which are not listed, never count.
     let last = |test: &dyn Fn(&Charmap<'_>) -> bool| {
         charmaps
             .clone()
@@ -733,41 +715,6 @@ impl<'f> Charmap<'f> {
             work: WorkBudget::new(self.work),
             done: false,
         }
-    }
-}
-
-/// A charmap read as libass 0.17.5 reads text through it: a character is
-/// looked up at the code `ass_font_index_magic` gives it, as
-/// `FT_Get_Char_Index` looks codes up. [`Font::text_lookup`](crate::Font::text_lookup)
-/// makes one.
-#[derive(Clone, Copy, Debug)]
-pub struct TextLookup<'f> {
-    charmap: Charmap<'f>,
-    /// The bits set in every code looked up: `0xF000` in a Windows Symbol
-    /// charmap, none in others.
-    prefix: u32,
-}
-
-impl<'f> TextLookup<'f> {
-    pub(crate) const fn new(charmap: Charmap<'f>, symbol: bool) -> Self {
-        let prefix = if symbol { 0xf000 } else { 0 };
-        Self { charmap, prefix }
-    }
-
-    pub const fn charmap(&self) -> Charmap<'f> {
-        self.charmap
-    }
-
-    /// The code `c` is looked up at: `0xF000 | c` in a Windows Symbol charmap,
-    /// `c` in any other; `None` for 0, which libass never looks up.
-    pub const fn code(&self, c: u32) -> Option<u32> {
-        let code = c | self.prefix;
-        if code == 0 { None } else { Some(code) }
-    }
-
-    /// The glyph `c` maps to.
-    pub fn glyph(&self, c: u32) -> Option<GlyphId> {
-        self.charmap.glyph(self.code(c)?)
     }
 }
 
@@ -1587,10 +1534,9 @@ fn groups(table: &[u8], code: u32, consecutive: bool) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        CharEncoding, Charmap, CharmapKind, CmapFormat, Source, Subtable, parse, text_charmap,
-    };
+    use super::{CharEncoding, Charmap, CharmapKind, CmapFormat, Source, Subtable, parse};
     use crate::GlyphId;
+    use crate::compat::libass::text_charmap_among as text_charmap;
     use crate::name::Platform;
     use crate::sfnt::Table;
     use triergon_core::{Budget, Error, WorkBudget};

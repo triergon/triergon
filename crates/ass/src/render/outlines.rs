@@ -8,6 +8,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+use triergon_font::compat::libass;
 use triergon_font::{Font, GlyphId, Orientation};
 use triergon_raster::{BorderStroke, OUTLINE_MAX, Outline, Raster, Shape, Vector, pixels_26_6};
 
@@ -275,14 +276,15 @@ impl Outlines {
         decorations: Decorations,
         work: &mut WorkBudget,
     ) -> Result<OutlineValue> {
-        let sized = source.at_size(pixels_26_6(size))?;
+        let sized = libass::at_size(source, pixels_26_6(size))?;
         let scratch = &mut self.scratch;
         let metrics = sized.outline_into(glyph, scratch)?;
         // Synthesis, decoration and the conversion pass over its points.
         charge(work, scratch.points().len())?;
         // An outline FreeType refuses to embolden is drawn as it is
         // (`decorations-orientation.ass`).
-        sized.synthesize(scratch, source.synthesis(font.weight(), font.slant()))?;
+        let synthesis = libass::synthesis(source, font.weight(), font.slant());
+        libass::synthesize(&sized, scratch, synthesis)?;
         // A glyph an `@` font draws rotated advances by its linear vertical
         // advance (`d16_to_d6`, in `int`).
         let advance = if decorations.rotate {
@@ -291,8 +293,8 @@ impl Outlines {
             metrics.advance
         };
         let lines = [
-            (decorations.underline, sized.underline()),
-            (decorations.strike_out, sized.strikeout()),
+            (decorations.underline, libass::underline(&sized)),
+            (decorations.strike_out, libass::strikeout(&sized)),
         ]
         .map(|(on, band)| band.filter(|_| on && advance > 0));
         let mut outline = Outline::new(&self.budget);
@@ -328,7 +330,7 @@ impl Outlines {
                 outline.push_rect(Vector::new(0, from), Vector::new(advance, to))?;
             }
         }
-        let (asc, desc) = sized.ascent_descent();
+        let (asc, desc) = libass::ascent_descent(&sized);
         Ok(OutlineValue {
             shape: Shape::from_outlines(outline, Outline::new(&self.budget)),
             advance,

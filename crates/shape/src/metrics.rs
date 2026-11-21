@@ -7,9 +7,10 @@ use crate::rotations::{Decide, FaceRotations};
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 use triergon_core::{Error, Result, WorkBudget};
+use triergon_font::compat::libass::{self, TextLookup};
 use triergon_font::{
     CharEncoding, Charmap, ControlBox, Font, GlyphId, GlyphMetrics, Load, Outline, OutlineFormat,
-    Platform, SizedFont, TextLookup, Variant, VariationSequences,
+    Platform, SizedFont, Variant, VariationSequences,
 };
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
@@ -257,11 +258,11 @@ impl Metrics for OtMetrics<'_> {
 /// The font functions libass 0.17.5 installs on the HarfBuzz font of a face at a
 /// size (`init_font_funcs` and `get_hb_font` in `ass_shaper.c`): the face's
 /// character map looked up as libass looks codes up
-/// ([`Font::text_lookup`]), FreeType's variation sequences
+/// ([`libass::text_lookup`]), FreeType's variation sequences
 /// ([`Font::variation_sequences`]), default-load
 /// advances ([`SizedFont::default_advance`]) and `FT_KERNING_DEFAULT` kerning
 /// ([`SizedFont::kerning`]), in 26.6 pixels at the size's
-/// [`SizedFont::harfbuzz_scale`] and pixels per em, so that hinting device
+/// [`libass::harfbuzz_scale`] and pixels per em, so that hinting device
 /// tables apply.
 ///
 /// For a face of an `@` font ([`Self::rotating`]), the advance of a glyph
@@ -305,14 +306,14 @@ impl std::fmt::Debug for SizedMetrics<'_> {
 
 impl<'a> SizedMetrics<'a> {
     /// libass's font functions over `sized`, through the charmap libass
-    /// selects when it opens the face ([`Font::text_charmap`]), with `work`
+    /// selects when it opens the face ([`libass::text_charmap`]), with `work`
     /// bounding what they load.
     ///
     /// # Errors
     ///
     /// As [`Self::with_charmap`].
     pub fn new(sized: SizedFont<'a>, work: &'a mut WorkBudget) -> Result<Self> {
-        Self::with_charmap(sized, sized.font().text_charmap(), work)
+        Self::with_charmap(sized, libass::text_charmap(sized.font()), work)
     }
 
     /// libass's font functions over `sized`, through `charmap`, the one the
@@ -322,14 +323,14 @@ impl<'a> SizedMetrics<'a> {
     /// # Errors
     ///
     /// `Unsupported` when libass would convert codes for the charmap, which
-    /// this crate does not ([`Font::text_lookup`]).
+    /// this crate does not ([`libass::text_lookup`]).
     pub fn with_charmap(
         sized: SizedFont<'a>,
         charmap: Option<Charmap<'a>>,
         work: &'a mut WorkBudget,
     ) -> Result<Self> {
         let lookup = charmap
-            .map(|charmap| sized.font().text_lookup(charmap))
+            .map(|charmap| libass::text_lookup(sized.font(), charmap))
             .transpose()?;
         let unicode = charmap.is_some_and(|c| {
             c.platform() == Platform::Unicode
@@ -338,7 +339,7 @@ impl<'a> SizedMetrics<'a> {
                     CharEncoding::Unicode | CharEncoding::UnicodeFull
                 )
         });
-        let (x, y) = sized.harfbuzz_scale();
+        let (x, y) = libass::harfbuzz_scale(&sized);
         let size = sized.metrics();
         Ok(Self {
             sized,

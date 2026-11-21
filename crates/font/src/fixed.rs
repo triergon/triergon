@@ -1,14 +1,31 @@
-//! FreeType's fixed-point arithmetic, reproduced to the bit: scaled outlines and
-//! metrics are only identical when every product rounds the same way.
+//! Binary fixed-point arithmetic: the products, quotients and roundings every
+//! scaled coordinate and metric of this crate goes through.
 //!
-//! FreeType is followed as GCC builds it for 32-bit ARM, where `FT_Long` has
-//! 32 bits. Products and sums are `i64` here, which agrees wherever FreeType's
-//! values fit 32 bits; where they may not, the callers narrow or wrap them as
-//! a 32-bit `FT_Long` or `CF2_Fixed` does. `FT_MulFix`, `FT_MulDiv` and
-//! `FT_DivFix` take their intermediate products in 64 bits on every target.
+//! Three representations occur. Positions and distances at a size are 26.6
+//! (1/64 pixel); scales, matrix coefficients and charstring numbers are 16.16;
+//! the TrueType interpreter's unit vectors are 2.14. A value is a plain integer
+//! holding the scaled number, and the name of each function says which
+//! representation it works on.
+//!
+//! Overflow follows one of two policies, chosen by module:
+//!
+//! - The functions here take and return `i64` and compute in 64 bits. They are
+//!   exact wherever the operands and the result fit 32 bits, and wrap in 64
+//!   bits beyond that. Callers that keep 32-bit values narrow the result where
+//!   they store it.
+//! - [`wrap32`] has the same operations on values a 32-bit integer holds: each
+//!   reads the low 32 bits of its operands and returns the low 32 bits of the
+//!   64-bit result, sign-extended.
+//!
+//! Every product and quotient rounds half away from zero. The results are the
+//! ones FreeType 2.15.0 gives on a target with a 32-bit `long`, which the
+//! outline and metric comparisons depend on; the module is translated from it
+//! (see `docs/provenance.md`).
+
+pub mod wrap32;
 
 /// One in 16.16.
-pub(crate) const ONE: i64 = 0x1_0000;
+pub const ONE: i64 = 0x1_0000;
 
 /// 16.16 horizontal and vertical scales from font units to outline coordinates.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,16 +39,17 @@ impl Scale {
     pub(crate) const UNITS: Self = Self { x: ONE, y: ONE };
 }
 
-/// `FT_MulFix`: `a × b / 65536`, rounded half away from zero.
-pub(crate) const fn mul_fix(a: i64, b: i64) -> i64 {
+/// `a × b / 65536`, rounded half away from zero: a value times a 16.16 factor.
+pub const fn mul_fix(a: i64, b: i64) -> i64 {
     let ab = a.wrapping_mul(b);
     // The sign bit turns 0x8000 into 0x7fff for negative products.
     (ab.wrapping_add(0x8000).wrapping_add(ab >> 63)) >> 16
 }
 
-/// `FT_DivFix`: `a × 65536 / b`, rounded half away from zero; `0x7fffffff` with
-/// the quotient's sign for a zero divisor.
-pub(crate) fn div_fix(a: i64, b: i64) -> i64 {
+/// `a × 65536 / b`, rounded half away from zero: the 16.16 ratio of two values
+/// of one representation. A zero divisor gives `0x7fffffff`, negated when `a`
+/// is negative.
+pub fn div_fix(a: i64, b: i64) -> i64 {
     let negative = (a < 0) != (b < 0);
     let (a, b) = (a.unsigned_abs(), b.unsigned_abs());
     let q = ((a << 16).wrapping_add(b >> 1))
@@ -41,9 +59,9 @@ pub(crate) fn div_fix(a: i64, b: i64) -> i64 {
     if negative { q.wrapping_neg() } else { q }
 }
 
-/// `FT_MulDiv`: `a × b / c`, rounded half away from zero; `0x7fffffff` with the
-/// result's sign for a zero divisor.
-pub(crate) fn mul_div(a: i64, b: i64, c: i64) -> i64 {
+/// `a × b / c`, rounded half away from zero. A zero divisor gives `0x7fffffff`,
+/// negated when exactly one of `a` and `b` is negative.
+pub fn mul_div(a: i64, b: i64, c: i64) -> i64 {
     let negative = ((a < 0) != (b < 0)) != (c < 0);
     let (a, b, c) = (a.unsigned_abs(), b.unsigned_abs(), c.unsigned_abs());
     let d = a
@@ -55,20 +73,22 @@ pub(crate) fn mul_div(a: i64, b: i64, c: i64) -> i64 {
     if negative { d.wrapping_neg() } else { d }
 }
 
-/// `FT_PIX_ROUND`, `FT_PIX_FLOOR` and `FT_PIX_CEIL` on 26.6 values.
-pub(crate) const fn pix_round(v: i64) -> i64 {
+/// A 26.6 value rounded to the nearest whole pixel, halves up.
+pub const fn pix_round(v: i64) -> i64 {
     v.wrapping_add(32) & !63
 }
 
-pub(crate) const fn pix_floor(v: i64) -> i64 {
+/// A 26.6 value rounded down to a whole pixel.
+pub const fn pix_floor(v: i64) -> i64 {
     v & !63
 }
 
-pub(crate) const fn pix_ceil(v: i64) -> i64 {
+/// A 26.6 value rounded up to a whole pixel.
+pub const fn pix_ceil(v: i64) -> i64 {
     v.wrapping_add(63) & !63
 }
 
-/// `FT_MSB`: the index of the highest set bit (zero for zero).
+/// The index of the highest set bit (zero for zero).
 const fn msb(z: u32) -> u32 {
     match z.checked_ilog2() {
         Some(bit) => bit,
@@ -76,8 +96,8 @@ const fn msb(z: u32) -> u32 {
     }
 }
 
-/// `FT_SqrtFixed`: the square root of a 16.16 value, by FreeType's 64-bit
-/// Babylonian iteration with rounded-up division.
+/// The square root of a 16.16 value, by a 64-bit Babylonian iteration whose
+/// quotients round up.
 pub(crate) fn sqrt_fixed(v: u32) -> u32 {
     if v == 0 {
         return 0;
@@ -95,10 +115,10 @@ pub(crate) fn sqrt_fixed(v: u32) -> u32 {
     }
 }
 
-/// `FT_Vector_NormLen`: normalises `(x, y)` to a 16.16 unit vector in place and
-/// returns the original length, by FreeType's Newton iteration in 32 bits.
+/// Normalises `(x, y)` to a 16.16 unit vector in place and returns the
+/// original length, by a Newton iteration on the low 32 bits of the
+/// components, wrapping in 32 bits.
 pub(crate) fn norm_len(v: &mut (i64, i64)) -> i64 {
-    // FreeType reads the components as 32-bit integers.
     let (x0, y0) = (v.0 as i32, v.1 as i32);
     let (sx, sy) = (x0 < 0, y0 < 0);
     let (mut x, mut y) = (x0.unsigned_abs(), y0.unsigned_abs());
@@ -163,7 +183,8 @@ pub(crate) fn norm_len(v: &mut (i64, i64)) -> i64 {
     i64::from(length)
 }
 
-/// `FT_Hypot` (`FT_Vector_Length`): the length of `(x, y)` by FreeType's CORDIC.
+/// The length of `(x, y)`, by 22 CORDIC rotations of the vector onto the x
+/// axis.
 pub(crate) fn hypot(x: i64, y: i64) -> i64 {
     if x == 0 {
         return y.abs();
@@ -171,7 +192,7 @@ pub(crate) fn hypot(x: i64, y: i64) -> i64 {
     if y == 0 {
         return x.abs();
     }
-    // ft_trig_prenorm: bring the larger component's top bit to bit 29.
+    // Bring the larger component's top bit to bit 29.
     let top = msb((x.unsigned_abs() | y.unsigned_abs()) as u32).cast_signed();
     let (mut x, mut y, shift) = if top <= 29 {
         let s = 29 - top;
@@ -184,7 +205,8 @@ pub(crate) fn hypot(x: i64, y: i64) -> i64 {
         let s = top - 29;
         (x >> s, y >> s, -s)
     };
-    // ft_trig_pseudo_polarize, keeping only the magnitude.
+    // Rotate into the right half plane, then onto the axis, keeping only the
+    // magnitude.
     if y > x {
         if y > -x {
             (x, y) = (y, -x);
@@ -204,7 +226,7 @@ pub(crate) fn hypot(x: i64, y: i64) -> i64 {
         }
         b <<= 1;
     }
-    // ft_trig_downscale by the CORDIC gain 0.858785336480436 × 2^32.
+    // Undo the CORDIC gain: times 0.858785336480436 in 0.32.
     let magnitude = ((x.unsigned_abs() * 0xDBD9_5B16 + 0x4000_0000) >> 32).cast_signed();
     let x = if x < 0 { -magnitude } else { magnitude };
     if shift > 0 {

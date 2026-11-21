@@ -7,7 +7,7 @@
 
 use super::number::{Operand, POWER_TENS, fixed_dynamic};
 use crate::fixed::ONE;
-use crate::long::{div_fix, mul_div, mul_fix, wrap};
+use crate::fixed::wrap32::{div_fix, mul_div, mul_fix, wrap};
 use crate::read::Reader;
 use triergon_core::{Error, Result};
 

@@ -5,7 +5,7 @@
 use super::super::hints::{Dimension, GlyphHints};
 use super::super::latin::{self, add_to_edge, edge_properties, start_edge};
 use super::{Axis, Metrics, blue};
-use crate::long::{abs, div_fix, mul_fix};
+use crate::fixed::wrap32::{abs, div_fix, mul_fix};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 

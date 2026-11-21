@@ -13,7 +13,8 @@ errors. Shaping, rasterising and ASS parsing belong to other crates.
 
 ```rust,no_run
 use triergon_core::{Budget, Bytes};
-use triergon_font::{FaceInfo, Font, Limits, Outline, Request, Segment, select};
+use triergon_font::compat::libass::{self, FaceInfo, Request, select};
+use triergon_font::{Font, Limits, Outline, Segment};
 
 let pool = Budget::new(64 << 20)?;
 let file = Bytes::copy_from_slice(&pool, &std::fs::read("Arimo-Regular.ttf")?)?;
@@ -26,7 +27,8 @@ let infos: Vec<FaceInfo<'_>> = faces.iter().map(FaceInfo::new).collect();
 let request = Request { family: "Arimo", weight: 700, slant: 0, character: Some(u32::from('g')) };
 let font = &faces[select(&infos, &request).ok_or("no matching face")?];
 
-let glyph = font.glyph_index('g').ok_or("unmapped")?;
+let charmap = font.unicode_charmap().ok_or("no Unicode charmap")?;
+let glyph = charmap.glyph(u32::from('g')).ok_or("unmapped")?;
 let mut outline = Outline::new(&pool); // reuse it for every glyph
 let metrics = font.outline_into(glyph, &mut outline)?;
 for segment in outline.segments() {
@@ -37,11 +39,12 @@ let _advance = f64::from(metrics.advance) / em;
 
 // The glyph as libass draws it with hinting off: 256 pixels (16384 in 26.6),
 // then scaled.
-let sized = font.at_size(16_384)?;
+let sized = libass::at_size(font, 16_384)?;
 let mut scaled = Outline::new(&pool); // reuse it too
 let glyph_metrics = sized.outline_into(glyph, &mut scaled)?; // 26.6 pixels, y up
-sized.synthesize(&mut scaled, font.synthesis(request.weight, request.slant))?;
-let _shaping_advance = sized.default_advance(glyph)?; // what HarfBuzz receives
+let synthesis = libass::synthesis(font, request.weight, request.slant);
+libass::synthesize(&sized, &mut scaled, synthesis)?;
+let _shaping_advance = sized.default_advance(glyph)?; // the default load's
 let _drawn_advance = glyph_metrics.advance;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```

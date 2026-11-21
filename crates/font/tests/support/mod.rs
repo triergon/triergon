@@ -3,7 +3,8 @@
 #![allow(dead_code)]
 
 use triergon_core::{Budget, Bytes, WorkBudget};
-use triergon_font::{FaceInfo, Font, GlyphId, Limits, Load, Outline, Request, select};
+use triergon_font::compat::libass::{self, FaceInfo, Request, select};
+use triergon_font::{Font, GlyphId, Limits, Load, Outline};
 
 mod cff;
 
@@ -1234,16 +1235,16 @@ pub fn exercise(data: &[u8], limits: Limits) {
         // Sizes: libass's 256 pixels, a small one and the extremes.
         let sized: Vec<_> = [16384, 538, 1, i32::MAX]
             .into_iter()
-            .filter_map(|height| font.at_size(height).ok())
+            .filter_map(|height| libass::at_size(font, height).ok())
             .collect();
-        let synthesis = font.synthesis(900, 110);
+        let synthesis = libass::synthesis(font, 900, 110);
         for size in &sized {
             let _ = (
-                size.ascent_descent(),
-                size.harfbuzz_scale(),
-                size.underline(),
+                libass::ascent_descent(size),
+                libass::harfbuzz_scale(size),
+                libass::underline(size),
             );
-            let _ = (size.strikeout(), size.embolden_strength());
+            let _ = (libass::strikeout(size), libass::embolden_strength(size));
         }
         for glyph in spread.map(GlyphId) {
             let _ = font.advance(glyph);
@@ -1257,12 +1258,13 @@ pub fn exercise(data: &[u8], limits: Limits) {
                 let _ = size.load(glyph, Load::Default, &mut scaled, &mut work);
                 let _ = size.kerning(glyph, GlyphId(1));
                 if size.outline_into(glyph, &mut scaled).is_ok() {
-                    let _ = size.synthesize(&mut scaled, synthesis);
+                    let _ = libass::synthesize(size, &mut scaled, synthesis);
                     let _ = scaled.segments().count();
                 }
             }
         }
-        let _ = font.glyph_index('A');
+        let text = libass::text_charmap(font).map(|charmap| libass::text_lookup(font, charmap));
+        let _ = text.map(|text| text.map(|text| text.glyph(u32::from('A'))));
     }
     let faces: Vec<FaceInfo<'_>> = fonts.iter().map(FaceInfo::new).collect();
     for family in ["Test Sans", "x"] {

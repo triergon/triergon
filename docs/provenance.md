@@ -40,7 +40,7 @@ Translated from FreeType 2.15.0:
 | `autofit/latin/` | `autofit/aflatin.c`, `autofit/afadjust.c` |
 | `autofit/cjk/` | `autofit/afcjk.c`: the CJK writing system, the only module translated after the specification-first rule, by explicit decision |
 | `autofit/style.rs`, `autofit/mod.rs` | `autofit/afglobal.c`, `afshaper.c`, `afloader.c`, `afmodule.c`, `afdummy.c` |
-| `fixed.rs`, `long.rs` | `base/ftcalc.c`, `base/fttrigon.c` |
+| `fixed.rs`, `fixed/wrap32.rs` | `base/ftcalc.c`, `base/fttrigon.c` |
 | `synthesis.rs` | `base/ftoutln.c`, `base/ftsynth.c` |
 | `postscript/mod.rs` | `psnames/psmodule.c` |
 | `sized.rs` | the load-flag handling of `FT_Load_Glyph` (`base/ftobjs.c`) |
@@ -58,9 +58,9 @@ Following FreeType 2.15.0's reading of the font formats: `cmap.rs`, `glyf.rs`, `
 FreeType's reading of the tables, including its repairs of malformed data, and follow the
 FreeType functions their comments name.
 
-Following libass 0.17.5: the face scoring of `matching.rs`, the choice of synthetic styles
-in `synthesis.rs`, the size request and load flags of `sized.rs`, and the text charmap
-selection and lookup in `cmap.rs` and `lib.rs`.
+Following libass 0.17.5: `compat/libass.rs` (the face metrics and size request, the text
+charmap selection and lookup, the choice and strength of synthetic styles, the decoration
+bands) and the face scoring of `compat/libass/matching.rs`.
 
 Following HarfBuzz 14.6.0: the binary search in `read.rs` and the variation sequence
 lookup in `cmap.rs`.

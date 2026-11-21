@@ -9,7 +9,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use triergon_core::{Budget, BudgetVec, Bytes, Reservation, Result, WorkBudget};
-use triergon_font::{Charmap, FaceInfo, Font, GlyphId, Limits, Request, select};
+use triergon_font::compat::libass::{self, FaceInfo, Request, select};
+use triergon_font::{Charmap, Font, GlyphId, Limits};
 
 use crate::{EmbeddedFont, FontDesc, charge};
 
@@ -51,7 +52,7 @@ pub(super) struct Face {
 
 impl Face {
     fn new(font: Font, uid: u32) -> Self {
-        let charmap = font.text_charmap_index();
+        let charmap = libass::text_charmap_index(&font);
         Self {
             font: Arc::new(font),
             uid,
@@ -68,7 +69,7 @@ impl Face {
     /// looks it up (`ass_font_index_magic`, then `FT_Get_Char_Index`).
     fn glyph(&self, symbol: u32) -> Result<Option<GlyphId>> {
         match self.charmap() {
-            Some(charmap) => Ok(self.font.text_lookup(charmap)?.glyph(symbol)),
+            Some(charmap) => Ok(libass::text_lookup(&self.font, charmap)?.glyph(symbol)),
             None => Ok(None),
         }
     }
@@ -82,7 +83,7 @@ impl Face {
         for (index, charmap) in self.font.charmaps().enumerate() {
             charge(work, 1)?;
             self.charmap = Some(index);
-            if let Some(glyph) = self.font.text_lookup(charmap)?.glyph(symbol) {
+            if let Some(glyph) = libass::text_lookup(&self.font, charmap)?.glyph(symbol) {
                 return Ok(Some(glyph));
             }
         }
@@ -396,7 +397,7 @@ impl Library {
     ///
     /// `Unsupported` where libass would look `symbol` up in a way this crate
     /// does not: through a charmap whose codes libass converts
-    /// ([`Font::text_lookup`]).
+    /// ([`libass::text_lookup`]).
     pub(super) fn glyph(
         &mut self,
         id: FontId,

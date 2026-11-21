@@ -1,13 +1,13 @@
 //! Choosing a face for an ASS style's font name, bold and italic values, with
-//! libass's scoring.
+//! the scoring libass applies to the fonts it loads itself.
 
 use std::borrow::Borrow;
 
+use super::{text_charmap, weight};
 use crate::name::{NameId, NameRecord, Platform};
 use crate::{Font, OutlineFormat};
 
-/// What an ASS style or override asks for, as libass describes a font
-/// (`ASS_FontDesc`).
+/// What an ASS style or override asks for, as libass describes a font.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Request<'a> {
     /// The font name, without a leading `@` (vertical) marker.
@@ -41,52 +41,53 @@ pub struct FaceInfo<'a> {
 }
 
 impl<'a> FaceInfo<'a> {
+    /// What matching reads from `font`.
     pub fn new(font: &'a Font) -> Self {
-        let freetype = font.style();
-        let weight = font.weight();
+        let style = font.style();
         // With OS/2, only fsSelection's italic and bold bits count, as GDI reads them.
         let (bold, italic) = match font.os2() {
             Some(os2) => (os2.selection.bold(), os2.selection.italic()),
-            None => (freetype.bold, freetype.italic),
+            None => (style.bold, style.italic),
         };
         Self {
             font,
-            weight,
+            weight: weight(font),
             bold,
             italic,
         }
     }
 
+    /// The face.
     pub const fn font(&self) -> &'a Font {
         self.font
     }
 
-    /// The weight libass assigns: `OS/2.usWeightClass`, with classes 1 to 9 read
-    /// as 100 to 900 (4 as 350), and 400 or 700 by FreeType's bold flag when it is
-    /// zero or the table is absent.
+    /// The face's [`weight`](super::weight).
     pub const fn weight(&self) -> u32 {
         self.weight
     }
 
-    /// The italic flag: `fsSelection` bit 0, or FreeType's flag without `OS/2`.
+    /// The italic flag: `fsSelection` bit 0, or [`Font::style`]'s without
+    /// `OS/2`.
     pub const fn is_italic(&self) -> bool {
         self.italic
     }
 
-    /// The bold flag: `fsSelection` bit 5, or FreeType's flag without `OS/2`.
+    /// The bold flag: `fsSelection` bit 5, or [`Font::style`]'s without `OS/2`.
     pub const fn is_bold(&self) -> bool {
         self.bold
     }
 
     /// Whether the face has a family name to be matched by: a Windows-platform
-    /// family name (ID 1), or the one FreeType reports. libass registers no
-    /// face without one.
+    /// family name (ID 1), or [`Font::family_name`]. libass registers no face
+    /// without one.
     pub fn has_family_name(&self) -> bool {
         self.windows(NameId::Family).next().is_some() || self.font.family_name().is_some()
     }
 
     /// Whether a Windows-platform family name (ID 1) equals `name` ignoring ASCII
-    /// case. A face without any uses FreeType's family name in its ASCII form.
+    /// case. A face without any uses [`Font::family_name`] in its ASCII form:
+    /// up to a NUL, every unit outside 32..=127 read as `?`.
     pub fn has_family(&self, name: &str) -> bool {
         let mut any = false;
         for record in self.windows(NameId::Family) {
@@ -146,9 +147,7 @@ impl<'a> FaceInfo<'a> {
     /// Whether the face maps `code` in its text charmap, looked up unchanged.
     fn covers(&self, code: Option<u32>) -> bool {
         code.is_none_or(|code| {
-            self.font
-                .text_charmap()
-                .is_some_and(|charmap| charmap.glyph(code).is_some())
+            text_charmap(self.font).is_some_and(|charmap| charmap.glyph(code).is_some())
         })
     }
 }
@@ -195,7 +194,7 @@ fn same(mut text: impl Iterator<Item = char>, name: &str) -> bool {
         && text.next().is_none()
 }
 
-/// FreeType's ASCII form of a name compared with `name`: it ends at NUL and turns
+/// The ASCII form of a name compared with `name`: it ends at NUL and turns
 /// every unit outside 32..=127 into `?`.
 fn ascii_eq(record: NameRecord<'_>, name: &str) -> bool {
     let text = record
@@ -211,7 +210,8 @@ fn ascii_eq(record: NameRecord<'_>, name: &str) -> bool {
     same(text, name)
 }
 
-/// FreeType's PostScript form, which keeps printable ASCII other than `[](){}<>/%`.
+/// The PostScript form of a name compared with `name`: it keeps printable
+/// ASCII other than `[](){}<>/%`.
 fn postscript_eq(record: NameRecord<'_>, name: &str) -> bool {
     let text = record
         .code_units()

@@ -6,6 +6,7 @@ mod support;
 
 use std::cell::RefCell;
 use triergon_core::{Budget, Bytes, WorkBudget};
+use triergon_font::compat::libass;
 use triergon_font::{Font, GlyphId, Limits};
 use triergon_shape::{Extents, FaceRotations, GlyphRotations, Metrics, SizedMetrics};
 
@@ -19,7 +20,7 @@ fn vertical_font() -> (Budget, Font) {
 #[test]
 fn a_glyph_first_found_through_a_rotating_code_point_advances_vertically() {
     let (budget, font) = vertical_font();
-    let sized = font.at_size(16384).expect("size");
+    let sized = libass::at_size(&font, 16384).expect("size");
     let (across, down) = (GlyphId(28), GlyphId(1));
     let horizontal = sized.default_advance(across).expect("advance");
     let vertical = sized
@@ -65,7 +66,7 @@ fn a_glyph_first_found_through_a_rotating_code_point_advances_vertically() {
 #[test]
 fn glyphs_without_points_have_empty_extents_and_no_contour_points() {
     let (_budget, font) = vertical_font();
-    let sized = font.at_size(16384).expect("size");
+    let sized = libass::at_size(&font, 16384).expect("size");
     let mut work = WorkBudget::new(1 << 20);
     let metrics = SizedMetrics::new(sized, &mut work).expect("metrics");
     // Every glyph of the test font is empty; a glyph outside the face has no

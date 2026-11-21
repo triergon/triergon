@@ -9,20 +9,20 @@
 )]
 // Pending: `missing_docs`, `clippy::expect_used`.
 
+pub mod compat;
+pub mod fixed;
+pub mod read;
+
 mod autofit;
 mod bytecode;
 mod cff;
 mod cmap;
-mod fixed;
 mod glyf;
 mod kern;
-mod long;
-mod matching;
 mod metrics;
 mod name;
 mod outline;
 mod postscript;
-mod read;
 mod sfnt;
 mod sized;
 mod store;
@@ -31,16 +31,14 @@ mod work;
 
 pub use cff::{CharstringBounds, CharstringOperator, OperatorSet};
 pub use cmap::{
-    CharEncoding, Charmap, CharmapKind, CmapFormat, Mappings, TextLookup, Variant,
-    VariationSequences,
+    CharEncoding, Charmap, CharmapKind, CmapFormat, Mappings, Variant, VariationSequences,
 };
-pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
 pub use name::{Language, NameChars, NameId, NameRecord, Platform};
 pub use outline::{Outline, OutlinePoint, Point, PointKind, Segment};
-pub use sized::{Band, Load, SizeMetrics, SizedFont};
+pub use sized::{Load, SizeMetrics, SizedFont};
 pub use store::{Built, Store, StoreKey};
-pub use synthesis::{Orientation, Synthesis};
+pub use synthesis::Orientation;
 
 use cff::{Cff, Version};
 use fixed::{Scale, div_fix, mul_fix};
@@ -90,65 +88,62 @@ pub enum OutlineFormat {
     Cff2,
 }
 
-/// FreeType's style flags, from `OS/2.fsSelection` (italic or oblique, bold) or,
-/// without `OS/2`, from `head.macStyle`.
+/// A face's style flags, from `OS/2.fsSelection` or, without `OS/2`, from
+/// `head.macStyle`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Style {
+    /// `fsSelection` bit 5, or `macStyle` bit 0.
     pub bold: bool,
+    /// `fsSelection` bit 0 (italic) or 9 (oblique), or `macStyle` bit 1.
     pub italic: bool,
 }
 
-/// Face-wide vertical metrics in font units, chosen as FreeType chooses them:
-/// typographic metrics when `OS/2` sets USE_TYPO_METRICS, else `hhea`, else when
-/// both `hhea` values are zero the typographic and then the Windows metrics.
-/// Values are 16-bit, as FreeType stores them, and the height is positive.
+/// Face-wide vertical metrics in font units: typographic metrics when `OS/2`
+/// sets USE_TYPO_METRICS, else `hhea`, else when both `hhea` values are zero
+/// the typographic and then the Windows metrics. Values are kept to 16 bits,
+/// and the height is positive.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VerticalMetrics {
+    /// From the baseline up to the top of a line.
     pub ascender: i32,
+    /// From the baseline to the bottom of a line, negative below it.
     pub descender: i32,
     /// Baseline to baseline.
     pub height: i32,
 }
 
 /// What loading a glyph reports besides its outline, at the scale it loads
-/// at, as FreeType's glyph slot reports it. A TrueType composite takes the
-/// metrics of its last `USE_MY_METRICS` component; a CFF FontMatrix scales and
-/// offsets the advances.
+/// at. A TrueType composite takes the metrics of its last `USE_MY_METRICS`
+/// component; a CFF FontMatrix scales and offsets the advances.
 ///
 /// Loaded unhinted ([`Font::outline_into`] in font units, [`SizedFont::outline_into`]
 /// or [`SizedFont::load`] with [`Load::Unhinted`] at a size), the advances
 /// are scaled and the box is the outline's exact control box. With
-/// [`Load::Default`], FreeType's default load, the advances are rounded to
-/// whole pixels and the box is fitted outwards to the pixel grid
-/// (`ft_glyphslot_grid_fit_metrics`, or the auto-hinter's own fitting in
-/// `af_loader_load_glyph`), unless the size has zero pixels per em, which
-/// loads as unhinted.
+/// [`Load::Default`], the advances are rounded to whole pixels and the box
+/// is fitted outwards to the pixel grid, unless the size has zero pixels per
+/// em, which loads as unhinted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GlyphMetrics {
-    /// The advance: `advance.x` unhinted, `metrics.horiAdvance` of the
-    /// default load.
+    /// The horizontal advance.
     pub advance: i32,
-    /// The vertical advance (`metrics.vertAdvance`): the `vmtx` advance
-    /// height where the face has vertical metrics
-    /// ([`Font::has_vertical_metrics`]), else the one FreeType makes up from
-    /// the typographic ascender and descender. A TrueType glyph measures it
+    /// The vertical advance: the `vmtx` advance height where the face has
+    /// vertical metrics ([`Font::has_vertical_metrics`]), else the
+    /// typographic ascender minus descender. A TrueType glyph measures it
     /// between its scaled phantom points, from its header's `yMax` plus the
     /// top side bearing down by the advance height, and reads the distance
     /// back in font units as a 16-bit value before scaling it again.
     pub vertical_advance: i32,
-    /// `linearVertAdvance`: the vertical advance in font units, scaled to
-    /// 16.16 pixels by the size's y scale for a glyph loaded at a size, by
-    /// either load.
+    /// The vertical advance in font units, scaled to 16.16 pixels by the
+    /// size's y scale for a glyph loaded at a size, by either load.
     pub linear_vertical_advance: i64,
-    /// `horiBearingX`: from the origin to the left of the outline's control
-    /// box (every point, off-curve ones too; zero for an outline without
-    /// points).
+    /// From the origin to the left of the outline's control box (every
+    /// point, off-curve ones too; zero for an outline without points).
     pub bearing_x: i32,
-    /// `horiBearingY`: from the origin up to the top of the control box.
+    /// From the origin up to the top of the control box.
     pub bearing_y: i32,
-    /// `width`: the control box's width.
+    /// The control box's width.
     pub width: i32,
-    /// `height`: the control box's height, positive.
+    /// The control box's height, positive.
     pub height: i32,
 }
 
@@ -168,7 +163,7 @@ impl GlyphMetrics {
     }
 }
 
-/// `FT_Outline_Get_CBox`: the box of every point of `outline`, as `[x_min,
+/// The box of every point of `outline`, control points included, as `[x_min,
 /// y_min, x_max, y_max]`; zero for an outline without points.
 fn control_box(outline: &Outline) -> [i32; 4] {
     let mut points = outline.points().iter().map(|p| p.point);
@@ -180,9 +175,8 @@ fn control_box(outline: &Outline) -> [i32; 4] {
     })
 }
 
-/// A glyph's advances as FreeType's loading computes them at a scale, before
-/// any grid fitting: horizontal and vertical, and the vertical one in font
-/// units.
+/// A glyph's advances at a scale, before any grid fitting: horizontal and
+/// vertical, and the vertical one in font units.
 #[derive(Clone, Copy, Debug)]
 struct Advances {
     horizontal: i64,
@@ -194,9 +188,13 @@ struct Advances {
 /// one glyph's `glyf` header box.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Bounds {
+    /// The left edge.
     pub x_min: i16,
+    /// The bottom edge.
     pub y_min: i16,
+    /// The right edge.
     pub x_max: i16,
+    /// The top edge.
     pub y_max: i16,
 }
 
@@ -219,8 +217,11 @@ pub enum ControlBox {
 /// The `hhea` line metrics, in font units.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct HorizontalHeader {
+    /// `ascender`.
     pub ascender: i16,
+    /// `descender`.
     pub descender: i16,
+    /// `lineGap`.
     pub line_gap: i16,
     /// `advanceWidthMax`.
     pub advance_max: u16,
@@ -248,23 +249,23 @@ pub struct Font {
     os2: Option<Os2>,
     glyph_count: u16,
     hmtx: LongMetrics,
-    /// `vmtx`, where FreeType reads vertical metrics: `vhea` and `vmtx` both
+    /// `vmtx`, where the face has vertical metrics: `vhea` and `vmtx` both
     /// load and `vhea` lists at least one record.
     vmtx: Option<LongMetrics>,
     names: Names,
-    /// The `cmap` subtables FreeType makes selectable charmaps of.
+    /// The `cmap` subtables that are selectable charmaps.
     subtables: BudgetVec<cmap::Subtable>,
-    /// The Unicode charmap FreeType builds from a CFF face's glyph names.
+    /// The Unicode charmap built from a CFF face's glyph names.
     name_map: Option<postscript::UnicodeMap>,
-    /// The format 14 subtable FreeType reads variation sequences from.
+    /// The subtable variation sequences are read from.
     variation_sequences: Option<cmap::Variations>,
     outlines: Outlines,
     kern: Kern,
     /// `post` underline position and thickness.
     underline: (i16, i16),
-    /// How FreeType's default loading treats the face's advances.
+    /// How the default load treats the face's advances.
     default_load: sized::Hinting,
-    /// The auto-hinter's state, for a face FreeType auto-hints.
+    /// The auto-hinter's state, for an auto-hinted face.
     autofit: Option<autofit::Autofit>,
     /// The TrueType interpreter, for a face whose programs it runs.
     bytecode: Option<bytecode::Bytecode>,
@@ -292,8 +293,8 @@ impl Font {
         let required =
             |table: Option<sfnt::Table>| table.ok_or(Error::Invalid("missing required table"));
         let head = metrics::head(required(tables.head)?.bytes(bytes))?;
-        // FreeType fails a face without horizontal metrics, and reads
-        // vertical ones where both tables load.
+        // A face needs horizontal metrics, and has vertical ones where both
+        // tables load.
         let (hhea, hmtx) = metrics::header_and_records(
             bytes,
             [tables.hhea, tables.extended_hhea],
@@ -307,7 +308,7 @@ impl Font {
         )?;
         let maxp_glyphs = metrics::glyph_count(required(tables.maxp)?.bytes(bytes))?;
         let os2 = tables.os2.and_then(|t| metrics::os2(t.bytes(bytes)));
-        // FreeType treats a broken `name` table as a missing one.
+        // A broken `name` table counts as a missing one.
         let names = tables
             .name
             .and_then(|t| Names::new(bytes, t.offset, t.len).ok())
@@ -362,8 +363,8 @@ impl Font {
             None => Kern::new(budget),
         };
         let underline = metrics::underline(tables.post.map(|t| t.bytes(bytes)));
-        // FreeType builds a Unicode charmap from the glyph names of a CFF face
-        // without a Windows BMP or Unicode-platform charmap (`cff_face_init`).
+        // A CFF face without a Windows BMP or Unicode-platform charmap gets a
+        // Unicode charmap built from its glyph names.
         let unicode = cmap.unicode_variations
             || cmap.list.iter().any(|s| {
                 s.platform() == Platform::Unicode
@@ -418,10 +419,9 @@ impl Font {
         self.limits
     }
 
-    /// The bytes of table `tag`: the first nonempty record with that tag whose
-    /// range lies inside the file, as FreeType's `FT_Load_Sfnt_Table` finds it.
-    /// Tables this crate does not read, such as `GDEF`, `GSUB` and `GPOS`, are
-    /// found the same way.
+    /// The bytes of table `tag`: the first nonempty directory record with
+    /// that tag whose range lies inside the file. Tables this crate does not
+    /// read, such as `GDEF`, `GSUB` and `GPOS`, are found the same way.
     pub fn table(&self, tag: [u8; 4]) -> Option<&[u8]> {
         let data = self.data.as_ref();
         sfnt::find(data, self.tables.records, tag).map(|t| t.bytes(data))
@@ -432,6 +432,8 @@ impl Font {
         self.index
     }
 
+    /// The number of glyphs: `maxp.numGlyphs`, cut to the glyphs `loca`
+    /// covers, or the CFF CharStrings count.
     pub const fn glyph_count(&self) -> u16 {
         self.glyph_count
     }
@@ -441,10 +443,12 @@ impl Font {
         (0..self.glyph_count).map(GlyphId)
     }
 
+    /// `head.unitsPerEm`, 16 to 16384.
     pub const fn units_per_em(&self) -> u16 {
         self.head.units_per_em
     }
 
+    /// The `head` box of all glyphs.
     pub const fn bounds(&self) -> Bounds {
         let [x_min, y_min, x_max, y_max] = self.head.bounds;
         Bounds {
@@ -455,10 +459,12 @@ impl Font {
         }
     }
 
+    /// `head.macStyle`.
     pub const fn mac_style(&self) -> MacStyle {
         self.head.mac_style
     }
 
+    /// The outline technology of the face's glyphs.
     pub fn outline_format(&self) -> OutlineFormat {
         match &self.outlines {
             Outlines::Glyf(_) => OutlineFormat::TrueType,
@@ -472,6 +478,7 @@ impl Font {
         self.os2
     }
 
+    /// The `hhea` line metrics.
     pub const fn horizontal_header(&self) -> HorizontalHeader {
         HorizontalHeader {
             ascender: self.hhea.ascender,
@@ -481,6 +488,8 @@ impl Font {
         }
     }
 
+    /// The face's line metrics (see [`VerticalMetrics`] for the choice of
+    /// table).
     pub fn vertical_metrics(&self) -> VerticalMetrics {
         let HorizontalHeader {
             ascender: a,
@@ -491,7 +500,7 @@ impl Font {
         let short = |v: i32| i32::from(v as i16);
         let metrics = |ascender: i32, descender: i32, gap: i32| {
             let (ascender, descender) = (short(ascender), short(descender));
-            // FT_Open_Face makes a negative height positive.
+            // A negative height is made positive.
             let height = short(ascender - descender + gap);
             VerticalMetrics {
                 ascender,
@@ -512,7 +521,7 @@ impl Font {
                 if os2.typo_ascender != 0 || os2.typo_descender != 0 {
                     typo(&os2)
                 } else {
-                    // FreeType reads the unsigned Windows values as 16-bit signed.
+                    // The unsigned Windows values read as 16-bit signed.
                     metrics(
                         i32::from(os2.win_ascent.cast_signed()),
                         -i32::from(os2.win_descent.cast_signed()),
@@ -524,6 +533,7 @@ impl Font {
         }
     }
 
+    /// The face's style flags.
     pub fn style(&self) -> Style {
         match self.os2 {
             Some(os2) => Style {
@@ -543,12 +553,14 @@ impl Font {
         self.names.records(self.data.as_ref())
     }
 
-    /// The record FreeType reports for `name_id` (see [`Self::family_name`]).
+    /// The preferred record for `name_id`, as [`Self::family_name`] reports
+    /// one: a Windows Unicode or Symbol record, US English before others,
+    /// else a Macintosh Roman English one, else a Unicode-platform one.
     pub fn preferred_name(&self, name_id: NameId) -> Option<NameRecord<'_>> {
         self.names.preferred(self.data.as_ref(), name_id)
     }
 
-    /// The family name FreeType reports: the WWS family (ID 21), then the
+    /// The family name: the WWS family (ID 21), then the
     /// typographic family (16), then the family (1); a face that sets the
     /// `fsSelection` WWS bit skips ID 21. Each ID's record is chosen as
     /// [`Self::preferred_name`] does.
@@ -556,8 +568,8 @@ impl Font {
         self.first_name(&[NameId::WwsFamily, NameId::TypographicFamily, NameId::Family])
     }
 
-    /// The style name FreeType reports, by the rule of [`Self::family_name`] over
-    /// IDs 22, 17 and 2.
+    /// The style name, by the rule of [`Self::family_name`] over IDs 22, 17
+    /// and 2.
     pub fn style_name(&self) -> Option<NameRecord<'_>> {
         self.first_name(&[
             NameId::WwsSubfamily,
@@ -572,10 +584,11 @@ impl Font {
         ids.iter().find_map(|&id| self.preferred_name(id))
     }
 
-    /// The PostScript name record (ID 6) FreeType reads for an sfnt face: among
-    /// Windows records (encoding 0 or 1) the last US English one, else the first;
-    /// failing that, among Macintosh Roman records the last English one, else the
-    /// first. FreeType then keeps only printable ASCII other than `[](){}<>/%`.
+    /// The PostScript name record (ID 6): among Windows records (encoding 0
+    /// or 1) the last US English one, else the first; failing that, among
+    /// Macintosh Roman records the last English one, else the first. A
+    /// PostScript name proper keeps only the record's printable ASCII other
+    /// than `[](){}<>/%`.
     pub fn postscript_name(&self) -> Option<NameRecord<'_>> {
         let pick = |platform: Platform, encodings: &[CharEncoding], language: Language| {
             let mut found: Option<NameRecord<'_>> = None;
@@ -604,17 +617,16 @@ impl Font {
         })
     }
 
-    /// The face's charmaps in FreeType's order: the `cmap` subtables FreeType
-    /// accepts (formats 0, 2, 4, 6, 8, 10, 12 and 13), in directory order;
-    /// then, for a CFF face without a Windows BMP or Unicode-platform charmap
-    /// (of any format, 14 and 15 included), the Unicode charmap FreeType
-    /// builds from its glyph names when one maps a code point
-    /// ([`CharmapKind::GlyphNames`]), a CID-keyed face's CIDs read as string
-    /// IDs as FreeType reads them; then, for a name-keyed CFF face whose
-    /// encoding maps a code, the charmap of its encoding
-    /// ([`CharmapKind::CffEncoding`]). FreeType also lists the
-    /// variation-sequence subtables of formats 14 and 15, which cannot be
-    /// selected and are left out.
+    /// The face's charmaps: the `cmap` subtables that pass validation
+    /// (formats 0, 2, 4, 6, 8, 10, 12 and 13), in directory order; then, for
+    /// a CFF face without a Windows BMP or Unicode-platform charmap (of any
+    /// format, 14 and 15 included), the Unicode charmap built from its glyph
+    /// names when one maps a code point ([`CharmapKind::GlyphNames`]), a
+    /// CID-keyed face's CIDs read as string IDs; then, for a name-keyed CFF
+    /// face whose encoding maps a code, the charmap of its encoding
+    /// ([`CharmapKind::CffEncoding`]). The variation-sequence subtables of
+    /// formats 14 and 15 map no codes on their own and are left out
+    /// ([`Self::variation_sequences`]).
     pub fn charmaps(&self) -> impl Iterator<Item = Charmap<'_>> + Clone + '_ {
         let (data, glyphs, work) = (
             self.data.as_ref(),
@@ -639,9 +651,9 @@ impl Font {
         self.charmaps().nth(index)
     }
 
-    /// The Unicode variation sequences FreeType reads
-    /// (`FT_Face_GetCharVariantIndex`): its first variation-sequence charmap,
-    /// the first (0, 5) subtable of format 14 or 15 its validation keeps.
+    /// The Unicode variation sequences of the face: the first
+    /// variation-sequence subtable, of format 14 or 15, that an encoding
+    /// record lists for (0, 5) and that passes validation.
     pub fn variation_sequences(&self) -> Option<VariationSequences<'_>> {
         let variations = self.variation_sequences?;
         Some(VariationSequences::new(
@@ -650,63 +662,12 @@ impl Font {
         ))
     }
 
-    /// The charmap libass 0.17.5 uses for text, as it selects one when it opens
-    /// a face (`ass_charmap_magic`). In [`Self::charmaps`] order: the first
-    /// Windows full-Unicode charmap (3, 10); else the first Windows BMP
-    /// charmap (3, 1), which may be the one FreeType builds from glyph names;
-    /// else the first other Windows charmap, such as Symbol (3, 0). A face
-    /// without Windows charmaps keeps the charmap FreeType selects on opening
-    /// it: the last full-Unicode charmap ((0, 4), or (0, 6) in format 13),
-    /// else the last Unicode- or ISO-platform one. Without one of those, it is
-    /// the first charmap.
-    pub fn text_charmap(&self) -> Option<Charmap<'_>> {
-        self.text_charmap_index()
-            .and_then(|index| self.charmap(index))
-    }
-
-    /// The index of [`Self::text_charmap`] in [`Self::charmaps`].
-    pub fn text_charmap_index(&self) -> Option<usize> {
-        cmap::text_charmap(self.charmaps())
-    }
-
-    /// The charmap `FT_Select_Charmap` selects for `FT_ENCODING_UNICODE`
-    /// (`find_unicode_charmap`), whatever charmap libass reads text through.
-    fn unicode_charmap(&self) -> Option<Charmap<'_>> {
-        cmap::freetype_default(self.charmaps()).and_then(|index| self.charmap(index))
-    }
-
-    /// `charmap`, one of this face's, read as libass 0.17.5 reads text through
-    /// it (`ass_font_index_magic`).
-    ///
-    /// # Errors
-    ///
-    /// `Unsupported` where libass converts codes for the charmap and this
-    /// crate does not: through iconv for the Windows Shift-JIS, PRC, Big5,
-    /// Wansung and Johab charmaps (encodings 2 to 6), and by its legacy Arabic
-    /// tables for the Symbol charmap of a face declaring an Arabic character
-    /// set (`OS/2.fsSelection` high byte 178 or 179).
-    pub fn text_lookup<'f>(&'f self, charmap: Charmap<'f>) -> Result<TextLookup<'f>> {
-        if charmap.platform() != Platform::Windows {
-            return Ok(TextLookup::new(charmap, false));
-        }
-        match charmap.encoding_id() {
-            2..=6 => Err(Error::Unsupported("libass's multibyte charmap conversion")),
-            0 if self
-                .os2
-                .is_some_and(|os2| matches!(os2.selection.bits() >> 8, 178 | 179)) =>
-            {
-                Err(Error::Unsupported("libass's legacy Arabic charmaps"))
-            }
-            encoding => Ok(TextLookup::new(charmap, encoding == 0)),
-        }
-    }
-
-    /// The glyph for `c` through [`Self::text_charmap`], as libass looks it up
-    /// ([`Self::text_lookup`]); `None` also where libass would convert the
-    /// code and this crate does not.
-    pub fn glyph_index(&self, c: char) -> Option<GlyphId> {
-        let lookup = self.text_lookup(self.text_charmap()?).ok()?;
-        lookup.glyph(u32::from(c))
+    /// The charmap Unicode text is read through: the last full-Unicode
+    /// charmap ((3, 10), (0, 4), or (0, 6) in format 13), else the last
+    /// Unicode one (any Unicode- or ISO-platform subtable, Windows (3, 1),
+    /// or the charmap built from glyph names).
+    pub fn unicode_charmap(&self) -> Option<Charmap<'_>> {
+        cmap::unicode_charmap(self.charmaps()).and_then(|index| self.charmap(index))
     }
 
     /// Every (left, right) pair the `kern` table lists, in table order, possibly
@@ -722,23 +683,23 @@ impl Font {
     }
 
     /// The `hmtx` left side bearing of `glyph` in font units; zero where the
-    /// table has no value for it, as FreeType reads a short table.
+    /// table is too short to hold it.
     pub fn side_bearing(&self, glyph: GlyphId) -> Result<i16> {
         let glyph = self.check(glyph)?;
         Ok(self.hmtx.bearing(self.data.as_ref(), glyph))
     }
 
-    /// Whether FreeType reads vertical metrics for the face: `vhea` and `vmtx`
-    /// both load and `vhea` lists at least one record. Without them, it makes
-    /// up a vertical advance from the face's ascender and descender
+    /// Whether the face has vertical metrics: `vhea` and `vmtx` both load and
+    /// `vhea` lists at least one record. Without them, a glyph's vertical
+    /// advance is made up from the face's ascender and descender
     /// ([`GlyphMetrics::vertical_advance`]).
     pub const fn has_vertical_metrics(&self) -> bool {
         self.vmtx.is_some()
     }
 
-    /// The vertical advance FreeType makes up for a face without vertical
-    /// metrics: the typographic ascender minus descender of `OS/2`, else those
-    /// of `hhea`, in font units.
+    /// The vertical advance of a face without vertical metrics: the
+    /// typographic ascender minus descender of `OS/2`, else those of `hhea`,
+    /// in font units.
     fn made_up_vertical_advance(&self) -> i64 {
         match self.os2 {
             Some(os2) => i64::from(os2.typo_ascender) - i64::from(os2.typo_descender),
@@ -762,11 +723,10 @@ impl Font {
     /// variable font.
     ///
     /// A TrueType outline is shifted horizontally so that its left side bearing is
-    /// the `hmtx` value, by `lsb - xMin` of the glyph whose metrics apply, as
-    /// FreeType places it. CFF outlines are unshifted and, as FreeType's CFF
-    /// engine builds them, in whole font units (rounded down), then through the
-    /// FontMatrix in fixed point. [`Font::at_size`] loads outlines scaled to
-    /// pixels.
+    /// the `hmtx` value, by `lsb - xMin` of the glyph whose metrics apply. CFF
+    /// outlines are unshifted and built in whole font units (rounded down), then
+    /// put through the FontMatrix in fixed point. [`Font::at_height`] loads
+    /// outlines scaled to pixels.
     ///
     /// # Errors
     ///
@@ -778,8 +738,8 @@ impl Font {
         self.load(glyph, Scale::UNITS, outline, &mut work)
     }
 
-    /// Loads `glyph` as FreeType does without hinting, at the 16.16 `scale` (one
-    /// for font units), and returns its advance at that scale.
+    /// Loads `glyph` without hinting, at the 16.16 `scale` (one for font
+    /// units), and returns its metrics at that scale.
     pub(crate) fn load(
         &self,
         glyph: GlyphId,
@@ -827,9 +787,9 @@ impl Font {
         }
     }
 
-    /// The advances of a TrueType glyph whose metrics are `m`, between
-    /// FreeType's phantom points scaled by `scale`, and the scaled origin the
-    /// outline is moved by.
+    /// The advances of a TrueType glyph whose metrics are `m`, between its
+    /// phantom points scaled by `scale`, and the scaled origin the outline is
+    /// moved by.
     fn glyf_advances(&self, m: glyf::Metrics, scale: Scale) -> (i64, Advances) {
         let data = self.data.as_ref();
         // The horizontal phantom points: the origin and the advance.
@@ -924,7 +884,7 @@ impl Font {
 
     /// The control box of `glyph`, read without building its outline: the
     /// `glyf` header box of a TrueType glyph, the box of every point a CFF or CFF2
-    /// charstring draws. HarfBuzz takes TrueType glyph extents from it.
+    /// charstring draws.
     ///
     /// # Errors
     ///
@@ -957,19 +917,6 @@ impl Font {
             data: self.data.as_ref(),
             glyph_count: self.glyph_count,
             limits: &self.limits,
-        }
-    }
-
-    /// The weight libass assigns the face: `OS/2.usWeightClass`, with classes 1
-    /// to 9 read as 100 to 900 (4 as 350), and 400 or 700 by the bold style when
-    /// it is zero or `OS/2` is absent.
-    pub fn weight(&self) -> u32 {
-        match self.os2.map_or(0, |o| o.weight_class) {
-            0 if self.style().bold => 700,
-            0 => 400,
-            4 => 350,
-            class @ 1..=9 => u32::from(class) * 100,
-            class => u32::from(class),
         }
     }
 

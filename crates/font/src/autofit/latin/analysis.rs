@@ -6,7 +6,7 @@ use super::super::hints::{
     AxisHints, Dimension, Edge, GlyphHints, Segment, Width, direction, edge, point,
 };
 use super::{Axis, Metrics, blue, constant};
-use crate::long::{abs, div_fix, mul_fix, wrap};
+use crate::fixed::wrap32::{abs, div_fix, mul_fix, wrap};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 

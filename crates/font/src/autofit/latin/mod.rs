@@ -18,7 +18,7 @@ use super::Face;
 use super::hints::{Dimension, GlyphHints, Width, sort_and_quantize_widths};
 use super::style::{MAX_BLUES, MAX_CLUSTERS, clusters};
 use super::tables::{SCRIPTS, STYLES};
-use crate::long::{self, abs, mul_div, mul_fix, pix_round, wrap};
+use crate::fixed::wrap32::{self, abs, mul_div, mul_fix, pix_round, wrap};
 use crate::outline::{Outline, OutlinePoint, PointKind};
 use triergon_core::{Result, WorkBudget};
 
@@ -703,7 +703,9 @@ fn extremum(
     } else {
         !on(segment_first) || !on(segment_last)
     };
-    if (round && properties & property::NEUTRAL != 0) || best_y == long::MIN || best_y == long::MAX
+    if (round && properties & property::NEUTRAL != 0)
+        || best_y == wrap32::MIN
+        || best_y == wrap32::MAX
     {
         return None;
     }

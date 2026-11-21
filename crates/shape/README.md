@@ -256,7 +256,7 @@ Paragraphs are limited to 2³² characters.
     `FT_Face_GetCharVariantIndex`, cached `FT_LOAD_DEFAULT` metrics for advances
     and extents, that load's outline for contour points, and
     `FT_KERNING_DEFAULT` kerning. The candidate shapes with `SizedMetrics` over
-    `Font::at_size`. This compares device tables, contour-point anchors and
+    `compat::libass::at_size`. This compares device tables, contour-point anchors and
     FreeType's advances, the extents fallback mark positioning reads from
     glyphs FreeType's auto-hinter gives a CJK style (NotoEmoji), and the hinted
     contour points and extents of instructed TrueType faces (DejaVu Sans `c` with

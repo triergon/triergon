@@ -15,6 +15,7 @@ use std::ops::Range;
 use std::process::ExitCode;
 use std::time::Instant;
 use triergon_core::{Budget, Bytes, WorkBudget};
+use triergon_font::compat::libass;
 use triergon_font::{Font, Limits};
 use triergon_shape::bidi::{self, BaseDirection, BidiClass, Bracket, Level, Resolver};
 use triergon_shape::{
@@ -238,8 +239,7 @@ fn shape_text(
                 // The comparison measures answers, not work: a face's runs
                 // share an unbounded budget.
                 let mut work = WorkBudget::new(u64::MAX);
-                let Ok(metrics) = font
-                    .at_size(height)
+                let Ok(metrics) = libass::at_size(&font, height)
                     .and_then(|sized| SizedMetrics::new(sized, &mut work))
                 else {
                     sink.record(Record::FaceError(index))?;

@@ -2,8 +2,9 @@
 //! ordered work digest of the harness protocol and the readable line format.
 
 use std::io::{self, Write};
+use triergon_font::compat::libass::{self, Band};
 use triergon_font::{
-    Band, Charmap, GlyphMetrics, Orientation, Outline, PointKind, SizeMetrics, SizedFont,
+    Charmap, GlyphMetrics, Orientation, Outline, PointKind, SizeMetrics, SizedFont,
 };
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
 
@@ -22,17 +23,17 @@ pub struct Size {
 
 impl Size {
     pub fn new(height: i32, sized: &SizedFont<'_>, postscript: bool) -> Self {
-        let (ascent, descent) = sized.ascent_descent();
+        let (ascent, descent) = libass::ascent_descent(sized);
         Self {
             height,
             metrics: sized.metrics(),
             ascent,
             descent,
-            harfbuzz: sized.harfbuzz_scale(),
-            strength: sized.embolden_strength(),
+            harfbuzz: libass::harfbuzz_scale(sized),
+            strength: libass::embolden_strength(sized),
             postscript,
-            underline: sized.underline(),
-            strikeout: sized.strikeout(),
+            underline: libass::underline(sized),
+            strikeout: libass::strikeout(sized),
         }
     }
 }

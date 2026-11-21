@@ -13,7 +13,7 @@
 use super::super::hints::{Dimension, GlyphHints, edge, point};
 use super::super::tables::ADJUSTMENTS;
 use super::{Blue, Metrics, analysis, blue};
-use crate::long::{self, mul_fix, pix_round, wrap};
+use crate::fixed::wrap32::{self, mul_fix, pix_round, wrap};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 
@@ -177,14 +177,14 @@ fn compute_vertical_extrema(hints: &mut GlyphHints, work: &mut WorkBudget) -> Re
     charge(work, hints.points.len() + count)?;
     hints.y_minima.clear();
     hints.y_maxima.clear();
-    hints.y_minima.try_resize(count, long::MAX)?;
-    hints.y_maxima.try_resize(count, long::MIN)?;
+    hints.y_minima.try_resize(count, wrap32::MAX)?;
+    hints.y_maxima.try_resize(count, wrap32::MIN)?;
     let points = hints.points.as_slice();
     for (c, &first) in hints.contours.as_slice().iter().enumerate() {
         if points[points[first].next].next == first {
             continue;
         }
-        let (mut min, mut max) = (long::MAX, long::MIN);
+        let (mut min, mut max) = (wrap32::MAX, wrap32::MIN);
         let mut p = first;
         loop {
             min = min.min(points[p].y);
@@ -208,7 +208,7 @@ fn extrema(hints: &GlyphHints, c: usize) -> (i64, i64) {
 /// `af_find_highest_contour`: the contour reaching highest, of two the
 /// shorter one.
 fn highest_contour(hints: &GlyphHints) -> usize {
-    let (mut best, mut best_min, mut best_max) = (0, long::MAX, long::MIN);
+    let (mut best, mut best_min, mut best_max) = (0, wrap32::MAX, wrap32::MIN);
     for c in 0..hints.contours.len() {
         let (min, max) = extrema(hints, c);
         if max > best_max || (max == best_max && min > best_min) {
@@ -227,7 +227,7 @@ fn second_highest_contour(hints: &GlyphHints) -> usize {
     }
     let highest = highest_contour(hints);
     let highest_min = hints.y_minima[highest];
-    let (mut best, mut best_max) = (0, long::MIN);
+    let (mut best, mut best_max) = (0, wrap32::MIN);
     for c in (0..hints.contours.len()).filter(|&c| c != highest) {
         let (min, max) = extrema(hints, c);
         if max > best_max && min < highest_min {
@@ -240,7 +240,7 @@ fn second_highest_contour(hints: &GlyphHints) -> usize {
 /// `af_find_lowest_contour`: the contour reaching lowest, of two the
 /// shorter one.
 fn lowest_contour(hints: &GlyphHints) -> usize {
-    let (mut best, mut best_min, mut best_max) = (0, long::MAX, long::MIN);
+    let (mut best, mut best_min, mut best_max) = (0, wrap32::MAX, wrap32::MIN);
     for c in 0..hints.contours.len() {
         let (min, max) = extrema(hints, c);
         if min < best_min || (min == best_min && max < best_max) {
@@ -258,7 +258,7 @@ fn second_lowest_contour(hints: &GlyphHints) -> usize {
     }
     let lowest = lowest_contour(hints);
     let lowest_max = hints.y_maxima[lowest];
-    let (mut best, mut best_min) = (0, long::MAX);
+    let (mut best, mut best_min) = (0, wrap32::MAX);
     for c in (0..hints.contours.len()).filter(|&c| c != lowest) {
         let (min, max) = extrema(hints, c);
         if min < best_min && max > lowest_max {
@@ -444,8 +444,8 @@ fn align_tilde(hints: &mut GlyphHints, tilde: usize, top: bool) -> i64 {
 /// horizontal extent of the other contours of three or more points.
 fn overlaps_horizontally(hints: &GlyphHints, c: usize) -> bool {
     let points = hints.points.as_slice();
-    let (mut own_min, mut own_max) = (long::MAX, long::MIN);
-    let (mut other_min, mut other_max) = (long::MAX, long::MIN);
+    let (mut own_min, mut own_max) = (wrap32::MAX, wrap32::MIN);
+    let (mut other_min, mut other_max) = (wrap32::MAX, wrap32::MIN);
     for (i, &first) in hints.contours.as_slice().iter().enumerate() {
         if points[points[first].next].next == first {
             continue;

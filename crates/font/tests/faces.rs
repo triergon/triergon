@@ -2,10 +2,11 @@ mod support;
 
 use support::{bytes, cff_tables, cjk_tables, collection, font, truetype_tables};
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
+use triergon_font::compat::libass::{self, FaceInfo, Request, select};
 use triergon_font::{
-    Bounds, Built, CharEncoding, CharmapKind, CharstringBounds, CmapFormat, ControlBox, FaceInfo,
-    Font, GlyphId, Limits, Load, Orientation, Outline, OutlineFormat, Platform, Point, PointKind,
-    Request, Segment, SizedFont, Store, StoreKey, Style, select,
+    Bounds, Built, CharEncoding, CharmapKind, CharstringBounds, CmapFormat, ControlBox, Font,
+    GlyphId, Limits, Load, Orientation, Outline, OutlineFormat, Platform, Point, PointKind,
+    Segment, SizedFont, Store, StoreKey, Style,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -51,9 +52,10 @@ fn truetype_metrics_names_and_charmap() {
         "TestSans-Bold"
     );
     assert_eq!(font.names().count(), 8);
-    assert_eq!(font.glyph_index('B'), Some(GlyphId(2)));
-    assert_eq!(font.glyph_index('D'), None);
-    let charmap = font.text_charmap().unwrap();
+    let charmap = libass::text_charmap(&font).unwrap();
+    let text = libass::text_lookup(&font, charmap).unwrap();
+    assert_eq!(text.glyph(u32::from('B')), Some(GlyphId(2)));
+    assert_eq!(text.glyph(u32::from('D')), None);
     assert_eq!(
         (charmap.platform(), charmap.encoding(), charmap.kind()),
         (
@@ -111,18 +113,18 @@ fn sizes_scale_as_freetype_does_for_libass() {
         &truetype_tables(400, 0, "Test Sans", "Regular"),
     ));
     // Windows metrics 1024 and 256: libass's span is 1280 font units.
-    let gdi = face.gdi_metrics();
+    let gdi = libass::vertical_metrics(&face);
     assert_eq!(
         (gdi.ascender, gdi.descender, gdi.height),
         (1024, -256, 1280)
     );
-    let sized = face.at_size(16_384).unwrap();
+    let sized = libass::at_size(&face, 16_384).unwrap();
     let m = sized.metrics();
     assert_eq!((m.x_scale, m.y_scale, m.x_ppem), (838_861, 838_861, 200));
     assert_eq!((m.ascender, m.descender, m.height), (13120, -3328, 16384));
-    assert_eq!(sized.ascent_descent(), (13107, 3277));
-    assert_eq!(sized.harfbuzz_scale(), (12800, 12800));
-    assert_eq!(sized.embolden_strength(), 200);
+    assert_eq!(libass::ascent_descent(&sized), (13107, 3277));
+    assert_eq!(libass::harfbuzz_scale(&sized), (12800, 12800));
+    assert_eq!(libass::embolden_strength(&sized), 200);
     assert_eq!(sized.kerning(GlyphId(1), GlyphId(2)), -512);
     // No bytecode: the auto-hinter's advance, here the stem's distance to the
     // phantom points kept, 80 pixels.
@@ -143,37 +145,39 @@ fn sizes_scale_as_freetype_does_for_libass() {
     );
     assert_eq!(metrics.advance, 5120);
     assert_eq!(outline.orientation(), Orientation::TrueType);
-    let synthesis = face.synthesis(700, 110);
+    let synthesis = libass::synthesis(&face, 700, 110);
     assert_eq!((synthesis.oblique, synthesis.embolden), (true, true));
-    assert!(sized.synthesize(&mut outline, synthesis).unwrap());
+    assert!(libass::synthesize(&sized, &mut outline, synthesis).unwrap());
     assert_eq!(outline.points()[1].point, Point::new(1538, 2760));
     let tricky = parse(&font(
         b"\0\x01\0\0",
         &truetype_tables(400, 0, "ABCDEF+PMingLiU", "Regular"),
     ));
     assert_eq!(
-        tricky.at_size(16384).unwrap().default_advance(GlyphId(1)),
+        libass::at_size(&tricky, 16384)
+            .unwrap()
+            .default_advance(GlyphId(1)),
         Err(Error::Unsupported(
             "hinted advances of a tricky TrueType font"
         ))
     );
-    assert!(face.at_size(-1).is_err());
+    assert!(libass::at_size(&face, -1).is_err());
     // No pixels per em: FreeType loads glyphs unscaled and unhinted.
-    let unscaled = face.at_size(0).unwrap();
+    let unscaled = libass::at_size(&face, 0).unwrap();
     assert_eq!(unscaled.metrics().x_ppem, 0);
-    assert_eq!(unscaled.ascent_descent(), (0, 0));
-    assert_eq!(unscaled.harfbuzz_scale(), (0, 0));
+    assert_eq!(libass::ascent_descent(&unscaled), (0, 0));
+    assert_eq!(libass::harfbuzz_scale(&unscaled), (0, 0));
     let metrics = unscaled.outline_into(GlyphId(1), &mut outline).unwrap();
     assert_eq!(outline.points()[2].point, Point::new(250, 200));
     assert_eq!(metrics.advance, 400);
     assert_eq!(unscaled.default_advance(GlyphId(1)), Ok(400));
-    assert_eq!(face.at_size(1).unwrap().metrics().x_ppem, 0);
+    assert_eq!(libass::at_size(&face, 1).unwrap().metrics().x_ppem, 0);
 
     let cff = parse(&font(b"OTTO", &cff_tables()));
-    let sized = cff.at_size(16384).unwrap();
+    let sized = libass::at_size(&cff, 16384).unwrap();
     // hhea 800 and -200 without OS/2: 410 units are 6717.4 26.6 units, rounded to 105 pixels.
     assert_eq!(sized.default_advance(GlyphId(1)), Ok(6720));
-    assert!(cff.is_postscript());
+    assert_eq!(cff.outline_format(), OutlineFormat::Cff);
 }
 
 /// A default load: the outline's points and the metrics as (advance,
@@ -212,7 +216,7 @@ fn auto_hinted_glyphs_follow_freetypes_auto_hinter() {
         &truetype_tables(400, 0, "Test Sans", "Regular"),
     ));
     // 12.8 26.6 units per font unit, 200 pixels per em.
-    let sized = face.at_size(16_384).unwrap();
+    let sized = libass::at_size(&face, 16_384).unwrap();
     // The square's stem is 200 units, 40 pixels: its edges stay on the
     // pixels they scale to, the bottom on the bottom zone and the top a
     // stem's height above it. The vertical advance is the typographic
@@ -242,7 +246,7 @@ fn auto_hinted_glyphs_follow_freetypes_auto_hinter() {
     // At 7 pixels per em (scale 27546) the stem, 84/64 pixel, is centred
     // between pixels: its edges at 21 and 105 move to 48 and 132, and the
     // standard width is extra light, so the stem keeps its width.
-    let small = face.at_size(538).unwrap();
+    let small = libass::at_size(&face, 538).unwrap();
     assert_eq!(small.metrics().x_ppem, 7);
     let (points, metrics) = default_load(&small, 1).unwrap();
     assert_eq!(points, [(48, 0), (48, 84), (132, 84), (132, 0)]);
@@ -257,7 +261,7 @@ fn auto_hinted_glyphs_follow_freetypes_auto_hinter() {
         b"\0\x01\0\0",
         &truetype_tables(400, 1, "Test Sans", "Italic"),
     ));
-    let small = italic.at_size(538).unwrap();
+    let small = libass::at_size(&italic, 538).unwrap();
     let (points, metrics) = default_load(&small, 1).unwrap();
     assert_eq!(points, [(21, 0), (21, 84), (105, 84), (105, 0)]);
     assert_eq!(metrics, [192, 448, 0, 128, 128, 128]);
@@ -267,7 +271,7 @@ fn auto_hinted_glyphs_follow_freetypes_auto_hinter() {
 fn ideographs_follow_freetypes_cjk_auto_hinter() {
     let face = parse(&font(b"\0\x01\0\0", &cjk_tables()));
     // A scale of one 26.6 unit per font unit, 16 pixels per em.
-    let sized = face.at_size(1280).unwrap();
+    let sized = libass::at_size(&face, 1280).unwrap();
     assert_eq!(sized.metrics().x_ppem, 16);
     // The box is the standard character, a stem 180 units wide and 750
     // tall, and gives both blue zones, each of one value: a top at 730,
@@ -605,7 +609,7 @@ fn cff_faces_list_freetype_charmaps_in_its_order() {
         ]
     );
     // libass reads text through the Windows UCS-4 subtable.
-    assert_eq!(font.text_charmap_index(), Some(1));
+    assert_eq!(libass::text_charmap_index(&font), Some(1));
     let maps: Vec<Vec<(u32, u16)>> = font
         .charmaps()
         .map(|c| {

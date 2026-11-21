@@ -8,7 +8,7 @@ use super::super::style::NONBASE;
 use super::super::tables::{SCRIPTS, STYLES};
 use super::adjust;
 use super::{Axis, Metrics, analysis};
-use crate::long::{abs, mul_div, pix_round, wrap};
+use crate::fixed::wrap32::{abs, mul_div, pix_round, wrap};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 

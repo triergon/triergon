@@ -15,7 +15,7 @@ use super::hints::{Dimension, Width};
 use super::latin::{self, Stems};
 use super::style::{MAX_BLUES, MAX_CLUSTERS, clusters};
 use super::tables::STYLES;
-use crate::long::{abs, div_fix, mul_fix, pix_round, wrap};
+use crate::fixed::wrap32::{abs, div_fix, mul_fix, pix_round, wrap};
 use crate::outline::{Outline, OutlinePoint};
 use triergon_core::{Result, WorkBudget};
 

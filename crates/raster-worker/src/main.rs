@@ -18,6 +18,7 @@ use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 use std::time::Instant;
 use triergon_core::{Budget, Bytes};
+use triergon_font::compat::libass;
 use triergon_font::{Font, GlyphId, Limits};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -75,7 +76,7 @@ fn spread(total: usize, count: usize) -> Vec<u16> {
 /// after its GDI metrics, each outline unhinted (`FT_LOAD_NO_HINTING`).
 fn load(file: &Bytes, budget: &Budget, height: i32, count: usize) -> Selection {
     let font = Font::new(file.clone(), 0, budget, Limits::default()).ok()?;
-    let sized = font.at_size(height).ok()?;
+    let sized = libass::at_size(&font, height).ok()?;
     let mut outline = triergon_font::Outline::new(budget);
     let glyphs = spread(usize::from(font.glyph_count()), count)
         .into_iter()

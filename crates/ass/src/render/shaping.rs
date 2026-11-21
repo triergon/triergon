@@ -13,6 +13,7 @@ use triergon_core::{
     Budget, BudgetVec, Error, Reservation, Result, WorkBudget, round_ties_even_i32,
 };
 use triergon_font::GlyphId;
+use triergon_font::compat::libass;
 use triergon_raster::{Vector, pixels_26_6};
 use triergon_shape::bidi::{BaseDirection, BidiClass, Level, Resolver, reorder_line};
 use triergon_shape::{
@@ -562,9 +563,7 @@ impl Shaper {
         charge(work, read.saturating_add(RUN_UNITS))?;
         // The run's glyphs share the size their outlines load at, and the
         // face reads them through the charmap it has selected.
-        let sized = face_font
-            .font
-            .at_size(pixels_26_6(text.style(first).size))?;
+        let sized = libass::at_size(&face_font.font, pixels_26_6(text.style(first).size))?;
         let mut metrics = SizedMetrics::with_charmap(sized, face_font.charmap(), work)?;
         let rotations;
         if font.vertical() {

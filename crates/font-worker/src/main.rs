@@ -12,7 +12,8 @@ use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 use std::time::Instant;
 use triergon_core::{Budget, Bytes, WorkBudget};
-use triergon_font::{Font, GlyphId, Limits, Load, NameRecord, Outline, SizedFont, Synthesis};
+use triergon_font::compat::libass::{self, Synthesis};
+use triergon_font::{Font, GlyphId, Limits, Load, NameRecord, Outline, OutlineFormat, SizedFont};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -115,7 +116,7 @@ fn read(file: &Bytes, budget: &Budget, operation: &Operation, sink: &mut impl Si
             if heights.len() > 1 {
                 sink.record(Record::Request(height))?;
             }
-            let Ok(sized) = font.at_size(height) else {
+            let Ok(sized) = libass::at_size(&font, height) else {
                 sink.record(Record::SizeError(height))?;
                 continue;
             };
@@ -175,7 +176,7 @@ fn face(font: &Font, outline: &mut Outline, sink: &mut impl Sink) -> io::Result<
             })?;
         }
     }
-    sink.record(Record::TextCharmap(font.text_charmap()))?;
+    sink.record(Record::TextCharmap(libass::text_charmap(font)))?;
     for (left, right) in kerning_pairs(font) {
         let value = font.kerning(left, right);
         if value != 0 {
@@ -211,7 +212,7 @@ fn scaled(
     sink.record(Record::Size(&Size::new(
         height,
         sized,
-        font.is_postscript(),
+        font.outline_format() == OutlineFormat::Cff,
     )))?;
     for (left, right) in kerning_pairs(font) {
         let value = sized.kerning(left, right);
@@ -242,7 +243,7 @@ fn scaled(
             // `synthesize` answers `false` where it refuses to embolden, as
             // FreeType refuses an outline without an orientation.
             let applied = styled.copy_from(&outline).is_ok()
-                && matches!(sized.synthesize(&mut styled, synthesis), Ok(true));
+                && matches!(libass::synthesize(sized, &mut styled, synthesis), Ok(true));
             sink.record(Record::Styled {
                 style,
                 index: glyph.0,

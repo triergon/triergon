@@ -204,7 +204,7 @@ selective style overrides), in the frame and storage size and margins of its
   scripts registers each one's as it first draws them, where libass, whose
   tracks share one library, registers every track's as soon as it is read;
   fonts registered once stay selectable in both), are matched by family, full
-  or PostScript name, weight and slant with `triergon_font::select`, as libass
+  or PostScript name, weight and slant with `triergon_font::compat::libass::select`, as libass
   matches fonts without a system font provider. Each requested font keeps the
   faces it gathers: the one selected for it, then, for a character none of
   them maps, one selected for that character from the requested family, the
@@ -217,7 +217,7 @@ selective style overrides), in the frame and storage size and margins of its
   controls (U+0080 to U+009F) through a Macintosh Roman charmap. The retry is
   `Error::Unsupported` for a face with charmaps FreeType lists and
   `triergon-font` does not read, as is any lookup through a charmap whose
-  codes libass converts (`Font::text_lookup`). The default font file's face gets an id of its
+  codes libass converts (`compat::libass::text_lookup`). The default font file's face gets an id of its
   own, so a font never takes it for a face it already has: libass leaves
   that id uninitialised, and this is its result whenever the id does not
   collide with a registered face's; the reference is built with locals

@@ -9,7 +9,7 @@
 //! [`long`](super::long)).
 
 use crate::Orientation;
-use crate::long::{div_fix, mul_fix, to_i32, wrap};
+use crate::fixed::wrap32::{div_fix, mul_fix, to_i32, wrap};
 use crate::outline::{Outline, PointKind};
 use crate::work::charge;
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
