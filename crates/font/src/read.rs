@@ -141,7 +141,8 @@ pub fn bsearch(count: usize, compare: impl Fn(usize) -> std::cmp::Ordering) -> O
     use std::cmp::Ordering;
     let (mut min, mut max) = (0_isize, isize::try_from(count).ok()? - 1);
     while min <= max {
-        let mid = (min + max) / 2;
+        // Both ends lie in `0..count`, so the sum halves as unsigned.
+        let mid = ((min as usize + max as usize) / 2) as isize;
         match compare(mid as usize) {
             Ordering::Greater => max = mid - 1,
             Ordering::Less => min = mid + 1,
