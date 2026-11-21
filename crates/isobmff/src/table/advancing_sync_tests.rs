@@ -31,18 +31,18 @@ fn sample_error_after_membership_does_not_commit_either_row() {
     // This is not a claim about reachable valid-media timestamps or stps syntax.
     table.partial = table.sync.clone();
     let mut cursor = table.cursor();
-    cursor.dts = i128::MAX;
+    cursor.at.dts = i128::MAX;
     let mut trial = cursor;
     assert_eq!(trial.advance().unwrap_err(), Error::Overflow);
-    assert_eq!((trial.sync_row, trial.partial_row), (1, 1));
+    assert_eq!((trial.at.sync_row, trial.at.partial_row), (1, 1));
     for _ in 0..2 {
         let mut work = WorkBudget::new(1);
         assert_eq!(cursor.poll(&mut work).unwrap_err(), Error::Overflow);
         assert_eq!(work.spent(), 1);
         assert_eq!(
-            (cursor.ordinal, cursor.sync_row, cursor.partial_row),
+            (cursor.at.ordinal, cursor.at.sync_row, cursor.at.partial_row),
             (0, 0, 0)
         );
-        assert_eq!(cursor.dts, i128::MAX);
+        assert_eq!(cursor.at.dts, i128::MAX);
     }
 }

@@ -138,20 +138,7 @@ impl SampleTable {
     }
     /// A cursor over every sample in decode order.
     pub fn cursor(&self) -> SampleCursor<'_> {
-        SampleCursor {
-            table: self,
-            ordinal: 0,
-            stts_run: 0,
-            stts_left: 0,
-            delta: 0,
-            ctts_run: 0,
-            ctts_left: 0,
-            offset: 0,
-            chunks: ChunkCursor::default(),
-            dts: 0,
-            sync_row: 0,
-            partial_row: 0,
-        }
+        self.resume(SampleCursorPosition::default())
     }
     /// The byte ranges of its samples in order, without their clocks or access.
     pub(crate) fn ranges(&self) -> SampleRanges<'_> {
@@ -925,20 +912,32 @@ impl Findings {
 
 /// Reads the samples of a [`SampleTable`] in decode order; from [`SampleTable::cursor`].
 /// It allocates nothing, and a failed poll leaves it where it was.
+// The table before the position: the compiler's order puts it after, which measured more
+// instructions in the per-sample paths that copy or poll the cursor.
 #[derive(Clone, Copy, Debug)]
+#[repr(C)]
 pub struct SampleCursor<'a> {
     table: &'a SampleTable,
+    at: SampleCursorPosition,
+}
+
+/// A [`SampleCursor`]'s place in its table, kept without borrowing the table so an
+/// owner can hold both.
+// The time last, so that the cursor fits in 96 bytes with the table first.
+#[derive(Clone, Copy, Debug, Default)]
+#[repr(C)]
+pub(crate) struct SampleCursorPosition {
     ordinal: u64,
+    chunks: ChunkCursor,
     stts_run: u32,
     stts_left: u32,
     delta: u32,
     ctts_run: u32,
     ctts_left: u32,
     offset: u32,
-    chunks: ChunkCursor,
-    dts: i128,
     sync_row: u32,
     partial_row: u32,
+    dts: i128,
 }
 
 /// The chunk holding a table's next sample: its samples left and the byte at
@@ -1060,12 +1059,16 @@ impl<'a> SampleCursor<'a> {
     }
     /// How many samples the cursor has produced.
     pub(crate) fn ordinal(&self) -> u64 {
-        self.ordinal
+        self.at.ordinal
+    }
+    /// Where the cursor stands, to resume from with [`SampleTable::resume`].
+    pub(crate) fn position(&self) -> SampleCursorPosition {
+        self.at
     }
     /// The next sample, for one work unit.
     #[inline]
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
-        if self.ordinal == self.table.sample_count() {
+        if self.at.ordinal == self.table.sample_count() {
             return Ok(Next::End);
         }
         if !work.try_charge(1) {
@@ -1082,18 +1085,18 @@ impl<'a> SampleCursor<'a> {
         let sample = table.sample_with_access(
             SamplePosition {
                 ordinal,
-                description: self.chunks.description,
-                byte: self.chunks.byte,
-                dts: self.dts,
-                delta: self.delta,
-                cto: self.offset,
+                description: self.at.chunks.description,
+                byte: self.at.chunks.byte,
+                dts: self.at.dts,
+                delta: self.at.delta,
+                cto: self.at.offset,
             },
             || {
                 let sync =
-                    sequential_contains(table.sync.as_ref(), &mut self.sync_row, ordinal, true)?;
+                    sequential_contains(table.sync.as_ref(), &mut self.at.sync_row, ordinal, true)?;
                 let partial = sequential_contains(
                     table.partial.as_ref(),
-                    &mut self.partial_row,
+                    &mut self.at.partial_row,
                     ordinal,
                     false,
                 )?;
@@ -1108,18 +1111,22 @@ impl<'a> SampleCursor<'a> {
     /// cursor then stands where [`poll`](Self::poll) would leave it.
     pub(crate) fn skip(&mut self) -> Result<SkippedSample> {
         let ordinal = self.enter()?;
-        let start = self.chunks.byte;
+        let start = self.at.chunks.byte;
         let size = self.table.sizes.get(ordinal - 1)?;
         let end = start.checked_add(u64::from(size)).ok_or(Error::Overflow)?;
-        let sync =
-            sequential_contains(self.table.sync.as_ref(), &mut self.sync_row, ordinal, true)?;
+        let sync = sequential_contains(
+            self.table.sync.as_ref(),
+            &mut self.at.sync_row,
+            ordinal,
+            true,
+        )?;
         let partial = sequential_contains(
             self.table.partial.as_ref(),
-            &mut self.partial_row,
+            &mut self.at.partial_row,
             ordinal,
             false,
         )?;
-        let (dts, delta) = (self.dts, self.delta);
+        let (dts, delta) = (self.at.dts, self.at.delta);
         self.leave(ordinal, end)?;
         Ok(SkippedSample {
             ordinal,
@@ -1134,39 +1141,42 @@ impl<'a> SampleCursor<'a> {
     /// Loads the time runs and the chunk that hold the next sample, and returns
     /// its ordinal.
     fn enter(&mut self) -> Result<u64> {
-        if self.stts_left == 0 {
-            self.stts_left = self.table.stts.word(self.stts_run, 0)?;
-            self.delta = self.table.stts.word(self.stts_run, 4)?;
-            self.stts_run = self.stts_run.checked_add(1).ok_or(Error::Overflow)?;
+        if self.at.stts_left == 0 {
+            self.at.stts_left = self.table.stts.word(self.at.stts_run, 0)?;
+            self.at.delta = self.table.stts.word(self.at.stts_run, 4)?;
+            self.at.stts_run = self.at.stts_run.checked_add(1).ok_or(Error::Overflow)?;
         }
         if let Some(ctts) = &self.table.ctts
-            && self.ctts_left == 0
+            && self.at.ctts_left == 0
         {
-            self.ctts_left = ctts.word(self.ctts_run, 0)?;
-            self.offset = ctts.word(self.ctts_run, 4)?;
-            self.ctts_run = self.ctts_run.checked_add(1).ok_or(Error::Overflow)?;
+            self.at.ctts_left = ctts.word(self.at.ctts_run, 0)?;
+            self.at.offset = ctts.word(self.at.ctts_run, 4)?;
+            self.at.ctts_run = self.at.ctts_run.checked_add(1).ok_or(Error::Overflow)?;
         }
-        self.chunks.enter(self.table)?;
-        self.ordinal.checked_add(1).ok_or(Error::Overflow)
+        self.at.chunks.enter(self.table)?;
+        self.at.ordinal.checked_add(1).ok_or(Error::Overflow)
     }
     /// Steps past sample `ordinal`, which ends at byte `end`.
     fn leave(&mut self, ordinal: u64, end: u64) -> Result<()> {
-        self.dts = self
+        self.at.dts = self
+            .at
             .dts
-            .checked_add(i128::from(self.delta))
+            .checked_add(i128::from(self.at.delta))
             .ok_or(Error::Overflow)?;
-        self.ordinal = ordinal;
-        self.stts_left = self
+        self.at.ordinal = ordinal;
+        self.at.stts_left = self
+            .at
             .stts_left
             .checked_sub(1)
             .ok_or(Error::Invalid("time run exhausted"))?;
         if self.table.ctts.is_some() {
-            self.ctts_left = self
+            self.at.ctts_left = self
+                .at
                 .ctts_left
                 .checked_sub(1)
                 .ok_or(Error::Invalid("composition run exhausted"))?;
         }
-        self.chunks.consume(end)
+        self.at.chunks.consume(end)
     }
 }
 
@@ -1372,57 +1382,12 @@ impl SampleLocator<'_> {
     }
 }
 
-/// A [`SampleCursor`]'s place in its table, kept without borrowing the table so
-/// an owner can hold both.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct SampleCursorPosition {
-    ordinal: u64,
-    stts_run: u32,
-    stts_left: u32,
-    delta: u32,
-    ctts_run: u32,
-    ctts_left: u32,
-    offset: u32,
-    chunks: ChunkCursor,
-    dts: i128,
-    sync_row: u32,
-    partial_row: u32,
-}
-
 impl SampleTable {
     /// The cursor continuing from `position`, which must come from this table.
     pub(crate) fn resume(&self, position: SampleCursorPosition) -> SampleCursor<'_> {
         SampleCursor {
             table: self,
-            ordinal: position.ordinal,
-            stts_run: position.stts_run,
-            stts_left: position.stts_left,
-            delta: position.delta,
-            ctts_run: position.ctts_run,
-            ctts_left: position.ctts_left,
-            offset: position.offset,
-            chunks: position.chunks,
-            dts: position.dts,
-            sync_row: position.sync_row,
-            partial_row: position.partial_row,
-        }
-    }
-}
-
-impl SampleCursor<'_> {
-    pub(crate) fn position(&self) -> SampleCursorPosition {
-        SampleCursorPosition {
-            ordinal: self.ordinal,
-            stts_run: self.stts_run,
-            stts_left: self.stts_left,
-            delta: self.delta,
-            ctts_run: self.ctts_run,
-            ctts_left: self.ctts_left,
-            offset: self.offset,
-            chunks: self.chunks,
-            dts: self.dts,
-            sync_row: self.sync_row,
-            partial_row: self.partial_row,
+            at: position,
         }
     }
 }
