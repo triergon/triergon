@@ -500,6 +500,10 @@ pub struct Player<S: Source> {
     head: usize,
     count: usize,
     bytes: usize,
+    /// An event read but not yet published, and the source it was read from. The
+    /// two are set and taken together and stay two fields: one option of the pair
+    /// cost 0.45% of the instructions of a program read and up to 1.4% of a range
+    /// read.
     pending: Option<Event>,
     pending_source: Option<triergon_core::SourceId>,
     request: Option<InputRequest>,
