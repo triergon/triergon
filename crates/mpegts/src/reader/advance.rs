@@ -290,7 +290,9 @@ impl Reader {
             if !matches!(self.flight, InFlight::Idle) {
                 let flow = match std::mem::replace(&mut self.flight, InFlight::Idle) {
                     InFlight::Idle => Flow::Continue,
-                    InFlight::Raw { event, step } => self.share_raw(event, step, work, SEEKING)?,
+                    InFlight::Raw { event, step } => {
+                        self.share_raw(event, step, work, cancel, SEEKING)?
+                    }
                     InFlight::Source { source, step } => {
                         self.admit(source, step, work, cancel, SEEKING)?
                     }
@@ -345,10 +347,18 @@ impl Reader {
                         work.take(3);
                         return Ok(Self::inline_source(event));
                     }
-                    self.flight = InFlight::Raw {
-                        event,
-                        step: RawStep::Prepare,
-                    };
+                    // Admit the event now unless the loop head would stop first.
+                    if cancel.load(Ordering::Relaxed) || work.remaining() == 0 {
+                        self.flight = InFlight::Raw {
+                            event,
+                            step: RawStep::Prepare,
+                        };
+                        continue;
+                    }
+                    match self.share_raw(event, RawStep::Prepare, work, cancel, SEEKING)? {
+                        Flow::Continue => continue,
+                        Flow::Return(step) => return Ok(step),
+                    }
                 }
                 Step::NeedInput(request) => {
                     if request.maximum == 0
@@ -380,6 +390,7 @@ impl Reader {
         event: TraceEvent,
         mut step: RawStep,
         work: &mut WorkBudget,
+        cancel: &AtomicBool,
         seeking: bool,
     ) -> Result<Flow> {
         if let RawStep::Prepare = step {
@@ -409,11 +420,16 @@ impl Reader {
                         return Err(error);
                     }
                 };
-                self.flight = InFlight::Source {
-                    source: SourceEvent(Shared::new(event, charge)),
-                    step: Admission::Begin,
-                };
-                return Ok(Flow::Continue);
+                let source = SourceEvent(Shared::new(event, charge));
+                // Begin admitting it now unless the loop head would stop first.
+                if cancel.load(Ordering::Relaxed) || work.remaining() == 0 {
+                    self.flight = InFlight::Source {
+                        source,
+                        step: Admission::Begin,
+                    };
+                    return Ok(Flow::Continue);
+                }
+                return self.admit(source, Admission::Begin, work, cancel, seeking);
             }
             step = RawStep::Begin;
         }
