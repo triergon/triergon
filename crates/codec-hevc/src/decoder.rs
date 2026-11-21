@@ -410,7 +410,8 @@ impl Context {
 
     /// Starts the picture whose first slice segment header is `sh`: its order count,
     /// reference marking, the output the buffer owes before it, its storage and its
-    /// references. On an error nothing of the decoder's POC and IRAP state has changed.
+    /// references. The order count state (prevTid0Pic, first picture, end of sequence)
+    /// changes only once the picture has started.
     fn start_picture(
         &mut self,
         sh: &SliceHeader,
