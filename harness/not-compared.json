@@ -4,12 +4,6 @@
     "triergon-ass": [],
     "triergon-bitstream": [
       {
-        "name": "bit-readers",
-        "entry_points": ["BitReader", "CachedBitReader", "BitCursor", "LsbReader", "RiceReader"],
-        "degree": "step",
-        "needs": "none beyond the decoders and parsers that read through them, of which FLAC, MPEG audio and Vorbis are graded outside the gate; no reference exposes its bit reader"
-      },
-      {
         "name": "cabac",
         "entry_points": ["cabac::Engine"],
         "degree": "step",
@@ -20,12 +14,6 @@
         "entry_points": ["crc", "crc::Crc32Mpeg", "crc::Crc32Ieee"],
         "degree": "step",
         "needs": "each polynomial's values over a corpus against the reference's av_crc; compared only through the readers and decoders that check Ogg pages, MPEG-TS sections, Matroska elements and audio frames"
-      },
-      {
-        "name": "rbsp",
-        "entry_points": ["Rbsp", "runs"],
-        "degree": "step",
-        "needs": "none beyond the H.264, HEVC and subtitle parsers that unescape through it; no reference exposes emulation prevention removal"
       }
     ],
     "triergon-capture": [
@@ -48,12 +36,6 @@
         "entry_points": ["DownmixLevels", "SurroundEncoding"],
         "degree": "step",
         "needs": "each frame's downmix levels folded against the reference's downmix side data; compared only through the stereo mix"
-      },
-      {
-        "name": "dsp-kernels",
-        "entry_points": ["mdct::Imdct", "kbd_window", "vorbis_window", "Divisor", "divide"],
-        "degree": "step",
-        "needs": "a worker operation running the transforms and windows on test vectors against the reference's; compared only through the AAC, AC-3, Opus and Vorbis outputs, of which Opus and Vorbis are graded outside the gate"
       }
     ],
     "triergon-codec-aac": [
@@ -174,12 +156,6 @@
         "entry_points": ["Decoder"],
         "degree": "outside-gate",
         "needs": "a gate item running the opus lane of cargo xtask codecs grade; the timed file workloads require equal work, not equal output"
-      },
-      {
-        "name": "final-range",
-        "entry_points": ["Decoder::final_range"],
-        "degree": "unit-tests",
-        "needs": "the range decoder's final state per packet against the reference decoder's for the same vectors"
       }
     ],
     "triergon-codec-vorbis": [],
@@ -201,12 +177,6 @@
         "entry_points": ["InputCursor", "container::ContainerReader", "blocking::Blocking", "blocking::Feed"],
         "degree": "step",
         "needs": "every compared reader fed windows of every size and resumed after each Yield and Backpressure, folded against the same reference output; compared only as the protocol the compared readers run on"
-      },
-      {
-        "name": "budgets",
-        "entry_points": ["Budget", "Bytes", "BudgetVec", "WorkBudget"],
-        "degree": "no-reference",
-        "needs": "none: storage and work accounting that no reference has; the memory gates measure its effect"
       }
     ],
     "triergon-elementary": [
