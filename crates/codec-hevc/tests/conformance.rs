@@ -76,14 +76,22 @@ fn decode_all(data: &[u8]) -> (Vec<u8>, Vec<DecodeError>) {
     (out, errs)
 }
 
+/// Reports a check that did not run on the test run's own standard error, where it shows
+/// although the test passes: the check's input is kept outside the repository. One write,
+/// so the line stays whole beside the test harness's output.
+fn skipped(what: std::fmt::Arguments<'_>) {
+    use std::io::Write as _;
+    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
+}
+
 #[test]
 fn conformance_vectors_match_ffmpeg() {
     let dir = vector_dir();
     if !dir.is_dir() {
-        eprintln!(
-            "note: {} absent; skipping HEVC conformance test",
+        skipped(format_args!(
+            "the HEVC conformance vectors: {} absent",
             dir.display()
-        );
+        ));
         return;
     }
     let full = std::env::var("HEVC_CONFORMANCE_FULL").is_ok();
@@ -130,7 +138,10 @@ fn conformance_vectors_match_ffmpeg() {
 fn plane_raw_matches_rows() {
     let path = vector_dir().join("CONFWIN_A_Sony_1.bit");
     let Ok(data) = std::fs::read(&path) else {
-        eprintln!("note: {} absent; skipping", path.display());
+        skipped(format_args!(
+            "the HEVC plane row check: {} absent",
+            path.display()
+        ));
         return;
     };
     let mut dec = Decoder::new();

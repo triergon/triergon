@@ -1,5 +1,6 @@
 //! The decoder test suite (`.research/flac-test-files`) and the generated streams
-//! (`.research/flac-generated`), when present: the integer output must reproduce the
+//! (`.research/flac-generated`), kept outside the repository; without them the tests check
+//! nothing and say so on the test run's standard error. The integer output must reproduce the
 //! STREAMINFO MD5 the encoder recorded, the float output must be the integer output
 //! scaled, and the damaged files of `faulty` must decode or fail without a panic.
 //! Bit-exactness against FFmpeg is graded by `harness/codecs/flac/flac_vectors.py`.
@@ -41,6 +42,14 @@ fn research(dir: &str) -> Vec<PathBuf> {
         .collect();
     files.sort();
     files
+}
+
+/// Reports a check that did not run on the test run's own standard error, where it shows
+/// although the test passes: the check's input is kept outside the repository. One write,
+/// so the line stays whole beside the test harness's output.
+fn skipped(what: std::fmt::Arguments<'_>) {
+    use std::io::Write as _;
+    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
 }
 
 /// Files up to this size are checked by default; an unoptimised build decodes the whole
@@ -109,12 +118,23 @@ fn check_md5(max_bytes: u64) {
             }
         }
     }
+    if checked == 0 {
+        skipped(format_args!(
+            "the FLAC MD5 check: no stream in .research/flac-test-files or .research/flac-generated"
+        ));
+    }
     eprintln!("{checked} streams match their MD5");
 }
 
 #[test]
 fn damaged_files_never_panic() {
-    for path in research("flac-test-files/faulty") {
+    let faulty = research("flac-test-files/faulty");
+    if faulty.is_empty() {
+        skipped(format_args!(
+            "the damaged FLAC files: .research/flac-test-files/faulty absent"
+        ));
+    }
+    for path in faulty {
         let mut out = AudioFrame::default();
         let Some((configuration, frames)) = read(&path) else {
             // A file the reader refuses still reaches a decoder without a configuration,

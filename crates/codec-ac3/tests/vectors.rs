@@ -87,19 +87,27 @@ const VECTORS: &[Expect] = &[
     },
 ];
 
+/// Reports a check that did not run on the test run's own standard error, where it shows
+/// although the test passes: the check's input is kept outside the repository. One write,
+/// so the line stays whole beside the test harness's output.
+fn skipped(what: std::fmt::Arguments<'_>) {
+    use std::io::Write as _;
+    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
+}
+
 #[test]
 fn fate_vectors_frame_counts_layouts_and_coarse_values() {
     let root = suite();
     if !root.exists() {
-        eprintln!(
-            "note: {} absent, skipping FATE vector checks",
+        skipped(format_args!(
+            "the AC-3 vector checks: {} absent",
             root.display()
-        );
+        ));
         return;
     }
     for v in VECTORS {
         let Ok(data) = std::fs::read(root.join(v.path)) else {
-            eprintln!("note: {} absent, skipped", v.path);
+            skipped(format_args!("the AC-3 vector {}: absent", v.path));
             continue;
         };
         let mut dec = Decoder::new();
@@ -158,7 +166,10 @@ fn fate_vectors_frame_counts_layouts_and_coarse_values() {
 fn corrupted_vectors_never_panic() {
     let root = suite();
     if !root.exists() {
-        eprintln!("note: {} absent, skipping corruption test", root.display());
+        skipped(format_args!(
+            "the AC-3 corruption test: {} absent",
+            root.display()
+        ));
         return;
     }
     let mut seed = 0x1234_5678u32;

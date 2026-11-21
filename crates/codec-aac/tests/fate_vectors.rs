@@ -108,12 +108,21 @@ const NUMERIC: &[&str] = &[
     "ct_sbr_i-ps_i_raw",
 ];
 
+/// Reports a check that did not run on the test run's own standard error, where it shows
+/// although the test passes: the check's input is kept outside the repository. One write,
+/// so the line stays whole beside the test harness's output.
+fn skipped(what: std::fmt::Arguments<'_>) {
+    use std::io::Write as _;
+    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
+}
+
 #[test]
 fn fate_structure() {
+    let mut absent = 0;
     for &(name, rate, ch, samples, errors) in STRUCTURE {
         let p = suite().join(name);
         let Ok(data) = std::fs::read(&p) else {
-            eprintln!("note: {} absent, skipped", p.display());
+            absent += 1;
             continue;
         };
         let d = decode_file(&data);
@@ -123,12 +132,21 @@ fn fate_structure() {
             "{name}"
         );
     }
+    if absent > 0 {
+        skipped(format_args!(
+            "{absent} of {} AAC structure vectors: absent from {}",
+            STRUCTURE.len(),
+            suite().display()
+        ));
+    }
 }
 
 #[test]
 fn fate_numeric_with_references() {
     let Some(refdir) = std::env::var_os("AAC_REF_DIR") else {
-        eprintln!("note: AAC_REF_DIR not set, numeric comparison skipped");
+        skipped(format_args!(
+            "the AAC numeric comparison: AAC_REF_DIR is not set"
+        ));
         return;
     };
     let refdir = PathBuf::from(refdir);
@@ -136,7 +154,9 @@ fn fate_numeric_with_references() {
         let adts = refdir.join(format!("{name}.adts"));
         let reff = refdir.join(format!("{name}.f32"));
         let (Ok(data), Ok(rb)) = (std::fs::read(&adts), std::fs::read(&reff)) else {
-            eprintln!("note: {name} input or reference absent, skipped");
+            skipped(format_args!(
+                "the AAC numeric comparison of {name}: input or reference absent"
+            ));
             continue;
         };
         let d = decode_file(&data);

@@ -184,13 +184,22 @@ fn rebuild(seed: &[u8], edits: &[Edit]) -> Vec<u8> {
     data
 }
 
+/// Reports a check that did not run on the test run's own standard error, where it shows
+/// although the test passes: the check's input is kept outside the repository. One write,
+/// so the line stays whole beside the test harness's output.
+fn skipped(what: std::fmt::Arguments<'_>) {
+    use std::io::Write as _;
+    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
+}
+
 #[test]
 fn fuzz_findings_decode_to_typed_errors() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../.research/fate-samples/h264-conformance");
+    let mut absent = 0;
     for case in CASES {
         let Ok(seed) = std::fs::read(dir.join(case.seed)) else {
-            eprintln!("skipped: no {} in {}", case.seed, dir.display());
+            absent += 1;
             continue;
         };
         assert_eq!(hex_digest(&seed), case.seed_md5, "{}", case.seed);
@@ -209,5 +218,12 @@ fn fuzz_findings_decode_to_typed_errors() {
             "{}: decoded without an error",
             case.seed
         );
+    }
+    if absent > 0 {
+        skipped(format_args!(
+            "{absent} of {} H.264 fuzz findings: seeds absent from {}",
+            CASES.len(),
+            dir.display()
+        ));
     }
 }

@@ -1,5 +1,6 @@
 //! FATE vector tests. The vectors live outside git (`.research/fate-samples/dts/`,
-//! rights unreviewed); every test skips with a note when its file is absent. Core frames
+//! rights unreviewed); without them the tests check nothing and say so once on the test
+//! run's standard error. Core frames
 //! are taken from the container (raw DTS / DTS-HD file chunks / MPEG-TS PES) by this
 //! file's own parsing, extension substreams are dropped, and the decoded output is
 //! checked against fingerprints of FFmpeg 9.0.2 decoding the same core-only bytes
@@ -9,16 +10,29 @@ mod support;
 use std::path::PathBuf;
 use support::harness;
 
+/// Reports a check that did not run on the test run's own standard error, where it shows
+/// although the test passes: the check's input is kept outside the repository. One write,
+/// so the line stays whole beside the test harness's output.
+fn skipped(what: std::fmt::Arguments<'_>) {
+    use std::io::Write as _;
+    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
+}
+
 fn fate(rel: &str) -> Option<Vec<u8>> {
-    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../.research/fate-samples/dts")
-        .join(rel);
-    if let Ok(b) = std::fs::read(&p) {
-        Some(b)
-    } else {
-        eprintln!("note: vector {} absent, skipped", p.display());
-        None
+    static ABSENT: std::sync::Once = std::sync::Once::new();
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/fate-samples/dts");
+    let bytes = std::fs::read(dir.join(rel)).ok();
+    match bytes {
+        Some(_) => {}
+        None if dir.is_dir() => skipped(format_args!("the DTS vector {rel}: absent")),
+        None => ABSENT.call_once(|| {
+            skipped(format_args!(
+                "every DTS vector test: {} absent",
+                dir.display()
+            ));
+        }),
     }
+    bytes
 }
 
 /// STRMDATA payload of a DTS-HD file (8-byte chunk id, 8-byte big-endian size).

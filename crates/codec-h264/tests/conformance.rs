@@ -61,14 +61,22 @@ fn decode_file(data: &[u8]) -> (Vec<String>, Option<DecodeError>) {
     (md, unsupported)
 }
 
+/// Reports a check that did not run on the test run's own standard error, where it shows
+/// although the test passes: the check's input is kept outside the repository. One write,
+/// so the line stays whole beside the test harness's output.
+fn skipped(what: std::fmt::Arguments<'_>) {
+    use std::io::Write as _;
+    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
+}
+
 #[test]
 fn conformance_vectors_bit_exact() {
     let dir = vectors_dir();
     if !dir.exists() {
-        eprintln!(
-            "note: conformance vectors not present at {}; skipping",
+        skipped(format_args!(
+            "the H.264 conformance vectors: {} absent",
             dir.display()
-        );
+        ));
         return;
     }
     let table = include_str!("ffmpeg_framemd5_digests.txt");
@@ -88,7 +96,7 @@ fn conformance_vectors_bit_exact() {
         }
         let path = dir.join(name);
         let Ok(data) = std::fs::read(&path) else {
-            eprintln!("note: {name} missing; skipped");
+            skipped(format_args!("the H.264 conformance vector {name}: absent"));
             continue;
         };
         ran += 1;
