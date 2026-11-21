@@ -13,7 +13,7 @@ use triergon_font::{Font, GlyphId, Orientation};
 use triergon_raster::compat::libass::BorderStroke;
 use triergon_raster::{OUTLINE_MAX, Outline, Raster, Shape, Vector, pixels_26_6};
 
-use super::cache::{Cache, CacheKey, Kept};
+use super::cache::{Cache, CacheKey, Found, Kept};
 use super::fonts::{FontId, RequestedFont};
 use super::text::{Decorations, DrawingText};
 use crate::{Bold, Drawing, Italic, Limits, charge};
@@ -34,23 +34,13 @@ pub(super) struct OutlineValue {
 /// identify an outline, by the value, which a key holds while it is kept,
 /// as libass's keys hold theirs: two are equal when they are the same.
 #[derive(Clone, Debug)]
-pub(super) struct KeptOutline(Kept<Option<OutlineValue>>);
-
-impl KeptOutline {
-    /// The outline kept, `None` for one that cannot be built.
-    fn built(kept: Kept<Option<OutlineValue>>) -> Option<Self> {
-        kept.is_some().then_some(Self(kept))
-    }
-}
+pub(super) struct KeptOutline(Kept<OutlineValue>);
 
 impl Deref for KeptOutline {
     type Target = OutlineValue;
 
     fn deref(&self) -> &OutlineValue {
-        match &*self.0 {
-            Some(value) => value,
-            None => unreachable!("a kept outline is built"),
-        }
+        &self.0
     }
 }
 
@@ -151,9 +141,9 @@ impl CacheKey for OutlineKey {
 #[derive(Debug)]
 pub(super) struct Outlines {
     budget: Budget,
-    /// `None` for a key whose outline cannot be built, which libass also
-    /// keeps.
-    cache: Cache<OutlineKey, Option<OutlineValue>>,
+    /// A key whose outline cannot be built is kept without one, as libass
+    /// keeps it.
+    cache: Cache<OutlineKey, OutlineValue>,
     scratch: triergon_font::Outline,
 }
 
@@ -184,7 +174,13 @@ impl Outlines {
         key: OutlineKey,
         value: Option<OutlineValue>,
     ) -> Result<Option<KeptOutline>> {
-        self.cache.insert(key, value, 1).map(KeptOutline::built)
+        match value {
+            Some(value) => self
+                .cache
+                .insert(key, value, 1)
+                .map(|kept| Some(KeptOutline(kept))),
+            None => self.cache.insert_absent(key, 1).map(|()| None),
+        }
     }
 
     /// The outline of a glyph of `font`, `None` when its face cannot load it.
@@ -195,7 +191,7 @@ impl Outlines {
         work: &mut WorkBudget,
     ) -> Result<Option<KeptOutline>> {
         if let Some(found) = self.cache.get(KeyRef::Glyph(&glyph)) {
-            return Ok(KeptOutline::built(found));
+            return Ok(found.value().map(KeptOutline));
         }
         charge(work, OUTLINE_UNITS)?;
         let source = &font.faces()[glyph.face].font;
@@ -218,7 +214,7 @@ impl Outlines {
         work: &mut WorkBudget,
     ) -> Result<Option<KeptOutline>> {
         if let Some(found) = self.cache.get(KeyRef::Border(glyph, stroke)) {
-            return Ok(KeptOutline::built(found));
+            return Ok(found.value().map(KeptOutline));
         }
         // A stroked border holds only what it needs, as a kept outline should.
         let value = stroke
@@ -234,11 +230,11 @@ impl Outlines {
     /// The unit square opaque boxes are drawn from, which libass keeps as
     /// an outline (`ass_render.c:1294-1309`, `1423`).
     pub(super) fn unit_box(&mut self) -> Result<KeptOutline> {
-        if let Some(found) = self.cache.get(KeyRef::UnitBox).and_then(KeptOutline::built) {
-            return Ok(found);
+        if let Some(Found::Value(found)) = self.cache.get(KeyRef::UnitBox) {
+            return Ok(KeptOutline(found));
         }
         let value = OutlineValue::of_shape(Shape::unit_box(&self.budget)?);
-        let kept = self.cache.insert(OutlineKey::UnitBox, Some(value), 1)?;
+        let kept = self.cache.insert(OutlineKey::UnitBox, value, 1)?;
         Ok(KeptOutline(kept))
     }
 
@@ -250,7 +246,7 @@ impl Outlines {
         work: &mut WorkBudget,
     ) -> Result<Option<KeptOutline>> {
         if let Some(found) = self.cache.get(KeyRef::Drawing(drawing.text)) {
-            return Ok(KeptOutline::built(found));
+            return Ok(found.value().map(KeptOutline));
         }
         // The parser passes over the text once.
         charge(work, OUTLINE_UNITS.saturating_add(drawing.text.len()))?;

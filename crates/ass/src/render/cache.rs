@@ -148,12 +148,33 @@ pub(super) trait CacheKey {
     fn same(a: &Self::View<'_>, b: &Self::View<'_>) -> bool;
 }
 
+/// What a lookup finds for a key the cache keeps.
+#[derive(Debug)]
+pub(super) enum Found<T> {
+    /// Its value.
+    Value(Kept<T>),
+    /// No value: the key was kept by [`Cache::insert_absent`].
+    Absent,
+}
+
+impl<T> Found<T> {
+    /// The value found, `None` for a key kept without one.
+    pub(super) fn value(self) -> Option<Kept<T>> {
+        match self {
+            Self::Value(kept) => Some(kept),
+            Self::Absent => None,
+        }
+    }
+}
+
 /// An entry's value: kept by the cache, or, cut while held, kept only by its
-/// holders.
+/// holders; or none, for a key whose value cannot be made, which is kept so
+/// that it is not tried again and which nothing can hold.
 #[derive(Debug)]
 enum Value<T> {
     Kept(Arc<Node<T>>),
     Lent(Weak<Node<T>>),
+    Absent,
 }
 
 #[derive(Debug)]
@@ -171,10 +192,18 @@ struct Entry<K, T> {
     newer: u32,
 }
 
+/// A slot of the slab entries live in, and how many entries it has held, so
+/// that a release record of an earlier one is told apart.
 #[derive(Debug)]
-enum Slot<K, T> {
-    Free { next: u32, generation: u32 },
-    Used { entry: Entry<K, T>, generation: u32 },
+struct Slot<K, T> {
+    generation: u32,
+    state: SlotState<K, T>,
+}
+
+#[derive(Debug)]
+enum SlotState<K, T> {
+    Free { next: u32 },
+    Used(Entry<K, T>),
 }
 
 /// How a cache hashes its keys, every lookup of every frame: each word is
@@ -290,9 +319,9 @@ pub(super) struct Cache<K, T> {
     released: Arc<ReleaseLog>,
     /// The release records the log has room for.
     records: usize,
-    /// The entries, each with a shared allocation for its value that lives
-    /// until it goes.
-    len: usize,
+    /// The entries with a value, each in a shared allocation that lives
+    /// until the entry goes.
+    values: usize,
     /// libass's `cache_size`: what the entries kept count, held ones too.
     size: usize,
     limit: usize,
@@ -321,20 +350,20 @@ impl<K: CacheKey, T> Cache<K, T> {
             newest: NONE,
             released: Arc::default(),
             records: 0,
-            len: 0,
+            values: 0,
             size: 0,
             limit: usize::MAX,
             charge: Reservation::empty(budget),
         }
     }
 
-    /// The value kept for `key`, which is now the newest in the use queue,
+    /// What is kept for `key`, which is now the newest in the use queue,
     /// queued again if it was cut while held (`ass_cache_get`).
-    pub(super) fn get(&mut self, key: K::View<'_>) -> Option<Kept<T>> {
+    pub(super) fn get(&mut self, key: K::View<'_>) -> Option<Found<T>> {
         let at = self.find(&key)?;
         let entry = self.entry_mut(at);
-        let node = match &entry.value {
-            Value::Kept(node) => Arc::clone(node),
+        let found = match &entry.value {
+            Value::Kept(node) => Found::Value(Kept(Arc::clone(node))),
             Value::Lent(node) => {
                 let Some(node) = node.upgrade() else {
                     // Let go but not yet taken out: as good as gone.
@@ -343,12 +372,13 @@ impl<K: CacheKey, T> Cache<K, T> {
                 };
                 node.released.lent.store(false, Ordering::Relaxed);
                 entry.value = Value::Kept(Arc::clone(&node));
-                node
+                Found::Value(Kept(node))
             }
+            Value::Absent => Found::Absent,
         };
         self.unqueue(at);
         self.queue(at);
-        Some(Kept(node))
+        Some(found)
     }
 
     /// Keeps `value` for `key`, absent before, counted as `size` and,
@@ -361,18 +391,37 @@ impl<K: CacheKey, T> Cache<K, T> {
     /// `Overflow` when the count would, and the budget's errors; the cache is
     /// then unchanged.
     pub(super) fn insert(&mut self, key: K, value: T, size: usize) -> Result<Kept<T>> {
-        let at = self.add(key, value, size)?;
-        let Value::Kept(node) = &self.entry(at).value else {
-            unreachable!("a value just kept");
-        };
-        let kept = Kept(Arc::clone(node));
+        let (at, generation) = self.add(key, size, Self::NODE_BYTES)?;
+        let node = Arc::new(Node {
+            value,
+            released: Released {
+                log: Arc::clone(&self.released),
+                slot: at,
+                generation,
+                lent: AtomicBool::new(false),
+            },
+        });
+        self.entry_mut(at).value = Value::Kept(Arc::clone(&node));
+        self.values += 1;
         self.shrink();
-        Ok(kept)
+        Ok(Kept(node))
     }
 
-    /// Adds an entry for `key` as the newest in the queue, without cutting;
-    /// its slot.
-    fn add(&mut self, key: K, value: T, size: usize) -> Result<u32> {
+    /// Keeps `key` without a value, as [`Cache::insert`] keeps a value.
+    ///
+    /// # Errors
+    ///
+    /// As [`Cache::insert`].
+    pub(super) fn insert_absent(&mut self, key: K, size: usize) -> Result<()> {
+        self.add(key, size, 0)?;
+        self.shrink();
+        Ok(())
+    }
+
+    /// Adds an entry for `key` without a value as the newest in the queue,
+    /// without cutting, with room charged for `value_bytes` more; its slot
+    /// and the slot's generation.
+    fn add(&mut self, key: K, size: usize, value_bytes: usize) -> Result<(u32, u32)> {
         let hash = self.hash(&key.view());
         debug_assert!(self.find(&key.view()).is_none(), "a key kept twice");
         let size = if size == 1 {
@@ -383,33 +432,24 @@ impl<K: CacheKey, T> Cache<K, T> {
         let total = size
             .and_then(|size| self.size.checked_add(size).map(|total| (size, total)))
             .ok_or(Error::Overflow)?;
-        self.reserve()?;
+        self.reserve(value_bytes)?;
         let (size, total) = total;
-        let (at, generation) = self.take_slot();
-        let value = Value::Kept(Arc::new(Node {
-            value,
-            released: Released {
-                log: Arc::clone(&self.released),
-                slot: at,
-                generation,
-                lent: AtomicBool::new(false),
-            },
-        }));
+        let at = self.take_slot();
         let chain = self.index.insert(hash, at).unwrap_or(NONE);
-        let entry = Entry {
+        let slot = &mut self.slots[at as usize];
+        slot.state = SlotState::Used(Entry {
             key,
             hash,
             chain,
-            value,
+            value: Value::Absent,
             size,
             older: NONE,
             newer: NONE,
-        };
-        self.slots[at as usize] = Slot::Used { entry, generation };
-        self.len += 1;
+        });
+        let generation = slot.generation;
         self.size = total;
         self.queue(at);
-        Ok(at)
+        Ok((at, generation))
     }
 
     /// Cuts the cache to `limit` as `ass_cache_cut` does, and keeps it
@@ -470,9 +510,9 @@ impl<K: CacheKey, T> Cache<K, T> {
     /// Takes out the entries whose values were let go, cut while held.
     fn take_released(&mut self) {
         while let Some((at, generation)) = self.released.pop() {
-            if let Some(Slot::Used {
-                entry,
+            if let Some(Slot {
                 generation: current,
+                state: SlotState::Used(entry),
             }) = self.slots.get(at as usize)
                 && *current == generation
                 && matches!(entry.value, Value::Lent(_))
@@ -482,13 +522,13 @@ impl<K: CacheKey, T> Cache<K, T> {
         }
     }
 
-    /// Room for one more entry: a slot, its index bucket, its value and its
-    /// release record, charged before anything changes.
+    /// Room for one more entry: a slot, its index bucket, its release record
+    /// and `value_bytes` for its value, charged before anything changes.
     ///
     /// # Errors
     ///
     /// `Overflow` when every slot number is taken, and the budget's errors.
-    fn reserve(&mut self) -> Result<()> {
+    fn reserve(&mut self, value_bytes: usize) -> Result<()> {
         if self.free == NONE {
             // A new slot's number must not be `NONE`.
             if u32::try_from(self.slots.len()).map_or(true, |len| len == NONE) {
@@ -510,8 +550,7 @@ impl<K: CacheKey, T> Cache<K, T> {
                 .map_err(|_| Error::Allocation)?;
             self.records = log.capacity();
         }
-        // One value more than kept.
-        let bytes = self.charged_bytes().saturating_add(Self::NODE_BYTES);
+        let bytes = self.charged_bytes().saturating_add(value_bytes);
         self.charge.resize_to(bytes)
     }
 
@@ -536,25 +575,29 @@ impl<K: CacheKey, T> Cache<K, T> {
                 .saturating_mul(Self::BUCKET_BYTES)
                 .saturating_add(Self::INDEX_TAIL_BYTES)
         };
-        let values = self.len.saturating_mul(Self::NODE_BYTES);
+        let values = self.values.saturating_mul(Self::NODE_BYTES);
         index.saturating_add(values).saturating_add(log)
     }
 
-    /// A free slot and its generation, from the free list or new.
-    fn take_slot(&mut self) -> (u32, u32) {
-        if let Some(Slot::Free { next, generation }) = self.slots.get(self.free as usize) {
-            let (at, generation) = (self.free, *generation);
+    /// A free slot, from the free list or new.
+    fn take_slot(&mut self) -> u32 {
+        if let Some(Slot {
+            state: SlotState::Free { next },
+            ..
+        }) = self.slots.get(self.free as usize)
+        {
+            let at = self.free;
             self.free = *next;
-            return (at, generation);
+            return at;
         }
         let at = self.slots.len() as u32;
-        let free = Slot::Free {
-            next: NONE,
+        let free = Slot {
             generation: 0,
+            state: SlotState::Free { next: NONE },
         };
         // Reserved in `reserve`.
         let _ = self.slots.try_push(free);
-        (at, 0)
+        at
     }
 
     fn hash(&self, key: &K::View<'_>) -> u64 {
@@ -574,17 +617,21 @@ impl<K: CacheKey, T> Cache<K, T> {
         None
     }
 
+    /// The entry at `at`, a slot the index, a chain or the use queue links:
+    /// those link only slots in use, which the slab's numbering cannot show
+    /// the compiler.
     fn entry(&self, at: u32) -> &Entry<K, T> {
-        match &self.slots[at as usize] {
-            Slot::Used { entry, .. } => entry,
-            Slot::Free { .. } => unreachable!("a free slot linked"),
+        match &self.slots[at as usize].state {
+            SlotState::Used(entry) => entry,
+            SlotState::Free { .. } => unreachable!("a free slot linked"),
         }
     }
 
+    /// [`Cache::entry`], to change.
     fn entry_mut(&mut self, at: u32) -> &mut Entry<K, T> {
-        match &mut self.slots[at as usize] {
-            Slot::Used { entry, .. } => entry,
-            Slot::Free { .. } => unreachable!("a free slot linked"),
+        match &mut self.slots[at as usize].state {
+            SlotState::Used(entry) => entry,
+            SlotState::Free { .. } => unreachable!("a free slot linked"),
         }
     }
 
@@ -648,24 +695,21 @@ impl<K: CacheKey, T> Cache<K, T> {
                 before = next;
             }
         }
-        let Slot::Used { generation, .. } = &self.slots[at as usize] else {
-            unreachable!("a free slot linked");
-        };
+        let slot = &mut self.slots[at as usize];
         // A record of the entry let go of before is stale from now on.
-        let free = Slot::Free {
-            next: self.free,
-            generation: generation.wrapping_add(1),
-        };
-        let Slot::Used { entry, .. } = std::mem::replace(&mut self.slots[at as usize], free) else {
-            unreachable!("a free slot linked");
-        };
+        slot.generation = slot.generation.wrapping_add(1);
+        let state = std::mem::replace(&mut slot.state, SlotState::Free { next: self.free });
         self.free = at;
-        self.len -= 1;
-        debug_assert!(entry.size <= self.size);
-        self.size = self.size.saturating_sub(entry.size);
-        // Dropping the entry lets go of its key and value, which may log
-        // other entries as released.
-        drop(entry);
+        if let SlotState::Used(entry) = state {
+            if !matches!(entry.value, Value::Absent) {
+                self.values -= 1;
+            }
+            debug_assert!(entry.size <= self.size);
+            self.size = self.size.saturating_sub(entry.size);
+            // Dropping the entry lets go of its key and value, which may log
+            // other entries as released.
+            drop(entry);
+        }
     }
 
     /// What libass counts for the entries kept.
@@ -677,7 +721,8 @@ impl<K: CacheKey, T> Cache<K, T> {
     /// The entries kept.
     #[cfg(test)]
     pub(super) fn len(&self) -> usize {
-        self.len
+        let used = |slot: &&Slot<K, T>| matches!(slot.state, SlotState::Used(_));
+        self.slots.iter().filter(used).count()
     }
 }
 
@@ -798,7 +843,7 @@ mod tests {
 
     use std::hash::BuildHasher;
 
-    use super::{CacheKey, ITEM_BYTES, Kept, KeyHasher};
+    use super::{CacheKey, Found, ITEM_BYTES, Kept, KeyHasher};
 
     type Cache<T = u32> = super::Cache<u32, T>;
 
@@ -834,7 +879,7 @@ mod tests {
     }
 
     fn found<T: Copy>(cache: &mut Cache<T>, key: u32) -> Option<T> {
-        cache.get(key).map(|value| *value)
+        cache.get(key).and_then(Found::value).map(|value| *value)
     }
 
     #[test]
@@ -864,7 +909,7 @@ mod tests {
         assert_eq!(cache.size(), 2 * (100 + ITEM_BYTES));
         assert!(found(&mut cache, 1).is_none() && found(&mut cache, 2).is_none());
         assert!(found(&mut cache, 3).is_some());
-        let Some(again) = cache.get(0) else {
+        let Some(Found::Value(again)) = cache.get(0) else {
             panic!("the held entry went");
         };
         assert!(Kept::ptr_eq(&held, &again));
@@ -926,7 +971,7 @@ mod tests {
         let next = cache.insert(1, 1, 100).unwrap();
         cache.settle();
         assert_eq!(cache.len(), 1);
-        let Some(found) = cache.get(1) else {
+        let Some(Found::Value(found)) = cache.get(1) else {
             panic!("the stale record took the new entry");
         };
         assert!(Kept::ptr_eq(&found, &next));
@@ -964,13 +1009,15 @@ mod tests {
         assert_eq!(cache.size(), 2);
     }
 
-    /// An outline that cannot be built is kept as `None`, found as such,
-    /// and goes at a cut like any value nothing holds.
+    /// A key whose value cannot be made, such as an outline that cannot be
+    /// built, is kept without one, counted, found as such, and goes at a cut
+    /// like any entry nothing holds.
     #[test]
     fn an_absent_value_is_kept_and_cut_as_any_other() {
-        let mut cache: Cache<Option<u32>> = cache();
-        drop(cache.insert(0, None, 10).unwrap());
-        assert_eq!(found(&mut cache, 0), Some(None));
+        let mut cache: Cache = cache();
+        cache.insert_absent(0, 10).unwrap();
+        assert!(matches!(cache.get(0), Some(Found::Absent)));
+        assert_eq!((cache.len(), cache.size()), (1, 10 + ITEM_BYTES));
         cache.cut(0);
         assert!(cache.get(0).is_none());
     }

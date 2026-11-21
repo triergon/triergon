@@ -15,7 +15,7 @@ use triergon_raster::{
 };
 
 use super::CacheLimits;
-use super::cache::{Cache, CacheKey, Kept, sizes};
+use super::cache::{Cache, CacheKey, Found, Kept, sizes};
 use super::outlines::{KeptOutline, Outlines};
 use super::placement::{GlyphDrawing, PlacedRun, Placer, Runs};
 use super::units::d6_to_double;
@@ -377,7 +377,7 @@ impl Painter {
             effects,
             glyphs: &self.glyphs,
         };
-        let composite = if let Some(composite) = self.composites.get(view) {
+        let composite = if let Some(Found::Value(composite)) = self.composites.get(view) {
             composite
         } else {
             let bitmaps = drawn.iter().map(|d| &d.bitmaps);
@@ -508,7 +508,7 @@ impl Bitmaps {
         work: &mut WorkBudget,
     ) -> Result<PlacedBitmap<SharedBitmap>> {
         charge(work, LOOKUP_UNITS)?;
-        let kept = if let Some(kept) = self.cache.get(key) {
+        let kept = if let Some(Found::Value(kept)) = self.cache.get(key) {
             kept
         } else {
             let bitmap = match raster.draw(shape, &at.transform, work)? {
