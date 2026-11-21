@@ -818,7 +818,7 @@ I/N`, every Nth workload), a capture case (`capture qualify --stage timing`, the
 tests, and the font, shaping, rasterising and ASS comparisons. A contract with
 `"runner": "cargo xtask report"` adds its feature to the plan. Its optional
 `corpus_directory` supplies the gate's `--corpus` argument. Specialized commands and
-on-demand or diagnostic exclusions are listed in `xtask/src/gate.rs`. The planner
+on-demand or diagnostic exclusions are listed in `xtask/src/gate/plan.rs`. The planner
 rejects a feature with no runner or exclusion. Both
 targets run every item. `cargo xtask gate plan --shards N`
 splits the items into N shards of about equal planning weight, each for its own host;
