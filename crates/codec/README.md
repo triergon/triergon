@@ -100,9 +100,6 @@ then keeps the element order of the PCE, and so does the AAC decoder.
 - **Errors.** A refused access unit is a `DecodeFailure`; the decoder stays usable.
   Typed errors are available from each codec crate's own `decode`/`send`.
 
-## Conformance
-
 Speaker ids and names follow FFmpeg's channel layout API (`AV_CHAN_*`, `AV_CH_*`).
-The channel order is verified through the codec crates, whose output planes are
-compared with FFmpeg channel by channel; unit tests pin layout equality, masks and
-capacity. Gates: [docs/quality.md](../../docs/quality.md).
+Verification: [harness/codecs](../../harness/codecs/STATUS.md); results in
+[docs/status.md](../../docs/status.md).

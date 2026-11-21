@@ -1,7 +1,7 @@
 # ass-worker
 
-ASS parsing and rendering measurement worker for the harness. It reads whole scripts, runs
-Matroska packet streams and walks events through
+ASS parsing and rendering measurement worker for the harness. It reads whole scripts,
+runs Matroska packet streams and walks events through
 [triergon-ass](../ass/README.md), as the libass reference worker
 (`harness/reference_ass.h`) does with libass 0.17.5. It is tooling
 (`publish = false`), not part of the library.
@@ -27,31 +27,20 @@ ass-worker ass-render-dump   FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
 
 A fixture's directives (`;@force`, `;@extract-fonts`, `;@time`) and a stream's
 commands (`@private`, `@data`, `@styles` blocks, `@chunk`, `@dump`, `@flush`,
-`@prune`, `@check-readorder`) are described in `src/fixture.rs`. A record is a
-kind and integers, doubles, strings or absent values (`src/record.rs`): the
-track, its formats, styles, events and embedded fonts; per walk every glyph's
-state, drawing outlines, the event state, the vector clip and karaoke results.
-The fold, bench and memory modes print the harness protocol's one JSON line,
-whose `digest` folds every record in order; the bench mode adds the elapsed time
-of the timed loop and the memory mode brackets one operation with the
-allocation-window markers. Reading the file, its directives and commands, and
-for a walk the script, are outside both. The dump mode prints the same records
-as lines, identical to the reference's dump. The features are
-`harness/features/ass-parse-*/`.
+`@prune`, `@check-readorder`) are described in `src/fixture.rs`. The fold, bench and
+memory modes print the harness protocol's one JSON line, whose `digest` folds every
+record in order; the bench mode adds the elapsed time and the memory mode brackets one
+operation with the allocation-window markers. The dump mode prints the same records as
+lines, identical to the reference's dump. The features are `harness/features/ass-parse-*/`.
 
-The `ass-render-*` modes render a script (MODE `script`) or a stream fixture
-(`chunks`) with the fonts its `;@attach`, `;@default-family` and
-`;@default-font` directives name, relative to FONTS, at the frame and
-storage size given, at the times of its `;@frames` directive or `@frames`
-commands, as `harness/reference_ass_render.h` renders them with libass
-(feature `harness/features/ass-render/`), with `triergon_ass::Renderer`.
-One operation does what a player embedding libass does: it copies the attached
-fonts into its budget (as `ass_add_font` does), reads the default font file, creates
-the renderer with libass's cache limits at 1000 glyphs and 24 MiB, reads the script
-or runs the stream and renders every frame. The bench mode times the reading and
-the rendering, from the configured renderer to the last frame, as the reference
-does; the memory mode measures the whole operation (`src/render.rs`). Each frame's
-change value is folded, then every image in list order (kind, position, size,
-colour, alpha rows), the box behind a `BorderStyle` 4 event with kind 3, and the
-dump mode prints the reference's lines. Its runtime and memory are measured against
-`harness/reference_ass_player.h`, libass linked as a player links it.
+The `ass-render-*` modes render a script (MODE `script`) or a stream fixture (`chunks`)
+with `triergon_ass::Renderer`, as `harness/reference_ass_render.h` renders it with libass
+(feature `harness/features/ass-render/`): with the fonts its `;@attach`,
+`;@default-family` and `;@default-font` directives name, relative to FONTS, at the frame
+and storage size given, at the times of its `;@frames` directive or `@frames` commands.
+One operation does what a player embedding libass does: it copies the attached fonts into
+its budget, reads the default font file, creates the renderer with libass's cache limits
+(1000 glyphs, 24 MiB), reads the script or runs the stream and renders every frame. The
+bench mode times the reading and the rendering; the memory mode measures the whole
+operation. Runtime and memory are measured against `harness/reference_ass_player.h`,
+libass linked as a player links it.

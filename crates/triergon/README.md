@@ -59,10 +59,9 @@ then treat as FFmpeg treats one (no seeking, no known length). Both stop reading
 soon as a fixed signature selects the format (Matroska needs four bytes, Ogg five,
 ISO BMFF eight; a native FLAC marker once higher-priority signatures are ruled out).
 Frame-based and ID3-prefixed inputs use the elementary probe at EOF or 64 KiB,
-whichever comes first; the seekable adapter then rewinds. Before reading a pipe, the
-sequential adapter reserves room for the largest replay the pool can admit (up to
-64 KiB with elementary readers, 389 bytes without), so a refused reservation leaves
-the pipe untouched; it releases that capacity after replaying the last byte.
+whichever comes first; the seekable adapter then rewinds. The sequential adapter
+reserves its replay buffer (up to 64 KiB with elementary readers, 389 bytes without)
+before reading a pipe, so a refused reservation leaves the pipe untouched.
 
 ## Supported
 
@@ -90,21 +89,21 @@ The meaning of each type is documented in
 
 ## Behaviour and limits
 
-- **Probing.** `probe` returns `Probe::Matroska` for an EBML header
-  (`1A 45 DF A3`), `Probe::Isobmff` when bytes 4–8 are `ftyp`, `styp`, `moov`,
-  `moof`, `mdat`, `free`, `skip` or `sidx`, and `Probe::Ts` when sync bytes `0x47`
-  sit at offsets 0, 188 and 376 (at least 377 bytes). `Probe::M2ts` checks sync
-  at offsets 4, 196 and 388 behind the original arrival prefixes. When both patterns
-  match, the facade selects TS188.
+- **Probing.** `probe` returns `Probe::Matroska` for an EBML header (`1A 45 DF A3`),
+  `Probe::Isobmff` when bytes 4–8 are `ftyp`, `styp`, `moov`, `moof`, `mdat`, `free`,
+  `skip` or `sidx`, and `Probe::Ts` when sync bytes `0x47` sit at offsets 0, 188 and 376
+  (at least 377 bytes). `Probe::M2ts` checks sync at offsets 4, 196 and 388 behind the
+  original arrival prefixes. When both patterns match, the facade selects TS188.
   `Probe::Ogg` is an `OggS` page. With the `elementary` feature,
   `triergon_elementary::probe` recognises native FLAC (`fLaC`, or a frame header that a
-  second one continues) and MPEG audio, ADTS and AC-3/E-AC-3 by two frames that agree, after
-  any ID3v2 tag. Anything else, including a prefix too short to decide, is
+  second one continues) and MPEG audio, ADTS and AC-3/E-AC-3 by two frames that agree,
+  after any ID3v2 tag. Anything else, including a prefix too short to decide, is
   `Probe::Unknown`.
 - **Opening.** MPEG-TS opens through `AnyReader::MpegTs` with its `mpegts`
   feature. Its default program selection requires a single PAT media program;
-  use `mpegts::ReaderLimits` for an explicit selection. Unknown sources, a format without its feature, and ISO
-  BMFF on a source without random access are also `Error::Unsupported`.
+  use `mpegts::ReaderLimits` for an explicit selection. Unknown sources, a format
+  without its feature, and ISO BMFF on a source without random access are also
+  `Error::Unsupported`.
 - **Defaults.** `open` builds each reader with its default limits
   (`triergon_matroska::Limits`, `triergon_isobmff::ReaderLimits`,
   `triergon_mpegts::ReaderLimits`, `triergon_ogg::Limits`,
@@ -115,8 +114,8 @@ The meaning of each type is documented in
 - **Dispatch.** Forwarding is one `match` per call with no allocation and no
   dynamic dispatch on the packet path. Tracks are returned as `&dyn TrackInfo`.
   `AnyPacket` implements `PacketInfo`; match `AnyPacket::Matroska(p)`,
-  `AnyPacket::Isobmff(p)`, `AnyPacket::MpegTs(p)`, `AnyPacket::Ogg(p)` or `AnyPacket::Elementary(p)` for the
-  format's own packet type.
+  `AnyPacket::Isobmff(p)`, `AnyPacket::MpegTs(p)`, `AnyPacket::Ogg(p)` or
+  `AnyPacket::Elementary(p)` for the format's own packet type.
 - **Other events.** `Event::Other` carries an `AnyOther`; match
   `AnyOther::Matroska(event)` for Matroska configuration, documents and structure,
   or `AnyOther::Isobmff(event)` for root boxes and the end of opening. ISO BMFF has
@@ -135,16 +134,6 @@ The meaning of each type is documented in
 
 ## Conformance
 
-The facade adds no parsing; format semantics and their FFmpeg comparisons live in
-the format crates, and the rules every reader follows are the
+The facade adds no parsing; format semantics and their FFmpeg comparisons live in the
+format crates, and the rules every reader follows are the
 [container contract](../../docs/architecture.md#container-contract).
-`tests/any_reader.rs` checks that `probe` classifies the three container families
-and that an authored Matroska file reads through `AnyReader` with the expected track and
-packet. `tests/any_reader_mpegts.rs`
-checks TS188/M2TS192 dispatch, full source AUs and unchanged PES payload bytes.
-`tests/any_reader_isobmff.rs` reads and seeks an
-authored MP4 through `AnyReader`; `tests/any_reader_ogg.rs` and
-`tests/any_reader_elementary.rs` read authored Ogg Opus, MPEG audio and headerless FLAC
-streams with their trims. `tests/blocking_probe.rs` checks short reads, interruptions,
-reader features (a disabled MPEG-TS feature is refused), container precedence and
-budgeted prefix replay. Gates: [docs/quality.md](../../docs/quality.md).

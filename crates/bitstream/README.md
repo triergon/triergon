@@ -10,7 +10,7 @@ plain values, so a caller chooses its own error type and text.
 [`BitReader`] and [`CachedBitReader`] read MSB-first bits of a slice and yield zeros past
 what they can reach, so a decoder polls [`Reader::overrun`] at syntax boundaries instead
 of branching on every field. They share every method and differ in how they reach the
-bits, which can decide several percent of a decoder's time:
+bits:
 
 - `BitReader` does one unaligned eight-byte load per read and keeps no state. Use it for
   fixed-width fields and short tables, as AC-3 and H.264 do. A load that does not fit in
@@ -35,8 +35,7 @@ assert!(reader.overrun());
 [`RiceReader::rice`] checks the exclusive bit limit for each code. A failed
 read leaves the reader at the start of that code. A decoder validating a whole
 partition can use [`RiceReader::rice_in_partition`] and call [`RiceReader::past_end`]
-once before accepting any of its values. On 32-bit targets, a code contained in the upper
-word of the cache can be extracted using a single machine word.
+once before accepting any of its values.
 
 ## Checked reads
 
@@ -76,10 +75,7 @@ binarizations and context tables. A context is one state byte; `decision_unfille
 `Engine::new` and `restart` refuse an initial offset of 510 or 511 (`InvalidOffset`),
 which the specifications forbid. Every decoding process then keeps the offset below the
 range, so `bypass_bits(n)` returns at most `n` bits on any input. The `HEADROOM`
-parameter chooses a register layout; both decode every stream the same. The register is a
-machine word: on 64-bit targets 64 bits refilled 32 at a time, on 32-bit targets 32 bits
-refilled to capacity from the stream's bit position, where 64-bit shifts and comparisons
-take several instructions.
+parameter chooses a register layout; both decode every stream the same.
 
 ```rust
 use triergon_bitstream::cabac::{Engine, InvalidOffset, init_state};

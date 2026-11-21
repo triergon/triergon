@@ -56,7 +56,8 @@ charges a caller's `Budget`.
   400 bit/s units (`Error::BitRate`). Geometry limits (even, 2–4094) are enforced by
   `Geometry::new`.
 - `encode` refuses a picture whose geometry differs from the configuration
-  (`Error::PictureGeometry`) before changing any state. A successful encode replaces the contents of `out`.
+  (`Error::PictureGeometry`) before changing any state. A successful encode replaces the
+  contents of `out`.
 - Storage sized from the configuration is charged to the encoder's budget before it
   is allocated: the reference, reconstructed and previous source pictures, the
   macroblock and motion arrays, the coarse planes (reserved together on first motion
@@ -70,10 +71,8 @@ charges a caller's `Budget`.
 - The input must have its coded padding filled (`Picture::pad_edges`; the pixel
   `Converter` does this).
 - Every successful call encodes and advances the picture index, also for an unchanged
-  source picture (a keepalive). When the whole picture repeats, a macroblock the
-  previous picture skipped with a zero residual is skipped again without computing it,
-  as long as its quantiser is no finer; the output is the same. The first I picture
-  runs a trial pass to seed the intra rate model.
+  source picture (a keepalive). The first I picture runs a trial pass to seed the intra
+  rate model.
 - The picture rate is fixed at 30 Hz. Timestamps belong to the caller or muxer.
 - A nonzero `vbv_underflow_bits` means some picture exceeded the modelled buffer
   occupancy.
@@ -82,20 +81,6 @@ charges a caller's `Budget`.
 
 Written from ISO/IEC 11172-2 (sequence to block layers, Table 2-D.4 picture rates,
 Annex C VBV model). The reference is FFmpeg 9.0.2 `mpeg1video` with an I/P GOP of 30,
-driven through the capture pipeline ([triergon-capture](../capture/README.md)). Per
-case the harness requires:
-
-- an error-free independent FFmpeg decode of every picture and identical picture
-  types;
-- VBV underflow no worse than the reference;
-- PSNR-Y within 0.25 dB of the reference at equal or fewer bits. When the reference
-  overspends, the encoder is re-run at 1.25–4.5× the requested rate and PSNR-Y is
-  interpolated at the reference's bit count.
-
-Unit tests cover the VLC tables (prefix-free and complete), DC differentials, escape
-levels, reconstruction oddification and saturation, half-sample rounding, motion
-search and bounds, the zero-residual shortcut against the complete transform, the
-inverse transform over a block's nonzero coefficients and the forward rows against a
-butterfly transform, and skips reused for a repeated picture against the computed
-path. `tests/encoder.rs` covers configuration, geometry refusal and exact output
-after a budget retry. See the [quality gates](../../docs/quality.md).
+driven through the capture pipeline ([triergon-capture](../capture/README.md)); the
+comparison is described in [harness/capture](../../harness/capture/README.md) and its
+results in [docs/status.md](../../docs/status.md).

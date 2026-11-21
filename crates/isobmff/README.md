@@ -9,12 +9,7 @@ I/O of its own, decodes no codec, and does not apply edits to presentation.
 
 `Reader` implements the core `ContainerReader` over the source view, so the crate
 works in generic code and inside `triergon::AnyReader`. The parts below stay
-available for finer control.
-
-`media_kind(&handler)` classifies an `hdlr` handler code without allocating,
-using the same mapping as `TrackInfo::kind`. Unknown handlers stay unknown.
-
-The crate exposes two views of the same file:
+available for finer control. The crate exposes two views of the same file:
 
 - **Source view** (`BoxReader`, `SampleTable`, `FragmentIndex`, `SampleReader`,
   seek planners). Every value is a wire fact: original sample ordinals, byte
@@ -26,36 +21,17 @@ The crate exposes two views of the same file:
   chooses FFmpeg's result. It is a separate projection and never rewrites source
   facts. The `compat::mov` documentation names the FFmpeg revision it reproduces.
 
-Values that only make sense when comparing traces with FFmpeg, such as its return
-codes, log lines and models of its input layer, are compiled only with the
-non-default `reference-trace` feature, under `reference_trace::mov`.
+## Cargo features
 
-After packet traversal reaches the end, `replay_track` can build an index for a
-selected track using the sample extents and clock facts already checked during
-that traversal. Each replay has its own entry limit.
+- `reference-trace` (off by default): values that only make sense when comparing
+  traces with FFmpeg, such as its return codes, log lines and models of its input
+  layer, under `reference_trace::mov`. `examples/isobmff_consumer_worker.rs` needs it.
 
 ## Usage
 
 All parsers are polled. Each `poll` takes a `WorkBudget` (and usually a cancel
 flag) and returns `Yield`, a result, or `Step::NeedInput` for the shared
 `InputCursor` to satisfy.
-
-`SampleReader::new_with_shared_window` can return a view of a complete sample in an
-existing shared input window; the view retains the window's budget charge. Within one
-input generation, `SampleReader::new` copies a sample from the current window where it
-holds the sample's start, and `BoxReader::skip` continues from it; samples split across
-windows use a bounded packet buffer.
-
-Packet cursors check sample extents a chunk or a fragment run at a time, and sample by
-sample only where a span leaves an extent, so the first failing sample reports the
-error. The compatibility seek (`SeekJob`, `GlobalSeekJob`) reads the index of a track
-whose entries are its samples (a regular track with no edit list or one media edit
-after at most an empty edit, or a track of fragments alone) from its tables, builds
-only the entry it selects, and falls back to building every entry where an entry needs
-a rule the table walk does not follow. A global seek starts each track from the state
-its own seek reached instead of replaying it from its first sample. Optional seek
-restarts at short intervals and fragment boundaries reduce replay work for nearby
-seeks.
 
 ```rust
 use std::sync::atomic::AtomicBool;
@@ -154,7 +130,7 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | Fragments (`moof`/`traf`) | `Trex::parse`, `FragmentBuilder` → `FragmentIndex`, `OwnedFragmentCursor` |
 | One track, regular + fragments | `SourceTrack`, `TrackSampleCursor` |
 | All tracks in file order | `PhysicalSampleCursor::new_with_media_extents` |
-| Payload bytes | `SampleReader::{new, new_terminal_mdat}` |
+| Payload bytes | `SampleReader::{new, new_with_shared_window, new_terminal_mdat}` |
 | Edit lists | `EditList::parse`, `EditEntry::map_rate_one`, `MovieEditLocator` |
 | Seek | `SourceSeekPlanner`, `MovieSourceSeekPlanner`, `SourceCompositionLookup` |
 | Segment/fragment indexes | `SegmentIndex` (`sidx`), `TrackFragmentRandomAccess` (`tfra`), `MovieFragmentRandomAccessTail` (`mfro`) |
@@ -167,13 +143,16 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | FFmpeg-compatible recovery | `compat::mov::recovery::{RecoveryTrackHeader, RunRecoveryBuilder, PartialSampleReader}` |
 | Encoded tracks | `compat::mov::encoded::EncodedStreamJob`, `compat::mov::edits::EncodedEditJob` |
 
+`SampleReader::new_with_shared_window` returns a view of a complete sample in an
+existing shared input window and retains the window's budget charge; samples split
+across windows use a bounded packet buffer.
+
 ## Container reader
 
 `Reader::new` takes a seekable source, runs `open::MovieOpen` over it and then
 delivers samples in ascending byte order across tracks, each track in decode order.
-Every step takes a `WorkBudget` and the reader asks for input with `Step::NeedInput`,
-as any `ContainerReader` does. It retains `moov` and each `moof`, under `ReaderLimits`,
-and shares a sample's window where the whole sample fits in one.
+It retains `moov` and each `moof` under `ReaderLimits` (largest sample 64 MiB by
+default) and shares a sample's window where the whole sample fits in one.
 
 | Neutral item | ISO BMFF source |
 |---|---|
@@ -187,102 +166,32 @@ and shares a sample's window where the whole sample fits in one.
 | `random_access` | `stss` or fragment sample flags |
 | `Event::Other` | `ReaderEvent::Box` for each root box, `ReaderEvent::Movie` once tracks are available |
 
-Dolby Vision sample entries `dvh1` and `dvhe` report HEVC and `dav1` reports AV1.
-The reader and range playback keep the source entry code and expose the base
-`hvcC` or `av1C` configuration. Dolby Vision boxes remain available through
-`SampleDescription::extensions`. See the [registered sample entries](https://mp4ra.org/registered-types/codecs).
+Dolby Vision sample entries `dvh1` and `dvhe` report HEVC and `dav1` reports AV1,
+with the base `hvcC` or `av1C` configuration; the Dolby Vision boxes remain
+available through `SampleDescription::extensions`. See the
+[registered sample entries](https://mp4ra.org/registered-types/codecs).
 
 `request_seek` finds the latest stated sync sample presented at or before the target
 on the track's media clock, or the first one if none is, without reading media. It
 reports `SeekMethod::Index`. Other tracks resume at their first sample at or after
 that time, which may not be a sync sample.
 
-What the reader does not do:
+Limits of the reader:
 
-- **Forward-only sources** are refused, because `mdat` can precede the metadata.
-- **Edit lists** are not applied. Times are media times and the list is on
-  `Track::edits`; `compat::mov` gives FFmpeg's edited packets.
-- **A sample entry change inside a track** is not reflected in `TrackInfo`, which
-  describes the first entry. `Packet::sample` names each sample's entry and
-  `Track::descriptions` keeps them all.
-- **Colour, chapters and other metadata** have no typed field here. They stay
-  readable through `Track::descriptions` and `Reader::movie_box`, so `colour` is
-  `None`, and `default_track` and `forced` are `None` because the format has no
-  such flags.
-- **External data references** are refused, as is media outside an `mdat`. Only a
-  `url ` entry flagged self-contained counts as this file.
-- **An empty `traf`** fails the open, because it cannot state the base the next
-  `traf` may inherit.
-- **A fragment without `tfdt`** has `None` times, and a seek cannot land on it.
-- **Times beyond `i64`** fail the read with `Error::Overflow`.
-- **Encrypted entries** report their outer code (`encv`, `enca`) as `CodecId::Other`.
-- **A QuickTime `mp4a` entry** whose sound description or `wave` layout cannot be walked
-  stays `CodecId::Other`, as does any object type other than AAC or DTS with a core.
-
-### Comparison with FFmpeg
-
-`cargo xtask codecs isobmff-reader` compares every packet `Reader` delivers with the
-formats reference's `ffprobe -show_packets`, read with `-f mov -fflags
-+noparse+nofillin -ignore_editlist 1` so that FFmpeg, like the reader, fills nothing in
-and reports media times. Tracks pair with FFmpeg's streams by `track_ID`; per track,
-each packet's size, position, payload MD5, sync flag, pts, dts and duration are
-compared, and so are the order across tracks, the set of tracks and how reading ended.
-Seek cases call `request_seek` and read FFmpeg from the same time with
-`-read_intervals`. The contract, corpus, rules, reviewed dispositions and frozen
-difference lists are in
-[harness/features/isobmff-reader](../../harness/features/isobmff-reader).
-
-The 648 cases are 522 distinct inputs read through (the 251 authored open-index
-inputs, the committed ISO BMFF, playback and AAC fixtures, the MP4 range fixtures with
-FATE's `mp4-init-nonkeyframe.mp4`, and the subtitle corpus's MP4 files) and 126 seeks
-on 42 of them. 333 match exactly, 3 are refused by both, and 312 differ only by
-17 reviewed dispositions: 12 FFmpeg behaviours and 5 kinds of input the reader refuses
-under its documented policy (4 reads by two kinds):
-
-- **Refusals** (131 reads). The reader refuses media outside every `mdat`,
-  inconsistent sample tables, truncated files, a zero timescale and times beyond `i64`,
-  where FFmpeg reads what it can; FFmpeg fails to open 13 inputs the reader reads.
-- **Clock conventions** (58). FFmpeg moves decode times earlier by the most negative
-  `ctts` offset, and in fragments presentation times later; it reads version 0 offsets
-  of 2^31 or more as negative; it times fragments without `tfdt`, which the reader
-  leaves unknown; it reports no duration for a stated decode delta of 0; it marks the
-  first sample of an empty `stss` a keyframe.
-- **Packetisation and order** (55). FFmpeg delivers QuickTime PCM a chunk at a time and
-  interleaves tracks by time where the reader keeps byte order.
-- **Seeks** (72 seek cases). Both land the seek track on the same sync sample, except where a
-  reordered sync sample is decoded but not presented by the target: FFmpeg lands on it,
-  the reader on the one before. FFmpeg resumes the other tracks at their last sample at
-  or before the landing decode time, the reader at the first at or after the landing.
-
-`examples/isobmff_consumer_worker.rs` (needs `reference-trace`) drives the
-FFmpeg-compatible operations for comparison runs. At a seek or range plan it resets
-its input to the landing's byte position, as the playback engine does. Its
-`--recover-regular-tables` profile, for open and index comparisons only, uses the
-bounded regular recovery cursors for a single local, unedited track.
-
-`AacConfigurationJob` reads AudioSpecificConfig from one `mp4a` sample
-description, including QuickTime version 1 and version 2 sound descriptions
-with `wave` extensions. For version 2, it checks the declared extension offset
-and reads the descriptor inside `wave`. It returns the source offset and shared
-bytes under `ConfigurationLimits` and a `WorkBudget`. The descriptor identifies
-MPEG-4 Audio. Callers validate the bytes and determine the audio object type separately.
-`ObjectTypeScan` reads any `mp4a` or `mp4s` description's stated object
-type and decoder-specific information the same way.
-
-Range playback accepts edit lists for indexed AAC-LC with 1024 core samples and
-an explicit Program Configuration Element of up to eight channels. The edit plan
-keeps the sample durations in `stts` and uses the coded frame length for trims.
-
-`BoxReader::with_media_data_policy` can preserve a terminal `mdat`'s
-declared extent when the source length is known and the media ends early.
-This lets a compatibility consumer validate sample ranges against the
-declaration and read only the available prefix. `BoxReader::new` still
-rejects boxes extending past the source.
-
-`MovieOpen::new_recovery` also accepts the legacy QuickTime `dhlr`/`cios`
-component inside media information when its media handler is a QuickTime
-`mhlr`. Sample descriptions must still refer to self-contained data. In this
-view, `sdtp` may carry flag 1 with version 0 and exactly one byte per sample.
+- Forward-only sources are refused, because `mdat` can precede the metadata.
+- Edit lists are not applied: times are media times and the list is on
+  `Track::edits`. `compat::mov` gives FFmpeg's edited packets.
+- `TrackInfo` describes the first sample entry; `Packet::sample` names each
+  sample's entry and `Track::descriptions` keeps them all.
+- Colour, chapters and other metadata have no typed field (`colour`,
+  `default_track` and `forced` are `None`); read them through `Track::descriptions`
+  and `Reader::movie_box`.
+- External data references and media outside an `mdat` are refused; only a `url `
+  entry flagged self-contained counts as this file. An empty `traf` fails the open.
+- A fragment without `tfdt` has `None` times and cannot be a seek landing. Times
+  beyond `i64` fail with `Error::Overflow`.
+- Encrypted entries (`encv`, `enca`), unwalkable QuickTime `mp4a` layouts and object
+  types other than AAC or DTS with a core report `CodecId::Other`.
 
 ## Supported
 
@@ -298,93 +207,43 @@ view, `sdtp` may carry flag 1 with version 0 and exactly one byte per sample.
 | QuickTime PCM | v0 unsigned 8-bit and signed 16-bit big-endian (`QtPcmSampleReaderV0`) |
 | FFmpeg-compatible view | AVC, HEVC, AV1, VP9, AAC, AC-3, E-AC-3, DTS (`compat::mov::encoded::EncodedEntryKind`), raw video, `tx3g`, PCM |
 
+`AacConfigurationJob` returns the AudioSpecificConfig bytes of an `mp4a` entry
+(including QuickTime v1/v2 `wave`) unvalidated; callers determine the object type.
+
 ## Behaviour and limits
 
-- **Input.** The caller owns I/O through the core `InputCursor`. `BoxReader`
-  retains only boxes the caller asks for with `read_metadata`; `mdat` is never
-  retained. A reader is bound to one input transaction: after a reset, build a
-  new reader.
+- **Input.** `BoxReader` retains only boxes the caller asks for with
+  `read_metadata`; `mdat` is never retained. A reader is bound to one input
+  transaction: after a reset, build a new reader. `BoxReader::new` rejects boxes
+  extending past the source; `with_media_data_policy` can keep a terminal `mdat`'s
+  declared extent when the media ends early.
 - **Bounds.** `Limits` caps boxes, table records and sample descriptions
   (defaults 1,000,000 / 1,000,000 / 256). All storage is charged to the shared
-  `Budget`. Tables stay as compact wire runs; nothing allocates per sample.
-  Work is charged as fields are parsed, so every operation can yield and be
-  cancelled.
+  `Budget`; tables stay as compact wire runs and nothing allocates per sample.
+  Every operation can yield and be cancelled.
 - **Clocks.** `Sample` carries exact source ticks; `Sample::source_times`
   converts to core `Time`. A fragment with no `tfdt` and no caller-supplied
   `FragmentContext::decode_origin` has unknown DTS/CTS, not zero.
   `CompositionOffset` keeps version, raw bits and the signed reading separate;
   an absent offset differs from an explicit zero.
-- **Comparison checks.** With `reference-trace`, the MOV comparison worker applies
-  `reference_trace::mov::fragment_clock::check_signed_decode_runs` (an explicit
-  `tfdt` at or below `i64::MAX` must accumulate to a decode end at most `i64::MAX`)
-  and `reference_trace::mov::sample_entry::RawVisualEntriesJob` (configuration boxes
-  of raw visual entries; a nonempty Opus configuration under 11 payload bytes fails).
-  Source indexes and inspection keep the original values.
-- **Surplus timing entries.** `SampleTableBuilder::with_timing_policy`
-  accepts `TimingRunPolicy::BoundedPrefix` for the QuickTime-compatible
-  interpretation of overlong timing runs. The last decode run may cross
-  the sample count if it starts within it. Positive composition runs may
-  extend beyond it. The sample table retains all raw runs and reports the
-  unused counts through `SampleTable::timing_run_surplus`. The source
-  seek planners and default physical cursor constructors require exact
-  coverage. Compatibility playback can opt into physical range validation
-  for a checked prefix, including forward-only media, through the physical
-  cursor constructors that accept a timing policy.
-- **Out-of-range sync entries.** `SampleTableBuilder::with_policy` can select
-  `SyncSamplePolicy::BoundedPrefix`. The first `stss` entry past the last
-  sample ends the usable prefix. That entry and the rest of the table remain
-  available as raw metadata, with their count in
-  `SampleTable::unused_sync_entries`. They never mark a sample or provide a
-  seek point. The default policy rejects an out-of-range entry.
-- **Payload ranges.** `SampleReader::new` requires the sample to lie inside the
-  caller's `mdat` payload extent. `PhysicalSampleCursor::new_with_media_extents`
-  checks every track's ranges against the `mdat` extents before emitting
-  anything. Valid but backward-ordered layouts are `Unsupported` for the
-  physical cursor only.
-- **Edits.** Source edit lists are parsed and mapped at rate one only.
-  Non-unit rates and dwell edits are refused. The source view never repeats
-  or shifts packets; the FFmpeg-compatible view does. There, encoded AVC keeps a
-  leading empty edit as a start delay on both packet clocks, and an edited endpoint
-  at or beyond the signed clock limit produces no video packets.
-  A front-metadata cursor can project checked encoded edits for regular tracks
-  within one finite media extent. The forward playback index checks the
-  projected byte order before delivering any packet.
-  `SampleTable::has_composition_offsets` reports a regular table's `ctts`
-  presence before reading its samples.
-  A regular video edit starting on the first decoded sample's presentation
-  tick keeps the initial non-sync samples with their original flags when
-  there is no sync sample at or before that tick. A
-  backward seek on that track requires a preceding sync sample. Secondary
-  tracks can replay their verified prefix when the primary lands earlier.
-  A zero-origin edit covering the decode span can retain reordered non-sync
-  packets past its presentation end and marks them for discard.
-  Range playback preserves AAC sample durations from `stts`, including
-  durations longer than one coded frame. Trim counts use the coded frame length.
-  The regular range view also establishes a 1024-sample clock for indexed AAC-LC
-  configurations 11, 12 and 14 when the media timescale matches the core rate.
-  The compatible view of a fragmented file supports one open-ended rate-one
-  media edit after an optional leading empty edit. The empty edit
-  delays packet clocks by its duration, rounded to the track time base.
-  A front movie with fragment defaults establishes the same edit before the
-  track's first fragment, even when that fragment follows other media.
-  Backward seek queries subtract the media start. AAC leading trim for
-  a single initialization edit uses the declared AAC object type and
-  configured audio sample rate.
-  Regular Opus range playback retains the `dOps` record and exposes its canonical
-  identification header. The MOV policy projects leading and trailing edit trim
-  and retains up to one second of history plus the preceding sample for a long
-  leading crop. Source packet durations stay available alongside the projected
-  durations. A secondary Opus seek keeps an exact match or searches 10 ms earlier
-  when the target falls between samples. The optional `with_opus_recovery` policy
-  starts from the Opus track's source `roll` group at the video presentation
-  landing. It reports the first source sample and available preroll, including
-  when recovery starts at the beginning of the track. It refuses a landing at
-  or past the end of the Opus presentation window.
+- **Table policies.** By default timing runs must cover the sample count exactly
+  and an out-of-range `stss` entry is refused. `SampleTableBuilder` can opt into
+  `TimingRunPolicy::BoundedPrefix` (QuickTime-style overlong runs, reported by
+  `SampleTable::timing_run_surplus`) and `SyncSamplePolicy::BoundedPrefix` (unused
+  entries counted by `SampleTable::unused_sync_entries`, never seek points). The
+  source seek planners and default physical cursors require exact coverage.
+- **Payload ranges.** `SampleReader::new` requires the sample inside the caller's
+  `mdat` payload extent; `PhysicalSampleCursor::new_with_media_extents` checks every
+  track first and returns `Unsupported` for valid backward-ordered layouts.
+- **Edits.** Source edit lists are parsed and mapped at rate one only; non-unit
+  rates and dwell edits are refused. The source view never repeats or shifts
+  packets; the FFmpeg-compatible view does, including AAC and Opus trim for range
+  playback and, for fragmented files, one open-ended rate-one media edit after an
+  optional leading empty edit.
 - **Seek.** Seek planners select a preceding container sync sample, record
-  available and missing preroll, and validate every media range before
-  publishing a plan. A sync sample is a container fact, not proof of decoder
-  recovery. `sidx` and `tfra` entries are hints and are not verified against
-  the media.
+  available and missing preroll, and validate every media range before publishing
+  a plan. A sync sample is a container fact, not proof of decoder recovery. `sidx`
+  and `tfra` entries are hints, not verified against the media.
 - **Refusals.** Unknown box versions, unknown flags, unselected `stz2` widths,
   non-unit edits and unobserved FFmpeg-compatible profiles return
   `Error::Unsupported`. Structural damage returns `Invalid` or `Truncated`.
@@ -407,62 +266,11 @@ Specification basis:
   experimental and refuses fields they leave open.
 - ETSI TS 102 366 Annex F (AC-3/E-AC-3 in ISO media).
 
-Verification:
-
-- Integration tests under `tests/` use independently authored fixtures in
-  `tests/fixtures/` with expected values written from the specifications.
-  Fixture hashes and provenance are in `tests/fixtures/PROVENANCE.json`;
-  FFmpeg-generated fixtures document their commands (for example
-  [range-encoded-edits](tests/fixtures/range-encoded-edits/README.md)).
-- The FFmpeg-compatible view is compared packet by packet (order, timestamps,
-  flags, bytes) with the pinned FFmpeg reference. Comparisons never sort or
-  normalise either side.
-
-With the `formats` reference prepared and the workers built (`cargo xtask
-build-workers`), `cargo xtask isobmff-bench` runs all 1,020 open and index parity
-checks: 972 output labels and 48 explicit refusals. `--benchmark --memory` measures
-the complete selection (956 physical operations and 16 explicit aliases), and
-`--subset52` a separate 52-operation selection that cannot qualify the feature;
-both keep every parity check. `--require-acceptance` applies the gates, and `cargo
-xtask grade` joins separate timing and memory `collection.json` files against
-[harness/features/isobmff-open-index](../../harness/features/isobmff-open-index).
-
-`cargo xtask isobmff-seek` compares 476 seek and range-plan cases
-([contract](../../harness/features/isobmff-seek/contract.json)) over eight authored
-movies of up to 1,800 samples per track (`harness/fixtures/isobmff-seek`, written by
-`cargo xtask isobmff-seek fixtures --out DIR`) and 36 inputs of the open and index
-corpus:
-
-- 378 seeks: open, optionally read to the end, `GlobalSeekJob` backward on one
-  track and read up to 64 packets, against the reference's public backward seek
-  and packet reads. Traces must be byte-identical.
-- 94 range plans: `MovieSourceSeekPlanner` with published `roll` recovery and the
-  plan's samples read from its decode start through its target, against the
-  reference's backward seek reading as many packets. The source positions, sizes
-  and payloads must be identical in order.
-- 4 matching refusals of inputs whose open both workers refuse.
-
-`--benchmark --memory` times and measures the 472 successful cases and `--part I/N`
-every Nth of them; every case is compared in every run. The worker runs a range plan
-for a seek mode given `--range-plan`.
-
-Gate results (c6g.4xlarge, `f8661cb0`): every case matches, and all 472 timed cases
-pass runtime and memory on both targets (worst upper bound 0.9136 on Linux AArch64 and
-0.9546 on 32-bit ARMv7, peak heap at most 0.9032 of the reference's).
-
-Not compared yet: the compatibility seek refuses a global seek across tracks with
-unequal clocks, overlapping or null index clocks and regular table recovery as
-unsupported, and on 47 inputs of the open and index corpus its result differs from
-the reference's at some targets. Where decode times start below zero or below the
-first presentation time, the reference lands on the preceding sync sample for a
-target at or just after a later sync sample's decode time. Where an edit trims the
-last presented sample, the reference reports that sample's full duration after a
-seek and the seek keeps the trimmed one; where an edit starts inside the first
-sample, the seek lands one sample earlier. A range
-plan works in movie time with recovery groups and composition offsets, so it
-selects other samples than the reference's decode-time seek on inputs with
-composition offsets, edits that do not start at the media start, `roll` groups or
-more than one track; those plans are not compared.
-
-Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
-and [docs/status.md](../../docs/status.md).
+Fixture hashes and provenance are in `tests/fixtures/PROVENANCE.json`;
+FFmpeg-generated fixtures document their commands (for example
+[range-encoded-edits](tests/fixtures/range-encoded-edits/README.md)).
+Verification: the FFmpeg comparisons are defined in
+[harness/features/isobmff-reader](../../harness/features/isobmff-reader),
+[isobmff-open-index](../../harness/features/isobmff-open-index) and
+[isobmff-seek](../../harness/features/isobmff-seek); results are in
+[docs/status.md](../../docs/status.md).

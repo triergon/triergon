@@ -52,11 +52,12 @@ Further independent programs are skipped.
 - `decode` appends to `out`, which must be empty or hold the same rate and layout
   (`OutputLayoutMismatch` otherwise). `reset` drops delay lines, concealment history and
   noise state.
-- Planes follow the triergon-codec [channel order](../codec/README.md#channel-order); 7.1 is
-  FL FR FC LFE BL BR SL SR.
+- Planes follow the triergon-codec [channel order](../codec/README.md#channel-order); 7.1
+  is FL FR FC LFE BL BR SL SR.
 - Refused with `Unsupported(Feature)`: bsid > 16, reserved fscod2 and stream type 3, and
-  (with `Compat::Reference`) E-AC-3 reduced sample rates. Enhanced coupling conceals the frame
-  and reports `Feature::EnhancedCoupling` in `FrameInfo::concealed`; FFmpeg does the same.
+  (with `Compat::Reference`) E-AC-3 reduced sample rates. Enhanced coupling conceals the
+  frame and reports `Feature::EnhancedCoupling` in `FrameInfo::concealed`; FFmpeg does
+  the same.
 - Concealment (A/52 7.10 block repeat): a damaged block repeats the previous block for
   the rest of the frame; a truncated AC-3 frame outputs six copies of the last block; a
   truncated E-AC-3 frame outputs nothing.
@@ -94,29 +95,17 @@ hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
 
 ## Known gaps
 
-- No oracle coverage: dual mono, 2/3-block E-AC-3 frames, `blkswe`, AHT on coupling and
-  LFE channels, dependents without channel map, E-AC-3 reduced sample rates with
-  `Compat::Specification` (its hearing-threshold column is a guess).
-- bsid 9/10 rests on self-authored probe streams and patched content; no encoded stream
-  of that kind has been compared.
+- Not compared with FFmpeg: dual mono, 2/3-block E-AC-3 frames, `blkswe`, AHT on
+  coupling and LFE channels, dependents without channel map, and E-AC-3 reduced sample
+  rates with `Compat::Specification` (its hearing-threshold column is a guess). bsid 9/10
+  has been compared on self-authored probe streams only.
 - Error concealment on corrupt mono/stereo/2.1 input can differ from FFmpeg in a few
   frames.
 
-## Conformance
+## Standards
 
-- Specification: ATSC A/52:2018; `src/spec_tables.rs` is generated from its text by
-  `harness/codecs/ac3/gen_tables.py`.
-- Reference: FFmpeg 9.0.2's float decoder on the FATE AC-3/E-AC-3 vectors and on streams
-  from FFmpeg's own encoders covering every acmod, rate, coupling and E-AC-3. Every sample
-  is compared: exact rate, layout and count; per channel RMS ≤ 8.8e-6 and
-  max |diff| ≤ 6.1035e-5 (`harness/codecs/numeric-rules.json`). Dither-free comparisons use
-  streams rewritten by `examples/strip_dither.rs`.
-- Gate item `codecs-audio` grades the FATE AC-3 and E-AC-3 vectors and the AC-3 streams
-  copied out of FATE's WAV and transport stream on Linux AArch64 and 32-bit ARMv7
-  (`thumbv7neon-unknown-linux-gnueabihf`): 6/6 AC-3 and 6/6 E-AC-3 pass on both at
-  `c68c9667`, with FFmpeg's noise reproduced.
-- Downmix metadata is compared per frame against `ffprobe -show_frames`.
-- `cargo test -p triergon-codec-ac3` runs table, transform, synthetic-frame, bsid 9/10 and
-  corruption tests; FATE checks skip when the corpus is absent.
-- Derivation notes and tools: [harness/codecs/ac3](../../harness/codecs/ac3/STATUS.md).
-  Project-wide gates: [docs/quality.md](../../docs/quality.md).
+ATSC A/52:2018; `src/spec_tables.rs` is generated from its text by
+`harness/codecs/ac3/gen_tables.py`. `examples/strip_dither.rs` rewrites a stream without
+dither. Derivation notes and tools:
+[harness/codecs/ac3](../../harness/codecs/ac3/STATUS.md); results in
+[docs/status.md](../../docs/status.md).

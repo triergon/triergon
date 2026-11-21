@@ -72,54 +72,24 @@ assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 203
 **Time.** `Time` is an exact, always-reduced rational number of seconds. Unknown
 time is `Option<Time>`; no value is a sentinel. `checked_add`/`checked_sub`
 reduce before range checks, so a wide intermediate alone never rejects a valid
-result; products that do not fit `u128` go through a fixed 256-bit scratch
-calculation without heap allocation. Rounded views (`to_ticks`, `to_i64_ticks`,
+result, and nothing allocates. Rounded views (`to_ticks`, `to_i64_ticks`,
 `to_nanoseconds`, `TimeBase::rescale`) take an explicit `Rounding`:
 `TowardZero`, `AwayFromZero`, `Floor`, `Ceil` or `NearestAway`. Results that do
 not fit return `Error::Overflow`; a zero timebase or denominator is `Invalid`.
-Clock projections use checked 64-bit multiplication and division when
-the scaled magnitude fits, with the selected rounding policy. On targets with
-32-bit registers, where 64-bit division is a library loop, reduction to lowest
-terms uses a binary greatest common divisor and divides by it exactly through
-the divisor's inverse modulo 2⁶⁴, and a tick base that is a multiple of the time's
-denominator is recognised the same way; 64-bit targets divide.
 Use `TimeBase::MICROSECONDS` and `TimeBase::NANOSECONDS` for those fixed clocks.
 
-**Budget and storage.** `Budget::new(limit)` creates one accounting pool; clones
-share it. Its limit includes its own fixed control block
-(`Budget::control_storage_bytes()`). Every owned allocation holds a linear
-`Reservation` until it drops. `Charged<T>` keeps a value charged for as long as it
-lives (`Charged::boxed` charges a boxed value's size). A `Reservation` held apart
-from its storage is for output a caller owns, such as a decoder's output frame:
-`resize_to` charges that storage before it grows. `Bytes` is an immutable shared span: slicing and
-cloning share one backing allocation, and every alias keeps the whole backing
-capacity charged (`retained_capacity`). `budget()` borrows the pool of that
-allocation. `try_into_writer` turns a uniquely owned whole
-allocation into a `BytesWriter`, keeping its bytes; a shared allocation or a slice is
-refused and returned. `BytesWriter::try_write_at` writes in place across steps, the fill
-seeing the earlier bytes or zero past them; growth charges old and new buffers together
-before it reserves, and a refused charge or allocation changes nothing. `finish`
-publishes the bytes. `BudgetVec<T>` is the charged mutable
-vector and reads and writes as a slice (`try_filled` builds one filled with a value,
-`try_clone` charges a copy); growth charges old and new buffers together, and a rejected push,
-reserve or `freeze` returns the original value or builder unchanged.
-`BudgetVec::<u8>::try_with_owner_capacity` is for output whose size is known before it
-is written: one claim charges the capacity and the header `freeze` adds, so filling it
-within that capacity and freezing it charge nothing more.
-`BudgetVecIntoIter<T>::as_slice()` borrows the remaining elements in traversal
-order without advancing or allocating. The iterator keeps its capacity charged
-until it drops, including after its last element is consumed. Reclaiming hands
-an allocation back for reuse: `BudgetVecIntoIter::reclaim()` and
-`Bytes::try_reclaim()` drop or discard the contents and return an empty
-`BudgetVec` that keeps the capacity and is charged for exactly it, so a consumer
-can return a used-up vector or frozen buffer to its producer to fill again
-without allocating. `try_reclaim` fails, returning the bytes intact, while
-another handle shares the allocation. `BudgetVec::fits_reuse_for(len)` states
-the size rule for keeping such an allocation: at most twice the item it serves,
-the slack amortised doubling already allows.
-`OwnedInputBytes` adopts a caller `Vec<u8>` as immutable input; produced
-packets or views cannot be converted back into it. `used()` and `peak()` report
-requested capacity, not RSS or allocator overhead.
+**Budget and storage.** `Budget::new(limit)` creates one accounting pool; clones share
+it, and its limit includes its own control block (`Budget::control_storage_bytes()`).
+Every owned allocation holds a `Reservation` until it drops; a `Reservation` held apart
+from its storage covers output a caller owns, such as a decoder's output frame
+(`resize_to` charges before it grows). `Bytes` is an immutable shared span: slices and
+clones share one backing allocation, and every alias keeps the whole capacity charged.
+`BudgetVec<T>` is the charged mutable vector and `BytesWriter` a writer filled in place
+across steps; growth charges old and new buffers together, and a refused charge returns
+the original value unchanged. `BudgetVecIntoIter::reclaim()` and `Bytes::try_reclaim()`
+hand an allocation back as an empty `BudgetVec` for reuse without allocating.
+`OwnedInputBytes` adopts a caller `Vec<u8>` as immutable input. `used()` and `peak()`
+report requested capacity, not RSS or allocator overhead.
 
 Two capacity errors are distinct. `Error::Limit` means the request can never fit
 the policy. `Error::Backpressure` means it fits once the caller releases retained
@@ -144,16 +114,10 @@ source is the separate `finish` call, after which reads return
 | `reset(offset)` | new | logical seek or recovery; the parser resets its own state too |
 | `continue_source(id, caps)` | kept | next entity of the same logical stream (playlist segment) |
 
-Reads come in four forms: `read_into` (copy into a slice), `read_append` (copy
-into a `BudgetVec<u8>`), `read_discard` (skip without copy) and `read_span`
-(zero-copy `Bytes` alias of the window). `buffered()` peeks without consuming.
-`consume_response` lets a parser process a complete borrowed response
-without retaining an input window.
-A parser that still needs bytes after a partial read can use `pending_request()`
-to ask for the next window once the current window is empty and the source is
-still active. It checks cancellation before returning a request.
-A read that yields, starves or hits backpressure keeps its position, so the
-caller retries the same call.
+Reads come in four forms: `read_into` (copy into a slice), `read_append` (copy into a
+`BudgetVec<u8>`), `read_discard` (skip without copy) and `read_span` (zero-copy `Bytes`
+alias of the window); `buffered()` peeks without consuming. A read that yields, starves
+or hits backpressure keeps its position, so the caller retries the same call.
 
 **Work and cancellation.** Every read charges one `WorkBudget` unit per byte.
 Format crates also charge parsing, decompression, indexing and pixel work before
@@ -206,25 +170,9 @@ the facade's `triergon::AnyReader`. The
 semantic contract is described in
 [docs/architecture.md](../../docs/architecture.md#container-contract).
 
-## Conformance
+## Verification
 
-The arithmetic follows exact rational semantics; there is no external
-specification. Verification:
-
-- Integration tests in `tests/` cover ownership and charge accounting across
-  clone, teardown, reset and cross-thread release; stale-token, foreign-pool and
-  source-mismatch rejection; inline and owned windows; and clock boundary widths.
-- `cargo xtask core-time` (also part of `cargo xtask check variants`) compares
-  every output row from `examples/time-oracle.rs` with independent Python
-  `fractions.Fraction` and integer expectations. Each of the debug and release
-  builds runs 34,502 time and 15,024 wide-arithmetic cases plus 1,280 time and
-  429 wide edge cases, and verifies the input and expected-file SHA-256s
-  (`--help` lists the toolchain, target, profile and output options).
-- Two `compile_fail` doctests on `OwnedInputBytes` prove produced storage
-  cannot be turned back into caller input.
-- Container-model unit tests check exact packet time without fabricated values and
-  that the neutral value types stay small on 32-bit targets; the format crates test
-  their implementations.
-
-The crate forbids `unsafe` code and has no dependencies. Project-wide gates and
-the FFmpeg comparison harness are described in [docs/quality.md](../../docs/quality.md).
+The arithmetic follows exact rational semantics; there is no external specification.
+`cargo xtask core-time` compares the time arithmetic with an independent Python
+`fractions.Fraction` oracle. The crate forbids `unsafe` code and has no dependencies.
+Project-wide gates: [docs/quality.md](../../docs/quality.md).

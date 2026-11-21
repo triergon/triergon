@@ -71,19 +71,8 @@ Multiplex differences (PMT stream type, SDT provider) are listed under
 
 ## Conformance
 
-The reference is FFmpeg 9.0.2 (`swscale` with `SWS_BILINEAR`, `mpeg1video` with an
-I/P GOP of 30, `mpegts`) driven by the capture build of `harness/reference.c`; the
-capture worker selects the constructor for the target. `harness/capture/` (contract
-and cases in `contract.json` and `cases.json`) runs both pipelines and applies
-the per-stage rules documented in [triergon-pixel](../pixel/README.md#conformance)
-and [triergon-codec-mpeg1](../codec-mpeg1/README.md#conformance). For the multiplex,
-an independent re-demux (FFmpeg and an own TS walker) must find the same PIDs and
-tables (subject to the documented differences), PES payloads equal to the
-elementary stream, identical per-frame PTS, DTS and PCR, valid continuity and the
-table cadence. The harness measures peak live heap and total resident peak RSS
-with the same input and checked output for each worker.
-
-`tests/session.rs` covers the start sequence and timing, keepalive, sink failure,
-bottom-up input, geometry and rate extremes, and error mapping.
-[capture-worker](../capture-worker/README.md) runs a session from the harness command
-line. Gates: [docs/quality.md](../../docs/quality.md).
+The reference is FFmpeg 9.0.2 (`swscale` with `SWS_BILINEAR`, `mpeg1video` with an I/P
+GOP of 30, `mpegts`). The comparison rules are in
+[harness/capture](../../harness/capture/README.md) and the results in
+[docs/status.md](../../docs/status.md). [capture-worker](../capture-worker/README.md) runs
+a session from the harness command line.

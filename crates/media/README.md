@@ -1,12 +1,13 @@
 # Matroska / WebM reader (triergon-matroska)
 
 Package `triergon-matroska`. A bounded Matroska and WebM demuxer: EBML parsing, tracks,
-packets with lacing and content encoding, Cues-based seeking, static colour/HDR,
-block additions and segment metadata (Info, chapters, tags, attachments). It is a
-format-layer crate on top of [triergon-core](../core/README.md) and
-[triergon-bitstream](../bitstream/README.md); its push reader implements the core `ContainerReader`. It does not
-decode codecs, schedule playback or render metadata; it returns source facts, and
-the `compat` modules reproduce FFmpeg's choices where a consumer needs them.
+packets with lacing and content encoding, Cues-based seeking, static colour/HDR, block
+additions and segment metadata (Info, chapters, tags, attachments). It is a format-layer
+crate on top of [triergon-core](../core/README.md) and
+[triergon-bitstream](../bitstream/README.md); its push reader implements the core
+`ContainerReader`. It does not decode codecs, schedule playback or render metadata; it
+returns source facts, and the `compat` modules reproduce FFmpeg's choices where a
+consumer needs them.
 
 The neutral track view identifies the nine deprecated AAC CodecIDs alongside
 `A_AAC`. `Track::legacy_aac_profile` exposes the profile signalled by a deprecated
@@ -39,8 +40,8 @@ while let Some(p) = reader.next_typed_packet(&cancel)? {
 need `Read + Seek`; `open_owned_seekable_in` reads an `OwnedInputBytes` and lets
 packets alias the input allocation. The `*_in` variants share a caller `Budget`.
 `next_packet` returns the plain `matroska::Packet` and refuses packets that carry
-block additions or CodecState; use `next_typed_packet` for those.
-Typed configurations expose their allocation accounting through `Configuration::budget()`.
+block additions or CodecState; use `next_typed_packet` for those. Typed configurations
+expose their allocation accounting through `Configuration::budget()`.
 
 `examples/matroska_packets.rs FILE` prints the tracks and packets of a file.
 
@@ -132,11 +133,11 @@ and seeking on a non-video track.
 | `index_entries` | 16,384 | Cues entries |
 | `decompression_ratio` / `decompression_work` | 1024 / 128 Mi | expansion vs. input; work units per encoding |
 
-Exceeding a policy is `Error::Limit`; output that fits once the caller drops
-retained packets is `Step::Backpressure` from `Reader::step` (`Error::Backpressure`
-from `BlockingReader`) and is retryable. `PayloadOwnership::OwnedExact` (default) gives each block payload
-storage of exactly its size; `SharedBounded` lets payloads alias their parent
-input allocation and reports that parent's full capacity as retained.
+Exceeding a policy is `Error::Limit`; output that fits once the caller drops retained
+packets is `Step::Backpressure` from `Reader::step` (`Error::Backpressure` from
+`BlockingReader`) and is retryable. `PayloadOwnership::OwnedExact` (default) gives each
+block payload storage of exactly its size; `SharedBounded` lets payloads alias their
+parent input allocation and reports that parent's full capacity as retained.
 
 **Opening.** Sequential input requires metadata before the first Cluster. Seekable
 input follows bounded SeekHead chains to load late Tracks, Cues, chapters, tags
@@ -149,70 +150,44 @@ duration is known, and fractional lace durations and negative PTS are kept.
 `dts_ns` is not derived. `compat::clock::packet_timing` is an opt-in view in
 Segment ticks that reproduces FFmpeg's packet clock, including its omissions.
 
-**Content encoding.** The reader validates lace sizes against the block before
-delivery and walks the checked header with a fixed-size cursor under the caller's
-work budget. Encodings apply in descending `ContentEncodingOrder`, and each laced
-frame is decoded separately. `zlib::decompress` reads one complete RFC 1950
-stream (stored, fixed and dynamic blocks), checks Adler-32 before returning
-anything and rejects trailing bytes. Cancellation is checked between blocks,
-symbols and checksum chunks.
+**Content encoding.** Encodings apply in descending `ContentEncodingOrder`, and each
+laced frame is decoded separately. `zlib::decompress` reads one complete RFC 1950 stream
+(stored, fixed and dynamic blocks), checks Adler-32 before returning anything and rejects
+trailing bytes.
 
 **Seeking.** Requests name a track index (must be video) and a presentation time in
 nanoseconds. `seek_previous` lands on the latest video keyframe at or before the
 target. `seek_for_playback` first subtracts the largest track SeekPreRoll, then
-replays the landing Cluster, including interleaved audio before the keyframe.
-A bounded scan can land on the first verified keyframe for a nonnegative
-request that precedes it.
-When the reader recovers earlier subtitles, it filters the replay prefix up
-to the destination keyframe. It keeps complete untimed audio laces and audio
-with a known end past the cutoff, even when the packet starts before it.
-For overlap, a zero BlockDuration falls back to the track's DefaultDuration.
-Returned packets retain the declared block timing. Recovery can fail with
-`missing timed audio duration` if a timed packet has no duration, or
-`Error::Overflow` if its timing exceeds the supported range.
-A cue is checked against the real Cluster, track, timestamp and
-keyframe; a forged index fails instead of landing elsewhere. The gap after the
-last cue is scanned for uncued keyframes. The `SeekReceipt` reports `actual_ns`,
-`used_index`, `scanned_bytes`, `preroll_ns`, `discard_until_ns` (decode, but do
-not present, earlier packets) and `replays_from_start` (taken from source position,
-so one-time start trimming is not repeated). After any failure or cancellation the
-caller must seek or `reset` before reading more packets.
+replays the landing Cluster, including interleaved audio before the keyframe. A cue is
+checked against the real Cluster, track, timestamp and keyframe; a forged index fails
+instead of landing elsewhere, and the gap after the last cue is scanned for uncued
+keyframes. The `SeekReceipt` reports `actual_ns`, `used_index`, `scanned_bytes`,
+`preroll_ns`, `discard_until_ns` (decode, but do not present, earlier packets) and
+`replays_from_start` (so one-time start trimming is not repeated). Recovery can fail
+with `missing timed audio duration` if a timed packet has no duration. After any failure
+or cancellation the caller must seek or `reset` before reading more packets.
 
 **Colour.** `Track::colour` keeps every source field: bit depth, both chroma and Cb
-subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering
-value as exact `f64`. Zero-length numbers take the schema default. Duplicates,
-bad widths, non-finite values, negative luminance and chromaticity outside [0, 1]
-fail. With the `reference-trace` feature, `Colour::trace_fields()` gives the
-values FFmpeg reports for comparison: signed 32-bit rationals from continued
-fractions, with FFmpeg's omissions (no bit depth, incomplete light levels,
-incomplete/zero primaries); values that cannot fit return `Overflow`.
+subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering value as
+exact `f64`. Zero-length numbers take the schema default. Duplicates, bad widths,
+non-finite values, negative luminance and chromaticity outside [0, 1] fail. With the
+`reference-trace` feature, `Colour::trace_fields()` gives the values FFmpeg reports.
 
 **Reference compatibility.** The reader follows the specifications. The `compat`
 modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and
-each names the FFmpeg revision it reproduces. `compat::clock` gives FFmpeg's packet
-clock. `compat::seek::at_block_start` selects complete audio blocks by their start
-in the comparison clock during subtitle seek recovery. That integer clock gives
-zero recovery delay to an audio track with a positive rate below 1 Hz. The ordinary
-playback seek uses packet overlap and retains untimed laces so their timestamps can be
-derived from the audio. An overlapping lace with leading discard padding keeps all its
-frames so a decoder can apply the block-wide trim using their sample counts.
-`compat::block_additions` builds readers that admit WebM VP9's implicit
-ITU-T T.35 addition (BlockAddID 4 without a declared MaxBlockAdditionID), and
-projects block additions to the packet side data and HDR10+ events FFmpeg attaches
-to packets. The `reference-trace` feature exposes comparison projections, such as
-`Colour::trace_fields` (above) and `seek_initial_trim`, which reports when the
-block-start seek comparison reapplies initial audio padding.
+each names the FFmpeg revision it reproduces: `compat::clock` gives FFmpeg's packet
+clock, `compat::seek` its block-start audio selection after a subtitle seek, and
+`compat::block_additions` builds readers that admit WebM VP9's implicit ITU-T T.35
+addition (BlockAddID 4 without a declared MaxBlockAdditionID) and projects block
+additions to the packet side data and HDR10+ events FFmpeg attaches to packets.
 
-**Segment metadata.** Each `metadata::SharedDocument` owns one source buffer
-plus a compact node arena; `Edition`, `Chapter`, `Tag`, `SimpleTag`,
-`SegmentInfo` and `Attachment` are borrowed views with no string or payload
-copies. Attachments stay valid after the reader is dropped. Chapter times are
-exact unsigned nanoseconds; ordered editions are reported, not executed.
-Building a document validates every node once in resumable, work-charged steps;
-text fields are checked in place in the document's buffer, without taking a
-handle to it per field.
+**Segment metadata.** Each `metadata::SharedDocument` owns one source buffer; `Edition`,
+`Chapter`, `Tag`, `SimpleTag`, `SegmentInfo` and `Attachment` are borrowed views with no
+string or payload copies. Attachments stay valid after the reader is dropped. Chapter
+times are exact unsigned nanoseconds; ordered editions are reported, not executed.
+Building a document validates every node once in resumable, work-charged steps.
 
-## Conformance
+## Standards
 
 Authored from RFC 8794 §§4–7, 11 (EBML) and RFC 9559 §§5, 10–11, 22 (Matroska:
 §5.1.3.5 block side data, §5.1.4.1.16–17 block addition mappings,
@@ -220,14 +195,5 @@ Authored from RFC 8794 §§4–7, 11 (EBML) and RFC 9559 §§5, 10–11, 22 (Mat
 chapters/tags/attachments), RFC 1950/1951 (zlib/DEFLATE) and ITU-T T.35
 HDR10+ Application 4 carriage.
 
-Verified by unit and integration tests (malformed input, limits, cancellation,
-ownership, seek edge cases; `tests/container.rs` reads packets and tracks through
-the neutral views only); independent Python oracles for EBML structure, exact
-source time, zlib content, colour and metadata; and a native FFmpeg comparison
-worker over the authored corpora in `harness/` plus the upstream FATE vectors
-`matroska-xiph-lacing`, `matroska-zlib-decompression` and
-`matroska-zero-length-block`. Packet bytes, timestamps, configuration, colour,
-metadata and seek landings must match exactly, with no epsilon. Where FFmpeg's
-representation differs (packet clock, colour rationals, flattened chapters,
-collapsed tag targets) the source facts and the FFmpeg view are each checked.
-Gates and harness: [docs/quality.md](../../docs/quality.md).
+Verification: the Matroska harness contract in [docs/quality.md](../../docs/quality.md);
+results in [docs/status.md](../../docs/status.md).

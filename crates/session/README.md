@@ -1,13 +1,12 @@
 # triergon-session
 
-A decode-session layer for desktop playback. It takes AVC/HEVC Annex B access
-units and AC-3, E-AC-3, ADTS AAC, DTS core, FLAC, Opus, Vorbis or MPEG audio frames, drives the pure-Rust codec
-crates through the [triergon-codec](../codec/README.md) traits, and publishes
-clock-gated 1920×1080 RGBA pictures and interleaved stereo s16 PCM. It is a
-composition-layer crate over triergon-codec and
-[triergon-pixel](../pixel/README.md). The caller owns the clock, packet framing,
-output devices and GPU upload. Nothing here spawns a process or links a native
-library.
+A decode-session layer for desktop playback. It takes AVC/HEVC Annex B access units and
+AC-3, E-AC-3, ADTS AAC, DTS core, FLAC, Opus, Vorbis or MPEG audio frames, drives the
+pure-Rust codec crates through the [triergon-codec](../codec/README.md) traits, and
+publishes clock-gated 1920×1080 RGBA pictures and interleaved stereo s16 PCM. It is a
+composition-layer crate over triergon-codec and [triergon-pixel](../pixel/README.md). The
+caller owns the clock, packet framing, output devices and GPU upload. Nothing here spawns
+a process or links a native library.
 
 ## Usage
 
@@ -40,13 +39,13 @@ fn play(
 }
 ```
 
-`video_decoder`, `audio_decoder` and `StreamSelection::load` need the `codecs`
-feature, which adds the nine decoder crates. `audio_decoder(codec, configuration)` takes
-the canonical configuration of FLAC, Opus and Vorbis (see `audio_configuration`) and
-ignores it for the others. Without it, implement `VideoDecoder`
-and `AudioDecoder` (re-exported from triergon-codec) yourself; the tests use
-scripted decoders. The `simd` feature forwards to the HEVC decoder's nightly-only
-SIMD kernels, and `aac-simd` to the [AAC decoder's](../codec-aac/README.md#features).
+`video_decoder`, `audio_decoder` and `StreamSelection::load` need the `codecs` feature,
+which adds the nine decoder crates. `audio_decoder(codec, configuration)` takes the
+canonical configuration of FLAC, Opus and Vorbis (see `audio_configuration`) and ignores
+it for the others. Without it, implement `VideoDecoder` and `AudioDecoder` (re-exported
+from triergon-codec) yourself. The `simd` feature forwards to the HEVC decoder's
+nightly-only SIMD kernels, and `aac-simd` to the [AAC
+decoder's](../codec-aac/README.md#features).
 
 For ADTS packets carrying an explicit container priming edit, use
 `compat::aac::adts_decoder(PrimingPolicy::Container)` and apply the edit to
@@ -56,9 +55,9 @@ Use `TrackDecoder::aac_access_units_in` to decode raw AAC-LC from a checked
 AudioSpecificConfig with a fixed layout or a Program Configuration Element.
 `TrackDecoder::aac_access_units_with_layout_in` accepts
 `compat::aac::Policy::ConventionalSurround` for fixed layouts. Call
-`TrackDecoder::into_decoder` to use the configured decoder in an audio session.
-With parsed facts for a fixed layout, `AacAccessUnitConfig::decoder_with_layout_in`
-also builds a decoder for an audio session.
+`TrackDecoder::into_decoder` to use the configured decoder in an audio session; with
+parsed facts for a fixed layout, `AacAccessUnitConfig::decoder_with_layout_in` builds
+one directly.
 
 ## Supported
 
@@ -70,17 +69,14 @@ also builds a decoder for an audio session.
 
 `TrackDecoder::new(track)` picks the decoder from a track's codec (`audio_codec`) and
 configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). The
-generic AAC track decoder takes ADTS. For raw packets, call
-`TrackDecoder::aac_access_units_in` with the AudioSpecificConfig of the packet's
-sample description. Callers with parsed facts for a fixed layout can construct an
-`AacAccessUnitConfig` and build the same decoder for an `AudioSession`.
+generic AAC track decoder takes ADTS; raw packets use `aac_access_units_in` above.
 `TrackDecoder::decode(packet, frame)` drops what the container marks for
 discarding: the packet's `Trim`, samples before time zero (Matroska CodecDelay, Ogg
 pre-skip) and the decoder's start delay (`AudioDecoder::delay`, the Opus pre-skip), a
-start trim carrying into the next packet when it is longer than one. `Discard::of(packet)`
-with `AudioSession::feed_discarding` does the same for a clock-paced session.
-`examples/decode_audio.rs` decodes the first audio track of any file `triergon::open_blocking`
-opens, as the harness grades it.
+start trim carrying into the next packet when it is longer than one.
+`Discard::of(packet)` with `AudioSession::feed_discarding` does the same for a
+clock-paced session. `examples/decode_audio.rs` decodes the first audio track of any
+file `triergon::open_blocking` opens.
 
 Supporting modules: `mix` (stereo downmix and s16 conversion), `queue` (bounded
 input).
@@ -113,12 +109,9 @@ input).
   at −3 dB. The `DownmixLevels` an AC-3/E-AC-3 stream carries (mix levels, Dolby or
   Pro Logic II surround encoding) are honoured. A layout without speaker positions
   mixes as FFmpeg's default layout for its channel count, and 16-bit frames (FLAC) mix
-  in integers as FFmpeg's resampler mixes them ([harness/codecs/downmix-integer.md](../../harness/codecs/downmix-integer.md)).
-  Float mixes become s16 rounded toward negative infinity and saturated (`mix::to_s16`),
-  with a conversion, a comparison and integer saturation: no `floorf` call on 32-bit
-  ARM, which has no rounding instruction. On 32-bit ARM a stereo pair that passes
-  through converts from the samples' bits with integer operations, which vectorise
-  there (LLVM emits no vector float code for that target); the values are the same.
+  in integers as FFmpeg's resampler mixes them
+  ([harness/codecs/downmix-integer.md](../../harness/codecs/downmix-integer.md)). Float
+  mixes become s16 rounded toward negative infinity and saturated (`mix::to_s16`).
 - **Stream selection.** `StreamSelection` names a stream's video codec and its
   audio codec, if any. `StreamSelection::load` starts both sessions with the
   matching decoders; with `audio: None` the audio session stays `Idle`.
@@ -127,14 +120,6 @@ input).
 
 The letterbox and downmix rules are native observations of FFmpeg 9.0.2, recorded in
 [rgba-contract.json](../../harness/codecs/rgba-contract.json) and
-[downmix-contract.json](../../harness/codecs/downmix-contract.json);
-`triergon_pixel::letterbox` and `mix.rs` implement them and their unit tests pin them.
-The letterbox is checked against the reference chain in
-[triergon-pixel](../pixel/README.md#conformance); `tests/sessions.rs` covers
-timing, flush, stop, backpressure, failure, rate changes and downmix with
-scripted decoders. A host test in `triergon-playback` (`tests/continuation.rs`)
-reads an AVC/AAC MP4, feeds both sessions through the framing adapters, and
-checks output positions, seek-to-start replay and teardown. Codec conformance
-lives in the codec crates. Gates: [docs/quality.md](../../docs/quality.md).
-
-The [session queue workloads](../../harness/session-queues/README.md) exercise borrowed feeds, byte-limit backpressure, starvation and EOS with decoded AC-3, AAC and AVC output. They compare allocation calls, retained heap, peak heap, RSS and runtime across worker builds.
+[downmix-contract.json](../../harness/codecs/downmix-contract.json). Codec conformance
+lives in the codec crates; verification: [harness/codecs](../../harness/codecs/STATUS.md);
+results in [docs/status.md](../../docs/status.md).

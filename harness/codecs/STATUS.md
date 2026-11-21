@@ -7,24 +7,23 @@ container readers (`crates/ogg`, `crates/elementary`) with FFmpeg 9.0.2. What ea
 decoder supports and refuses is in its crate README. The reference is the decode build
 of `harness/reference.c` with the decode profile's `ffmpeg` and `ffprobe`, driven by
 `cargo xtask codecs` (`--help` lists its commands). Gate definitions:
-[docs/quality.md](../../docs/quality.md).
+[docs/quality.md](../../docs/quality.md); results: [docs/status.md](../../docs/status.md).
 
 | Path | Content |
 |---|---|
 | `numeric-rules.json` | Comparison rules `cargo xtask codecs grade` applies: lossy audio per channel RMS ≤ 8.8e-6 and max ≤ 6.1035e-5 with exact rate, layout and counts; FLAC bit-exact; video bit-exact; RGBA output bit-exact; stereo s16 output ≤ 1 LSB; and the reviewed rules for the Layer I and II float decoders and the integer stereo mix of 16-bit FLAC |
-| `correctness-manifest.json` | The 778 correctness vectors: 457 of the video and elementary-stream lanes and 321 of the file-format lanes (FLAC 187, MP3 39, MP2 20, MP1 5, Vorbis 21, Opus 49) |
-| `derived-streams.json` | The FATE source, its SHA-256 and the `ffmpeg` arguments of each of the 71 derived elementary streams of the aac, ac3, eac3 and dts lanes (`cargo xtask codecs derive`) |
-| `reader-manifest.json`, `reader-seeks.json`, `reader-rules.json`, `reader-differences.json` | The 316 reader comparison inputs and the 26 Ogg seek cases; the views and fields compared per format, the reviewed comparison rules and the scoped dispositions of FFmpeg behaviours `cargo xtask codecs readers` applies; and every reviewed difference with its disposition |
-| `workloads.json`, `file-workloads.json`, [workloads.md](workloads.md) | The 20 elementary-stream and 10 file-format timing and memory workloads, and how they are generated |
+| `correctness-manifest.json` | The correctness vectors of every lane, pinned by SHA-256 |
+| `derived-streams.json` | The FATE source, its SHA-256 and the `ffmpeg` arguments of each derived elementary stream of the aac, ac3, eac3 and dts lanes (`cargo xtask codecs derive`) |
+| `reader-manifest.json`, `reader-seeks.json`, `reader-rules.json`, `reader-differences.json` | The reader comparison inputs and Ogg seek cases; the views, fields, rules and scoped dispositions `cargo xtask codecs readers` applies; every reviewed difference with its disposition |
+| `workloads.json`, `file-workloads.json`, [workloads.md](workloads.md) | The elementary-stream and file-format timing and memory workloads, and how they are generated |
 | [measurement-policy.md](measurement-policy.md) | What counts as equivalent work in timing and memory runs |
 | [adapter-contract.md](adapter-contract.md) | Session-layer contract for a host adapter |
 | `downmix-*.json`, [downmix-integer.md](downmix-integer.md) | Observed stereo downmix (`-ac 2`) rules, for float and for integer decoder output |
 | `rgba-*.json` | Observed letterbox scaling and RGBA conversion rules |
-| `codec-comparison` evidence set | Correctness rows and summaries, timing and memory records, identity hashes; `cargo xtask evidence fetch codec-comparison` unpacks it into `.research/evidence/codec-comparison/` |
-| `audio-review-linux-arm64`, `audio-quick-check-linux-arm64` evidence sets | The file-format lanes' correctness rows, instruction counts, paired timing and paired memory the status rows cite; the reader lane with both Ogg views, the generated Ogg inputs it compares (`inputs/ogg-generated`), and the quick check of the head against main |
 | `aac/`, `ac3/`, `dca/`, `h264/`, `hevc/` | Per-codec tools and derivation notes |
 | `flac/`, `mp3/`, `ogg/` | Generators of the FLAC, MPEG audio, Ogg and Speex vectors |
-| `codec-reference-binary`, `codec-reference-reproduction` evidence sets | The reference worker the cited results were measured with, and the proof that `prepare-ffmpeg --profile decode` rebuilds it: byte-identical output on every vector and workload, identical classifications |
+| `codec-comparison`, `audio-review-linux-arm64`, `audio-quick-check-linux-arm64` evidence sets | Recorded comparison runs: correctness rows, timing and memory records, identity hashes; `cargo xtask evidence fetch SET` unpacks one into `.research/evidence/SET/` |
+| `codec-reference-binary`, `codec-reference-reproduction` evidence sets | The reference worker, and the proof that `prepare-ffmpeg --profile decode` rebuilds it (byte-identical output on every vector and workload) |
 
 ## Running the comparison
 
@@ -77,9 +76,9 @@ transport stream (`-map 0:a:N -c:a copy -f ac3`), and 17 FATE files copied uncha
 (raw ADTS, AC-3 and E-AC-3; the `_small` streams are FATE's own cuts).
 `cargo xtask codecs derive --ffmpeg FF`, with the decode profile's `ffmpeg`, fetches each
 source by its SHA-256, makes every stream and fails on one that differs from its
-manifest pin; all 71 equal their pins. Evidence set `codec-derived-streams` holds them
-at their repository paths, and the gate images unpack it. The aac lane adds three
-crafted HE-AAC v2 streams of Parametric Stereo paths no FATE vector takes, in `aac/ps/vectors`
+manifest pin. Evidence set `codec-derived-streams` holds them at their repository
+paths, and the gate images unpack it. The aac lane adds three crafted HE-AAC v2 streams
+of Parametric Stereo paths no FATE vector takes, in `aac/ps/vectors`
 ([aac/ps/README.md](aac/ps/README.md)). The file-format lanes add FATE's `vorbis`,
 `opus` and `mp3-conformance` directories, the IETF CELLAR FLAC test files (`subset`,
 `uncommon`; CC0), the FLAC streams `harness/codecs/flac/flac_vectors.py FFMPEG FLAC
@@ -162,7 +161,7 @@ for review.
 `cargo xtask codecs isobmff-reader` applies the same alignment and the same reviewed,
 frozen difference lists to the neutral ISO BMFF reader, against the formats profile's
 `ffprobe` with the MOV demuxer, and is a gate item (`isobmff-reader`). Its contract,
-corpus of 648 read and seek cases, rules and differences are in
+corpus of read and seek cases, rules and differences are in
 [harness/features/isobmff-reader](../features/isobmff-reader); it fails when a case
 fails:
 
@@ -179,27 +178,23 @@ retried on 281 and 282; [early stop](../../docs/quality.md#early-stop) applies).
 target/harness/ffmpeg-decode-worker --workloads harness/codecs/file-workloads.json
 --root . --out DIR` measures both workers' `OP-memory` runs under the shared observer
 of `target/harness` (30 pairs, seed 283). Each worker's work is checked first and must
-be equal; the gate is the paired 95% upper bounds of peak heap
-(`heap_ratio_upper_95`) and total resident peak RSS (`total_rss_ratio_upper_95`), both
-below 1.0, with the gate build on native Linux AArch64 or in the 32-bit ARMv7 user space.
+be equal; the paired 95% upper bounds of peak heap (`heap_ratio_upper_95`) and total
+resident peak RSS (`total_rss_ratio_upper_95`) are graded by the
+[memory gate](../../docs/quality.md#gates), with the gate build on native Linux AArch64
+or in the 32-bit ARMv7 user space.
 `DIR` keeps every raw observation per workload and `summary.json`.
 
 ## Dispositions cited by the correctness summaries
 
 - AC-3/E-AC-3 noise: bap-0 dither, AHT zero-bin fill and SPX blending noise are random.
   A decoder matches FFmpeg's noisy output only by reproducing its noise stream, which
-  `codec-ac3` does under `compat: Compat::Reference`. Both correctness summaries in the
-  `codec-comparison` evidence set were collected with a build that used its own
-  generator; they record 10 AC-3/E-AC-3 vectors as failures for this reason. The set's
+  `codec-ac3` does under `compat: Compat::Reference`. The `codec-comparison` set's
   `CORRECTNESS-MANIFEST-AC3-NODITHER.json` is the dither-stripped comparison set.
-- `aac-sce-in-stereo.adts`: FFmpeg leaves FR unwritten in single-SCE frames.
-  The recorded comparison at `81edf4c0` measured RMS 1.3e-8 on FL and
-  RMS 0.0853 (max 0.130) on FR. The stereo s16 output passed with 72
-  samples one LSB apart. In the float comparison for this exact input,
-  `ffmpeg-aac-initialized-pcm` initializes both planes before decoding.
-  The grader requires successful decoding and all 222,208 samples per
-  channel in both the float and stereo s16 comparisons. The stereo s16
-  comparison and measurement workers keep the ordinary reference.
+- `aac-sce-in-stereo.adts`: FFmpeg leaves FR unwritten in single-SCE frames. The float
+  comparison of this exact input (by SHA-256) uses `ffmpeg-aac-initialized-pcm`, which
+  initializes both planes before decoding, and requires successful decoding and all
+  222,208 samples per channel in both the float and stereo s16 comparisons. The stereo
+  s16 comparison and the measurement workers keep the ordinary reference.
 - `xll_51_24_48_none.core.dts` carries no DTS core substream, only the lossless
   extension, which FFmpeg decodes (3,072 samples of 5.1) and this decoder does not
   implement; `summarize` counts it out of set, never as a pass.

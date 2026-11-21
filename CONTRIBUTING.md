@@ -23,7 +23,7 @@ PART`: `cargo xtask check lint`, `test`, `variants` and `parity`. Each part runs
 locally the same way. The jobs restore the packed reference builds (`cargo xtask
 references`) and the target directory of an earlier run; `tools/target-cache.py` marks
 every tracked file whose content differs from that run's as new, so cargo rebuilds
-whatever reads it. Beside them, a job runs the tests of `triergon-framing`,
+whatever reads it. Beside them, the `armv7 tests` job runs the tests of `triergon-framing`,
 `triergon-isobmff` and `triergon-mpegts` in the `checked` profile for the 32-bit gate
 target `thumbv7neon-unknown-linux-gnueabihf` under user-mode QEMU, where smaller
 pointers change the storage sizes their budget tests pin. The required `check` status passes

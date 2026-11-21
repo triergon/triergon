@@ -86,11 +86,9 @@ rounds each dimension up to 16; `luma_stride` is `16 × macroblock_width()` and
 - Every other width takes the filtered path. It averages each horizontal pixel pair
   and rounds the chroma terms to six fractional bits. The vertical filter applies
   centre-sited taps 1/8, 3/8, 3/8 and 1/8 over rows 2k−1 … 2k+2 with edge rows
-  replicated. It rounds to eight bits after filtering. Below width 16 the reference
-  is FFmpeg's ARMv7 build. At widths of 2 modulo 4 from 18 up that build faults, and
-  the reference is its AArch64 build. The
-  [conversion probe](../../harness/capture/README.md#short-frames) checks these
-  cases sample for sample.
+  replicated. It rounds to eight bits after filtering. Below width 16 this follows
+  FFmpeg's ARMv7 build; at widths of 2 modulo 4 from 18 up, where that build faults, its
+  AArch64 build.
 
 On the filtered path, a 2-row picture takes chroma from the lower row. A 4-row
 picture averages each pair of rows. The first chroma row of a 6-row picture
@@ -113,22 +111,17 @@ to nearest or half a step below, and clamped to 0–255. This is how FFmpeg's DV
 and PGS subtitle decoders convert palette entries, and how its MP4 demuxer converts
 a DVD colour table (half a step below).
 
-**Letterbox.** `Scaler::letterbox` writes the complete canvas: opaque black padding
-and the fitted picture. It reproduces FFmpeg's
+**Letterbox.** `Scaler::letterbox` writes the complete canvas: opaque black padding and
+the fitted picture. It reproduces FFmpeg's
 `scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=rgba`
 bit for bit:
 
 - `fit` scales the display size to fit, rounded to nearest; the offset is
   `(canvas − fitted) / 2` rounded down. Only `width` and `height` are used; `sar` is
   not applied.
-- Same-size 8-bit pictures take a direct converter: luma at 15 fractional bits, each
-  chroma product floored to 14 bits, one final rounding, chroma shared by each 2×2
-  block.
-- Everything else (any resampling, every high-bit-depth picture) takes a separable
-  path: Keys bicubic taps (C = 3/5) in FFmpeg's fixed-point domain, a horizontal pass
-  to 15-bit intermediates and a vertical pass with 12-bit taps, chroma resampled as
-  its own plane, then table-driven conversion. An odd fitted width switches to
-  FFmpeg's full-width-chroma output stage, including its wrapping 32-bit sum.
+- Same-size 8-bit pictures take a direct converter; everything else (any resampling,
+  every high-bit-depth picture) takes FFmpeg's separable bicubic path in its fixed-point
+  domain, including its full-width-chroma output stage for an odd fitted width.
 - FFmpeg's decoder applies a left crop only as far as its plane pointers stay
   32-byte aligned; the scaler widens the picture by the part of a left crop FFmpeg
   keeps, read from the plane `offset`.
@@ -139,31 +132,15 @@ bit depth.
 
 ## Conformance
 
-The conversion follows ITU-R BT.601 and ITU-T H.273 MatrixCoefficients. The
-letterbox rules were recovered by black-box observation of FFmpeg 9.0.2 (crafted
-impulses, ramps and constant fields through its public filter API).
-
-- `tests/rgba_reference.rs` compares whole canvases against digests of 15
-  pseudo-random pictures passed through FFmpeg 9.0.2's chain: 8- and 10-bit, 64×240
-  to 3840×2160, limited and full range, seven matrix codes, odd fitted widths and a
-  tall 528×4216 picture (`tests/fixtures/rgba-reference-digests.txt`).
-- A unit test pins the BT.601 palette conversion, in both roundings, against
-  FFmpeg's DVD palettes.
-- Unit tests pin the fit rule, taps against reference measurements (including
-  near ties), the left-crop alignment rule, filter normalisation, the BT.601
-  coefficients against their derivation, primaries and extremes, centre-sited
-  chroma, bottom-up input and edge padding.
-- The RGBA → YUV conversion is compared with FFmpeg's `swscale` (`SWS_BILINEAR`)
-  in the capture harness: every Y, Cb and Cr sample within ±1 of the reference. See
-  [triergon-capture](../capture/README.md#conformance). The block path's rule comes
-  from black-box probes of the capture reference built for ARMv7 (its `convert`
-  mode): every one of the 2^24 colours for luma and for uniform 2×2 blocks, random
-  and near-tie blocks for the rounding, and random pictures at widths 16 to 4092,
-  heights 2 to 540 and both orientations, all exact. Unit tests pin the path
-  choice, observed block-path values and both paths' row siting.
-- For pictures of 2, 4 and 6 rows, unit tests pin each input row's contribution
-  in both orientations. The [capture reference probe](../../harness/capture/README.md#short-frames)
-  compares every sample from row impulses and pseudo-random pictures at the
-  filtered widths below 16.
-
-Gates: [docs/quality.md](../../docs/quality.md).
+The conversion follows ITU-R BT.601 and ITU-T H.273 MatrixCoefficients. The letterbox
+rules were recovered by black-box observation of FFmpeg 9.0.2 (crafted impulses, ramps
+and constant fields through its public filter API);
+`tests/fixtures/rgba-reference-digests.txt` holds the digests of 15 pseudo-random
+pictures passed through FFmpeg 9.0.2's chain. The RGBA → YUV block path's rule comes from
+black-box probes of the capture reference built for ARMv7 (its `convert` mode): every one
+of the 2^24 colours for luma and for uniform 2×2 blocks, random and near-tie blocks for
+the rounding, and random pictures at widths 16 to 4092, heights 2 to 540 and both
+orientations. The filtered widths below 16 come from the [capture reference
+probe](../../harness/capture/README.md#short-frames). The capture comparison is described
+in [harness/capture](../../harness/capture/README.md); results in
+[docs/status.md](../../docs/status.md).

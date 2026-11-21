@@ -1,19 +1,18 @@
 # triergon-framing
 
-Packet framing and codec-configuration parsing for the format layer: H.264/HEVC
-NAL units and records, AV1 OBUs, VP9 records, AAC, AC-3/E-AC-3, DTS core, MPEG audio
-headers, and FLAC, Opus and Vorbis configurations.
-Containers hand it record bytes and complete samples; it returns source-preserving
-views, decoder-ready Annex-B/ADTS/temporal-unit output and typed refusals. It
-depends on `triergon-core` and `triergon-bitstream`, does no I/O and does not decode
-audio or video.
+Packet framing and codec-configuration parsing for the format layer: H.264/HEVC NAL units
+and records, AV1 OBUs, VP9 records, AAC, AC-3/E-AC-3, DTS core, MPEG audio headers, and
+FLAC, Opus and Vorbis configurations. Containers hand it record bytes and complete
+samples; it returns source-preserving views, decoder-ready Annex-B/ADTS/temporal-unit
+output and typed refusals. It depends on `triergon-core` and `triergon-bitstream`, does
+no I/O and does not decode audio or video.
 
 ## Usage
 
 Every record job, packet job and incremental reader takes a core `Budget` pool, a
-`WorkBudget` and a cancel flag, and is driven by `step`. Record and packet jobs return `BuildStep::{Yield, Ready,
-Complete}`; incremental readers return core `Step::{NeedInput, Yield, Ready, End}`
-and are fed with `provide` and closed with `finish` or `fail`.
+`WorkBudget` and a cancel flag, and is driven by `step`. Record and packet jobs return
+`BuildStep::{Yield, Ready, Complete}`; incremental readers return core `Step::{NeedInput,
+Yield, Ready, End}` and are fed with `provide` and closed with `finish` or `fail`.
 
 AVC and HEVC record parsers, including their compatibility wrappers, also offer
 `step_into` with an empty output slot and `ConfigProgress`. This publishes the
@@ -106,98 +105,54 @@ assert_eq!(decoder_input, [
 | Audio configuration | `canonical_flac_configuration`, `canonical_opus_configuration`, `canonical_vorbis_configuration` | One canonical decoder configuration per codec, whichever container carried it |
 | DTS parser comparison | `reference_trace::dts::ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
 
-With the DTS packet corpus in `TRIERGON_DTS_CORPUS` and the pinned `ffmpeg` and
-`ffprobe` on `PATH`, `cargo test -p triergon-framing --test dts_packet_corpus -- --ignored`
-compares the 27 fields between inspectors and each packet's core size and bytes with
-the reference filter ([results](../../docs/status.md#dts-core-header-inspection)).
-
 ## Behaviour and limits
 
-`AacAdtsCarrier::into_selected_frame` shares the original bytes of a complete,
-aligned AAC-LC envelope with the typed frame. On an opaque or incomplete
-carrier it returns the original observation, including its boundary and
-selected-source diagnostic.
-
 **Reference compatibility.** The crate-root types follow the specifications.
-`compat::nal` reproduces FFmpeg where a consumer needs FFmpeg's result: it accepts
-configuration records as the `mp4toannexb` packet receiver does, and names the
-FFmpeg revision it reproduces. Comparison-only projections are compiled only with
-the non-default `reference-trace` feature: the reference's return codes, and under
-`reference_trace::dts` the packets, clock and byte positions of FFmpeg's `dca`
-parser over raw 14-bit DTS.
+`compat::nal` reproduces FFmpeg's `mp4toannexb` packet receiver where a consumer needs
+its result, and names the FFmpeg revision it reproduces. Comparison-only projections
+need the non-default `reference-trace` feature.
 
 **Input model.** Incremental readers own a core `InputCursor` and accept same-pool
 windows of any size with the exact token, source and offset. An empty window is
-starvation; a known length is not EOF. Truncation, transport failure and
-cancellation are sticky errors, never a synthetic end. A new source or reset needs
-a new reader. Record parsers take a complete pool-owned record (box payload, no
-size/type header); sample jobs take one complete container sample.
+starvation; a known length is not EOF. Truncation, transport failure and cancellation
+are sticky errors, never a synthetic end. A new source or reset needs a new reader.
+Record parsers take a complete pool-owned record (box payload, no size/type header);
+sample jobs take one complete container sample.
 
 **Source preservation.** Outputs keep exact source bytes, offsets, source ID and
-generation. Raw and reserved fields stay readable; local violations are reported
-through `syntax_issues()` bitsets rather than cleared. Absent and present-zero
-fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input. A
-retained view keeps the whole backing allocation charged. The configuration
-writers use the validated parameter-set ranges from these records.
+generation. Raw and reserved fields stay readable; local violations are reported through
+`syntax_issues()` bitsets rather than cleared. Absent and present-zero fields are
+distinct (`None` vs `Some(0)`). Views share the pool-owned input, and a retained view
+keeps the whole backing allocation charged.
 
-**Resources.** All arithmetic is checked. Every operation has caller limits
-(bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
-one unit always progresses and zero units consume nothing. Copies are at most
-4096 bytes between cancel checks. Allocation pressure returns retryable
-`Backpressure` at the exact checkpoint; no partial output is published.
-Stateful packet jobs keep up to seven segment descriptors inline and charge more
-to the caller's pool; passthrough packets share the original payload. Outputs are
-sized and charged once before they are written. A `NalPacketSession` frames
-packets, records and outputs of at most 4 GiB − 1 bytes
-(`NalPacketLimits::MAXIMUM_SPAN`), whatever its limits allow.
+**Resources.** All arithmetic is checked. Every operation has caller limits (bytes,
+NAL/OBU/frame counts, input window) and charges work per byte or field. Allocation
+pressure returns retryable `Backpressure` at the exact checkpoint; no partial output is
+published. A `NalPacketSession` frames packets, records and outputs of at most
+4 GiB − 1 bytes (`NalPacketLimits::MAXIMUM_SPAN`).
 
 **Codec-specific limits.**
 
-- NAL: payload bytes are opaque. No RBSP, SPS/PPS body or decoder-consistency
-  check. Annex-B termination follows H.264 B.2 / H.265 B.3; the leading `zero_byte`
-  rule is not enforced. `AnnexBWriter` never edits emulation prevention.
-- avcC/hvcC parsers refuse `lengthSizeMinusOne = 2` (three-byte lengths) and
-  unknown versions. The `compat::nal` receiver parsers accept them for the packet
-  session only.
-- The AVC packet receiver can emit parameter sets before a buffering-period SEI
-  (H.264 Annex D). It uses in-band sets found before the following slice, then
-  falls back to the active configuration for missing sets. It preserves the
-  original packet NALs and does not parse the SEI payload.
-- The AVC High-profile comparisons frame samples from complete sequence and
-  picture parameter-set arrays with zero to three extension header bytes.
-  The receiver preserves those bytes as a trailing suffix and reports
-  `Truncated` as the strict source refusal. When a complete extension header
-  declares entries and the record ends at the header, the receiver frames
-  the base parameter sets and preserves the header and the strict refusal.
+- NAL: payload bytes are opaque; no RBSP, SPS/PPS body or decoder-consistency check.
+  The leading `zero_byte` rule is not enforced. `AnnexBWriter` never edits emulation
+  prevention.
+- avcC/hvcC parsers refuse `lengthSizeMinusOne = 2` (three-byte lengths) and unknown
+  versions; the `compat::nal` receiver parsers accept them for the packet session only.
 - `RawAnnexBReader` refuses data-partitioned, redundant-picture and extended AVC
-  profiles. It adds no timestamps. `append_payload` can consume an interior NAL
-  slice while the reader is waiting for input. A fresh reader can use `resume_at`
-  at an independently established access-unit boundary, preserving the original
-  elementary coordinate and preceding NAL count. Resumed bytes must carry their
-  own parameter sets; no decoder or picture history is restored.
-- AV1: LEB128 up to 8 bytes and `u32::MAX`. `OneObu` needs an external length;
-  AV1 Annex-B (length-delimited) streams are not parsed. Sequence headers are not
-  parsed. `Av1TemporalUnitJob` adds a missing temporal delimiter, inserts av1C
-  config OBUs at random access when the sample has no sequence header, and writes
-  a size field for a size-less final OBU.
-- VP9: only vpcC version 1. No frame header or superframe parsing.
-- AAC: other object types, unsupported extension modes and frequency indices
-  13/14 are refused. ADTS wrapping refuses configurations above 7 because the
-  header carries three channel-configuration bits. ADTS CRC is carried but not verified; multi-block and
-  protected frames are not parsed. The writer obeys the 8191-byte frame limit.
-- AC-3/E-AC-3: input must be aligned big-endian syncframes. There is no resync
-  search, no word-swapped or IEC 61937 input, and no CRC or audio-block check.
-  bsid 9/10 and E-AC-3 mixing definition 3 are refused. `sample_span()` is the
-  coded duration of one frame, not a presentation time.
-  `Ac3FrameReader::read_frame_parts` can consume a complete aligned frame
-  from several slices when the first slice contains its header prefix.
-- DTS: canonical big-endian normal frames only in `DtsCoreFrameReader`; no
-  resync or termination frames. The extension extent probes read size fields. HCRC is reported, not
-  checked. `DtsHeaderInspector` and `inspect_dts_header_bits` expose the raw
-  seven-bit NBLKS code once complete. Their `coded_window_samples` view is
-  `32 × (NBLKS + 1)` core samples per channel for codes 5 through 127.
-  `normal_window` additionally requires a normal frame, SHORT=31, a normal
-  block count (7, 15, 31, 63 or 127), a known sample rate and version 0–7.
+  profiles and adds no timestamps. `resume_at` starts a fresh reader at an independently
+  established access-unit boundary; resumed bytes must carry their own parameter sets.
+- AV1: LEB128 up to 8 bytes and `u32::MAX`; `OneObu` needs an external length; AV1
+  Annex-B (length-delimited) streams and sequence headers are not parsed.
+- VP9: only vpcC version 1; no frame header or superframe parsing.
+- AAC: other object types, unsupported extension modes and frequency indices 13/14 are
+  refused. ADTS wrapping refuses channel configurations above 7. ADTS CRC is carried but
+  not verified; multi-block and protected frames are not parsed.
+- AC-3/E-AC-3: input must be aligned big-endian syncframes; no resync search,
+  word-swapped or IEC 61937 input, and no CRC or audio-block check. bsid 9/10 and E-AC-3
+  mixing definition 3 are refused. `sample_span()` is the coded duration of one frame,
+  not a presentation time.
+- DTS: canonical big-endian normal frames only in `DtsCoreFrameReader`; no resync or
+  termination frames. HCRC is reported, not checked.
 
 ## Conformance
 
@@ -217,31 +172,12 @@ Implemented from these specifications:
 | MPEG audio | ISO/IEC 11172-3 §2.4.2.3, §2.4.3.1; ISO/IEC 13818-3 |
 | FLAC, Opus, Vorbis | RFC 9639; RFC 7845 §5.1 and RFC 6716 §§3.1–3.2; Vorbis I §§4.2–4.3 |
 
-Verification:
+Test fixtures: `fixtures/*.tsv` are bit-authored corpora with expected values from an
+independent whole-buffer oracle. `fixtures/raw-annex-b/*.packets` hold the packet extents
+and key flags FFmpeg's raw H.264/HEVC demuxers produce for the paired streams;
+`hevc-eos.hevc` is `hevc-aud0.hevc` with an end of sequence before its second VPS and an
+end of bitstream at the end.
 
-- `fixtures/*.tsv` are bit-authored corpora with expected values from an
-  independent whole-buffer oracle. Tests replay each case at many chunk sizes and
-  work grants, plus negative, limit, cancellation, backpressure and ownership cases.
-- `tests/nal_packet_receiver.rs` and `tests/framing_native_compat.rs` encode
-  behaviour observed from pinned FFmpeg (`h264_mp4toannexb`, `hevc_mp4toannexb`,
-  hvcC and AAC configuration handling).
-- `fixtures/raw-annex-b/*.packets` hold the packet extents and key flags FFmpeg's
-  raw H.264/HEVC demuxers produce for the paired streams. `hevc-eos.hevc` is
-  `hevc-aud0.hevc` with an end of sequence before its second VPS and an end of
-  bitstream at the end.
-
-From the repository root, `cargo xtask framing` compares all 135 AVC/HEVC
-packet-framing scripts with the pinned FFmpeg bitstream-filter API. The
-[contract](../../harness/features/packet-framing/contract.json) covers configuration,
-complete packet fields and side data, malformed input, flush and drain actions,
-and retained packet access after close. Add `--benchmark --memory` to collect
-paired runtime and memory measurements through the shared harness; qualification
-requires the pinned gate build on native AArch64 Linux and 32-bit ARMv7.
-
-Set `TRIERGON_PACKET_EVENTS` to a private output directory when running
-`cargo test -p triergon-framing --features reference-trace --test packet_view`
-to export every complete event trace and digest with all digest assertions active.
-
-Per-module parity, runtime and memory results are in
-[docs/status.md](../../docs/status.md); the gates and harness are described in
-[docs/quality.md](../../docs/quality.md).
+Verification: the [packet-framing
+harness](../../harness/features/packet-framing/README.md); results in
+[docs/status.md](../../docs/status.md).

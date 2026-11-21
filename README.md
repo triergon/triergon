@@ -96,11 +96,9 @@ lto = "fat"
 codegen-units = 1
 ```
 
-Cargo's default profile runs measurably slower on 32-bit ARM: without fat LTO the
-playback worker executes up to 25.0% more instructions, and 16 codegen units add up to
-another 2.5%. `panic = "abort"` saves a further 2 to 3%; it is safe unless the program
-wraps calls into these crates in `catch_unwind`. See
-[measuring performance](docs/quality.md#measuring-performance).
+Cargo's default profile runs measurably slower, most of all on 32-bit ARM.
+`panic = "abort"` is faster still; it is safe unless the program wraps calls into these
+crates in `catch_unwind`. See [measuring performance](docs/quality.md#measuring-performance).
 
 On GNU/Linux the published memory also assumes the program's functions are linked in
 the playback worker's trained order, as the measurement workers are: by the Rust

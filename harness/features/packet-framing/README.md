@@ -25,8 +25,9 @@ and across a flush, plus a header-only IDR. `cargo xtask framing manifest --reco
 records packet counts and whole-operation folds from the built FFmpeg worker.
 Use `--replace` to intentionally update existing input hashes or folds.
 
-The xtask entry point generates all inputs and delegates reports, paired timing,
-memory collection, isolation and gate-build checks to the shared harness. There
+`cargo xtask framing` (`--help` for options) generates all inputs and delegates
+reports, paired timing, memory collection, isolation and gate-build checks to the
+shared harness; `cargo xtask framing fixtures` writes the hash-checked inputs. There
 is no case filter. A baseline comparison cannot be an acceptance run. Workers
 preload identical padded, immutable input templates before timing and memory
 markers, and retain every output until after close. The Rust worker enables the

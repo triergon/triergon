@@ -62,9 +62,6 @@ the pre-skip or other container trims.
 
 ## Behaviour and limits
 
-- When every stream of a packet decodes CELT frames alone (and no SILK samples are held
-  back), de-emphasis runs once all streams are decoded, for up to eight output channels
-  in one loop; otherwise each stream de-emphasises its own frames, with the same output.
 - The header's output gain is applied after de-emphasis, once per packet. Its pre-skip
   is not: the decoder reports it as its start delay (`AudioDecoder::delay`), which a
   consumer discards together with the container's trims (Ogg's granule positions,
@@ -88,30 +85,20 @@ the pre-skip or other container trims.
 - Malformed packets return `DecodeFailure` (an `Invalid` error inside); streams of one
   multistream packet with different durations are `Invalid`. A packet is checked whole
   (every stream's framing, each hybrid frame's redundant frame size, the durations, then
-  the output frame's charge) before any stream decodes; the SILK symbols read while
-  checking are staged and not read twice. A refused packet leaves every stream as it
-  was, so the next packet decodes as if it had not been sent.
+  the output frame's charge) before any stream decodes. A refused packet leaves every
+  stream as it was, so the next packet decodes as if it had not been sent.
 - Memory charged to the decoder's budget: at construction the state of each stream
   (45 KiB: CELT history and energies, SILK state) with room to stage one packet of it
   (20 KiB), the buffers and inverse MDCT tables the streams share (140 KiB), and the
   output frame before a packet that needs it larger. `Limits::live_storage_bytes` is 64
   MiB by default, which holds the largest header with a wide margin: 255 streams (16
-  MiB) and 93 channels of 120 ms (2 MiB).
-  A refused charge is `DecodeError::Budget`; in `decode` it refuses only that packet.
-  Nothing is allocated per packet.
+  MiB) and 93 channels of 120 ms (2 MiB). A refused charge is `DecodeError::Budget`; in
+  `decode` it refuses only that packet. Nothing is allocated per packet.
 
 Constant tables are taken from RFC 6716; see [THIRD-PARTY.md](THIRD-PARTY.md).
 
-## Conformance
+## Standards
 
-- Specifications: RFC 6716 with the RFC 8251 updates, and RFC 7845 for the identification
-  header and the channel mappings.
-- `cargo xtask codecs grade` runs the `opus` lane
-  ([harness/codecs/STATUS.md](../../harness/codecs/STATUS.md)), which decodes each file
-  through the container readers with its trims applied and compares the result with FFmpeg
-  9.0.2's native decoder under the [numeric
-  rules](../../harness/codecs/numeric-rules.json).
-- On the gate build 49/49 pass: FATE's `opus` directory (the 12 RFC test vectors and three
-  more files) and 34 generated streams (SILK, CELT and hybrid frames of several sizes and
-  bandwidths, families 1 and 255, a Matroska track). Runtime and memory against the
-  [gates](../../docs/quality.md#gates): [status](../../docs/status.md).
+RFC 6716 with the RFC 8251 updates, and RFC 7845 for the identification header and the
+channel mappings. Verification: [harness/codecs](../../harness/codecs/STATUS.md); results
+in [docs/status.md](../../docs/status.md).

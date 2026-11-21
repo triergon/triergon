@@ -45,8 +45,7 @@ output, without container trims. `--reset-at N` resets the decoder before access
   grouped quantizers and the joint stereo bound.
 - Layer I, joint stereo included.
 - All three layers share one polyphase synthesis filterbank (a 32-point DCT by Lee's
-  factorisation, then the 512-tap window, which uses the symmetry of the matrixed
-  vectors to read each value once for two outputs). Mono frames give one plane (`FC`); stereo,
+  factorisation, then the 512-tap window). Mono frames give one plane (`FC`); stereo,
   joint stereo and dual channel give two (`FL`, `FR`). A stream may change mode, sample
   rate or layer between frames.
 
@@ -96,12 +95,6 @@ The Huffman tables are checked to be complete prefix codes.
 
 `harness/codecs/mp3/make_vectors.sh FFMPEG OUT` generates the test streams (libmp3lame,
 mp2 and mp2fixed encodes at MPEG-1, 2 and 2.5 rates, and random Layer I/II frames from
-`harness/codecs/mp3/random_frames.py`) with the FFmpeg it is given.
-`cargo xtask codecs grade` decodes them and the ISO conformance streams through the
-container readers under the [numeric rules](../../harness/codecs/numeric-rules.json) (the
-`mp1`, `mp2` and `mp3` lanes, [harness/codecs/STATUS.md](../../harness/codecs/STATUS.md));
-Layer I and II compare with FFmpeg's float decoders. On the gate build 62/64 pass
-(Layer I 5/5, Layer II 20/20, Layer III 37/39). Open: `he_mode` changes channel mode
-mid-stream, which FFmpeg's CLI converts to the first frame's format; `he_free` is free
-format, which FFmpeg's demuxer and this decoder both refuse. Runtime and memory against
-the [gates](../../docs/quality.md#gates): [status](../../docs/status.md).
+`harness/codecs/mp3/random_frames.py`) with the FFmpeg it is given. Comparison:
+[harness/codecs](../../harness/codecs/STATUS.md); results in
+[docs/status.md](../../docs/status.md).

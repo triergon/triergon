@@ -88,8 +88,5 @@ Each command takes a fresh output directory. It records the binary and manifest
 hashes, verifies every file hash and unit-size pattern, and checks the 20 paired
 output folds before collecting measurements. Time uses 30 randomized pairs for
 each complete cycle. Memory uses 10 pairs per case and endpoint with separate heap
-and RSS processes. Per architecture this schedules 300 timed worker invocations
-and 600 observed invocations before warmups, calibration and any harness retries.
-Unsuccessful observations are kept with the successful rows. The ratios describe only
-the two supplied workers; the status records collection validity, and the per-case
-bounds and allocation counts show whether the change helps.
+and RSS processes. Unsuccessful observations are kept with the successful rows. The
+ratios describe only the two supplied workers.

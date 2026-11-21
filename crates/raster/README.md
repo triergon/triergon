@@ -100,89 +100,67 @@ them.
 | Clipping | `render_glyph`: `\clip` and `\iclip` rectangles and the `\kf` split; the multiply blends of vector clips | `Clip`, `ClipFrame`, `Bitmap::multiply`, `Bitmap::multiply_inverse` |
 
 `Raster::stroke` writes the outer (+offset) and inner (−offset) outline of a
-border in one pass over the source's contours. Each segment is joined to the
-offset before it: nearly parallel normals merge, and a corner gets a round cap
-of quadratic arcs on one side and a spike to the corner on the side the turn
-folds over. A line offsets directly; a spline is fitted by one offset spline
-when libass's radial and angular error bounds allow and is halved otherwise.
-Where an offset intersects itself, that part is replaced by libass's polyline,
-and a contour that never leaves a point is drawn as a circle. The result
-matches libass point for point and segment for segment.
+border in one pass over the source's contours, with libass's joins, round caps,
+spline fitting and error bounds, and matches libass point for point and segment
+for segment.
 
 The arithmetic is libass's own: 26.6 integer subdivision with its rounding, the
-16-bit wrapping of the tile and blur engines, `lrint` rounding to even, and the
-C `FFMAX`/`FFMIN` treatment of NaN. Floating-point expressions keep the C
-source's order and grouping, and the reference is built without
-floating-point contraction (`-ffp-contract=off`), so neither side fuses
-multiply-adds: additions, multiplications, divisions and square roots, which
-IEEE 754 rounds correctly, give the same result on every target. Two further
-properties are matched:
+16-bit wrapping of the tile and blur engines, `lrint` rounding to even, and the C
+`FFMAX`/`FFMIN` treatment of NaN. Floating-point expressions keep the C source's
+order and grouping without fused multiply-adds, so the correctly rounded
+operations give the same result on every target. Two further properties:
 
-- **libass's C engine.** The gated reference runs libass's plain C bitmap
-  engine on every host (`ass_bitmap_engine_init(ASS_CPU_FLAG_NONE)`: 16×16
-  tiles and rows aligned to 16 bytes), which is what libass runs on 32-bit
-  ARMv7, where it has no assembly. Bitmaps keep its stride (the width rounded
-  up to 16), every pass works over the width and the row padding stays zero.
-  libass's SIMD engines depart from it, for example by blurring `\be` over
-  whole rows into the padding, and AVX2 pads rows to 32 bytes; the
-  diagnostic `raster-simd` feature records where.
-- **libm.** Five functions come from the platform's libm, as libass's do:
-  the sine and cosine of the `\frx`, `\fry` and `\frz` rotations
+- **libass's C engine.** Bitmaps match libass's plain C bitmap engine
+  (`ass_bitmap_engine_init(ASS_CPU_FLAG_NONE)`: 16×16 tiles and rows aligned to
+  16 bytes), which is what libass runs on 32-bit ARMv7. Bitmaps keep its stride
+  (the width rounded up to 16), every pass works over the width and the row
+  padding stays zero. libass's SIMD engines depart from it, for example by
+  blurring `\be` over whole rows into the padding.
+- **libm.** Five functions come from the platform's libm, as libass's do: the
+  sine and cosine of the `\frx`, `\fry` and `\frz` rotations
   (`Placement::rotation`), `log1p` and `expm1`, which quantise the `\blur`
-  radius and restore its variance (`Effects::blur`), and `exp` in the
-  Gaussian blur's coefficients (`Raster::blur` and `Raster::compose`); `log`
-  only takes the constant `log 256`. Neither Apple's libm nor glibc
-  guarantees correct rounding for these, so a result that depends on them is
-  the one libass computes against the same libm, and platforms whose libms
-  differ can differ there. The comparison covers Apple's libm on macOS AArch64
-  and glibc on Linux x86_64, AArch64 and 32-bit ARMv7, where every case of
-  the C engine matches apart from two sweep cases on ARMv7 whose composite cannot be
-  allocated in a 32-bit address space ([status](../../docs/status.md)).
+  radius and restore its variance (`Effects::blur`), and `exp` in the Gaussian
+  blur's coefficients (`Raster::blur` and `Raster::compose`). Libms do not
+  guarantee correct rounding for these, so results that depend on them match
+  libass built against the same libm and can differ between platforms.
 
 ## Behaviour and limits
 
 Every input-dependent allocation is charged to the `Budget` a value was created
-with: outlines, bitmaps and the rasteriser's, stroker's and blur's scratch,
-which a `Raster` keeps and reuses. Work is charged to the `WorkBudget` the caller passes
-to each stage, one per frame: subdivision steps (each spline part the
-stroker offsets and each arc it subdivides), emitted points, polyline
+with: outlines, bitmaps and the rasteriser's, stroker's and blur's scratch, which
+a `Raster` keeps and reuses. Work is charged to the `WorkBudget` the caller
+passes to each stage, one per frame: subdivision steps, emitted points, polyline
 segments and 16×16 tiles filled, and every 16 pixels of a row a blur stage
 writes or a run's glyph bitmaps are summed into, charged before the stage
-allocates or runs. `Limits` bounds sizes: the points of a stroked
-outline (`outline_points`) and the bytes of a bitmap (`bitmap_bytes`). Running
-out of work or exceeding a limit is `Error::Policy`. The bitmap default is
-`MAX_BITMAP_BYTES`, libass's own bound just under 2³¹ bytes, so only the budget
-limits what libass draws; a bitmap beyond that bound is not drawn, as in
-libass, and a blur whose intermediate planes would pass libass's bound leaves
-the bitmap unblurred, as libass does. Outline coordinates stay within
-±(2²⁸ − 1); conversions and transforms that leave the range are
-`Error::Invalid`, and the glyph pipeline drops such outlines as libass does. No
-input panics, including arithmetic overflow in debug builds. Where libass's
-result depends on the target for values far out of range (conversions of
-doubles beyond the `long` range, shifts by 32 or more), the crate follows
-libass on 32-bit ARM hard-float with GCC on every target: conversions
-saturate, NaN converts to 0 and such shifts give 0, so a coordinate rounds
-out of range as libass does there.
+allocates or runs. `Limits` bounds the points of a stroked outline
+(`outline_points`, default 2²²) and the bytes of a bitmap (`bitmap_bytes`,
+default `MAX_BITMAP_BYTES`, libass's own bound just under 2³¹ bytes, so only the
+budget limits what libass draws). Running out of work or exceeding a limit is
+`Error::Policy`. A bitmap beyond libass's bound is not drawn, and a blur whose
+intermediate planes would pass it leaves the bitmap unblurred, as in libass.
 
-Not covered: glyph loading, hinting, synthetic styles and decoration lines
-(`triergon-font` and the renderer); drawing parsing and the image list,
-including where vector clips overlap and how their images are allocated, which
-belong to the renderer. The large-tile build of libass
-(`--enable-large-tiles`) is not matched.
+Outline coordinates stay within ±(2²⁸ − 1); conversions and transforms that leave
+the range are `Error::Invalid`, and the glyph pipeline drops such outlines as
+libass does. Where libass's result depends on the target for values far out of
+range (conversions of doubles beyond the `long` range, shifts by 32 or more), the
+crate follows libass on 32-bit ARM hard-float with GCC on every target:
+conversions saturate, NaN converts to 0 and such shifts give 0. No input panics,
+including arithmetic overflow in debug builds.
+
+## Not supported
+
+- Glyph loading, hinting, synthetic styles and decoration lines
+  (`triergon-font` and the renderer).
+- Drawing parsing and the image list, including where vector clips overlap and
+  how their images are allocated (the renderer).
+- The large-tile build of libass (`--enable-large-tiles`) and its SIMD engines.
 
 ## Verification
 
-`cargo test -p triergon-raster` runs unit tests and `tests/robustness.rs`,
-which mutates random glyph sources and runs every operation on them. The
-features `raster-glyphs`, `raster-outlines`, `raster-bitmaps` and
-`raster-sweep` (`harness/features/raster-*`, run by
-`cargo xtask raster compare [--all]`) compare
-[raster-worker](../raster-worker/README.md) with the pinned libass build on
-its C engine exactly: outline points and segments, bitmap positions, sizes and every pixel,
-glyph and run positions, and clip parts; see [docs/status.md](../../docs/status.md).
-Runtime and memory are not measured; the libass pin in
-[docs/quality.md](../../docs/quality.md#reference-and-corpus) sets how the reference
-is to be timed.
+`cargo test -p triergon-raster` runs unit tests and a mutation test. The
+comparison with libass 0.17.5's C engine runs through
+[raster-worker](../raster-worker/README.md) and the `harness/features/raster-*`
+features; [docs/status.md](../../docs/status.md) has the results.
 
 ## Licence
 

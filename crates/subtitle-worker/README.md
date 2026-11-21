@@ -35,28 +35,17 @@ option of the reference decoder with the same meaning; values the reference woul
 refuse are refused) or, for `cc`, `source=video` (caption data from the video
 stream, the default) or `source=packets` (608 byte pairs, such as an SCC file).
 
-Preparation is outside the timed interval and the memory window: reading the file
-through the Triergon container readers, selecting the stream, copying its packets
-in demux order, for captions extracting the caption data of every picture in
-output order (H.264 and HEVC in Matroska or MP4 with the parameter sets of the
-track's configuration before the first packet's), and creating the pool the decoder is charged to. The operation creates the decoder, decodes every prepared packet in
-order (the PGS, DVB and DVD decoders in work slices of 65,536 units, resumed until
-the packet is done), drains it, folds every output subtitle (`src/sink.rs`) and frees
-everything.
-
-The fold, bench and memory modes run through
-[triergon-harness-runner](../harness-runner/README.md) and print the harness
-protocol's one JSON line: `packets` counts output subtitles, `bytes` folded bytes and
-`digest` folds every subtitle's packet index, times, and per rectangle its geometry,
-flags, palette, pixels, text and ASS line. A decoder error, such as memory the pool
-refuses, ends the operation with its `refusal` and the packet it stopped at as its
-`cause`. The line also carries `input_digest`, worked out outside the operation as
-the reference works it out: the packet count, then per packet whether it has a PTS,
-the PTS and the duration, folded word by word (d = 31d + w, wrapping); the
-`subtitle-cc` contract compares it, so the prepared packets' order and times must
-match the reference's exactly. The trace mode prints the folded values as lines,
-identical to the reference's trace; the input mode prints the prepared packets. The
-features are `harness/features/subtitle-{pgs,dvb,dvd,cc,teletext}/`.
+Reading the file, selecting the stream, copying its packets in demux order (for
+captions, extracting every picture's caption data in output order) and creating the
+decoder's pool happen outside the timed interval and the memory window. The fold, bench
+and memory modes run through [triergon-harness-runner](../harness-runner/README.md):
+`packets` counts output subtitles, `bytes` folded bytes, and `digest` folds every
+subtitle. A decoder error, such as memory the pool refuses, ends the operation with its
+`refusal` and the packet it stopped at as its `cause`. The line also carries
+`input_digest`, a fold of the prepared packets' count, PTS and durations that must match
+the reference's. The trace mode prints the folded values as lines, identical to the
+reference's trace; the input mode prints the prepared packets. The features are
+`harness/features/subtitle-{pgs,dvb,dvd,cc,teletext}/`.
 
 ## Text subtitles
 
@@ -69,28 +58,19 @@ through `compat::mov_text::Decoder` and ASS packets through `compat::ass::Decode
 with the capsule's label if it has one. `srt` and `vtt` read one SubRip or WebVTT
 document through `compat::document::Reader`, folding every cue's start, duration,
 text and WebVTT identifier and settings. The inputs are written by
-`harness/subtitle_corpus.py`; the corpus is `harness/features/subtitle-text/`, and a
-test checks every case against the fold the reference recorded, in work slices of
-any size.
+`harness/subtitle_corpus.py`; the corpus is `harness/features/subtitle-text/`.
 
 ## Recorded PGS cases
 
-The `subtitle-capsule-worker` binary of this package runs the `pgs-` modes, so that
-the `sub-` operations of `subtitle-worker` compile as they would without them: a
-second caller of the PGS receiver changes how its code is inlined. They pair with
-the formats build of the reference worker (`harness/reference_pgs.h`) and fold
-their own byte transcript; a decoder refusal is a marker in the transcript.
-
-The `pgs-` modes decode PGS packets through
-`triergon_subtitles::compat::pgs::ReceiverDecoder`. The input is a case capsule
-(`SMBMO001`): the packet time base, the forced-only option and up to 64 records,
-each a complete PGS packet with its raw PTS and DTS or a hard reset that reopens
-the decoder. Every published subtitle is folded with its packet, consumed bytes,
-PTS in microseconds, display window and canvas, and per rectangle the geometry,
-forced flag, stride, index plane, palette and the palette value of every pixel. The
-fold is the digest of the byte transcript stored as `expected.bin` beside each case
-in `crates/subtitles/tests/native-compatibility-gold/`, and a test checks all 229
-in work slices of any size. The corpus is `harness/features/subtitle-pgs-capsules/`.
+The `subtitle-capsule-worker` binary runs the `pgs-` modes, kept apart so the `sub-`
+operations of `subtitle-worker` compile as they would without them. They pair with the
+formats build of the reference worker (`harness/reference_pgs.h`) and fold their own
+byte transcript; a decoder refusal is a marker in the transcript. The input is a case
+capsule (`SMBMO001`): the packet time base, the forced-only option and up to 64 records,
+each a complete PGS packet with its raw PTS and DTS or a hard reset that reopens the
+decoder. The fold is the digest of the byte transcript stored as `expected.bin` beside
+each case in `crates/subtitles/tests/native-compatibility-gold/`. The corpus is
+`harness/features/subtitle-pgs-capsules/`.
 
 ## Recording and verifying subtitle fixtures
 
