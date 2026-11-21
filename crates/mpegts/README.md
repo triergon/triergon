@@ -348,6 +348,10 @@ whole backing allocation.
 - ETSI TS 102 114 V1.6.1 (DTS, DTS-HD; seek recovery per §7.5.3.4, §8.3.1, §8.5 and
   Annex G.3.1); ISO/IEC 14496-3 §1.7.2 (LOAS); RFC 8216 (entity boundaries).
 
+The [original-input controls](../../harness/fate/README.md) check source
+program discovery events, PMT replacement, encoded clocks, PES payload ranges
+and diagnostics for unaligned input.
+
 ## Verification
 
 Integration tests use independently authored streams in `tests/data/` (listed in
