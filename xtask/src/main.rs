@@ -13,6 +13,7 @@ mod core_time;
 mod corpus;
 mod ebml;
 mod evidence;
+mod exceptions;
 mod fate;
 mod fetch;
 mod ffprobe;

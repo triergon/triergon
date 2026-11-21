@@ -193,6 +193,16 @@ const COVERED: [(&str, Coverage); 26] = [
     ),
 ];
 
+/// How many registered features a command other than `report` gates, and how many
+/// the gate leaves out.
+pub fn dedicated_coverage() -> (usize, usize) {
+    let excluded = COVERED
+        .iter()
+        .filter(|(_, coverage)| matches!(coverage, Coverage::Excluded(_)))
+        .count();
+    (COVERED.len() - excluded, excluded)
+}
+
 /// How a registered feature with a specialized runner or exclusion is covered.
 #[derive(Clone, Copy, Debug)]
 enum Coverage {

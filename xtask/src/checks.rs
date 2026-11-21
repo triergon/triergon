@@ -97,6 +97,11 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     errors.extend(runtime_mentions(root));
     errors.extend(policy_values(root));
     errors.extend(contract_fields(root));
+    let exceptions = data
+        .iter()
+        .find(|(path, _)| path == crate::exceptions::FILE)
+        .map(|(_, record)| record);
+    errors.extend(crate::exceptions::check(exceptions, &data));
     // Generated manifests: the case ids and the pins match, in the recorded form.
     for generator in crate::generators::GENERATORS {
         errors.extend(generator.check(root));
@@ -923,10 +928,21 @@ mod tests {
         )
         .unwrap();
         stated_policy(&root);
+        let missing = design(&root).unwrap_err();
+        assert_eq!(
+            missing,
+            ["harness/gate-exceptions.json: no recorded counts"]
+        );
+        let counts = crate::exceptions::counted(&[]);
+        fs::write(
+            root.join(crate::exceptions::FILE),
+            json::to_python(&Value::object([("counts", counts)]), None),
+        )
+        .unwrap();
         let ok = design(&root).unwrap();
         assert!(
             ok.starts_with(
-                "Design integrity OK: 2 harness data files, 1 unmapped FATE identities."
+                "Design integrity OK: 3 harness data files, 1 unmapped FATE identities."
             )
         );
         fs::write(root.join("harness/sub/bad.json"), "{").unwrap();

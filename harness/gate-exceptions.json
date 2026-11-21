@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "about": "What the gates require and every exception to them, counted from the feature contracts, the gate plan and every list under harness/ whose name starts with open_ (an entry counts once for each case it names, under each gate target it is open on). `cargo xtask check-design` counts them again: a change that drops a requirement or adds an exception must change this file too.",
+  "counts": {
+    "features": 62,
+    "required_by_check": 32,
+    "on_demand": 4,
+    "diagnostic": 1,
+    "gated_by_report": 36,
+    "gated_by_another_command": 22,
+    "not_gated": 4,
+    "open": {
+      "harness/codecs/aac/ps-open-manifest.json": {
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 4,
+          "thumbv7neon-unknown-linux-gnueabihf": 4
+        }
+      },
+      "harness/features/ass-parse-host/contract.json": {
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 4,
+          "thumbv7neon-unknown-linux-gnueabihf": 2
+        }
+      },
+      "harness/features/ass-render-host/contract.json": {
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 4
+        }
+      },
+      "harness/features/raster-sweep/contract.json": {
+        "open_cases": {
+          "thumbv7neon-unknown-linux-gnueabihf": 2
+        }
+      },
+      "harness/features/subtitle-dvd-host/contract.json": {
+        "open_cases": {
+          "aarch64-unknown-linux-gnu": 4
+        }
+      }
+    }
+  }
+}
