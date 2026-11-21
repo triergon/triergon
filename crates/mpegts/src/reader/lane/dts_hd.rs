@@ -253,9 +253,10 @@ fn check_pes(pes: &Pes, minimum: usize, maximum: usize) -> Result<()> {
 }
 
 struct ExtensionPacket {
-    crc: HeaderCrc,
+    crc: Option<HeaderCrc>,
     end: usize,
     duration: Option<Time>,
+    remaining: u8,
 }
 
 struct Batch {
@@ -264,10 +265,10 @@ struct Batch {
     current: Option<ExtensionPacket>,
 }
 
-// Annex F.4.3 allows multiple AUs in one PES when there is one substream.
+// Annex F.4.3 allows multiple AUs in one PES only for a single substream.
 pub(super) struct ExtensionReader {
     input: aligned_audio::Reader<10, ()>,
-    index: u8,
+    extensions: u8,
     pes_bytes: usize,
     batch: Option<Batch>,
     incomplete: bool,
@@ -281,11 +282,21 @@ impl ExtensionReader {
         caps: SourceCapabilities,
         maximum: usize,
         window: usize,
-        index: u8,
+        descriptor: DvbDtsHd<'_>,
     ) -> Result<Self> {
+        let extensions = descriptor
+            .extensions
+            .iter()
+            .enumerate()
+            .fold(0_u8, |mask, (index, stream)| {
+                mask | (u8::from(stream.is_some()) << index)
+            });
+        if extensions == 0 {
+            return Err(Error::Invalid("DTS-HD extension substream"));
+        }
         Ok(Self {
             input: aligned_audio::Reader::new(pool, source, caps, maximum, window)?,
-            index,
+            extensions,
             pes_bytes: 0,
             batch: None,
             incomplete: false,
@@ -348,7 +359,7 @@ impl ExtensionReader {
             if !work.try_charge(1) {
                 return Ok(Step::Yield);
             }
-            match next_extension(bytes, batch.cursor, self.input.maximum(), self.index) {
+            match next_extension(bytes, batch.cursor, self.input.maximum(), self.extensions) {
                 Ok(pending) => batch.current = Some(pending),
                 Err(Error::Truncated) => {
                     self.batch = None;
@@ -359,16 +370,19 @@ impl ExtensionReader {
             }
         }
         let pending = batch.current.as_mut().expect("extension header");
-        loop {
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
+        match pending.check(bytes, self.input.maximum(), work, cancel) {
+            Ok(false) => return Ok(Step::Yield),
+            Err(Error::Truncated) => {
+                self.batch = None;
+                self.incomplete = true;
+                return await_logical_end(self.input.input(), work, cancel);
             }
-            if pending.crc.step(bytes, work)? {
-                break;
+            result => {
+                result?;
             }
-            if work.remaining() == 0 {
-                return Ok(Step::Yield);
-            }
+        }
+        if self.extensions.count_ones() > 1 && pending.end != bytes.len() {
+            return Err(Error::Invalid("DTS-HD PES access unit extent"));
         }
         let pending = batch.current.take().expect("validated extension header");
         self.duration = pending.duration.or(self.duration);
@@ -389,7 +403,7 @@ fn next_extension(
     bytes: &[u8],
     cursor: usize,
     maximum: usize,
-    index: u8,
+    extensions: u8,
 ) -> Result<ExtensionPacket> {
     let tail = &bytes[cursor..];
     let extent = probe_dts_extension_substream_extent(
@@ -399,17 +413,75 @@ fn next_extension(
             maximum_frame_bytes: maximum,
         },
     )?;
-    if extent.substream_index != index {
+    if u32::from(extent.substream_index) != extensions.trailing_zeros() {
         return Err(Error::Invalid("DTS-HD extension substream index"));
     }
     if extent.frame_bytes > tail.len() {
         return Err(Error::Truncated);
     }
     Ok(ExtensionPacket {
-        crc: HeaderCrc::new(cursor, extent.header_bytes),
+        crc: Some(HeaderCrc::new(cursor, extent.header_bytes)),
         end: cursor + extent.frame_bytes,
         duration: extension_duration(tail, extent)?,
+        remaining: extensions & !(1 << extent.substream_index),
     })
+}
+
+impl ExtensionPacket {
+    fn check(
+        &mut self,
+        bytes: &[u8],
+        maximum: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if let Some(crc) = &mut self.crc {
+                if !crc.step(bytes, work)? {
+                    if work.remaining() == 0 {
+                        return Ok(false);
+                    }
+                    continue;
+                }
+                self.crc = None;
+            }
+            if self.remaining == 0 {
+                return Ok(true);
+            }
+            if !work.try_charge(1) {
+                return Ok(false);
+            }
+            let aligned = self.end.next_multiple_of(4);
+            if bytes
+                .get(self.end..aligned)
+                .ok_or(Error::Truncated)?
+                .iter()
+                .any(|&byte| byte != 0)
+            {
+                return Err(Error::Invalid("DTS-HD substream alignment"));
+            }
+            let tail = bytes.get(aligned..).ok_or(Error::Truncated)?;
+            let extent = probe_dts_extension_substream_extent(
+                tail,
+                DtsFrameExtentLimits {
+                    maximum_header_bytes: 4096,
+                    maximum_frame_bytes: maximum,
+                },
+            )?;
+            if extent.frame_bytes > tail.len() {
+                return Err(Error::Truncated);
+            }
+            if u32::from(extent.substream_index) != self.remaining.trailing_zeros() {
+                return Err(Error::Invalid("DTS-HD extension substream order"));
+            }
+            self.remaining &= !(1 << extent.substream_index);
+            self.crc = Some(HeaderCrc::new(aligned, extent.header_bytes));
+            self.end = aligned + extent.frame_bytes;
+        }
+    }
 }
 
 fn extension_duration(bytes: &[u8], extent: DtsExtensionSubstreamExtent) -> Result<Option<Time>> {
