@@ -277,22 +277,35 @@ fn dvd_palette_options_use_the_selected_corpus_and_keep_absence() {
 fn the_font_features_are_registered_prefix_features() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let features = PrefixFeature::registered(root, "font-worker", &BTreeMap::new()).unwrap();
-    let found: Vec<(&str, &str, usize)> = features
+    let found: Vec<_> = features
         .iter()
-        .map(|f| (f.id.as_str(), f.prefix.as_str(), f.cases.len()))
+        .map(|f| {
+            (
+                f.id.as_str(),
+                f.prefix.as_str(),
+                f.cases.len(),
+                f.reference.is_some(),
+            )
+        })
         .collect();
     assert_eq!(
         found,
         [
-            ("font-hinting-default", "font-sized-", 159),
-            ("font-hinting-modes", "font-sized-", 954),
-            ("font-hinting-none", "font-sized-", 159),
-            ("font-outlines", "font-", 53),
+            ("font-hinting-default", "font-sized-", 159, true),
+            ("font-hinting-modes", "font-sized-", 954, true),
+            ("font-hinting-none", "font-sized-", 159, true),
+            ("font-outlines", "font-", 53, true),
+            ("font-store", "store-", 13, false),
         ]
     );
     let reviewed = reviewed_inputs(root).unwrap();
     for feature in &features {
-        assert_eq!(feature.corpus, root.join(".research/fonts/files"));
+        let directory = if feature.id == "font-store" {
+            "harness/features/font-store/inputs"
+        } else {
+            ".research/fonts/files"
+        };
+        assert_eq!(feature.corpus, root.join(directory));
         assert!(
             feature
                 .cases

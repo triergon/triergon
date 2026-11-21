@@ -2,7 +2,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::{comparison, features, manifest, oracle, report, validation, worker};
 use crate::json::{self, Value};
@@ -58,13 +58,12 @@ fn case_input(root: &Path, contract: &Value, corpus: &Path, case: &Value) -> R<P
     Ok(input)
 }
 
-fn corpus_path(root: &Path, contract: &Value, listing: &Value) -> R<PathBuf> {
+pub(super) fn corpus_directory(root: &Path, contract: &Value, listing: &Value) -> Option<PathBuf> {
     contract
         .get("corpus_directory")
         .and_then(Value::as_str)
         .map(|p| root.join(p))
         .or_else(|| report::recorded_corpus(root, listing))
-        .ok_or("no corpus directory".into())
 }
 
 fn oracle_trace(root: &Path, contract: &Value, corpus: &Path, case: &Value) -> R<String> {
@@ -79,7 +78,7 @@ fn oracle_trace(root: &Path, contract: &Value, corpus: &Path, case: &Value) -> R
 }
 
 pub fn record(root: &Path, contract: &Value, listing: &mut Value) -> R<()> {
-    let corpus = corpus_path(root, contract, listing)?;
+    let corpus = corpus_directory(root, contract, listing).ok_or("no corpus directory")?;
     let Value::Object(members) = listing else {
         return Err("expected a manifest object".into());
     };
@@ -97,21 +96,124 @@ pub fn record(root: &Path, contract: &Value, listing: &mut Value) -> R<()> {
     Ok(())
 }
 
+pub(super) enum CaseOutput<'a> {
+    /// Retain the raw oracle and candidate outputs in the case's report directory.
+    Files(&'a Path),
+    /// Record the candidate's arguments, exit code and raw stdout digest.
+    Calls(&'a mut Vec<Value>),
+}
+
+pub(super) struct TraceOracle<'a> {
+    contract: &'a Value,
+    oracle: oracle::Kind,
+    mode: String,
+    operation: &'a str,
+    fields: Vec<String>,
+    timeout: Duration,
+}
+
+impl<'a> TraceOracle<'a> {
+    pub(super) fn new(contract: &'a Value) -> R<Self> {
+        Ok(Self {
+            contract,
+            oracle: kind(contract)?,
+            mode: format!("{}trace", validation::text(contract, "worker_operation")?),
+            operation: validation::text(contract, "operation")?,
+            fields: comparison::work_fields(contract)?,
+            timeout: worker::contract_parity_timeout(contract)?,
+        })
+    }
+
+    pub(super) fn compare_case(
+        &self,
+        root: &Path,
+        corpus: &Path,
+        case: &Value,
+        candidate: &Path,
+        output: CaseOutput<'_>,
+    ) -> R<Value> {
+        let input = case_input(root, self.contract, corpus, case)?;
+        let declared = report::case_arguments(case);
+        let arguments = report::resolved_case_arguments(corpus, case, declared.clone())?;
+        let run_candidate = || -> R<worker::Finished> {
+            let mut command = vec![
+                candidate.as_os_str().to_owned(),
+                self.mode.as_str().into(),
+                input.as_os_str().to_owned(),
+            ];
+            command.extend_from_slice(&arguments);
+            worker::run_in(&command, &[], Some(root), self.timeout)?
+                .ok_or("candidate timed out".into())
+        };
+        // Trace identities include the candidate call even if the oracle pin fails.
+        let (files, recorded) = match output {
+            CaseOutput::Files(path) => (Some(path), None),
+            CaseOutput::Calls(calls) => (
+                None,
+                Some(run_candidate().inspect(|result| {
+                    let argv = [
+                        self.mode.as_str().into(),
+                        input
+                            .file_name()
+                            .unwrap_or(input.as_os_str())
+                            .to_string_lossy(),
+                    ]
+                    .into_iter()
+                    .chain(declared.iter().map(|argument| argument.to_string_lossy()));
+                    calls.push(Value::object([
+                        ("argv", Value::strings(argv)),
+                        ("exit", Value::int(result.code)),
+                        ("stdout_sha256", Value::str(sha256::hex(&result.stdout))),
+                    ]));
+                })),
+            ),
+        };
+        let expected = pin(case)?;
+        let reference = oracle::trace(root, self.oracle, &input, &arguments, self.timeout)?;
+        let observed = sha256::hex(reference.as_bytes());
+        if let Some(path) = files {
+            report::create_output(path)?;
+            fs::write(path.join("oracle.trace"), &reference).map_err(|e| e.to_string())?;
+        }
+        if observed != expected {
+            return Err(format!(
+                "oracle trace changed: expected {expected}, got {observed}"
+            ));
+        }
+        let result = recorded.unwrap_or_else(run_candidate)?;
+        if let Some(path) = files {
+            fs::write(path.join("candidate.stdout"), &result.stdout).map_err(|e| e.to_string())?;
+            fs::write(path.join("candidate.stderr"), &result.stderr).map_err(|e| e.to_string())?;
+        }
+        if result.code != 0 {
+            return Err(format!("candidate exited {}", result.code));
+        }
+        let actual = split_trace(&result.stdout, self.operation, &self.fields)?;
+        case_input(root, self.contract, corpus, case)?;
+        let status = if actual == reference.as_bytes() {
+            "pass"
+        } else {
+            "mismatch"
+        };
+        Ok(Value::object([
+            ("status", Value::str(status)),
+            ("oracle_trace_sha256", Value::str(observed)),
+            ("candidate_trace_sha256", Value::str(sha256::hex(actual))),
+        ]))
+    }
+}
+
 pub fn compare(root: &Path, file: &Path, output: &Path) -> R<i32> {
     let contract = json::read(file)?;
     let contract_sha = super::linux::file_sha(file)?;
-    let oracle = kind(&contract)?;
+    let oracle = TraceOracle::new(&contract)?;
     let id = validation::text(&contract, "id")?;
-    let prefix = validation::text(&contract, "worker_operation")?;
-    let operation = validation::text(&contract, "operation")?;
     let candidate_name = validation::text(&contract, "candidate")?;
-    let fields = comparison::work_fields(&contract)?;
-    let timeout = worker::contract_parity_timeout(&contract)?;
     let target = report::gate_target()?;
     let manifest_file = file.with_file_name("corpus.json");
     let (listing, manifest_sha) = manifest::read(root, &manifest_file)?;
     manifest::validate_required(&contract, &listing)?;
-    let corpus = corpus_path(root, &contract, &listing)?;
+    let corpus = corpus_directory(root, &contract, &listing).ok_or("no corpus directory")?;
     let open = report::open_cases(&contract, &listing, &target)?;
     let identity = json::read(&root.join("target/harness/identity.json"))?;
     let candidate = validation::candidate_worker(root, &identity, candidate_name)?;
@@ -133,52 +235,17 @@ pub fn compare(root: &Path, file: &Path, output: &Path) -> R<i32> {
         {
             return Err(format!("invalid oracle case id: {case_id}"));
         }
-        let compare_case = || -> R<Value> {
-            let input = case_input(root, &contract, &corpus, case)?;
-            let expected = pin(case)?;
-            let arguments =
-                report::resolved_case_arguments(&corpus, case, report::case_arguments(case))?;
-            let reference = oracle::trace(root, oracle, &input, &arguments, timeout)?;
-            let observed = sha256::hex(reference.as_bytes());
-            let case_output = output.join(case_id);
-            report::create_output(&case_output)?;
-            fs::write(case_output.join("oracle.trace"), &reference).map_err(|e| e.to_string())?;
-            if observed != expected {
-                return Err(format!(
-                    "oracle trace changed: expected {expected}, got {observed}"
-                ));
+        let parity = match oracle.compare_case(
+            root,
+            &corpus,
+            case,
+            &candidate,
+            CaseOutput::Files(&output.join(case_id)),
+        ) {
+            Ok(parity) => {
+                println!("{case_id} {}", worker::status(&parity));
+                parity
             }
-            let mut command = vec![
-                candidate.as_os_str().to_owned(),
-                format!("{prefix}trace").into(),
-                input.into(),
-            ];
-            command.extend(arguments);
-            let result =
-                worker::run_in(&command, &[], Some(root), timeout)?.ok_or("candidate timed out")?;
-            fs::write(case_output.join("candidate.stdout"), &result.stdout)
-                .map_err(|e| e.to_string())?;
-            fs::write(case_output.join("candidate.stderr"), &result.stderr)
-                .map_err(|e| e.to_string())?;
-            if result.code != 0 {
-                return Err(format!("candidate exited {}", result.code));
-            }
-            let actual = split_trace(&result.stdout, operation, &fields)?;
-            case_input(root, &contract, &corpus, case)?;
-            let status = if actual == reference.as_bytes() {
-                "pass"
-            } else {
-                "mismatch"
-            };
-            println!("{case_id} {status}");
-            Ok(Value::object([
-                ("status", Value::str(status)),
-                ("oracle_trace_sha256", Value::str(observed)),
-                ("candidate_trace_sha256", Value::str(sha256::hex(actual))),
-            ]))
-        };
-        let parity = match compare_case() {
-            Ok(parity) => parity,
             Err(error) => {
                 execution_failed = true;
                 println!("{case_id} error: {error}");

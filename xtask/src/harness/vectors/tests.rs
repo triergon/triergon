@@ -55,6 +55,7 @@ fn prefix_traces_require_the_reference_and_secondary_input_pins() {
                 identity,
                 &root.join("raw"),
                 &mut Vec::new(),
+                &mut Vec::new(),
             )
             .unwrap_err()
         };
@@ -69,6 +70,98 @@ fn prefix_traces_require_the_reference_and_secondary_input_pins() {
         );
     }
     assert!(!root.join("raw").exists());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn oracle_prefix_traces_record_every_call_and_check_the_oracle_pin() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = crate::walk::scratch("oracle-prefix-traces");
+    let feature = root.join("harness/features/spec");
+    for directory in [
+        &feature,
+        &root.join("inputs"),
+        &root.join("harness/fonts"),
+        &root.join("harness/fate"),
+        &root.join("target/harness"),
+    ] {
+        fs::create_dir_all(directory).unwrap();
+    }
+    for path in [
+        "harness/fonts/corpus.json",
+        "harness/fate/samples.json",
+        "target/harness/identity.json",
+    ] {
+        fs::write(root.join(path), "{}").unwrap();
+    }
+    fs::write(
+        feature.join("contract.json"),
+        r#"{"id":"spec","worker_operation":"spec-","operation":"inspect","candidate":"candidate","oracle":"views-smoke","corpus_directory":"inputs"}"#,
+    )
+    .unwrap();
+    fs::write(
+        root.join("harness/oracles.py"),
+        "import json, sys\nfrom pathlib import Path\nprint(json.dumps({'data': [Path(sys.argv[2]).read_text() + ' ' + sys.argv[3]]}))\n",
+    )
+    .unwrap();
+    fs::write(root.join("inputs/first"), "3").unwrap();
+    let input_sha = crate::sha256::hex(b"3");
+    let cases = [
+        ("equal", "7", crate::sha256::hex(b"3 7\n"), "pass"),
+        ("different", "8", crate::sha256::hex(b"3 8\n"), "mismatch"),
+        ("stale-pin", "7", "0".repeat(64), "error"),
+    ];
+    let listing = cases
+        .iter()
+        .map(|(id, arg, pin, _)| {
+            format!(
+                r#"{{"id":"{id}","file":"first","rights":"authored-synthetic","sha256":"{input_sha}","arguments":["{arg}"],"expected":{{"trace_sha256":"{pin}"}}}}"#
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    fs::write(
+        feature.join("corpus.json"),
+        format!(r#"{{"directory":"unused","cases":[{listing}]}}"#),
+    )
+    .unwrap();
+    let candidate = root.join("candidate");
+    let summary = r#"{"schema":1,"operation":"inspect","iterations":1,"packets":1,"bytes":0,"digest":8,"eof":true}"#;
+    fs::write(
+        &candidate,
+        format!(
+            "#!/bin/sh\n[ \"$1\" = spec-trace ] && [ \"$(cat \"$2\")\" = 3 ] || exit 1\nprintf '%s\\n' '3 7' '{summary}'\n"
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&candidate, fs::Permissions::from_mode(0o755)).unwrap();
+    let output = root.join("traces.json");
+    let run = |output: &Path, compare| {
+        trace_identities(&root, &candidate, output, compare, &BTreeMap::new())
+    };
+    assert_eq!(run(&output, None), Ok(0));
+    let record = json::read(&output).unwrap();
+    let calls = record.get("calls").and_then(Value::as_array).unwrap();
+    let verdicts = record.get("verdicts").unwrap();
+    let stdout_sha = crate::sha256::hex(format!("3 7\n{summary}\n").as_bytes());
+    assert_eq!(calls.len(), cases.len());
+    for (call, (id, arg, _, status)) in calls.iter().zip(cases) {
+        assert_eq!(s(verdicts, &format!("spec/{id}")), Some(status));
+        assert_eq!(
+            call.get("argv"),
+            Some(&Value::strings(["spec-trace", "first", arg]))
+        );
+        assert_eq!(call.get("exit"), Some(&Value::int(0)));
+        assert_eq!(s(call, "stdout_sha256"), Some(stdout_sha.as_str()));
+    }
+    assert_eq!(run(&root.join("repeat.json"), Some(&output)), Ok(0));
+    fs::write(root.join("inputs/first"), "changed").unwrap();
+    assert_eq!(
+        run(&root.join("changed.json"), Some(&output)).unwrap_err(),
+        "spec/equal: input-hash-mismatch"
+    );
     fs::remove_dir_all(root).unwrap();
 }
 

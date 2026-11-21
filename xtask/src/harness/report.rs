@@ -560,7 +560,7 @@ pub struct PrefixFeature {
 }
 
 impl PrefixFeature {
-    /// Loads a prefix feature; `corpus` overrides the manifest's `directory`.
+    /// Loads a prefix feature with an optional override for its corpus directory.
     pub fn load(
         root: &Path,
         contract: &Path,
@@ -575,19 +575,26 @@ impl PrefixFeature {
         };
         let id = text("id")?;
         let (listing, _) = super::manifest::read(root, manifest)?;
-        let corpus = match corpus {
-            Some(corpus) => corpus.to_path_buf(),
-            None => recorded_corpus(root, &listing).ok_or_else(|| {
+        let has_oracle = document.get("oracle").is_some();
+        let corpus = corpus
+            .map(Path::to_path_buf)
+            .or_else(|| {
+                if has_oracle {
+                    super::oracle_compare::corpus_directory(root, &document, &listing)
+                } else {
+                    recorded_corpus(root, &listing)
+                }
+            })
+            .ok_or_else(|| {
                 format!(
                     "{}: no corpus directory; pass --corpus or record `directory`",
                     manifest.display()
                 )
-            })?,
-        };
+            })?;
         Ok(Self {
             prefix: text("worker_operation")?,
             candidate: text("candidate")?,
-            reference: if document.get("oracle").is_some() {
+            reference: if has_oracle {
                 None
             } else {
                 Some(text("reference")?)

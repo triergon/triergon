@@ -11,6 +11,7 @@ use std::time::Duration;
 use super::acceptance::acceptance;
 use super::comparison::{reference_record, reference_summary};
 use super::gate_build;
+use super::oracle_compare::{CaseOutput, TraceOracle};
 use super::parity::{self, Run};
 use super::policy::{Memory, Runtime};
 use super::provenance::source_identity_error;
@@ -500,6 +501,7 @@ pub fn trace_identities(
     let started = std::time::Instant::now();
     super::worker::record_calls(&candidate);
     let mut verdicts = Vec::new();
+    let mut calls = Vec::new();
     let result = if features.is_empty() {
         matroska_traces(
             root,
@@ -516,10 +518,11 @@ pub fn trace_identities(
             &features,
             &identity,
             &scratch,
+            &mut calls,
             &mut verdicts,
         )
     };
-    let calls = super::worker::stop_recording();
+    calls.extend(super::worker::stop_recording());
     let _ = fs::remove_dir_all(&scratch);
     result?;
     let elapsed = (started.elapsed().as_secs_f64() * 10.0).round() / 10.0;
@@ -722,10 +725,40 @@ fn prefix_traces(
     features: &[PrefixFeature],
     identity: &Value,
     scratch: &Path,
+    calls: &mut Vec<Value>,
     verdicts: &mut Vec<(String, Value)>,
 ) -> R<()> {
     let target = gate_target()?;
     for feature in features {
+        if feature.reference.is_none() {
+            let contract = json::read(&feature.contract)?;
+            let oracle = TraceOracle::new(&contract)?;
+            // Keep calls in feature order when switching to raw oracle traces.
+            calls.extend(super::worker::stop_recording());
+            for case in &feature.cases {
+                let id = format!("{}/{}", feature.id, super::validation::text(case, "id")?);
+                let previous_calls = calls.len();
+                let status = match oracle.compare_case(
+                    root,
+                    &feature.corpus,
+                    case,
+                    candidate,
+                    CaseOutput::Calls(calls),
+                ) {
+                    Ok(result) => super::worker::status(&result).to_owned(),
+                    Err(error) if calls.len() == previous_calls => {
+                        return Err(format!("{id}: {error}"));
+                    }
+                    Err(error) => {
+                        println!("{id} error: {error}");
+                        "error".into()
+                    }
+                };
+                verdicts.push((id, Value::str(status)));
+            }
+            super::worker::record_calls(candidate);
+            continue;
+        }
         let reference = feature.reference_worker(root, identity)?;
         for case in &feature.cases {
             let id = s(case, "id").unwrap_or_default();
