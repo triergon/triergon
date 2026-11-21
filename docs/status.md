@@ -68,7 +68,7 @@ The [session queue workloads](../harness/session-queues/README.md) cover five re
 | MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.9716 (3/3 pass) at `ce55904b` | heap ≤0.0155, total RSS ≤0.6373 (3/3 lower) at `ce55904b` | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 0.7935 (71/71 pass) at `ce55904b` | heap ≤0.0207, total RSS ≤0.7419 (71/71 lower) at `ce55904b` | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core with consistent coded-window diagnostics from owned and packed inspectors | 135/135 AVC/HEVC reference comparisons. At `7c730ff8` on AArch64, both DTS inspectors agreed on all 27 fields and every core matched its reference length and bytes across seven inputs. [DTS corpus and instruction counts](#dts-core-header-inspection). | 0.9964 (135/135 pass for AVC/HEVC) at `217fef73` | heap ≤0.3300, total RSS ≤0.9888 (135/135 lower) at `217fef73` | ARMv7 total RSS, full AVC/HEVC/ADTS grammar |
-| Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets including EUC-KR receiver policies, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7). `subtitle-text-host` matches 23/23 SubRip and WebVTT documents with oversized timestamp fields on both targets. | `subtitle-text` 1.0146 (367/367 pass)<br>`subtitle-text-host` 0.0909 (23/23 pass) at `ab677583` | `subtitle-text` heap ≤0.3361, total RSS ≤0.9297 (367/367 lower)<br>`subtitle-text-host` heap ≤0.0121, total RSS ≤0.7906 (23/23 lower) at `ab677583` | FATE coverage |
+| Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets including EUC-KR receiver policies, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7). `subtitle-text-host` matches 23/23 SubRip and WebVTT documents with oversized timestamp fields on both targets. | `subtitle-text` 0.7966 (367/367 pass, worst `mov-text-tags-ranges`) at `f13dcaf3`<br>`subtitle-text-host` 0.0909 (23/23 pass) at `ab677583` | `subtitle-text` heap ≤0.3361, total RSS ≤0.9270 (367/367 lower) at `f13dcaf3`<br>`subtitle-text-host` heap ≤0.0121, total RSS ≤0.7906 (23/23 lower) at `ab677583` | FATE coverage |
 | Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 319/319 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7806 (319/319 pass) at `546045db` | heap ≤0.9654, total RSS ≤0.9682 (319/319 lower) at `546045db` | FATE coverage |
 | Subtitles, PGS capsules | Recorded PGS packet sessions through `compat::pgs::ReceiverDecoder`, with raw PTS, DTS and time base, the forced-only option and hard resets that reopen the decoder | 229/229 cases (`subtitle-pgs-capsules`: capsules of up to 64 complete PGS packets against FFmpeg's `pgssub` decoder), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7221 (229/229 pass) at `546045db` | heap ≤0.5788, total RSS ≤0.7381 (229/229 lower) at `546045db` | — |
 | Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` (−2 keeps a region's first automatic palette until a new epoch) | 241/241 cases (`subtitle-dvb`: TS and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.8995 (241/241 pass; worst `long-text-mkv`) at `f8e1c4d9` | heap ≤0.7116, total RSS ≤0.7901 (241/241 lower) at `f8e1c4d9` | FATE coverage |
@@ -87,6 +87,29 @@ The [session queue workloads](../harness/session-queues/README.md) cover five re
 | Capture | RGBA to YUV 4:2:0, MPEG-1 video with retryable motion-search allocation, MPEG-TS mux | 15/15 conversion, encoder and mux comparisons at `c30b9c80`. Conversion is byte-identical to FFmpeg 9.0.2 using `Session::open_filtered` on AArch64 and `Session::open` on ARMv7. | 0.9730 (15/15 pass, worst `c04-motion-960`, median of the cases 0.8137) at `c30b9c80` | heap ≤0.5904, total RSS ≤0.9704 (15/15 lower, kernel-bound) at `c30b9c80` | FFmpeg's ARMv7 build faults at widths of 2 modulo 4 from 18 up. The converter uses the filtered path at those widths. |
 
 ## Subtitle text comparisons
+
+At `f13dcaf3`, a partial gate run of `subtitle-text` per target passed parity,
+runtime, peak heap and total RSS on all 367 cases, every runtime upper bound
+below 0.85. `CharsetJob` converts single-byte charsets up to 4096 source bytes a
+step and charges what a byte-at-a-time conversion charges, and a mov_text
+packet stages its event prefix in 64 bytes instead of 2048, so no packet zeroes
+or moves a 2 KB buffer.
+
+| Case | Linux AArch64 at `546045db` | at `f13dcaf3` | ARMv7 at `546045db` | at `f13dcaf3` |
+|---|---|---|---|---|
+| `mov-text-tags-ranges` | below 1.0 | 0.7966 | 1.0131 | 0.8471 |
+| `charset-windows-1251-text` | 1.0325 | 0.5442 | below 1.0 | 0.4959 |
+| `charset-windows-1252-text` | 1.0121 | 0.5396 | below 1.0 | 0.4697 |
+
+Per operation, against main `6ed706b8` (least of three runs, the difference of
+1,050- and 50-iteration runs), Windows-1251 text took 46% fewer cycles on
+AArch64 and 45% fewer on ARMv7, and `mov-text-tags-ranges` 8% and 15% fewer.
+Retired instructions fell on 305 of 367 cases on AArch64 and 277 on ARMv7. They
+rose by about 0.9% on the multibyte ASCII charset cases, which take one more
+check per character, and by 13 to 37 instructions per SubRip or WebVTT document
+in the shared worker code; those cases run at about 0.40 and 0.05 of the
+reference. The other subtitle worker items changed by less than 0.04% on
+AArch64, and the playback worker builds to the same bytes.
 
 At `ab677583`, all 390 text cases passed parity, runtime, peak heap and total RSS
 against FFmpeg on each target. Two AArch64 runtime upper bounds exceeded 1.00,
@@ -279,7 +302,11 @@ Linux AArch64 and ISO BMFF seek's `origin18-nonzero-anchor-second-absent-t1-mid-
 1.0221 on ARMv7. A partial run of Matroska segment metadata and the external HDR vector at
 `f12511e4`, which parses metadata documents without a source handle per text field, puts
 `chapters-many` at 0.7906 on Linux AArch64 and 0.6203 on ARMv7; the item's highest case
-there is `chapters-depth`, at 0.9777 and 0.9092.
+there is `chapters-depth`, at 0.9777 and 0.9092. A partial run of subtitle text at
+`f13dcaf3`, which converts single-byte charsets in runs and stages mov_text event prefixes in
+64 bytes, puts `charset-windows-1251-text` at 0.5442 on Linux AArch64 and
+`mov-text-tags-ranges` at 0.8471 on ARMv7; the item's highest case there is
+`mov-text-tags-ranges` on both targets, at 0.7966 and 0.8471.
 
 The previous ceiling, 1.10, was set on one more full sharded gate run per target
 at `1c64b775`, measured as the `a73350ca` run was, with set `codec-derived-streams` unpacked
@@ -1431,6 +1458,8 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Playback startup and continuation, 32-bit ARMv7, shard 2 of 2 | `5514c6a0f0118bcbaecabd1e8ac35f9b8597d094` | [`c18114051ed24c0ccfb1312bf639fe123d062bc52e07a695304692265759038b`](../harness/evidence/sets/gate-run-armv7-5514c6a0-20261119-030651-shard-2.json) |
 | Partial gate run, Matroska segment metadata and the external HDR vector, Linux AArch64 | `f12511e4f9d631c2aac50445a572a1722b3de5d3` | [`548df59e660c774f58cb2daaa73953e214e5e72b0bb071d24464baf540103999`](../harness/evidence/sets/gate-run-aarch64-f12511e4-20261120-235350-shard-1.json) |
 | Partial gate run, Matroska segment metadata and the external HDR vector, 32-bit ARMv7 | `f12511e4f9d631c2aac50445a572a1722b3de5d3` | [`6d79e0b9012f36a88c96b26d173b80c13a46cccbb85107172f4b70b94d6832b2`](../harness/evidence/sets/gate-run-armv7-f12511e4-20261120-235457-shard-1.json) |
+| Partial gate run, subtitle text, Linux AArch64 | `f13dcaf328757770f863a8500670b836e6ffe83e` | [`771a37d0e26d889d12b24f5f49cd4a0f9e658fd7a2bedf44603a2d26814ca9cc`](../harness/evidence/sets/gate-run-aarch64-f13dcaf3-20261121-011834-shard-1.json) |
+| Partial gate run, subtitle text, 32-bit ARMv7 | `f13dcaf328757770f863a8500670b836e6ffe83e` | [`4f99a8ce4c41ce6efa35900a938c7423fd6f5e246008094c4f522e65d3239dca`](../harness/evidence/sets/gate-run-armv7-f13dcaf3-20261121-011727-shard-1.json) |
 | Matroska and linked worker gates with the CELT changes, Linux AArch64, shard 1 of 8 | `2fc2ebb8b30ba97544c9a07a4111fecaa0695c13` | [`3554e145a92af3bedfdf0e3df38e94430cec2f3e0c4ed0834a357f8b8b8e9e27`](../harness/evidence/sets/gate-run-aarch64-2fc2ebb8-20261119-164526-shard-1.json) |
 | Matroska and linked worker gates with the CELT changes, Linux AArch64, shard 2 of 8 | `2fc2ebb8b30ba97544c9a07a4111fecaa0695c13` | [`183c439e8adcd51efe2f93be5727ea90c78bdb2b27551e2354f3841d45036df7`](../harness/evidence/sets/gate-run-aarch64-2fc2ebb8-20261119-164526-shard-2.json) |
 | Matroska and linked worker gates with the CELT changes, Linux AArch64, shard 3 of 8 | `2fc2ebb8b30ba97544c9a07a4111fecaa0695c13` | [`2ee2890c10e6ec7f8ff905c2cf39f6c02d1870c5554efcda615135a50aa19f07`](../harness/evidence/sets/gate-run-aarch64-2fc2ebb8-20261119-164526-shard-3.json) |
@@ -1845,7 +1874,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | Fonts | `font-outlines` 53/53, `font-hinting-none` 159/159 and `font-hinting-default` 159/159 at `69d4d0f8`, as on AArch64 | not measured | not measured |
 | Shaping | `shape-libass` 209/209 and `shape-text` 209/209 at `69d4d0f8`, `shape-bidi` 24/24, `shape-simple` 6/6, `shape-unicode` 1/1, `shape-extents` 9/9 | not measured | not measured |
 | ASS rendering | `ass-render` 100/100 and `ass-render-host` 4/4 pass; the crate's tests pass | `ass-render` 0.8002 (100/100 pass), `ass-render-host` 0.7315 (4/4 pass) at `eaff16ba` | heap ≤0.9754, total RSS ≤0.9975 (104/104 lower) at `eaff16ba` |
-| Subtitles, text | `subtitle-text` 367/367 and `subtitle-text-host` 23/23 pass | `subtitle-text` 0.9927 (367/367 pass)<br>`subtitle-text-host` 0.0818 (23/23 pass) at `ab677583` | `subtitle-text` heap ≤0.3358, total RSS ≤0.9872 (367/367 lower)<br>`subtitle-text-host` heap ≤0.0075, total RSS ≤0.9137 (23/23 lower) at `ab677583` |
+| Subtitles, text | `subtitle-text` 367/367 and `subtitle-text-host` 23/23 pass | `subtitle-text` 0.8471 (367/367 pass, worst `mov-text-tags-ranges`) at `f13dcaf3`<br>`subtitle-text-host` 0.0818 (23/23 pass) at `ab677583` | `subtitle-text` heap ≤0.3358, total RSS ≤0.9965 (367/367 lower) at `f13dcaf3`<br>`subtitle-text-host` heap ≤0.0075, total RSS ≤0.9137 (23/23 lower) at `ab677583` |
 | Subtitles, PGS | 319/319 (`subtitle-pgs`) | 0.7775 (319/319 pass) at `546045db` | heap ≤0.9678, total RSS ≤0.9971 (319/319 lower) at `546045db` |
 | Subtitles, PGS capsules | 229/229 (`subtitle-pgs-capsules`) | 0.6719 (229/229 pass) at `546045db` | heap ≤0.5966, total RSS ≤0.7996 (229/229 lower) at `546045db` |
 | Subtitles, DVB | 241/241 (`subtitle-dvb`) | 0.8514 (241/241 pass) at `f8e1c4d9` | heap ≤0.7118, total RSS ≤0.8630 (241/241 lower) at `f8e1c4d9` |
