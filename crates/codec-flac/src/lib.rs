@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
@@ -8,7 +9,6 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`.
 
 mod error;
 mod frame;
@@ -62,9 +62,14 @@ pub enum CrcPolicy {
 /// The format of one decoded frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrameInfo {
+    /// Samples per second: the frame header's, else STREAMINFO's.
     pub sample_rate: u32,
+    /// The sample size, 4 to 32: the frame header's, else the stream's.
     pub bits_per_sample: u8,
+    /// The output planes: STREAMINFO's layout when the frame has its channel count, else
+    /// the default layout of the frame's count.
     pub layout: ChannelLayout,
+    /// The block size, 1 to 65536 (at most STREAMINFO's maximum).
     pub samples_per_channel: usize,
 }
 
