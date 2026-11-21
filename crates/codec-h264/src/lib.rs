@@ -262,21 +262,13 @@ struct ActivePic {
     pic: CurPic,
     target: Target,
     sps: Sps,
-    idr: bool,
-    nal_ref_idc: u8,
-    frame_num: u32,
-    field_pic: bool,
-    bottom: bool,
+    /// TopFieldOrderCnt and BottomFieldOrderCnt (8.2.1).
     poc: [i32; 2],
-    frame_num_offset: i32,
-    poc_msb: i32,
-    poc_lsb: u32,
-    delta_poc_bottom: i32,
-    delta_poc: [i32; 2],
-    idr_pic_id: u32,
-    /// Marking information from the first slice.
-    sh_first: SliceHeader,
-    max_slice_err: Option<DecodeError>,
+    /// PicOrderCntMsb for pic_order_cnt_type 0, FrameNumOffset for the other types.
+    poc_base: i32,
+    /// The header of the picture's first slice: what later slices are compared with
+    /// (7.4.1.2.4) and the reference marking.
+    sh: SliceHeader,
 }
 
 /// H.264 decoder.
@@ -664,10 +656,11 @@ impl Decoder {
         let new_pic = match &self.active {
             None => true,
             Some(a) => {
+                let a = &a.sh;
                 a.frame_num != sh.frame_num
                     || a.field_pic != sh.field_pic
-                    || (sh.field_pic && a.bottom != sh.bottom_field)
-                    || (a.nal_ref_idc == 0) != (sh.nal.nal_ref_idc == 0)
+                    || (sh.field_pic && a.bottom_field != sh.bottom_field)
+                    || (a.nal.nal_ref_idc == 0) != (sh.nal.nal_ref_idc == 0)
                     || (sps.poc_type == 0
                         && (a.poc_lsb != sh.poc_lsb || a.delta_poc_bottom != sh.delta_poc_bottom))
                     || (sps.poc_type == 1 && a.delta_poc != sh.delta_poc)
@@ -734,20 +727,9 @@ impl Decoder {
             pic,
             target,
             sps: sps.clone(),
-            idr: sh.idr,
-            nal_ref_idc: sh.nal.nal_ref_idc,
-            frame_num: sh.frame_num,
-            field_pic: sh.field_pic,
-            bottom: sh.bottom_field,
             poc,
-            frame_num_offset: fno,
-            poc_msb: fno,
-            poc_lsb: sh.poc_lsb,
-            delta_poc_bottom: sh.delta_poc_bottom,
-            delta_poc: sh.delta_poc,
-            idr_pic_id: sh.idr_pic_id,
-            sh_first: sh.clone(),
-            max_slice_err: None,
+            poc_base: fno,
+            sh: sh.clone(),
         });
         Ok(())
     }
@@ -1147,11 +1129,7 @@ impl Decoder {
             no_samples: &self.no_samples,
         };
         let mut dec = SliceDecoder::new(&ctx, pic, refs, &self.rbsp, len, &mut self.mb_samples);
-        dec.run().map_err(|e| {
-            let e = DecodeError::from(e);
-            active.max_slice_err = Some(e);
-            e
-        })
+        dec.run().map_err(DecodeError::from)
     }
 
     /// Finish the active picture: deblock, reference marking (8.2.5), then removal (C.4.4),
@@ -1163,7 +1141,7 @@ impl Decoder {
         // Conceal undecoded macroblocks minimalistically (keep prediction-free content).
         deblock::finish(&mut a.pic);
         let structure = a.pic.structure;
-        let is_ref = a.nal_ref_idc != 0;
+        let is_ref = a.sh.nal.nal_ref_idc != 0;
         let compact = a.sps.frame_mbs_only && a.sps.direct_8x8_inference;
         let mut target = a.target;
         let Some(fs) = target_store(&mut self.dpb, &mut target) else {
@@ -1177,9 +1155,9 @@ impl Decoder {
             &mut self.spare_motion,
         ));
         let sps = &a.sps;
-        let sh = &a.sh_first;
+        let sh = &a.sh;
         let nums = PicNums {
-            frame_num: a.frame_num,
+            frame_num: sh.frame_num,
             max_frame_num: sps.max_frame_num(),
             structure,
         };
@@ -1197,7 +1175,7 @@ impl Decoder {
                 Some(at) => Current::Stored(at),
                 None => Current::New(&mut new),
             };
-            if a.idr {
+            if sh.idr {
                 // All other references unused.
                 for (i, e) in entries.iter_mut().enumerate() {
                     if Some(i) != first {
@@ -1253,20 +1231,20 @@ impl Decoder {
                 self.poc_state.prev_poc_msb = 0;
                 self.poc_state.prev_poc_lsb = if structure != 2 { poc[0] } else { 0 };
             } else {
-                self.poc_state.prev_poc_msb = a.poc_msb;
-                self.poc_state.prev_poc_lsb = a.poc_lsb as i32;
+                self.poc_state.prev_poc_msb = a.poc_base;
+                self.poc_state.prev_poc_lsb = sh.poc_lsb as i32;
             }
-            self.poc_state.prev_ref_frame_num = if mmco5 { 0 } else { a.frame_num };
+            self.poc_state.prev_ref_frame_num = if mmco5 { 0 } else { sh.frame_num };
         }
-        self.poc_state.prev_frame_num_offset = if mmco5 { 0 } else { a.frame_num_offset };
-        self.poc_state.prev_frame_num = if mmco5 { 0 } else { a.frame_num };
+        self.poc_state.prev_frame_num_offset = if mmco5 { 0 } else { a.poc_base };
+        self.poc_state.prev_frame_num = if mmco5 { 0 } else { sh.frame_num };
         self.poc_state.prev_mmco5 = mmco5;
         // Removal before storage (C.4.4): an IDR picture or mmco 5 outputs or discards every
         // prior picture; a second field does neither.
         let second_field = matches!(target, Target::SecondField(_));
         self.dpb.avc_remove(
             AvcPicture {
-                idr: a.idr && !second_field,
+                idr: sh.idr && !second_field,
                 mmco5: mmco5 && !second_field,
                 no_output_of_prior_pics: no_output_prior,
             },
@@ -1292,7 +1270,7 @@ impl Decoder {
                 match self.dpb.store(stored, fs) {
                     Ok(id) => {
                         if field.is_some() {
-                            self.pending_field = Some((id, structure, a.frame_num));
+                            self.pending_field = Some((id, structure, sh.frame_num));
                         }
                     }
                     Err(refused) => self.free.push(refused.picture),
