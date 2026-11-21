@@ -659,6 +659,13 @@ may override that count for diagnostic comparisons.
     the SHA-256 of a file any gate item reads on either target or of a committed file:
     the corpus is apart from the gate by exact bytes. `cargo xtask link-order check`
     compares the pins with every gate input known without a prepared host.
+  - The operations run in the manifest's order, so a worker's first operations decide
+    which of its code lies together. The playback worker's start with the two
+    progressive TS188 operations, which run on Linux AArch64 only: the code the
+    progressive reader runs for every packet, PES and access unit then lies in one
+    stretch, where it fits a Graviton2 core's 64 KiB instruction cache far better than
+    spread among the code the other playback operations ran first. ARMv7 has no
+    progressive operation, and its order is unchanged by this.
   - `cargo xtask link-order BINARY [OUT] --trained FILE` writes a binary's symbol
     ordering file: the functions the trained order lists, in its order, then every
     other function in module order, sorted by the path of the item it belongs to (a
