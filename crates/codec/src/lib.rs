@@ -73,7 +73,7 @@ pub struct AudioFrame {
     pub samples_per_channel: usize,
     /// What the planes are images of.
     pub sample_format: SampleFormat,
-    /// One plane per speaker of `layout`, in its order, `samples_per_channel` samples each.
+    /// One plane per channel of `layout`, in its order, `samples_per_channel` samples each.
     pub planes: Vec<Vec<f32>>,
 }
 

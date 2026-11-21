@@ -179,10 +179,13 @@ fn headers_map_channels_to_ffmpeg_layouts() {
     let unordered = Decoder::new(&head(3, 255, 2, 1, &[0, 1, 2], 0)).unwrap();
     assert_eq!(unordered.layout().channels(), 3);
     assert_eq!(unordered.layout().mask(), 0);
-    assert!(matches!(
-        Decoder::new(&head(4, 2, 2, 2, &[0, 1, 2, 3], 0)),
-        Err(DecodeError::Unsupported(_))
-    ));
+    assert_eq!(
+        Decoder::new(&head(4, 2, 2, 2, &[0, 1, 2, 3], 0))
+            .unwrap()
+            .layout()
+            .ambisonic_order(),
+        Some((1, false))
+    );
     assert!(matches!(
         Decoder::new(&head(9, 1, 9, 0, &[0, 1, 2, 3, 4, 5, 6, 7, 8], 0)),
         Err(DecodeError::Invalid(_))
@@ -193,6 +196,75 @@ fn headers_map_channels_to_ffmpeg_layouts() {
         Decoder::new(&head(94, 255, 94, 0, &channels, 0)),
         Err(DecodeError::Unsupported(_))
     ));
+}
+
+#[test]
+fn ambisonic_counts_and_direct_mapping() {
+    for channels in 1..=93u8 {
+        let mapping: Vec<u8> = (0..channels).collect();
+        let result = Decoder::new(&head(channels, 2, channels, 0, &mapping, 0));
+        let expected = (0..=8).find_map(|order| {
+            [false, true].into_iter().find_map(|stereo| {
+                ((order + 1) * (order + 1) + 2 * u8::from(stereo) == channels)
+                    .then_some((order, stereo))
+            })
+        });
+        match expected {
+            Some(expected) => {
+                let layout = result.unwrap().layout();
+                assert_eq!(layout.ambisonic_order(), Some(expected));
+                assert_eq!(layout.channels(), usize::from(channels));
+                assert_eq!(layout.mask(), 0);
+                assert!(layout.speakers().is_empty());
+            }
+            None => assert!(matches!(result, Err(DecodeError::Invalid(_))), "{channels}"),
+        }
+    }
+    assert!(matches!(
+        Decoder::new(&head(4, 3, 2, 2, &[0, 1, 2, 3], 0)),
+        Err(DecodeError::Unsupported(_))
+    ));
+}
+
+#[test]
+fn ambisonic_planes_match_direct_streams_and_family_255() {
+    let mapping = [3, 0, 255, 2];
+    let mut ambisonic = Decoder::new(&head(4, 2, 2, 2, &mapping, 0)).unwrap();
+    let mut control = Decoder::new(&head(4, 255, 2, 2, &mapping, 0)).unwrap();
+    let mut streams = [
+        Decoder::new(&head(2, 0, 0, 0, &[], 0)).unwrap(),
+        Decoder::new(&head(2, 0, 0, 0, &[], 0)).unwrap(),
+    ];
+    let mut seed = 7;
+    let mut a = AudioFrame::default();
+    let mut b = AudioFrame::default();
+    let mut decoded = [AudioFrame::default(), AudioFrame::default()];
+    for _ in 0..3 {
+        let first = celt_packet(true, 60, &mut seed);
+        let second = celt_packet(true, 40, &mut seed);
+        let packet = [delimited(&first), second.clone()].concat();
+        ambisonic.decode(&packet, &mut a).unwrap();
+        control.decode(&packet, &mut b).unwrap();
+        streams[0].decode(&first, &mut decoded[0]).unwrap();
+        streams[1].decode(&second, &mut decoded[1]).unwrap();
+        for (actual, control) in a.planes.iter().zip(&b.planes) {
+            assert!(
+                actual
+                    .iter()
+                    .zip(control)
+                    .all(|(x, y)| x.to_bits() == y.to_bits())
+            );
+        }
+        assert_eq!(a.planes[0], decoded[1].planes[1]);
+        assert_eq!(a.planes[1], decoded[0].planes[0]);
+        assert!(a.planes[2].iter().all(|&v| v == 0.0));
+        assert_eq!(a.planes[3], decoded[1].planes[0]);
+        assert!(
+            [0, 1, 3]
+                .into_iter()
+                .all(|plane| a.planes[plane].iter().any(|&sample| sample != 0.0))
+        );
+    }
 }
 
 #[test]
