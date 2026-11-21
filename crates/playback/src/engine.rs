@@ -8,7 +8,7 @@ pub(crate) use mp4::{Mp4RangeLanding, Mp4SyncLanding};
 
 use crate::engine::matroska::MkvEngine;
 use crate::engine::mp4::Mp4Engine;
-use crate::engine::ts::{SegmentDiscovery, TsEngine};
+use crate::engine::ts::{Delivery as TsDelivery, TsEngine};
 use crate::event::EngineStep;
 use crate::input::SourceReply;
 use crate::{Format, Result, SeekIntent, TrackKey, TrackKind, io::provide, mp4_plan::PreparedMp4};
@@ -203,7 +203,7 @@ impl Engine {
     }
 
     pub fn delivers_demux_pes(&self) -> bool {
-        matches!(self, Self::Ts(t) if t.segment_discovery.is_some() || !t.pes_tracks.as_slice().is_empty())
+        matches!(self, Self::Ts(t) if t.delivery.discovers_tracks() || !t.pes_tracks.as_slice().is_empty())
     }
     pub(crate) fn assembles_pid(&self, pid: u16) -> bool {
         matches!(self, Self::Ts(t) if t.pes_tracks.index(pid).is_some())
@@ -219,9 +219,9 @@ impl Engine {
             SourceTimePolicy::Unanchored,
             DescriptorNamespace::Unspecified,
             if media {
-                SegmentDiscovery::MediaFeed
+                TsDelivery::MediaFeed
             } else {
-                SegmentDiscovery::AvcAacFeed
+                TsDelivery::AvcAacFeed
             },
         )
         .map(Self::Ts)
@@ -349,7 +349,7 @@ impl Engine {
             Self::Matroska(r) => Ok(EngineStep::from_matroska(r.step(w, c)?)),
             Self::Mp4(r) => r.poll(w, c, None),
             Self::Ts(r) => {
-                if r.segment_discovery == Some(SegmentDiscovery::CompactProgressive) {
+                if r.delivery == TsDelivery::CompactProgressive {
                     return Err(Error::Invalid("compact TS payload polling required"));
                 }
                 r.poll::<EngineStep>(w, c)
@@ -503,7 +503,7 @@ impl Engine {
                 r.configs = [None; 64];
             }
             Self::Ts(r) => {
-                if r.segment_discovery.is_some() {
+                if r.delivery.discovers_tracks() {
                     return Err(Error::Unsupported("seek needs a fresh TS segment"));
                 }
                 if r.native_context.is_some() {

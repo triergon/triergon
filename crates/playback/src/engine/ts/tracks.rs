@@ -3,7 +3,7 @@
 
 use crate::Result;
 use crate::compat::pes::{AdmittedCarriage, Carriage, PidSelection};
-use crate::engine::ts::{SegmentDiscovery, TsEngine};
+use crate::engine::ts::{Delivery, TsEngine};
 use triergon_core::{BudgetVec, Error};
 use triergon_mpegts::{self as ts};
 use ts::compat::pes::{
@@ -80,7 +80,7 @@ impl TsEngine {
                 0x24 => Carriage::Registered(RegisteredCarriage::Hevc),
                 0x0f | 0x11 | 0x81 | 0x87 => Carriage::AudioFromPmt,
                 0x06 if (matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_))
-                    || self.segment_discovery == Some(SegmentDiscovery::MediaFeed))
+                    || self.delivery == Delivery::MediaFeed)
                     && stream.descriptors().any(|entry| {
                         entry.is_ok_and(|descriptor| matches!(descriptor.tag, 0x6a | 0x7a))
                     }) =>
@@ -138,7 +138,7 @@ impl TsEngine {
             program: map.program_descriptors.as_ref(),
             elementary: stream.descriptor_bytes.as_ref(),
         };
-        let hls_audio = self.segment_discovery == Some(SegmentDiscovery::MediaFeed);
+        let hls_audio = self.delivery == Delivery::MediaFeed;
         let carriage = match spec.carriage {
             Carriage::AudioFromPmt => match stream.stream_type {
                 0x0f => Carriage::Registered(RegisteredCarriage::AacAdts),
@@ -212,7 +212,7 @@ impl TsEngine {
             ),
             Carriage::AudioFromPmt => Err(mismatch),
         }?;
-        if self.segment_discovery == Some(SegmentDiscovery::CompactProgressive)
+        if self.delivery == Delivery::CompactProgressive
             && matches!(carriage, Carriage::Registered(_))
         {
             observer.enable_compact_payloads()?;

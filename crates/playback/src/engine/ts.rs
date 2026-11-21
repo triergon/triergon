@@ -20,13 +20,47 @@ use triergon_mpegts::{
 };
 use ts::compat::pes::{DemuxClock, ReadyContinuation, SourceContext, selected_track_kind};
 use ts::psi::DescriptorNamespace;
+/// What a TS engine delivers and where its tracks come from. One byte: the
+/// discriminants are the bit patterns the same state had as an
+/// `Option` of the five discovering modes, so every test compiles as before.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SegmentDiscovery {
-    Native,
-    Progressive,
-    CompactProgressive,
-    AvcAacFeed,
-    MediaFeed,
+#[repr(u8)]
+pub(crate) enum Delivery {
+    /// Source events, plus demux PES of the tracks found in the segment's own PMT.
+    Segment = 0,
+    /// Demux PES only, owned payloads, to a progressive reader.
+    Progressive = 1,
+    /// Demux PES only, compact payloads, to a progressive reader.
+    CompactProgressive = 2,
+    /// Demux PES only, to an AVC and AAC segment reader.
+    AvcAacFeed = 3,
+    /// Demux PES only, to a media segment reader (HLS audio carriage rules).
+    MediaFeed = 4,
+    /// Source events of a declared program, plus demux PES of the selected PIDs.
+    Program = 5,
+}
+
+impl Delivery {
+    /// Whether the tracks come from the stream's own PMT.
+    #[inline]
+    pub(crate) const fn discovers_tracks(self) -> bool {
+        !matches!(self, Self::Program)
+    }
+
+    /// Whether a progressive reader takes the PES.
+    #[inline]
+    pub(crate) const fn is_progressive(self) -> bool {
+        matches!(self, Self::Progressive | Self::CompactProgressive)
+    }
+
+    /// Whether only the PES feed is delivered, not the source events.
+    #[inline]
+    pub(crate) const fn is_feed(self) -> bool {
+        matches!(
+            self,
+            Self::Progressive | Self::CompactProgressive | Self::AvcAacFeed | Self::MediaFeed
+        )
+    }
 }
 
 pub struct TsEngine {
@@ -54,7 +88,7 @@ pub struct TsEngine {
     pub(crate) event_ordinal: u64,
     pub(crate) suppressed_events: u64,
     pub(crate) pes_updates_from: Option<usize>,
-    pub(crate) segment_discovery: Option<SegmentDiscovery>,
+    pub(crate) delivery: Delivery,
     pub(crate) segmented: bool,
     pub(crate) boundary: Option<ts::stream::MediaEntityEnd>,
 }
@@ -99,7 +133,7 @@ impl TsEngine {
             event_ordinal: 0,
             suppressed_events: 0,
             pes_updates_from: None,
-            segment_discovery: None,
+            delivery: Delivery::Program,
             segmented: false,
             boundary: None,
         })
@@ -218,27 +252,24 @@ impl TsEngine {
         policy: SourceTimePolicy,
         namespace: DescriptorNamespace,
     ) -> Result<Self> {
-        Self::segment(input, limits, policy, namespace, SegmentDiscovery::Native)
+        Self::segment(input, limits, policy, namespace, Delivery::Segment)
     }
 
+    /// `delivery` is one of the modes that discover their tracks.
     pub(crate) fn segment(
         input: InputCursor,
         limits: ts::ParseLimits,
         policy: SourceTimePolicy,
         namespace: DescriptorNamespace,
-        discovery: SegmentDiscovery,
+        discovery: Delivery,
     ) -> Result<Self> {
         let budget = input.budget().clone();
-        let stream = match discovery {
-            SegmentDiscovery::Native => {
-                TransportStream::new_single_program_segment(budget, limits, namespace)?
-            }
-            SegmentDiscovery::Progressive | SegmentDiscovery::CompactProgressive => {
-                TransportStream::new_single_program_progressive_feed(budget, limits, namespace)?
-            }
-            SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed => {
-                TransportStream::new_single_program_feed(budget, limits, namespace)?
-            }
+        let stream = if discovery.is_progressive() {
+            TransportStream::new_single_program_progressive_feed(budget, limits, namespace)?
+        } else if discovery.is_feed() {
+            TransportStream::new_single_program_feed(budget, limits, namespace)?
+        } else {
+            TransportStream::new_single_program_segment(budget, limits, namespace)?
         };
         let engine = Self::from_stream(
             input,
@@ -249,7 +280,7 @@ impl TsEngine {
             stream,
         )?;
         Ok(Self {
-            segment_discovery: Some(discovery),
+            delivery: discovery,
             ..engine
         })
     }
@@ -264,9 +295,9 @@ impl TsEngine {
             SourceTimePolicy::Unanchored,
             DescriptorNamespace::Unspecified,
             if compact {
-                SegmentDiscovery::CompactProgressive
+                Delivery::CompactProgressive
             } else {
-                SegmentDiscovery::Progressive
+                Delivery::Progressive
             },
         )
     }
@@ -288,10 +319,7 @@ impl TsEngine {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<FeedStep> {
-        if !matches!(
-            self.segment_discovery,
-            Some(SegmentDiscovery::Progressive | SegmentDiscovery::CompactProgressive)
-        ) {
+        if !self.delivery.is_progressive() {
             return Err(Error::Invalid("compact TS payload selection required"));
         }
         self.poll::<FeedStep>(work, cancel)
@@ -507,7 +535,7 @@ impl TsEngine {
             }
             return T::project(FeedStep::Yield);
         }
-        if self.segment_discovery.is_some() && self.pcr_pid.is_none() {
+        if self.delivery.discovers_tracks() && self.pcr_pid.is_none() {
             return Err(Error::Invalid("TS segment ended without an active PMT"));
         }
         self.stream.end_of_source()?;
@@ -574,14 +602,8 @@ impl TsEngine {
                     Ok(ts::AssemblyStep::Output(packet)) => {
                         self.pes_pending = Some(packet);
                         if T::PROGRESSIVE
-                            || self.segment_discovery.is_none()
-                            || matches!(
-                                self.segment_discovery,
-                                Some(
-                                    SegmentDiscovery::Progressive
-                                        | SegmentDiscovery::CompactProgressive
-                                )
-                            )
+                            || self.delivery == Delivery::Program
+                            || self.delivery.is_progressive()
                         {
                             return self.project_pending_packet(w, c);
                         }
@@ -602,21 +624,8 @@ impl TsEngine {
             }
             self.pes_active = self.draining.then_some(index + 1);
         }
-        let progressive = T::PROGRESSIVE
-            || matches!(
-                self.segment_discovery,
-                Some(SegmentDiscovery::Progressive | SegmentDiscovery::CompactProgressive)
-            );
-        let feed_only = progressive
-            || matches!(
-                self.segment_discovery,
-                Some(
-                    SegmentDiscovery::Progressive
-                        | SegmentDiscovery::CompactProgressive
-                        | SegmentDiscovery::AvcAacFeed
-                        | SegmentDiscovery::MediaFeed
-                )
-            );
+        let progressive = T::PROGRESSIVE || self.delivery.is_progressive();
+        let feed_only = progressive || self.delivery.is_feed();
         if self.ended {
             return T::project(FeedStep::End);
         }
@@ -748,7 +757,7 @@ impl TsEngine {
                     maximum: 64,
                 });
             }
-            if self.segment_discovery.is_some() && self.pes_adopting == 0 {
+            if self.delivery.discovers_tracks() && self.pes_adopting == 0 {
                 self.pes_tracks = self.discover_tracks(map)?;
             }
             if !self.native_prefix_failed
@@ -762,7 +771,7 @@ impl TsEngine {
                             observer.bind_input(context, &self.input)?;
                         }
                         track.observer = Some(observer);
-                        track.update = (self.segment_discovery.is_some()
+                        track.update = (self.delivery.discovers_tracks()
                             || track.selection.carriage == Carriage::AudioFromPmt)
                             .then_some(TrackUpdate::Configuration(AdmittedCarriage {
                                 track: TrackKey::Ts {
