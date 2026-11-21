@@ -397,7 +397,7 @@ enum Phase {
 pub struct FragmentBuilder {
     raw: BoxView,
     boxes: BoxChildren,
-    runs: Option<BudgetVec<IndexedRun>>,
+    runs: BudgetVec<IndexedRun>,
     pending: Option<IndexedRun>,
     header: Option<Tfhd>,
     decode_time: Option<FragmentDecodeTime>,
@@ -444,7 +444,7 @@ impl FragmentBuilder {
         Ok(Self {
             raw,
             boxes,
-            runs: Some(BudgetVec::new(&budget)),
+            runs: BudgetVec::new(&budget),
             pending: None,
             header: None,
             decode_time: None,
@@ -509,20 +509,16 @@ impl FragmentBuilder {
                         self.pending = Some(value);
                         return Ok(BuildStatus::Yield);
                     }
-                    let runs = self
-                        .runs
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing fragment runs"))?;
                     // Most fragments hold one run or a few: each of the first
                     // four takes exactly its own slot, where a push would take
                     // four at once. Longer lists grow geometrically.
-                    if runs.len() < 4
-                        && let Err(error) = runs.try_reserve_exact(1)
+                    if self.runs.len() < 4
+                        && let Err(error) = self.runs.try_reserve_exact(1)
                     {
                         self.pending = Some(value);
                         return Err(error);
                     }
-                    if let Err(error) = runs.try_push(value) {
+                    if let Err(error) = self.runs.try_push(value) {
                         self.pending = Some(error.value);
                         return Err(error.error);
                     }
@@ -541,13 +537,8 @@ impl FragmentBuilder {
                             self.header = Some(Tfhd::parse(&raw)?);
                         }
                         b"trun" => {
-                            let count = self
-                                .runs
-                                .as_ref()
-                                .ok_or(Error::Invalid("missing fragment runs"))?
-                                .len();
                             policy(
-                                u32::try_from(count)
+                                u32::try_from(self.runs.len())
                                     .map_err(|_| Error::Overflow)?
                                     .checked_add(1)
                                     .ok_or(Error::Overflow)?,
@@ -566,9 +557,7 @@ impl FragmentBuilder {
                             if self.decode_time.is_some() {
                                 return Err(Error::Invalid("duplicate tfdt"));
                             }
-                            if self.header.is_none()
-                                || self.runs.as_ref().is_some_and(|r| !r.is_empty())
-                            {
+                            if self.header.is_none() || !self.runs.is_empty() {
                                 return Err(Error::Invalid(
                                     "tfdt must follow tfhd and precede trun",
                                 ));
@@ -580,11 +569,7 @@ impl FragmentBuilder {
                 }
                 continue;
             }
-            let length = self
-                .runs
-                .as_ref()
-                .ok_or(Error::Invalid("missing fragment runs"))?
-                .len();
+            let length = self.runs.len();
             if self.phase == Phase::StartRun && self.run == length {
                 self.phase = Phase::Ready;
                 continue;
@@ -632,8 +617,6 @@ impl FragmentBuilder {
                 Phase::StartRun => {
                     let run = self
                         .runs
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing runs"))?
                         .as_mut_slice()
                         .get_mut(self.run)
                         .ok_or(Error::Invalid("run index"))?;
@@ -654,8 +637,6 @@ impl FragmentBuilder {
                 Phase::Sum => {
                     let run = self
                         .runs
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing runs"))?
                         .as_slice()
                         .get(self.run)
                         .ok_or(Error::Invalid("run index"))?;
@@ -704,8 +685,6 @@ impl FragmentBuilder {
                 Phase::Commit => {
                     let run = self
                         .runs
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing runs"))?
                         .as_mut_slice()
                         .get_mut(self.run)
                         .ok_or(Error::Invalid("run index"))?;
@@ -740,7 +719,7 @@ impl FragmentBuilder {
     }
     /// The index; the error that stopped the build, or `Error::Invalid` before
     /// [`BuildStatus::Ready`].
-    pub fn finish(mut self) -> Result<FragmentIndex> {
+    pub fn finish(self) -> Result<FragmentIndex> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -750,7 +729,7 @@ impl FragmentBuilder {
         Ok(FragmentIndex {
             raw: self.raw,
             decode_time: self.decode_time,
-            runs: self.runs.take().ok_or(Error::Invalid("missing runs"))?,
+            runs: self.runs,
             defaults: self.defaults.ok_or(Error::Invalid("missing defaults"))?,
             first_ordinal: self.context.first_ordinal,
             count: self
