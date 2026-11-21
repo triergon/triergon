@@ -99,6 +99,10 @@ impl SharedText {
             constant: Some(value),
         }
     }
+    #[expect(
+        clippy::expect_used,
+        reason = "the bytes were validated as UTF-8 when the text was built and never change"
+    )]
     pub fn as_str(&self) -> &str {
         self.constant
             .unwrap_or_else(|| std::str::from_utf8(&self.bytes).expect("validated immutable UTF-8"))

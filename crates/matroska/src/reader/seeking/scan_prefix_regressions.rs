@@ -237,7 +237,7 @@ fn drain(reader: &mut Reader, feed: &mut Feed<'_>, quantum: u64) -> Result<Vec<P
             Step::Ready(Event::Packet(value)) => packets.push(view(value)),
             Step::Yield | Step::Ready(_) => (),
             Step::End(_) => return Ok(packets),
-            other => panic!("ample-pool replay stalled: {other:?}"),
+            other @ Step::Backpressure(_) => panic!("ample-pool replay stalled: {other:?}"),
         }
     }
     panic!("replay stalled")
@@ -920,7 +920,9 @@ fn scan_prefix_control_caller_pressure_can_be_released_without_losing_seek_progr
             }
             ParseStep::Event(Event::Packet(_)) => panic!("no packet before seek completion"),
             ParseStep::Yield | ParseStep::Event(_) => (),
-            other => panic!("transient pressure cannot become permanent exhaustion: {other:?}"),
+            other @ ParseStep::Finished => {
+                panic!("transient pressure cannot become permanent exhaustion: {other:?}")
+            }
         }
         assert!(work.spent() <= 8192);
     }

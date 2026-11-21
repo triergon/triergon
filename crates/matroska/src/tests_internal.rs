@@ -1663,7 +1663,7 @@ fn typed_document_preserves_the_validated_preorder_source_catalogue_under_work_o
                 (
                     element.id(),
                     element.raw().to_vec(),
-                    element.parent().map(|p| p.id()),
+                    element.parent().map(crate::metadata::Element::id),
                 )
             })
             .collect::<Vec<_>>()

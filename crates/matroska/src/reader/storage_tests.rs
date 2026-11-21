@@ -178,7 +178,7 @@ fn own_storage_proof_matches_live_charges_through_typed_jobs_and_hidden_input_pa
             Step::Ready(event) => drop(event),
             Step::Yield => (),
             Step::End(_) => finished = true,
-            other => panic!("ample pool must finish: {other:?}"),
+            other @ Step::Backpressure(_) => panic!("ample pool must finish: {other:?}"),
         }
         exact_floor(&reader, 0);
         if finished {
@@ -372,7 +372,7 @@ fn performance_blocking_supply_preserves_canonical_exact_read_requests() {
                 finished = true;
                 break;
             }
-            other => panic!("canonical supply: {other:?}"),
+            other @ ParseStep::Backpressure { .. } => panic!("canonical supply: {other:?}"),
         }
     }
     assert!(finished);

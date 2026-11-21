@@ -549,7 +549,9 @@ mod header_refill_blocking_tests {
                     finished = true;
                     break;
                 }
-                other => panic!("canonical complete source: {other:?}"),
+                other @ ParseStep::Backpressure { .. } => {
+                    panic!("canonical complete source: {other:?}")
+                }
             }
         }
         assert!(finished);

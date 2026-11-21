@@ -180,7 +180,7 @@ fn event_facts(event: &Event) -> String {
             packet.packet.data.as_ref(),
             packet.configuration.generation(),
             packet.configuration.revision(),
-            packet.group.as_ref().map(|g| g.raw_body())
+            packet.group.as_ref().map(crate::BlockGroupSource::raw_body)
         ),
         Event::Seek(receipt) => format!("seek:{receipt:?}"),
     }

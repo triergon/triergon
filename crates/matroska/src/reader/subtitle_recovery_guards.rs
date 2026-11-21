@@ -109,8 +109,7 @@ impl Driver {
             match self.step(false).unwrap() {
                 ParseStep::NeedInput(_) => self.supply(),
                 ParseStep::Yield
-                | ParseStep::Event(Event::Envelope(_))
-                | ParseStep::Event(Event::Configuration(_)) => (),
+                | ParseStep::Event(Event::Envelope(_) | Event::Configuration(_)) => (),
                 other => panic!("packet/receipt before recovery source validation: {other:?}"),
             }
         }
@@ -121,8 +120,7 @@ impl Driver {
             match self.step(false).unwrap() {
                 ParseStep::NeedInput(_) => self.supply(),
                 ParseStep::Yield
-                | ParseStep::Event(Event::Envelope(_))
-                | ParseStep::Event(Event::Configuration(_)) => (),
+                | ParseStep::Event(Event::Envelope(_) | Event::Configuration(_)) => (),
                 ParseStep::Event(Event::Seek(receipt)) => return receipt,
                 other => panic!("invalid recovery seek publication: {other:?}"),
             }
@@ -134,8 +132,7 @@ impl Driver {
             match self.step(false).unwrap() {
                 ParseStep::NeedInput(_) => self.supply(),
                 ParseStep::Yield
-                | ParseStep::Event(Event::Envelope(_))
-                | ParseStep::Event(Event::Configuration(_)) => (),
+                | ParseStep::Event(Event::Envelope(_) | Event::Configuration(_)) => (),
                 ParseStep::Event(Event::Packet(packet)) => return packet,
                 other => panic!("actual subtitle prefix absent: {other:?}"),
             }
@@ -299,9 +296,7 @@ fn subtitle_recovery_whole_operation_limit_is_not_refilled_for_the_extra_scan() 
         match driver.step(false) {
             Ok(ParseStep::NeedInput(_)) => driver.supply(),
             Ok(
-                ParseStep::Yield
-                | ParseStep::Event(Event::Envelope(_))
-                | ParseStep::Event(Event::Configuration(_)),
+                ParseStep::Yield | ParseStep::Event(Event::Envelope(_) | Event::Configuration(_)),
             ) => (),
             Err(Error::Policy("operation read bytes")) => {
                 rejected = true;

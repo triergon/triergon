@@ -395,7 +395,7 @@ impl TrackJob {
                         .is_some_and(crate::content_encoding::Decoder::contains_zlib);
                     let t = self.out.as_mut().required("missing TrackEntry builder")?;
                     t.packet_prefix = self.prefixes.frame_prefix.clone();
-                    t.packet_decoder = self.prefixes.frame.clone();
+                    t.packet_decoder.clone_from(&self.prefixes.frame);
                     if let Some(decoder) = &self.prefixes.private {
                         let limit = if self.compressed_private {
                             self.limits.metadata_bytes.min(self.private_budget)

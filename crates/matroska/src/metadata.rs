@@ -411,14 +411,6 @@ pub(crate) struct Catalogue {
     nodes: usize,
     attachments: usize,
 }
-impl Default for Catalogue {
-    fn default() -> Self {
-        Self::new(
-            &Budget::new(crate::Limits::default().live_storage_bytes)
-                .expect("valid default pool policy"),
-        )
-    }
-}
 impl Catalogue {
     pub(crate) fn new(pool: &Budget) -> Self {
         Self {

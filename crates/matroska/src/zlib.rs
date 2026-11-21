@@ -27,6 +27,10 @@ struct Bits<'a> {
 }
 impl Bits<'_> {
     #[inline]
+    #[expect(
+        clippy::expect_used,
+        reason = "eight bytes always convert; `first_chunk` grows the inlined decode loop"
+    )]
     fn fill(&mut self, width: usize) {
         debug_assert!(width <= 16);
         if self.available >= width {
@@ -220,6 +224,10 @@ fn dynamic(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman)> {
 }
 
 #[cfg(any(test, feature = "reference-trace"))]
+#[expect(
+    clippy::expect_used,
+    reason = "the fixed code lengths of RFC 1951 §3.2.6 always form complete trees"
+)]
 fn fixed() -> &'static (Huffman, Huffman) {
     static TREES: std::sync::OnceLock<(Huffman, Huffman)> = std::sync::OnceLock::new();
     TREES.get_or_init(|| {
@@ -350,7 +358,7 @@ fn stored_range(
         return Err(Error::Policy("inflate work"));
     }
     let range = 7..7 + length;
-    let expected = u32::from_be_bytes(data[range.end..].try_into().expect("four checksum bytes"));
+    let expected = u32::from_be_bytes(*data.last_chunk().ok_or(Error::Truncated)?);
     if adler32(&data[range.clone()], cancel)? != expected {
         return Err(Error::Invalid("Adler-32 mismatch"));
     }
@@ -476,11 +484,7 @@ pub fn decompress(data: &[u8], limits: InflateLimits, cancel: &AtomicBool) -> Re
     if bits.position() != bits.data.len() {
         return Err(Error::Invalid("trailing zlib bytes"));
     }
-    let expected = u32::from_be_bytes(
-        data[data.len() - 4..]
-            .try_into()
-            .expect("four checksum bytes"),
-    );
+    let expected = u32::from_be_bytes(*data.last_chunk().ok_or(Error::Truncated)?);
     if adler32(&out, cancel)? != expected {
         return Err(Error::Invalid("Adler-32 mismatch"));
     }

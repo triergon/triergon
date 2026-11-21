@@ -554,7 +554,7 @@ impl Reader {
                 || self
                     .configuration
                     .as_ref()
-                    .is_some_and(|configuration| configuration.has_codec_states());
+                    .is_some_and(Configuration::has_codec_states);
             if changed {
                 self.revision = self.revision.checked_add(1).ok_or(Error::Overflow)?;
             }

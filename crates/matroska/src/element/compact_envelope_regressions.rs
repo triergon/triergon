@@ -300,7 +300,7 @@ fn first_leaf(reader: &mut ElementReader, payload: &[u8]) -> ElementHeader {
                 return header;
             }
             CompactEnvelopeProgress::Step(ParseStep::Yield) => (),
-            other => panic!("unexpected first leaf {other:?}"),
+            other @ CompactEnvelopeProgress::Step(_) => panic!("unexpected first leaf {other:?}"),
         }
     }
     panic!("leaf not ready")
@@ -416,7 +416,9 @@ fn compact_envelope_freeze_pressure_retains_builder_and_retries_once() {
                 reader.admit_typed_leaf(header, None, false).unwrap();
             }
             CompactEnvelopeProgress::Step(ParseStep::Yield) => (),
-            other => panic!("unexpected before freeze {other:?}"),
+            other @ CompactEnvelopeProgress::Step(_) => {
+                panic!("unexpected before freeze {other:?}")
+            }
         }
     }
     assert!(
@@ -522,7 +524,9 @@ fn compact_envelope_shared_hidden_parent_is_charged_once_through_reset_and_alias
             CompactEnvelopeProgress::Step(
                 ParseStep::Event(CompactElementEvent::Start(_)) | ParseStep::Yield,
             ) => (),
-            other => panic!("unexpected hidden source progress {other:?}"),
+            other @ CompactEnvelopeProgress::Step(_) => {
+                panic!("unexpected hidden source progress {other:?}")
+            }
         }
     }
     let header = found.expect("actual block leaf");

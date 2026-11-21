@@ -392,7 +392,7 @@ fn cue_ties_replay_the_complete_native_observed_suffix_fresh_and_after_eof() {
                     };
                     let audio = count % 2 == 0;
                     let delay = if audio { 21_333_333 } else { 0 };
-                    assert_eq!(packet.track, if audio { 1 } else { 0 });
+                    assert_eq!(packet.track, usize::from(audio));
                     assert!(packet.keyframe);
                     assert!(packet.dts_ns.is_none());
                     assert_eq!(packet.data.as_ref(), if audio { AUDIO } else { VIDEO });

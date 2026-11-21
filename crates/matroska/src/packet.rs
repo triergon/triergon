@@ -1,7 +1,7 @@
 //! Packets: one frame of a Block with its source timing, and the same frame
 //! with the track configuration and BlockGroup side data it was read under.
 use crate::storage::SharedBytes;
-use crate::timing::BlockTiming;
+use crate::timing::{BlockTiming, ExactTime};
 use crate::{Error, Result};
 
 pub(crate) mod batch;
@@ -95,10 +95,10 @@ impl PacketFields {
         } else {
             let source = timing.source()?;
             (
-                source.pts.map(|pts| pts.rounded_ns()).transpose()?,
+                source.pts.map(ExactTime::rounded_ns).transpose()?,
                 source
                     .duration
-                    .map(|duration| duration.rounded_duration_ns())
+                    .map(ExactTime::rounded_duration_ns)
                     .transpose()?,
             )
         };

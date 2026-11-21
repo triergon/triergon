@@ -122,7 +122,7 @@ fn structural_attachment_node_and_depth_limits_are_independent() {
         Document::parse(ATTACHMENTS, payload.clone(), 4096, 32, 1024, 1024),
         Err(Error::Policy(_))
     ));
-    let mut c = Catalogue::default();
+    let mut c = Catalogue::new(&Budget::new(crate::Limits::default().live_storage_bytes).unwrap());
     let limits = crate::Limits::default();
     assert!(
         c.add(ATTACHMENTS, payload.clone(), 0, None, limits)
@@ -271,7 +271,8 @@ fn cumulative_arena_limits_and_absolute_depth_remain_bounded() {
         0x7373,
         &e(0x67c8, &[e(0x45a3, b"X"), e(0x4487, b"Y")].concat()),
     );
-    let mut catalogue = Catalogue::default();
+    let mut catalogue =
+        Catalogue::new(&Budget::new(crate::Limits::default().live_storage_bytes).unwrap());
     let limits = crate::Limits {
         metadata_nodes: 9,
         ..crate::Limits::default()

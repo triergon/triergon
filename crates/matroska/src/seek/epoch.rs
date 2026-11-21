@@ -249,7 +249,7 @@ impl EpochRestoreJob {
             let actual = self
                 .configuration
                 .codec_state(reference.track)
-                .and_then(|state| state.position())
+                .and_then(crate::configuration::CodecState::position)
                 .map_or(0, |position| position.segment_position);
             if reference.block < found.data
                 || reference.block >= found.end

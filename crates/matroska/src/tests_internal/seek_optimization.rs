@@ -132,7 +132,7 @@ fn seek_optimization_epoch_skips_unused_simpleblock_allocation_but_charges_all_s
             ParseStep::Backpressure { .. } => {
                 panic!("irrelevant SimpleBlock body must not require a32KiB collected owner")
             }
-            other => panic!("bounded source epoch: {other:?}"),
+            other @ ParseStep::Finished => panic!("bounded source epoch: {other:?}"),
         }
         assert!(work.spent() <= 1);
     }
