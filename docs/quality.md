@@ -267,7 +267,11 @@ have the same hashes.
   prepared gate host from the functions each operation first runs under QEMU user mode
   (`qemu-arm -cpu cortex-a15`, `qemu-aarch64 -cpu neoverse-n1`, `-d page,in_asm`), after
   `link-order separate` checks that no training file shares a SHA-256 with a gate input
-  or committed file. `build-workers` fails when committed orders disagree with the
+  or committed file. The operations run in the manifest's order, so a worker's first
+  operations decide which of its code lies together: the playback worker's start with the
+  two progressive TS188 operations, which run on Linux AArch64 only, so the code the
+  progressive reader runs per packet lies in one stretch. `build-workers` fails when
+  committed orders disagree with the
   manifest or a worker holds fewer than 95% of its order's names, and records each
   order in `identity.json`; `cargo xtask link-order BINARY [OUT] --trained FILE` writes
   one binary's ordering file. The linker arguments, after the policy's own, are

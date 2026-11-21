@@ -382,10 +382,16 @@ impl TsPayloadStep {
 
 // Each poller keeps the return layout of its consumer.
 trait TsStepProjection: Sized {
+    /// Whether only progressive feeds poll through this projection, so that
+    /// their polling holds no code of the other engines.
+    const PROGRESSIVE: bool;
+
     fn project(step: TsPayloadStep) -> Result<Self>;
 }
 
 impl TsStepProjection for BackendStep {
+    const PROGRESSIVE: bool = false;
+
     #[inline(always)]
     fn project(step: TsPayloadStep) -> Result<Self> {
         Ok(match step {
@@ -420,6 +426,9 @@ impl TsStepProjection for BackendStep {
 }
 
 impl TsStepProjection for TsPayloadStep {
+    // `poll_progressive_payload` admits progressive engines alone.
+    const PROGRESSIVE: bool = true;
+
     #[inline]
     fn project(step: Self) -> Result<Self> {
         Ok(step)
@@ -2125,7 +2134,8 @@ impl TsEngine {
                 match result {
                     Ok(ts::AssemblyStep::Output(packet)) => {
                         self.native_pending = Some(packet);
-                        if self.segment_discovery.is_none()
+                        if T::PROGRESSIVE
+                            || self.segment_discovery.is_none()
                             || matches!(
                                 self.segment_discovery,
                                 Some(
@@ -2153,19 +2163,21 @@ impl TsEngine {
             }
             self.native_active = self.draining.then_some(index + 1);
         }
-        let progressive = matches!(
-            self.segment_discovery,
-            Some(SegmentDiscovery::Progressive | SegmentDiscovery::CompactProgressive)
-        );
-        let feed_only = matches!(
-            self.segment_discovery,
-            Some(
-                SegmentDiscovery::Progressive
-                    | SegmentDiscovery::CompactProgressive
-                    | SegmentDiscovery::AvcAacFeed
-                    | SegmentDiscovery::MediaFeed
-            )
-        );
+        let progressive = T::PROGRESSIVE
+            || matches!(
+                self.segment_discovery,
+                Some(SegmentDiscovery::Progressive | SegmentDiscovery::CompactProgressive)
+            );
+        let feed_only = progressive
+            || matches!(
+                self.segment_discovery,
+                Some(
+                    SegmentDiscovery::Progressive
+                        | SegmentDiscovery::CompactProgressive
+                        | SegmentDiscovery::AvcAacFeed
+                        | SegmentDiscovery::MediaFeed
+                )
+            );
         if self.ended {
             return T::project(TsPayloadStep::End);
         }
@@ -2212,93 +2224,17 @@ impl TsEngine {
             {
                 self.refuse_after_lost_grid();
             }
+            if matches!(
+                self.pending,
+                Some(TraceEvent::ProgramMap { active: true, .. } | TraceEvent::Pat(_))
+            ) && self.adopt_table(feed_only)?
+            {
+                return T::project(TsPayloadStep::Yield);
+            }
             let event = self
                 .pending
                 .as_ref()
                 .ok_or(Error::Invalid("TS event missing"))?;
-            if let TraceEvent::ProgramMap {
-                map,
-                active: true,
-                configuration_epoch,
-            } = event
-            {
-                if map.streams.len() > 64 {
-                    return Err(Error::Limit {
-                        requested: map.streams.len(),
-                        maximum: 64,
-                    });
-                }
-                if self.segment_discovery.is_some() && self.native_map_next == 0 {
-                    self.native_tracks = self.discover_tracks(map)?;
-                }
-                if !self.native_prefix_failed
-                    && let Some(track) = self.native_tracks.as_slice().get(self.native_map_next)
-                {
-                    let observer = self.native_observer(track.selection, map, *configuration_epoch);
-                    let track = &mut self.native_tracks.as_mut_slice()[self.native_map_next];
-                    match observer {
-                        Ok((mut observer, carriage)) => {
-                            if let Some(context) = self.native_context.as_ref() {
-                                observer.bind_input(context, &self.input)?;
-                            }
-                            track.observer = Some(observer);
-                            track.update = (self.segment_discovery.is_some()
-                                || track.selection.carriage == TsNativeCarriage::AudioFromPmt)
-                                .then_some(TsNativeUpdate::Configuration(TsNativeConfiguration {
-                                    track: TrackKey::Ts {
-                                        program: self.program,
-                                        pid: track.pid(),
-                                    },
-                                    configuration_epoch: *configuration_epoch,
-                                    carriage,
-                                }));
-                        }
-                        Err(error) => track.refuse(error),
-                    }
-                    self.native_map_next += 1;
-                    if self.native_map_next < self.native_tracks.as_slice().len() {
-                        return T::project(TsPayloadStep::Yield);
-                    }
-                }
-                self.facts
-                    .try_reserve_exact(map.streams.len().saturating_sub(self.facts.len()))?;
-                self.facts.clear();
-                for e in map.streams.as_slice() {
-                    let observer = self
-                        .native_tracks
-                        .index(e.pid)
-                        .and_then(|i| self.native_tracks.as_slice()[i].observer.as_ref());
-                    let kind = track_kind(selected_track_kind(e, observer));
-                    self.facts
-                        .try_push(TrackFact {
-                            key: TrackKey::Ts {
-                                program: self.program,
-                                pid: e.pid,
-                            },
-                            kind,
-                            enabled: true,
-                        })
-                        .map_err(|e| e.error)?;
-                }
-                self.native_map_next = 0;
-                self.native_update_at = self
-                    .native_tracks
-                    .as_slice()
-                    .iter()
-                    .position(|track| track.update.is_some());
-                self.pcr_pid = Some(map.pcr_pid);
-            }
-            if let TraceEvent::Pat(table) = event {
-                if self.program == 0 {
-                    let program = self.stream.selected_program();
-                    if !feed_only {
-                        self.native = Some(DemuxClock::new(program)?);
-                    }
-                    self.native_packet_clock = Some(DemuxClock::new(program)?);
-                    self.program = program;
-                }
-                self.tsid = Some(table.header.extension);
-            }
             // Feeds consume native payloads and the source facts needed for
             // admission. The source parser still validates every carrier.
             if feed_only
@@ -2344,88 +2280,213 @@ impl TsEngine {
                 }
                 continue;
             }
-            let key = match (self.tsid, self.pcr_pid) {
-                (Some(tsid), Some(pcr_pid)) => Some(ClockKey {
-                    tsid,
-                    program: self.program,
-                    pcr_pid,
-                    epoch: match event {
-                        TraceEvent::Pes(p) => p.epochs.clock,
-                        _ => self.stream.source_epochs().clock,
-                    },
-                }),
-                _ => None,
+            // A feed delivers only its rare table, clock and fault events whole.
+            return if feed_only {
+                self.deliver_feed_event(w, c)
+            } else {
+                self.deliver_event(w, c)
             };
-            let mut source_pts = None;
-            let mut source_dts = None;
-            let mut native_clock = None;
-            if let TraceEvent::Pes(pes) = event {
-                if let Some(key) = key {
-                    source_pts = Some(source_timestamp(pes.header.pts_raw33, key, self.policy)?);
-                    source_dts = Some(source_timestamp(pes.header.dts_raw33, key, self.policy)?);
-                }
-                // Native clock work remains separately charged and may yield without taking
-                // the source event. No native time is copied into source fields.
-                let projector = self
-                    .native
-                    .as_mut()
-                    .ok_or(Error::Invalid("TS PES before program discovery"))?;
-                native_clock = projector.project(pes, w, c)?;
-                if native_clock.is_none() {
-                    return T::project(TsPayloadStep::Yield);
-                }
-            }
-            let event = self
-                .pending
-                .take()
-                .ok_or(Error::Invalid("TS event missing"))?;
-            if let TraceEvent::Transport(packet) = &event
-                && let Some(index) = self.native_tracks.index(packet.pid)
-            {
-                let context = self.native_source_context();
-                let track = &mut self.native_tracks.as_mut_slice()[index];
-                if let Some(observer) = track.observer.as_mut() {
-                    // Keep one unit for delivery of the original source event.
-                    let ready = if w.remaining() >= 3 {
-                        observer.append_ready_borrowed_continuation(
-                            packet,
-                            context,
-                            &self.input,
-                            w,
-                            c,
-                        )?
-                    } else {
-                        ReadyContinuation::Unhandled
-                    };
-                    match ready {
-                        ReadyContinuation::Buffered => {}
-                        ReadyContinuation::Complete => self.native_active = Some(index),
-                        ReadyContinuation::Unhandled => match observer.push_borrowed(
-                            packet,
-                            context,
-                            self.native_context.as_ref().map(|_| &self.input),
-                        ) {
-                            Ok(()) => self.native_active = Some(index),
-                            Err(error) => {
-                                track.refuse(error);
-                                self.native_update_at = Some(index);
-                            }
-                        },
-                    }
-                }
-            }
-            self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
-            if matches!(event, TraceEvent::Finished) {
-                self.ended = true;
-            }
-            return T::project(TsPayloadStep::Event(TsEvent {
-                source: event,
-                source_pts,
-                source_dts,
-                native_clock,
-                clock_key: key,
-            }));
         }
+    }
+
+    /// Adopts the pending PAT or active PMT: the program, the native tracks and
+    /// their observers, and the track facts. True while the PMT's next track
+    /// still needs its observer, which leaves the event pending.
+    #[cold]
+    fn adopt_table(&mut self, feed_only: bool) -> Result<bool> {
+        let Some(event) = self.pending.as_ref() else {
+            return Ok(false);
+        };
+        if let TraceEvent::ProgramMap {
+            map,
+            active: true,
+            configuration_epoch,
+        } = event
+        {
+            if map.streams.len() > 64 {
+                return Err(Error::Limit {
+                    requested: map.streams.len(),
+                    maximum: 64,
+                });
+            }
+            if self.segment_discovery.is_some() && self.native_map_next == 0 {
+                self.native_tracks = self.discover_tracks(map)?;
+            }
+            if !self.native_prefix_failed
+                && let Some(track) = self.native_tracks.as_slice().get(self.native_map_next)
+            {
+                let observer = self.native_observer(track.selection, map, *configuration_epoch);
+                let track = &mut self.native_tracks.as_mut_slice()[self.native_map_next];
+                match observer {
+                    Ok((mut observer, carriage)) => {
+                        if let Some(context) = self.native_context.as_ref() {
+                            observer.bind_input(context, &self.input)?;
+                        }
+                        track.observer = Some(observer);
+                        track.update = (self.segment_discovery.is_some()
+                            || track.selection.carriage == TsNativeCarriage::AudioFromPmt)
+                            .then_some(TsNativeUpdate::Configuration(TsNativeConfiguration {
+                                track: TrackKey::Ts {
+                                    program: self.program,
+                                    pid: track.pid(),
+                                },
+                                configuration_epoch: *configuration_epoch,
+                                carriage,
+                            }));
+                    }
+                    Err(error) => track.refuse(error),
+                }
+                self.native_map_next += 1;
+                if self.native_map_next < self.native_tracks.as_slice().len() {
+                    return Ok(true);
+                }
+            }
+            self.facts
+                .try_reserve_exact(map.streams.len().saturating_sub(self.facts.len()))?;
+            self.facts.clear();
+            for e in map.streams.as_slice() {
+                let observer = self
+                    .native_tracks
+                    .index(e.pid)
+                    .and_then(|i| self.native_tracks.as_slice()[i].observer.as_ref());
+                let kind = track_kind(selected_track_kind(e, observer));
+                self.facts
+                    .try_push(TrackFact {
+                        key: TrackKey::Ts {
+                            program: self.program,
+                            pid: e.pid,
+                        },
+                        kind,
+                        enabled: true,
+                    })
+                    .map_err(|e| e.error)?;
+            }
+            self.native_map_next = 0;
+            self.native_update_at = self
+                .native_tracks
+                .as_slice()
+                .iter()
+                .position(|track| track.update.is_some());
+            self.pcr_pid = Some(map.pcr_pid);
+        }
+        if let TraceEvent::Pat(table) = event {
+            if self.program == 0 {
+                let program = self.stream.selected_program();
+                if !feed_only {
+                    self.native = Some(DemuxClock::new(program)?);
+                }
+                self.native_packet_clock = Some(DemuxClock::new(program)?);
+                self.program = program;
+            }
+            self.tsid = Some(table.header.extension);
+        }
+        Ok(false)
+    }
+
+    /// Delivers the pending source event with its source and native clocks,
+    /// offering a transport packet to its native track first.
+    #[inline(always)]
+    fn deliver_event<T: TsStepProjection>(
+        &mut self,
+        w: &mut WorkBudget,
+        c: &AtomicBool,
+    ) -> Result<T> {
+        let event = self
+            .pending
+            .as_ref()
+            .ok_or(Error::Invalid("TS event missing"))?;
+        let key = match (self.tsid, self.pcr_pid) {
+            (Some(tsid), Some(pcr_pid)) => Some(ClockKey {
+                tsid,
+                program: self.program,
+                pcr_pid,
+                epoch: match event {
+                    TraceEvent::Pes(p) => p.epochs.clock,
+                    _ => self.stream.source_epochs().clock,
+                },
+            }),
+            _ => None,
+        };
+        let mut source_pts = None;
+        let mut source_dts = None;
+        let mut native_clock = None;
+        if let TraceEvent::Pes(pes) = event {
+            if let Some(key) = key {
+                source_pts = Some(source_timestamp(pes.header.pts_raw33, key, self.policy)?);
+                source_dts = Some(source_timestamp(pes.header.dts_raw33, key, self.policy)?);
+            }
+            // Native clock work remains separately charged and may yield without taking
+            // the source event. No native time is copied into source fields.
+            let projector = self
+                .native
+                .as_mut()
+                .ok_or(Error::Invalid("TS PES before program discovery"))?;
+            native_clock = projector.project(pes, w, c)?;
+            if native_clock.is_none() {
+                return T::project(TsPayloadStep::Yield);
+            }
+        }
+        let event = self
+            .pending
+            .take()
+            .ok_or(Error::Invalid("TS event missing"))?;
+        if let TraceEvent::Transport(packet) = &event
+            && let Some(index) = self.native_tracks.index(packet.pid)
+        {
+            let context = self.native_source_context();
+            let track = &mut self.native_tracks.as_mut_slice()[index];
+            if let Some(observer) = track.observer.as_mut() {
+                // Keep one unit for delivery of the original source event.
+                let ready = if w.remaining() >= 3 {
+                    observer.append_ready_borrowed_continuation(
+                        packet,
+                        context,
+                        &self.input,
+                        w,
+                        c,
+                    )?
+                } else {
+                    ReadyContinuation::Unhandled
+                };
+                match ready {
+                    ReadyContinuation::Buffered => {}
+                    ReadyContinuation::Complete => self.native_active = Some(index),
+                    ReadyContinuation::Unhandled => match observer.push_borrowed(
+                        packet,
+                        context,
+                        self.native_context.as_ref().map(|_| &self.input),
+                    ) {
+                        Ok(()) => self.native_active = Some(index),
+                        Err(error) => {
+                            track.refuse(error);
+                            self.native_update_at = Some(index);
+                        }
+                    },
+                }
+            }
+        }
+        self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
+        if matches!(event, TraceEvent::Finished) {
+            self.ended = true;
+        }
+        T::project(TsPayloadStep::Event(TsEvent {
+            source: event,
+            source_pts,
+            source_dts,
+            native_clock,
+            clock_key: key,
+        }))
+    }
+
+    /// [`Self::deliver_event`] for a feed, which consumes its payload events and
+    /// delivers only the rare ones whole.
+    #[cold]
+    fn deliver_feed_event<T: TsStepProjection>(
+        &mut self,
+        w: &mut WorkBudget,
+        c: &AtomicBool,
+    ) -> Result<T> {
+        self.deliver_event(w, c)
     }
 }
 impl RawEvent {
