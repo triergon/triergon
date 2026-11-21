@@ -325,7 +325,7 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
         }
         "audio-dts" => audio(AudioCodec::Dts, data, out),
         "audio-flac" | "audio-mp3" | "audio-vorbis" | "audio-opus" => {
-            file_audio::<false>(data, out)
+            file_audio::<false>(data, out);
         }
         "audio-opus-ambisonic" => file_audio::<true>(data, out),
         _ => {
