@@ -4,7 +4,10 @@
 //! [`RootWalkTransportBuilder`] follows the reader from the sample entry through every box
 //! after `moov` to the end of the file, counting the absolute seeks FFmpeg makes to skip
 //! boxes, and keeps each possible buffer state. Source boxes and bytes are kept as they are.
-use super::transport_window::{CAPACITY, Revisit, Window};
+use super::transport_window::{
+    CAPACITY, CHILD_LIMIT, DISCARD_BOUND, Revisit, Window, expected, next_kind, small_plain,
+    visual_entry,
+};
 use crate::{
     BuildStatus, Limits, Next,
     boxes::{BoxChildren, BoxHeader, BoxView},
@@ -19,8 +22,8 @@ use std::{
 use triergon_core::{Budget, Error, Result, WorkBudget};
 
 const CONSUMPTION_BOUNDS: &str = "v4 modeled metadata consumption bounds";
-const DISCARD_BOUND: u64 = 32768; // Separately observed reference forward protocol bound.
-const CHILD_LIMIT: u32 = 16;
+const PLAIN_ATOMS: &str = "v4 modeled transport requires bounded plain source atoms";
+const RGB24_FIELDS: &str = "v4 unreviewed RGB24 entry fields";
 
 /// Selects the root-walk transport model; pass it to [`RootWalkTransportBuilder::new`].
 #[derive(Clone, Copy, Debug)]
@@ -174,67 +177,6 @@ impl Window {
     }
 }
 
-const LEVEL_0: [[u8; 4]; 2] = [*b"mvhd", *b"trak"];
-const LEVEL_1: [[u8; 4]; 2] = [*b"tkhd", *b"mdia"];
-const LEVEL_2: [[u8; 4]; 3] = [*b"mdhd", *b"hdlr", *b"minf"];
-const LEVEL_3: [[u8; 4]; 3] = [*b"vmhd", *b"dinf", *b"stbl"];
-const LEVEL_4: [[u8; 4]; 6] = [*b"stsd", *b"stts", *b"stsc", *b"stsz", *b"stco", *b"stss"];
-const LEVEL_5: [[u8; 4]; 1] = [*b"raw "];
-
-fn expected(level: u8) -> &'static [[u8; 4]] {
-    match level {
-        0 => &LEVEL_0,
-        1 => &LEVEL_1,
-        2 => &LEVEL_2,
-        3 => &LEVEL_3,
-        4 => &LEVEL_4,
-        5 => &LEVEL_5,
-        _ => &[],
-    }
-}
-fn next_kind(level: u8) -> [u8; 4] {
-    match level {
-        0 => *b"trak",
-        1 => *b"mdia",
-        2 => *b"minf",
-        3 => *b"stbl",
-        4 => *b"stsd",
-        _ => *b"raw ",
-    }
-}
-fn small_plain(header: &BoxHeader, length: u64) -> Result<()> {
-    if header.header_size != 8
-        || header.size.is_none()
-        || header.end()?.is_none_or(|end| end > length)
-    {
-        return Err(Error::Unsupported(
-            "v4 modeled transport requires bounded plain source atoms",
-        ));
-    }
-    Ok(())
-}
-fn visual_entry(raw: &BoxView) -> Result<()> {
-    let b = raw.payload();
-    if raw.header().kind != *b"raw "
-        || b.len() != 78
-        || b[..6] != [0; 6]
-        || fields::u16_at(b, 6)? != 1
-        || b[8..24] != [0; 16]
-        || fields::u16_at(b, 24)? != 2
-        || fields::u16_at(b, 26)? != 2
-        || fields::u32_at(b, 28)? != 0x0048_0000
-        || fields::u32_at(b, 32)? != 0x0048_0000
-        || fields::u32_at(b, 36)? != 0
-        || fields::u16_at(b, 40)? != 1
-        || b[42..74] != [0; 32]
-        || fields::u16_at(b, 74)? != 24
-        || fields::u16_at(b, 76)? != u16::MAX
-    {
-        return Err(Error::Unsupported("v4 unreviewed RGB24 entry fields"));
-    }
-    Ok(())
-}
-
 /// Builds a [`RootWalkTransportModel`] from a file's top-level box headers and movie
 /// metadata.
 ///
@@ -330,7 +272,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
             ));
         }
         let entry = table.descriptions()[0].raw().clone();
-        visual_entry(&entry)?;
+        visual_entry(&entry, RGB24_FIELDS)?;
         Ok(Self {
             ftyp,
             movie,
@@ -410,7 +352,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
                     return Ok(BuildStatus::Yield);
                 }
                 let header = &self.roots[self.root_at];
-                small_plain(header, self.context.physical_length)?;
+                small_plain(header, self.context.physical_length, PLAIN_ATOMS)?;
                 if header.start != self.root_end {
                     return Err(Error::Unsupported("v4 discontinuous source root carriage"));
                 }
@@ -443,7 +385,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
                 match children.poll(work)? {
                     Next::Yield => return Ok(BuildStatus::Yield),
                     Next::Item(raw) => {
-                        small_plain(raw.header(), self.context.physical_length)?;
+                        small_plain(raw.header(), self.context.physical_length, PLAIN_ATOMS)?;
                         if raw.header().kind == *b"free" && self.level != 5 {
                             continue;
                         }

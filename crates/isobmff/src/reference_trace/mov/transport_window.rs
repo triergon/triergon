@@ -2,12 +2,78 @@
 //! 32768-byte buffer in the source as read callbacks of a bounded size fill it, and where a
 //! refill can start when the reader returns to the sample entry.
 use crate::{
-    reference_trace::mov::raw_video_transport::EntryRevisit, table::recovery::DescriptionContext,
+    boxes::{BoxHeader, BoxView},
+    fields,
+    reference_trace::mov::raw_video_transport::EntryRevisit,
+    table::recovery::DescriptionContext,
 };
 use triergon_core::{Error, Result};
 
 /// Capacity of the reference wrapper's original allocation.
 pub(super) const CAPACITY: u64 = 32768;
+/// Most bytes FFmpeg's reader discards by reading forward instead of seeking.
+pub(super) const DISCARD_BOUND: u64 = 32768;
+/// Most children walked at one level, top-level boxes included.
+pub(super) const CHILD_LIMIT: u32 = 16;
+
+const LEVEL_0: [[u8; 4]; 2] = [*b"mvhd", *b"trak"];
+const LEVEL_1: [[u8; 4]; 2] = [*b"tkhd", *b"mdia"];
+const LEVEL_2: [[u8; 4]; 3] = [*b"mdhd", *b"hdlr", *b"minf"];
+const LEVEL_3: [[u8; 4]; 3] = [*b"vmhd", *b"dinf", *b"stbl"];
+const LEVEL_4: [[u8; 4]; 6] = [*b"stsd", *b"stts", *b"stsc", *b"stsz", *b"stco", *b"stss"];
+const LEVEL_5: [[u8; 4]; 1] = [*b"raw "];
+
+pub(super) fn expected(level: u8) -> &'static [[u8; 4]] {
+    match level {
+        0 => &LEVEL_0,
+        1 => &LEVEL_1,
+        2 => &LEVEL_2,
+        3 => &LEVEL_3,
+        4 => &LEVEL_4,
+        5 => &LEVEL_5,
+        _ => &[],
+    }
+}
+pub(super) fn next_kind(level: u8) -> [u8; 4] {
+    match level {
+        0 => *b"trak",
+        1 => *b"mdia",
+        2 => *b"minf",
+        3 => *b"stbl",
+        4 => *b"stsd",
+        _ => *b"raw ",
+    }
+}
+pub(super) fn small_plain(header: &BoxHeader, length: u64, refusal: &'static str) -> Result<()> {
+    if header.header_size != 8
+        || header.size.is_none()
+        || header.end()?.is_none_or(|end| end > length)
+    {
+        return Err(Error::Unsupported(refusal));
+    }
+    Ok(())
+}
+pub(super) fn visual_entry(raw: &BoxView, refusal: &'static str) -> Result<()> {
+    let b = raw.payload();
+    if raw.header().kind != *b"raw "
+        || b.len() != 78
+        || b[..6] != [0; 6]
+        || fields::u16_at(b, 6)? != 1
+        || b[8..24] != [0; 16]
+        || fields::u16_at(b, 24)? != 2
+        || fields::u16_at(b, 26)? != 2
+        || fields::u32_at(b, 28)? != 0x0048_0000
+        || fields::u32_at(b, 32)? != 0x0048_0000
+        || fields::u32_at(b, 36)? != 0
+        || fields::u16_at(b, 40)? != 1
+        || b[42..74] != [0; 32]
+        || fields::u16_at(b, 74)? != 24
+        || fields::u16_at(b, 76)? != u16::MAX
+    {
+        return Err(Error::Unsupported(refusal));
+    }
+    Ok(())
+}
 
 #[derive(Clone, Copy, Default, Debug)]
 pub(super) struct Window {
