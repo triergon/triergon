@@ -692,6 +692,16 @@ impl<'a> EncodedEditJob<'a> {
         dependency_table: bool,
         range_playback: bool,
     ) -> Result<Self> {
+        // Only range playback reads the `dac3`/`dec3` record that gives a Dolby edit its
+        // frame clock.
+        if !range_playback
+            && matches!(
+                context.stream.kind(),
+                EncodedEntryKind::Ac3 | EncodedEntryKind::Eac3
+            )
+        {
+            return Err(Error::Unsupported("encoded codec requires range playback"));
+        }
         if !context.table.raw().bytes().belongs_to(input.budget())
             || !context.edits.raw().bytes().belongs_to(input.budget())
             || !context
@@ -1161,8 +1171,11 @@ impl<'a> EncodedEditJob<'a> {
                 return Err(Error::Unsupported("encoded edit sub-tick duration"));
             }
             match self.context.stream.kind() {
-                kind if kind.is_video() => {}
-                EncodedEntryKind::Dts => {}
+                EncodedEntryKind::Avc
+                | EncodedEntryKind::Hevc
+                | EncodedEntryKind::Av1
+                | EncodedEntryKind::Vp9
+                | EncodedEntryKind::Dts => {}
                 EncodedEntryKind::Opus => {
                     // Opus in ISO BMFF, section 4.4. dOps PreSkip does not
                     // determine the presentation window.
@@ -1202,15 +1215,10 @@ impl<'a> EncodedEditJob<'a> {
                         ));
                     }
                 }
-                EncodedEntryKind::Ac3 | EncodedEntryKind::Eac3 if self.dolby_config.is_some() => {
+                EncodedEntryKind::Ac3 | EncodedEntryKind::Eac3 => {
                     if Time::from_ticks(ticks, self.context.media_base)? != duration {
                         return Err(Error::Unsupported("encoded Dolby edit fractional duration"));
                     }
-                }
-                _ => {
-                    return Err(Error::Unsupported(
-                        "encoded edited audio codec frame clock not established",
-                    ));
                 }
             }
             self.initialized = true;

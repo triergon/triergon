@@ -646,9 +646,7 @@ fn range_playback_keeps_dolby_packets_and_reports_the_leading_sample_skip() {
         let source = Source::new(raw, b"soun");
         assert!(matches!(
             source.plan(1),
-            Err(Error::Unsupported(
-                "encoded edited audio codec frame clock not established"
-            ))
+            Err(Error::Unsupported("encoded codec requires range playback"))
         ));
         let plan = range_plan(&source, *b"isom").unwrap();
         let packets = rows(&source, plan);
