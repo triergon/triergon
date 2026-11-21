@@ -24,5 +24,8 @@ required-features = ["reference-trace"]
 name = "trace"
 required-features = ["reference-trace"]
 
+[dev-dependencies]
+triergon-harness-protocol = { path = "../harness-protocol" }
+
 [lints]
 workspace = true

@@ -9,6 +9,7 @@ use triergon::{Budget, ContainerReader, PacketInfo};
 use triergon_codec_flac::{AudioFrame, Decoder};
 use triergon_framing::flac;
 use triergon_harness_protocol::md5;
+use triergon_harness_protocol::test_report::skipped;
 
 /// The configuration and frames of a native FLAC file, read by the elementary reader up
 /// to its first error; `None` when it does not open as FLAC.
@@ -47,11 +48,6 @@ fn research(dir: &str) -> Vec<PathBuf> {
 /// Reports a check that did not run on the test run's own standard error, where it shows
 /// although the test passes: the check's input is kept outside the repository. One write,
 /// so the line stays whole beside the test harness's output.
-fn skipped(what: std::fmt::Arguments<'_>) {
-    use std::io::Write as _;
-    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
-}
-
 /// Files up to this size are checked by default; an unoptimised build decodes the whole
 /// suite (about 500 MB) in minutes.
 const DEFAULT_MAX_BYTES: u64 = 3 << 20;

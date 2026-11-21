@@ -6,6 +6,7 @@
 //! (tests/ffmpeg_ref_md5.txt). Out-of-set vectors must be refused with `Unsupported`.
 
 use std::path::PathBuf;
+use triergon_harness_protocol::test_report::skipped;
 
 use triergon_codec_hevc::{AccessUnitSplitter, DecodeError, Decoder, Row};
 
@@ -79,11 +80,6 @@ fn decode_all(data: &[u8]) -> (Vec<u8>, Vec<DecodeError>) {
 /// Reports a check that did not run on the test run's own standard error, where it shows
 /// although the test passes: the check's input is kept outside the repository. One write,
 /// so the line stays whole beside the test harness's output.
-fn skipped(what: std::fmt::Arguments<'_>) {
-    use std::io::Write as _;
-    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
-}
-
 #[test]
 fn conformance_vectors_match_ffmpeg() {
     let dir = vector_dir();

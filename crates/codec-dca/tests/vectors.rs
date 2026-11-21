@@ -9,15 +9,11 @@
 mod support;
 use std::path::PathBuf;
 use support::harness;
+use triergon_harness_protocol::test_report::skipped;
 
 /// Reports a check that did not run on the test run's own standard error, where it shows
 /// although the test passes: the check's input is kept outside the repository. One write,
 /// so the line stays whole beside the test harness's output.
-fn skipped(what: std::fmt::Arguments<'_>) {
-    use std::io::Write as _;
-    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
-}
-
 fn fate(rel: &str) -> Option<Vec<u8>> {
     static ABSENT: std::sync::Once = std::sync::Once::new();
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/fate-samples/dts");

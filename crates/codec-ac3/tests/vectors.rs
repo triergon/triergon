@@ -6,6 +6,7 @@
 //! (the exact, dither-stripped comparison lives in harness/codecs/ac3/).
 
 use std::path::PathBuf;
+use triergon_harness_protocol::test_report::skipped;
 
 use triergon_codec_ac3::{AudioFrame, Decoder, access_unit_len};
 
@@ -90,11 +91,6 @@ const VECTORS: &[Expect] = &[
 /// Reports a check that did not run on the test run's own standard error, where it shows
 /// although the test passes: the check's input is kept outside the repository. One write,
 /// so the line stays whole beside the test harness's output.
-fn skipped(what: std::fmt::Arguments<'_>) {
-    use std::io::Write as _;
-    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
-}
-
 #[test]
 fn fate_vectors_frame_counts_layouts_and_coarse_values() {
     let root = suite();

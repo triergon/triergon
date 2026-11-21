@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use triergon_codec_h264::{DecodeError, Decoder};
 use triergon_framing::nal::AnnexBUnits;
 use triergon_harness_protocol::md5::hex_digest;
+use triergon_harness_protocol::test_report::skipped;
 
 enum Edit {
     /// Remove `remove` bytes at `at`, then insert `bytes` there.
@@ -187,11 +188,6 @@ fn rebuild(seed: &[u8], edits: &[Edit]) -> Vec<u8> {
 /// Reports a check that did not run on the test run's own standard error, where it shows
 /// although the test passes: the check's input is kept outside the repository. One write,
 /// so the line stays whole beside the test harness's output.
-fn skipped(what: std::fmt::Arguments<'_>) {
-    use std::io::Write as _;
-    let _ = std::io::stderr().write_all(format!("skipped: {what}\n").as_bytes());
-}
-
 #[test]
 fn fuzz_findings_decode_to_typed_errors() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
