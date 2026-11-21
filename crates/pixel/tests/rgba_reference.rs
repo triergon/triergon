@@ -34,67 +34,39 @@ fn letterbox(
 ) -> Vec<u8> {
     let (cw, ch) = (w.div_ceil(2), h.div_ceil(2));
     let mut state = seed;
-    let y = plane(&mut state, w * h, bits);
-    let u = plane(&mut state, cw * ch, bits);
-    let v = plane(&mut state, cw * ch, bits);
+    let wide = [(w * h, w), (cw * ch, cw), (cw * ch, cw)]
+        .map(|(samples, stride)| (plane(&mut state, samples, bits), stride));
+    // The same samples as bytes, for the pictures that are stored as bytes.
+    let narrow = wide
+        .each_ref()
+        .map(|(samples, _)| samples.iter().map(|&s| s as u8).collect::<Vec<_>>());
+    let planes = std::array::from_fn(|i| {
+        let (ref samples, stride) = wide[i];
+        if bits == 8 {
+            Plane::U8 {
+                data: &narrow[i],
+                stride,
+                offset: 0,
+            }
+        } else {
+            Plane::U16 {
+                data: samples,
+                stride,
+                offset: 0,
+            }
+        }
+    });
+    let view = PictureView {
+        width: w,
+        height: h,
+        bit_depth: bits,
+        planes,
+        pts: None,
+        sar: (1, 1),
+        colour,
+    };
     let mut rgba = vec![0_u8; CANVAS_BYTES];
-    if bits == 8 {
-        let narrow = |p: &[u16]| p.iter().map(|&s| s as u8).collect::<Vec<_>>();
-        let (y, u, v) = (narrow(&y), narrow(&u), narrow(&v));
-        let view = PictureView {
-            width: w,
-            height: h,
-            bit_depth: 8,
-            planes: [
-                Plane::U8 {
-                    data: &y,
-                    stride: w,
-                    offset: 0,
-                },
-                Plane::U8 {
-                    data: &u,
-                    stride: cw,
-                    offset: 0,
-                },
-                Plane::U8 {
-                    data: &v,
-                    stride: cw,
-                    offset: 0,
-                },
-            ],
-            pts: None,
-            sar: (1, 1),
-            colour,
-        };
-        scaler.letterbox(&view, &mut rgba);
-    } else {
-        let view = PictureView {
-            width: w,
-            height: h,
-            bit_depth: bits,
-            planes: [
-                Plane::U16 {
-                    data: &y,
-                    stride: w,
-                    offset: 0,
-                },
-                Plane::U16 {
-                    data: &u,
-                    stride: cw,
-                    offset: 0,
-                },
-                Plane::U16 {
-                    data: &v,
-                    stride: cw,
-                    offset: 0,
-                },
-            ],
-            pts: None,
-            sar: (1, 1),
-            colour,
-        };
-        scaler.letterbox(&view, &mut rgba);
-    }
+    scaler.letterbox(&view, &mut rgba);
     rgba
 }
 
@@ -140,7 +112,7 @@ fn letterbox_matches_reference_digests() {
 /// bits) to canvases in OUT, for comparison with the decode reference /
 /// `probe_rgba` output. With the optional fields IN holds whole coded CW x CH
 /// pictures and the W x H view starts at (LEFT, TOP), as the decoders hand it
-/// over (see `codec::Plane`). `RGBA_BENCH=N` converts the first picture N
+/// over (see [`Plane`]). `RGBA_BENCH=N` converts the first picture N
 /// times instead and prints the median time.
 #[test]
 #[ignore = "needs RGBA_RAW input"]
