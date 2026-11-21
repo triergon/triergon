@@ -21,7 +21,7 @@ pub(crate) const MAX: i64 = i32::MAX as i64;
 pub(crate) const MIN: i64 = i32::MIN as i64;
 
 /// The low 32 bits of `v`, sign-extended.
-pub const fn wrap(v: i64) -> i64 {
+pub(crate) const fn wrap(v: i64) -> i64 {
     v as i32 as i64
 }
 
@@ -31,32 +31,32 @@ pub(crate) const fn to_i32(v: i64) -> i32 {
 }
 
 /// The magnitude of `v`'s low 32 bits; the smallest value stays negative.
-pub const fn abs(v: i64) -> i64 {
+pub(crate) const fn abs(v: i64) -> i64 {
     (v as i32).wrapping_abs() as i64
 }
 
 /// [`fixed::mul_fix`] in 32 bits.
-pub const fn mul_fix(a: i64, b: i64) -> i64 {
+pub(crate) const fn mul_fix(a: i64, b: i64) -> i64 {
     wrap(fixed::mul_fix(wrap(a), wrap(b)))
 }
 
 /// [`fixed::div_fix`] in 32 bits.
-pub fn div_fix(a: i64, b: i64) -> i64 {
+pub(crate) fn div_fix(a: i64, b: i64) -> i64 {
     wrap(fixed::div_fix(wrap(a), wrap(b)))
 }
 
 /// [`fixed::mul_div`] in 32 bits.
-pub fn mul_div(a: i64, b: i64, c: i64) -> i64 {
+pub(crate) fn mul_div(a: i64, b: i64, c: i64) -> i64 {
     wrap(fixed::mul_div(wrap(a), wrap(b), wrap(c)))
 }
 
 /// [`fixed::pix_round`] in 32 bits.
-pub const fn pix_round(v: i64) -> i64 {
+pub(crate) const fn pix_round(v: i64) -> i64 {
     wrap(fixed::pix_round(wrap(v)))
 }
 
 /// [`fixed::pix_ceil`] in 32 bits.
-pub const fn pix_ceil(v: i64) -> i64 {
+pub(crate) const fn pix_ceil(v: i64) -> i64 {
     wrap(fixed::pix_ceil(wrap(v)))
 }
 

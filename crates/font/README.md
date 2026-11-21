@@ -227,7 +227,7 @@ width or resolution) on a face with those metrics: `Font::vertical_metrics`
 for the face's own, or the ones a renderer substitutes
 (`compat::libass::at_size`). The scale is that height over ascender minus
 descender, for x and y; pixels per em, the grid-fitted size metrics and every
-product follow FreeType's fixed-point rounding (the `fixed` module). A size of
+product follow FreeType's fixed-point rounding, half away from zero. A size of
 zero pixels per em, such as height 0, keeps its scales and metrics, but glyphs
 then load unscaled and unhinted, in font units, as FreeType loads them when the
 scale is undefined. A `SizedFont` then gives:
@@ -398,17 +398,11 @@ returns `false` where emboldening is refused.
 **Decorations.** `underline` and `strikeout` are the bands libass adds from
 `post` and `OS/2`, rounded as it rounds them.
 
-## Fixed point and table reading
+## Reading other tables
 
-`fixed` has the arithmetic every scaled value goes through: `mul_fix`,
-`div_fix` and `mul_div`, which round half away from zero, and the 26.6
-roundings `pix_round`, `pix_floor` and `pix_ceil`. They compute in 64 bits and
-are exact where their operands fit 32; `fixed::wrap32` has the same
-operations on values held in 32 bits, wrapping as the hinters need.
-
-`read` has the big-endian readers the tables are read with (`Reader`,
-`u16_at`, `u24_at`, `u32_at`) and the binary search (`bsearch`), for readers of
-tables this crate leaves to others, whose bytes `Font::table` gives;
+`read` has the big-endian reads at an offset (`u16_at`, `u32_at`) and the
+binary search (`bsearch`) the tables are read with, for readers of tables this
+crate leaves to others, whose bytes `Font::table` gives;
 `CFF_STANDARD_ENCODING` is the CFF Standard Encoding such a reader of `CFF `
 needs for `seac`.
 

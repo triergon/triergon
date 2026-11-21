@@ -22,10 +22,10 @@
 //! outline and metric comparisons depend on; the module is translated from it
 //! (see `docs/provenance.md`).
 
-pub mod wrap32;
+pub(crate) mod wrap32;
 
 /// One in 16.16.
-pub const ONE: i64 = 0x1_0000;
+pub(crate) const ONE: i64 = 0x1_0000;
 
 /// 16.16 horizontal and vertical scales from font units to outline coordinates.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,7 +40,7 @@ impl Scale {
 }
 
 /// `a × b / 65536`, rounded half away from zero: a value times a 16.16 factor.
-pub const fn mul_fix(a: i64, b: i64) -> i64 {
+pub(crate) const fn mul_fix(a: i64, b: i64) -> i64 {
     let ab = a.wrapping_mul(b);
     // The sign bit turns 0x8000 into 0x7fff for negative products.
     (ab.wrapping_add(0x8000).wrapping_add(ab >> 63)) >> 16
@@ -49,7 +49,7 @@ pub const fn mul_fix(a: i64, b: i64) -> i64 {
 /// `a × 65536 / b`, rounded half away from zero: the 16.16 ratio of two values
 /// of one representation. A zero divisor gives `0x7fffffff`, negated when `a`
 /// is negative.
-pub fn div_fix(a: i64, b: i64) -> i64 {
+pub(crate) fn div_fix(a: i64, b: i64) -> i64 {
     let negative = (a < 0) != (b < 0);
     let (a, b) = (a.unsigned_abs(), b.unsigned_abs());
     let q = ((a << 16).wrapping_add(b >> 1))
@@ -61,7 +61,7 @@ pub fn div_fix(a: i64, b: i64) -> i64 {
 
 /// `a × b / c`, rounded half away from zero. A zero divisor gives `0x7fffffff`,
 /// negated when exactly one of `a` and `b` is negative.
-pub fn mul_div(a: i64, b: i64, c: i64) -> i64 {
+pub(crate) fn mul_div(a: i64, b: i64, c: i64) -> i64 {
     let negative = ((a < 0) != (b < 0)) != (c < 0);
     let (a, b, c) = (a.unsigned_abs(), b.unsigned_abs(), c.unsigned_abs());
     let d = a
@@ -74,17 +74,17 @@ pub fn mul_div(a: i64, b: i64, c: i64) -> i64 {
 }
 
 /// A 26.6 value rounded to the nearest whole pixel, halves up.
-pub const fn pix_round(v: i64) -> i64 {
+pub(crate) const fn pix_round(v: i64) -> i64 {
     v.wrapping_add(32) & !63
 }
 
 /// A 26.6 value rounded down to a whole pixel.
-pub const fn pix_floor(v: i64) -> i64 {
+pub(crate) const fn pix_floor(v: i64) -> i64 {
     v & !63
 }
 
 /// A 26.6 value rounded up to a whole pixel.
-pub const fn pix_ceil(v: i64) -> i64 {
+pub(crate) const fn pix_ceil(v: i64) -> i64 {
     v.wrapping_add(63) & !63
 }
 

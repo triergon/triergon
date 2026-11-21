@@ -1,13 +1,14 @@
 //! Big-endian reads over font tables: the primitives this crate's table
-//! readers are built from, for readers of the tables it leaves to others
-//! ([`Font::table`](crate::Font::table) gives their bytes).
+//! readers are built from. The reads at an offset ([`u16_at`], [`u32_at`])
+//! and the binary search ([`bsearch`]) are public, for readers of the tables
+//! this crate leaves to others ([`Font::table`](crate::Font::table) gives
+//! their bytes).
 //!
-//! Every read is bounds-checked. A [`Reader`] is a cursor for structures read
-//! in order, whose reads past the end are errors: data that ends early is
-//! malformed, so it is `Error::Invalid`; `Error::Truncated` is kept for a
-//! transport that ends early. [`u16_at`], [`u24_at`] and [`u32_at`] read at an
-//! offset and give `None` past the end, for lookups that treat missing data
-//! as an absent entry.
+//! Every read is bounds-checked. The crate's `Reader` is a cursor for
+//! structures read in order, whose reads past the end are errors: data that
+//! ends early is malformed, so it is `Error::Invalid`; `Error::Truncated` is
+//! kept for a transport that ends early. The reads at an offset give `None`
+//! past the end, for lookups that treat missing data as an absent entry.
 
 use triergon_core::{Error, Result};
 
@@ -17,19 +18,19 @@ pub(crate) const TRUNCATED: Error = Error::Invalid("truncated font table");
 /// cursor and moves past it, or fails with `Invalid("truncated font table")`
 /// when the data ends first.
 #[derive(Clone, Copy, Debug)]
-pub struct Reader<'a> {
+pub(crate) struct Reader<'a> {
     data: &'a [u8],
     at: usize,
 }
 
 impl<'a> Reader<'a> {
     /// A reader at the start of `data`.
-    pub const fn new(data: &'a [u8]) -> Self {
+    pub(crate) const fn new(data: &'a [u8]) -> Self {
         Self { data, at: 0 }
     }
 
     /// A reader over `data` at `offset`, which may be its end but not beyond.
-    pub fn at(data: &'a [u8], offset: usize) -> Result<Self> {
+    pub(crate) fn at(data: &'a [u8], offset: usize) -> Result<Self> {
         if offset > data.len() {
             return Err(TRUNCATED);
         }
@@ -37,27 +38,27 @@ impl<'a> Reader<'a> {
     }
 
     /// A reader over the same data at `offset`.
-    pub fn moved_to(&self, offset: usize) -> Result<Self> {
+    pub(crate) fn moved_to(&self, offset: usize) -> Result<Self> {
         Self::at(self.data, offset)
     }
 
     /// The cursor's offset in the data.
-    pub const fn offset(&self) -> usize {
+    pub(crate) const fn offset(&self) -> usize {
         self.at
     }
 
     /// Whether every byte has been read.
-    pub const fn at_end(&self) -> bool {
+    pub(crate) const fn at_end(&self) -> bool {
         self.at == self.data.len()
     }
 
     /// Moves past `count` bytes.
-    pub fn skip(&mut self, count: usize) -> Result<()> {
+    pub(crate) fn skip(&mut self, count: usize) -> Result<()> {
         self.take(count).map(|_| ())
     }
 
     /// The next `count` bytes.
-    pub fn take(&mut self, count: usize) -> Result<&'a [u8]> {
+    pub(crate) fn take(&mut self, count: usize) -> Result<&'a [u8]> {
         let end = self.at.checked_add(count).ok_or(TRUNCATED)?;
         let bytes = self.data.get(self.at..end).ok_or(TRUNCATED)?;
         self.at = end;
@@ -72,42 +73,42 @@ impl<'a> Reader<'a> {
     }
 
     /// The next byte.
-    pub fn u8(&mut self) -> Result<u8> {
+    pub(crate) fn u8(&mut self) -> Result<u8> {
         Ok(self.array::<1>()?[0])
     }
 
     /// The next byte, signed.
-    pub fn i8(&mut self) -> Result<i8> {
+    pub(crate) fn i8(&mut self) -> Result<i8> {
         Ok(i8::from_be_bytes(self.array()?))
     }
 
     /// The next two bytes: `uint16`, `UFWORD` or `Offset16`.
-    pub fn u16(&mut self) -> Result<u16> {
+    pub(crate) fn u16(&mut self) -> Result<u16> {
         Ok(u16::from_be_bytes(self.array()?))
     }
 
     /// The next two bytes, signed: `int16` or `FWORD`.
-    pub fn i16(&mut self) -> Result<i16> {
+    pub(crate) fn i16(&mut self) -> Result<i16> {
         Ok(i16::from_be_bytes(self.array()?))
     }
 
     /// The next four bytes: `uint32` or `Offset32`.
-    pub fn u32(&mut self) -> Result<u32> {
+    pub(crate) fn u32(&mut self) -> Result<u32> {
         Ok(u32::from_be_bytes(self.array()?))
     }
 
     /// The next four bytes, signed: `int32` or `Fixed`.
-    pub fn i32(&mut self) -> Result<i32> {
+    pub(crate) fn i32(&mut self) -> Result<i32> {
         Ok(i32::from_be_bytes(self.array()?))
     }
 
     /// The next four bytes as a table or feature tag.
-    pub fn tag(&mut self) -> Result<[u8; 4]> {
+    pub(crate) fn tag(&mut self) -> Result<[u8; 4]> {
         self.array()
     }
 
     /// An unsigned integer of `size` bytes, at most 4; zero for none.
-    pub fn uint(&mut self, size: u8) -> Result<u32> {
+    pub(crate) fn uint(&mut self, size: u8) -> Result<u32> {
         let mut value = 0_u32;
         for _ in 0..size {
             value = value << 8 | u32::from(self.u8()?);
@@ -122,7 +123,7 @@ pub fn u16_at(data: &[u8], at: usize) -> Option<u16> {
 }
 
 /// The big-endian 24-bit value at `at`, if `data` holds it.
-pub fn u24_at(data: &[u8], at: usize) -> Option<u32> {
+pub(crate) fn u24_at(data: &[u8], at: usize) -> Option<u32> {
     let [a, b, c] = *data.get(at..)?.first_chunk()?;
     Some(u32::from_be_bytes([0, a, b, c]))
 }

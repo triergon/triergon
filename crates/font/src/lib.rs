@@ -11,7 +11,6 @@
 )]
 
 pub mod compat;
-pub mod fixed;
 pub mod read;
 
 /// What only a comparison of this crate with a reference build needs: which
@@ -25,6 +24,7 @@ mod autofit;
 mod bytecode;
 mod cff;
 mod cmap;
+mod fixed;
 mod glyf;
 mod kern;
 mod metrics;
