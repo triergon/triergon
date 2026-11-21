@@ -13,7 +13,7 @@
         "name": "cabac",
         "entry_points": ["cabac::Engine"],
         "degree": "step",
-        "needs": "none beyond the H.264 and HEVC decoders; no reference exposes its CABAC engine"
+        "needs": "H.264 and HEVC picture comparisons exercise every Engine method. The HEVC overrun check observes only the length of the slice returned by data(). A specification oracle needs to compare the returned slice and cursor values and cover initial offsets 510 and 511 and bypass reads of 17 through 32 bins"
       },
       {
         "name": "crc",
