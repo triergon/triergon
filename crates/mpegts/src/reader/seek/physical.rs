@@ -100,12 +100,8 @@ impl Capture {
         length: u64,
         maximum: usize,
     ) -> Result<Charged<Box<Self>>> {
-        // Reserve the caller-bounded table before parsing. Recording a point
-        // then copies exactly three carriers, never an input-sized old table.
-        let mut checkpoints = BudgetVec::new(pool);
         let capacity =
             maximum.min(usize::try_from(length / (3 * WIDTH) as u64).map_err(|_| Error::Overflow)?);
-        checkpoints.try_reserve_exact(capacity)?;
         Charged::boxed(
             pool,
             Self {
@@ -120,7 +116,7 @@ impl Capture {
                 carriers: [None; 3],
                 pat: None,
                 map: None,
-                checkpoints,
+                checkpoints: BudgetVec::new(pool),
             },
         )
     }
@@ -255,6 +251,9 @@ impl Capture {
             && pat.table(0, table.source_sections.as_slice()[0].as_ref())
             && pmt.table(table.programs.as_slice()[0].pid, map.map().source.as_ref())
             && (self.checkpoints.len() == self.maximum
+                // An input with no usable checkpoint needs no checkpoint table.
+                || (self.checkpoints.is_empty()
+                    && self.checkpoints.try_reserve_exact(self.maximum).is_err())
                 || self
                     .checkpoints
                     .try_push(Checkpoint {
