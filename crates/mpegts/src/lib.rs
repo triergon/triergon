@@ -42,10 +42,10 @@ pub use media_entity::{MediaEntityEnd, ObservedTrace};
 pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
 pub use reader::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, DvbSubtitleTailPolicy,
-    DvbSubtitleUnit, EntityTransition, IncompleteVideo, LoasFrame, MpegAudioFrame, Packet,
-    PacketClock, PayloadSource, Reader, ReaderEvent, ReaderLimits, SourceEvent, Track,
-    UnframedAudio,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, DtsExtensionFrame,
+    DvbSubtitleTailPolicy, DvbSubtitleUnit, EntityTransition, IncompleteVideo, LoasFrame,
+    MpegAudioFrame, Packet, PacketClock, PayloadSource, Reader, ReaderEvent, ReaderLimits,
+    SeekEntity, SourceEvent, Track, UnframedAudio,
 };
 pub use stream::{
     CarrierObservation, CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem,

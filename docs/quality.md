@@ -84,7 +84,16 @@ resource limit becomes an explicit, reviewed rule for that case.
   into the worker so the allocation observer can audit the code doing the work.
 - **DTS transport reference.** The `transport-dts` profile enables the MPEG-TS
   demuxer and DTS parser for the [DVB DTS comparison](../harness/features/mpegts-dts-core/contract.json).
-  The worker uses the same transport fold as the formats reference.
+  The legacy packet operation uses the same transport fold as the formats reference.
+  The [grouped DTS-HD comparison](../harness/features/mpegts-dts-hd-grouped/contract.json)
+  uses the demuxer without parsing, then explicitly feeds each aligned finite PES
+  to the public DTS parser and drains it. Its source-clock fold includes original
+  PES headers, physical and elementary ranges, one-use PTS/DTS and the exact
+  reference-clock duration. A small independent fixed-prefix reader supplies the
+  source duration, distinct from the parser's asset-derived duration. The
+  [multiple-extension comparison](../harness/features/mpegts-dts-hd-extensions/contract.json)
+  uses complete demuxer packets, because the explicit parser separates extension
+  substreams. These operations keep the legacy DTS-HD comparison unchanged.
 - **Container scope.** A candidate worker carries only the runner families its
   reference build can demux. `media-worker` reads Matroska for the `matroska` build's
   container harness; `playback-matroska-worker` runs Matroska startup and seek (`feed-`)

@@ -43,6 +43,7 @@ fn facade_delivers_source_aus_and_every_original_pes_without_decoder_injection()
                     | AccessUnit::Loas(_)
                     | AccessUnit::MpegAudio(_)
                     | AccessUnit::Dts(_)
+                    | AccessUnit::DtsExtension(_)
                     | AccessUnit::DvbSubtitle(_) => {
                         panic!("authored AVC/AAC input")
                     }

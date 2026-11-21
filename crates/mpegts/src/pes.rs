@@ -299,6 +299,20 @@ impl PesAssembler {
         self.unbounded_adts = true;
     }
 
+    /// Restore a verified byte coordinate before the first PES of a fresh route.
+    pub(crate) fn resume_elementary_offset(&mut self, offset: u64) -> Result<()> {
+        if self.active
+            || self.next_chunk != 0
+            || self.header_used != 0
+            || self.elementary_offset != 0
+            || self.byte_run_epoch != 0
+        {
+            return Err(Error::SourceMismatch);
+        }
+        self.elementary_offset = offset;
+        Ok(())
+    }
+
     /// One TS payload at a time. Drain poll before supplying another. A rejected
     /// input is returned intact; no bytes have been consumed from that input.
     pub fn push(
