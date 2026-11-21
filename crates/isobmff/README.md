@@ -8,18 +8,18 @@ edit lists and seek indexes, and reads sample payloads by byte range. It does no
 I/O of its own, decodes no codec, and does not apply edits to presentation.
 
 `Reader` implements the core `ContainerReader` over the source view, so the crate
-works in generic code and inside `triergon::AnyReader`. The parts below stay
+works in generic code and inside `triergon::AnyReader`. The modules below stay
 available for finer control.
 
 `media_kind(&handler)` classifies an `hdlr` handler code without allocating,
-using the same mapping as `TrackInfo::kind`. Unknown handlers stay unknown.
+using the same mapping as `Track`'s kind. Unknown handlers stay unknown.
 
 The crate exposes two views of the same file:
 
-- **Source view** (`BoxReader`, `SampleTable`, `FragmentIndex`, `SampleReader`,
-  seek planners). Every value is a wire fact: original sample ordinals, byte
-  ranges, raw composition-offset bits and exact clocks. Unknown clocks stay
-  `None`.
+- **Source view**: the modules `boxes`, `movie`, `table`, `fragment`, `payload`,
+  `interleave`, `seek`, `index`, `sample_groups`, `config`, `quicktime` and `open`.
+  Every value is a wire fact: original sample ordinals, byte ranges, raw
+  composition-offset bits and exact clocks. Unknown clocks stay `None`.
 - **FFmpeg-compatible view** (`compat::mov`). It reproduces the packet order,
   timestamps, flags and seek behaviour of FFmpeg's MOV demuxer run with
   `+noparse+nofillin` (`DemuxProfile::NoParseNoFillin`), for a consumer that
@@ -47,8 +47,10 @@ that traversal. Each replay has its own entry limit.
 ## Usage
 
 All parsers are polled. Each `poll` takes a `WorkBudget` (and usually a cancel
-flag) and returns `Yield`, a result, or `Step::NeedInput` for the shared
-`InputCursor` to satisfy.
+flag). Readers of the input return the core `Step`, whose `NeedInput` the shared
+`InputCursor` satisfies. Walks over parsed boxes and tables return `Next`
+(`Item`, `Yield`, `End`); builders return `BuildStatus` and are then finished;
+cursors whose items are taken separately return `CursorStatus`.
 
 `SampleReader::new_with_shared_window` can return a view of a complete sample
 in an existing shared input window. The view retains the window's budget charge.
@@ -174,18 +176,19 @@ of all tracks in file order through `PhysicalSampleCursor`.
 
 | Task | Entry points |
 | --- | --- |
-| Box framing | `BoxReader`, `BoxView::children`, `BoxChildren` |
-| Movie/track headers | `MovieHeader::parse`, `MovieHeader::declared_duration_ticks`, `TrackHeader::parse`, `SampleDescription` |
-| Regular sample tables | `SampleTableBuilder` → `SampleTable::{cursor, locate, previous_sync}` |
-| Fragments (`moof`/`traf`) | `Trex::parse`, `FragmentBuilder` → `FragmentIndex`, `OwnedFragmentCursor` |
-| One track, regular + fragments | `SourceTrack`, `TrackSampleCursor` |
-| All tracks in file order | `PhysicalSampleCursor::new_with_media_extents` |
-| Payload bytes | `SampleReader::{new, new_terminal_mdat}` |
-| Edit lists | `EditList::parse`, `EditEntry::map_rate_one`, `MovieEditLocator` |
-| Seek | `SourceSeekPlanner`, `MovieSourceSeekPlanner`, `SourceCompositionLookup` |
-| Segment/fragment indexes | `SegmentIndex` (`sidx`), `TrackFragmentRandomAccess` (`tfra`), `MovieFragmentRandomAccessTail` (`mfro`) |
-| Recovery groups | `RecoveryDescriptions` (`sgpd`), `RecoveryMappings` (`sbgp`), `RecoveryLookup` |
-| Codec configuration | `SampleDescription::extensions`, `AacConfigurationJob`, `ObjectTypeScan`, `check_dts_core_description`, `SoundDescriptionV0` |
+| Box framing | `boxes::{BoxReader, BoxView, BoxChildren}` |
+| Movie/track headers | `movie::{MovieHeader, TrackHeader, SampleDescription}` |
+| Regular sample tables | `table::SampleTableBuilder` → `table::SampleTable::{cursor, locate, previous_sync}` |
+| Fragments (`moof`/`traf`) | `fragment::{Trex, FragmentBuilder}` → `fragment::{FragmentIndex, OwnedFragmentCursor}` |
+| One track, regular + fragments | `interleave::{SourceTrack, TrackSampleCursor}` |
+| All tracks in file order | `interleave::PhysicalSampleCursor::new_with_media_extents` |
+| Payload bytes | `payload::SampleReader::{new, new_terminal_mdat}` |
+| Edit lists | `movie::{EditList, EditEntry}`, `seek::MovieEditLocator` |
+| Seek | `seek::{SourceSeekPlanner, MovieSourceSeekPlanner, SourceCompositionLookup}` |
+| Segment/fragment indexes | `index::{SegmentIndex, TrackFragmentRandomAccess, MovieFragmentRandomAccessTail}` (`sidx`, `tfra`, `mfro`) |
+| Recovery groups | `sample_groups::{RecoveryDescriptions, RecoveryMappings, RecoveryLookup}` (`sgpd`, `sbgp`) |
+| Codec configuration | `SampleDescription::extensions`, `config::{AacConfigurationJob, ObjectTypeScan, check_dts_core_description}` |
+| QuickTime sound | `quicktime::{SoundDescriptionV0, PcmSampleReader}` |
 | Whole movie | `open::MovieOpen` → `open::Movie`, under `open::OpenLimits`; `new_progressive` stops at the first media after a front movie, `new_recovery` admits terminal media declarations |
 | Neutral reader | `Reader`, `ReaderLimits`, `Track`, `Packet`, `ReaderEvent` |
 | FFmpeg-compatible packets | `compat::mov::packets::{PacketCursor, StreamView}`, `compat::mov::edits::EditCursor` |
