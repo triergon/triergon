@@ -5,6 +5,8 @@
 //! coordinates (equations 8-228 / 8-229 / 8-237 / 8-238), so no per-sample clamping happens on
 //! the common path.
 
+use crate::picture::{array, array_mut};
+
 /// A view of one reference plane: a frame, or one field of a frame (stride doubled).
 #[derive(Clone, Copy)]
 pub(crate) struct PlaneRef<'a> {
@@ -101,7 +103,7 @@ fn clip_h(v: i16) -> u8 {
 #[inline(always)]
 fn h6<const W: usize>(src: &[u8], o: usize) -> [i16; W] {
     let win = &src[o..o + W + 5];
-    let t = |k: usize| -> &[u8; W] { win[k..k + W].try_into().unwrap() };
+    let t = |k: usize| -> &[u8; W] { array(win, k) };
     let (s0, s1, s2, s3, s4, s5) = (t(0), t(1), t(2), t(3), t(4), t(5));
     let mut out = [0i16; W];
     for x in 0..W {
@@ -115,7 +117,7 @@ fn h6<const W: usize>(src: &[u8], o: usize) -> [i16; W] {
 
 #[inline(always)]
 fn row16(src: &[u8], o: usize) -> &[u8; 16] {
-    src[o..o + 16].try_into().unwrap()
+    array(src, o)
 }
 
 /// Vertical 6-tap intermediates h1 for one output row from 6 source rows.
@@ -163,8 +165,8 @@ fn copy_block<const W: usize>(
     ds: usize,
 ) {
     for y in 0..h {
-        let s: &[u8; W] = src[so + y * st..so + y * st + W].try_into().unwrap();
-        let d: &mut [u8; W] = (&mut dst[y * ds..y * ds + W]).try_into().unwrap();
+        let s: &[u8; W] = array(src, so + y * st);
+        let d: &mut [u8; W] = array_mut(dst, y * ds);
         *d = *s;
     }
 }
@@ -468,9 +470,9 @@ fn combine_rows<const W: usize, C: Combine>(
     h: usize,
 ) {
     for y in 0..h {
-        let rd: &mut [u8; W] = (&mut d[y * ds..y * ds + W]).try_into().unwrap();
-        let ra: &[u8; W] = a[y * sa..y * sa + W].try_into().unwrap();
-        let rb: &[u8; W] = b[y * sb..y * sb + W].try_into().unwrap();
+        let rd: &mut [u8; W] = array_mut(d, y * ds);
+        let ra: &[u8; W] = array(a, y * sa);
+        let rb: &[u8; W] = array(b, y * sb);
         c.apply(rd, ra, rb);
     }
 }
@@ -557,9 +559,9 @@ pub(crate) fn weight_bi_narrow(
     let n = (st * h).next_multiple_of(16);
     with_combine!(log_wd, w0, w1, o, |c| {
         for (ra, rb) in a[..n].chunks_exact_mut(16).zip(b[..n].chunks_exact(16)) {
-            let ra: &mut [u8; 16] = ra.try_into().unwrap();
+            let ra: &mut [u8; 16] = array_mut(ra, 0);
             let x = *ra;
-            c.apply::<16>(ra, &x, rb.try_into().unwrap());
+            c.apply::<16>(ra, &x, array(rb, 0));
         }
     });
     store_narrow(w, a, st, h, d, ds);
@@ -592,7 +594,7 @@ fn weight_uni_w<const W: usize>(a: &mut [u8], sa: usize, h: usize, log_wd: u32, 
     // ((v*w + 2^(logWD-1)) >> logWD) + o, with o folded into the rounding term (8-270 / 8-271).
     let round = (if log_wd >= 1 { 1 << (log_wd - 1) } else { 0 }) + (o << log_wd);
     for y in 0..h {
-        let ra: &mut [u8; W] = (&mut a[y * sa..y * sa + W]).try_into().unwrap();
+        let ra: &mut [u8; W] = array_mut(a, y * sa);
         for v in ra.iter_mut() {
             *v = ((*v as i32 * wt + round) >> log_wd).clamp(0, 255) as u8;
         }

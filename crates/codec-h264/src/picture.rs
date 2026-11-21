@@ -1,7 +1,37 @@
-//! Frame buffers, per-picture motion storage and the frame stores of the decoded picture
-//! buffer.
+//! Frame buffers, per-picture motion storage, the frame stores of the decoded picture
+//! buffer, and fixed-size views of their rows.
 
 use triergon_codec::{Budget, BudgetVec, StorageError};
+
+/// The `N` elements of `s` from `at`; a range past the end panics as indexing does.
+#[inline(always)]
+#[expect(
+    clippy::unwrap_used,
+    reason = "the range has length N; `as_chunks` compiles worse"
+)]
+pub(crate) fn array<T, const N: usize>(s: &[T], at: usize) -> &[T; N] {
+    s[at..at + N].try_into().unwrap()
+}
+
+/// A copy of the `N` elements of `s` from `at`; a range past the end panics as indexing does.
+#[inline(always)]
+#[expect(
+    clippy::unwrap_used,
+    reason = "the range has length N; `as_chunks` compiles worse"
+)]
+pub(crate) fn copied<T: Copy, const N: usize>(s: &[T], at: usize) -> [T; N] {
+    s[at..at + N].try_into().unwrap()
+}
+
+/// The `N` elements of `s` from `at`, mutably; a range past the end panics as indexing does.
+#[inline(always)]
+#[expect(
+    clippy::unwrap_used,
+    reason = "the range has length N; `as_chunks` compiles worse"
+)]
+pub(crate) fn array_mut<T, const N: usize>(s: &mut [T], at: usize) -> &mut [T; N] {
+    (&mut s[at..at + N]).try_into().unwrap()
+}
 
 /// Planar 4:2:0 8-bit frame buffer (luma dimensions are multiples of 16). The planes carry
 /// their charge, so output pictures sharing the buffer keep it charged.

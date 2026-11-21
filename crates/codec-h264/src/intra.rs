@@ -2,6 +2,7 @@
 
 use crate::SliceError;
 use crate::mbinfo::Kind;
+use crate::picture::array_mut;
 use crate::recon::*;
 use crate::slicedec::SliceDecoder;
 use crate::tables::*;
@@ -415,7 +416,7 @@ impl SliceDecoder<'_> {
     pub(crate) fn add_luma4x4(&mut self, r: usize, qp: i32, inter: bool, dc: Option<i32>) {
         let base = r * 16;
         let ls = &self.s.ls4[if inter { 3 } else { 0 }][(qp % 6) as usize];
-        let coef: &mut [i32; 16] = (&mut self.mb.coef[base..base + 16]).try_into().unwrap();
+        let coef: &mut [i32; 16] = array_mut(&mut self.mb.coef, base);
         let d = dequant4(coef, ls, qp);
         let any_ac = coef[1..].iter().fold(0, |a, &c| a | c) != 0;
         coef.fill(0);
@@ -435,7 +436,7 @@ impl SliceDecoder<'_> {
     pub(crate) fn add_luma8x8(&mut self, b8: usize, qp: i32, inter: bool) {
         let base = b8 * 64;
         let ls = &self.s.ls8[inter as usize][(qp % 6) as usize];
-        let coef: &mut [i32; 64] = (&mut self.mb.coef[base..base + 64]).try_into().unwrap();
+        let coef: &mut [i32; 64] = array_mut(&mut self.mb.coef, base);
         let d = dequant8(coef, ls, qp);
         let any_ac = coef[1..].iter().fold(0, |a, &c| a | c) != 0;
         coef.fill(0);
@@ -488,8 +489,7 @@ impl SliceDecoder<'_> {
                 let mut d = [0i32; 16];
                 let mut any_ac = false;
                 if has_ac {
-                    let coef: &mut [i32; 16] =
-                        (&mut self.mb.coef[base..base + 16]).try_into().unwrap();
+                    let coef: &mut [i32; 16] = array_mut(&mut self.mb.coef, base);
                     d = dequant4(coef, &ls, qpc);
                     any_ac = coef[1..].iter().fold(0, |a, &c| a | c) != 0;
                     coef.fill(0);

@@ -39,8 +39,7 @@ impl Vlc {
                 .iter()
                 .filter(|c| c.1 as u32 > bits && c.0 >> (c.1 as u32 - bits) == p)
                 .map(|c| c.1 as u32 - bits)
-                .max()
-                .unwrap();
+                .fold(0, u32::max);
             let base = table.len();
             table.resize(base + (1 << sub_bits), (0, 0));
             for &(code, len, sym) in codes {

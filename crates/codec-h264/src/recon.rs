@@ -4,6 +4,7 @@
 //! conforming stream keeps every value within 16 bits (8.5.12.1, 8.5.13.1), and a corrupt
 //! one's levels can take any i32.
 
+use crate::picture::array_mut;
 use std::num::Wrapping;
 
 /// A wrapping sample or coefficient of the scaling and transform kernels.
@@ -52,9 +53,7 @@ pub(crate) fn idct4_add(d: &[i32; 16], dst: &mut [u8], off: usize, stride: usize
     }
     let h = tr4(&u); // h[i][j]
     for i in 0..4 {
-        let row: &mut [u8; 4] = (&mut dst[off + i * stride..off + i * stride + 4])
-            .try_into()
-            .unwrap();
+        let row: &mut [u8; 4] = array_mut(dst, off + i * stride);
         for j in 0..4 {
             row[j] = (row[j] as i32 + ((h[i][j] + Wrapping(32)) >> 6).0).clamp(0, 255) as u8;
         }
