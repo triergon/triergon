@@ -44,7 +44,7 @@ substreams and writes interleaved f32le.
 - Output layout: AMODE 0 → FC; 1–4 → FL FR; 5 → 3.0; 6 → 3.0(back); 7 → 4.0;
   8 → quad(side); 9 → 5.0(side). The LFF field adds LFE; XCh adds BC. Planes follow the
   triergon-codec [channel order](../codec/README.md#channel-order), e.g. 5.1(side) is FL FR FC LFE SL SR and 6.1 is
-  FL FR FC LFE BC SL SR. `layout_name(&layout)` gives FFmpeg's layout name.
+  FL FR FC LFE BC SL SR. `ChannelLayout::name` gives FFmpeg's layout name.
 - 14-bit packings are normalized to 16-bit big endian; FSIZE counts bytes of the 16-bit
   equivalent stream, as in FFmpeg.
 - Errors are typed (`DecodeError`, the one of triergon-codec): `Unsupported(&str)`,

@@ -14,7 +14,6 @@ mod downmix;
 mod error;
 mod header;
 mod imdct;
-mod layout;
 mod noise;
 mod quant;
 mod spec_tables;
@@ -25,7 +24,6 @@ mod trace;
 pub use downmix::{DownmixInfo, DownmixType};
 pub use error::{DecodeError, Feature};
 pub use header::{FrameHeader, StreamType, Syntax, access_unit_len, parse_header};
-pub use layout::{MAX_CHANNELS, layout_name};
 pub use substream::{DownmixCodes, FrameFeatures, NoiseMode};
 #[cfg(not(feature = "reference-trace"))]
 use trace::Trace;
@@ -40,6 +38,8 @@ use quant::GroupTables;
 use substream::{BlockSink, LFE, NCH, PlaneMap, Substream, acmod_channels};
 use triergon_codec::{AudioDecoder, Budget, Charged, DownmixLevels, Reservation};
 
+/// Maximum number of output channels (A/52 Annex E 3.8.2: at most 16 per program).
+pub const MAX_CHANNELS: usize = 16;
 /// Bytes of zero padding kept after a frame in the decode buffer.
 pub(crate) const PAD: usize = 16;
 /// Largest syncframe: 2048 16-bit words (E-AC-3 frmsiz) / 1920 words (AC-3 32 kHz 640 kbps).
@@ -581,9 +581,7 @@ fn coded_speakers(au: &[u8], f: &SyncframeRef) -> Result<[Option<Speaker>; NCH],
             }
         }
         if n != nf || (map & 1 != 0) != h.lfeon {
-            return Err(DecodeError::Invalid(
-                "chanmap does not match acmod/lfeon",
-            ));
+            return Err(DecodeError::Invalid("chanmap does not match acmod/lfeon"));
         }
     } else {
         for (c, &sp) in acmod_channels(h.acmod).iter().enumerate() {

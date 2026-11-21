@@ -357,33 +357,3 @@ impl AudioDecoder for Decoder {
         Decoder::reset(self);
     }
 }
-
-/// FFmpeg's name for `layout` where one exists, else `"N channels (A+B+...)"` as
-/// ffprobe prints it.
-pub fn layout_name(layout: &ChannelLayout) -> String {
-    const NAMED: &[(u64, &str)] = &[
-        (0x4, "mono"),
-        (0x3, "stereo"),
-        (0x7, "3.0"),
-        (0x107, "4.0"),
-        (0x37, "5.0(back)"),
-        (0x607, "5.0"),
-        (0x3f, "5.1(back)"),
-        (0x60f, "5.1"),
-        (0xff, "7.1(wide)"),
-        (0x63f, "7.1"),
-        (0x503f, "5.1.2(back)"),
-        (0x13, "3.0(back)"),
-        (0x33, "quad"),
-        (0x603, "quad(side)"),
-        (0xb, "2.1"),
-        (0x70f, "6.1"),
-        (0x13f, "6.1(back)"),
-    ];
-    let mask = layout.mask();
-    if let Some((_, name)) = NAMED.iter().find(|(named, _)| *named == mask) {
-        return (*name).to_string();
-    }
-    let names: Vec<&str> = layout.speakers().iter().map(|s| s.name()).collect();
-    format!("{} channels ({})", names.len(), names.join("+"))
-}

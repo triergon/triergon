@@ -3,7 +3,7 @@
 //!
 //! usage: decode IN.aac OUT.f32
 use std::io::Write;
-use triergon_codec_aac::{AudioFrame, Decoder, adts, layout_name};
+use triergon_codec_aac::{AudioFrame, Decoder, adts};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -36,11 +36,7 @@ fn main() {
         match dec.decode(au, &mut frame) {
             Ok(()) => {
                 frames += 1;
-                let key = (
-                    frame.sample_rate,
-                    layout_name(&frame.layout),
-                    frame.planes.len(),
-                );
+                let key = (frame.sample_rate, frame.layout.name(), frame.planes.len());
                 if last.as_ref() != Some(&key) {
                     if last.is_some() {
                         changes += 1;
