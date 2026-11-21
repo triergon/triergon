@@ -4,9 +4,9 @@
 use crate::DecodeError;
 use crate::bits::BitReader;
 use crate::books;
-use crate::subframe::{HIST, SubBuf, sat24};
+use crate::subframe::{HIST, SubBuf, adpcm, joint_copy, read_indices, sat24};
 use crate::tables::{JOINT_SCALE, SCALE_6BIT, STEP_LOSSLESS, STEP_LOSSY};
-use crate::vq::{ADPCM_VQ, HF_VQ};
+use crate::vq::HF_VQ;
 
 pub(crate) const X96_SYNC: u32 = 0x1D95_F262;
 const MAX_CH: usize = 5;
@@ -295,27 +295,7 @@ pub(crate) fn decode_subframe(
                 } else {
                     0
                 };
-                let nh = books::huffman_sel_count(a);
-                if a <= 10 && sel < nh {
-                    let book = books::sample_book(a, sel)
-                        .ok_or(DecodeError::InvalidData("X96 codebook"))?;
-                    for v in &mut q {
-                        *v = br.huff(book);
-                    }
-                } else if a <= 7 {
-                    let bc = books::block_code(a);
-                    for blk in 0..2 {
-                        let digits = bc
-                            .split(br.read(bc.bits))
-                            .ok_or(DecodeError::InvalidData("X96 block code"))?;
-                        q[blk * 4..blk * 4 + 4].copy_from_slice(&digits);
-                    }
-                } else {
-                    let bits = a - 3;
-                    for v in &mut q {
-                        *v = br.read_signed(bits);
-                    }
-                }
+                read_indices(br, a, sel, &mut q, "X96 codebook", "X96 block code")?;
                 let scale = steps[a as usize] as f32 * (1.0 / 4_194_304.0) * side.scale[ch][n];
                 let row = buf.row_mut(ch, n);
                 let base = HIST + t0 + ssf * 8;
@@ -335,16 +315,11 @@ pub(crate) fn decode_subframe(
     for ch in 0..nch {
         for n in h.sbs..h.sbe[ch] {
             if side.pmode[ch][n] {
-                let c = &ADPCM_VQ[side.pvq[ch][n] as usize];
-                let c = c.map(|v| f32::from(v) * (1.0 / 8192.0));
-                let row = buf.row_mut(ch, n);
-                for m in HIST + t0..HIST + t0 + nsamp {
-                    let p = c[0] * row[m - 1]
-                        + c[1] * row[m - 2]
-                        + c[2] * row[m - 3]
-                        + c[3] * row[m - 4];
-                    row[m] = sat24(row[m] + p);
-                }
+                adpcm(
+                    buf.row_mut(ch, n),
+                    HIST + t0..HIST + t0 + nsamp,
+                    side.pvq[ch][n],
+                );
             }
         }
     }
@@ -353,16 +328,7 @@ pub(crate) fn decode_subframe(
         if h.joinx[ch] > 0 {
             let src = h.joinx[ch] as usize - 1;
             for n in h.sbe[ch]..h.sbe[src] {
-                let js = side.jscale[ch][n];
-                let mut tmp = [0f32; 32];
-                {
-                    let srow = buf.row(src, n);
-                    for m in 0..nsamp {
-                        tmp[m] = sat24(srow[HIST + t0 + m] * js);
-                    }
-                }
-                let row = buf.row_mut(ch, n);
-                row[HIST + t0..HIST + t0 + nsamp].copy_from_slice(&tmp[..nsamp]);
+                joint_copy(buf, src, ch, n, side.jscale[ch][n], t0, nsamp);
             }
         }
     }

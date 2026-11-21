@@ -386,27 +386,8 @@ pub(crate) fn decode_subframe(
                     } else {
                         0
                     };
-                    let nh = books::huffman_sel_count(abits);
-                    if abits <= 10 && sel < nh {
-                        let book = books::sample_book(abits, sel)
-                            .ok_or(DecodeError::InvalidData("sample codebook"))?;
-                        for v in &mut q {
-                            *v = br.huff(book);
-                        }
+                    if read_indices(br, abits, sel, &mut q, "sample codebook", "block code")? {
                         adj = hdr.adj[ch][abits as usize - 1];
-                    } else if abits <= 7 {
-                        let bc = books::block_code(abits);
-                        for blk in 0..2 {
-                            let digits = bc
-                                .split(br.read(bc.bits))
-                                .ok_or(DecodeError::InvalidData("block code"))?;
-                            q[blk * 4..blk * 4 + 4].copy_from_slice(&digits);
-                        }
-                    } else {
-                        let bits = abits - 3;
-                        for v in &mut q {
-                            *v = br.read_signed(bits);
-                        }
                     }
                 }
                 let tm = side.tmode[ch][n] as usize;
@@ -423,22 +404,9 @@ pub(crate) fn decode_subframe(
                     row[base + m] = sat24(q[m] as f32 * scale);
                 }
                 if side.pmode[ch][n] {
-                    let c = &ADPCM_VQ[side.pvq[ch][n] as usize];
-                    let c = [
-                        f32::from(c[0]) * (1.0 / 8192.0),
-                        f32::from(c[1]) * (1.0 / 8192.0),
-                        f32::from(c[2]) * (1.0 / 8192.0),
-                        f32::from(c[3]) * (1.0 / 8192.0),
-                    ];
                     // History lives immediately before `base` (previous subsubframe,
                     // subframe or, through the HIST area, the previous frame).
-                    for m in base..base + 8 {
-                        let p = c[0] * row[m - 1]
-                            + c[1] * row[m - 2]
-                            + c[2] * row[m - 3]
-                            + c[3] * row[m - 4];
-                        row[m] = sat24(row[m] + p);
-                    }
+                    adpcm(row, base..base + 8, side.pvq[ch][n]);
                 }
             }
         }
@@ -454,18 +422,80 @@ pub(crate) fn decode_subframe(
         if hdr.joinx[ch] > 0 {
             let src = hdr.joinx[ch] as usize - 1;
             for n in hdr.nsubs[ch] as usize..nsubs_all[src] as usize {
-                let js = side.jscale[ch][n];
-                let mut tmp = [0f32; 32];
-                {
-                    let srow = buf.row(src, n);
-                    for m in 0..nsamp {
-                        tmp[m] = sat24(srow[HIST + t0 + m] * js);
-                    }
-                }
-                let row = buf.row_mut(slot0 + ch, n);
-                row[HIST + t0..HIST + t0 + nsamp].copy_from_slice(&tmp[..nsamp]);
+                joint_copy(buf, src, slot0 + ch, n, side.jscale[ch][n], t0, nsamp);
             }
         }
     }
     Ok(())
+}
+
+/// Reads the eight quantization indices of one subband and subsubframe into `q`
+/// (Table 5-29): Huffman codes from codebook `sel` of quantizer group `abits` (1..=26),
+/// else a block code (`abits` up to 7), else linear codes. Returns whether a Huffman
+/// codebook coded them; the errors name the failing codebook and block code.
+#[inline(always)]
+pub(crate) fn read_indices(
+    br: &mut BitReader<'_>,
+    abits: u32,
+    sel: u32,
+    q: &mut [i32; 8],
+    codebook_error: &'static str,
+    block_code_error: &'static str,
+) -> Result<bool, DecodeError> {
+    let nh = books::huffman_sel_count(abits);
+    if abits <= 10 && sel < nh {
+        let book =
+            books::sample_book(abits, sel).ok_or(DecodeError::InvalidData(codebook_error))?;
+        for v in q {
+            *v = br.huff(book);
+        }
+        Ok(true)
+    } else if abits <= 7 {
+        let bc = books::block_code(abits);
+        for blk in 0..2 {
+            let digits = bc
+                .split(br.read(bc.bits))
+                .ok_or(DecodeError::InvalidData(block_code_error))?;
+            q[blk * 4..blk * 4 + 4].copy_from_slice(&digits);
+        }
+        Ok(false)
+    } else {
+        let bits = abits - 3;
+        for v in q {
+            *v = br.read_signed(bits);
+        }
+        Ok(false)
+    }
+}
+
+/// Inverse ADPCM (C.3.3) of `row[span]` with prediction vector `pvq`; each sample is
+/// predicted from the four before it.
+#[inline(always)]
+pub(crate) fn adpcm(row: &mut [f32], span: core::ops::Range<usize>, pvq: u16) {
+    let c = ADPCM_VQ[pvq as usize].map(|v| f32::from(v) * (1.0 / 8192.0));
+    for m in span {
+        let p = c[0] * row[m - 1] + c[1] * row[m - 2] + c[2] * row[m - 3] + c[3] * row[m - 4];
+        row[m] = sat24(row[m] + p);
+    }
+}
+
+/// Joint intensity (C.3.4): samples `t0 .. t0 + nsamp` of band `band` of slot `dst`
+/// become those of slot `src` scaled by `js`.
+#[inline(always)]
+pub(crate) fn joint_copy(
+    buf: &mut SubBuf,
+    src: usize,
+    dst: usize,
+    band: usize,
+    js: f32,
+    t0: usize,
+    nsamp: usize,
+) {
+    let mut tmp = [0f32; 32];
+    let srow = buf.row(src, band);
+    for m in 0..nsamp {
+        tmp[m] = sat24(srow[HIST + t0 + m] * js);
+    }
+    let row = buf.row_mut(dst, band);
+    row[HIST + t0..HIST + t0 + nsamp].copy_from_slice(&tmp[..nsamp]);
 }
