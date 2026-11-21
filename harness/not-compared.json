@@ -82,6 +82,53 @@
         "needs": "a worker operation that runs this comparison projection against the reference"
       }
     ],
+    "triergon-isobmff": [
+      {
+        "name": "segment-indexes",
+        "entry_points": ["index::SegmentIndex", "index::TrackFragmentRandomAccess", "index::MovieFragmentRandomAccessTail"],
+        "needs": "a worker operation reading sidx, tfra and mfro boxes, compared with the reference's segment and fragment index entries"
+      },
+      {
+        "name": "quicktime-pcm-sound",
+        "entry_points": ["quicktime::SoundDescriptionV0", "quicktime::PcmSampleReader"],
+        "needs": "a corpus of version 0 QuickTime sound descriptions with a reference view of their fields and PCM samples"
+      },
+      {
+        "name": "mov-pcm-packets",
+        "entry_points": ["compat::mov::pcm::PcmStream", "compat::mov::pcm::PcmCursor", "compat::mov::pcm::PcmReader"],
+        "needs": "a worker operation grouping QuickTime PCM samples into packets, folded against the reference's packets; tests check recorded reference output in tests/fixtures/pcm-v0"
+      },
+      {
+        "name": "mov-run-recovery",
+        "entry_points": ["compat::mov::recovery::RunRecoveryBuilder", "compat::mov::recovery::RunRecoveryBuilder::new_direct", "compat::mov::recovery::DirectPacketCursor", "compat::mov::recovery::PhysicalReader"],
+        "needs": "a worker profile running run and direct recovery and physical reads against the reference's recovered packets; --recover-regular-tables runs description recovery only"
+      },
+      {
+        "name": "mov-track-seek",
+        "entry_points": ["compat::mov::seek::SeekJob"],
+        "needs": "a worker operation seeking one track on its own against the reference; compared only as the per-track step of GlobalSeekJob (isobmff-seek)"
+      },
+      {
+        "name": "source-seek-planning",
+        "entry_points": ["seek::SourceSeekPlanner", "seek::SourceCompositionLookup"],
+        "needs": "a worker operation planning seeks to a sample ordinal with a caller's preroll and looking up composition times, against the reference; compared only inside MovieSourceSeekPlanner range plans (isobmff-seek)"
+      },
+      {
+        "name": "dts-core-signalling",
+        "entry_points": ["config::check_dts_core_description"],
+        "needs": "a corpus of DTS sample entries with the reference's verdict on their core signalling"
+      },
+      {
+        "name": "mov-encoded-views",
+        "entry_points": ["compat::mov::encoded::EncodedMetadataProfile", "compat::mov::encoded::EncodedRecoveryProfile", "compat::mov::encoded::DependencyView"],
+        "needs": "a worker operation projecting the metadata, recovery and dependency views of encoded entries against the reference; tests check recorded reference output in tests/fixtures"
+      },
+      {
+        "name": "mov-reference-trace",
+        "entry_points": ["reference_trace::mov::receiver::ReceiverClock", "reference_trace::mov::diagnostics::PrivateDiagnosticJob", "reference_trace::mov::operation::InitialOperationJob", "reference_trace::mov::sample_entry::PrivateConfigurationJob", "reference_trace::mov::sample_entry::SampleEntryHeaderJob", "reference_trace::mov::transport::RootWalkTransportBuilder"],
+        "needs": "a worker operation that runs these comparison projections against the reference; tests check recorded reference output only"
+      }
+    ],
     "triergon-raster": [],
     "triergon-shape": []
   }
