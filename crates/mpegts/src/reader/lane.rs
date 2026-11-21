@@ -1190,21 +1190,25 @@ impl Lane {
         (self.published < self.supplied).then_some(self.published..self.supplied)
     }
 
-    /// Resume an independently framed MPEG audio PES with its original private
-    /// coordinates, output bound and one-use PES anchor numbering.
-    pub(super) fn resume_mpeg_audio(
+    /// Resume an independently framed PES with its proved original private
+    /// coordinates, output bounds and one-use PES anchor numbering.
+    pub(super) fn resume_independent(
         &mut self,
         offset: u64,
         frames: usize,
+        nals: usize,
         map: SourceEvent,
     ) -> Result<()> {
-        let Some(Framer::MpegAudio(framer)) = &mut self.framer else {
-            return Err(Error::SourceMismatch);
-        };
         if self.supplied != 0 || self.serial != 0 || self.completed != 0 {
             return Err(Error::SourceMismatch);
         }
-        framer.resume_at(offset, self.limits.elementary_input_window)?;
+        match &mut self.framer {
+            Some(Framer::MpegAudio(framer)) if nals == 0 => {
+                framer.resume_at(offset, self.limits.elementary_input_window)?;
+            }
+            Some(Framer::Video(framer)) => framer.resume_at(offset, nals)?,
+            _ => return Err(Error::SourceMismatch),
+        }
         self.supplied = offset;
         self.published = offset;
         self.serial = frames as u64;

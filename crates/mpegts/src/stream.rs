@@ -607,12 +607,12 @@ impl TransportStream {
 
     /// A fresh in-band map re-establishes this profile's transport state. Only
     /// its separately proved concatenated elementary coordinate needs restoring.
-    pub(crate) fn resume_audio_offset(&mut self, pid: u16, offset: u64) -> Result<()> {
+    pub(crate) fn resume_elementary_offset(&mut self, pid: u16, offset: u64) -> Result<()> {
         let [route] = self.routes.as_mut_slice() else {
             return Err(Error::SourceMismatch);
         };
         if route.pid != pid
-            || !matches!(route.stream_type, 0x03 | 0x04)
+            || !matches!(route.stream_type, 0x03 | 0x04 | 0x1b | 0x24)
             || route.epochs
                 != (SourceEpochs {
                     configuration: 2,
