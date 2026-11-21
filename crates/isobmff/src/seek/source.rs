@@ -587,6 +587,18 @@ impl<'a> SourceSeekPlanner<'a> {
             other => other,
         })
     }
+    /// [`poll`](Self::poll), with the landing once the plan is ready.
+    pub(crate) fn poll_landing(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<&SourceSeekLanding>> {
+        self.poll(work, cancel)?;
+        Ok(match &self.phase {
+            Phase::Ready(landing) => Some(landing),
+            _ => None,
+        })
+    }
     /// The plan, once [`poll`](Self::poll) has returned `Ready`; `Error::Invalid`
     /// before that, or the error a poll returned.
     pub fn finish(self) -> Result<SourceSeekPlan<'a>> {
