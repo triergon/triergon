@@ -94,7 +94,7 @@ releases its retained capacity after replaying the last byte.
 | `elementary` | no | `triergon::elementary` ([triergon-elementary](../elementary/README.md)): native FLAC, MPEG audio, ADTS, AC-3 | yes |
 | `framing` | no | `triergon::framing` ([triergon-framing](../framing/README.md)) | not a reader |
 | `subtitles` | no | `triergon::subtitles` ([triergon-subtitles](../subtitles/README.md)) | not a reader |
-| `playback` | no | `playback` ([engine and player](../playback/README.md)), `hls` ([segments and progressive feeds](../hls/README.md)), `raw_video` ([Annex B feeds and probing](../raw-video/README.md)), `bridge` ([decoder access units](../bridge/README.md]). Also enables `framing`. | independent |
+| `playback` | no | `playback` ([engine and player](../playback/README.md)), `hls` ([segments and progressive feeds](../hls/README.md)), `raw_video` ([Annex B feeds and probing](../raw-video/README.md)), `bridge` ([decoder access units](../bridge/README.md)). Also enables `framing`. | independent |
 | `session` | no | `session` ([decode queues](../session/README.md)), `codec` ([decoder traits](../codec/README.md)) and `codec::pixel` ([picture and colour types](../pixel/README.md)) | independent |
 | `codecs` | no | Enables `session` and adds the built-in decoders under `codec` | independent |
 | `render` | no | `render::ass` ([scripts and images](../ass/README.md)), `render::font` ([font faces](../font/README.md)), `render::shape` ([shaping](../shape/README.md)), `render::raster` ([rasterising](../raster/README.md)) | independent |
