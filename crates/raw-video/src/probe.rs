@@ -38,6 +38,7 @@ pub enum RawVideoProbeStep {
 
 /// Selects one codec from ordered parameter sets and a compatible slice
 /// prefix. The actual read prefix is replayed to the selected raw reader.
+#[derive(Debug)]
 pub struct RawVideoProbe<S: Source> {
     driver: ProbeDriver<S>,
     reader_limits: RawAnnexBLimits,
@@ -109,6 +110,7 @@ pub enum PlaybackProbeStep {
     clippy::large_enum_variant,
     reason = "one inline selected reader avoids a separate uncharged allocation"
 )]
+#[derive(Debug)]
 pub enum PlaybackInput<S: Source> {
     Container(SelectedInput<ProbeReplay<S>>),
     RawVideo {
@@ -119,6 +121,7 @@ pub enum PlaybackInput<S: Source> {
 
 /// Common selector for the existing container signatures and the bounded raw
 /// Annex B probe. It keeps the actual prefix when the transport cannot rewind.
+#[derive(Debug)]
 pub struct PlaybackProbe<S: Source> {
     driver: ProbeDriver<S>,
 }
@@ -180,6 +183,7 @@ enum ProbeMode {
     Playback,
 }
 
+#[derive(Debug)]
 struct ProbeDriver<S: Source> {
     source: Option<SourceOwner<S>>,
     input: InputCursor,
@@ -403,6 +407,7 @@ impl<S: Source> ProbeDriver<S> {
 }
 
 /// A one-pass replay of accepted probe bytes and any confirmed source EOF.
+#[derive(Debug)]
 pub struct ProbeReplay<S: Source> {
     id: SourceId,
     prefix: Option<Bytes>,
@@ -464,7 +469,7 @@ impl<S: Source> Source for ProbeReplay<S> {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Head {
     prefix: [u8; 5],
     len: usize,
@@ -496,7 +501,7 @@ impl Head {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Signatures {
     zeros: usize,
     count: usize,

@@ -16,6 +16,7 @@ use triergon_subtitles::{compat, pgs::PacketClock};
 const OBJECT_TYPE_VOBSUB: u8 = 0xe0;
 
 /// Reads one DVD subtitle track's sample entry.
+#[derive(Debug)]
 pub struct Mp4DvdSetup {
     scan: ObjectTypeScan,
     scope: BitmapScope,
@@ -73,6 +74,7 @@ impl Mp4DvdSetup {
 }
 
 /// One DVD subtitle track of an MP4 movie and its decoder settings.
+#[derive(Debug)]
 pub struct Mp4DvdTrack {
     scope: BitmapScope,
     epoch: u64,

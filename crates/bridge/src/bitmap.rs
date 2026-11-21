@@ -16,6 +16,7 @@ pub struct BitmapScope {
     pub generation: u64,
     pub configuration: u64,
 }
+#[derive(Debug)]
 pub struct BitmapInput<M> {
     pub scope: BitmapScope,
     pub sequence: u64,
@@ -25,11 +26,13 @@ pub struct BitmapInput<M> {
     pub duration: Option<i64>,
     pub metadata: M,
 }
+#[derive(Debug)]
 struct Data<M> {
     input: Option<BitmapInput<M>>,
     /// Keeps the owner's allocation charged to the pool while it lives.
     _charge: Reservation,
 }
+#[derive(Debug)]
 pub struct BitmapOwner<M>(Arc<Data<M>>);
 impl<M> Clone for BitmapOwner<M> {
     fn clone(&self) -> Self {
@@ -37,10 +40,15 @@ impl<M> Clone for BitmapOwner<M> {
     }
 }
 impl<M> BitmapOwner<M> {
+    #[expect(
+        clippy::expect_used,
+        reason = "every owner is built holding its input and never gives it up"
+    )]
     pub fn input(&self) -> &BitmapInput<M> {
         self.0.input.as_ref().expect("published bitmap packet")
     }
 }
+#[derive(Debug)]
 pub struct BitmapRejection<M> {
     pub input: BitmapInput<M>,
     pub error: Error,
@@ -129,6 +137,7 @@ fn allocate_owner<M>(
         _charge: charge,
     })))
 }
+#[derive(Debug)]
 pub struct PgsBridge<M> {
     pool: Budget,
     scope: BitmapScope,
@@ -139,6 +148,7 @@ pub struct PgsBridge<M> {
     maximum_packet: usize,
 }
 /// One decoded packet with the receiver's output for it.
+#[derive(Debug)]
 pub struct PgsOutput<M> {
     pub packet: BitmapOwner<M>,
     pub decoded: compat::pgs::ReceiverPacket,
@@ -199,6 +209,7 @@ impl<M> PgsOutput<M> {
     }
 }
 
+#[derive(Debug)]
 pub enum PgsStep<M> {
     Yield,
     NeedPacket,
@@ -412,6 +423,7 @@ pub struct DvdQueuePicture<'a> {
 }
 
 /// One decoded packet and what it presents.
+#[derive(Debug)]
 pub struct DvdOutput<M> {
     pub packet: BitmapOwner<M>,
     pub picture: Option<DvdPicture>,
@@ -462,6 +474,7 @@ impl<M> DvdOutput<M> {
     }
 }
 
+#[derive(Debug)]
 pub enum DvdReceiverStep<M> {
     Yield,
     NeedPacket,
@@ -473,6 +486,7 @@ pub enum DvdReceiverStep<M> {
 /// in order, with one pending packet. Units are reassembled across packets
 /// and the colour state carries over between them within the current source,
 /// track and generation.
+#[derive(Debug)]
 pub struct DvdReceiver<M> {
     pool: Budget,
     scope: BitmapScope,

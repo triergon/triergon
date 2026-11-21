@@ -1,7 +1,14 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
-#![warn(clippy::print_stdout, clippy::print_stderr, clippy::unwrap_used)]
-// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
+#![warn(
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unwrap_used,
+    clippy::expect_used
+)]
+// Pending: `missing_docs`.
 
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, Result, SourceFailure, SourceLocation, Step, WorkBudget};
@@ -28,6 +35,7 @@ pub use probe::{
     clippy::large_enum_variant,
     reason = "one inline raw parser avoids an uncharged allocation for the active source"
 )]
+#[derive(Debug)]
 enum State<S: Source> {
     Active {
         reader: RawAnnexBReader,
@@ -39,6 +47,7 @@ enum State<S: Source> {
 
 /// Owns one explicitly identified raw video source. Container timestamps are
 /// absent. The caller may provide a presentation clock at the sink boundary.
+#[derive(Debug)]
 pub struct RawVideoSource<S: Source> {
     state: State<S>,
 }

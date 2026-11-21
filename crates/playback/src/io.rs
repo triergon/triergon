@@ -13,6 +13,7 @@ use triergon_core::{
 };
 /// The injected source remains the sole transport owner. Dropping a partially
 /// opened format aborts/quiesces and closes exactly once.
+#[derive(Debug)]
 pub struct SourceOwner<S: Source> {
     source: Option<S>,
     aborted: bool,
@@ -101,11 +102,13 @@ pub fn provide(input: &mut InputCursor, reply: &SourceReply) -> Result<bool> {
         }
     }
 }
+#[derive(Debug)]
 pub struct SelectedInput<S: Source> {
     pub input: InputCursor,
     pub source: SourceOwner<S>,
     pub format: Format,
 }
+#[derive(Debug)]
 pub enum ProbeProgress {
     Yield,
     NeedInput(InputRequest),
@@ -113,6 +116,7 @@ pub enum ProbeProgress {
 }
 /// Original bounded signature selection. Filenames and caller expected output
 /// have no role. Three physical sync bytes distinguish TS188 and M2TS192.
+#[derive(Debug)]
 pub struct Probe<S: Source> {
     input: Option<InputCursor>,
     source: Option<SourceOwner<S>>,
@@ -301,12 +305,14 @@ pub fn detect_container(prefix: &[u8]) -> Result<Option<Format>> {
     }
 }
 
+#[derive(Debug)]
 struct CachedWindow {
     offset: u64,
     bytes: Bytes,
 }
 /// A probe replays only actual provided prefix owners. Sequential transports do
 /// not need to reopen or seek; the next upstream range follows the cached bytes.
+#[derive(Debug)]
 pub struct ReplaySource<S: Source> {
     source: SourceId,
     inner: SourceOwner<S>,

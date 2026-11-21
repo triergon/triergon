@@ -11,11 +11,13 @@ use ts::compat::pes::{
     PrivateAudioDescriptors, RegisteredCarriage,
 };
 use ts::psi::{DescriptorNamespace, ProgramMap};
+#[derive(Debug)]
 pub(crate) enum TrackUpdate {
     Configuration(AdmittedCarriage),
     Refusal(Error),
 }
 
+#[derive(Debug)]
 pub(crate) struct PesTrack {
     pub(crate) selection: PidSelection,
     pub(crate) observer: Option<DemuxObserver>,
@@ -45,6 +47,7 @@ impl PesTrack {
     clippy::large_enum_variant,
     reason = "legacy single-track playback has an inline observer and requires no extra allocation"
 )]
+#[derive(Debug)]
 pub(crate) enum PesTracks {
     Inline(Option<PesTrack>),
     Multiple(BudgetVec<PesTrack>),

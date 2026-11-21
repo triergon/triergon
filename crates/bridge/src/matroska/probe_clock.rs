@@ -24,6 +24,7 @@ impl From<DemuxPacketTiming> for MatroskaPacketTiming {
 
 /// Retain scalar timing rows for the caller's selected packets of one feed
 /// during discovery. The feed's `push` observes a packet.
+#[derive(Debug)]
 pub struct MatroskaClockProbe<'feed, F> {
     feed: &'feed F,
     maximum_packets: usize,
@@ -68,6 +69,7 @@ impl<'feed, F> MatroskaClockProbe<'feed, F> {
 }
 
 /// Replays the probe's timestamp projection without retaining packet payloads.
+#[derive(Debug)]
 pub struct MatroskaClockPrefix<'feed, F>(MatroskaClockProbe<'feed, F>);
 
 impl<'feed, F> MatroskaClockPrefix<'feed, F> {
@@ -96,6 +98,7 @@ impl<'feed, F> MatroskaClockPrefix<'feed, F> {
 
 /// Forward clock for one feed binding. Rebuild it on a new seek generation.
 /// The feed's `observe` advances it by one packet.
+#[derive(Debug)]
 pub struct MatroskaClock<'feed, F> {
     feed: &'feed F,
     timeline: Timeline,
@@ -123,7 +126,7 @@ pub(super) struct DemuxPacketTiming {
 }
 
 impl DemuxPacketTiming {
-    pub fn demux(packet: &Packet) -> Result<Self> {
+    pub(super) fn demux(packet: &Packet) -> Result<Self> {
         let timing = triergon_matroska::compat::clock::packet_timing(packet.packet.timing)?;
         Ok(Self {
             pts: timing
@@ -139,7 +142,7 @@ impl DemuxPacketTiming {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Stamp {
     Relative(i128),
     Absolute(i128),
@@ -158,7 +161,7 @@ impl Stamp {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(super) struct PacketClock {
     stamp: Option<Stamp>,
     duration_ns: Option<u64>,
@@ -186,7 +189,7 @@ impl PacketClock {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub(super) struct Timeline {
     next: i128,
     /// First absolute clock minus the relative elapsed time at that packet.
@@ -194,7 +197,7 @@ pub(super) struct Timeline {
 }
 
 impl Timeline {
-    pub fn push(&mut self, timing: DemuxPacketTiming) -> Result<PacketClock> {
+    pub(super) fn push(&mut self, timing: DemuxPacketTiming) -> Result<PacketClock> {
         let stamp = if let Some(pts) = timing.pts {
             let pts = i128::from(pts);
             if self.shift.is_none() {
@@ -223,12 +226,12 @@ impl Timeline {
         })
     }
 
-    pub fn resolve(self, clock: PacketClock) -> Result<DemuxPacketTiming> {
+    pub(super) fn resolve(self, clock: PacketClock) -> Result<DemuxPacketTiming> {
         clock.resolve(self.shift)
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct InitialDuration {
     packets: usize,
     first: Stamp,
@@ -250,7 +253,7 @@ impl InitialDuration {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub(super) struct ProbeTimeline {
     timeline: Timeline,
     leading: usize,
@@ -260,7 +263,7 @@ pub(super) struct ProbeTimeline {
 }
 
 impl ProbeTimeline {
-    pub fn push(&mut self, count: usize, timing: DemuxPacketTiming) -> Result<PacketClock> {
+    pub(super) fn push(&mut self, count: usize, timing: DemuxPacketTiming) -> Result<PacketClock> {
         if !self.seen_duration {
             if let Some(duration_ns) = timing.duration_ns {
                 self.seen_duration = true;
@@ -308,7 +311,7 @@ impl ProbeTimeline {
         self.timeline.push(timing)
     }
 
-    pub fn resolve(self, index: usize, original: PacketClock) -> Result<DemuxPacketTiming> {
+    pub(super) fn resolve(self, index: usize, original: PacketClock) -> Result<DemuxPacketTiming> {
         let clock = match self.fill.filter(|fill| index < fill.packets) {
             Some(fill) => fill.clock(index)?,
             None => original,
@@ -316,7 +319,7 @@ impl ProbeTimeline {
         self.timeline.resolve(clock)
     }
 
-    pub fn into_live(self) -> Timeline {
+    pub(super) fn into_live(self) -> Timeline {
         self.timeline
     }
 }

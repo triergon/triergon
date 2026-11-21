@@ -29,6 +29,7 @@ type Edits<'a> = &'a [Option<EncodedEditPlan>];
 /// Prepare range playback from a complete, checked MP4 open transaction.
 /// The native cursor checks every source extent and projected occurrence
 /// before publishing data.
+#[derive(Debug)]
 pub struct Mp4RangeOpen<'a> {
     movie: &'a Movie,
     edits: Option<Edits<'a>>,
@@ -109,6 +110,7 @@ impl<'a> Mp4RangeOpen<'a> {
 /// Direct-output range player. Sample geometry and clocks are produced in
 /// native occurrence order from the checked tables, with one head per track.
 /// Payload reads and output generations use the ordinary player and MP4 engine.
+#[derive(Debug)]
 pub struct Mp4RangePlayer<'a, S: Source> {
     movie: &'a Movie,
     edits: Option<Edits<'a>>,
@@ -278,12 +280,16 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             result => result?,
         };
         if applied {
-            self.cursor = command.cursor.take().expect("checked range seek cursor");
+            self.cursor = command
+                .cursor
+                .take()
+                .ok_or(Error::Invalid("checked range seek cursor"))?;
         }
         Ok(applied)
     }
 }
 
+#[derive(Debug)]
 struct SeekScope {
     pool: Budget,
     session: u64,
@@ -292,6 +298,7 @@ struct SeekScope {
     target: Time,
 }
 
+#[derive(Debug)]
 pub struct Mp4RangeSeekJob<'a> {
     scope: SeekScope,
     checked: Option<RangeSeekJob<'a>>,
@@ -319,13 +326,22 @@ impl<'a> Mp4RangeSeekJob<'a> {
             if checked.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
                 return Ok(false);
             }
-            self.replay = Some(self.checked.take().expect("polled checked seek").finish()?);
+            self.replay = Some(
+                self.checked
+                    .take()
+                    .ok_or(Error::Invalid("polled checked seek"))?
+                    .finish()?,
+            );
         }
         if let Some(global) = &mut self.global {
             if global.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
                 return Ok(false);
             }
-            let plan = self.global.take().expect("polled global seek").finish()?;
+            let plan = self
+                .global
+                .take()
+                .ok_or(Error::Invalid("polled global seek"))?
+                .finish()?;
             let skipped = plan.anchors().iter().try_fold(0u64, |count, anchor| {
                 count.checked_add(anchor.occurrence).ok_or(Error::Overflow)
             })?;
@@ -375,6 +391,7 @@ impl<'a> Mp4RangeSeekJob<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct Mp4RangeSeek<'a> {
     scope: SeekScope,
     cursor: Option<PacketCursor<'a>>,

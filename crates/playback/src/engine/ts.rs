@@ -23,7 +23,7 @@ use ts::psi::DescriptorNamespace;
 /// What a TS engine delivers and where its tracks come from. One byte: the
 /// discriminants are the bit patterns the same state had as an
 /// `Option` of the five discovering modes, so every test compiles as before.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub(crate) enum Delivery {
     /// Source events, plus demux PES of the tracks found in the segment's own PMT.
@@ -63,6 +63,7 @@ impl Delivery {
     }
 }
 
+#[derive(Debug)]
 pub struct TsEngine {
     /// The startup context the observers are bound to, if any.
     pub(crate) bound_context: Option<ts::compat::input::InputContext>,

@@ -21,12 +21,13 @@ pub struct Mp4SyncSeekRequest {
     pub maximum_scanned_rows: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct SyncPoint {
     row: usize,
     cts: i128,
 }
 
+#[derive(Debug)]
 enum Phase {
     Video,
     Prefix { sync_row: usize, audio_from: Time },
@@ -35,6 +36,7 @@ enum Phase {
 
 /// Borrows the existing checked rows and uses constant scratch. No input
 /// requests are issued before the completed command is applied to the player.
+#[derive(Debug)]
 pub struct Mp4SyncSeekJob<'a> {
     plan: &'a PreparedMp4,
     request: Mp4SyncSeekRequest,
@@ -54,6 +56,7 @@ pub struct Mp4SyncSeekJob<'a> {
 }
 
 /// A checked landing in one player's current generation.
+#[derive(Debug)]
 pub struct Mp4SyncSeekCommand {
     pool: Budget,
     generation: u64,

@@ -32,7 +32,7 @@ pub struct MatroskaDolbyLimits {
     pub maximum_syncframes: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum DolbyCodec {
     Ac3,
     Ac3Bsid(u8),
@@ -52,6 +52,7 @@ impl DolbyCodec {
     clippy::large_enum_variant,
     reason = "the bounded inline parser avoids a separate uncharged setup allocation"
 )]
+#[derive(Debug)]
 enum SetupCodec {
     Hevc(HvcConfigParser),
     Dolby(DolbyCodec),
@@ -60,6 +61,7 @@ enum SetupCodec {
 /// Bind one selected HEVC, AC-3 or E-AC-3 track to its current configuration.
 /// Dolby syncframes are self-describing. Any codec private data stays in the
 /// source configuration for the consumer.
+#[derive(Debug)]
 pub struct MatroskaHevcDolbySetup {
     association: Option<Association>,
     codec: SetupCodec,
@@ -173,11 +175,13 @@ impl MatroskaHevcDolbySetup {
 
 // Keep the bounded HEVC configuration inline to avoid another feed allocation.
 #[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
 enum FeedCodec {
     Hevc(HevcAnnexBConfig),
     Dolby(DolbyCodec),
 }
 
+#[derive(Debug)]
 pub struct MatroskaHevcDolbyFeed {
     association: Association,
     codec: FeedCodec,
@@ -201,11 +205,13 @@ impl MatroskaHevcDolbyFeed {
     }
 }
 
+#[derive(Debug)]
 enum PacketJob<'a> {
     Hevc(HevcAnnexBJob<'a>),
     Dolby(DolbyJob<'a>),
 }
 
+#[derive(Debug)]
 pub struct MatroskaHevcDolbyJob<'a> {
     source: &'a Packet,
     job: PacketJob<'a>,
@@ -239,6 +245,7 @@ impl<'a> MatroskaHevcDolbyJob<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct MatroskaHevcDolbyPacket<'a> {
     pub source: &'a Packet,
     pub payload: MatroskaHevcDolbyPayload<'a>,
@@ -299,6 +306,7 @@ fn dolby_final_syncframe(family: Ac3Family, mut raw: &[u8]) -> Option<Ac3FrameHe
     None
 }
 
+#[derive(Debug)]
 pub enum MatroskaHevcDolbyPayload<'a> {
     Hevc(HevcAnnexBAccessUnit<'a>),
     Dolby { family: Ac3Family, raw: &'a [u8] },
@@ -321,6 +329,7 @@ impl MatroskaHevcDolbyPayload<'_> {
     }
 }
 
+#[derive(Debug)]
 struct DolbyJob<'a> {
     codec: DolbyCodec,
     data: &'a [u8],

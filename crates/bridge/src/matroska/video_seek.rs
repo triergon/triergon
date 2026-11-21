@@ -6,6 +6,7 @@ use triergon_playback::{Delivery, Event, Output, OutputScope, TrackKey};
 /// Admit the selected video's packets from the resolved keyframe onward.
 /// Use the same gate on each output in playback order after the seek receipt.
 /// The player keeps complete source replay available for other consumers.
+#[derive(Debug)]
 pub struct MatroskaVideoSeekGate {
     scope: OutputScope,
     track: u64,

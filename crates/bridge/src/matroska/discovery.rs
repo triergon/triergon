@@ -49,6 +49,7 @@ pub enum MatroskaDiscoveryStep {
 
 /// The same Source continues with unrestricted playback requests after the
 /// discovery operation. Pending and failed replies keep their usual meanings.
+#[derive(Debug)]
 pub struct MatroskaStartupSource<S> {
     source: S,
     remaining: Option<usize>,
@@ -96,6 +97,7 @@ impl<S: Source> Source for MatroskaStartupSource<S> {
     }
 }
 
+#[derive(Debug)]
 struct Readiness {
     configuration: Configuration,
     waiting: u64,
@@ -202,6 +204,7 @@ impl Readiness {
 
 /// Own the prefix until discovery completes. Outputs move from the player
 /// into a budgeted replay buffer in their original order.
+#[derive(Debug)]
 pub struct MatroskaDiscovery<S: Source> {
     player: Player<MatroskaStartupSource<S>>,
     limits: MatroskaDiscoveryLimits,
@@ -215,6 +218,7 @@ pub struct MatroskaDiscovery<S: Source> {
     cutoff: Option<MatroskaDiscoveryCutoff>,
 }
 
+#[derive(Debug)]
 enum ReplayBuffer {
     Full(BudgetVec<Output>),
     Matroska(BudgetVec<MatroskaReplayOutput>),
@@ -237,6 +241,7 @@ impl ReplayBuffer {
 }
 
 /// Startup replay stored using the typed Matroska event representation.
+#[derive(Debug)]
 pub struct MatroskaReplayPrefix(BudgetVec<MatroskaReplayOutput>);
 
 impl MatroskaReplayPrefix {
@@ -271,8 +276,10 @@ impl MatroskaReplayPrefix {
 }
 
 /// The same discovery operation with a format-specific replay buffer.
+#[derive(Debug)]
 pub struct MatroskaCompactDiscovery<S: Source>(MatroskaDiscovery<S>);
 
+#[derive(Debug)]
 pub struct MatroskaCompactDiscovered<S: Source> {
     pub player: Player<MatroskaStartupSource<S>>,
     pub prefix: MatroskaReplayPrefix,
@@ -344,6 +351,7 @@ impl<S: Source> MatroskaCompactDiscovery<S> {
     }
 }
 
+#[derive(Debug)]
 pub struct MatroskaDiscovered<S: Source> {
     pub player: Player<MatroskaStartupSource<S>>,
     pub prefix: BudgetVec<Output>,

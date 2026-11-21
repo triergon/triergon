@@ -65,7 +65,7 @@ impl PartialEq for RawVideoConfiguration {
 
 impl Eq for RawVideoConfiguration {}
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Sps {
     vps: Option<u8>,
     width: u32,
@@ -73,6 +73,7 @@ struct Sps {
     avc_timing: Option<AvcVuiTiming>,
 }
 
+#[derive(Debug)]
 struct Set<T> {
     bytes: Bytes,
     info: T,
@@ -88,6 +89,7 @@ enum Update<'a> {
 /// Observe complete access units from one reader, in decoding order. Use a
 /// fresh tracker when restarting the source. Published configurations alias
 /// the original charged NAL owners and survive later ID reuse.
+#[derive(Debug)]
 pub struct RawVideoConfigTracker {
     pool: Budget,
     codec: Codec,

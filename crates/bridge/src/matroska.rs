@@ -59,6 +59,7 @@ fn check_limit(requested: usize, maximum: usize) -> Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
 struct Association {
     configuration: Configuration,
     track: usize,
@@ -96,6 +97,7 @@ impl Association {
     }
 }
 
+#[derive(Debug)]
 enum Parser {
     Avc(AvcConfigParser),
     DerivedAac(AacAdtsParameters),
@@ -105,6 +107,7 @@ enum Parser {
     },
 }
 
+#[derive(Debug)]
 enum FeedCodec {
     Avc(AvcAnnexBConfig),
     Aac {
@@ -115,6 +118,7 @@ enum FeedCodec {
 
 /// Prepare a feed from the selected track's effective initialization. A later
 /// CodecState or seek generation can require a fresh setup.
+#[derive(Debug)]
 pub struct MatroskaFeedSetup {
     pending: Option<(Association, Parser)>,
     limits: MatroskaFeedLimits,
@@ -289,6 +293,7 @@ fn parse(
     }
 }
 
+#[derive(Debug)]
 pub struct MatroskaTrackFeed {
     association: Association,
     codec: FeedCodec,
@@ -334,11 +339,13 @@ impl MatroskaTrackFeed {
     }
 }
 
+#[derive(Debug)]
 enum PacketJob<'a> {
     Avc(AvcAnnexBJob<'a>),
     Aac(Option<[u8; 7]>),
 }
 
+#[derive(Debug)]
 pub struct MatroskaFeedJob<'a> {
     source: &'a Packet,
     codec: PacketJob<'a>,
@@ -381,11 +388,13 @@ impl<'a> MatroskaFeedJob<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct MatroskaFeedPacket<'a> {
     pub source: &'a Packet,
     pub payload: MatroskaFeedPayload<'a>,
 }
 
+#[derive(Debug)]
 pub enum MatroskaFeedPayload<'a> {
     Avc(AvcAnnexBAccessUnit<'a>),
     Aac { header: [u8; 7], raw: &'a [u8] },

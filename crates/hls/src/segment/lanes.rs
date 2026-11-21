@@ -118,11 +118,13 @@ impl LaneAssembler for HlsAac {
     }
 }
 
+#[derive(Debug)]
 enum Picture {
     Avc(AvcTsAccessUnit),
     Hevc(HlsHevcPicture),
 }
 
+#[derive(Debug)]
 pub struct HlsMediaVideoUnit(Picture);
 
 impl HlsMediaVideoUnit {

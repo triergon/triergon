@@ -30,7 +30,7 @@ pub struct Mp4DemuxSeekRequest {
     pub limits: SeekLimits,
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 struct Anchor {
     track: u32,
     occurrence: u64,
@@ -38,6 +38,7 @@ struct Anchor {
     row: usize,
 }
 
+#[derive(Debug)]
 pub struct Mp4DemuxSeekJob<'a> {
     plan: &'a PreparedMp4,
     global: Option<GlobalSeekJob<'a>>,
@@ -56,6 +57,7 @@ pub struct Mp4DemuxSeekJob<'a> {
 }
 
 /// A generation-bound native seek with the original reference index entry.
+#[derive(Debug)]
 pub struct Mp4DemuxSeekCommand {
     pool: Budget,
     generation: u64,

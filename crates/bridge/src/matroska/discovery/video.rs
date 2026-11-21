@@ -14,7 +14,7 @@ use triergon_matroska::{Track, TypedPacket as Packet};
 use triergon_playback::Output;
 use triergon_raw_video::hevc_startup as hevc;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum TrackProbe {
     Unseen,
     Unresolved,
@@ -25,7 +25,7 @@ enum TrackProbe {
     },
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Chain {
     codec: Codec,
     length: LengthSize,
@@ -43,7 +43,7 @@ impl Chain {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Sample {
     cursor: usize,
     nals: u8,
@@ -52,11 +52,13 @@ struct Sample {
 }
 
 #[allow(clippy::large_enum_variant, reason = "one bounded setup at a time")]
+#[derive(Debug)]
 enum Setup {
     Avc(AvcConfigParser),
     Hevc(HvcConfigParser),
 }
 
+#[derive(Debug)]
 pub(super) struct VideoProbe {
     tracks: [TrackProbe; 64],
     setup: Option<Setup>,

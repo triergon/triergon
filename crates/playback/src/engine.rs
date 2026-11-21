@@ -43,6 +43,7 @@ pub(crate) fn track_kind(kind: MediaKind) -> TrackKind {
     clippy::large_enum_variant,
     reason = "bounded inline format state; no uncharged boxed parser"
 )]
+#[derive(Debug)]
 pub enum Engine {
     Matroska(MkvEngine),
     Mp4(Mp4Engine),

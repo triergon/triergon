@@ -8,6 +8,7 @@ use triergon_framing::{
     aac::{AacAdtsOutput, AacAdtsParameters, AacAdtsWriter, AacAudioSpecificConfig, AacSource},
 };
 use triergon_playback::Mp4Packet;
+#[derive(Debug)]
 pub struct AacBridge {
     pool: Budget,
     source: triergon_core::SourceId,
@@ -17,10 +18,12 @@ pub struct AacBridge {
     parameters: AacAdtsParameters,
     maximum: usize,
 }
+#[derive(Debug)]
 pub struct AacPacketJob {
     source: Option<Mp4Packet>,
     writer: AacAdtsWriter,
 }
+#[derive(Debug)]
 pub struct AacPacketOutput {
     pub source: Mp4Packet,
     pub adts: AacAdtsOutput,

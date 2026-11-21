@@ -15,6 +15,7 @@ use triergon_isobmff::{
     table::TimingRunPolicy,
 };
 
+#[derive(Debug)]
 pub struct OpenedMp4<S: Source> {
     pub movie: Movie,
     pub input: InputCursor,
@@ -40,6 +41,7 @@ fn check_format<S: Source>(selected: &SelectedInput<S>) -> Result<()> {
     }
     Ok(())
 }
+#[derive(Debug)]
 pub struct Mp4Open<S: Source> {
     input: Option<InputCursor>,
     source: Option<SourceOwner<S>>,

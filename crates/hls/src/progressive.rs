@@ -48,7 +48,7 @@ pub enum TsProgressiveStep {
     End,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
     Read,
     Video,
@@ -59,13 +59,14 @@ enum Phase {
     Failed,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct PatBinding {
     tsid: u16,
     program: u16,
     pmt_pid: u16,
 }
 
+#[derive(Debug)]
 struct Tracks {
     video: TrackKey,
     audio: TrackKey,
@@ -73,12 +74,13 @@ struct Tracks {
     epoch: u64,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum NextAudioTime {
     Ticks90(i64),
     Exact(Time),
 }
 
+#[derive(Debug)]
 struct Transport<S: Source> {
     engine: TsEngine,
     request: Option<InputRequest>,
@@ -216,6 +218,7 @@ impl<S: Source> Drop for Transport<S> {
 ///
 /// Open a fresh input and reader to start at another media offset.
 /// The input starts at byte zero and clocks stay on the source timeline.
+#[derive(Debug)]
 pub struct TsProgressiveReader<S: Source> {
     transport: Option<Transport<S>>,
     limits: TsProgressiveLimits,

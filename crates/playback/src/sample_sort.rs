@@ -1,6 +1,7 @@
 //! In-place sample ordering for layouts that cannot use the linear merge.
 use triergon_core::WorkBudget;
 
+#[derive(Debug)]
 pub(crate) struct SampleSort {
     next_parent: usize,
     end: usize,

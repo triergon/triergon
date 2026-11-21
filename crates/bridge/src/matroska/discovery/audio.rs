@@ -10,7 +10,7 @@ use triergon_framing::{
 use triergon_matroska::{LegacyAacProfile, Track, TypedPacket as Packet};
 use triergon_playback::Output;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(super) struct AudioProbe {
     aac: Option<AacAscParser>,
     unavailable_aac: u64,
@@ -19,7 +19,7 @@ pub(super) struct AudioProbe {
 impl AudioProbe {
     /// Observe one pending packet. An unsupported configuration leaves its
     /// track unresolved, so discovery can fall through to its usual bounds.
-    pub fn poll(
+    pub(super) fn poll(
         &mut self,
         output: &Output,
         packet: &Packet,

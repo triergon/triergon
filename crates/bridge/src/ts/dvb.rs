@@ -20,6 +20,7 @@ const MAX_RECTANGLES: usize = 8;
 
 /// One selected service from one active PMT. A new playback generation, PMT
 /// epoch or TS clock discontinuity needs a new bridge.
+#[derive(Debug)]
 pub struct DvbTsBridge {
     binding: PesBinding,
     configuration: SourceConfiguration,
@@ -33,6 +34,7 @@ pub struct DvbTsBridge {
 }
 
 /// An accepted PES on its way to the decoder.
+#[derive(Debug)]
 struct Pending {
     data: PesData,
     /// The PES time in 90 kHz ticks, on the player's timeline when it has

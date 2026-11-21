@@ -53,6 +53,7 @@ pub enum TeletextStep {
 
 /// One teletext stream of one active PMT. A new playback generation, PMT
 /// epoch or TS clock epoch needs a new bridge.
+#[derive(Debug)]
 pub struct TeletextTsBridge {
     binding: PesBinding,
     clock: ProgramClock,

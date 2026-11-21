@@ -24,6 +24,7 @@ pub enum StartupStep {
     NeedEof,
     Ready,
 }
+#[derive(Debug)]
 pub struct Startup<S: Source> {
     input: Option<InputCursor>,
     source: Option<SourceOwner<S>>,
@@ -34,6 +35,7 @@ pub struct Startup<S: Source> {
     context: Option<InputContext>,
     failed: bool,
 }
+#[derive(Debug)]
 pub struct BoundInput<S: Source> {
     input: InputCursor,
     source: SourceOwner<S>,
@@ -229,6 +231,7 @@ impl<S: Source> Startup<S> {
         })
     }
 }
+#[derive(Debug)]
 struct PrefixRead {
     bytes: BudgetVec<u8>,
     pending: Option<InputWindow>,

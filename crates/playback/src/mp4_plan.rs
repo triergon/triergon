@@ -113,6 +113,7 @@ pub struct Mp4Configuration {
     pub description: SampleDescription,
     pub revision: u64,
 }
+#[derive(Debug)]
 pub struct PlanTrack {
     pub(crate) trex: Option<iso::fragment::Trex>,
     pub(crate) next_ordinal: u64,
@@ -156,6 +157,7 @@ impl SourceRow {
 ///     plan.source_rows.clear();
 /// }
 /// ```
+#[derive(Debug)]
 pub struct PreparedMp4 {
     pub(crate) read_scope: crate::mp4_open::MetadataReadScope,
     pub(crate) demux_recovery: bool,
@@ -295,7 +297,7 @@ impl PreparedMp4 {
     }
 }
 /// The phase of an index job, in the order the job runs them.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 enum IndexPhase {
     /// Track headers and sample descriptions.
@@ -336,12 +338,22 @@ pub struct Mp4IndexJob<'a> {
     zero_scale_clock: Option<MediaClock>,
     first_sample_probe: Option<(SampleCursor<'a>, Error)>,
 }
+impl std::fmt::Debug for Mp4IndexJob<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Mp4IndexJob")
+            .field("phase", &self.phase)
+            .field("track", &self.track)
+            .field("limits", &self.limits)
+            .finish_non_exhaustive()
+    }
+}
 
 const OUTSIDE_MEDIA: &str = "sample outside media extent";
 const BACKWARD_LAYOUT: &str = "physical merge needs nondecreasing per-track source offsets";
 /// The strict view's refusal of a first sample that the source continues past.
 pub(crate) const BACKWARD_LAYOUT_REFUSAL: Error = Error::Unsupported(BACKWARD_LAYOUT);
 
+#[derive(Debug)]
 struct RangeDuration {
     micros: i64,
     scan: bool,
@@ -1187,6 +1199,7 @@ impl<'a> Mp4IndexJob<'a> {
 }
 /// Source movie-time mapping uses the existing format job. The command binds
 /// the actual model/pool/entity, so callers cannot invent a source mapping.
+#[derive(Debug)]
 pub struct MovieSeekJob<'a> {
     locator: iso::seek::MovieEditLocator<'a>,
     source: triergon_core::SourceId,
@@ -1196,6 +1209,7 @@ pub struct MovieSeekJob<'a> {
     raw_media_clock: BoxView,
     raw_edits: Option<BoxView>,
 }
+#[derive(Debug)]
 pub struct MovieSeekCommand {
     pub(crate) point: iso::seek::MoviePoint,
     pub(crate) source: triergon_core::SourceId,

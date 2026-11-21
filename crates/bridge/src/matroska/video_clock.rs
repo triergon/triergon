@@ -13,6 +13,7 @@ use triergon_raw_video::hevc_startup as hevc;
 
 /// One timing projection for an ordered progressive AVC feed, beginning at
 /// an admitted IDR. Observe each checked sample once.
+#[derive(Debug)]
 pub struct MatroskaAvcClock<'feed> {
     association: &'feed Association,
     config: &'feed AvcAnnexBConfig,
@@ -52,6 +53,7 @@ impl MatroskaAvcClock<'_> {
     }
 }
 
+#[derive(Debug)]
 pub(super) struct DecodeClock {
     codec: Codec,
     pps: u8,

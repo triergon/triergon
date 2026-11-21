@@ -11,6 +11,7 @@ use triergon_raw_video::hevc_startup as hevc;
 /// One timing projection for an ordered HEVC feed from a random-access
 /// picture. Observe each packet once, in the original decode order.
 /// The source packet retains its container clocks.
+#[derive(Debug)]
 pub struct MatroskaHevcClock<'feed> {
     association: &'feed Association,
     config: &'feed HevcAnnexBConfig,

@@ -4,6 +4,7 @@ use crate::Result;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{SourceId, WorkBudget};
 use triergon_matroska::{Event as MkvEvent, ParseStep, Reader};
+#[derive(Debug)]
 pub struct MkvEngine {
     pub(crate) reader: Reader,
     pub(crate) source: SourceId,

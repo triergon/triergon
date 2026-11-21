@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Error, Result, WorkBudget};
 use triergon_playback::Output;
 
+#[derive(Debug)]
 struct Row {
     output: usize,
     clock: PacketClock,
@@ -16,6 +17,7 @@ struct Row {
 /// Project the packet clocks for one selected bitmap track over a caller-owned
 /// stream-probe buffer. The caller supplies the actual probe boundary, in
 /// output order, before any packet in it reaches the decoder.
+#[derive(Debug)]
 pub struct MatroskaBitmapClockProbe<'track, 'prefix> {
     track: &'track MatroskaBitmapTrack,
     prefix: &'prefix [Output],
@@ -138,6 +140,7 @@ impl<'track, 'prefix> MatroskaBitmapClockProbe<'track, 'prefix> {
 
 /// Continue the selected clock in packet order after releasing the probe
 /// buffer. A seek or configuration change needs a new track binding.
+#[derive(Debug)]
 pub struct MatroskaBitmapLiveClock<'track> {
     track: &'track MatroskaBitmapTrack,
     timeline: Timeline,

@@ -153,6 +153,10 @@ impl Output {
         self.pool().same_pool(pool)
     }
     /// The budget the output's storage is charged to.
+    #[expect(
+        clippy::expect_used,
+        reason = "an output without a payload budget of its own stores the player's"
+    )]
     pub fn pool(&self) -> &Budget {
         Self::event_budget(&self.event)
             .or(self.pool.as_ref())
@@ -274,7 +278,7 @@ pub enum Progress {
     Backpressure { requested: usize, available: usize },
     AwaitEntity,
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct ActiveSeek {
     intent: SeekIntent,
     matroska_ceiling_ns: Option<i64>,
@@ -396,6 +400,7 @@ fn mp4_seek_tick_comparison_keeps_exact_order() {
     }
 }
 
+#[derive(Debug)]
 pub struct Player<S: Source> {
     engine: Option<Engine>,
     source: Option<SourceOwner<S>>,

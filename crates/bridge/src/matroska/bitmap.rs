@@ -20,11 +20,13 @@ pub enum MatroskaBitmapCodec {
     Dvb,
 }
 
+#[derive(Debug)]
 pub struct MatroskaBitmapSource {
     pub packet: Packet,
     pub delivery: Delivery,
 }
 
+#[derive(Debug)]
 pub struct MatroskaDvbPacket {
     pub packet: dvb::DvbPacket,
     pub source: MatroskaBitmapSource,
@@ -91,6 +93,7 @@ pub enum MatroskaDvbStep<'a> {
     Yield,
 }
 
+#[derive(Debug)]
 enum Codec {
     Pgs,
     VobSub,
@@ -98,6 +101,7 @@ enum Codec {
 }
 
 /// Binds a bitmap decoder to one source track and configuration revision.
+#[derive(Debug)]
 pub struct MatroskaBitmapTrack {
     association: Association,
     pool: Budget,

@@ -37,6 +37,7 @@ pub enum SourceReply {
 
 /// Actual bounded local bytes for startup assets and deterministic functional tests.
 /// The immutable caller input retains its existing pool charge; ranges share it.
+#[derive(Debug)]
 pub struct ByteSource {
     source: SourceId,
     bytes: Bytes,

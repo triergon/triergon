@@ -14,12 +14,13 @@ use triergon_playback::{Mp4Packet, mp4_plan::Mp4Configuration};
 
 /// The player or sink keeps the original packet (and its clock) for the lifetime
 /// of the receiver view. Bind a new bridge after a source configuration changes.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Av1Input<'a> {
     Matroska(&'a MatroskaPacket),
     Mp4(&'a Mp4Packet),
 }
 
+#[derive(Debug)]
 enum Binding {
     Matroska {
         configuration: Configuration,
@@ -33,6 +34,7 @@ enum Binding {
     },
 }
 
+#[derive(Debug)]
 pub struct Av1BridgeSetup {
     pool: Budget,
     binding: Option<Binding>,
@@ -44,6 +46,7 @@ pub struct Av1BridgeSetup {
     packet_limits: Av1TemporalUnitLimits,
 }
 
+#[derive(Debug)]
 pub struct Av1Bridge {
     binding: Binding,
     configuration: Option<Av1Configuration>,

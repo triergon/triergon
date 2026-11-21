@@ -31,12 +31,13 @@ pub struct HlsAacFrame {
     pub duration: Time,
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 struct Clock {
     pts: Option<Time>,
     dts: Option<Time>,
 }
 
+#[derive(Debug)]
 struct PendingPes {
     spans: PayloadCursor,
     // A joined tail replaces the current logical span only after its complete
@@ -146,6 +147,7 @@ impl PendingPes {
 /// or a discontinuity. Retention is one PES span list and one charged frame
 /// buffer. Consumed spans are released as the cursor advances, and delivered
 /// frames own their charge independently of the reader.
+#[derive(Debug)]
 pub struct HlsAac {
     pool: Budget,
     config: AdmittedCarriage,
@@ -371,6 +373,10 @@ impl HlsAac {
             {
                 continue;
             }
+            #[expect(
+                clippy::expect_used,
+                reason = "the whole range of the joined tail is in bounds"
+            )]
             let span = if let Some(joined) = &input.joined {
                 joined.view(0..joined.len()).expect("complete joined tail")
             } else {

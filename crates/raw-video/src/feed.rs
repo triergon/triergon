@@ -20,6 +20,7 @@ pub enum RawFeedClock {
     },
 }
 
+#[derive(Debug)]
 struct SubmissionClock {
     next: Time,
     picture_duration: Time,
@@ -46,6 +47,7 @@ impl RawVideoFeedPacket {
     }
 }
 
+#[derive(Debug)]
 struct Active<S: Source> {
     source: RawVideoSource<S>,
     tracker: RawVideoConfigTracker,
@@ -59,12 +61,14 @@ struct Active<S: Source> {
     clippy::large_enum_variant,
     reason = "one inline decoder configuration tracker avoids an uncharged allocation"
 )]
+#[derive(Debug)]
 enum State<S: Source> {
     Active(Active<S>),
     End(SourceLocation),
     Failed(Error),
 }
 
+#[derive(Debug)]
 pub struct RawVideoFeed<S: Source> {
     state: State<S>,
 }

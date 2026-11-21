@@ -33,6 +33,7 @@ impl Default for ProgressiveLimits {
         }
     }
 }
+#[derive(Debug)]
 enum SourceCursor {
     Physical(OwnedFragmentCursor),
     Native(iso::compat::mov::front::FrontFragment),
@@ -45,16 +46,18 @@ impl SourceCursor {
         }
     }
 }
+#[derive(Debug)]
 struct Cursor {
     cursor: SourceCursor,
     head: Option<SourceRow>,
     native: Option<iso::compat::mov::front::FrontSample>,
 }
+#[derive(Debug)]
 struct PendingRow {
     source: SourceRow,
     native: Option<iso::compat::mov::front::FrontSample>,
 }
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
     Drain,
     TerminalDrain,
@@ -101,6 +104,7 @@ pub(crate) fn prepare_media_replay(
     Ok(pending)
 }
 
+#[derive(Debug)]
 pub(crate) struct ProgressiveState {
     limits: ProgressiveLimits,
     phase: Phase,

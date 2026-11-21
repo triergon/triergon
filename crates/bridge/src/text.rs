@@ -40,6 +40,7 @@ pub(crate) fn receiver_timing(start_us: Option<i64>, display_ms: Option<u32>) ->
             .transpose()?,
     ))
 }
+#[derive(Debug)]
 pub struct RejectedOutput {
     pub output: Output,
     pub error: Error,
@@ -122,6 +123,7 @@ impl TextSource {
         }
     }
 }
+#[derive(Debug)]
 pub struct TextOutput {
     pub source: TextSource,
     pub cue: text::Cue,
@@ -130,6 +132,7 @@ pub struct TextOutput {
     clippy::large_enum_variant,
     reason = "bounded inline source event retains all charged owners"
 )]
+#[derive(Debug)]
 pub enum TextStep {
     Yield,
     Cue(TextOutput),
@@ -141,6 +144,7 @@ pub struct TextRejection {
     pub source: TextSource,
     pub error: Error,
 }
+#[derive(Debug)]
 struct CopyStage {
     fields: [BudgetVec<u8>; 4],
     ready: [Option<Bytes>; 4],
@@ -149,6 +153,7 @@ struct CopyStage {
     scan: usize,
     scanned: bool,
 }
+#[derive(Debug)]
 pub struct TextBridge {
     extractor: Extractor,
     pool: Budget,

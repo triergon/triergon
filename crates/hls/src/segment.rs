@@ -73,6 +73,7 @@ pub enum HlsFeedUnit<'a, C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> 
     Audio(&'a A, &'a C),
 }
 
+#[derive(Debug)]
 pub struct HlsSegment<C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> {
     video: BudgetVec<V>,
     audio: BudgetVec<A>,
@@ -118,6 +119,10 @@ impl<C, V, A> HlsSegment<C, V, A> {
         self.feed_bytes
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "the sealed lane order names exactly the stored video and audio units"
+    )]
     pub fn access_units(&self) -> impl ExactSizeIterator<Item = HlsFeedUnit<'_, C, V, A>> {
         let mut video = self.video.as_slice().iter();
         let mut audio = self.audio.as_slice().iter().zip(self.clocks.as_slice());
@@ -163,6 +168,7 @@ type AssembledSegment<C, V, A> =
 /// the transport has reported EOF and both assemblers have drained. A failed
 /// attempt releases its source and staged output. To retry the transport,
 /// construct a fresh reader with a new source owner.
+#[derive(Debug)]
 pub struct HlsSegmentReader<S: Source> {
     inner: SegmentReader<S, AvcTsReader, HlsAac>,
 }
@@ -190,6 +196,7 @@ pub struct HlsMediaProfile {
 
 pub type HlsMediaSegment = HlsSegment<HlsAudioClockNs, HlsMediaVideoUnit, HlsMediaAudioUnit>;
 
+#[derive(Debug)]
 pub struct HlsMediaSegmentReader<S: Source> {
     inner: SegmentReader<S, VideoAssembler, AudioAssembler>,
 }
@@ -229,6 +236,16 @@ struct SegmentReader<S: Source, V: LaneAssembler, A: LaneAssembler> {
     order: BudgetVec<Lane>,
     video_tail90: Option<i64>,
     feed_bytes: usize,
+}
+
+impl<S: Source, V: LaneAssembler, A: LaneAssembler> std::fmt::Debug for SegmentReader<S, V, A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SegmentReader")
+            .field("phase", &self.phase)
+            .field("limits", &self.limits)
+            .field("feed_bytes", &self.feed_bytes)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<S: Source> HlsSegmentReader<S> {
@@ -443,7 +460,9 @@ where
             }
         };
         let initial_raster = self.video.as_slice()[0].raster();
-        let video_tail90 = self.video_tail90.expect("sealed video clock");
+        let video_tail90 = self
+            .video_tail90
+            .ok_or(Error::Invalid("sealed video clock"))?;
         self.phase = Phase::Taken;
         Ok(Some(HlsSegment {
             initial_raster,

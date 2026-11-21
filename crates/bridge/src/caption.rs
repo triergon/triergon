@@ -93,6 +93,7 @@ enum End {
 /// The selected video track's captions for one source and generation. A seek,
 /// track switch or configuration change needs a new bridge, made with the
 /// track's configuration again.
+#[derive(Debug)]
 pub struct CaptionBridge {
     pool: Budget,
     source: SourceId,

@@ -21,6 +21,7 @@ impl FeedToken {
         self.ordinal
     }
 }
+#[derive(Debug)]
 pub struct Feed {
     token: FeedToken,
     output: Output,
@@ -36,6 +37,7 @@ impl Feed {
         self.output
     }
 }
+#[derive(Debug)]
 pub enum Submission {
     Accepted(FeedToken),
     Blocked(Feed),
@@ -80,6 +82,7 @@ enum CatalogueChange<'a> {
     ProgressiveSeek(crate::catalogue::RangeSeek<'a>),
 }
 
+#[derive(Debug)]
 pub struct Pump<S: Source, T: Sink> {
     player: Option<Player<S>>,
     sink: Option<T>,

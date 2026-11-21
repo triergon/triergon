@@ -29,6 +29,7 @@ pub struct TsPesFacts {
     clippy::large_enum_variant,
     reason = "the packet moves its charged owners inline, as the bitmap bridge takes it"
 )]
+#[derive(Debug)]
 pub enum PgsTsStep {
     /// Push the next PES.
     NeedPacket,
@@ -40,6 +41,7 @@ pub enum PgsTsStep {
 
 /// One PGS stream of one active PMT. A new playback generation, PMT epoch or
 /// TS clock epoch needs a new track.
+#[derive(Debug)]
 pub struct PgsTsTrack {
     binding: PesBinding,
     scope: BitmapScope,

@@ -31,19 +31,20 @@ pub(crate) struct CachedDescription {
     pub(crate) revision: u64,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct Mp4SyncLanding {
     pub(crate) first_row: usize,
     pub(crate) sync_row: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) enum Mp4RangeLanding<'a> {
     Source(Mp4SyncLanding),
     Demux(&'a DemuxReplay),
     DemuxCursor(u64),
 }
 
+#[derive(Debug)]
 pub struct Mp4Engine {
     pub(crate) progressive: Option<progressive::ProgressiveState>,
     pub(crate) media_cache_fill: Option<PendingMedia>,

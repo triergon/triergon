@@ -30,6 +30,7 @@ pub struct CatalogueBoundary {
 /// Only this constructor can create a candidate. Its engine has never emitted
 /// a packet or advanced a delivery/configuration cursor. All source facts and
 /// native-view refusals come from the existing checked open/index operations.
+#[derive(Debug)]
 pub struct Mp4Catalogue<S: Source> {
     pub(crate) engine: Engine,
     pub(crate) source: SourceOwner<S>,
@@ -80,6 +81,7 @@ impl<S: Source> Mp4Catalogue<S> {
 /// envelopes and any not-yet-queued event and range request. Its transport has
 /// already been aborted/quiesced/closed. These are readable retired facts, never
 /// current feed permission. Dropping the receipt releases only its own aliases.
+#[derive(Debug)]
 pub struct RetiredCatalogue {
     pub(crate) engine: Option<Engine>,
     pub(crate) queue: BudgetVec<Option<Output>>,
@@ -148,6 +150,7 @@ pub(crate) struct RangeSeek<'a> {
 
 /// Prepared reservations and exclusive borrows make commit allocation-free.
 /// Dropping this transaction leaves both player and candidate unchanged.
+#[derive(Debug)]
 pub struct CatalogueCommit<'a, S: Source> {
     pub(crate) player: &'a mut Player<S>,
     pub(crate) next: &'a mut Option<Mp4Catalogue<S>>,
@@ -199,7 +202,10 @@ impl<S: Source> CatalogueCommit<'_, S> {
             delivery_epoch: self.epoch,
         };
         // No fallible operation follows the ownership transfer.
-        let next = self.next.take().expect("validated replacement");
+        let next = self
+            .next
+            .take()
+            .ok_or(Error::Invalid("validated replacement"))?;
         let retired =
             self.player
                 .commit_mp4_catalogue(next, self.selection, self.epoch, self.queue);

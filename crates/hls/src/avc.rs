@@ -128,12 +128,13 @@ pub enum AvcTsStep {
     End,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Anchor {
     serial: u64,
     clock: AvcTsClock,
 }
 
+#[derive(Debug)]
 struct Chunk {
     // Direct syntax fixtures do not construct a transport packet.
     #[cfg(test)]
@@ -141,6 +142,7 @@ struct Chunk {
     offset: usize,
 }
 
+#[derive(Debug)]
 struct PendingPes {
     spans: PayloadCursor,
     remaining: usize,
@@ -156,6 +158,10 @@ impl Chunk {
         spans.and_then(PayloadCursor::current_bytes)
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "outside direct test chunks, a chunk is read only from the pending PES's spans"
+    )]
     fn retire(&self, pending: &mut Option<PendingPes>) {
         #[cfg(test)]
         if self.bytes.is_some() {
@@ -169,30 +175,32 @@ impl Chunk {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Prefix {
     start: usize,
     anchor: Option<Anchor>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Nal {
     prefix: Prefix,
     header: usize,
     kind: u8,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Picture {
     pps: u8,
     idr: bool,
 }
 
+#[derive(Debug)]
 struct Unit {
     clock: Option<AvcTsClock>,
     picture: Option<Picture>,
 }
 
+#[derive(Debug)]
 struct ParameterSet<T> {
     id: u8,
     seen_in_unit: u64,
@@ -239,6 +247,7 @@ fn remember<T>(
 
 /// One selected AVC track and segment. PES and carrier boundaries can occur
 /// anywhere in an access unit. Create a fresh reader at a segment or track reset.
+#[derive(Debug)]
 pub struct AvcTsReader {
     pool: Budget,
     limits: AvcTsLimits,
