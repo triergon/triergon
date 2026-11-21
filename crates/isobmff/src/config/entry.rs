@@ -3,7 +3,7 @@ use super::{ConfigurationLimits, ObjectTypeScan, dts_entry_children};
 use crate::{
     BuildStatus, Limits, Next,
     boxes::BoxChildren,
-    movie::{EntryLayout, SampleDescription, TrackHeader},
+    movie::{EntryLayout, SampleDescription},
 };
 use triergon_core::container::CodecId;
 use triergon_core::{Bytes, Result, WorkBudget};
@@ -91,18 +91,18 @@ pub struct EntryConfiguration {
     configuration: Configuration,
 }
 impl EntryConfiguration {
-    /// Starts identifying `entry`, a sample entry of the track `header` describes.
-    /// `limits` bounds the `esds` read; `format` bounds the walk over the entry's
-    /// children, with at most `limits.max_child_boxes` of them.
+    /// Starts identifying `entry`, a sample entry of a track whose `hdlr` handler type
+    /// is `handler`. `limits` bounds the `esds` read; `format` bounds the walk over the
+    /// entry's children, with at most `limits.max_child_boxes` of them.
     pub fn new(
-        header: &TrackHeader,
+        handler: [u8; 4],
         entry: &SampleDescription,
         limits: ConfigurationLimits,
         format: Limits,
     ) -> Self {
-        let (scan, configuration) = entry_scan(header, entry, limits, format);
+        let (scan, configuration) = entry_scan(handler, entry, limits, format);
         Self {
-            handler: header.handler,
+            handler,
             format: entry.format,
             scan,
             object_type: None,
@@ -141,19 +141,19 @@ impl EntryConfiguration {
 /// What identifying a track's first entry still has to read, and what its
 /// configuration is if that reading finds nothing.
 fn entry_scan(
-    header: &TrackHeader,
+    handler: [u8; 4],
     entry: &SampleDescription,
     limits: ConfigurationLimits,
     format: Limits,
 ) -> (Option<EntryScan>, Configuration) {
     if matches!(
-        (&header.handler, &entry.format),
+        (&handler, &entry.format),
         (b"soun", b"mp4a") | (b"subp", b"mp4s")
     ) {
         let scan = ObjectTypeScan::new(entry, limits).ok();
         return (scan.map(EntryScan::ObjectType), Configuration::Entry);
     }
-    let codec = codec_id(&header.handler, &entry.format, None);
+    let codec = codec_id(&handler, &entry.format, None);
     let Some(record) = configuration_box(codec) else {
         return (None, Configuration::Entry);
     };

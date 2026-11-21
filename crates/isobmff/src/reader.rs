@@ -638,7 +638,7 @@ fn identify_entry(
             .first()
             .ok_or(Error::Invalid("empty sample descriptions"))?;
         let identity = EntryConfiguration::new(
-            track.source.header(),
+            track.source.header().handler,
             first,
             limits.configuration,
             limits.open.format,
