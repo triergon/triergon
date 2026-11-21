@@ -725,8 +725,8 @@ impl Reader {
                     index: index_entries.map(|maximum| IndexBuilder {
                         points: BudgetVec::new(&self.pool),
                         maximum,
-                        physical: (entities.is_none()
-                            && self.limits.format == crate::PacketFormat::Ts188)
+                        physical: entities
+                            .is_none()
                             .then(|| {
                                 physical::Capture::new(&self.pool, self.source, length, maximum)
                                     .ok()
