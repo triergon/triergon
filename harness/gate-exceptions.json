@@ -46,6 +46,7 @@
     },
     "not_compared": {
       "triergon-ass": 1,
+      "triergon-bitstream": 4,
       "triergon-capture": 1,
       "triergon-codec": 3,
       "triergon-codec-aac": 4,
@@ -58,15 +59,17 @@
       "triergon-codec-mpeg1": 1,
       "triergon-codec-opus": 2,
       "triergon-codec-vorbis": 1,
+      "triergon-core": 4,
       "triergon-elementary": 4,
       "triergon-font": 1,
       "triergon-framing": 13,
       "triergon-isobmff": 9,
       "triergon-matroska": 5,
       "triergon-ogg": 4,
+      "triergon-pixel": 1,
       "triergon-raster": 0,
       "triergon-session": 3,
-      "triergon-shape": 0,
+      "triergon-shape": 1,
       "triergon-subtitles": 11
     }
   }

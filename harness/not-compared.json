@@ -9,6 +9,32 @@
         "needs": "ass-render fixtures rendered with each setting changed from its default, against libass configured with the same values"
       }
     ],
+    "triergon-bitstream": [
+      {
+        "name": "bit-readers",
+        "entry_points": ["BitReader", "CachedBitReader", "BitCursor", "LsbReader", "RiceReader"],
+        "degree": "step",
+        "needs": "none beyond the decoders and parsers that read through them, of which FLAC, MPEG audio and Vorbis are graded outside the gate; no reference exposes its bit reader"
+      },
+      {
+        "name": "cabac",
+        "entry_points": ["cabac::Engine"],
+        "degree": "step",
+        "needs": "none beyond the H.264 and HEVC decoders; no reference exposes its CABAC engine"
+      },
+      {
+        "name": "crc",
+        "entry_points": ["crc", "crc::Crc32Mpeg", "crc::Crc32Ieee"],
+        "degree": "step",
+        "needs": "each polynomial's values over a corpus against the reference's av_crc; compared only through the readers and decoders that check Ogg pages, MPEG-TS sections, Matroska elements and audio frames"
+      },
+      {
+        "name": "rbsp",
+        "entry_points": ["Rbsp", "runs"],
+        "degree": "step",
+        "needs": "none beyond the H.264, HEVC and subtitle parsers that unescape through it; no reference exposes emulation prevention removal"
+      }
+    ],
     "triergon-capture": [
       {
         "name": "session-configuration",
@@ -187,6 +213,32 @@
         "entry_points": ["Decoder", "Decoder::from_headers_in"],
         "degree": "outside-gate",
         "needs": "a gate item running the vorbis lane of cargo xtask codecs grade; the timed file workloads require equal work, not equal output"
+      }
+    ],
+    "triergon-core": [
+      {
+        "name": "exact-time",
+        "entry_points": ["Time", "TimeBase::rescale", "TickScale", "Rounding", "round_ties_even_i32"],
+        "degree": "step",
+        "needs": "a worker operation rescaling ticks across bases and rounding modes against the reference's av_rescale_rnd; compared only through the timestamps of compared readers, and with an independent Python model by the core time oracle"
+      },
+      {
+        "name": "source-signatures",
+        "entry_points": ["signature"],
+        "degree": "step",
+        "needs": "a corpus of file prefixes with the format the reference's probe picks for each; compared only through the readers and probes built on them"
+      },
+      {
+        "name": "reader-protocol",
+        "entry_points": ["InputCursor", "container::ContainerReader", "blocking::Blocking", "blocking::Feed"],
+        "degree": "step",
+        "needs": "every compared reader fed windows of every size and resumed after each Yield and Backpressure, folded against the same reference output; compared only as the protocol the compared readers run on"
+      },
+      {
+        "name": "budgets",
+        "entry_points": ["Budget", "Bytes", "BudgetVec", "WorkBudget"],
+        "degree": "no-reference",
+        "needs": "none: storage and work accounting that no reference has; the memory gates measure its effect"
       }
     ],
     "triergon-elementary": [
@@ -417,6 +469,14 @@
         "needs": "the reader-ogg lane read through open_stream from a source without Seek, against the same reference packets"
       }
     ],
+    "triergon-pixel": [
+      {
+        "name": "ycbcr-palette",
+        "entry_points": ["YcbcrMatrix", "ChannelRounding"],
+        "degree": "step",
+        "needs": "palette entries converted against the reference's subtitle palette conversion; compared only through the DVB, PGS and DVD subtitle decoders' output"
+      }
+    ],
     "triergon-raster": [],
     "triergon-session": [
       {
@@ -438,7 +498,14 @@
         "needs": "a worker operation feeding demuxed packets through VideoSession and folding its published pictures and times against the reference's decoded frames; cargo xtask session-queues compares two revisions only"
       }
     ],
-    "triergon-shape": [],
+    "triergon-shape": [
+      {
+        "name": "libass-rotations",
+        "entry_points": ["compat::libass::rotates", "compat::libass::GlyphRotations", "compat::libass::FaceRotations", "compat::libass::SizedMetrics::rotating"],
+        "degree": "step",
+        "needs": "shape-libass cases on @ faces against libass's font functions, which shape-libass excludes; compared only through ass-render's vertical fixtures"
+      }
+    ],
     "triergon-subtitles": [
       {
         "name": "text-extraction",
