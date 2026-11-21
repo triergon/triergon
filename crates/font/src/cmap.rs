@@ -115,10 +115,9 @@ impl CmapFormat {
     }
 
     /// Whether the subtable passes validation, given the bytes from its
-    /// start to the end of the `cmap` table, with the flags validation finds
-    /// (format 4's unsorted or overlapping segments); `steps` counts the
-    /// records read.
-    fn check(self, table: &[u8], steps: &mut usize) -> Option<u8> {
+    /// start to the end of the `cmap` table, with the order of format 4's
+    /// segments; `steps` counts the records read.
+    fn check(self, table: &[u8], steps: &mut usize) -> Option<SegmentOrder> {
         let short = |at| u16_at(table, at).map(usize::from);
         let long = |at| u32_at(table, at).and_then(|n| usize::try_from(n).ok());
         let limit = table.len();
@@ -155,7 +154,7 @@ impl CmapFormat {
                 ascending_groups(table, 16, groups, steps)
             }
         }
-        .map(|()| 0)
+        .map(|()| SegmentOrder::Sorted)
     }
 }
 
@@ -269,9 +268,9 @@ fn variations_valid(table: &[u8], extended: bool, steps: &mut usize) -> Option<(
 
 /// Validates a format 4 subtable: the segment arrays fit the rest of the
 /// `cmap` table, no segment starts after it ends, and glyph-array offsets
-/// stay within the table, but for a final 0xFFFF segment. Returns the
-/// [`UNSORTED`] and [`OVERLAPPING`] flags of its segments.
-fn segment_delta_valid(table: &[u8], steps: &mut usize) -> Option<u8> {
+/// stay within the table, but for a final 0xFFFF segment. Returns the order
+/// of its segments.
+fn segment_delta_valid(table: &[u8], steps: &mut usize) -> Option<SegmentOrder> {
     let limit = table.len();
     let fits = |ok: bool| ok.then_some(());
     // The subtable is measured to the end of `cmap`, whatever its length says.
@@ -281,7 +280,7 @@ fn segment_delta_valid(table: &[u8], steps: &mut usize) -> Option<u8> {
     *steps += segments;
     let (starts, offsets) = (16 + 2 * segments, 16 + 6 * segments);
     let glyph_ids = offsets + 2 * segments;
-    let (mut flags, mut last_start, mut last_end) = (0, 0, 0);
+    let (mut order, mut last_start, mut last_end) = (SegmentOrder::Sorted, 0, 0);
     for n in 0..segments {
         let end = usize::from(u16_at(table, 14 + 2 * n)?);
         let start = usize::from(u16_at(table, starts + 2 * n)?);
@@ -289,11 +288,11 @@ fn segment_delta_valid(table: &[u8], steps: &mut usize) -> Option<u8> {
         fits(start <= end)?;
         // Overlapping segments pass at the default level, ordered or not.
         if n > 0 && start <= last_end {
-            flags |= if last_start > start || last_end > end {
-                UNSORTED
+            order = order.max(if last_start > start || last_end > end {
+                SegmentOrder::Unsorted
             } else {
-                OVERLAPPING
-            };
+                SegmentOrder::Overlapping
+            });
         }
         (last_start, last_end) = (start, end);
         let sentinel = n == segments - 1 && start == 0xffff && end == 0xffff;
@@ -304,7 +303,7 @@ fn segment_delta_valid(table: &[u8], steps: &mut usize) -> Option<u8> {
             fits(array >= glyph_ids && array + 2 * (end - start + 1) <= limit)?;
         }
     }
-    Some(flags)
+    Some(order)
 }
 
 /// What a platform and encoding number mean, for cmap subtables and name
@@ -346,8 +345,8 @@ pub(crate) struct Subtable {
     platform: Platform,
     encoding: u16,
     format: CmapFormat,
-    /// What validation found: format 4's unsorted or overlapping segments.
-    flags: u8,
+    /// The order validation found format 4's segments in.
+    order: SegmentOrder,
     /// The subtable's offset in the file.
     offset: usize,
     /// The end of the `cmap` table in the file.
@@ -380,8 +379,8 @@ pub(crate) struct Subtables {
 /// subtable, or nothing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kept {
-    /// A selectable format, with its validation flags.
-    Format(CmapFormat, u8),
+    /// A selectable format, with the order of format 4's segments.
+    Format(CmapFormat, SegmentOrder),
     Variations {
         extended: bool,
     },
@@ -446,8 +445,8 @@ pub(crate) fn parse(
                 .map_or(Kept::None, |()| Kept::Variations { extended: n == 15 }),
             number => number
                 .and_then(CmapFormat::from_number)
-                .and_then(|format| format.check(sub, &mut steps).map(|flags| (format, flags)))
-                .map_or(Kept::None, |(format, flags)| Kept::Format(format, flags)),
+                .and_then(|format| format.check(sub, &mut steps).map(|order| (format, order)))
+                .map_or(Kept::None, |(format, order)| Kept::Format(format, order)),
         };
         last = Some((*offset, *kept));
         charge(work, steps)?;
@@ -456,12 +455,12 @@ pub(crate) fn parse(
     for &(platform, encoding, offset) in list.as_slice() {
         let at = validated.partition_point(|&(o, _)| o < offset);
         match validated[at].1 {
-            Kept::Format(format, flags) => {
+            Kept::Format(format, order) => {
                 let subtable = Subtable {
                     platform,
                     encoding,
                     format,
-                    flags,
+                    order,
                     offset: table.offset + offset,
                     end: table.offset + table.len,
                 };
@@ -538,7 +537,7 @@ impl Subtable {
             }
             CmapFormat::HighByte => Some(u32::from(high_byte(table, code))),
             CmapFormat::SegmentDelta => {
-                Some(SegmentDelta::new(table, self.flags, glyph_count).char_index(code))
+                Some(SegmentDelta::new(table, self.order, glyph_count).char_index(code))
             }
             CmapFormat::Trimmed => {
                 let first = u32::from(u16_at(table, 6)?);
@@ -568,7 +567,7 @@ impl Subtable {
             CmapFormat::HighByte => high_byte_next(table, code, steps),
             CmapFormat::SegmentDelta => {
                 let (code, glyph) =
-                    SegmentDelta::new(table, self.flags, glyph_count).char_next(state, code, steps);
+                    SegmentDelta::new(table, self.order, glyph_count).char_next(state, code, steps);
                 (glyph != 0).then_some((code, glyph))
             }
             CmapFormat::Mixed => mixed_next(table, code, glyph_count, steps),
@@ -952,10 +951,18 @@ fn trimmed(table: &[u8], array: usize, first: u32, count: u32, code: u32) -> Opt
     u16_at(table, at).map(u32::from)
 }
 
-/// Format 4 segments whose starts or ends descend.
-const UNSORTED: u8 = 1;
-/// Format 4 segments that overlap in order.
-const OVERLAPPING: u8 = 2;
+/// The order of a format 4 subtable's segments, as validation finds it,
+/// which decides how they are searched; `Sorted` for the other formats.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum SegmentOrder {
+    /// Ascending without overlaps: searched by bisection.
+    Sorted,
+    /// Ascending, some overlapping: by bisection, then for the first that
+    /// holds the code.
+    Overlapping,
+    /// Some starts or ends descend: searched in table order.
+    Unsorted,
+}
 
 /// Where stepping through a format 4 subtable continues from: the last code
 /// it gave and the segment that code is in.
@@ -993,17 +1000,17 @@ impl Default for SegmentState {
 struct SegmentDelta<'a> {
     table: &'a [u8],
     segments: usize,
-    flags: u8,
+    order: SegmentOrder,
     glyph_count: u32,
 }
 
 impl<'a> SegmentDelta<'a> {
-    fn new(table: &'a [u8], flags: u8, glyph_count: u32) -> Self {
+    fn new(table: &'a [u8], order: SegmentOrder, glyph_count: u32) -> Self {
         let segments = usize::from(u16_at(table, 6).unwrap_or(0) >> 1);
         Self {
             table,
             segments,
-            flags,
+            order,
             glyph_count,
         }
     }
@@ -1054,7 +1061,7 @@ impl<'a> SegmentDelta<'a> {
     fn char_index(&self, code: u32) -> u32 {
         if code >= 0x1_0000 {
             0
-        } else if self.flags & UNSORTED != 0 {
+        } else if self.order == SegmentOrder::Unsorted {
             self.linear(code, false, &mut 0).1
         } else {
             self.binary(code, false, &mut 0).1
@@ -1067,7 +1074,7 @@ impl<'a> SegmentDelta<'a> {
         if code >= 0xffff {
             return (code, 0);
         }
-        if self.flags & UNSORTED != 0 {
+        if self.order == SegmentOrder::Unsorted {
             return self.linear(code, true, steps);
         }
         if code == state.charcode {
@@ -1202,7 +1209,7 @@ impl<'a> SegmentDelta<'a> {
                 p += n2;
                 let mut offset = self.word(p);
                 self.last_fix(mid, start, end, p, &mut delta, &mut offset);
-                if self.flags & OVERLAPPING != 0 {
+                if self.order == SegmentOrder::Overlapping {
                     // The first segment holding the code, whose glyphs are
                     // not missing.
                     max = mid;
@@ -1583,7 +1590,9 @@ fn groups(table: &[u8], code: u32, consecutive: bool) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CharEncoding, Charmap, CharmapKind, CmapFormat, Source, Subtable, parse};
+    use super::{
+        CharEncoding, Charmap, CharmapKind, CmapFormat, SegmentOrder, Source, Subtable, parse,
+    };
     use crate::GlyphId;
     use crate::compat::libass::text_charmap_among as text_charmap;
     use crate::name::Platform;
@@ -1813,7 +1822,7 @@ mod tests {
                         platform: Platform::from_id(platform),
                         encoding,
                         format,
-                        flags: 0,
+                        order: SegmentOrder::Sorted,
                         offset,
                         end: 0,
                     };
