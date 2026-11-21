@@ -8,9 +8,7 @@ use crate::{
     record_input,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, InputCursor, Result, SourceId, Step, WorkBudget,
-};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, Step, WorkBudget};
 
 /// Bits: 1 marker missing, 2 nonzero upper reserved bits, 4 nonzero absent-delay
 /// reserved bits. Empty issues do not certify Sequence Header/sample semantics.
@@ -191,20 +189,44 @@ impl Av1Configuration {
 #[derive(Debug)]
 pub struct Av1ConfigParser {
     pool: Budget,
-    source: Option<Bytes>,
     identity: SourceId,
     generation: u64,
-    header_cursor: Option<InputCursor>,
-    reader: Option<Av1ObuReader>,
-    header: [u8; 4],
-    header_used: usize,
-    fields: Option<Av1ConfigFields>,
     limits: Av1ConfigLimits,
+    state: State,
+}
+
+/// Where a parse stands. The record, its OBU reader and the OBUs read are held only
+/// while it is read.
+#[derive(Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one read per parser; boxing it would allocate outside the pool"
+)]
+enum State {
+    Reading(Read),
+    Complete,
+    Failed(Error),
+}
+
+#[derive(Debug)]
+struct Read {
+    source: Bytes,
+    reader: Av1ObuReader,
     obus: BudgetVec<Av1Obu>,
-    pending: Option<Av1Obu>,
-    reserved: bool,
-    complete: bool,
-    failure: Option<Error>,
+    stage: Stage,
+}
+
+#[derive(Debug)]
+enum Stage {
+    /// The OBU table, reserved before anything is read.
+    Reserve,
+    /// The four fixed bytes.
+    Header { bytes: [u8; 4], used: usize },
+    /// The configOBUs after them, with one read and not yet stored.
+    Obus {
+        fields: Av1ConfigFields,
+        pending: Option<Av1Obu>,
+    },
 }
 
 impl Av1ConfigParser {
@@ -222,32 +244,19 @@ impl Av1ConfigParser {
         record_input::check_record(pool, &record, 4, limits.maximum_record_bytes)?;
         let cursor = record_input::cursor(pool, source, &record, limits.obu.maximum_input_window)?;
         let generation = cursor.generation();
+        let reader = Av1ObuReader::from_cursor(cursor, Av1ObuFraming::LowOverhead, limits.obu)?;
         Ok(Self {
             pool: pool.clone(),
-            source: Some(record),
             identity: source,
             generation,
-            header_cursor: Some(cursor),
-            reader: None,
-            header: [0; 4],
-            header_used: 0,
-            fields: None,
             limits,
-            obus: BudgetVec::new(pool),
-            pending: None,
-            reserved: false,
-            complete: false,
-            failure: None,
+            state: State::Reading(Read {
+                source: record,
+                reader,
+                obus: BudgetVec::new(pool),
+                stage: Stage::Reserve,
+            }),
         })
-    }
-
-    fn stop(&mut self, error: Error) {
-        self.failure = Some(error);
-        self.pending = None;
-        self.reader = None;
-        self.header_cursor = None;
-        self.source = None;
-        self.obus = BudgetVec::new(&self.pool);
     }
 
     /// Charges fixed-header bytes, OBU work, one reserve, one descriptor insert
@@ -265,147 +274,115 @@ impl Av1ConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<Av1Configuration>> {
-        if let Some(error) = self.failure {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
         if cancel.load(Ordering::Relaxed) {
-            self.stop(Error::Cancelled);
+            self.state = State::Failed(Error::Cancelled);
             return Err(Error::Cancelled);
         }
-        let result = self.step_inner(work, cancel);
+        let result = self.read(work, cancel);
         if let Err(error) = result
             && !retryable(error)
         {
-            self.stop(error);
+            self.state = State::Failed(error);
         }
         result
     }
 
-    fn step_inner(
+    fn read(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<Av1Configuration>> {
-        if self.complete {
+        let State::Reading(read) = &mut self.state else {
             return Ok(BuildStep::Complete);
-        }
-        if !self.reserved {
-            if !work.try_charge(1) {
-                return Ok(BuildStep::Yield);
-            }
-            self.obus.try_reserve_exact(self.limits.obu.maximum_obus)?;
-            self.reserved = true;
-        }
+        };
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if self.header_used < 4 {
-                let cursor = self
-                    .header_cursor
-                    .as_mut()
-                    .ok_or(Error::Invalid("missing av1C header cursor"))?;
-                match cursor.read_into(&mut self.header[self.header_used..], work, cancel)? {
-                    Step::Ready(count) => {
-                        self.header_used =
-                            self.header_used.checked_add(count).ok_or(Error::Overflow)?;
-                    }
-                    Step::Yield => return Ok(BuildStep::Yield),
-                    Step::End(_) => return Err(Error::Truncated),
-                    Step::NeedInput(request) => {
-                        let source = self
-                            .source
-                            .as_ref()
-                            .ok_or(Error::Invalid("missing av1C source"))?;
-                        match record_input::window(source, &request)? {
-                            Some(window) => cursor.provide(&window)?,
-                            None => cursor.finish(request.source, request.token)?,
-                        }
-                    }
-                }
-                continue;
-            }
-            if self.fields.is_none() {
-                if !work.try_charge(1) {
-                    return Ok(BuildStep::Yield);
-                }
-                let fields = Av1ConfigFields::parse(self.header)?;
-                let cursor = self
-                    .header_cursor
-                    .take()
-                    .ok_or(Error::Invalid("missing av1C header cursor"))?;
-                self.reader = Some(Av1ObuReader::from_cursor(
-                    cursor,
-                    Av1ObuFraming::LowOverhead,
-                    self.limits.obu,
-                )?);
-                self.fields = Some(fields);
-            }
-            if self.pending.is_some() {
-                if !work.try_charge(1) {
-                    return Ok(BuildStep::Yield);
-                }
-                let obu = self
-                    .pending
-                    .take()
-                    .ok_or(Error::Invalid("missing av1C pending OBU"))?;
-                if obu.facts().header.obu_type() == 1 && !self.obus.is_empty() {
-                    return Err(Error::Invalid(
-                        "av1C Sequence Header OBU must occur only once and first",
-                    ));
-                }
-                if self.obus.len() >= self.limits.obu.maximum_obus {
-                    return Err(Error::Limit {
-                        requested: self.obus.len().checked_add(1).ok_or(Error::Overflow)?,
-                        maximum: self.limits.obu.maximum_obus,
-                    });
-                }
-                let source = self
-                    .source
-                    .as_ref()
-                    .ok_or(Error::Invalid("missing av1C source"))?;
-                let obu = obu.configuration_view(&self.pool, source)?;
-                if let Err(rejected) = self.obus.try_push(obu) {
-                    self.pending = Some(rejected.value);
-                    return Err(rejected.error);
-                }
-            }
-            let reader = self
-                .reader
-                .as_mut()
-                .ok_or(Error::Invalid("missing av1C OBU reader"))?;
-            match reader.step(work, cancel)? {
-                Step::Ready(obu) => self.pending = Some(obu),
-                Step::Yield => return Ok(BuildStep::Yield),
-                Step::NeedInput(request) => {
-                    let source = self
-                        .source
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing av1C source"))?;
-                    match record_input::window(source, &request)? {
-                        Some(window) => reader.provide(&window)?,
-                        None => reader.finish(request.source, request.token)?,
-                    }
-                }
-                Step::End(_) => {
+            match &mut read.stage {
+                Stage::Reserve => {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    let raw = self
-                        .source
-                        .take()
-                        .ok_or(Error::Invalid("missing av1C source"))?;
-                    let fields = self.fields.ok_or(Error::Invalid("missing av1C fields"))?;
-                    let obus = std::mem::replace(&mut self.obus, BudgetVec::new(&self.pool));
-                    self.reader = None;
-                    self.complete = true;
-                    return Ok(BuildStep::Ready(Av1Configuration {
-                        raw,
-                        fields,
-                        obus,
-                        source: self.identity,
-                        generation: self.generation,
-                    }));
+                    read.obus.try_reserve_exact(self.limits.obu.maximum_obus)?;
+                    read.stage = Stage::Header {
+                        bytes: [0; 4],
+                        used: 0,
+                    };
+                }
+                Stage::Header { bytes, used } if *used < 4 => {
+                    match read.reader.read_into(&mut bytes[*used..], work, cancel)? {
+                        Step::Ready(count) => {
+                            *used = used.checked_add(count).ok_or(Error::Overflow)?;
+                        }
+                        Step::Yield => return Ok(BuildStep::Yield),
+                        Step::End(_) => return Err(Error::Truncated),
+                        Step::NeedInput(request) => {
+                            match record_input::window(&read.source, &request)? {
+                                Some(window) => read.reader.provide(&window)?,
+                                None => read.reader.finish(request.source, request.token)?,
+                            }
+                        }
+                    }
+                }
+                &mut Stage::Header { bytes, .. } => {
+                    if !work.try_charge(1) {
+                        return Ok(BuildStep::Yield);
+                    }
+                    read.stage = Stage::Obus {
+                        fields: Av1ConfigFields::parse(bytes)?,
+                        pending: None,
+                    };
+                }
+                Stage::Obus { fields, pending } => {
+                    if pending.is_some() && !work.try_charge(1) {
+                        return Ok(BuildStep::Yield);
+                    }
+                    if let Some(obu) = pending.take() {
+                        if obu.facts().header.obu_type() == 1 && !read.obus.is_empty() {
+                            return Err(Error::Invalid(
+                                "av1C Sequence Header OBU must occur only once and first",
+                            ));
+                        }
+                        if read.obus.len() >= self.limits.obu.maximum_obus {
+                            return Err(Error::Limit {
+                                requested: read.obus.len().checked_add(1).ok_or(Error::Overflow)?,
+                                maximum: self.limits.obu.maximum_obus,
+                            });
+                        }
+                        let obu = obu.configuration_view(&self.pool, &read.source)?;
+                        if let Err(rejected) = read.obus.try_push(obu) {
+                            *pending = Some(rejected.value);
+                            return Err(rejected.error);
+                        }
+                    }
+                    match read.reader.step(work, cancel)? {
+                        Step::Ready(obu) => *pending = Some(obu),
+                        Step::Yield => return Ok(BuildStep::Yield),
+                        Step::NeedInput(request) => {
+                            match record_input::window(&read.source, &request)? {
+                                Some(window) => read.reader.provide(&window)?,
+                                None => read.reader.finish(request.source, request.token)?,
+                            }
+                        }
+                        Step::End(_) => {
+                            if !work.try_charge(1) {
+                                return Ok(BuildStep::Yield);
+                            }
+                            let configuration = Av1Configuration {
+                                raw: read.source.clone(),
+                                fields: *fields,
+                                obus: std::mem::replace(&mut read.obus, BudgetVec::new(&self.pool)),
+                                source: self.identity,
+                                generation: self.generation,
+                            };
+                            self.state = State::Complete;
+                            return Ok(BuildStep::Ready(configuration));
+                        }
+                    }
                 }
             }
         }

@@ -326,6 +326,17 @@ impl Av1ObuReader {
         })
     }
 
+    /// Reads bytes that precede the first OBU, as
+    /// [`InputCursor::read_into`](triergon_core::InputCursor::read_into) does.
+    pub(crate) fn read_into(
+        &mut self,
+        output: &mut [u8],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<usize>> {
+        self.cursor.read_into(output, work, cancel)
+    }
+
     /// The request for the bytes at [`position`](Self::position).
     pub fn request(&self) -> InputRequest {
         self.cursor.request()
