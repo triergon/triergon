@@ -373,7 +373,8 @@ impl CharsetJob {
                         }
                     }
                 }
-                Phase::Ready | Phase::Taken => unreachable!(),
+                // The loop's head returns in these phases.
+                Phase::Ready | Phase::Taken => continue,
             }
         }
     }
