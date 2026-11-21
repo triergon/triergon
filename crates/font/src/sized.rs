@@ -226,15 +226,11 @@ impl Font {
         let Some(name) = self.family_name() else {
             return false;
         };
-        // The ASCII form of the name, up to a NUL: UTF-16 units (bytes on
-        // Macintosh) outside 32..=127 read as `?`; the first 128 are enough.
+        // The first 128 characters of the name's ASCII form are enough.
         let mut ascii = [0_u8; 128];
         let mut len = 0;
-        for unit in name.code_units().take_while(|&u| u != 0).take(ascii.len()) {
-            ascii[len] = u8::try_from(unit)
-                .ok()
-                .filter(|b| (32..=127).contains(b))
-                .unwrap_or(b'?');
+        for c in name.ascii().take(ascii.len()) {
+            ascii[len] = c as u8;
             len += 1;
         }
         let mut family = &ascii[..len];

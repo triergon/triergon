@@ -86,8 +86,8 @@ impl<'a> FaceInfo<'a> {
     }
 
     /// Whether a Windows-platform family name (ID 1) equals `name` ignoring ASCII
-    /// case. A face without any uses [`Font::family_name`] in its ASCII form:
-    /// up to a NUL, every unit outside 32..=127 read as `?`.
+    /// case. A face without any uses [`Font::family_name`] in its ASCII form
+    /// ([`NameRecord::ascii`]).
     pub fn has_family(&self, name: &str) -> bool {
         let mut any = false;
         for record in self.windows(NameId::Family) {
@@ -96,7 +96,10 @@ impl<'a> FaceInfo<'a> {
                 return true;
             }
         }
-        !any && self.font.family_name().is_some_and(|r| ascii_eq(r, name))
+        !any && self
+            .font
+            .family_name()
+            .is_some_and(|r| same(r.ascii(), name))
     }
 
     /// Whether `name` is the face's full name (Windows ID 4) or PostScript name,
@@ -109,7 +112,7 @@ impl<'a> FaceInfo<'a> {
         let postscript = self
             .font
             .postscript_name()
-            .is_some_and(|r| postscript_eq(r, name));
+            .is_some_and(|r| same(r.postscript(), name));
         if full == postscript {
             full
         } else if self.font.outline_format() == OutlineFormat::Cff {
@@ -188,38 +191,11 @@ where
     best.map(|(_, index)| index)
 }
 
+/// Whether `text` equals `name`, ignoring ASCII case.
 fn same(mut text: impl Iterator<Item = char>, name: &str) -> bool {
     name.chars()
         .all(|c| text.next().is_some_and(|t| t.eq_ignore_ascii_case(&c)))
         && text.next().is_none()
-}
-
-/// The ASCII form of a name compared with `name`: it ends at NUL and turns
-/// every unit outside 32..=127 into `?`.
-fn ascii_eq(record: NameRecord<'_>, name: &str) -> bool {
-    let text = record
-        .code_units()
-        .map(u32::from)
-        .take_while(|&u| u != 0)
-        .map(|u| {
-            u8::try_from(u)
-                .ok()
-                .filter(|b| (32..=127).contains(b))
-                .map_or('?', char::from)
-        });
-    same(text, name)
-}
-
-/// The PostScript form of a name compared with `name`: it keeps printable
-/// ASCII other than `[](){}<>/%`.
-fn postscript_eq(record: NameRecord<'_>, name: &str) -> bool {
-    let text = record
-        .code_units()
-        .map(u32::from)
-        .filter_map(|u| u8::try_from(u).ok())
-        .filter(|&b| (33..=126).contains(&b) && !b"[](){}<>/%".contains(&b))
-        .map(char::from);
-    same(text, name)
 }
 
 #[cfg(test)]

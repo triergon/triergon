@@ -64,30 +64,14 @@ impl Operation {
     }
 }
 
-/// FreeType's ASCII form of a name: UTF-16 units, or bytes for Macintosh records,
-/// up to a NUL, with units outside 32..=127 shown as `?`.
+/// The ASCII form of a family or style name.
 fn ascii(record: NameRecord<'_>) -> String {
-    record
-        .code_units()
-        .take_while(|&u| u != 0)
-        .map(|u| {
-            u8::try_from(u)
-                .ok()
-                .filter(|b| (32..=127).contains(b))
-                .map_or('?', char::from)
-        })
-        .collect()
+    record.ascii().collect()
 }
 
-/// FreeType's PostScript form: printable ASCII other than `[](){}<>/%`, absent
-/// when nothing remains.
+/// The PostScript form of a name, absent when nothing of it remains.
 fn postscript(record: NameRecord<'_>) -> Option<String> {
-    let text: String = record
-        .code_units()
-        .filter_map(|u| u8::try_from(u).ok())
-        .filter(|&b| (33..=126).contains(&b) && !b"[](){}<>/%".contains(&b))
-        .map(char::from)
-        .collect();
+    let text: String = record.postscript().collect();
     (!text.is_empty()).then_some(text)
 }
 
@@ -240,8 +224,8 @@ fn scaled(
                 oblique: !matches!(style, Style::Bold),
                 embolden: !matches!(style, Style::Oblique),
             };
-            // `synthesize` answers `false` where it refuses to embolden, as
-            // FreeType refuses an outline without an orientation.
+            // `synthesize` answers `false` where it refuses to embolden: an
+            // outline without an orientation.
             let applied = styled.copy_from(&outline).is_ok()
                 && matches!(libass::synthesize(sized, &mut styled, synthesis), Ok(true));
             sink.record(Record::Styled {

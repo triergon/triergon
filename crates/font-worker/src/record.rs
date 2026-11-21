@@ -67,7 +67,8 @@ pub enum Record<'a> {
         ascender: i32,
         descender: i32,
         height: i32,
-        /// `advanceWidthMax` as FreeType exposes it, an `FT_Short`.
+        /// `advanceWidthMax` read as a signed 16-bit value, as the reference
+        /// worker folds it.
         max_advance: i16,
         bold: bool,
         italic: bool,
@@ -189,8 +190,8 @@ const fn point_tag(kind: PointKind) -> u8 {
     }
 }
 
-/// An orientation's folded value and dump word, as the reference maps
-/// `FT_Outline_Get_Orientation`'s result.
+/// An orientation's folded value and dump word, as the reference worker
+/// maps them.
 fn orientation(outline: &Outline) -> (u64, &'static str) {
     match outline.orientation() {
         Orientation::TrueType => (0, "truetype"),
@@ -229,7 +230,7 @@ impl Work {
                 tag,
                 c.platform().id().into(),
                 c.encoding_id().into(),
-                // FreeType's `FT_Get_CMap_Format`: -1 for a charmap it adds.
+                // -1 for a charmap that is not a `cmap` subtable.
                 signed(c.kind().format_number().map_or(-1, i64::from)),
             ]),
             None => self.words(&[tag, ABSENT]),

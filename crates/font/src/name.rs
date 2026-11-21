@@ -332,6 +332,26 @@ impl<'a> NameRecord<'a> {
         })
     }
 
+    /// The name in ASCII, as FreeType reports a face's family and style
+    /// names: the code units up to a NUL, each outside 32..=127 as `?`.
+    pub fn ascii(&self) -> impl Iterator<Item = char> + 'a {
+        self.code_units().take_while(|&u| u != 0).map(|u| {
+            u8::try_from(u)
+                .ok()
+                .filter(|b| (32..=127).contains(b))
+                .map_or('?', char::from)
+        })
+    }
+
+    /// The name as a PostScript name: its code units that are printable ASCII
+    /// (33..=126) other than `[](){}<>/%`.
+    pub fn postscript(&self) -> impl Iterator<Item = char> + 'a {
+        self.code_units()
+            .filter_map(|u| u8::try_from(u).ok())
+            .filter(|&b| (33..=126).contains(&b) && !b"[](){}<>/%".contains(&b))
+            .map(char::from)
+    }
+
     /// Whether the decoded string equals `text` ignoring ASCII case.
     pub fn eq_ignore_ascii_case(&self, text: &str) -> bool {
         let mut chars = self.chars();
