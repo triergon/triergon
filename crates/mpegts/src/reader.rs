@@ -1085,12 +1085,7 @@ impl Reader {
                         TraceEvent::Finished => self.finished = true,
                         _ => (),
                     }
-                    if SEEKING
-                        && (!matches!(
-                            source.event(),
-                            TraceEvent::Pat(_) | TraceEvent::ProgramMap { .. }
-                        ) || !self.seek.as_slice()[0].publishes_tables())
-                    {
+                    if SEEKING && !self.seek.as_slice()[0].publishes_source(source.event()) {
                         continue;
                     }
                     return Ok(Step::Ready(Event::Other(ReaderEvent::Source(source))));

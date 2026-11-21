@@ -151,6 +151,46 @@ discard time for `PlaybackPreroll`. The caller supplies decoder setup.
 The reader refuses seeks across selected-track source epochs and ambiguous clock
 wraps. A coded random-access picture must have resolved timing.
 
+`Reader::request_seek_in_epoch(request, epochs)` selects the exact clock and
+configuration pair reported by `Packet::epochs()` in the same source. Only
+access units in that pair compete for the landing; equal or overlapping timestamps
+in other epochs do not compete. A missing epoch or an epoch with no eligible
+preceding access unit is refused. Clock-wrap ambiguity within the selected epoch
+remains a refusal. These source facts are independent of input generations and
+PMT version numbers.
+
+This operation scans and replays one length-known, seekable entity from its
+start. Replay publishes the original PAT, PMTs and clock transitions, and
+selected-epoch `VideoHeaders` before the landing, so decoder setup retains its
+source order. The landing packet and the complete following suffix keep their
+bytes, PTS, DTS, track configuration and PES ranges, including subsequent epoch
+changes. The caller supplies any additional decoder configuration needed at the
+landing. Explicit epoch seeks do not use the timestamp-only index or retained
+suffix optimisation. The source must remain stable between scan and replay.
+
+The epoch distinction follows [H.222.0 (08/2023)](https://www.itu.int/rec/T-REC-H.222.0-202308-S/en)
+§2.4.3.5 (a signalled PCR discontinuity starts a new system time base) and
+§2.4.4.9–10 (current program definitions and their changes). Selecting an epoch
+is a reader policy; it does not alter those source facts or normalize timestamps.
+
+The required [picture comparison](../../harness/features/mpegts-previous-picture/contract.json)
+covers eight explicit-epoch AVC seeks against the pinned FFmpeg formats build:
+a clock change or same-codec PMT descriptor change, each in TS188 and M2TS192,
+with both seek policies. Each picture has its own PES. Both workers scan the full
+stable input through EOF and replay every suffix packet, comparing the requested,
+landing and discard times, PTS, effective DTS, random-access flags and all bytes.
+The candidate selects the source epoch pair; the reference selects landing
+candidates by its public packet positions over the authored physical boundary.
+After building the workers, run:
+
+```sh
+CARGO_INCREMENTAL=0 cargo xtask report \
+  --contract harness/features/mpegts-previous-picture/contract.json \
+  --manifest harness/features/mpegts-previous-picture/corpus.json --corpus .
+```
+
+Native Linux parity, runtime and memory qualification remain separate checks.
+
 Use `Reader::request_seek_in_entities` for consecutive length-known, seekable
 parts of one logical transport stream. The ordered `SeekEntity` list supplies
 source IDs and lengths, and the scan bound applies to their combined size. Feed

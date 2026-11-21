@@ -78,7 +78,7 @@ impl Input {
     }
 }
 
-fn video(root: &Path, hevc: bool, repeat: usize) -> R<Input> {
+fn pictures(root: &Path, hevc: bool) -> R<(Codec, Vec<Vec<u8>>)> {
     let codec = super::video(root, hevc)?;
     let stem = format!("crates/framing/fixtures/raw-annex-b/{}-aud0", codec.name);
     let raw = source(
@@ -87,11 +87,9 @@ fn video(root: &Path, hevc: bool, repeat: usize) -> R<Input> {
     )?;
     let index =
         String::from_utf8(source(root, &format!("{stem}.packets"))?).map_err(|e| e.to_string())?;
-    let mut ts = Transport::new();
-    ts.tables(&codec, &[])?;
-    let mut i = 0_u64;
-    for _ in 0..repeat {
-        for line in index.lines() {
+    let pictures = index
+        .lines()
+        .map(|line| {
             let mut fields = line.split_ascii_whitespace();
             let offset = fields
                 .next()
@@ -106,6 +104,19 @@ fn video(root: &Path, hevc: bool, repeat: usize) -> R<Input> {
             let bytes = raw
                 .get(offset..offset.checked_add(length).ok_or("picture extent")?)
                 .ok_or("picture outside input")?;
+            Ok(bytes.to_vec())
+        })
+        .collect::<R<Vec<_>>>()?;
+    Ok((codec, pictures))
+}
+
+fn video(root: &Path, hevc: bool, repeat: usize) -> R<Input> {
+    let (codec, pictures) = pictures(root, hevc)?;
+    let mut ts = Transport::new();
+    ts.tables(&codec, &[])?;
+    let mut i = 0_u64;
+    for _ in 0..repeat {
+        for bytes in &pictures {
             ts.pes(
                 0xe0,
                 &part(bytes, Some(90_000 + i * 3000), Some(84_000 + i * 3000)),
@@ -124,6 +135,111 @@ fn video(root: &Path, hevc: bool, repeat: usize) -> R<Input> {
         m2ts: hevc,
         data: ts.finish(hevc),
     })
+}
+
+fn epoch_video(root: &Path, configuration: bool, m2ts: bool) -> R<(Input, usize)> {
+    let (codec, pictures) = pictures(root, false)?;
+    if pictures.len() != 12 {
+        return Err("epoch control requires all twelve authored source pictures".into());
+    }
+    let mut ts = Transport::new();
+    ts.tables(&codec, &[])?;
+    ts.pcr(89_000, false);
+    let mut boundary = 0;
+    for (epoch, base) in [99_000, 90_000].into_iter().enumerate() {
+        if epoch == 1 {
+            if configuration {
+                ts.tables_for_version(&[(&codec, PID, &[0x0a, 4, b'e', b'n', b'g', 0])], 1)?;
+            } else {
+                ts.pcr(80_000, true);
+                ts.pcr(81_000, false);
+            }
+            boundary = ts.bytes.len() / 188 * if m2ts { 192 } else { 188 };
+        }
+        for (i, bytes) in pictures.iter().enumerate() {
+            // Reordered PTS and increasing encoded DTS in each epoch. An
+            // unfiltered scan would choose the earlier epoch's 111,000-tick
+            // keyframe over the selected epoch's 102,000-tick keyframe.
+            let presentation = match i % 4 {
+                1 => i + 2,
+                2 | 3 => i - 1,
+                _ => i,
+            } as u64;
+            ts.pes(
+                0xe0,
+                &part(
+                    bytes,
+                    Some(base + presentation * 3000),
+                    Some(base - 9000 + i as u64 * 3000),
+                ),
+            )?;
+        }
+    }
+    Ok((
+        Input {
+            name: if configuration {
+                "avc-configuration-epoch"
+            } else {
+                "avc-clock-epoch"
+            },
+            m2ts,
+            data: ts.finish(m2ts),
+        },
+        boundary,
+    ))
+}
+
+fn epoch_cases(root: &Path, reference: &Path, cases: &mut Vec<Value>) -> R<()> {
+    for configuration in [false, true] {
+        for m2ts in [false, true] {
+            let (input, boundary) = epoch_video(root, configuration, m2ts)?;
+            let start = format!("epoch-start={boundary}");
+            let pair = if configuration {
+                "epoch=0:3"
+            } else {
+                "epoch=1:2"
+            };
+            let unfiltered = input.record(
+                root,
+                "mpegts-previous-picture",
+                "unfiltered-epoch-control",
+                &["256", "112000", "previous"],
+                reference,
+                "ts-seek-fold",
+            )?;
+            if unfiltered.get("reference_refusal").is_some()
+                || unfiltered.get("expected").and_then(|v| v.get("packets"))
+                    != Some(&Value::int(20))
+            {
+                return Err("unfiltered epoch control must land in the earlier epoch".into());
+            }
+            for policy in ["previous", "preroll"] {
+                let id = format!(
+                    "{}-{}-{policy}",
+                    input.name,
+                    if m2ts { "m2ts" } else { "ts188" }
+                );
+                let row = input.record(
+                    root,
+                    "mpegts-previous-picture",
+                    &id,
+                    &["256", "112000", policy, pair, &start],
+                    reference,
+                    "ts-seek-fold",
+                )?;
+                if row.get("reference_refusal").is_some()
+                    || row.get("expected").and_then(|v| v.get("packets")) != Some(&Value::int(8))
+                    || row.get("expected") == unfiltered.get("expected")
+                {
+                    return Err(format!(
+                        "{id}: epoch control must deliver all eight suffix pictures"
+                    ));
+                }
+                cases.push(row);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn audio(name: &'static str, pieces: &[&[u8]], m2ts: bool, version: u8) -> R<Input> {
@@ -254,6 +370,7 @@ pub fn author(root: &Path, args: &[String]) -> R<()> {
         seek,
         "ts-seek-fold",
     )?);
+    epoch_cases(root, seek, &mut cases)?;
     manifest(root, feature, cases)?;
 
     let raw = fs::read(root.join(AUDIO)).map_err(|e| format!("{AUDIO}: {e}"))?;

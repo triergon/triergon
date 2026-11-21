@@ -1,6 +1,9 @@
 use super::*;
 use triergon_core::container::{SeekMethod, SeekPolicy, SeekRequest};
 
+#[path = "seek_epochs.rs"]
+mod epochs;
+
 fn sample(kind: u8, raw: &[u8], layout: &str, times: impl Fn(usize) -> u64) -> Transport {
     let mut ts = Transport::new();
     ts.tables(&[(kind, PID, &[])], 0);
