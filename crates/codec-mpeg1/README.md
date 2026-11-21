@@ -52,7 +52,8 @@ charges a caller's `Budget`.
 ## Behaviour and limits
 
 - `Encoder::new` refuses `gop == 0` (`Error::Gop`), a zero `bit_rate` or a `max_rate`
-  that is zero or beyond the 18-bit sequence-header field in 400 bit/s units
+  that is zero or above 104,856,800 bit/s, whose 400 bit/s units would reach 0x3FFFF,
+  the sequence-header bit_rate that marks variable bit rate operation
   (`Error::BitRate`, with the refused rate), and a `vbv_bits` that is zero or beyond
   1023 units of 16 kbit (`Error::VbvBuffer`). Geometry limits (even, 2–4094) are
   enforced by `Geometry::new`.

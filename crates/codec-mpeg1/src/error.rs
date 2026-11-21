@@ -8,8 +8,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Why an encoder refused a configuration or a picture.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
-    /// `bit_rate` is zero, or `max_rate` is zero or above the 104,857,200 bit/s the
-    /// sequence header's bit_rate field holds; carries the refused rate in bit/s.
+    /// `bit_rate` is zero, or `max_rate` is zero or above the 104,856,800 bit/s the
+    /// sequence header's bit_rate field states as a rate; carries the refused rate in
+    /// bit/s.
     BitRate(u32),
     /// `vbv_bits` is zero or above the 16,760,832 bits the sequence header's
     /// vbv_buffer_size field holds; carries the refused size.

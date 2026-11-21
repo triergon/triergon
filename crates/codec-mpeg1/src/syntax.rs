@@ -11,6 +11,10 @@ use crate::tables::{
     ZIGZAG,
 };
 
+/// The bit_rate value that identifies variable bit rate operation (§2.4.3.2): a rate the
+/// header states is coded below it.
+pub(crate) const VARIABLE_BIT_RATE: u32 = 0x3FFFF;
+
 /// Picture rate 30 Hz: frame_rate_code 5 in Table 2-D.4.
 const FRAME_RATE_CODE: u32 = 5;
 

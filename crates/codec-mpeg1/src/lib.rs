@@ -43,7 +43,8 @@ pub struct EncoderConfig {
     /// Average rate the GOP allocation aims for, in bit/s; nonzero.
     pub bit_rate: u32,
     /// Rate at which the VBV buffer fills, in bit/s, and the sequence header's
-    /// bit_rate, rounded up to 400 bit/s units; 1 to 104,857,200.
+    /// bit_rate, rounded up to 400 bit/s units; 1 to 104,856,800 (the field's next
+    /// value marks a variable bit rate stream).
     pub max_rate: u32,
     /// VBV buffer size in bits, signalled rounded up to 16,384-bit units; 1 to
     /// 16,760,832 (1023 units).
@@ -260,7 +261,7 @@ fn validate(cfg: &EncoderConfig) -> Result<()> {
     if cfg.bit_rate == 0 {
         return Err(Error::BitRate(cfg.bit_rate));
     }
-    if cfg.max_rate == 0 || cfg.max_rate.div_ceil(400) > 0x3FFFF {
+    if cfg.max_rate == 0 || cfg.max_rate.div_ceil(400) >= syntax::VARIABLE_BIT_RATE {
         return Err(Error::BitRate(cfg.max_rate));
     }
     if cfg.vbv_bits == 0 || cfg.vbv_bits.div_ceil(16384) > 1023 {

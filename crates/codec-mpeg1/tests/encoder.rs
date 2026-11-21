@@ -17,6 +17,27 @@ fn direct_zero_gop_is_rejected_before_allocation() {
     ));
 }
 #[test]
+fn a_max_rate_the_header_would_code_as_variable_bit_rate_is_refused() {
+    // bit_rate 0x3FFFF identifies variable bit rate (ISO/IEC 11172-2 §2.4.3.2).
+    for max_rate in [104_856_801, 104_857_200] {
+        assert!(matches!(
+            Encoder::new(EncoderConfig { max_rate, ..cfg() }),
+            Err(Error::BitRate(rate)) if rate == max_rate
+        ));
+    }
+    let mut e = Encoder::new(EncoderConfig {
+        max_rate: 104_856_800,
+        ..cfg()
+    })
+    .unwrap();
+    let mut out = Vec::new();
+    e.encode(&Picture::new(Geometry::new(16, 16).unwrap()), &mut out)
+        .unwrap();
+    assert_eq!(out[..4], [0, 0, 1, 0xB3]);
+    let bit_rate = u32::from_be_bytes([0, out[8], out[9], out[10]]) >> 6;
+    assert_eq!(bit_rate, 0x3FFFE);
+}
+#[test]
 fn mismatched_picture_returns_owner_unchanged_before_encoder_mutation() {
     let mut e = Encoder::new(cfg()).unwrap();
     let p = Picture::new(Geometry::new(32, 16).unwrap());
