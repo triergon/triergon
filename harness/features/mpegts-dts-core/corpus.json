@@ -69,6 +69,23 @@
         "bytes": 6144,
         "digest": 4157049037433056952
       }
+    },
+    {
+      "id": "dts-core-unlabelled-private-data",
+      "profile": "dts-core-unlabelled-private-data",
+      "file": "harness/features/mpegts-dts-core/inputs/dts-core-unlabelled-private-data.ts",
+      "sha256": "fd1d4fb7ca84f1dd39eb2ae65f1aea93fc8f291ca0a9f444984ec1808bb4cdbd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dts-core=256"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 24576,
+        "digest": 282797149400285436
+      }
     }
   ]
 }

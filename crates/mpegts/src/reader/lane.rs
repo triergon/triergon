@@ -160,8 +160,9 @@ impl Framer {
             0x06 if stream.codec_identification() == CodecIdentification::DvbSubtitles => {
                 Ok(Self::Dvb(dvb::Reader::new(limits.dvb_subtitle_tail_policy)))
             }
-            0x06 if stream.codec() == Some(CodecId::Dts) => {
-                if stream.dvb_descriptor_codec() != Some(CodecId::Dts)
+            0x06 if track.unlabelled_dts_core || stream.codec() == Some(CodecId::Dts) => {
+                if !track.unlabelled_dts_core
+                    && stream.dvb_descriptor_codec() != Some(CodecId::Dts)
                     && let Some(descriptor) = stream.dvb_dts_hd()?
                 {
                     if descriptor.core.is_none() {
@@ -1222,6 +1223,9 @@ impl Lane {
             Some(Framer::DtsHd(reader)) => reader.check_pes(pes)?,
             Some(Framer::DtsExtension(reader)) => reader.check_pes(pes)?,
             _ => (),
+        }
+        if self.track.unlabelled_dts_core && pes.header.stream_id != 0xbd {
+            return Err(Error::Invalid("unlabelled DTS core PES stream ID"));
         }
         let stream_type = self.track.stream().stream_type;
         if !(0xc0..=0xdf).contains(&pes.header.stream_id) {

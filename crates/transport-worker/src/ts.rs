@@ -1132,6 +1132,7 @@ mod tests {
             format: PacketFormat::Ts188,
             program: 1,
             namespace: DescriptorNamespace::Unspecified,
+            unlabelled_dts_core: None,
             input: Bytes::copy_from_slice(&pool, &data).unwrap(),
             following: BudgetVec::new(&pool),
         };

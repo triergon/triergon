@@ -225,6 +225,12 @@ DTS core packets, including headers and bodies split across PES packets.
 `DtsAudioFrame` carries the exact sample span and original frame bytes. The
 packet retains its source clocks and PES ranges.
 See [ETSI EN 300 468 Annex G](https://www.etsi.org/deliver/etsi_en/300400_300499/300468/01.18.01_60/en_300468v011801p.pdf).
+If the PMT has empty program and elementary descriptor loops, a caller that
+knows the private-data stream contains DTS core can supply its program and PID
+in `ReaderLimits::unlabelled_dts_core`. The reader requires PES stream ID
+`0xbd` and validates each DTS frame. Track metadata identifies DTS while
+retaining the original PMT and stream type.
+
 For ATSC, set `ReaderLimits::descriptor_namespace` to `DescriptorNamespace::Atsc`
 to interpret `0x81` as AC-3 and `0x87` as E-AC-3. Both require PES stream ID
 `0xbd`. ATSC E-AC-3 supports a six-block independent syncframe with its

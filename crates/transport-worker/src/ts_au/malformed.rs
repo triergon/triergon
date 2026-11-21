@@ -185,6 +185,7 @@ mod tests {
             format: PacketFormat::Ts188,
             program: 1,
             namespace: DescriptorNamespace::Unspecified,
+            unlabelled_dts_core: None,
             following: BudgetVec::new(&pool),
         };
         let mut diagnostic = Diagnostic {

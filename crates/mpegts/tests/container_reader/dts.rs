@@ -1,7 +1,8 @@
 use super::{
-    AccessUnit, AudioEofPolicy, CodecId, Drive, Error, Event, MediaKind, PID, PacketInfo,
+    AccessUnit, AudioEofPolicy, CodecId, Drive, Error, Event, MediaKind, PID, PROGRAM, PacketInfo,
     ReaderEvent, ReaderLimits, Time, TrackInfo, Transport, audio_eof_namespace,
 };
+use triergon_mpegts::compat::dts::UnlabelledCore;
 
 // EN 300 468 G.2, corresponding to a 48 kHz, 512-sample mono core.
 const DESCRIPTOR: &[u8] = &[0x7b, 5, 0xd2, 0x87, 0x83, 0xfe, 0x00];
@@ -12,6 +13,95 @@ fn limits() -> ReaderLimits {
     ReaderLimits {
         descriptor_namespace: audio_eof_namespace(),
         ..ReaderLimits::default()
+    }
+}
+
+#[test]
+fn caller_can_select_unlabelled_dts_core_without_changing_pmt_evidence() {
+    let mut ts = Transport::new();
+    ts.tables(&[(0x06, PID, &[])], 0);
+    ts.pes(PID, 0xbd, &BYTES[..7], Some(90_000), None);
+    ts.pes(PID, 0xbd, &BYTES[7..2 * FRAME], None, None);
+    for selection in [
+        None,
+        Some(UnlabelledCore {
+            program: PROGRAM + 1,
+            pid: PID,
+        }),
+        Some(UnlabelledCore {
+            program: PROGRAM,
+            pid: PID + 1,
+        }),
+        Some(UnlabelledCore {
+            program: PROGRAM,
+            pid: PID,
+        }),
+    ] {
+        let mut drive = Drive::new(
+            &ts.bytes,
+            ReaderLimits {
+                unlabelled_dts_core: selection,
+                ..limits()
+            },
+            7,
+            1,
+        );
+        let mut count = 0;
+        let mut unsupported = false;
+        while let Some(event) = drive.next().unwrap() {
+            match event {
+                Event::Packet(packet) => {
+                    assert!(matches!(packet.access_unit(), AccessUnit::Dts(_)));
+                    let track = packet.track_info();
+                    assert_eq!(track.codec(), CodecId::Dts);
+                    assert_eq!(track.kind(), MediaKind::Audio);
+                    assert_eq!(track.codec_tag(), &[0x06]);
+                    assert!(track.stream().codec().is_none());
+                    assert_eq!(packet.payload(), &BYTES[count * FRAME..(count + 1) * FRAME]);
+                    assert_eq!(packet.duration(), Some(960));
+                    if count == 0 {
+                        assert_eq!(packet.pts(), Some(90_000));
+                        assert_eq!(packet.sources().len(), 2);
+                    }
+                    count += 1;
+                }
+                Event::Other(ReaderEvent::Unsupported { .. }) => unsupported = true,
+                _ => (),
+            }
+        }
+        let selected = selection
+            == Some(UnlabelledCore {
+                program: PROGRAM,
+                pid: PID,
+            });
+        assert_eq!(count, if selected { 2 } else { 0 });
+        assert_eq!(unsupported, !selected);
+    }
+}
+
+#[test]
+fn unlabelled_dts_core_requires_private_stream_one() {
+    let mut ts = Transport::new();
+    ts.tables(&[(0x06, PID, &[])], 0);
+    ts.pes(PID, 0xc0, &BYTES[..FRAME], Some(90_000), None);
+    let mut drive = Drive::new(
+        &ts.bytes,
+        ReaderLimits {
+            unlabelled_dts_core: Some(UnlabelledCore {
+                program: PROGRAM,
+                pid: PID,
+            }),
+            ..limits()
+        },
+        7,
+        1,
+    );
+    loop {
+        match drive.next() {
+            Ok(Some(Event::Other(_))) => (),
+            Err(Error::Invalid(_)) => break,
+            _ => panic!("DTS must use private_stream_1"),
+        }
     }
 }
 
