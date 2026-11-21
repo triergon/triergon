@@ -64,6 +64,39 @@ pub(super) fn damage(bytes: &mut [u8], packets: &[Value], seed: u64) -> Result<(
     Ok(())
 }
 
+fn opus_preskip(bytes: &mut [u8], preskip: u16) -> Result<(), String> {
+    let Some(header) = bytes.get(..27) else {
+        return Err("truncated Ogg header".into());
+    };
+    if !header.starts_with(b"OggS\0") || header[5] != 2 {
+        return Err("expected an Ogg beginning-of-stream page".into());
+    }
+    let payload = 27 + usize::from(header[26]);
+    let lengths = bytes.get(27..payload).ok_or("truncated lacing table")?;
+    let size: usize = lengths.iter().map(|&len| usize::from(len)).sum();
+    let page = bytes
+        .get_mut(..payload + size)
+        .ok_or("truncated Ogg page")?;
+    if page
+        .get(payload..payload + 12)
+        .is_none_or(|head| !head.starts_with(b"OpusHead"))
+    {
+        return Err("Ogg page has no OpusHead".into());
+    }
+    page[payload + 10..payload + 12].copy_from_slice(&preskip.to_le_bytes());
+    page[22..26].fill(0);
+    let mut crc = 0_u32;
+    for &byte in &*page {
+        crc ^= u32::from(byte) << 24;
+        for _ in 0..8 {
+            let top = crc >> 31;
+            crc = (crc << 1) ^ (top * 0x04c1_1db7);
+        }
+    }
+    page[22..26].copy_from_slice(&crc.to_le_bytes());
+    Ok(())
+}
+
 fn pinned_source(
     root: &Path,
     vector: &Value,
@@ -84,7 +117,14 @@ fn generated(
     output: &Path,
 ) -> Result<(), Stop> {
     let bytes = fs::read(source).map_err(|e| format!("{}: {e}", source.display()))?;
-    let result = if vector.get("tail_source").is_some() {
+    let result = if let Some(samples) = vector.get("preskip").and_then(python::int) {
+        let mut result = bytes;
+        opus_preskip(
+            &mut result,
+            u16::try_from(samples).map_err(|e| e.to_string())?,
+        )?;
+        result
+    } else if vector.get("tail_source").is_some() {
         let tail = pinned_source(tools.root, vector, "tail_source", "tail_source_sha256")?;
         let mut result = bytes;
         result.extend(fs::read(&tail).map_err(|e| format!("{}: {e}", tail.display()))?);

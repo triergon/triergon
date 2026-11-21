@@ -512,29 +512,40 @@ fn variant_files(root: &Path, manifest: &str, lane: &str) -> R<Vec<(PathBuf, Opt
         .iter()
         .filter(|v| v.get("lane").and_then(Value::as_str) == Some(lane))
     {
-        let field = |key| {
-            vector
-                .get(key)
-                .and_then(Value::as_str)
-                .ok_or_else(|| format!("{manifest}: {lane} vector without {key}"))
-        };
-        let (path, pin) = if vector.get("source").is_some() {
-            ("source", "source_sha256")
-        } else {
-            ("path", "sha256")
-        };
-        files.push((root.join(field(path)?), Some(field(pin)?.to_owned())));
-        if vector.get("tail_source").is_some() {
-            files.push((
-                root.join(field("tail_source")?),
-                Some(field("tail_source_sha256")?.to_owned()),
-            ));
-        }
+        vector_files(root, manifest, lane, vector, &mut files)?;
     }
     if files.len() == 1 && crate::codecs::correctness::session_vector_lanes(lane).is_empty() {
         return Err(format!("{manifest}: no {lane} vectors"));
     }
     Ok(files)
+}
+
+fn vector_files(
+    root: &Path,
+    manifest: &str,
+    lane: &str,
+    vector: &Value,
+    files: &mut Vec<(PathBuf, Option<String>)>,
+) -> R<()> {
+    let field = |key| {
+        vector
+            .get(key)
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("{manifest}: {lane} vector without {key}"))
+    };
+    let (path, pin) = if vector.get("source").is_some() {
+        ("source", "source_sha256")
+    } else {
+        ("path", "sha256")
+    };
+    files.push((root.join(field(path)?), Some(field(pin)?.to_owned())));
+    if vector.get("tail_source").is_some() {
+        files.push((
+            root.join(field("tail_source")?),
+            Some(field("tail_source_sha256")?.to_owned()),
+        ));
+    }
+    Ok(())
 }
 
 const AAC_MOV_MANIFEST: &str = "harness/codecs/aac/mov-manifest.json";
@@ -585,11 +596,7 @@ fn lane_files(root: &Path, manifest: &str, lanes: &[&str]) -> R<Vec<(PathBuf, Op
             if text("lane") != Some(*lane) {
                 continue;
             }
-            let path =
-                text("path").ok_or_else(|| format!("{manifest}: a vector without a path"))?;
-            let pin =
-                text("sha256").ok_or_else(|| format!("{manifest}: a vector without a hash"))?;
-            files.push((root.join(path), Some(pin.to_owned())));
+            vector_files(root, manifest, lane, vector, &mut files)?;
         }
         if files.len() == before {
             return Err(format!("{manifest}: no vectors of {lane}"));
