@@ -81,6 +81,9 @@ pub struct ReaderLimits {
     pub unframed_audio_policy: UnframedAudioPolicy,
     /// Explicit DTS core identity for one unlabelled private-data route.
     pub unlabelled_dts_core: Option<crate::compat::dts::UnlabelledCore>,
+    /// Probe two complete canonical DTS core envelopes in the first private PES.
+    /// Disabled by default; see `compat::dts` for admission and refusal bounds.
+    pub probe_unlabelled_dts_core: bool,
     /// Compatibility policy for the reserved bits in a program clock reference.
     pub pcr_policy: crate::compat::pes::PcrPolicy,
     /// Framing policy for ADTS. The compatibility policy handles ADTS EOF itself.
@@ -114,6 +117,7 @@ impl Default for ReaderLimits {
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
             unframed_audio_policy: UnframedAudioPolicy::Strict,
             unlabelled_dts_core: None,
+            probe_unlabelled_dts_core: false,
             pcr_policy: crate::compat::pes::PcrPolicy::Strict,
             adts_packet_policy: PacketPolicy::Strict,
             adts_pes_policy: adts::PesPolicy::Strict,
@@ -204,6 +208,12 @@ impl Reader {
             return false;
         }
         let lane = &self.lanes.as_slice()[index];
+        if self.limits.probe_unlabelled_dts_core
+            && lane.track.stream().stream_type == 0x06
+            && lane.track.stream().descriptor_bytes.is_empty()
+        {
+            return false;
+        }
         let old = lane.track.program_map();
         let new = source.map();
         if old.pcr_pid != new.pcr_pid || old.header.extension != new.header.extension {
@@ -984,6 +994,10 @@ impl Reader {
                             lane.run = previous.run;
                         }
                         self.lanes.as_mut_slice()[index] = lane;
+                        if self.limits.probe_unlabelled_dts_core {
+                            self.tracks.as_mut_slice()[index] =
+                                self.lanes.as_slice()[index].track.clone();
+                        }
                         self.phase = if fault {
                             Phase::Publish
                         } else {
@@ -1095,7 +1109,13 @@ impl Reader {
             if let Some((index, source, key)) = self.queued_pes.take() {
                 let mut source = Some(source);
                 match self.lanes.as_mut_slice()[index].push(&mut source, key, work) {
-                    Ok(true) => self.active = Some(index),
+                    Ok(true) => {
+                        if self.limits.probe_unlabelled_dts_core {
+                            self.tracks.as_mut_slice()[index] =
+                                self.lanes.as_slice()[index].track.clone();
+                        }
+                        self.active = Some(index);
+                    }
                     retry => {
                         self.queued_pes = Some((index, source.expect("queued PES on retry"), key));
                         retry?;

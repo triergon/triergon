@@ -39,6 +39,14 @@ reference's; on Linux AArch64 three malformed PSI cases of the transport worker,
 code the corpus does not run, held one more 64 KiB window of code; and the ISO BMFF
 worker's operations read only the raw-video and timed-text movies of its comparison.
 
+The opt-in unlabelled DTS core probe requires two complete matching canonical
+frames in the initial PES of a unique descriptor-free private route. On the
+pinned FATE `dts/dts.ts` input, all 253 payloads and clocks match explicit
+DTS selection. The pinned reference's ordinary stream discovery classifies
+PID 256 as `bin_data` and emits 127 PES packets. Automatic-discovery
+qualification, alternate descriptor namespaces, packed core and split initial
+frames remain open.
+
 The blocking facade stops reading as soon as a container signature selects a reader.
 It reserves replay capacity before consuming sequential input and rewinds seekable input.
 Frame-based elementary probing examines up to 64 KiB once. On seekable input,

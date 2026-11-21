@@ -442,3 +442,172 @@ fn short_dts_hd_extension_keeps_truncation_and_original_bytes() {
         }
     }
 }
+
+fn probe_limits() -> ReaderLimits {
+    ReaderLimits {
+        probe_unlabelled_dts_core: true,
+        ..ReaderLimits::default()
+    }
+}
+
+#[test]
+fn automatic_core_probe_requires_two_envelopes_and_keeps_source_facts() {
+    for (chunk, work) in [(7, 1), (4096, 8192)] {
+        let mut ts = Transport::new();
+        ts.tables(&[(0x06, PID, &[])], 0);
+        ts.pes(PID, 0xbd, &BYTES[..2 * FRAME], Some(90_000), Some(89_000));
+        let mut drive = Drive::new(&ts.bytes, probe_limits(), chunk, work);
+        let mut count = 0;
+        let mut source_pes = false;
+        while let Some(event) = drive.next().unwrap() {
+            match event {
+                Event::Other(ReaderEvent::Source(source)) => {
+                    if let TraceEvent::Pes(pes) = source.event() {
+                        assert_eq!(pes.header.pts_raw33, Some(90_000));
+                        assert_eq!(pes.header.dts_raw33, Some(89_000));
+                        assert_eq!(pes.payload_len, 2 * FRAME);
+                        source_pes = true;
+                    }
+                }
+                Event::Packet(packet) => {
+                    assert!(source_pes);
+                    assert_eq!(packet.payload(), &BYTES[count * FRAME..(count + 1) * FRAME]);
+                    assert_eq!(packet.track_info().codec(), CodecId::Dts);
+                    assert!(packet.track_info().stream().codec().is_none());
+                    assert!(packet.track_info().stream().descriptor_bytes.is_empty());
+                    assert_eq!(packet.track_info().codec_tag(), &[0x06]);
+                    assert_eq!(packet.pts(), (count == 0).then_some(90_000));
+                    assert_eq!(packet.dts(), (count == 0).then_some(89_000));
+                    count += 1;
+                }
+                _ => (),
+            }
+        }
+        assert_eq!(count, 2);
+    }
+}
+
+#[test]
+fn automatic_core_probe_refuses_false_positives_and_ambiguous_routes() {
+    let valid = &BYTES[..2 * FRAME];
+    let mut damaged = valid.to_vec();
+    damaged[FRAME] ^= 1;
+    let mut prefixed = vec![0];
+    prefixed.extend_from_slice(valid);
+    for (payload, descriptors, stream_id, ambiguous) in [
+        (&valid[..4], &[][..], 0xbd, false),
+        (&valid[..FRAME], &[], 0xbd, false),
+        (&valid[..2 * FRAME - 1], &[], 0xbd, false),
+        (damaged.as_slice(), &[], 0xbd, false),
+        (prefixed.as_slice(), &[], 0xbd, false),
+        (valid, &[], 0xc0, false),
+        (valid, &[0x05, 4, b'A', b'C', b'-', b'3'], 0xbd, false),
+        (valid, &[], 0xbd, true),
+    ] {
+        let mut ts = Transport::new();
+        let mut streams = vec![(0x06, PID, descriptors)];
+        if ambiguous {
+            streams.push((0x06, PID + 1, &[]));
+        }
+        ts.tables(&streams, 0);
+        ts.pes(PID, stream_id, payload, Some(90_000), None);
+        // A later valid PES cannot rescue a failed initial probe.
+        ts.pes(PID, 0xbd, valid, None, None);
+        let mut drive = Drive::new(&ts.bytes, probe_limits(), 7, 1);
+        while let Some(event) = drive.next().unwrap() {
+            assert!(!matches!(event, Event::Packet(_)));
+        }
+    }
+}
+
+#[test]
+fn automatic_core_probe_does_not_keep_identity_after_a_map_change() {
+    let mut ts = Transport::new();
+    ts.tables(&[(0x06, PID, &[])], 0);
+    ts.pes(PID, 0xbd, &BYTES[..2 * FRAME], Some(90_000), None);
+    ts.tables(&[(0x06, PID, &[0x05, 4, b'A', b'C', b'-', b'3'])], 1);
+    ts.pes(PID, 0xbd, &BYTES[..2 * FRAME], Some(91_920), None);
+    let mut drive = Drive::new(&ts.bytes, probe_limits(), 7, 1);
+    let mut count = 0;
+    while let Some(event) = drive.next().unwrap() {
+        if matches!(event, Event::Packet(_)) {
+            count += 1;
+        }
+    }
+    assert_eq!(count, 2);
+}
+
+// Reuse the hash tooling without coupling this test to the separate seek module.
+#[allow(clippy::duplicate_mod)]
+#[path = "../../../../xtask/src/sha256.rs"]
+mod probe_sha256;
+
+#[test]
+#[ignore = "requires SHA-pinned FATE dts/dts.ts via TRIERGON_DTS_TS"]
+fn automatic_core_probe_fate_matches_explicit_selection() {
+    let path = std::env::var("TRIERGON_DTS_TS").expect("TRIERGON_DTS_TS");
+    assert_eq!(
+        probe_sha256::file_hex(std::path::Path::new(&path)).unwrap(),
+        "749561299cf838d55f52d5697f78c273a6c381c5e6c8300f859dfe23252ae2c2"
+    );
+    let bytes = std::fs::read(path).unwrap();
+    let mut traces = Vec::new();
+    for automatic in [false, true] {
+        let mut drive = Drive::new(
+            &bytes,
+            ReaderLimits {
+                program: Some(1),
+                probe_unlabelled_dts_core: automatic,
+                unlabelled_dts_core: (!automatic).then_some(UnlabelledCore {
+                    program: 1,
+                    pid: PID,
+                }),
+                pcr_policy: PcrPolicy::IgnoreReservedBits,
+                ..ReaderLimits::default()
+            },
+            4096,
+            8192,
+        );
+        let mut trace = Vec::new();
+        while let Some(event) = drive.next().unwrap() {
+            if let Event::Packet(packet) = event {
+                trace.push((
+                    packet.payload().to_vec(),
+                    packet.pts(),
+                    packet.dts(),
+                    packet.duration(),
+                ));
+            }
+        }
+        assert_eq!(trace.len(), 253);
+        traces.push(trace);
+    }
+    assert_eq!(traces[0], traces[1]);
+}
+
+#[test]
+fn automatic_probe_keeps_explicit_selection_valid_for_split_initial_frames() {
+    let mut ts = Transport::new();
+    ts.tables(&[(0x06, PID, &[])], 0);
+    ts.pes(PID, 0xbd, &BYTES[..7], Some(90_000), None);
+    ts.pes(PID, 0xbd, &BYTES[7..2 * FRAME], None, None);
+    let mut drive = Drive::new(
+        &ts.bytes,
+        ReaderLimits {
+            unlabelled_dts_core: Some(UnlabelledCore {
+                program: PROGRAM,
+                pid: PID,
+            }),
+            ..probe_limits()
+        },
+        7,
+        1,
+    );
+    let mut count = 0;
+    while let Some(event) = drive.next().unwrap() {
+        if matches!(event, Event::Packet(_)) {
+            count += 1;
+        }
+    }
+    assert_eq!(count, 2);
+}

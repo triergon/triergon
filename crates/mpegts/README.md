@@ -285,6 +285,45 @@ packet events. Track metadata, original PES, and transport diagnostics remain
 visible for every stream. Reset keeps the selection until the reader is closed.
 A closed reader with a selection needs to be constructed again.
 
+Set `ReaderLimits::probe_unlabelled_dts_core` to identify an unlabelled private
+route from two complete canonical big-endian DTS core envelopes in its initial
+PES. The default remains disabled. Admission requires empty program descriptors,
+a unique private-data entry with no descriptors, `private_stream_1`, elementary
+offset zero and matching sample rate, channel mode and block count. The probe
+reads at most 32768 bytes with cooperative work, retains the original charged
+PES across yields and allocates no payload storage. Source PMT, PES and clock
+facts stay unchanged. A failed initial probe remains unsupported; subsequent PES
+cannot rescue it. Map, clock and byte-run changes require fresh evidence.
+`unlabelled_dts_core` still permits explicit selection with split initial frames.
+The initial unsupported-track observation precedes probe admission; admitted
+packets and `Reader::tracks()` expose the separately inferred codec.
+
+This envelope check does not certify decoded audio. The existing DVB DTS
+classifier remains available under a declared DVB namespace. ATSC has no DTS
+mapping in that classifier. Registration-based DTS and Blu-ray stream types,
+word-swapped and 14-bit packing, split initial frames, multiple unlabelled private
+routes and descriptor-bearing unidentified entries are not admitted by this
+probe. Framing can recognize the packing syncwords, but transport admission
+currently supports only canonical core envelopes.
+
+The ignored `automatic_core_probe_fate_matches_explicit_selection` test checks
+all 253 packet payloads, PTS, DTS and durations against explicit selection for
+FATE `dts/dts.ts`, SHA-256
+`749561299cf838d55f52d5697f78c273a6c381c5e6c8300f859dfe23252ae2c2`.
+Set `TRIERGON_DTS_TS` to that file and run
+`CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test container_reader automatic_core_probe_fate -- --ignored`.
+
+Ordinary program and stream discovery with the pinned FFmpeg transport-dts
+build classifies program 1 / PID 256 as `bin_data` and emits 127 PES packets.
+The automatic reader emits 253 DTS access units. The required explicit
+declaration comparison covers DTS access units, and automatic-discovery
+qualification is open on both targets.
+
+```sh
+.research/reference-transport-dts/install/bin/ffprobe -v error -count_packets \
+  -show_programs -show_streams -of json "$TRIERGON_DTS_TS"
+```
+
 Repeated sections that match the active PAT or PMT retain each occurrence's
 source ranges. The reader reuses the accepted table when the bytes match.
 
