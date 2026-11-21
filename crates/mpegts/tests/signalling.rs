@@ -297,3 +297,33 @@ fn pmt_video_descriptor_parsing_yields_cancels_and_keeps_owned_raw_source() {
     );
     assert_eq!(map.source_ranges.as_slice()[0].entity, SourceId(1));
 }
+
+#[test]
+fn unimplemented_video_and_enhancement_tags_stay_opaque_tracks() {
+    use triergon_core::container::{CodecId, MediaKind, TrackInfo};
+
+    // These tags are outside the reader's supported codec map. Keep the tag
+    // and every descriptor byte even when a caller recognizes the codec.
+    for stream_type in [0x33, 0x36] {
+        let budget = Budget::new(1 << 20).unwrap();
+        let descriptors = [0xee, 4, 0, 0x47, 0xff, 1];
+        let section = map_section(&[], stream_type, &descriptors, &budget);
+        let mut reader = PmtReader::new(&section, &budget, ParseLimits::default()).unwrap();
+        let map = loop {
+            match reader
+                .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
+                .unwrap()
+            {
+                TableStep::Output(map) => break map,
+                TableStep::Yield => {}
+                TableStep::Done => panic!("PMT disappeared"),
+            }
+        };
+        let stream = &map.streams.as_slice()[0];
+        assert_eq!(stream.codec_tag(), &[stream_type]);
+        assert_eq!(TrackInfo::codec(stream), CodecId::Other(&[stream_type]));
+        assert_eq!(stream.kind(), MediaKind::Unknown);
+        assert_eq!(stream.descriptor_bytes.as_ref(), descriptors);
+        assert!(stream.configuration().is_empty());
+    }
+}
