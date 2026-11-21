@@ -35,7 +35,7 @@ mod step;
 pub mod storage;
 pub mod timing;
 mod track;
-pub mod zlib;
+mod zlib;
 
 pub use configuration::{CodecState, Configuration, Initialization, InitializationOrigin};
 pub use hdr10_plus::{
@@ -97,6 +97,9 @@ impl Default for Limits {
     }
 }
 
+#[cfg(test)]
+#[path = "../tests/support/deflate.rs"]
+mod deflate_kit;
 #[cfg(test)]
 #[path = "../tests/support/ebml.rs"]
 mod ebml_kit;

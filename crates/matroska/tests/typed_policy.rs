@@ -1,123 +1,17 @@
 //! Resource/work and cancellation regressions for retained typed operations.
+#[path = "support/deflate.rs"]
+mod deflate;
 #[path = "support/ebml.rs"]
 mod ebml;
 use ebml::{element as e, mkv};
 use std::sync::atomic::AtomicBool;
 use triergon_core::Step;
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
-use triergon_matroska::{
-    Error, Event, Limits, ParseStep, Reader,
-    storage::SharedBytes,
-    zlib::{InflateLimits, Inflater},
-};
-#[derive(Default)]
-struct Bits {
-    bytes: Vec<u8>,
-    used: usize,
-}
-impl Bits {
-    fn put(&mut self, value: u32, width: usize) {
-        for bit in 0..width {
-            if self.used.is_multiple_of(8) {
-                self.bytes.push(0);
-            }
-            let index = self.used / 8;
-            self.bytes[index] |= (((value >> bit) & 1) as u8) << (self.used % 8);
-            self.used += 1;
-        }
-    }
-    fn fixed(&mut self, symbol: u32) {
-        let (code, width) = match symbol {
-            0..=143 => (symbol + 0x30, 8),
-            144..=255 => (symbol - 144 + 0x190, 9),
-            256..=279 => (symbol - 256, 7),
-            280..=287 => (symbol - 280 + 0xc0, 8),
-            _ => panic!("authored fixed symbol"),
-        };
-        self.put(code.reverse_bits() >> (32 - width), width);
-    }
-}
-fn repeated(repeats: usize) -> (Vec<u8>, Vec<u8>) {
-    let mut bits = Bits::default();
-    bits.put(1, 1);
-    bits.put(1, 2);
-    bits.fixed(u32::from(b'a'));
-    for _ in 0..repeats {
-        bits.fixed(285);
-        bits.put(0, 5);
-    }
-    bits.fixed(256);
-    let expected = vec![b'a'; 1 + 258 * repeats];
-    let (mut a, mut b) = (1_u32, 0_u32);
-    for byte in &expected {
-        a = (a + u32::from(*byte)) % 65521;
-        b = (b + a) % 65521;
-    }
-    let mut source = vec![120, 1];
-    source.extend(bits.bytes);
-    source.extend(((b << 16) | a).to_be_bytes());
-    (source, expected)
-}
-
-#[test]
-fn inflater_growth_retains_both_allocations_and_yields_before_copying_the_live_prefix() {
-    let (raw, expected) = repeated(1);
-    let pool = Budget::new(64 * 1024).unwrap();
-    let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
-    let mut decoder = Inflater::new(
-        source,
-        InflateLimits {
-            output_bytes: 4096,
-            expansion_ratio: 1024,
-            work: 1_000_000,
-        },
-        &pool,
-    )
-    .unwrap();
-    let cancel = AtomicBool::new(false);
-    for _ in 0..20_000 {
-        if decoder.output_len() == 256 {
-            break;
-        }
-        assert!(matches!(
-            decoder.step(&mut WorkBudget::new(1), &cancel).unwrap(),
-            ParseStep::Yield
-        ));
-    }
-    assert_eq!(decoder.output_len(), 256);
-    let before = pool.used();
-    let mut work = WorkBudget::new(1);
-    assert!(matches!(
-        decoder.step(&mut work, &cancel).unwrap(),
-        ParseStep::Yield
-    ));
-    assert!(work.spent() <= 1);
-    assert_eq!(
-        decoder.output_len(),
-        256,
-        "one allocation step must not synchronously copy the old output and publish another byte"
-    );
-    assert!(
-        pool.used() >= before + 512,
-        "old and replacement allocations must stay charged while the growth copy is pending"
-    );
-    let mut result = None;
-    for _ in 0..20_000 {
-        match decoder.step(&mut WorkBudget::new(1), &cancel).unwrap() {
-            ParseStep::Yield => (),
-            ParseStep::Event(value) => {
-                result = Some(value);
-                break;
-            }
-            other => panic!("bounded growth must finish: {other:?}"),
-        }
-    }
-    assert_eq!(result.unwrap().as_ref(), expected.as_slice());
-}
+use triergon_matroska::{Error, Event, Limits, Reader};
 
 #[test]
 fn an_atomic_frame_larger_than_its_own_pool_minimum_is_a_permanent_limit_not_an_endless_wait() {
-    let (compressed, _) = repeated(128);
+    let (compressed, _) = deflate::repeated(128);
     let encoding = e(
         0x6d80,
         &e(
@@ -193,52 +87,4 @@ fn an_atomic_frame_larger_than_its_own_pool_minimum_is_a_permanent_limit_not_an_
         Some("operation retained storage"),
         "no caller retains a packet/configuration or reservation; repeated own-storage pressure ({pressure} polls) must be permanent"
     );
-}
-
-#[test]
-fn cancelling_an_incomplete_growth_releases_both_capacities_without_a_partial_event() {
-    let (raw, _) = repeated(128);
-    let pool = Budget::new(128 * 1024).unwrap();
-    let baseline = pool.used();
-    let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
-    let mut decoder = Inflater::new(
-        source,
-        InflateLimits {
-            output_bytes: 64 * 1024,
-            expansion_ratio: 1024,
-            work: 1_000_000,
-        },
-        &pool,
-    )
-    .unwrap();
-    let cancel = AtomicBool::new(false);
-    let mut pending = false;
-    for _ in 0..100_000 {
-        let len = decoder.output_len();
-        let before = pool.used();
-        let mut work = WorkBudget::new(1);
-        let result = decoder.step(&mut work, &cancel).unwrap();
-        assert!(work.spent() <= 1);
-        assert!(matches!(result, ParseStep::Yield));
-        if len > 2048 && decoder.output_len() == len && pool.used() > before {
-            pending = true;
-            break;
-        }
-    }
-    assert!(
-        pending,
-        "the authored stream must pause with old and replacement buffers live"
-    );
-    let mut work = WorkBudget::new(1);
-    assert!(matches!(
-        decoder.step(&mut work, &AtomicBool::new(true)),
-        Err(Error::Cancelled)
-    ));
-    assert_eq!(work.spent(), 0);
-    assert!(matches!(
-        decoder.step(&mut WorkBudget::new(1), &cancel),
-        Err(Error::Invalid(_))
-    ));
-    drop(decoder);
-    assert_eq!(pool.used(), baseline);
 }

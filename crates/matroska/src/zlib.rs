@@ -1,60 +1,21 @@
 //! Independent bounded zlib/DEFLATE reader, specified by RFC 1950 and RFC 1951.
 //! No preset dictionary is available in Matroska ContentCompression.
+// The public items are reachable through `reference_trace::zlib`.
+#![cfg_attr(not(feature = "reference-trace"), allow(unreachable_pub))]
 use crate::{Error, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 mod inflater;
 pub use inflater::Inflater;
 
-/// Charged blocking decoder. A single final stored stream preserves the legacy
-/// exact-capacity copy and checksum path; other streams drive the resumable
-/// decoder. Source and output stay in the same live-capacity pool.
-pub fn decompress_in(
-    source: &crate::storage::SharedBytes,
-    limits: InflateLimits,
-    cancel: &AtomicBool,
-    pool: &triergon_core::Budget,
-) -> Result<crate::storage::SharedBytes> {
-    if !source.belongs_to(pool) {
-        return Err(Error::ForeignPool);
-    }
-    if let Some(range) = stored_range(source, limits, cancel)? {
-        // Stored length is known and validated. Speculative capacity here can
-        // exhaust the existing cumulative decoded-capacity policy for later
-        // laces, although all decoded bytes fit. Keep the policy, reserve only
-        // this payload, and leave every allocation attached to its pool charge.
-        if range.is_empty() {
-            return Ok(crate::storage::SharedBytes::default());
-        }
-        let mut output = triergon_core::BudgetVec::new(pool);
-        output.try_reserve_exact(range.len())?;
-        output.try_extend_from_slice(&source[range])?;
-        let bytes = output.freeze().map_err(|error| error.error)?;
-        return Ok(crate::storage::SharedBytes::from_core(bytes));
-    }
-    let mut decoder = Inflater::new(source.clone(), limits, pool)?;
-    loop {
-        match decoder.step(&mut triergon_core::WorkBudget::new(8192), cancel)? {
-            crate::step::ParseStep::Event(bytes) => return Ok(bytes),
-            crate::step::ParseStep::Yield => (),
-            crate::step::ParseStep::Backpressure {
-                requested,
-                available,
-            } => {
-                return Err(Error::Backpressure(triergon_core::Backpressure {
-                    requested,
-                    available,
-                }));
-            }
-            _ => return Err(Error::Invalid("unexpected inflate input transition")),
-        }
-    }
-}
-
+/// The bounds of one inflated stream.
 #[derive(Clone, Copy, Debug)]
 pub struct InflateLimits {
+    /// Most decoded bytes.
     pub output_bytes: usize,
+    /// Most decoded bytes per input byte.
     pub expansion_ratio: usize,
+    /// Most work units: one per block, symbol and checksum chunk.
     pub work: u64,
 }
 
@@ -122,6 +83,10 @@ impl Bits<'_> {
     }
 }
 
+// A one-shot decoder for comparison with an independent zlib; the reader inflates
+// through `Inflater`. Kept apart so the reader's inlining is the same with and
+// without the comparison caller.
+#[cfg(any(test, feature = "reference-trace"))]
 struct Huffman {
     quick: [u16; 512],
     counts: [u16; 16],
@@ -130,6 +95,7 @@ struct Huffman {
     symbols: [u16; 288],
     max: usize,
 }
+#[cfg(any(test, feature = "reference-trace"))]
 impl Huffman {
     fn build(lengths: &[u8], code_lengths: bool) -> Result<Self> {
         let mut tree = Self {
@@ -210,6 +176,7 @@ impl Huffman {
     }
 }
 
+#[cfg(any(test, feature = "reference-trace"))]
 fn dynamic(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman)> {
     let literals = bits.take(5)? as usize + 257;
     let distances = bits.take(5)? as usize + 1;
@@ -252,6 +219,7 @@ fn dynamic(bits: &mut Bits<'_>) -> Result<(Huffman, Huffman)> {
     ))
 }
 
+#[cfg(any(test, feature = "reference-trace"))]
 fn fixed() -> &'static (Huffman, Huffman) {
     static TREES: std::sync::OnceLock<(Huffman, Huffman)> = std::sync::OnceLock::new();
     TREES.get_or_init(|| {
@@ -265,6 +233,7 @@ fn fixed() -> &'static (Huffman, Huffman) {
     })
 }
 
+#[cfg(any(test, feature = "reference-trace"))]
 fn reserve(out: &mut Vec<u8>, extra: usize, limit: usize, initial: usize) -> Result<()> {
     let total = out.len().checked_add(extra).ok_or(Error::Overflow)?;
     if total > limit {
@@ -341,9 +310,10 @@ fn header(data: &[u8]) -> Result<usize> {
     Ok(1_usize << ((data[0] >> 4) + 8))
 }
 
+#[cfg(any(test, feature = "reference-trace"))]
 /// Validate a single final stored block and borrow its decoded payload in-place.
 /// The same checksum and resource rules apply to this packet-buffer fast path.
-pub(crate) fn stored_range(
+fn stored_range(
     data: &[u8],
     limits: InflateLimits,
     cancel: &AtomicBool,
@@ -387,6 +357,7 @@ pub(crate) fn stored_range(
     Ok(Some(range))
 }
 
+#[cfg(any(test, feature = "reference-trace"))]
 /// Decode one complete RFC 1950 stream, with checked output, ratio and work limits.
 /// No bytes are returned until the checksum has been verified.
 pub fn decompress(data: &[u8], limits: InflateLimits, cancel: &AtomicBool) -> Result<Vec<u8>> {

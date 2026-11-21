@@ -1042,6 +1042,8 @@ impl State {
 }
 
 #[cfg(test)]
+mod stream_tests;
+#[cfg(test)]
 mod tests;
 
 crate::storage::usage::storage!(Inflater, |s| [

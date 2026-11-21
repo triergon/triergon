@@ -1,70 +1,12 @@
-//! RFC-authored DEFLATE fixtures. The bit writer is independent of the decoder.
+//! The inflater over whole streams: every block type under every work schedule,
+//! history copies, backpressure, cancellation and permanent limits.
+use super::Inflater;
+use crate::deflate_kit::{Bits, repeated, wrap};
+use crate::zlib::InflateLimits;
+use crate::{Error, step::ParseStep, storage::SharedBytes};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
-use triergon_matroska::{
-    Error, ParseStep,
-    storage::SharedBytes,
-    zlib::{InflateLimits, Inflater},
-};
 
-struct Bits {
-    data: Vec<u8>,
-    used: usize,
-}
-impl Bits {
-    fn new() -> Self {
-        Self {
-            data: Vec::new(),
-            used: 0,
-        }
-    }
-    fn put(&mut self, value: u32, width: usize) {
-        for bit in 0..width {
-            if self.used.is_multiple_of(8) {
-                self.data.push(0);
-            }
-            if value & (1 << bit) != 0 {
-                let last = self.data.len() - 1;
-                self.data[last] |= 1 << (self.used % 8);
-            }
-            self.used += 1;
-        }
-    }
-    fn fixed(&mut self, symbol: u32) {
-        let (code, width) = match symbol {
-            0..=143 => (0x30 + symbol, 8),
-            144..=255 => (0x190 + symbol - 144, 9),
-            256..=279 => (symbol - 256, 7),
-            280..=287 => (0xc0 + symbol - 280, 8),
-            _ => panic!("fixture symbol"),
-        };
-        self.put(code.reverse_bits() >> (32 - width), width);
-    }
-}
-fn wrap(raw: Vec<u8>, expected: &[u8]) -> Vec<u8> {
-    let (mut a, mut b) = (1_u32, 0_u32);
-    for byte in expected {
-        a = (a + u32::from(*byte)) % 65521;
-        b = (b + a) % 65521;
-    }
-    [
-        vec![0x78, 0x01],
-        raw,
-        ((b << 16) | a).to_be_bytes().to_vec(),
-    ]
-    .concat()
-}
-fn fixed_match() -> (Vec<u8>, Vec<u8>) {
-    let mut bits = Bits::new();
-    bits.put(1, 1);
-    bits.put(1, 2);
-    bits.fixed(u32::from(b'a'));
-    bits.fixed(285);
-    bits.put(0, 5);
-    bits.fixed(256);
-    let expected = vec![b'a'; 259];
-    (wrap(bits.data, &expected), expected)
-}
 fn dynamic() -> (Vec<u8>, Vec<u8>) {
     let mut bits = Bits::new();
     dynamic_block(&mut bits, true);
@@ -353,7 +295,7 @@ fn successive_dynamic_blocks_replace_code_lengths_literals_and_empty_distance_ta
 
 #[test]
 fn literal_backpressure_under_larger_steps_keeps_exact_permanent_work_and_cancel_state() {
-    let (input, expected) = fixed_match();
+    let (input, expected) = repeated(1);
     for units in [2, 3, 7, 8192] {
         let pool = Budget::new(64 * 1024).unwrap();
         let source = SharedBytes::copy_from_slice(&pool, &input).unwrap();
@@ -488,7 +430,7 @@ fn multi_stored_batches_and_checksum_boundaries_preserve_exact_bytes_and_work_po
 
 #[test]
 fn history_copy_retry_keeps_the_middle_of_an_overlapping_match() {
-    let (input, expected) = fixed_match();
+    let (input, expected) = repeated(1);
     let pool = Budget::new(64 * 1024).unwrap();
     let source = SharedBytes::copy_from_slice(&pool, &input).unwrap();
     let mut decoder = Inflater::new(source, limits(), &pool).unwrap();
@@ -601,7 +543,7 @@ fn empty_decoded_event_after_checksum_needs_no_empty_storage_owner() {
 #[test]
 fn all_deflate_block_types_progress_with_one_unit_and_keep_output_private_until_checksum() {
     let stored = vec![120, 1, 1, 3, 0, 252, 255, 97, 98, 99, 2, 77, 1, 39];
-    for (input, expected) in [(stored, b"abc".to_vec()), fixed_match(), dynamic()] {
+    for (input, expected) in [(stored, b"abc".to_vec()), repeated(1), dynamic()] {
         let pool = Budget::new(1024 * 1024).unwrap();
         let baseline = pool.used();
         let source = SharedBytes::copy_from_slice(&pool, &input).unwrap();
@@ -634,7 +576,7 @@ fn all_deflate_block_types_progress_with_one_unit_and_keep_output_private_until_
 
 #[test]
 fn inflate_backpressure_preserves_literal_or_match_state_for_retry() {
-    let (input, expected) = fixed_match();
+    let (input, expected) = repeated(1);
     let pool = Budget::new(64 * 1024).unwrap();
     let source = SharedBytes::copy_from_slice(&pool, &input).unwrap();
     let mut inflater = Inflater::new(source, limits(), &pool).unwrap();
@@ -674,7 +616,7 @@ fn inflate_backpressure_preserves_literal_or_match_state_for_retry() {
 
 #[test]
 fn corrupt_checksum_cancellation_and_permanent_limits_never_publish_partial_output() {
-    let (input, _) = fixed_match();
+    let (input, _) = repeated(1);
     for corrupt in [true, false] {
         let pool = Budget::new(64 * 1024).unwrap();
         let mut input = input.clone();
@@ -724,4 +666,108 @@ fn corrupt_checksum_cancellation_and_permanent_limits_never_publish_partial_outp
             .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .is_err()
     );
+}
+
+#[test]
+fn inflater_growth_retains_both_allocations_and_yields_before_copying_the_live_prefix() {
+    let (raw, expected) = repeated(1);
+    let pool = Budget::new(64 * 1024).unwrap();
+    let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+    let mut decoder = Inflater::new(
+        source,
+        InflateLimits {
+            output_bytes: 4096,
+            expansion_ratio: 1024,
+            work: 1_000_000,
+        },
+        &pool,
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    for _ in 0..20_000 {
+        if decoder.output_len() == 256 {
+            break;
+        }
+        assert!(matches!(
+            decoder.step(&mut WorkBudget::new(1), &cancel).unwrap(),
+            ParseStep::Yield
+        ));
+    }
+    assert_eq!(decoder.output_len(), 256);
+    let before = pool.used();
+    let mut work = WorkBudget::new(1);
+    assert!(matches!(
+        decoder.step(&mut work, &cancel).unwrap(),
+        ParseStep::Yield
+    ));
+    assert!(work.spent() <= 1);
+    assert_eq!(
+        decoder.output_len(),
+        256,
+        "one allocation step must not synchronously copy the old output and publish another byte"
+    );
+    assert!(
+        pool.used() >= before + 512,
+        "old and replacement allocations must stay charged while the growth copy is pending"
+    );
+    let mut result = None;
+    for _ in 0..20_000 {
+        match decoder.step(&mut WorkBudget::new(1), &cancel).unwrap() {
+            ParseStep::Yield => (),
+            ParseStep::Event(value) => {
+                result = Some(value);
+                break;
+            }
+            other => panic!("bounded growth must finish: {other:?}"),
+        }
+    }
+    assert_eq!(result.unwrap().as_ref(), expected.as_slice());
+}
+
+#[test]
+fn cancelling_an_incomplete_growth_releases_both_capacities_without_a_partial_event() {
+    let (raw, _) = repeated(128);
+    let pool = Budget::new(128 * 1024).unwrap();
+    let baseline = pool.used();
+    let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+    let mut decoder = Inflater::new(
+        source,
+        InflateLimits {
+            output_bytes: 64 * 1024,
+            expansion_ratio: 1024,
+            work: 1_000_000,
+        },
+        &pool,
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut pending = false;
+    for _ in 0..100_000 {
+        let len = decoder.output_len();
+        let before = pool.used();
+        let mut work = WorkBudget::new(1);
+        let result = decoder.step(&mut work, &cancel).unwrap();
+        assert!(work.spent() <= 1);
+        assert!(matches!(result, ParseStep::Yield));
+        if len > 2048 && decoder.output_len() == len && pool.used() > before {
+            pending = true;
+            break;
+        }
+    }
+    assert!(
+        pending,
+        "the authored stream must pause with old and replacement buffers live"
+    );
+    let mut work = WorkBudget::new(1);
+    assert!(matches!(
+        decoder.step(&mut work, &AtomicBool::new(true)),
+        Err(Error::Cancelled)
+    ));
+    assert_eq!(work.spent(), 0);
+    assert!(matches!(
+        decoder.step(&mut WorkBudget::new(1), &cancel),
+        Err(Error::Invalid(_))
+    ));
+    drop(decoder);
+    assert_eq!(pool.used(), baseline);
 }

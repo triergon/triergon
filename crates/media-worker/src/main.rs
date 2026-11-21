@@ -625,12 +625,16 @@ fn seek_trace(data: Vec<u8>, words: &[String], playback: bool) -> Outcome {
 /// `inflate FILE [OUTPUT_BYTES [EXPANSION_RATIO [WORK]]]`.
 #[inline(never)]
 fn inflate(data: &[u8], words: &[String]) -> Outcome {
-    let limits = triergon_matroska::zlib::InflateLimits {
+    let limits = triergon_matroska::reference_trace::zlib::InflateLimits {
         output_bytes: words.first().map_or(Ok(16 * 1024 * 1024), |s| s.parse())?,
         expansion_ratio: words.get(1).map_or(Ok(1024), |s| s.parse())?,
         work: words.get(2).map_or(Ok(128 * 1024 * 1024), |s| s.parse())?,
     };
-    let bytes = triergon_matroska::zlib::decompress(data, limits, &AtomicBool::new(false))?;
+    let bytes = triergon_matroska::reference_trace::zlib::decompress(
+        data,
+        limits,
+        &AtomicBool::new(false),
+    )?;
     println!("{}", quoted(&hex(&bytes)));
     Ok(())
 }

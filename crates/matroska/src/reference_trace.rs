@@ -12,3 +12,9 @@
 //! branch.
 
 pub use crate::reader::blocking::seek_initial_trim;
+
+/// The reader's zlib decoder and the one-shot decoder the harness compares with an
+/// independent zlib.
+pub mod zlib {
+    pub use crate::zlib::{InflateLimits, Inflater, decompress};
+}
