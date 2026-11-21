@@ -3861,7 +3861,7 @@
     {
       "id": "combined-services",
       "profile": "descriptors",
-      "file": "harness/features/dvb-source/inputs/combined-services.ts",
+      "file": "harness/features/dvb-source/authored/combined-services.ts",
       "sha256": "95cbe2f47853bc613482ecf9521995b0b64dd53c7c6b6dc34452cd44d515db32",
       "rights": "authored-synthetic",
       "arguments": [
@@ -3876,7 +3876,7 @@
     {
       "id": "separate-descriptors",
       "profile": "descriptors",
-      "file": "harness/features/dvb-source/inputs/separate-descriptors.ts",
+      "file": "harness/features/dvb-source/authored/separate-descriptors.ts",
       "sha256": "1a2346dc1b16f6afcb9f11f56e5c68b392d2286355ec9210b20d25ca80a93fa1",
       "rights": "authored-synthetic",
       "arguments": [

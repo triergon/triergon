@@ -109,7 +109,7 @@
     {
       "id": "attachments",
       "profile": "attachments",
-      "file": "harness/features/renderer-context/inputs/attachments.mkv",
+      "file": "harness/features/renderer-context/authored/attachments.mkv",
       "sha256": "bfa24a4f55cb6a5a95dad76849d01e0d53f97c125e4c79c5d9af863fff5738ce",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -122,7 +122,7 @@
     {
       "id": "ass-stream-basic",
       "profile": "streams",
-      "file": "harness/features/renderer-context/inputs/ass-stream-basic.mkv",
+      "file": "harness/features/renderer-context/authored/ass-stream-basic.mkv",
       "sha256": "33ff43148d732b135e3d52ab701a3abf1219df390d3c601bba87354623f12362",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -135,7 +135,7 @@
     {
       "id": "ass-stream-fonts",
       "profile": "streams",
-      "file": "harness/features/renderer-context/inputs/ass-stream-fonts.mkv",
+      "file": "harness/features/renderer-context/authored/ass-stream-fonts.mkv",
       "sha256": "bf5117633315f1be9664eee2ddc572a55eee2ed3de669e659225d1fcf0250c94",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -148,7 +148,7 @@
     {
       "id": "ass-stream-read-order-overflow",
       "profile": "streams",
-      "file": "harness/features/renderer-context/inputs/ass-stream-read-order-overflow.mkv",
+      "file": "harness/features/renderer-context/authored/ass-stream-read-order-overflow.mkv",
       "sha256": "de09531e5038c7b2aa62c89a87eecd4f04fb05bea109332640718f6ef6e1e884",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -161,7 +161,7 @@
     {
       "id": "ass-stream-read-order",
       "profile": "streams",
-      "file": "harness/features/renderer-context/inputs/ass-stream-read-order.mkv",
+      "file": "harness/features/renderer-context/authored/ass-stream-read-order.mkv",
       "sha256": "de09531e5038c7b2aa62c89a87eecd4f04fb05bea109332640718f6ef6e1e884",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -174,7 +174,7 @@
     {
       "id": "ass-stream-styles",
       "profile": "streams",
-      "file": "harness/features/renderer-context/inputs/ass-stream-styles.mkv",
+      "file": "harness/features/renderer-context/authored/ass-stream-styles.mkv",
       "sha256": "089252b0a97cf3a8ef4d7423acb47c7c57d2e756ac45caa8098004a74ee27ea1",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -187,7 +187,7 @@
     {
       "id": "ass-render-stream-change",
       "profile": "streams",
-      "file": "harness/features/renderer-context/inputs/ass-render-stream-change.mkv",
+      "file": "harness/features/renderer-context/authored/ass-render-stream-change.mkv",
       "sha256": "fdcd629d8f2f7e8bb564a22ce25a1af312ea3ed71d54d390551031635c6588ec",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -200,7 +200,7 @@
     {
       "id": "ass-render-stream-fallback",
       "profile": "streams",
-      "file": "harness/features/renderer-context/inputs/ass-render-stream-fallback.mkv",
+      "file": "harness/features/renderer-context/authored/ass-render-stream-fallback.mkv",
       "sha256": "5e2e6bc02e544c267fcac15ecee55c9f2516cbc1d514601b421668c869c367d6",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -213,7 +213,7 @@
     {
       "id": "ass-render-stream-fonts",
       "profile": "streams",
-      "file": "harness/features/renderer-context/inputs/ass-render-stream-fonts.mkv",
+      "file": "harness/features/renderer-context/authored/ass-render-stream-fonts.mkv",
       "sha256": "a9ce224caf648c95440efc7879e8065150e49c75f7cdea3ad212fd3d8631d4ad",
       "rights": "authored-synthetic",
       "arguments": [],

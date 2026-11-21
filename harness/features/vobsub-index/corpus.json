@@ -4668,11 +4668,11 @@
     {
       "id": "multi",
       "profile": "authored",
-      "file": "harness/features/vobsub-index/inputs/multi.idx",
+      "file": "harness/features/vobsub-index/authored/multi.idx",
       "sha256": "27b8e77cb7e43f6da101db661bb281319c7946710b3286dbc60c783c506b83be",
       "rights": "authored-synthetic",
       "arguments": [
-        "harness/features/vobsub-index/inputs/multi.idx",
+        "harness/features/vobsub-index/authored/multi.idx",
         ".research/subtitle-corpus/dvd/basic.sub"
       ],
       "companions": [
@@ -4690,11 +4690,11 @@
     {
       "id": "default-first",
       "profile": "authored",
-      "file": "harness/features/vobsub-index/inputs/default-first.idx",
+      "file": "harness/features/vobsub-index/authored/default-first.idx",
       "sha256": "79d3d3ea2845f2e6ef65936ab7f448514a620412980514258dc82dc4cebc7c17",
       "rights": "authored-synthetic",
       "arguments": [
-        "harness/features/vobsub-index/inputs/default-first.idx",
+        "harness/features/vobsub-index/authored/default-first.idx",
         ".research/subtitle-corpus/dvd/basic.sub"
       ],
       "companions": [
@@ -4712,11 +4712,11 @@
     {
       "id": "default-out-of-range",
       "profile": "authored",
-      "file": "harness/features/vobsub-index/inputs/default-out-of-range.idx",
+      "file": "harness/features/vobsub-index/authored/default-out-of-range.idx",
       "sha256": "9001b3dda0e75585e9b31e613d034a210f38fe4ca0437d4694d99153fa431dd7",
       "rights": "authored-synthetic",
       "arguments": [
-        "harness/features/vobsub-index/inputs/default-out-of-range.idx",
+        "harness/features/vobsub-index/authored/default-out-of-range.idx",
         ".research/subtitle-corpus/dvd/basic.sub"
       ],
       "companions": [
@@ -4734,11 +4734,11 @@
     {
       "id": "delay-across-track",
       "profile": "authored",
-      "file": "harness/features/vobsub-index/inputs/delay-across-track.idx",
+      "file": "harness/features/vobsub-index/authored/delay-across-track.idx",
       "sha256": "bf7fe88fdbfcdda6f2988a8212aa2150bc7dae2a16d6ee4de57d339cb458c167",
       "rights": "authored-synthetic",
       "arguments": [
-        "harness/features/vobsub-index/inputs/delay-across-track.idx",
+        "harness/features/vobsub-index/authored/delay-across-track.idx",
         ".research/subtitle-corpus/dvd/basic.sub"
       ],
       "companions": [
@@ -4756,11 +4756,11 @@
     {
       "id": "missing-index",
       "profile": "authored",
-      "file": "harness/features/vobsub-index/inputs/missing-index.idx",
+      "file": "harness/features/vobsub-index/authored/missing-index.idx",
       "sha256": "795275740af737c97b0703182380ed056536e45ab74d4b36a3109641e4cea3db",
       "rights": "authored-synthetic",
       "arguments": [
-        "harness/features/vobsub-index/inputs/missing-index.idx",
+        "harness/features/vobsub-index/authored/missing-index.idx",
         ".research/subtitle-corpus/dvd/basic.sub"
       ],
       "companions": [
@@ -4778,11 +4778,11 @@
     {
       "id": "malformed-id",
       "profile": "authored",
-      "file": "harness/features/vobsub-index/inputs/malformed-id.idx",
+      "file": "harness/features/vobsub-index/authored/malformed-id.idx",
       "sha256": "878c90d2c4c2e0821a2ce5816aa080969d0606aa7b7c69e4617c0e2eaf7df582",
       "rights": "authored-synthetic",
       "arguments": [
-        "harness/features/vobsub-index/inputs/malformed-id.idx",
+        "harness/features/vobsub-index/authored/malformed-id.idx",
         ".research/subtitle-corpus/dvd/basic.sub"
       ],
       "companions": [
@@ -4800,11 +4800,11 @@
     {
       "id": "large-index",
       "profile": "authored",
-      "file": "harness/features/vobsub-index/inputs/large-index.idx",
+      "file": "harness/features/vobsub-index/authored/large-index.idx",
       "sha256": "1efbd645a563e68326b0a427781cf24fbef4923900bd5df99f58299f19302013",
       "rights": "authored-synthetic",
       "arguments": [
-        "harness/features/vobsub-index/inputs/large-index.idx",
+        "harness/features/vobsub-index/authored/large-index.idx",
         ".research/subtitle-corpus/dvd/basic.sub"
       ],
       "companions": [
@@ -4822,11 +4822,11 @@
     {
       "id": "crlf",
       "profile": "authored",
-      "file": "harness/features/vobsub-index/inputs/crlf.idx",
+      "file": "harness/features/vobsub-index/authored/crlf.idx",
       "sha256": "83ac5787ac4d985e49076d145db135ca2d26096dd4665a4d6d02616dde56cf04",
       "rights": "authored-synthetic",
       "arguments": [
-        "harness/features/vobsub-index/inputs/crlf.idx",
+        "harness/features/vobsub-index/authored/crlf.idx",
         ".research/subtitle-corpus/dvd/basic.sub"
       ],
       "companions": [
@@ -4844,11 +4844,11 @@
     {
       "id": "long-timestamp",
       "profile": "authored",
-      "file": "harness/features/vobsub-index/inputs/long-timestamp.idx",
+      "file": "harness/features/vobsub-index/authored/long-timestamp.idx",
       "sha256": "4f64673e095fd4740a46266aa0a9cf96a401c73195e250d55a3da9a54527c927",
       "rights": "authored-synthetic",
       "arguments": [
-        "harness/features/vobsub-index/inputs/long-timestamp.idx",
+        "harness/features/vobsub-index/authored/long-timestamp.idx",
         ".research/subtitle-corpus/dvd/basic.sub"
       ],
       "companions": [

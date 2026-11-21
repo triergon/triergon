@@ -129,7 +129,9 @@ def write_corpora(out):
     cases = defaultdict(list)
 
     def file(feature, name, data):
-        relative = Path("harness/features") / feature / "inputs" / name
+        mixed = {"dvb-source", "pgs-segments", "renderer-context", "tx3g-configuration", "vobsub-index"}
+        folder = "authored" if feature in mixed else "inputs"
+        relative = Path("harness/features") / feature / folder / name
         dest = out / relative
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(data)

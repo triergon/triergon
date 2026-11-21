@@ -7705,7 +7705,7 @@
     {
       "id": "authored-packet-16-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7718,7 +7718,7 @@
     {
       "id": "authored-packet-16-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-01.bin",
       "sha256": "7cb7c4547cf2653590d7a9ace60cc623d25148adfbc88a89aeb0ef88da7839ba",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7731,7 +7731,7 @@
     {
       "id": "authored-packet-16-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-02.bin",
       "sha256": "d57e9d4f5842134f140032eaf38b5333638e8c4b145fcf86a23d48d3e9acc0f8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7744,7 +7744,7 @@
     {
       "id": "authored-packet-16-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-03.bin",
       "sha256": "576be531fd2efa1bb101faaa9a281ac224b5d372d2881f067de0bcb0e231333d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7757,7 +7757,7 @@
     {
       "id": "authored-packet-16-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-04.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-04.bin",
       "sha256": "43b6156e40451a46b98fbfffb1e870a5c09d6cd9403005d59efea79b2ff4eb48",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7770,7 +7770,7 @@
     {
       "id": "authored-packet-16-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-05.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-05.bin",
       "sha256": "00afdc428c1437251062a136a24694fbe39451096931fbb1b2cda48283b031b4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7783,7 +7783,7 @@
     {
       "id": "authored-packet-16-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-06.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-06.bin",
       "sha256": "22895ccaa71f2f3290a3d209e8b69bc59fd190900e057f4ed28f5c8278f879e7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7796,7 +7796,7 @@
     {
       "id": "authored-packet-16-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-07.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-07.bin",
       "sha256": "583ac07744e00199b07e6648741efefc9987c15b17f9b4f41c9c3c0350d65f5e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7809,7 +7809,7 @@
     {
       "id": "authored-packet-16-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-08.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-08.bin",
       "sha256": "2ab7e48c1f2414caf426f989f881a94041584647bfe23c34d54f2733e957d497",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7822,7 +7822,7 @@
     {
       "id": "authored-packet-16-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-09.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-09.bin",
       "sha256": "2613058ea6568201057ca31e4017069ff8ef27351c4784ece06f521d83395166",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7835,7 +7835,7 @@
     {
       "id": "authored-packet-16-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-10.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-10.bin",
       "sha256": "18da9ea76246923bd3bb6d8daf19a41701bcbe9a2f686eca23c7c59bf5ac5bb8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7848,7 +7848,7 @@
     {
       "id": "authored-packet-16-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-11.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-11.bin",
       "sha256": "13910a2224656c809b75d2f551049cb9ed1f61a89b83c193fdabe3c2ec7ac6d0",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7861,7 +7861,7 @@
     {
       "id": "authored-packet-16-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-12.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-12.bin",
       "sha256": "316af2ffd485a0bc003f8b673ff73a5e0ebce162b54652db4be0fd874c9ac144",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7874,7 +7874,7 @@
     {
       "id": "authored-packet-16-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-13.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-13.bin",
       "sha256": "906afd6387185305961e17c7410aea4fafb729322de7fd4b2feafb0fc99d7a7c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7887,7 +7887,7 @@
     {
       "id": "authored-packet-16-14",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-14.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-14.bin",
       "sha256": "33963137aaec5a2725399202b4fe49c68d11b8b6110b4d8ae49efda833c578b8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7900,7 +7900,7 @@
     {
       "id": "authored-packet-16-15",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-15.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-15.bin",
       "sha256": "0195313de71bad8c5c6ca864303f8ec1469955cb4a91b78b908bcdff679b950c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7913,7 +7913,7 @@
     {
       "id": "authored-packet-16-16",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-16.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-16.bin",
       "sha256": "013dbd1e057bfebc09fc829c8e572da15c8ab966c427c1767f23b26fa9fe757c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7926,7 +7926,7 @@
     {
       "id": "authored-packet-16-17",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-17.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-17.bin",
       "sha256": "a6e23a6f5362990a0e9fdf4318bf46eb903db86b161e8f4add29fa1dfb29f124",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7939,7 +7939,7 @@
     {
       "id": "authored-packet-16-18",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-18.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-18.bin",
       "sha256": "30629775e5ecaab34f3c136e7559887441da722d94c4b8de7353e42b29d94025",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7952,7 +7952,7 @@
     {
       "id": "authored-packet-16-19",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-19.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-19.bin",
       "sha256": "da7c14aed8929d6c725ee9e8ffea0fb2de9e307694a8cfafc18280a2300b75b0",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7965,7 +7965,7 @@
     {
       "id": "authored-packet-16-20",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-20.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-20.bin",
       "sha256": "04b43ed19177967fa65f9bfe91e8d442a5a0f0f9c3f9b2d32ed65f7f6352d1a6",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7978,7 +7978,7 @@
     {
       "id": "authored-packet-16-21",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-21.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-21.bin",
       "sha256": "731d5b38cfb2f6af903748f143a972fc81740338481b8eb1814c77bdea8b2a75",
       "rights": "authored-synthetic",
       "arguments": [
@@ -7991,7 +7991,7 @@
     {
       "id": "authored-packet-16-22",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-22.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-22.bin",
       "sha256": "b07178793bb69cbd5c4ea4db79ce01246843e445b4e11dd80cd26ff26a26b162",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8004,7 +8004,7 @@
     {
       "id": "authored-packet-16-23",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-23.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-23.bin",
       "sha256": "d23d10a139f8c3d17c2c5ca840b7de30191b756dc79be5f59aae647acf48318d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8017,7 +8017,7 @@
     {
       "id": "authored-packet-16-24",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-24.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-24.bin",
       "sha256": "6b9d5ea626bd6fe0bcca75635035d80a8b53f73571dca35d7dc2102740e15e6d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8030,7 +8030,7 @@
     {
       "id": "authored-packet-16-25",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-25.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-25.bin",
       "sha256": "e62a19055e2ec1606c1b00dd513bb1aca42eee6a53e6561824e6f17df59cede3",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8043,7 +8043,7 @@
     {
       "id": "authored-packet-16-26",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-26.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-26.bin",
       "sha256": "6dba45c0285a11a66bbdaaec751c584c0194034c1dc7384872d3c79970dfe22e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8056,7 +8056,7 @@
     {
       "id": "authored-packet-16-27",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-27.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-27.bin",
       "sha256": "66e11bfd098bf4360e3856c22d3a5de00dac3d1f8c79c72ab37ef03b43eded41",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8069,7 +8069,7 @@
     {
       "id": "authored-packet-16-28",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-28.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-28.bin",
       "sha256": "ab92d17767e0a5a2bf3087c8f21f973e04abe822ee20a48be5f328f25437e82d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8082,7 +8082,7 @@
     {
       "id": "authored-packet-16-29",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-29.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-29.bin",
       "sha256": "e3312718fbaf96ca9e62149a7cbce7e3c62f4f3e3f34c58c8fd51ad7de5adc82",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8095,7 +8095,7 @@
     {
       "id": "authored-packet-16-30",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-16-30.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-16-30.bin",
       "sha256": "ac1e50827bd9732038d7f4847b632bdef630ba6502d55b5a905d62eca61f04fe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8108,7 +8108,7 @@
     {
       "id": "typed-packet-16-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-00.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-00.bin",
       "sha256": "f05e7dfd5c005433273ce43ac5970762c9c688f2eae4e0a45401785f96aaad5e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8121,7 +8121,7 @@
     {
       "id": "typed-packet-16-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-01.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-01.bin",
       "sha256": "b6dedf0c7f6010d77da95afc3406f9ba84b633b5a0ec282c20fb8e702e0486a1",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8134,7 +8134,7 @@
     {
       "id": "typed-packet-16-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-02.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-02.bin",
       "sha256": "e9a2ede9408ed788813602713a7a6dc3687c05e3817e38ee76073e9d5f471177",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8147,7 +8147,7 @@
     {
       "id": "typed-packet-16-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-03.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-03.bin",
       "sha256": "e76bdc93c62af3de4133898c82ed4f4ef249c6d11adb3b5cc7002854e817a48b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8160,7 +8160,7 @@
     {
       "id": "typed-packet-16-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-04.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-04.bin",
       "sha256": "30ace734e6197765251cbb62fcdd8fa627919dfc504cb50cf735405720c1f2f0",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8173,7 +8173,7 @@
     {
       "id": "typed-packet-16-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-05.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-05.bin",
       "sha256": "acedc757fab28c91fb8a44bfc5ead733a3964fed2caac05dbdf4f0bb069b903d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8186,7 +8186,7 @@
     {
       "id": "typed-packet-16-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-06.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-06.bin",
       "sha256": "c5e5837393b7b343295cffd274b57fb9c78c0ec2d464c629d59aa837d31200e2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8199,7 +8199,7 @@
     {
       "id": "typed-packet-16-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-07.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-07.bin",
       "sha256": "0ec3ae3ca5a4ab5fae3ba87e71e5acab3e27aa6ceae8a48d1debd81ace2cadc7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8212,7 +8212,7 @@
     {
       "id": "typed-packet-16-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-08.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-08.bin",
       "sha256": "6b8f7c089155077df98712667865e3409869977c7a48ad67445b416c490b2a1b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8225,7 +8225,7 @@
     {
       "id": "typed-packet-16-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-09.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-09.bin",
       "sha256": "e250536292611943149c6c006186911e8e98c2f1003efde488a7b3e0033d5851",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8238,7 +8238,7 @@
     {
       "id": "typed-packet-16-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-10.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-10.bin",
       "sha256": "c1f49b4a00d6f3b5055f5821e10e466c9022cf1803f5529f0458ebbabe4e3e5e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8251,7 +8251,7 @@
     {
       "id": "typed-packet-16-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-11.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-11.bin",
       "sha256": "06d9745a14c708a72cb6aaeef68fb140020780d9613758ed9cd529c1e0e55d57",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8264,7 +8264,7 @@
     {
       "id": "typed-packet-16-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-12.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-12.bin",
       "sha256": "fe848eba3250d63c1f29b273354570029fe63def357b353ea9f3286d662950d8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8277,7 +8277,7 @@
     {
       "id": "typed-packet-16-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-13.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-13.bin",
       "sha256": "7a2b3e2fb03557709e7f59e918cc17e51503507ed17e267c3c2e2b07286da89a",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8290,7 +8290,7 @@
     {
       "id": "typed-packet-16-14",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-14.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-14.bin",
       "sha256": "393b0f38278abb547c0aa5cbb19085f992f36c457f3c8d1b92f4108044c59dcd",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8303,7 +8303,7 @@
     {
       "id": "typed-packet-16-15",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-15.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-15.bin",
       "sha256": "f77593e1154a61f8fe017518bb4781bdcab3a853e3f7674e5fb2ce67e14148fa",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8316,7 +8316,7 @@
     {
       "id": "typed-packet-16-16",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-16.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-16.bin",
       "sha256": "bf6892417b65e843b6fb23ec472ea65ed1ce7640e0ec77ff4112f42b46a5279a",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8329,7 +8329,7 @@
     {
       "id": "typed-packet-16-17",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-17.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-17.bin",
       "sha256": "488b9016b372271be83972ba87c4d580c544ddd9b0e45d1821e241cb533ef352",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8342,7 +8342,7 @@
     {
       "id": "typed-packet-16-18",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-18.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-18.bin",
       "sha256": "5a8c763dd01837769ac5f3160e4eebc43aac84aa984a422aed6e95ebdc068e98",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8355,7 +8355,7 @@
     {
       "id": "typed-packet-16-19",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-19.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-19.bin",
       "sha256": "b54a5ee1789018b7360cd0b4fc664f44a5fcbbde33a3551d06f8ccd3cba9c018",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8368,7 +8368,7 @@
     {
       "id": "typed-packet-16-20",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-20.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-20.bin",
       "sha256": "a5fc18eac5a43ec27e797e8d76642ee635e932edd2b326b786af880b0cb0488a",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8381,7 +8381,7 @@
     {
       "id": "typed-packet-16-21",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-21.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-21.bin",
       "sha256": "a8767b7479666f966ed59cf4f4e299bd2bc454e645b6a2c3c17c1115df669d1b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8394,7 +8394,7 @@
     {
       "id": "typed-packet-16-22",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-22.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-22.bin",
       "sha256": "483bc9422d12f23e0279d84fa7de2e1393272bc05e76f801b0b00563927bde75",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8407,7 +8407,7 @@
     {
       "id": "typed-packet-16-23",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-23.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-23.bin",
       "sha256": "4ef939b4ef548ae1f32fd2c94c65b5a9020f6c179bbf53d0530ecdfb1ebd1dc8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8420,7 +8420,7 @@
     {
       "id": "typed-packet-16-24",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-24.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-24.bin",
       "sha256": "0294faccb4de2e172ac9518a6f3599cf81d816aa20eab00674200d43797a0c95",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8433,7 +8433,7 @@
     {
       "id": "typed-packet-16-25",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-25.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-25.bin",
       "sha256": "850872f9a9b2a3118917d156dfe5cfc91e116b1fd77de8cbe651807a984a6b17",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8446,7 +8446,7 @@
     {
       "id": "typed-packet-16-26",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-16-26.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-16-26.bin",
       "sha256": "4ff3415edbce0c45fc432021edc7e6aadacd938b7408a2c8d37981807d47e48d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8459,7 +8459,7 @@
     {
       "id": "authored-sup-16-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8472,7 +8472,7 @@
     {
       "id": "authored-sup-16-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-01.bin",
       "sha256": "5c62e091b8c0565f1bafad0dad5934276143ae2ccef7a5381e8ada5b1a8d26d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8485,7 +8485,7 @@
     {
       "id": "authored-sup-16-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-02.bin",
       "sha256": "91f026c996feb33556b5d418d17e015945f305c96666b62e5c6284cc1df22a09",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8498,7 +8498,7 @@
     {
       "id": "authored-sup-16-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-03.bin",
       "sha256": "efadedd93727dd512852ce0c55922efebb9eb6bd84f15b8fd14431b0a6ad7b06",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8511,7 +8511,7 @@
     {
       "id": "authored-sup-16-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-04.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-04.bin",
       "sha256": "e5b41a82640e311dbe4da4c5075c054b24ab0464dbf5921bbe61d6667f1cca3b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8524,7 +8524,7 @@
     {
       "id": "authored-sup-16-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-05.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-05.bin",
       "sha256": "911e8913b023b1c18454c84e9c865195b0388009b17c5fcc6acee454b314979b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8537,7 +8537,7 @@
     {
       "id": "authored-sup-16-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-06.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-06.bin",
       "sha256": "1b88b944a27e60154c044a9b88f7e213a568a1090317addbd976d3241be97545",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8550,7 +8550,7 @@
     {
       "id": "authored-sup-16-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-07.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-07.bin",
       "sha256": "57432bd47ca701fa6a75a462f00c3e4acc20736785ffb0b5b811649ac9f8d3c8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8563,7 +8563,7 @@
     {
       "id": "authored-sup-16-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-08.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-08.bin",
       "sha256": "8e27502d787fa0cc641a6cc4d9e9eba3ca4b9d97685571c9c61344a65d4f1b59",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8576,7 +8576,7 @@
     {
       "id": "authored-sup-16-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-09.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-09.bin",
       "sha256": "f88fedb73626e948d9f4a289886d4ce786bcd9661c85b0105bdf889272ac63f5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8589,7 +8589,7 @@
     {
       "id": "authored-sup-16-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-10.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-10.bin",
       "sha256": "95f0f5dd2c38a04a4084d3e47a15b5ee3ecb873bb9000376dbb1d99ad3bbbb88",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8602,7 +8602,7 @@
     {
       "id": "authored-sup-16-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-11.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-11.bin",
       "sha256": "d24d41fa7081a8f2dc0ec4327c488a64ca41c35117e54e3d5e25c2151ee12815",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8615,7 +8615,7 @@
     {
       "id": "authored-sup-16-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-12.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-12.bin",
       "sha256": "121ee2d88417da751e40b363cb66bbfa5a82b037065e18532c72f2c197591ef5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8628,7 +8628,7 @@
     {
       "id": "authored-sup-16-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-13.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-13.bin",
       "sha256": "f20c77f3b514539d3e495f2ceba6ab90c2057eea237c73294d73b4e13f2df846",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8641,7 +8641,7 @@
     {
       "id": "authored-sup-16-14",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-14.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-14.bin",
       "sha256": "9941e21b43211f16a7ae8c9af023756ca43a55058f34d5deb5d70ccdfbfdf505",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8654,7 +8654,7 @@
     {
       "id": "authored-sup-16-15",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-15.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-15.bin",
       "sha256": "9f6cc98da498d97a80c614f60d19d4a2d77561678019f8a1212dbfd8a2206f44",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8667,7 +8667,7 @@
     {
       "id": "authored-sup-16-16",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-16.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-16.bin",
       "sha256": "9a143348343c2a40ecc2a08d46db10a1288dec44cc92f5851852b68321111342",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8680,7 +8680,7 @@
     {
       "id": "authored-sup-16-17",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-17.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-17.bin",
       "sha256": "a84311a56facb16b2e59da8a2665e332d7fa32dcfca15cdeb6af6d0fc5e09678",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8693,7 +8693,7 @@
     {
       "id": "authored-sup-16-18",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-18.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-18.bin",
       "sha256": "5e3144da6ead0a32af34a889c6d4b89731424fd10a8ff1dda932f475bc6f5e46",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8706,7 +8706,7 @@
     {
       "id": "authored-sup-16-19",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-19.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-19.bin",
       "sha256": "13b11f75312faa29002204d55ea5d1d531f16dfe0937777d520a3f6714a5a919",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8719,7 +8719,7 @@
     {
       "id": "authored-sup-16-20",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-20.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-20.bin",
       "sha256": "7ec868c6d4e9c1137b9142b0f8b4d1e07b7e63bbfddb62a5bfe9d40181620030",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8732,7 +8732,7 @@
     {
       "id": "authored-sup-16-21",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-21.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-21.bin",
       "sha256": "35bd459283f1ddc9943792319cc5278d0949a222a8bf87faddda05d9fb211d87",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8745,7 +8745,7 @@
     {
       "id": "authored-sup-16-22",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-22.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-22.bin",
       "sha256": "92161f9b80be9fceb3b58081d563d390c7b8c661b53e824d10a497bd2cf63f34",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8758,7 +8758,7 @@
     {
       "id": "authored-sup-16-23",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-23.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-23.bin",
       "sha256": "53afda71f07f0c7c95308f8b60cc25dc0fb646f9586b6c18190f2a59bb0f8116",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8771,7 +8771,7 @@
     {
       "id": "authored-sup-16-24",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-24.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-24.bin",
       "sha256": "6b8b3e169e31f394fcb55bdd0e6ad99d38280bee27d6e660afe0dd4dffc5084d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8784,7 +8784,7 @@
     {
       "id": "authored-sup-16-25",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-25.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-25.bin",
       "sha256": "6f06ed3bec9d158bf943efc227d4ce1fc56835496975358da4129093797aea22",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8797,7 +8797,7 @@
     {
       "id": "authored-sup-16-26",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-26.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-26.bin",
       "sha256": "5f4f204db41c1fae3e28f3a15247b06ab96f41cf8131f5b4cfdc497bec8b7012",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8810,7 +8810,7 @@
     {
       "id": "authored-sup-16-27",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-27.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-27.bin",
       "sha256": "5ff706a45beeba16ca9389feb24ab48a50dd5f15a6aa702aa293421cc8bab565",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8823,7 +8823,7 @@
     {
       "id": "authored-sup-16-28",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-28.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-28.bin",
       "sha256": "a8a8aab1fb521533f631e7b7eb3d1d93bf2b1e4427c53962ec9cd477eed38b48",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8836,7 +8836,7 @@
     {
       "id": "authored-sup-16-29",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-29.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-29.bin",
       "sha256": "b43030079353f6418634f7a0dfa22a84a5695b07ec3ba492cf9f6e798aa7d019",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8849,7 +8849,7 @@
     {
       "id": "authored-sup-16-30",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-30.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-30.bin",
       "sha256": "9c9cf6cb4216a61250e59c16f00256a11aff13cc0a02617cb59e577fd7f28216",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8862,7 +8862,7 @@
     {
       "id": "authored-sup-16-31",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-31.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-31.bin",
       "sha256": "37efee3fb3a6f4fb306a6837b891ec892f648c00b850ac6d51024319ca5940ea",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8875,7 +8875,7 @@
     {
       "id": "authored-sup-16-32",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-32.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-32.bin",
       "sha256": "b677bad25f253c2fe5fa9950fd36e140e15d45036b5b36437f19ee9dc6f73011",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8888,7 +8888,7 @@
     {
       "id": "authored-sup-16-33",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-33.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-33.bin",
       "sha256": "b43994453f794f2950658077691177605ded878044d4b183c99fa0b97661a982",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8901,7 +8901,7 @@
     {
       "id": "authored-sup-16-34",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-34.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-34.bin",
       "sha256": "bc11e4a37ffa2cd48b9c0e0130801d93c5cf8c9d3f026d24ce4fe67f79c671ab",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8914,7 +8914,7 @@
     {
       "id": "authored-sup-16-35",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-35.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-35.bin",
       "sha256": "4f84253163f7957dfc05acd39318de2a22e4b5155655bbfaf9a1c33440e21676",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8927,7 +8927,7 @@
     {
       "id": "authored-sup-16-36",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-36.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-36.bin",
       "sha256": "fac5c700091a20c77e9e97b7aabe32f49a49421aeac49b7ccbc46b21b75c7476",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8940,7 +8940,7 @@
     {
       "id": "authored-sup-16-37",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-37.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-37.bin",
       "sha256": "6f2d2d086a37c60bda922a74007ac067e700fe278f03d7baad2ec9cae6476eca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8953,7 +8953,7 @@
     {
       "id": "authored-sup-16-38",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-38.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-38.bin",
       "sha256": "474ec6192b7b24f48724f2ded1217664b84d9795c3ea5b0be9c10b87ed647316",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8966,7 +8966,7 @@
     {
       "id": "authored-sup-16-39",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-39.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-39.bin",
       "sha256": "243296a8ad799ffd62811b1dc3c541fd0feb4ceabeb3dc945c147bf37a8f39fa",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8979,7 +8979,7 @@
     {
       "id": "authored-sup-16-40",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-16-40.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-16-40.bin",
       "sha256": "5db171e3cb5008e186af7280c96becab91ed5516889b4bfd9107da3bb504fbab",
       "rights": "authored-synthetic",
       "arguments": [
@@ -8992,7 +8992,7 @@
     {
       "id": "typed-sup-16-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-00.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-00.bin",
       "sha256": "2c5bbfc884b47f830c91a830824fb4760d26e1342e0eede0e410c770cb3ec41e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9005,7 +9005,7 @@
     {
       "id": "typed-sup-16-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-01.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-01.bin",
       "sha256": "8631debfd67fb9ac4baa580a768b9021a426e7d67cfc9fbe56daced3def93e8a",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9018,7 +9018,7 @@
     {
       "id": "typed-sup-16-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-02.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-02.bin",
       "sha256": "7ad75afec405d071a52c185194c6ef88d22ff353e09390aa7557fe862e7f8cb8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9031,7 +9031,7 @@
     {
       "id": "typed-sup-16-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-03.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-03.bin",
       "sha256": "2837e5456ab432645b915fb1a815f600f4a118c211a1adbeaa99598eb9a8c8cb",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9044,7 +9044,7 @@
     {
       "id": "typed-sup-16-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-04.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-04.bin",
       "sha256": "e0ee9b06348b808f56b3b2414ba0c30123fa447f3daa6cc4962dfa2537ded127",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9057,7 +9057,7 @@
     {
       "id": "typed-sup-16-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-05.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-05.bin",
       "sha256": "809d0a60ea7fc79bc0f0d8c1d05417df3e5475c6ad2410bf1ed1d6b1db38c942",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9070,7 +9070,7 @@
     {
       "id": "typed-sup-16-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-06.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-06.bin",
       "sha256": "acfa96e0ed84caf8ca1a9182d32ba7e4b15b4027dbcd2c1702b5b7ff2a12dc57",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9083,7 +9083,7 @@
     {
       "id": "typed-sup-16-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-07.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-07.bin",
       "sha256": "28d3590972c5c6979639aa487945b9a4fe50a07e0b9d0d4ef4f66aa04c5eb161",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9096,7 +9096,7 @@
     {
       "id": "typed-sup-16-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-08.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-08.bin",
       "sha256": "2364dd47aec74ed141b0ef149538c9d288803267a4e3d7512270294b4031eda2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9109,7 +9109,7 @@
     {
       "id": "typed-sup-16-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-09.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-09.bin",
       "sha256": "8ec0738be62df310bc70cf9a9da40a365dcd85d82dbecb8751b8e146ca83b568",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9122,7 +9122,7 @@
     {
       "id": "typed-sup-16-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-10.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-10.bin",
       "sha256": "197150bf6f2434b02ed2a47ef76d2794472e949f93cc3437cf1c938ad4819034",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9135,7 +9135,7 @@
     {
       "id": "typed-sup-16-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-11.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-11.bin",
       "sha256": "091e8c04063b08206e7dfe137171d35e00905c723a766d0e74ea133127c541d6",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9148,7 +9148,7 @@
     {
       "id": "typed-sup-16-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-12.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-12.bin",
       "sha256": "09db0b379fadd03177c715e4e666176f701e3e0422c0b7415b22fb6a0b47035e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9161,7 +9161,7 @@
     {
       "id": "typed-sup-16-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-13.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-13.bin",
       "sha256": "06301feb904a0a0dc0f7e4fb8ccc08eea087f8aaa9c3cc7bd69f9865de48c5b8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9174,7 +9174,7 @@
     {
       "id": "typed-sup-16-14",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-14.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-14.bin",
       "sha256": "6e9a21e3c36a08bf051ffdb6d4fbf9817a4f1e1a3bef36edc4db6e426b459285",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9187,7 +9187,7 @@
     {
       "id": "typed-sup-16-15",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-15.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-15.bin",
       "sha256": "8d9924a573fecda88fbaae706e3905565d413b0da8c7e6ee829b5c2e9b86929c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9200,7 +9200,7 @@
     {
       "id": "typed-sup-16-16",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-16.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-16.bin",
       "sha256": "7fd6047eadbca301be5129fc375dec12cc00b7331cf8a692e15d6c04b361cf7c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9213,7 +9213,7 @@
     {
       "id": "typed-sup-16-17",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-17.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-17.bin",
       "sha256": "6e6cee15be292e4cb84300dfbbf1cbc5302b2331e73b7af0093da432c27d9b34",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9226,7 +9226,7 @@
     {
       "id": "typed-sup-16-18",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-18.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-18.bin",
       "sha256": "99c1398752f556aac29abb5c7d1e0731aade6db286a7312ad2b17e68159dd664",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9239,7 +9239,7 @@
     {
       "id": "typed-sup-16-19",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-19.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-19.bin",
       "sha256": "4f4564344bde1a78ba291e2e693c352d8ad3fcb76b425c7e881f255e0f522385",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9252,7 +9252,7 @@
     {
       "id": "typed-sup-16-20",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-20.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-20.bin",
       "sha256": "855168f0697ccde36cddf6f0afec584acca8399ef0bb88fc38bf9c2a502a7860",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9265,7 +9265,7 @@
     {
       "id": "typed-sup-16-21",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-21.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-21.bin",
       "sha256": "4dc42fd2ab667a52d7941116e1d28bfa872c19c93d89ef383dcc7e516517a873",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9278,7 +9278,7 @@
     {
       "id": "typed-sup-16-22",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-22.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-22.bin",
       "sha256": "3b50ce668733e9c4f2ef6cb9b5c2473c668ff7fdc9edd3393b91c318da64688c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9291,7 +9291,7 @@
     {
       "id": "typed-sup-16-23",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-23.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-23.bin",
       "sha256": "59548237836cea2e722dc02f2afe6886b6e7f41ea5e4f08a9e7f9d6154c63e7b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9304,7 +9304,7 @@
     {
       "id": "typed-sup-16-24",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-24.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-24.bin",
       "sha256": "a2646e6e581dc230638a15ebe1d210a2817d2c11f149cb1629b93621c101ef43",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9317,7 +9317,7 @@
     {
       "id": "typed-sup-16-25",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-25.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-25.bin",
       "sha256": "0a94ee587c9e1583f2752b70382267c4b2416c956e6e72358b1bc2f627cbcc4d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9330,7 +9330,7 @@
     {
       "id": "typed-sup-16-26",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-16-26.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-16-26.bin",
       "sha256": "77f89f6a10e25e335f019f6ffab88c46aa58f2fb665c8c268d88d13db051d716",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9343,7 +9343,7 @@
     {
       "id": "authored-packet-14-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9356,7 +9356,7 @@
     {
       "id": "authored-packet-14-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-01.bin",
       "sha256": "83891d7fe85c33e52c8b4e5814c92fb6a3b9467299200538a6babaa8b452d879",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9369,7 +9369,7 @@
     {
       "id": "authored-packet-14-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-02.bin",
       "sha256": "5aeca385d8b781825b07bbec7c858b7170426c88088935850bc13dd6402368a5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9382,7 +9382,7 @@
     {
       "id": "authored-packet-14-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-03.bin",
       "sha256": "35b4e6d0df7cd58839a3c8e11d8d565bbd53f1e3972a2ecd83337f63a02c12bf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9395,7 +9395,7 @@
     {
       "id": "authored-packet-14-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-04.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-04.bin",
       "sha256": "eab1cf7dc448247e06d992c7073ef6484d115b701fcdb1fd63b5054c67e97c59",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9408,7 +9408,7 @@
     {
       "id": "authored-packet-14-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-05.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-05.bin",
       "sha256": "b23185a78e29b86ed6366ee6d0611d04f06e29d5abddb195aff0bea567d20966",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9421,7 +9421,7 @@
     {
       "id": "authored-packet-14-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-06.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-06.bin",
       "sha256": "38d15e5752dc5188a949da2df01316ed4e735a363b772d1c6e60957edc555509",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9434,7 +9434,7 @@
     {
       "id": "authored-packet-14-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-07.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-07.bin",
       "sha256": "5631dff81da027abfefb5489c8adb87ef80c49d3f62a16a22ffa608e4521bc2b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9447,7 +9447,7 @@
     {
       "id": "authored-packet-14-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-08.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-08.bin",
       "sha256": "4a2ddc0367f4cc3d74a0b4805b7717b70bcdc142a1d7ef896b0bda08fddeca99",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9460,7 +9460,7 @@
     {
       "id": "authored-packet-14-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-09.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-09.bin",
       "sha256": "ac06e5966acfe76a57b8c45fcef3cbac89569b4cbb675868b2db0707db8ce42a",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9473,7 +9473,7 @@
     {
       "id": "authored-packet-14-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-10.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-10.bin",
       "sha256": "b3c6a98182ddca102a8e653ff5e53d86dddd23cf4c4dccd6b8b7d414207378a9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9486,7 +9486,7 @@
     {
       "id": "authored-packet-14-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-11.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-11.bin",
       "sha256": "e88da9c8752018b2e3c82dcaa6ad68864593417386b97773a1d46455a6491544",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9499,7 +9499,7 @@
     {
       "id": "authored-packet-14-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-12.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-12.bin",
       "sha256": "1dd664adbf53adf7ead511e9aebb80958b9962e7fdec75f8ade6d6a01928fa5b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9512,7 +9512,7 @@
     {
       "id": "authored-packet-14-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-13.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-13.bin",
       "sha256": "2380ce6e912604527d73809193516a393289fc0150029ac6ec3f3f53fe6e1ab4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9525,7 +9525,7 @@
     {
       "id": "authored-packet-14-14",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-14.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-14.bin",
       "sha256": "d4c614d8243c47f8d2cdc4db81d2d6be0c88ae9be6c782b5fa55c7eaae88fa20",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9538,7 +9538,7 @@
     {
       "id": "authored-packet-14-15",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-14-15.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-14-15.bin",
       "sha256": "b17bb3be208e041df1cd6a0cbf2c077a0d0d2a9b847de18c0621a9e7a733e375",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9551,7 +9551,7 @@
     {
       "id": "typed-packet-14-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-00.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-00.bin",
       "sha256": "aa21b28f8f172a6e85b275f6a82ad18e3a6ceaa88a671872a979bb1e02c49325",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9564,7 +9564,7 @@
     {
       "id": "typed-packet-14-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-01.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-01.bin",
       "sha256": "370e24d7922a82b8fc642371c336c759dec0b6382b78d0f5c5c1dfe58e8cb48c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9577,7 +9577,7 @@
     {
       "id": "typed-packet-14-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-02.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-02.bin",
       "sha256": "6e815506e4be4413d7559cd69d3f181bf5485de0daaecbddf5d7acdd05eb0043",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9590,7 +9590,7 @@
     {
       "id": "typed-packet-14-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-03.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-03.bin",
       "sha256": "74bb386bd8ee0169f92d1fb1e3360c7f5cf2a5a2aef30c1010a44d81d38658cf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9603,7 +9603,7 @@
     {
       "id": "typed-packet-14-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-04.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-04.bin",
       "sha256": "5e04f3ae20f1df39b670b698d164befc6815ae1e232def24ce922305a913d3e4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9616,7 +9616,7 @@
     {
       "id": "typed-packet-14-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-05.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-05.bin",
       "sha256": "de1b08b58cc097f89177b41acd310c6154c21c3fdfc326c544c70bf086b9a0ab",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9629,7 +9629,7 @@
     {
       "id": "typed-packet-14-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-06.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-06.bin",
       "sha256": "972a34ffb16c7fb454b86a92b5663ce7e35a1ba905f979903199e817ca157da5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9642,7 +9642,7 @@
     {
       "id": "typed-packet-14-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-07.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-07.bin",
       "sha256": "2f77c22d431016982509bfd74cb21ad877136d8cb9c74a877ae3be13211f9021",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9655,7 +9655,7 @@
     {
       "id": "typed-packet-14-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-08.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-08.bin",
       "sha256": "c7481137feded1d2e6ca37ec44d98d97e08fcd48d8f71c80bc03d44df2d2c1d1",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9668,7 +9668,7 @@
     {
       "id": "typed-packet-14-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-09.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-09.bin",
       "sha256": "389ebf73a818fc2d6dedcf7978adaeb5fff15d19c22cd56c52ca3cf2d9cdd55b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9681,7 +9681,7 @@
     {
       "id": "typed-packet-14-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-10.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-10.bin",
       "sha256": "ac98e34e7cdce1f8b56b4d81c2456d93e366dfbc001aa71e85716bbfdc444426",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9694,7 +9694,7 @@
     {
       "id": "typed-packet-14-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-14-11.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-14-11.bin",
       "sha256": "a427d141668b77a5ef5bd4d4f9936712957b234d0a7f4c208287f707708f4f9c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9707,7 +9707,7 @@
     {
       "id": "authored-sup-14-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9720,7 +9720,7 @@
     {
       "id": "authored-sup-14-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-01.bin",
       "sha256": "5c62e091b8c0565f1bafad0dad5934276143ae2ccef7a5381e8ada5b1a8d26d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9733,7 +9733,7 @@
     {
       "id": "authored-sup-14-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-02.bin",
       "sha256": "91f026c996feb33556b5d418d17e015945f305c96666b62e5c6284cc1df22a09",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9746,7 +9746,7 @@
     {
       "id": "authored-sup-14-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-03.bin",
       "sha256": "efadedd93727dd512852ce0c55922efebb9eb6bd84f15b8fd14431b0a6ad7b06",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9759,7 +9759,7 @@
     {
       "id": "authored-sup-14-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-04.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-04.bin",
       "sha256": "e5b41a82640e311dbe4da4c5075c054b24ab0464dbf5921bbe61d6667f1cca3b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9772,7 +9772,7 @@
     {
       "id": "authored-sup-14-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-05.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-05.bin",
       "sha256": "911e8913b023b1c18454c84e9c865195b0388009b17c5fcc6acee454b314979b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9785,7 +9785,7 @@
     {
       "id": "authored-sup-14-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-06.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-06.bin",
       "sha256": "1b88b944a27e60154c044a9b88f7e213a568a1090317addbd976d3241be97545",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9798,7 +9798,7 @@
     {
       "id": "authored-sup-14-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-07.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-07.bin",
       "sha256": "57432bd47ca701fa6a75a462f00c3e4acc20736785ffb0b5b811649ac9f8d3c8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9811,7 +9811,7 @@
     {
       "id": "authored-sup-14-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-08.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-08.bin",
       "sha256": "8e27502d787fa0cc641a6cc4d9e9eba3ca4b9d97685571c9c61344a65d4f1b59",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9824,7 +9824,7 @@
     {
       "id": "authored-sup-14-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-09.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-09.bin",
       "sha256": "f88fedb73626e948d9f4a289886d4ce786bcd9661c85b0105bdf889272ac63f5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9837,7 +9837,7 @@
     {
       "id": "authored-sup-14-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-10.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-10.bin",
       "sha256": "95f0f5dd2c38a04a4084d3e47a15b5ee3ecb873bb9000376dbb1d99ad3bbbb88",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9850,7 +9850,7 @@
     {
       "id": "authored-sup-14-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-11.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-11.bin",
       "sha256": "d5225af5ac0fcdc7400c925281f9c637dce2f10d56f4eeab33736386f8a9fc46",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9863,7 +9863,7 @@
     {
       "id": "authored-sup-14-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-12.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-12.bin",
       "sha256": "c0f29a5644f7317c44f578cd5787831f83333a20cb7e567e9ffc39a45f195c56",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9876,7 +9876,7 @@
     {
       "id": "authored-sup-14-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-13.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-13.bin",
       "sha256": "b10640790544e1435cbfa1616a7ec9fb736f3d7fc5812da989b5d3a45b21f48c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9889,7 +9889,7 @@
     {
       "id": "authored-sup-14-14",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-14.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-14.bin",
       "sha256": "6f8a23992c8393a6130119ccb97f696e29a5134eb77ca9685797143d506ab106",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9902,7 +9902,7 @@
     {
       "id": "authored-sup-14-15",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-15.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-15.bin",
       "sha256": "3084474c5243cf1d0e3e805ad2e3e5f324605b0d04c8b1b66dd8b8d2fa5dff36",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9915,7 +9915,7 @@
     {
       "id": "authored-sup-14-16",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-16.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-16.bin",
       "sha256": "f4a7fb884659e9fd6df0505e0e5c60dca80ba43032509f8171f75f365949697d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9928,7 +9928,7 @@
     {
       "id": "authored-sup-14-17",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-17.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-17.bin",
       "sha256": "cc53835e6a77875e092d6181f11570c110f3b0bf6fcaebd9b629a327228c8bad",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9941,7 +9941,7 @@
     {
       "id": "authored-sup-14-18",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-18.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-18.bin",
       "sha256": "2962d8c2d055e33502ed8f5d5806e18d0e3a1bb4541bc61d8ece782f39729405",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9954,7 +9954,7 @@
     {
       "id": "authored-sup-14-19",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-19.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-19.bin",
       "sha256": "9578f8e02e4cef8f84526eb467e187a983679b08b53cd70830f2f9ec6bbae887",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9967,7 +9967,7 @@
     {
       "id": "authored-sup-14-20",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-20.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-20.bin",
       "sha256": "0a62c7bd6df828c3c79968ca110a0558a208b4ecb7e1dee929b4750152a7a786",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9980,7 +9980,7 @@
     {
       "id": "authored-sup-14-21",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-21.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-21.bin",
       "sha256": "49ef04bb2c69fdf838397001532deb25e18ceda66c8cf453546d5527b6c34b4a",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9993,7 +9993,7 @@
     {
       "id": "authored-sup-14-22",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-22.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-22.bin",
       "sha256": "892fa2f9f461703cf9534bc9cd2ab92093adcb5e1c84a620ddb5b4d85ee75aeb",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10006,7 +10006,7 @@
     {
       "id": "authored-sup-14-23",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-23.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-23.bin",
       "sha256": "6de30e3011df42b654a21fbb38ce5755845bea2154cb3875024dae7d4924e71d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10019,7 +10019,7 @@
     {
       "id": "authored-sup-14-24",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-24.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-24.bin",
       "sha256": "a726db3deb5ba46183fbc88f977cb37c08f5039bb863cd8ad70f4cc5acdce7d9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10032,7 +10032,7 @@
     {
       "id": "authored-sup-14-25",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-14-25.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-14-25.bin",
       "sha256": "77d92c98d218bce56169ceb0ce56eda3d9db62827eec9af8334450485efe9b30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10045,7 +10045,7 @@
     {
       "id": "typed-sup-14-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-00.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-00.bin",
       "sha256": "8cffd6cf5ebe8115deffb3d4d10464bc3ff85db58c8aac36f7bea558e701a6da",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10058,7 +10058,7 @@
     {
       "id": "typed-sup-14-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-01.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-01.bin",
       "sha256": "b0135954889ac8f7b7a8aba2a55ed76f138a51217d112bb2735cd46a4b29a99c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10071,7 +10071,7 @@
     {
       "id": "typed-sup-14-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-02.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-02.bin",
       "sha256": "ee77b13cbc996b177c8505b9e9918fa3b939efc0899463e21b2ce8c16af4b48a",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10084,7 +10084,7 @@
     {
       "id": "typed-sup-14-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-03.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-03.bin",
       "sha256": "60cd43f0b46d7806b033154855cabdec67edf96788e94c3061bc834ff7701f04",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10097,7 +10097,7 @@
     {
       "id": "typed-sup-14-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-04.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-04.bin",
       "sha256": "fbf536ebee7b442870f51a8537b6c9ff8a5582b7186dcda264bdfaf8c42df3ac",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10110,7 +10110,7 @@
     {
       "id": "typed-sup-14-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-05.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-05.bin",
       "sha256": "139f4cd05b31b9ddcb24a094b2a2673f6ce4be42b337b2a3fe16ef7250231f6d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10123,7 +10123,7 @@
     {
       "id": "typed-sup-14-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-06.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-06.bin",
       "sha256": "5627c102cb727bc53e22b5ec1e7d99b6e2d95cc7000a4d77ee2a6b6b758d1d5d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10136,7 +10136,7 @@
     {
       "id": "typed-sup-14-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-07.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-07.bin",
       "sha256": "75107369c6717aacbde9a11b1f6bc9407c42f31bee4cd996433cedb66f330eb4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10149,7 +10149,7 @@
     {
       "id": "typed-sup-14-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-08.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-08.bin",
       "sha256": "82e0a8d13a77788457ff2e33cf07cf8eeae48495e20876a684909b1a40c7e838",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10162,7 +10162,7 @@
     {
       "id": "typed-sup-14-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-09.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-09.bin",
       "sha256": "98501a38befd3f71a03d12a9e23cd9a5b2916984cf9e4480b2ba203e9c6be26b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10175,7 +10175,7 @@
     {
       "id": "typed-sup-14-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-10.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-10.bin",
       "sha256": "56bda4b627ab8d424ebb03e62fd0a9cd6fc9b28eafe4350ac9eb423889b11fcd",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10188,7 +10188,7 @@
     {
       "id": "typed-sup-14-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-14-11.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-14-11.bin",
       "sha256": "6c006c3e9f5ebcdc70baa0ade6c256cdd0d1abdbc1a77fbb78da6b8e427e6878",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10201,7 +10201,7 @@
     {
       "id": "authored-packet-15-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10214,7 +10214,7 @@
     {
       "id": "authored-packet-15-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-01.bin",
       "sha256": "2f0fd1e89b8de1d57292742ec380ea47066e307ad645f5bc3adad8a06ff58608",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10227,7 +10227,7 @@
     {
       "id": "authored-packet-15-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-02.bin",
       "sha256": "78b4be1f9eeef9da65c393e4385f67edd142709b400ca7d900bd952e0c3cf727",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10240,7 +10240,7 @@
     {
       "id": "authored-packet-15-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-03.bin",
       "sha256": "9d9f0330378c2dedf055fc400be82688562f055592ac224692917ab4ed203fef",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10253,7 +10253,7 @@
     {
       "id": "authored-packet-15-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-04.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-04.bin",
       "sha256": "ac49719d03ce9f1adbc85d4bfb0f08ec09d187b6168ae87dbea37723a58cd0e0",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10266,7 +10266,7 @@
     {
       "id": "authored-packet-15-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-05.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-05.bin",
       "sha256": "6d7c228091ce64dcc22014e86cd39137c3cd5cb93c5b513e1a42cdf7aa629539",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10279,7 +10279,7 @@
     {
       "id": "authored-packet-15-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-06.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-06.bin",
       "sha256": "14e2c445247b0cc8d570e46abbfa625c24caf60fd9607b1f368dcbcdc3dd763f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10292,7 +10292,7 @@
     {
       "id": "authored-packet-15-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-07.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-07.bin",
       "sha256": "ad008013bdbd7d16d88b3c07330c3a15c6db3ba61e932e4f332bcdbd8b18b4e8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10305,7 +10305,7 @@
     {
       "id": "authored-packet-15-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-08.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-08.bin",
       "sha256": "7d5eba0002e19960946f7f45d317fba82f543da9f02e306ea0032e79d82bc306",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10318,7 +10318,7 @@
     {
       "id": "authored-packet-15-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-09.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-09.bin",
       "sha256": "a74772523cb0f3f9634cee4e882847f0d254ffbb9cec4cbc46235f8444f9db3e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10331,7 +10331,7 @@
     {
       "id": "authored-packet-15-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-10.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-10.bin",
       "sha256": "ae37f1074f62c40bc015363dd11b5b6e33a89af776f6cee68d8d1ce880cf6f24",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10344,7 +10344,7 @@
     {
       "id": "authored-packet-15-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-11.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-11.bin",
       "sha256": "9f227677b4f854677706155ab074c3471613db37c6d8b742ab4df65512d9513b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10357,7 +10357,7 @@
     {
       "id": "authored-packet-15-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-12.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-12.bin",
       "sha256": "ee5b4f34b99f267f58c8f84956e986635112f26b369831c647481f753a44455e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10370,7 +10370,7 @@
     {
       "id": "authored-packet-15-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-13.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-13.bin",
       "sha256": "258a673387fa6bda97280e6e0846606f3cabb2d8b590844235a125125fa6a7b2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10383,7 +10383,7 @@
     {
       "id": "authored-packet-15-14",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-14.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-14.bin",
       "sha256": "67550c785486c858ed39d6cfc9aa87255b348f05605ad0785e608a0f34277261",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10396,7 +10396,7 @@
     {
       "id": "authored-packet-15-15",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-15.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-15.bin",
       "sha256": "f6850d32838887c3d2a43e244ce3da6c50813a03eab9c642b7edadd13b663cc5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10409,7 +10409,7 @@
     {
       "id": "authored-packet-15-16",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-15-16.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-15-16.bin",
       "sha256": "17fbbbfc9b4b16df83eb7c375829af44c16b53b301201923d409a969c64d2c4e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10422,7 +10422,7 @@
     {
       "id": "typed-packet-15-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-00.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-00.bin",
       "sha256": "97e8b19801e1cd02962dc9fc19c389ffcd4da57c8fca9b1856f76188771d7680",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10435,7 +10435,7 @@
     {
       "id": "typed-packet-15-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-01.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-01.bin",
       "sha256": "ae79e0f4946c9fdd17f2bfe2e9c6e0f18708d73443e9cc89bf98f5156498015d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10448,7 +10448,7 @@
     {
       "id": "typed-packet-15-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-02.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-02.bin",
       "sha256": "d86380c718fcce1f754e458501c122a381c635de5b106d215dad5dbae4dd241a",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10461,7 +10461,7 @@
     {
       "id": "typed-packet-15-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-03.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-03.bin",
       "sha256": "edfbbe66d45e2ca9d1de6b72cecc4512c5ac4540bfdf1d55d1bd3617386b36fd",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10474,7 +10474,7 @@
     {
       "id": "typed-packet-15-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-04.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-04.bin",
       "sha256": "da7a2d41cdb08f0ea81188f477a1c6a87322229a05b044480cfe24282a403632",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10487,7 +10487,7 @@
     {
       "id": "typed-packet-15-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-05.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-05.bin",
       "sha256": "a952660d09ae5e3918b67679d316bd7394468876fe4f5feedcac60025f0c42ae",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10500,7 +10500,7 @@
     {
       "id": "typed-packet-15-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-06.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-06.bin",
       "sha256": "4885221fc76ca1c37200dd2bdf7518548305498220d05a55e65deaabdfcc1d50",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10513,7 +10513,7 @@
     {
       "id": "typed-packet-15-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-07.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-07.bin",
       "sha256": "ea4f97bd2eec33bdd1a6f9b5e682bdb32168390c69338dd361d737f52e72f1e3",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10526,7 +10526,7 @@
     {
       "id": "typed-packet-15-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-08.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-08.bin",
       "sha256": "35a9010cedf73725956013ee9377f68c93e6942a7112c5be218001f62ac69ee9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10539,7 +10539,7 @@
     {
       "id": "typed-packet-15-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-09.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-09.bin",
       "sha256": "673b12dfec84d6b790c0bbe895e126c88a1d04fa12255ae0805fbac3192c4a75",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10552,7 +10552,7 @@
     {
       "id": "typed-packet-15-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-10.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-10.bin",
       "sha256": "4ba33248d5db886aaca0240bde2b71e8213dd8db4dfc1216b422f1a7ea45e093",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10565,7 +10565,7 @@
     {
       "id": "typed-packet-15-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-11.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-11.bin",
       "sha256": "dbc0fbffa98d7a86fcfa6fbad00116a68f3af2d06e523eb32f24fe043336a46b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10578,7 +10578,7 @@
     {
       "id": "typed-packet-15-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-15-12.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-15-12.bin",
       "sha256": "8dabed96aec29534b8f5f63ef050af50be33dfdfae58061858bd220b25e434ce",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10591,7 +10591,7 @@
     {
       "id": "authored-sup-15-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10604,7 +10604,7 @@
     {
       "id": "authored-sup-15-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-01.bin",
       "sha256": "5c62e091b8c0565f1bafad0dad5934276143ae2ccef7a5381e8ada5b1a8d26d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10617,7 +10617,7 @@
     {
       "id": "authored-sup-15-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-02.bin",
       "sha256": "91f026c996feb33556b5d418d17e015945f305c96666b62e5c6284cc1df22a09",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10630,7 +10630,7 @@
     {
       "id": "authored-sup-15-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-03.bin",
       "sha256": "efadedd93727dd512852ce0c55922efebb9eb6bd84f15b8fd14431b0a6ad7b06",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10643,7 +10643,7 @@
     {
       "id": "authored-sup-15-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-04.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-04.bin",
       "sha256": "e5b41a82640e311dbe4da4c5075c054b24ab0464dbf5921bbe61d6667f1cca3b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10656,7 +10656,7 @@
     {
       "id": "authored-sup-15-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-05.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-05.bin",
       "sha256": "911e8913b023b1c18454c84e9c865195b0388009b17c5fcc6acee454b314979b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10669,7 +10669,7 @@
     {
       "id": "authored-sup-15-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-06.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-06.bin",
       "sha256": "1b88b944a27e60154c044a9b88f7e213a568a1090317addbd976d3241be97545",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10682,7 +10682,7 @@
     {
       "id": "authored-sup-15-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-07.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-07.bin",
       "sha256": "57432bd47ca701fa6a75a462f00c3e4acc20736785ffb0b5b811649ac9f8d3c8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10695,7 +10695,7 @@
     {
       "id": "authored-sup-15-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-08.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-08.bin",
       "sha256": "8e27502d787fa0cc641a6cc4d9e9eba3ca4b9d97685571c9c61344a65d4f1b59",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10708,7 +10708,7 @@
     {
       "id": "authored-sup-15-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-09.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-09.bin",
       "sha256": "f88fedb73626e948d9f4a289886d4ce786bcd9661c85b0105bdf889272ac63f5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10721,7 +10721,7 @@
     {
       "id": "authored-sup-15-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-10.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-10.bin",
       "sha256": "95f0f5dd2c38a04a4084d3e47a15b5ee3ecb873bb9000376dbb1d99ad3bbbb88",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10734,7 +10734,7 @@
     {
       "id": "authored-sup-15-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-11.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-11.bin",
       "sha256": "867f7069f3f979fc703a66d5c443666835bf3a66c81fb5ab6a4336e0b0f5d529",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10747,7 +10747,7 @@
     {
       "id": "authored-sup-15-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-12.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-12.bin",
       "sha256": "dae4810e134f8419094a3b59fd8a32caba2deb2c7a6ff58ac6a07234a5fc17d6",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10760,7 +10760,7 @@
     {
       "id": "authored-sup-15-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-13.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-13.bin",
       "sha256": "90ab53a1b4abc72bd60b3b0a06a16095d13c0a1660e3c825487d116cd6ae5f50",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10773,7 +10773,7 @@
     {
       "id": "authored-sup-15-14",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-14.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-14.bin",
       "sha256": "80386f29e5823d6fb9b08680c9a7bd87cb173edfa67ea716fe52aba771e1718e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10786,7 +10786,7 @@
     {
       "id": "authored-sup-15-15",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-15.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-15.bin",
       "sha256": "33af3f2097f13f7ea9e3bb80bb2ec6dd5672f7edf4d07c31d48481c558861f74",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10799,7 +10799,7 @@
     {
       "id": "authored-sup-15-16",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-16.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-16.bin",
       "sha256": "d98c80a733ea9702216b693ca5f232589264d5685bbbd7ccf126fe393b64ee8b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10812,7 +10812,7 @@
     {
       "id": "authored-sup-15-17",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-17.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-17.bin",
       "sha256": "3f3a171cf9c4b87f8e721867d9da42e87afaa6e6397573c1f9a1076a5ec6a49a",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10825,7 +10825,7 @@
     {
       "id": "authored-sup-15-18",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-18.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-18.bin",
       "sha256": "b7fe903e39adab52cb67051f694f3ba24358735e9f5f4aa79df061fdaf6d40eb",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10838,7 +10838,7 @@
     {
       "id": "authored-sup-15-19",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-19.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-19.bin",
       "sha256": "c7fb67d6fc1628d00ca31bbd788386bda8439e58f9653b6b70bde84692fbddb3",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10851,7 +10851,7 @@
     {
       "id": "authored-sup-15-20",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-20.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-20.bin",
       "sha256": "dc378024e5496de3be03030cb199aeee07898f94cce5985591f13904f9fd5232",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10864,7 +10864,7 @@
     {
       "id": "authored-sup-15-21",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-21.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-21.bin",
       "sha256": "0d563c205d0ace622a35a38a82e298b69b54dfea4233efc51f614b7823c0dcf2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10877,7 +10877,7 @@
     {
       "id": "authored-sup-15-22",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-22.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-22.bin",
       "sha256": "4a0b2d16e09189cf33d30259aa803fd4ad534322da492e0b133bcce43840b263",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10890,7 +10890,7 @@
     {
       "id": "authored-sup-15-23",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-23.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-23.bin",
       "sha256": "519dcaa3a9bd777f856bc08ed919615ddc00ab5e3d8b99a226845b344b5e5a04",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10903,7 +10903,7 @@
     {
       "id": "authored-sup-15-24",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-24.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-24.bin",
       "sha256": "533148b6bfc744159d602ef0b99903302e4a98db1dd297654c1aa1c0e4dc9f7e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10916,7 +10916,7 @@
     {
       "id": "authored-sup-15-25",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-25.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-25.bin",
       "sha256": "0554919322a726bee52e0a0604bc6615de6f64d0dd20238f74c2ba75f4520eef",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10929,7 +10929,7 @@
     {
       "id": "authored-sup-15-26",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-15-26.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-15-26.bin",
       "sha256": "6f9ba6bba3e7152b5dd600185adc39960b103712e22f9fc1280d2ba65cd17ca5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10942,7 +10942,7 @@
     {
       "id": "typed-sup-15-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-00.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-00.bin",
       "sha256": "ee8937f9705cc60cb49ed03ee096d9e58599fa145c85baf5f1da9ad463486e11",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10955,7 +10955,7 @@
     {
       "id": "typed-sup-15-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-01.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-01.bin",
       "sha256": "203770eb01c1920d00498024fa60d0300171a2cce4dd6377a6c8d43a7706569e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10968,7 +10968,7 @@
     {
       "id": "typed-sup-15-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-02.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-02.bin",
       "sha256": "4d08e8348c20259601adb002b4cf12a25d9cfc6af9fe3130f084e087a08332e0",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10981,7 +10981,7 @@
     {
       "id": "typed-sup-15-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-03.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-03.bin",
       "sha256": "7da1ed0ef4ed803e1491b34dba11d1186f4c92a30fc7d6bd23067a4ffc14c422",
       "rights": "authored-synthetic",
       "arguments": [
@@ -10994,7 +10994,7 @@
     {
       "id": "typed-sup-15-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-04.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-04.bin",
       "sha256": "d5f0fb13e0bc5b12b7ea5e9308236f34db7424386e5106bfb49a9992a3a33454",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11007,7 +11007,7 @@
     {
       "id": "typed-sup-15-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-05.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-05.bin",
       "sha256": "034a3d1c50cfedb6ae27db157def41e5c23cdd21b7f87fb6728e65785f2ec5cc",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11020,7 +11020,7 @@
     {
       "id": "typed-sup-15-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-06.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-06.bin",
       "sha256": "2b5c111db3bc19b10d9ce85b048954eaef9a5f875cc88ef49c2ee844e772e55e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11033,7 +11033,7 @@
     {
       "id": "typed-sup-15-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-07.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-07.bin",
       "sha256": "a4a0215936e9d5708ff58c0e15ba69248fe3eb59ba7e2024fe774028e0c578c0",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11046,7 +11046,7 @@
     {
       "id": "typed-sup-15-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-08.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-08.bin",
       "sha256": "f2fa59b38ba76d7e841c2918e4759123a10125353a38b54f9195df0de9230848",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11059,7 +11059,7 @@
     {
       "id": "typed-sup-15-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-09.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-09.bin",
       "sha256": "27d948c04a53c5005e1512af98676c407c884eec510def1f7eaddc6aa5755495",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11072,7 +11072,7 @@
     {
       "id": "typed-sup-15-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-10.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-10.bin",
       "sha256": "d4df98c20401ddc63725a5d919b39b532775af39cb15967eb153b358ec83a006",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11085,7 +11085,7 @@
     {
       "id": "typed-sup-15-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-11.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-11.bin",
       "sha256": "00b980f3fb40c8ad8e5c74689b8e272f95e575f8f531fc59930d1c77e2c28a78",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11098,7 +11098,7 @@
     {
       "id": "typed-sup-15-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-15-12.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-15-12.bin",
       "sha256": "9d4dbf8a33604b529b3b07bdfb81a948dc26ecc828e6bd2a1c575721ea91d32d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11111,7 +11111,7 @@
     {
       "id": "authored-packet-17-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11124,7 +11124,7 @@
     {
       "id": "authored-packet-17-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-01.bin",
       "sha256": "8f11b05da785e43e713d03774c6bd3405d99cd3024af334ffd68db663aa37034",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11137,7 +11137,7 @@
     {
       "id": "authored-packet-17-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-02.bin",
       "sha256": "009bcd40e9707180cd0f5b0a16f497a82ece54d6fe538d5861b47c49ffd91773",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11150,7 +11150,7 @@
     {
       "id": "authored-packet-17-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-03.bin",
       "sha256": "91b9bf57e43b0b5a99c9cd30111a80522c372a38f06fe3c5147e11eafae8c2c3",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11163,7 +11163,7 @@
     {
       "id": "authored-packet-17-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-04.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-04.bin",
       "sha256": "2b31609f3401c92461c46e1e7c68754377e245eba0da689572247a3558e8a090",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11176,7 +11176,7 @@
     {
       "id": "authored-packet-17-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-05.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-05.bin",
       "sha256": "ff0ee7b9ac25f645d997e39e17c27a31b501c742fcaf8fd18455bd68f7567382",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11189,7 +11189,7 @@
     {
       "id": "authored-packet-17-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-06.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-06.bin",
       "sha256": "056569877daec68e6cb126033654c212c18be8351505e3ce7cdd7d2e04618602",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11202,7 +11202,7 @@
     {
       "id": "authored-packet-17-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-07.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-07.bin",
       "sha256": "f20deb577b601ccdee1c0ff2c2ffcf7755ff5573b2073071d0e45282024a367e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11215,7 +11215,7 @@
     {
       "id": "authored-packet-17-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-08.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-08.bin",
       "sha256": "d68d436986b1c25a1eda4590f7db3f7bdfc1f5aec10f924d5ebf9146c9333d28",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11228,7 +11228,7 @@
     {
       "id": "authored-packet-17-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-09.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-09.bin",
       "sha256": "150b4e57a4bf8dd4634be0a34d2e34a25d43de1510224784dbfdbfae735c608c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11241,7 +11241,7 @@
     {
       "id": "authored-packet-17-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-10.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-10.bin",
       "sha256": "887fcbb965c6f94aac1244210798bc60a5278d7cfcf4a912b4bb7e0eaedf1bd0",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11254,7 +11254,7 @@
     {
       "id": "authored-packet-17-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-11.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-11.bin",
       "sha256": "661c5654f7ee99ac679ddc16579c0f01c84c2373dc1e003b861c10ae478bb1ec",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11267,7 +11267,7 @@
     {
       "id": "authored-packet-17-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-12.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-12.bin",
       "sha256": "b12ef4a3f8eb9f458206f73e7001ba55a96a95e58d9d07d9131942a411d6a5df",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11280,7 +11280,7 @@
     {
       "id": "authored-packet-17-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-17-13.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-17-13.bin",
       "sha256": "7a95f51f0e38b12d733ff8b95fcfb4d75bc19996462b8b81040c8af75db3bebb",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11293,7 +11293,7 @@
     {
       "id": "typed-packet-17-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-17-00.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-17-00.bin",
       "sha256": "48eedeffb3354fbcca2a3d95ecffce9f6e9126aae923751f396965e72796470b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11306,7 +11306,7 @@
     {
       "id": "typed-packet-17-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-17-01.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-17-01.bin",
       "sha256": "f7a5df430919f57bfd4050463f0eaafcf618a9762b199e62118e8fdf6ebd3531",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11319,7 +11319,7 @@
     {
       "id": "typed-packet-17-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-17-02.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-17-02.bin",
       "sha256": "a388d65965ad731cf04d2ab7856817bcb39f8aa32a87a563bf8a33dfa5e9087b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11332,7 +11332,7 @@
     {
       "id": "typed-packet-17-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-17-03.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-17-03.bin",
       "sha256": "ed0a3b75365da1f51ff52f2a9dd3857d1efe9d3d03b49ddcb2695c95fc875f1d",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11345,7 +11345,7 @@
     {
       "id": "typed-packet-17-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-17-04.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-17-04.bin",
       "sha256": "6d10dfdf9712774509c8346d6304cf6ed84b0098954ad66bb2af31d55fa6321c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11358,7 +11358,7 @@
     {
       "id": "typed-packet-17-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-17-05.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-17-05.bin",
       "sha256": "f3ec8393b6d2256134efa81c5980a6c10763138dde39185a694d787f5227ecc1",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11371,7 +11371,7 @@
     {
       "id": "typed-packet-17-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-17-06.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-17-06.bin",
       "sha256": "67bcb0a4cf66cea329c61fe296068d447ac06ed47ed52efae39e920d073db9c8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11384,7 +11384,7 @@
     {
       "id": "typed-packet-17-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-17-07.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-17-07.bin",
       "sha256": "4c740ed6c60a4af72e3c5083df7118517579e5ccf848513571afb4244875ae55",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11397,7 +11397,7 @@
     {
       "id": "typed-packet-17-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-17-08.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-17-08.bin",
       "sha256": "66e21ce45f925d86b82e864c7b40c520db478c9ff8d84e4b66b20f1486a9628f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11410,7 +11410,7 @@
     {
       "id": "typed-packet-17-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-17-09.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-17-09.bin",
       "sha256": "ff5bd7de814d028cc8d850ab5ff472bd969049196e49cecd11109d46d6b13fd3",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11423,7 +11423,7 @@
     {
       "id": "authored-sup-17-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11436,7 +11436,7 @@
     {
       "id": "authored-sup-17-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-01.bin",
       "sha256": "5c62e091b8c0565f1bafad0dad5934276143ae2ccef7a5381e8ada5b1a8d26d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11449,7 +11449,7 @@
     {
       "id": "authored-sup-17-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-02.bin",
       "sha256": "91f026c996feb33556b5d418d17e015945f305c96666b62e5c6284cc1df22a09",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11462,7 +11462,7 @@
     {
       "id": "authored-sup-17-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-03.bin",
       "sha256": "efadedd93727dd512852ce0c55922efebb9eb6bd84f15b8fd14431b0a6ad7b06",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11475,7 +11475,7 @@
     {
       "id": "authored-sup-17-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-04.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-04.bin",
       "sha256": "e5b41a82640e311dbe4da4c5075c054b24ab0464dbf5921bbe61d6667f1cca3b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11488,7 +11488,7 @@
     {
       "id": "authored-sup-17-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-05.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-05.bin",
       "sha256": "911e8913b023b1c18454c84e9c865195b0388009b17c5fcc6acee454b314979b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11501,7 +11501,7 @@
     {
       "id": "authored-sup-17-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-06.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-06.bin",
       "sha256": "1b88b944a27e60154c044a9b88f7e213a568a1090317addbd976d3241be97545",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11514,7 +11514,7 @@
     {
       "id": "authored-sup-17-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-07.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-07.bin",
       "sha256": "57432bd47ca701fa6a75a462f00c3e4acc20736785ffb0b5b811649ac9f8d3c8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11527,7 +11527,7 @@
     {
       "id": "authored-sup-17-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-08.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-08.bin",
       "sha256": "8e27502d787fa0cc641a6cc4d9e9eba3ca4b9d97685571c9c61344a65d4f1b59",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11540,7 +11540,7 @@
     {
       "id": "authored-sup-17-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-09.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-09.bin",
       "sha256": "f88fedb73626e948d9f4a289886d4ce786bcd9661c85b0105bdf889272ac63f5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11553,7 +11553,7 @@
     {
       "id": "authored-sup-17-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-10.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-10.bin",
       "sha256": "95f0f5dd2c38a04a4084d3e47a15b5ee3ecb873bb9000376dbb1d99ad3bbbb88",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11566,7 +11566,7 @@
     {
       "id": "authored-sup-17-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-11.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-11.bin",
       "sha256": "5bb407351d0c91bc9144186a0f628ea3b63b61bdfbfb19cfe1af31a68c3da3c9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11579,7 +11579,7 @@
     {
       "id": "authored-sup-17-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-12.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-12.bin",
       "sha256": "00dc2db233aab9b9f0d2e7f321e4cb9dd1ebc25551b9b1fdfcd7d3861bead08b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11592,7 +11592,7 @@
     {
       "id": "authored-sup-17-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-13.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-13.bin",
       "sha256": "52812df9d8fd326b3798fb559f88ec9e7731f41c18c445d8e9fdb2b88b877916",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11605,7 +11605,7 @@
     {
       "id": "authored-sup-17-14",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-14.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-14.bin",
       "sha256": "d4d006cdd7e6ddae7087c9d0c6f8e64965824ecb5ea73f2fc98cc3396ca4701c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11618,7 +11618,7 @@
     {
       "id": "authored-sup-17-15",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-15.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-15.bin",
       "sha256": "5dd36e6c9ca16650c3c42a96249547ac1e76db4928dcca25e753fd62f2f56741",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11631,7 +11631,7 @@
     {
       "id": "authored-sup-17-16",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-16.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-16.bin",
       "sha256": "59655d94b0c8258576ffee87797582d39bd27dcece2b6e4d6f5144c43c147d2a",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11644,7 +11644,7 @@
     {
       "id": "authored-sup-17-17",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-17.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-17.bin",
       "sha256": "78094edb403912e4bf4f7a780301488134208c1bedaca317b3fa31d58d6a2e18",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11657,7 +11657,7 @@
     {
       "id": "authored-sup-17-18",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-18.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-18.bin",
       "sha256": "4d80575ee03ddfbad40d7fbed07a19bc6005cc91d32503bdb6404b3eabe48516",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11670,7 +11670,7 @@
     {
       "id": "authored-sup-17-19",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-19.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-19.bin",
       "sha256": "a3ef299dc888e94f715ce64abc98c992f51e7864cf397e868e0e95583b7d3a3e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11683,7 +11683,7 @@
     {
       "id": "authored-sup-17-20",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-20.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-20.bin",
       "sha256": "fabe0549f5297ba950e9359e7531c9fb3a361cf2044ee7e2fdc8630062bb8833",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11696,7 +11696,7 @@
     {
       "id": "authored-sup-17-21",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-21.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-21.bin",
       "sha256": "19e5d862f5306fd2771f1ff593e024980b4d4c1b07fddc841ebffbbd600c153f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11709,7 +11709,7 @@
     {
       "id": "authored-sup-17-22",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-22.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-22.bin",
       "sha256": "807bee79102abd55902a139c1952c0bcffb61a4a11163bc9e84faffb8c41dc0a",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11722,7 +11722,7 @@
     {
       "id": "authored-sup-17-23",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-17-23.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-17-23.bin",
       "sha256": "6f69c43a6c6b4320888de0741e49b5f14e875ef2253140d59fb2d4ac875596da",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11735,7 +11735,7 @@
     {
       "id": "typed-sup-17-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-17-00.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-17-00.bin",
       "sha256": "ede9a90cab8fac736849250687650a6ab491e8d366671530ad51e55f16682e08",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11748,7 +11748,7 @@
     {
       "id": "typed-sup-17-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-17-01.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-17-01.bin",
       "sha256": "f3a5ed2081105e9968dbd5ab71b4f80aea45a0a515f4e24987848bcc5b593c08",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11761,7 +11761,7 @@
     {
       "id": "typed-sup-17-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-17-02.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-17-02.bin",
       "sha256": "726aea7888a5cd65082c5d98e1f01ad45040935911e37229c94409371c4dc0e0",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11774,7 +11774,7 @@
     {
       "id": "typed-sup-17-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-17-03.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-17-03.bin",
       "sha256": "22e8a84640dbc945d00aaf6361dc271c38cd01f6adda8ac16a2a38876f7dffeb",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11787,7 +11787,7 @@
     {
       "id": "typed-sup-17-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-17-04.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-17-04.bin",
       "sha256": "242518133abc9bc0051027e46ad743d975ab47719a45a512aac173bdd5506663",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11800,7 +11800,7 @@
     {
       "id": "typed-sup-17-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-17-05.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-17-05.bin",
       "sha256": "c7c5dca547a8e017819ca1c2e88c084fef7feb10a9298da731a6222da6fff99c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11813,7 +11813,7 @@
     {
       "id": "typed-sup-17-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-17-06.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-17-06.bin",
       "sha256": "e6081025079ac6f8a67728e17daa6af58edee464b3fc3a1631a137ce8dd39ae7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11826,7 +11826,7 @@
     {
       "id": "typed-sup-17-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-17-07.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-17-07.bin",
       "sha256": "5694ed5d3ac6d7403d1886d247761d2421884c35a348c1bd8aeadfbf7eae6f71",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11839,7 +11839,7 @@
     {
       "id": "typed-sup-17-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-17-08.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-17-08.bin",
       "sha256": "b4a5ac270e9903dc546414fe15051de4f6c5b52ac9f7e90fef81769b518ba5ea",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11852,7 +11852,7 @@
     {
       "id": "typed-sup-17-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-17-09.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-17-09.bin",
       "sha256": "52ecef0ad20e786488599ba2563ae191286c6bb0a793c44cd7c731fb347d88bc",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11865,7 +11865,7 @@
     {
       "id": "authored-packet-80-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-80-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-80-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11878,7 +11878,7 @@
     {
       "id": "authored-packet-80-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-80-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-80-01.bin",
       "sha256": "76be8b528d0075f7aae98d6fa57a6d3c83ae480a8469e668d7b0af968995ac71",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11891,7 +11891,7 @@
     {
       "id": "authored-packet-80-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-80-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-80-02.bin",
       "sha256": "8509b81230019d2ad970d970f791dfbdc8caf54f5c594fcd327cef9feed206c1",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11904,7 +11904,7 @@
     {
       "id": "authored-packet-80-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-80-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-80-03.bin",
       "sha256": "25ff297dd78c82468376d6e2c93b672b49c01fb125a2812b94f8f9693a51b67e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11917,7 +11917,7 @@
     {
       "id": "authored-sup-80-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11930,7 +11930,7 @@
     {
       "id": "authored-sup-80-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-01.bin",
       "sha256": "5c62e091b8c0565f1bafad0dad5934276143ae2ccef7a5381e8ada5b1a8d26d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11943,7 +11943,7 @@
     {
       "id": "authored-sup-80-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-02.bin",
       "sha256": "91f026c996feb33556b5d418d17e015945f305c96666b62e5c6284cc1df22a09",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11956,7 +11956,7 @@
     {
       "id": "authored-sup-80-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-03.bin",
       "sha256": "efadedd93727dd512852ce0c55922efebb9eb6bd84f15b8fd14431b0a6ad7b06",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11969,7 +11969,7 @@
     {
       "id": "authored-sup-80-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-04.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-04.bin",
       "sha256": "e5b41a82640e311dbe4da4c5075c054b24ab0464dbf5921bbe61d6667f1cca3b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11982,7 +11982,7 @@
     {
       "id": "authored-sup-80-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-05.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-05.bin",
       "sha256": "911e8913b023b1c18454c84e9c865195b0388009b17c5fcc6acee454b314979b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -11995,7 +11995,7 @@
     {
       "id": "authored-sup-80-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-06.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-06.bin",
       "sha256": "1b88b944a27e60154c044a9b88f7e213a568a1090317addbd976d3241be97545",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12008,7 +12008,7 @@
     {
       "id": "authored-sup-80-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-07.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-07.bin",
       "sha256": "57432bd47ca701fa6a75a462f00c3e4acc20736785ffb0b5b811649ac9f8d3c8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12021,7 +12021,7 @@
     {
       "id": "authored-sup-80-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-08.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-08.bin",
       "sha256": "8e27502d787fa0cc641a6cc4d9e9eba3ca4b9d97685571c9c61344a65d4f1b59",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12034,7 +12034,7 @@
     {
       "id": "authored-sup-80-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-09.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-09.bin",
       "sha256": "f88fedb73626e948d9f4a289886d4ce786bcd9661c85b0105bdf889272ac63f5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12047,7 +12047,7 @@
     {
       "id": "authored-sup-80-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-10.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-10.bin",
       "sha256": "95f0f5dd2c38a04a4084d3e47a15b5ee3ecb873bb9000376dbb1d99ad3bbbb88",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12060,7 +12060,7 @@
     {
       "id": "authored-sup-80-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-11.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-11.bin",
       "sha256": "c21e19e55bea3fdc60276b1854865e0afda85ec48443cedc49c875d2ed5f78d8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12073,7 +12073,7 @@
     {
       "id": "authored-sup-80-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-12.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-12.bin",
       "sha256": "8b8954acb559a80fd1df5e703d8b61a12bf63489c3d19444c869399bb4fdcfb4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12086,7 +12086,7 @@
     {
       "id": "authored-sup-80-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-80-13.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-80-13.bin",
       "sha256": "3e71ee5fc84abc6e67bf03bedd33e8d6205eaa80ed7c426a446fb5186aeb2502",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12099,7 +12099,7 @@
     {
       "id": "authored-packet-7f-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-7f-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-7f-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12112,7 +12112,7 @@
     {
       "id": "authored-packet-7f-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-7f-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-7f-01.bin",
       "sha256": "620bfdaa346b088fb49998d92f19a7eaf6bfc2fb0aee015753966da1028cb731",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12125,7 +12125,7 @@
     {
       "id": "authored-packet-7f-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-7f-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-7f-02.bin",
       "sha256": "9f3a060c00e96dbd2bf5cb77506048f22667fb11cd4d5e3c20993685fc805646",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12138,7 +12138,7 @@
     {
       "id": "authored-packet-7f-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-7f-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-7f-03.bin",
       "sha256": "d9fecd9012d163e69c6c74ddd4b8879837392fb5b86a1fbd7d21f20165ae32c5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12151,7 +12151,7 @@
     {
       "id": "authored-packet-7f-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-7f-04.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-7f-04.bin",
       "sha256": "2f150a6252d795c46b6f775cbc4a5b91abe3b1cea4575a416c58b7b06ea52d10",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12164,7 +12164,7 @@
     {
       "id": "authored-packet-7f-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-packet-7f-05.bin",
+      "file": "harness/features/pgs-segments/authored/authored-packet-7f-05.bin",
       "sha256": "1910aa6d26c25638265bf50939b21b3a1770acf56c3d14968efc654195c90725",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12177,7 +12177,7 @@
     {
       "id": "typed-packet-7f-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-7f-00.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-7f-00.bin",
       "sha256": "0f9b54be459a5dbf1e75c0f2b67f9933683cc7cddd49285bcdde86ffc2ef400c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12190,7 +12190,7 @@
     {
       "id": "typed-packet-7f-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-packet-7f-01.bin",
+      "file": "harness/features/pgs-segments/authored/typed-packet-7f-01.bin",
       "sha256": "689c8a43a198d04093a74e429b4290fcad77333f057ef3aa856e3f022e0b6150",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12203,7 +12203,7 @@
     {
       "id": "authored-sup-7f-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-00.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-00.bin",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12216,7 +12216,7 @@
     {
       "id": "authored-sup-7f-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-01.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-01.bin",
       "sha256": "5c62e091b8c0565f1bafad0dad5934276143ae2ccef7a5381e8ada5b1a8d26d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12229,7 +12229,7 @@
     {
       "id": "authored-sup-7f-02",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-02.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-02.bin",
       "sha256": "91f026c996feb33556b5d418d17e015945f305c96666b62e5c6284cc1df22a09",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12242,7 +12242,7 @@
     {
       "id": "authored-sup-7f-03",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-03.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-03.bin",
       "sha256": "efadedd93727dd512852ce0c55922efebb9eb6bd84f15b8fd14431b0a6ad7b06",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12255,7 +12255,7 @@
     {
       "id": "authored-sup-7f-04",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-04.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-04.bin",
       "sha256": "e5b41a82640e311dbe4da4c5075c054b24ab0464dbf5921bbe61d6667f1cca3b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12268,7 +12268,7 @@
     {
       "id": "authored-sup-7f-05",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-05.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-05.bin",
       "sha256": "911e8913b023b1c18454c84e9c865195b0388009b17c5fcc6acee454b314979b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12281,7 +12281,7 @@
     {
       "id": "authored-sup-7f-06",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-06.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-06.bin",
       "sha256": "1b88b944a27e60154c044a9b88f7e213a568a1090317addbd976d3241be97545",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12294,7 +12294,7 @@
     {
       "id": "authored-sup-7f-07",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-07.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-07.bin",
       "sha256": "57432bd47ca701fa6a75a462f00c3e4acc20736785ffb0b5b811649ac9f8d3c8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12307,7 +12307,7 @@
     {
       "id": "authored-sup-7f-08",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-08.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-08.bin",
       "sha256": "8e27502d787fa0cc641a6cc4d9e9eba3ca4b9d97685571c9c61344a65d4f1b59",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12320,7 +12320,7 @@
     {
       "id": "authored-sup-7f-09",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-09.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-09.bin",
       "sha256": "f88fedb73626e948d9f4a289886d4ce786bcd9661c85b0105bdf889272ac63f5",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12333,7 +12333,7 @@
     {
       "id": "authored-sup-7f-10",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-10.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-10.bin",
       "sha256": "95f0f5dd2c38a04a4084d3e47a15b5ee3ecb873bb9000376dbb1d99ad3bbbb88",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12346,7 +12346,7 @@
     {
       "id": "authored-sup-7f-11",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-11.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-11.bin",
       "sha256": "1118884f3cd3536435beb01c1bbf4e703f065572fd0e2fc2574c52960eaca2a2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12359,7 +12359,7 @@
     {
       "id": "authored-sup-7f-12",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-12.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-12.bin",
       "sha256": "a8962ac4c345b6f515bca3dc84f1398da893c15654738fe1ed0188d5c405ec07",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12372,7 +12372,7 @@
     {
       "id": "authored-sup-7f-13",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-13.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-13.bin",
       "sha256": "f2480f93179b79e9fa74e6ee7da6a5531d34334e2057670ba3691e7c62dcf7ea",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12385,7 +12385,7 @@
     {
       "id": "authored-sup-7f-14",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-14.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-14.bin",
       "sha256": "655bd2d04185f5225f8eb04d59b77dec83d13890fc3ce80fa53bd0ba555b2eb2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12398,7 +12398,7 @@
     {
       "id": "authored-sup-7f-15",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/authored-sup-7f-15.bin",
+      "file": "harness/features/pgs-segments/authored/authored-sup-7f-15.bin",
       "sha256": "ce72b7275cfdb3cb5b5fde18d1d6b678fa2b53f4e82164b3dc57045bd5e02b56",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12411,7 +12411,7 @@
     {
       "id": "typed-sup-7f-00",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-7f-00.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-7f-00.bin",
       "sha256": "6c37980b6cd62a0d2b681ee727b0c047dcc8bd3c133777fdd332568355a346f4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -12424,7 +12424,7 @@
     {
       "id": "typed-sup-7f-01",
       "profile": "truncations",
-      "file": "harness/features/pgs-segments/inputs/typed-sup-7f-01.bin",
+      "file": "harness/features/pgs-segments/authored/typed-sup-7f-01.bin",
       "sha256": "d35cb54465d537c74fcd3894448f98b9b38c8337b7703210d63aef74ab081754",
       "rights": "authored-synthetic",
       "arguments": [
