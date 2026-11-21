@@ -266,16 +266,15 @@ fn runtime_mentions(root: &Path) -> Vec<String> {
         }
     }
     for (area, cell) in status_runtimes(&read("docs/status.md")) {
-        let Some(runtime) = leading_ratio(&cell) else {
-            continue;
-        };
-        let above = runtime.parse().is_ok_and(|r: f64| r > gate.ceiling);
-        let claims_every_case = pass_count(&cell).is_none_or(|(passing, cases)| passing >= cases);
-        if above && claims_every_case {
-            errors.push(format!(
-                "docs/status.md: {area} runtime {runtime} is above the ceiling {ceiling}, \
-                 but the row does not say which cases fail"
-            ));
+        for (runtime, count) in cell_runtimes(&cell) {
+            let above = runtime.parse().is_ok_and(|r: f64| r > gate.ceiling);
+            let claims_every_case = count.is_none_or(|(passing, cases)| passing >= cases);
+            if above && claims_every_case {
+                errors.push(format!(
+                    "docs/status.md: {area} runtime {runtime} is above the ceiling {ceiling}, \
+                     but the row does not say which cases fail"
+                ));
+            }
         }
     }
     errors
@@ -319,7 +318,8 @@ fn mentions(text: &str, value: &str) -> bool {
     })
 }
 
-/// The area and runtime cell of every row of the status table.
+/// The area and runtime cell of every row of each status table with an "Area" and a
+/// "Runtime" column (one table per gate target).
 fn status_runtimes(status: &str) -> Vec<(String, String)> {
     let cells = |line: &str| -> Vec<String> {
         line.trim()
@@ -328,45 +328,103 @@ fn status_runtimes(status: &str) -> Vec<(String, String)> {
             .map(|cell| cell.trim().to_owned())
             .collect()
     };
+    let mut rows = Vec::new();
     let mut lines = status.lines();
-    let Some(column) = lines.by_ref().find_map(|line| {
+    while let Some(line) = lines.next() {
         let header = cells(line);
-        (header.first().is_some_and(|c| c == "Area"))
-            .then(|| header.iter().position(|c| c == "Runtime"))
-            .flatten()
-    }) else {
-        return Vec::new();
-    };
-    lines
-        .skip(1)
-        .take_while(|line| line.starts_with('|'))
-        .filter_map(|line| {
+        if header.first().is_none_or(|c| c != "Area") {
+            continue;
+        }
+        let Some(column) = header.iter().position(|c| c == "Runtime") else {
+            continue;
+        };
+        for line in lines
+            .by_ref()
+            .skip(1)
+            .take_while(|line| line.starts_with('|'))
+        {
             let row = cells(line);
-            Some((row.first()?.clone(), row.get(column)?.clone()))
-        })
-        .collect()
+            if let (Some(area), Some(cell)) = (row.first(), row.get(column)) {
+                rows.push((area.clone(), cell.clone()));
+            }
+        }
+    }
+    rows
 }
 
-/// The first decimal number in `cell`, such as 1.1808 in "1.1808 (71/71 pass)".
-fn leading_ratio(cell: &str) -> Option<&str> {
-    let start = cell.find(|c: char| c.is_ascii_digit())?;
-    let rest = &cell[start..];
-    let end = rest
-        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
-        .unwrap_or(rest.len());
-    let number = rest[..end].trim_end_matches('.');
-    number.contains('.').then_some(number)
+/// Each runtime a status cell states, with the `n/m` of its cases that pass when it says.
+/// A cell holds one result or several, separated by `<br>`, `;` or a comma outside
+/// parentheses and code spans, as in "MP4 forward 0.7670 (51/51 pass), raw Annex B 0.6286
+/// (7/7 pass)". A result's runtime is its first decimal number outside parentheses and
+/// code spans, unless "of" follows it, as in "0.921 of main's instructions".
+fn cell_runtimes(cell: &str) -> Vec<(&str, Option<(u64, u64)>)> {
+    // The cell with code spans and parenthesised text blanked byte for byte, so that
+    // offsets into it are offsets into the cell.
+    let mut top = String::with_capacity(cell.len());
+    let (mut depth, mut code) = (0u32, false);
+    for c in cell.chars() {
+        let inside = code || depth > 0;
+        match c {
+            '`' => code = !code,
+            '(' if !code => depth += 1,
+            ')' if !code => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+        if inside || code || depth > 0 {
+            top.extend(std::iter::repeat_n(' ', c.len_utf8()));
+        } else {
+            top.push(c);
+        }
+    }
+    let top = top.replace("<br>", ";;;;");
+    let mut results = Vec::new();
+    let mut start = 0;
+    for end in top
+        .match_indices([';', ','])
+        .map(|(at, _)| at)
+        .chain([top.len()])
+    {
+        let (shown, result) = (&top[start..end], &cell[start..end]);
+        start = end + 1;
+        let runtime = decimals(shown).find(|&(_, after)| {
+            let rest = shown[after..].trim_start();
+            !(rest == "of" || rest.starts_with("of "))
+        });
+        if let Some((at, after)) = runtime {
+            results.push((&result[at..after], pass_count(result)));
+        }
+    }
+    results
 }
 
-/// The `n/m` before "pass", such as (45, 125) in "1.3846 (45/125 pass for AVC/HEVC)".
-fn pass_count(cell: &str) -> Option<(u64, u64)> {
-    let words: Vec<&str> = cell
+/// The start and end of every number with a decimal point in `text` that is not part of
+/// a word or a longer number, such as 0.7670 in "MP4 forward 0.7670" but not 264 in H.264.
+fn decimals(text: &str) -> impl Iterator<Item = (usize, usize)> + '_ {
+    let joined = |c: char| c.is_alphanumeric() || c == '.' || c == '_';
+    text.char_indices().filter_map(move |(at, c)| {
+        if !c.is_ascii_digit() || text[..at].chars().next_back().is_some_and(joined) {
+            return None;
+        }
+        let run = text[at..]
+            .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+            .map_or(text.len(), |end| at + end);
+        let number = text[at..run].trim_end_matches('.');
+        number.contains('.').then_some((at, at + number.len()))
+    })
+}
+
+/// The last `n/m` before "pass", such as (45, 125) in "1.3846 (45/125 pass for AVC/HEVC)"
+/// or (956, 956) in "0.7395 (956/956 timed operations pass)".
+fn pass_count(result: &str) -> Option<(u64, u64)> {
+    let words: Vec<&str> = result
         .split(|c: char| c.is_whitespace() || c == '(' || c == ')')
         .filter(|word| !word.is_empty())
         .collect();
-    let counted = words.windows(2).find(|pair| pair[1].starts_with("pass"))?[0];
-    let (passing, cases) = counted.split_once('/')?;
-    Some((passing.parse().ok()?, cases.parse().ok()?))
+    let pass = words.iter().position(|word| word.starts_with("pass"))?;
+    words[..pass].iter().rev().find_map(|word| {
+        let (passing, cases) = word.split_once('/')?;
+        Some((passing.parse().ok()?, cases.parse().ok()?))
+    })
 }
 
 /// Every commit `docs/status.md` cites is an ancestor of `HEAD`, so the
@@ -995,7 +1053,12 @@ mod tests {
         fs::write(
             root.join("docs/status.md"),
             "| Area | Runtime |\n|---|---|\n| HLS | 1.2125 (71/71 pass) |\n\
-             | Framing | 1.3846 (45/125 pass for AVC/HEVC) |\n| PGS | PGS 1.11 |\n| TS | not measured |\n",
+             | Framing | 1.3846 (45/125 pass for AVC/HEVC) |\n| PGS | PGS 1.11 |\n| TS | not measured |\n\
+             | CC | 0.6557 (461/461 pass); runs take 1.300 of main's instructions (main at `1.5`) |\n\
+             \nOn ARMv7:\n\n| Area | Verified | Runtime |\n|---|---|---|\n\
+             | ISO | 956/956 | 1.2500 (955/956 timed operations pass, median 1.3) |\n\
+             | Playback | 58/58 | MP4 forward 1.2500 (51/51 pass, worst `a`), raw Annex B 0.6286 (7/7 pass) |\n\
+             | Text | 390/390 | `text` 0.8008 (367/367 pass)<br>`text-host` 1.3000 (23/23 timed operations pass) |\n",
         )
         .unwrap();
         assert_eq!(
@@ -1003,6 +1066,10 @@ mod tests {
             [
                 "README.md: restates the runtime ceiling 1.20; refer to docs/quality.md",
                 "docs/status.md: HLS runtime 1.2125 is above the ceiling 1.20, \
+                 but the row does not say which cases fail",
+                "docs/status.md: Playback runtime 1.2500 is above the ceiling 1.20, \
+                 but the row does not say which cases fail",
+                "docs/status.md: Text runtime 1.3000 is above the ceiling 1.20, \
                  but the row does not say which cases fail",
             ]
         );
