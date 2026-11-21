@@ -104,16 +104,26 @@ impl HeaderState {
 struct BodyState {
     header: ElementHeader,
     remaining: u64,
+    // Whether the payload is collected into a leaf or passed over unread.
     collect: bool,
-    allocated: bool,
+    stage: BodyStage,
     buffer: Option<BudgetVec<u8>>,
     span: Option<Bytes>,
     direct: Option<Bytes>,
     target: usize,
     copied: usize,
-    typed_admitted: bool,
     transfer: BodyTransfer,
     scan: ScanBody,
+}
+/// How far a body is towards reading its payload.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BodyStage {
+    /// The header is read; a typed caller has not admitted the leaf.
+    Pending,
+    /// A typed caller admitted the leaf.
+    Admitted,
+    /// A collected leaf's `target` capacity is set and paid for.
+    Sized,
 }
 /// Exclusive ownership transitions in the existing span/direct slots.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -458,13 +468,12 @@ impl ElementReader {
             header,
             remaining: size,
             collect,
-            allocated: false,
+            stage: BodyStage::Pending,
             buffer: None,
             span: None,
             direct: None,
             target: 0,
             copied: 0,
-            typed_admitted: false,
             transfer: BodyTransfer::Copy,
             scan: ScanBody::Off,
         });
@@ -738,7 +747,7 @@ impl ElementReader {
                         }
                         return Ok(ParseStep::Event(event));
                     }
-                    if pause_for_admission && !body.typed_admitted && !body.allocated {
+                    if pause_for_admission && body.stage == BodyStage::Pending {
                         let ordinary_block = matches!(admit, Admit::OrdinaryBlocks)
                             && body.collect
                             && matches!(body.header.id, BLOCK_GROUP | SIMPLE_BLOCK);
@@ -757,7 +766,7 @@ impl ElementReader {
                         {
                             body.collect = false;
                         }
-                        body.typed_admitted = true;
+                        body.stage = BodyStage::Admitted;
                         if scan_block && body.remaining >= 4 {
                             body.scan = ScanBody::FirstSpan;
                         }
@@ -768,7 +777,7 @@ impl ElementReader {
                     if matches!(body.scan, ScanBody::Prefix | ScanBody::Complete) {
                         return Ok(ParseStep::Yield);
                     }
-                    if body.collect && !body.allocated {
+                    if body.collect && body.stage != BodyStage::Sized {
                         if !work.try_charge(1) {
                             return Ok(ParseStep::Yield);
                         }
@@ -777,7 +786,7 @@ impl ElementReader {
                         // Admit the exact output capacity before requesting data.
                         // A complete input owner of that capacity may become the
                         // leaf directly; partial/hidden owners use the builder.
-                        body.allocated = true;
+                        body.stage = BodyStage::Sized;
                     }
                     if let Some(span) = &body.span {
                         let span_work = span.len() as u64;

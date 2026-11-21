@@ -31,7 +31,8 @@ fn before_empty_publication(pool: &Budget) -> ElementReader {
         let step = reader.step(&mut work, &AtomicBool::new(false)).unwrap();
         spent += work.spent();
         assert!(matches!(step, ParseStep::Yield));
-        if matches!(&reader.phase, Phase::Body(body) if body.allocated && body.remaining==0) {
+        if matches!(&reader.phase, Phase::Body(body) if body.stage == BodyStage::Sized && body.remaining==0)
+        {
             assert_eq!(reader.position(), EMPTY.len() as u64);
             assert_eq!(spent, 7); // five input bytes, header parse, output admission
             return reader;

@@ -404,7 +404,7 @@ fn compact_envelope_freeze_pressure_retains_builder_and_retries_once() {
         &[0x1a, 0x45, 0xdf, 0xa3, 0x83, b'a', b'b', b'c'],
     );
     for _ in 0..128 {
-        if matches!(&reader.phase, Phase::Body(body) if body.remaining==0 && body.span.is_none() && body.direct.is_none() && body.allocated)
+        if matches!(&reader.phase, Phase::Body(body) if body.remaining==0 && body.span.is_none() && body.direct.is_none() && body.stage == BodyStage::Sized)
         {
             break;
         }

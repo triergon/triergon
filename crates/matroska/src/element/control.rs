@@ -1,7 +1,9 @@
 //! The reader-facing control of the envelope: compact typed delivery of leaf
 //! events, typed leaf admission, scan prefixes, and the storage walk of the
 //! envelope's state. There is one core `InputCursor` and no second buffered layer.
-use super::{Admit, ElementHeader, ElementReader, ParseStep, Phase, SIMPLE_BLOCK, ScanBody};
+use super::{
+    Admit, BodyStage, ElementHeader, ElementReader, ParseStep, Phase, SIMPLE_BLOCK, ScanBody,
+};
 use crate::step::Required;
 use crate::{Error, Result};
 use std::sync::atomic::AtomicBool;
@@ -62,7 +64,7 @@ impl ElementReader {
     }
     fn awaiting_typed_admission(&self) -> Option<ElementHeader> {
         match &self.phase {
-            Phase::Body(body) if !body.typed_admitted && !body.allocated => Some(body.header),
+            Phase::Body(body) if body.stage == BodyStage::Pending => Some(body.header),
             _ => None,
         }
     }
@@ -156,7 +158,7 @@ impl ElementReader {
         let Phase::Body(body) = &mut self.phase else {
             return Err(Error::Invalid("no pending leaf admission"));
         };
-        if body.header != header || body.allocated || body.typed_admitted {
+        if body.header != header || body.stage != BodyStage::Pending {
             return Err(Error::Invalid("pending leaf admission identity changed"));
         }
         if maximum.is_some_and(|limit| body.remaining > limit as u64) {
@@ -165,7 +167,7 @@ impl ElementReader {
         if skip {
             body.collect = false;
         }
-        body.typed_admitted = true;
+        body.stage = BodyStage::Admitted;
         Ok(())
     }
     /// Only an active scan may arm this after normal typed admission. At least
@@ -175,8 +177,7 @@ impl ElementReader {
             return Err(Error::Invalid("no scan leaf admission"));
         };
         if body.header != header
-            || !body.typed_admitted
-            || body.allocated
+            || body.stage != BodyStage::Admitted
             || !body.collect
             || header.id != SIMPLE_BLOCK
             || body.scan != ScanBody::Off
