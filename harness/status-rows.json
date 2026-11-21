@@ -239,7 +239,7 @@
       "targets": [
         "aarch64-unknown-linux-gnu"
       ],
-      "text": "FLAC and MPEG audio in the codec workloads, ADTS and AC-3 unmeasured"
+      "text": "FLAC and MPEG audio use the file codec workloads. ADTS, AC-3 and E-AC-3 bounds are unmeasured."
     },
     {
       "area": "MPEG-TS",
@@ -498,6 +498,38 @@
       "results": [
         "framing"
       ]
+    },
+    {
+      "area": "AV1 OBU framing",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "av1-obu-reading"
+    },
+    {
+      "area": "AV1 OBU wire fields",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "av1-obu-wire"
+    },
+    {
+      "area": "AAC ADTS frames",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "aac-adts-frames"
+    },
+    {
+      "area": "AAC ADTS wire fields",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "aac-adts-header"
     },
     {
       "area": "Length-prefixed NAL units",
