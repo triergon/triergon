@@ -745,390 +745,423 @@ impl<'a> Mp4IndexJob<'a> {
         if w.remaining() == 0 {
             return Ok(false);
         }
-        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
         match self.phase {
-            IndexPhase::Tracks => {
-                if let Some(t) = self.movie.tracks().get(self.track) {
-                    if self.description == 0 {
-                        if !w.try_charge(1) {
-                            return Ok(false);
-                        }
-                        let h = t.header();
-                        let (base, demux_stream) = if h.timescale == 0 {
-                            (
-                                SourceTimeBase::UNAVAILABLE,
-                                StreamView::for_zero_scale_source(
-                                    h,
-                                    t.table(),
-                                    self.movie.major_brand(),
-                                    iso::compat::mov::recovery::RunRecoveryProfile,
-                                ),
-                            )
-                        } else {
-                            (
-                                h.time_base()?.into(),
-                                StreamView::for_source(
-                                    h,
-                                    t.table(),
-                                    !t.fragments().is_empty(),
-                                    self.movie.major_brand(),
-                                ),
-                            )
-                        };
-                        push(
-                            &mut p.tracks,
-                            PlanTrack {
-                                trex: self
-                                    .movie
-                                    .trex()
-                                    .iter()
-                                    .find(|x| x.track_id == t.header().track_id)
-                                    .copied(),
-                                next_ordinal: t.next_ordinal(),
-                                fragment_aac_trim: 0,
-                                snapshot: TrackSnapshot(Arc::new(TrackMetadata {
-                                    track_id: h.track_id,
-                                    base,
-                                    handler: h.handler,
-                                    enabled: h.enabled,
-                                    raw_tkhd: h.raw_tkhd.clone(),
-                                    raw_mdhd: h.raw_mdhd.clone(),
-                                    raw_hdlr: h.raw_hdlr.clone(),
-                                    raw_table: t.table().raw().clone(),
-                                    raw_edits: t.edits().map(|e| e.raw().clone()),
-                                    raw_dref: t.raw_dref().clone(),
-                                    demux_stream,
-                                    _charge: TrackSnapshot::reserve(&p.pool)?,
-                                })),
-                                descriptions: BudgetVec::new(&p.pool),
-                                edits: t
-                                    .edits()
-                                    .map(|e| {
-                                        EditList::parse(e.raw().clone(), iso::Limits::default())
-                                    })
-                                    .transpose()?,
-                            },
-                        )?;
-                        self.description = 1;
-                        return Ok(false);
-                    }
-                    if let Some(d) = t.table().descriptions().get(self.description - 1) {
-                        if !w.try_charge(1) {
-                            return Ok(false);
-                        }
-                        push(
-                            &mut p.tracks.as_mut_slice()[self.track].descriptions,
-                            d.clone(),
-                        )?;
-                        self.description += 1;
-                        return Ok(false);
-                    }
-                    self.track += 1;
-                    self.description = 0;
-                } else {
-                    self.phase = IndexPhase::Roots;
-                }
-            }
-            IndexPhase::Roots => {
-                if let Some(raw) = self.movie.raw_roots().get(self.root) {
-                    if !w.try_charge(1) {
-                        return Ok(false);
-                    }
-                    push(&mut p.raw_roots, raw.clone())?;
-                    self.root += 1;
-                } else {
-                    self.phase = IndexPhase::Media;
-                }
-            }
-            IndexPhase::Media => {
-                if let Some(range) = self.movie.media().get(self.extent) {
-                    if !w.try_charge(1) {
-                        return Ok(false);
-                    }
-                    push(&mut p.media, range.clone())?;
-                    self.extent += 1;
-                } else if let Some(extent) = self.movie.media_cache().get(p.media_cache.len()) {
-                    if !w.try_charge(1) {
-                        return Ok(false);
-                    }
-                    push(&mut p.media_cache, extent.clone())?;
-                } else {
-                    self.phase = if let Some(duration) = &self.range_duration {
-                        if let Some(cursor) = &mut self.native {
-                            if duration.scan {
-                                cursor.check_duration_before_replay()?;
-                            } else {
-                                cursor.check_projections_before_replay()?;
-                            }
-                            cursor.enable_range_seek_checkpoints();
-                        }
-                        IndexPhase::RangeCheck
-                    } else {
-                        IndexPhase::SourceRows
-                    };
-                }
-            }
-            IndexPhase::SourceRows => {
-                let source = self
-                    .source
-                    .as_mut()
-                    .ok_or(Error::Invalid("missing physical sample cursor"))?;
-                if let Some((probe, refusal)) = self.first_sample_probe.as_mut() {
-                    let media_end = p
-                        .media
-                        .as_slice()
-                        .last()
-                        .ok_or(Error::Invalid("first sample media extent missing"))?
-                        .end;
-                    match probe.poll(w)? {
-                        Next::Yield => return Ok(false),
-                        Next::Item(sample)
-                            if !sample.range.is_empty()
-                                && sample.range.start >= p.source_length.unwrap_or(media_end) =>
-                        {
-                            p.unavailable_first = Some(SourceRow {
-                                track_id: p.tracks.as_slice()[0].snapshot.track_id,
-                                sample,
-                            });
-                            self.phase = IndexPhase::Ready;
-                            return Ok(true);
-                        }
-                        _ => return Err(*refusal),
-                    }
-                }
-                if let Some(sort) = self.source_sort.as_mut() {
-                    if sort.poll(p.source_rows.as_mut_slice(), SourceRow::physical_key, w) {
-                        self.phase = IndexPhase::RangeCheck;
-                    }
-                    return Ok(false);
-                }
-                if self.pending_source.is_some() && !w.try_charge(1) {
-                    return Ok(false);
-                }
-                if let Some(row) = self.pending_source.take() {
-                    if let Some(terminal) = p.terminal_mdat {
-                        terminal.require_sample(&row.sample)?;
-                    }
-                    if p.source_rows.len() as u64 >= self.limits.samples {
-                        return Err(Error::Limit {
-                            requested: p.source_rows.len() + 1,
-                            maximum: self.limits.samples as usize,
-                        });
-                    }
-                    match p.source_rows.try_push(row) {
-                        Ok(()) => {}
-                        Err(e) => {
-                            self.pending_source = Some(e.value);
-                            return Err(e.error);
-                        }
-                    }
-                    return Ok(false);
-                }
-                let step = match source.poll(w, c) {
-                    Err(_)
-                        if p.read_scope == crate::mp4_open::MetadataReadScope::CompleteEntity
-                            && source.resume_in_track_order() =>
-                    {
-                        self.source_track_order = true;
-                        return Ok(false);
-                    }
-                    Err(error)
-                        if match error {
-                            Error::Invalid(OUTSIDE_MEDIA) => p.demux_recovery,
-                            // Without a source length the strict view cannot yet
-                            // tell a first sample in a later mdat from one beyond
-                            // the source end; the physical end decides.
-                            Error::Unsupported(BACKWARD_LAYOUT) => {
-                                p.demux_recovery || p.source_length.is_none()
-                            }
-                            _ => false,
-                        } && p.source_rows.is_empty()
-                            && p.terminal_mdat.is_none()
-                            && !p.media.is_empty()
-                            && self.movie.trex().is_empty() =>
-                    {
-                        let [track] = self.movie.tracks() else {
-                            return Err(error);
-                        };
-                        if !track.fragments().is_empty() || track.edits().is_some() {
-                            return Err(error);
-                        }
-                        // Probe the first decode occurrence only after a layout refusal.
-                        // The engine still needs the actual physical end before reporting it.
-                        self.first_sample_probe = Some((track.table().cursor(), error));
-                        return Ok(false);
-                    }
-                    result => result?,
-                };
-                match step {
-                    CursorStatus::Yield => {}
-                    CursorStatus::Ready => {
-                        let r = source.take_sample()?;
-                        self.pending_source = Some(SourceRow {
-                            track_id: r.track_id,
-                            sample: r.sample,
-                        });
-                    }
-                    CursorStatus::End => {
-                        p.forward_regular_extents =
-                            source.deferred_media().then_some(self.limits.media_extents);
-                        if self.source_track_order {
-                            self.source_sort = Some(SampleSort::new(p.source_rows.len()));
-                        } else {
-                            self.phase = IndexPhase::RangeCheck;
-                        }
-                    }
-                }
-            }
-            IndexPhase::RangeCheck => {
-                if let Some(duration) = &mut self.range_duration {
-                    let cursor = self
-                        .native
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing native range cursor"))?;
-                    match cursor.poll(w, c)? {
-                        CursorStatus::Yield => return Ok(false),
-                        CursorStatus::Ready => {
-                            return Err(Error::Invalid("range check yielded a packet"));
-                        }
-                        CursorStatus::End => {
-                            if duration.scan {
-                                duration.micros = cursor
-                                    .checked_duration_us()
-                                    .ok_or(Error::Invalid("range duration scan incomplete"))?;
-                            }
-                            cursor.rewind_at_end()?;
-                            self.track = 0;
-                            self.phase = IndexPhase::FragmentTrim;
-                            return Ok(false);
-                        }
-                    }
-                }
-                if self.pending_native.is_some() && !w.try_charge(1) {
-                    return Ok(false);
-                }
-                if let Some(mut row) = self.pending_native.take() {
-                    if let Some(clock) = self.zero_scale_clock
-                        && p.track(row.track_id)?.snapshot.base.get().is_none()
-                    {
-                        row.media_clock = clock;
-                    }
-                    let mut demux_order_replay = p.demux_order_replay;
-                    if p.demux_front && p.encoded_edits.is_none() && !demux_order_replay {
-                        let source = p.source_rows.as_slice().get(p.demux_rows.len());
-                        if source
-                            .is_none_or(|s| s.track_id != row.track_id || s.sample != row.source)
-                        {
-                            // Only a complete retained extent can serve a repeated occurrence.
-                            demux_order_replay = matches!(
-                                p.media.as_slice(),
-                                [extent] if (1..=RETAINED_MEDIA_BYTES as u64)
-                                    .contains(&(extent.end - extent.start))
-                            ) && p.terminal_mdat.is_none()
-                                && self.movie.trex().is_empty()
-                                && p.tracks
-                                    .as_slice()
-                                    .iter()
-                                    .any(|track| track.edits.is_some());
-                            if !demux_order_replay {
-                                let reason = if source.is_none() {
-                                    "native front repeated occurrence needs seekable context"
-                                } else {
-                                    "native front source occurrence order is not physical"
-                                };
-                                return Err(Error::Unsupported(reason));
-                            }
-                        }
-                    }
-                    if p.demux_rows.len() as u64 >= self.limits.occurrences {
-                        return Err(Error::Limit {
-                            requested: p.demux_rows.len() + 1,
-                            maximum: self.limits.occurrences as usize,
-                        });
-                    }
-                    let duration = if row.source.range.is_empty() {
-                        None
-                    } else {
-                        p.next_native_empty_duration(&row, true)
-                    };
-                    match p.demux_rows.try_push(row) {
-                        Ok(()) => {
-                            p.demux_order_replay = demux_order_replay;
-                            p.empty_duration = duration;
-                        }
-                        Err(e) => {
-                            self.pending_native = Some(e.value);
-                            return Err(e.error);
-                        }
-                    }
-                    return Ok(false);
-                }
-                if let Some(native) = self.native.as_mut() {
-                    match native.poll(w, c)? {
-                        CursorStatus::Yield => {}
-                        CursorStatus::Ready => {
-                            self.pending_native = Some(native.take_occurrence()?);
-                        }
-                        CursorStatus::End => {
-                            self.track = 0;
-                            self.phase = IndexPhase::FragmentTrim;
-                        }
-                    }
-                } else {
-                    self.phase = IndexPhase::FragmentTrim;
-                }
-            }
-            IndexPhase::FragmentTrim => {
-                if p.view == PlanView::Demux && self.track < p.tracks.len() {
-                    if self.fragment_aac_trim.is_none() {
-                        if !w.try_charge(1) {
-                            return Ok(false);
-                        }
-                        self.fragment_aac_trim = FragmentAacTrimJob::new(self.movie, self.track)?;
-                    }
-                    if let Some(job) = &mut self.fragment_aac_trim {
-                        let samples = match job.poll(w, c) {
-                            Ok(Some(samples)) => samples,
-                            Ok(None) => return Ok(false),
-                            Err(Error::Backpressure { .. })
-                                if self.range_duration.is_some()
-                                    && self
-                                        .native
-                                        .as_mut()
-                                        .is_some_and(PacketCursor::discard_seek_checkpoints) =>
-                            {
-                                // The configuration is required. Resume its parser on
-                                // the next poll after releasing optional seek state.
-                                return Ok(false);
-                            }
-                            Err(error) => return Err(error),
-                        };
-                        p.tracks.as_mut_slice()[self.track].fragment_aac_trim = samples;
-                        self.fragment_aac_trim = None;
-                    }
-                    self.track += 1;
-                } else {
-                    self.track = 0;
-                    self.phase = IndexPhase::FrontTracks;
-                }
-            }
-            IndexPhase::FrontTracks if p.demux_front && self.track < p.tracks.len() => {
+            IndexPhase::Tracks => self.index_tracks(w),
+            IndexPhase::Roots => self.copy_roots(w),
+            IndexPhase::Media => self.copy_media(w),
+            IndexPhase::SourceRows => self.merge_source_rows(w, c),
+            IndexPhase::RangeCheck => self.check_range(w, c),
+            IndexPhase::FragmentTrim => self.read_fragment_trim(w, c),
+            IndexPhase::FrontTracks => self.project_front_tracks(w),
+            IndexPhase::Ready => Ok(true),
+        }
+    }
+
+    /// Indexes the next track header and its sample descriptions.
+    fn index_tracks(&mut self, w: &mut WorkBudget) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if let Some(t) = self.movie.tracks().get(self.track) {
+            if self.description == 0 {
                 if !w.try_charge(1) {
                     return Ok(false);
                 }
-                let state = self
-                    .native
-                    .as_ref()
-                    .ok_or(Error::Invalid("front native cursor"))?
-                    .front_track(self.track)?;
-                push(&mut p.front_tracks, state)?;
-                self.track += 1;
+                let h = t.header();
+                let (base, demux_stream) = if h.timescale == 0 {
+                    (
+                        SourceTimeBase::UNAVAILABLE,
+                        StreamView::for_zero_scale_source(
+                            h,
+                            t.table(),
+                            self.movie.major_brand(),
+                            iso::compat::mov::recovery::RunRecoveryProfile,
+                        ),
+                    )
+                } else {
+                    (
+                        h.time_base()?.into(),
+                        StreamView::for_source(
+                            h,
+                            t.table(),
+                            !t.fragments().is_empty(),
+                            self.movie.major_brand(),
+                        ),
+                    )
+                };
+                push(
+                    &mut p.tracks,
+                    PlanTrack {
+                        trex: self
+                            .movie
+                            .trex()
+                            .iter()
+                            .find(|x| x.track_id == t.header().track_id)
+                            .copied(),
+                        next_ordinal: t.next_ordinal(),
+                        fragment_aac_trim: 0,
+                        snapshot: TrackSnapshot(Arc::new(TrackMetadata {
+                            track_id: h.track_id,
+                            base,
+                            handler: h.handler,
+                            enabled: h.enabled,
+                            raw_tkhd: h.raw_tkhd.clone(),
+                            raw_mdhd: h.raw_mdhd.clone(),
+                            raw_hdlr: h.raw_hdlr.clone(),
+                            raw_table: t.table().raw().clone(),
+                            raw_edits: t.edits().map(|e| e.raw().clone()),
+                            raw_dref: t.raw_dref().clone(),
+                            demux_stream,
+                            _charge: TrackSnapshot::reserve(&p.pool)?,
+                        })),
+                        descriptions: BudgetVec::new(&p.pool),
+                        edits: t
+                            .edits()
+                            .map(|e| EditList::parse(e.raw().clone(), iso::Limits::default()))
+                            .transpose()?,
+                    },
+                )?;
+                self.description = 1;
+                return Ok(false);
             }
-            IndexPhase::FrontTracks | IndexPhase::Ready => {
-                self.phase = IndexPhase::Ready;
-                return Ok(true);
+            if let Some(d) = t.table().descriptions().get(self.description - 1) {
+                if !w.try_charge(1) {
+                    return Ok(false);
+                }
+                push(
+                    &mut p.tracks.as_mut_slice()[self.track].descriptions,
+                    d.clone(),
+                )?;
+                self.description += 1;
+                return Ok(false);
+            }
+            self.track += 1;
+            self.description = 0;
+        } else {
+            self.phase = IndexPhase::Roots;
+        }
+        Ok(false)
+    }
+
+    /// Copies the next root box view into the plan.
+    fn copy_roots(&mut self, w: &mut WorkBudget) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if let Some(raw) = self.movie.raw_roots().get(self.root) {
+            if !w.try_charge(1) {
+                return Ok(false);
+            }
+            push(&mut p.raw_roots, raw.clone())?;
+            self.root += 1;
+        } else {
+            self.phase = IndexPhase::Media;
+        }
+        Ok(false)
+    }
+
+    /// Copies the next media extent into the plan.
+    fn copy_media(&mut self, w: &mut WorkBudget) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if let Some(range) = self.movie.media().get(self.extent) {
+            if !w.try_charge(1) {
+                return Ok(false);
+            }
+            push(&mut p.media, range.clone())?;
+            self.extent += 1;
+        } else if let Some(extent) = self.movie.media_cache().get(p.media_cache.len()) {
+            if !w.try_charge(1) {
+                return Ok(false);
+            }
+            push(&mut p.media_cache, extent.clone())?;
+        } else {
+            self.phase = if let Some(duration) = &self.range_duration {
+                if let Some(cursor) = &mut self.native {
+                    if duration.scan {
+                        cursor.check_duration_before_replay()?;
+                    } else {
+                        cursor.check_projections_before_replay()?;
+                    }
+                    cursor.enable_range_seek_checkpoints();
+                }
+                IndexPhase::RangeCheck
+            } else {
+                IndexPhase::SourceRows
+            };
+        }
+        Ok(false)
+    }
+
+    /// Merges the next source sample into the physical rows.
+    #[inline(always)]
+    fn merge_source_rows(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        let source = self
+            .source
+            .as_mut()
+            .ok_or(Error::Invalid("missing physical sample cursor"))?;
+        if let Some((probe, refusal)) = self.first_sample_probe.as_mut() {
+            let media_end = p
+                .media
+                .as_slice()
+                .last()
+                .ok_or(Error::Invalid("first sample media extent missing"))?
+                .end;
+            match probe.poll(w)? {
+                Next::Yield => return Ok(false),
+                Next::Item(sample)
+                    if !sample.range.is_empty()
+                        && sample.range.start >= p.source_length.unwrap_or(media_end) =>
+                {
+                    p.unavailable_first = Some(SourceRow {
+                        track_id: p.tracks.as_slice()[0].snapshot.track_id,
+                        sample,
+                    });
+                    self.phase = IndexPhase::Ready;
+                    return Ok(true);
+                }
+                _ => return Err(*refusal),
             }
         }
+        if let Some(sort) = self.source_sort.as_mut() {
+            if sort.poll(p.source_rows.as_mut_slice(), SourceRow::physical_key, w) {
+                self.phase = IndexPhase::RangeCheck;
+            }
+            return Ok(false);
+        }
+        if self.pending_source.is_some() && !w.try_charge(1) {
+            return Ok(false);
+        }
+        if let Some(row) = self.pending_source.take() {
+            if let Some(terminal) = p.terminal_mdat {
+                terminal.require_sample(&row.sample)?;
+            }
+            if p.source_rows.len() as u64 >= self.limits.samples {
+                return Err(Error::Limit {
+                    requested: p.source_rows.len() + 1,
+                    maximum: self.limits.samples as usize,
+                });
+            }
+            match p.source_rows.try_push(row) {
+                Ok(()) => {}
+                Err(e) => {
+                    self.pending_source = Some(e.value);
+                    return Err(e.error);
+                }
+            }
+            return Ok(false);
+        }
+        let step = match source.poll(w, c) {
+            Err(_)
+                if p.read_scope == crate::mp4_open::MetadataReadScope::CompleteEntity
+                    && source.resume_in_track_order() =>
+            {
+                self.source_track_order = true;
+                return Ok(false);
+            }
+            Err(error)
+                if match error {
+                    Error::Invalid(OUTSIDE_MEDIA) => p.demux_recovery,
+                    // Without a source length the strict view cannot yet
+                    // tell a first sample in a later mdat from one beyond
+                    // the source end; the physical end decides.
+                    Error::Unsupported(BACKWARD_LAYOUT) => {
+                        p.demux_recovery || p.source_length.is_none()
+                    }
+                    _ => false,
+                } && p.source_rows.is_empty()
+                    && p.terminal_mdat.is_none()
+                    && !p.media.is_empty()
+                    && self.movie.trex().is_empty() =>
+            {
+                let [track] = self.movie.tracks() else {
+                    return Err(error);
+                };
+                if !track.fragments().is_empty() || track.edits().is_some() {
+                    return Err(error);
+                }
+                // Probe the first decode occurrence only after a layout refusal.
+                // The engine still needs the actual physical end before reporting it.
+                self.first_sample_probe = Some((track.table().cursor(), error));
+                return Ok(false);
+            }
+            result => result?,
+        };
+        match step {
+            CursorStatus::Yield => {}
+            CursorStatus::Ready => {
+                let r = source.take_sample()?;
+                self.pending_source = Some(SourceRow {
+                    track_id: r.track_id,
+                    sample: r.sample,
+                });
+            }
+            CursorStatus::End => {
+                p.forward_regular_extents =
+                    source.deferred_media().then_some(self.limits.media_extents);
+                if self.source_track_order {
+                    self.source_sort = Some(SampleSort::new(p.source_rows.len()));
+                } else {
+                    self.phase = IndexPhase::RangeCheck;
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Checks the next packet projection against the source ranges.
+    #[inline(always)]
+    fn check_range(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if let Some(duration) = &mut self.range_duration {
+            let cursor = self
+                .native
+                .as_mut()
+                .ok_or(Error::Invalid("missing native range cursor"))?;
+            match cursor.poll(w, c)? {
+                CursorStatus::Yield => return Ok(false),
+                CursorStatus::Ready => {
+                    return Err(Error::Invalid("range check yielded a packet"));
+                }
+                CursorStatus::End => {
+                    if duration.scan {
+                        duration.micros = cursor
+                            .checked_duration_us()
+                            .ok_or(Error::Invalid("range duration scan incomplete"))?;
+                    }
+                    cursor.rewind_at_end()?;
+                    self.track = 0;
+                    self.phase = IndexPhase::FragmentTrim;
+                    return Ok(false);
+                }
+            }
+        }
+        if self.pending_native.is_some() && !w.try_charge(1) {
+            return Ok(false);
+        }
+        if let Some(mut row) = self.pending_native.take() {
+            if let Some(clock) = self.zero_scale_clock
+                && p.track(row.track_id)?.snapshot.base.get().is_none()
+            {
+                row.media_clock = clock;
+            }
+            let mut demux_order_replay = p.demux_order_replay;
+            if p.demux_front && p.encoded_edits.is_none() && !demux_order_replay {
+                let source = p.source_rows.as_slice().get(p.demux_rows.len());
+                if source.is_none_or(|s| s.track_id != row.track_id || s.sample != row.source) {
+                    // Only a complete retained extent can serve a repeated occurrence.
+                    demux_order_replay = matches!(
+                        p.media.as_slice(),
+                        [extent] if (1..=RETAINED_MEDIA_BYTES as u64)
+                            .contains(&(extent.end - extent.start))
+                    ) && p.terminal_mdat.is_none()
+                        && self.movie.trex().is_empty()
+                        && p.tracks
+                            .as_slice()
+                            .iter()
+                            .any(|track| track.edits.is_some());
+                    if !demux_order_replay {
+                        let reason = if source.is_none() {
+                            "native front repeated occurrence needs seekable context"
+                        } else {
+                            "native front source occurrence order is not physical"
+                        };
+                        return Err(Error::Unsupported(reason));
+                    }
+                }
+            }
+            if p.demux_rows.len() as u64 >= self.limits.occurrences {
+                return Err(Error::Limit {
+                    requested: p.demux_rows.len() + 1,
+                    maximum: self.limits.occurrences as usize,
+                });
+            }
+            let duration = if row.source.range.is_empty() {
+                None
+            } else {
+                p.next_native_empty_duration(&row, true)
+            };
+            match p.demux_rows.try_push(row) {
+                Ok(()) => {
+                    p.demux_order_replay = demux_order_replay;
+                    p.empty_duration = duration;
+                }
+                Err(e) => {
+                    self.pending_native = Some(e.value);
+                    return Err(e.error);
+                }
+            }
+            return Ok(false);
+        }
+        if let Some(native) = self.native.as_mut() {
+            match native.poll(w, c)? {
+                CursorStatus::Yield => {}
+                CursorStatus::Ready => {
+                    self.pending_native = Some(native.take_occurrence()?);
+                }
+                CursorStatus::End => {
+                    self.track = 0;
+                    self.phase = IndexPhase::FragmentTrim;
+                }
+            }
+        } else {
+            self.phase = IndexPhase::FragmentTrim;
+        }
+        Ok(false)
+    }
+
+    /// Reads the leading trim of the next track's first fragment AAC packets.
+    fn read_fragment_trim(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if p.view == PlanView::Demux && self.track < p.tracks.len() {
+            if self.fragment_aac_trim.is_none() {
+                if !w.try_charge(1) {
+                    return Ok(false);
+                }
+                self.fragment_aac_trim = FragmentAacTrimJob::new(self.movie, self.track)?;
+            }
+            if let Some(job) = &mut self.fragment_aac_trim {
+                let samples = match job.poll(w, c) {
+                    Ok(Some(samples)) => samples,
+                    Ok(None) => return Ok(false),
+                    Err(Error::Backpressure { .. })
+                        if self.range_duration.is_some()
+                            && self
+                                .native
+                                .as_mut()
+                                .is_some_and(PacketCursor::discard_seek_checkpoints) =>
+                    {
+                        // The configuration is required. Resume its parser on
+                        // the next poll after releasing optional seek state.
+                        return Ok(false);
+                    }
+                    Err(error) => return Err(error),
+                };
+                p.tracks.as_mut_slice()[self.track].fragment_aac_trim = samples;
+                self.fragment_aac_trim = None;
+            }
+            self.track += 1;
+        } else {
+            self.track = 0;
+            self.phase = IndexPhase::FrontTracks;
+        }
+        Ok(false)
+    }
+
+    /// Projects the next front track of a front-metadata demux plan, then
+    /// marks the plan ready.
+    fn project_front_tracks(&mut self, w: &mut WorkBudget) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if !(p.demux_front && self.track < p.tracks.len()) {
+            self.phase = IndexPhase::Ready;
+            return Ok(true);
+        }
+        if !w.try_charge(1) {
+            return Ok(false);
+        }
+        let state = self
+            .native
+            .as_ref()
+            .ok_or(Error::Invalid("front native cursor"))?
+            .front_track(self.track)?;
+        push(&mut p.front_tracks, state)?;
+        self.track += 1;
         Ok(false)
     }
     pub fn finish(mut self) -> Result<PreparedMp4> {
