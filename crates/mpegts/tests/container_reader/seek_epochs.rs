@@ -74,6 +74,106 @@ fn changed_video(configuration: bool) -> Transport {
     ts
 }
 
+#[test]
+fn codec_changing_epoch_matches_the_original_carrier_suffix() {
+    let mut ts = Transport::new();
+    ts.tables(&[(0x1b, PID, &[])], 0);
+    ts.pcr(80_000, false);
+    video(&mut ts, false, 90_000);
+    ts.tables(&[(0x24, PID, &[])], 1);
+    let boundary = ts.bytes.len();
+    video(&mut ts, true, 90_000);
+    assert_eq!(boundary, 11_468);
+    assert_eq!(
+        ts.bytes,
+        include_bytes!(
+            "../../../../harness/features/mpegts-previous-picture/inputs/avc-hevc-configuration-epoch.ts"
+        )
+    );
+    let pool = Budget::new(32 << 20).unwrap();
+    let packets = sequential(&pool, &ts.bytes, PacketFormat::Ts188);
+    let first = packets
+        .iter()
+        .position(|packet| packet.epochs() == epoch(0, 3))
+        .unwrap();
+    let expected: Vec<_> = packets[first..].iter().map(snapshot).collect();
+    assert_eq!(expected.len(), 12);
+    assert_eq!(expected[0].pts, Some(90_000));
+    assert_eq!(expected[0].dts, Some(81_000));
+    assert!(expected.windows(2).any(|pair| pair[0].pts > pair[1].pts));
+    assert!(expected.windows(2).all(|pair| pair[0].dts < pair[1].dts));
+    assert!(expected.iter().all(|packet| packet.epochs == epoch(0, 3)
+        && packet.stream_type == 0x24
+        && packet.pmt_version == 1));
+    let mut seeking = reader(&pool, &ts.bytes, PacketFormat::Ts188);
+    seeking
+        .request_seek_in_epoch(request(112_000), epoch(0, 3))
+        .unwrap();
+    let mut received = Vec::new();
+    let mut map_version = None;
+    let mut landed = false;
+    loop {
+        match seeking.step(&mut WorkBudget::new(17), &OFF).unwrap() {
+            Step::NeedInput(input) => {
+                let at = usize::try_from(input.offset).unwrap();
+                if at == ts.bytes.len() {
+                    seeking.finish(input.source, input.token).unwrap();
+                } else {
+                    let end = ts.bytes.len().min(at + input.maximum.min(127));
+                    let bytes = Bytes::copy_from_slice(&pool, &ts.bytes[at..end]).unwrap();
+                    seeking
+                        .provide(
+                            &InputWindow::new(input.source, input.token, input.offset, bytes)
+                                .unwrap(),
+                        )
+                        .unwrap();
+                }
+            }
+            Step::Ready(Event::Seek(seek)) => {
+                assert!(!landed);
+                assert_eq!(map_version, Some(1));
+                assert_eq!(seek.requested, clock(112_000));
+                assert_eq!(seek.landing, clock(90_000));
+                assert_eq!(seek.discard_until, clock(112_000));
+                assert_eq!(seek.method, SeekMethod::BoundedScan);
+                assert_eq!(seek.scanned_bytes, ts.bytes.len() as u64);
+                landed = true;
+            }
+            Step::Ready(Event::Packet(packet)) => {
+                assert!(landed);
+                if received.is_empty() {
+                    let AccessUnit::Video(unit) = packet.access_unit() else {
+                        panic!("video setup")
+                    };
+                    let kinds: Vec<_> = unit
+                        .nals()
+                        .iter()
+                        .map(|nal| nal.facts().header.nal_unit_type())
+                        .collect();
+                    assert!([32, 33, 34].iter().all(|kind| kinds.contains(kind)));
+                }
+                received.push(snapshot(&packet));
+            }
+            Step::Ready(Event::Other(ReaderEvent::Source(source))) => {
+                if let TraceEvent::ProgramMap {
+                    map, active: true, ..
+                } = source.event()
+                {
+                    map_version = Some(map.header.version);
+                }
+            }
+            Step::Ready(Event::Other(_)) | Step::Yield => (),
+            Step::End(end) => {
+                assert_eq!(end.source, ID);
+                break;
+            }
+            Step::Backpressure(pressure) => panic!("unexpected pressure {pressure:?}"),
+        }
+    }
+    assert!(landed);
+    assert_eq!(received, expected);
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct Origin {
     unit: Range<u64>,

@@ -218,6 +218,11 @@ Layer I/II, AVC or HEVC stream, the index can also hold restart checkpoints at
 in-band PAT/PMT carriers; a later seek compares those carriers byte for byte and
 reads no earlier bytes. Other landings replay the entity prefix.
 
+The picture seek corpus includes an AVC to HEVC change on one TS188 PID.
+Playback preroll retains the in-band HEVC parameter sets and emits all
+twelve pictures through EOF. The [case](../../harness/features/mpegts-previous-picture/corpus.json)
+records its clocks, source positions and packet digest.
+
 ### Opt-in policies
 
 | `ReaderLimits` field | Non-default choice |
