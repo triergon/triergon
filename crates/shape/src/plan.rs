@@ -472,7 +472,7 @@ struct Features {
 }
 
 impl Builder<'_> {
-    /// Compiles the plan as `hb_ot_map_builder_t::compile` does: merges
+    /// Compiles the plan as HarfBuzz's map builder does: merges
     /// duplicate features, allocates their mask bits and collects each stage's
     /// lookups.
     fn compile(

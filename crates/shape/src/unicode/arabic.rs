@@ -77,19 +77,19 @@ pub(crate) struct ArabicLigatureSet<const N: usize> {
     pub(crate) ligatures: &'static [ArabicLigature<N>],
 }
 
-/// The two-letter ligatures (`ligature_table`, the second `rlig` lookup), sorted by
-/// first component.
+/// The two-letter ligatures (the second `rlig` lookup), sorted by first
+/// component.
 pub(crate) fn arabic_ligatures() -> &'static [ArabicLigatureSet<1>] {
     &tables::ARABIC_LIGATURES
 }
 
-/// The ligatures of SHADDA with a mark (`ligature_mark_table`, the third `rlig`
-/// lookup, which does not skip marks).
+/// The ligatures of SHADDA with a mark (the third `rlig` lookup, which does
+/// not skip marks).
 pub(crate) fn arabic_mark_ligatures() -> &'static [ArabicLigatureSet<1>] {
     &tables::ARABIC_MARK_LIGATURES
 }
 
-/// The three-letter ligatures (`ligature_3_table`, the first `rlig` lookup).
+/// The three-letter ligatures (the first `rlig` lookup).
 pub(crate) fn arabic_ligatures_3() -> &'static [ArabicLigatureSet<2>] {
     &tables::ARABIC_LIGATURES_3
 }

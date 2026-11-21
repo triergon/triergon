@@ -1,8 +1,8 @@
-//! The `cmap` table as HarfBuzz 14.6.0's built-in font functions read it
-//! (`hb-ot-cmap-table.hh`): sanitized as `hb_sanitize_context_t` sanitizes
-//! it, subtables found by binary search over the raw encoding records, and
-//! looked up with each format's `get_glyph` and the accelerator's remapping
-//! for symbol and Macintosh subtables.
+//! The `cmap` table as HarfBuzz 14.6.0's built-in font functions read it:
+//! sanitized as a whole, subtables found by binary search over the raw
+//! encoding records, and looked up by each format's rules with the remapping
+//! of symbol and Macintosh subtables. Translated from HarfBuzz 14.6.0 (see
+//! `docs/provenance.md`).
 //!
 //! HarfBuzz does not validate subtables as FreeType does, and its sanitizer
 //! never edits a table: a table any of whose subtables or variation-sequence
@@ -30,7 +30,7 @@ pub(crate) struct Cmap<'a> {
     table: Data<'a>,
 }
 
-/// A subtable `find_best_subtable` chose, and how its codes are read.
+/// The subtable [`Cmap::best`] chose, and how its codes are read.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Subtable<'a> {
     table: Data<'a>,
@@ -39,8 +39,7 @@ pub(crate) struct Subtable<'a> {
     remap: Remap,
 }
 
-/// How the accelerator reads the chosen subtable's codes
-/// (`get_glyph_from_symbol`, `_from_macroman` and `_from_ascii`).
+/// How the chosen subtable's codes are read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Remap {
     /// Codes as they are.
@@ -57,8 +56,8 @@ enum Remap {
     Ascii,
 }
 
-/// `hb_sanitize_context_t` over the `cmap` table: bounds checks, and the
-/// budget of bytes its range checks may cover (`max_ops`).
+/// HarfBuzz's sanitizer over the `cmap` table: bounds checks, and the
+/// budget of bytes its range checks may cover.
 struct Sanitizer {
     len: usize,
     ops: i64,
@@ -66,7 +65,7 @@ struct Sanitizer {
 
 impl Sanitizer {
     fn new(len: usize) -> Self {
-        // HB_SANITIZE_MAX_OPS_FACTOR, _MIN and _MAX.
+        // 64 per byte of the table, at least 16384 and at most 2^30 - 1.
         let ops = u32::try_from(len)
             .ok()
             .and_then(|n| n.checked_mul(64))
@@ -77,12 +76,13 @@ impl Sanitizer {
         }
     }
 
-    /// `check_struct`: `size` bytes at `at`, uncharged.
+    /// Whether `size` bytes at `at` lie inside the table, uncharged.
     fn fits(&self, at: usize, size: usize) -> bool {
         at.checked_add(size).is_some_and(|end| end <= self.len)
     }
 
-    /// `check_range`: `size` bytes at `at`, charged to the budget.
+    /// Whether `size` bytes at `at` lie inside the table, charged to the
+    /// budget.
     fn range(&mut self, at: Option<usize>, size: Option<usize>) -> bool {
         let (Some(at), Some(size)) = (at, size) else {
             return false;
@@ -94,7 +94,7 @@ impl Sanitizer {
         self.ops > 0
     }
 
-    /// The whole table (`cmap::sanitize`).
+    /// Whether the whole table passes.
     fn table(&mut self, t: Data<'_>) -> bool {
         if !self.fits(0, 4) || t.u16(0) != 0 {
             return false;
@@ -109,11 +109,11 @@ impl Sanitizer {
         })
     }
 
-    /// `CmapSubtable::sanitize` of the subtable at `at`.
+    /// Whether the subtable at `at` passes.
     fn subtable(&mut self, t: Data<'_>, at: usize) -> bool {
         let field = |n: usize| at.checked_add(n);
-        // A 32-bit count of `size`-byte entries, as `check_array_sized`
-        // multiplies it.
+        // The bytes of a 32-bit count of `size`-byte entries, multiplied in
+        // 32 bits.
         let entries = |count: u32, size: u32| count.checked_mul(size).map(|n| n as usize);
         if !self.fits(at, 2) {
             return false;
@@ -165,7 +165,7 @@ impl<'a> Cmap<'a> {
             .then_some(Self { table })
     }
 
-    /// `find_subtable`: the record of `platform` and `encoding` (any for
+    /// The record of `platform` and `encoding` (any for
     /// 0xFFFF) by binary search, as the records stand; `None` for an offset
     /// of zero.
     fn find(self, platform: u16, encoding: u16) -> Option<usize> {
@@ -185,7 +185,7 @@ impl<'a> Cmap<'a> {
         (offset != 0).then_some(offset)
     }
 
-    /// `find_best_subtable`: Symbol, then the 32-bit and 16-bit Unicode
+    /// The subtable HarfBuzz prefers: Symbol, then the 32-bit and 16-bit Unicode
     /// subtables in HarfBuzz's order, then Macintosh Roman, then any
     /// Macintosh subtable. A Symbol subtable's codes are remapped by the
     /// font page of `os2`, the face's `OS/2` table.
@@ -231,9 +231,8 @@ impl<'a> Cmap<'a> {
         self.find(1, 0xFFFF).map(|at| subtable(at, Remap::Ascii))
     }
 
-    /// `find_variation_selector_subtable`: the last (0, 5) record whose
-    /// subtable is format 14 (format 15 is compiled out,
-    /// `HB_NO_BEYOND_64K`).
+    /// The variation sequences: the subtable of the last (0, 5) record whose
+    /// subtable is format 14 (HarfBuzz's build reads no format 15).
     pub(crate) fn variation_sequences(self) -> Option<&'a [u8]> {
         let count = usize::from(self.table.u16(2));
         (0..count)
@@ -248,7 +247,7 @@ impl<'a> Cmap<'a> {
 }
 
 impl Subtable<'_> {
-    /// The glyph `c` maps to, through the accelerator's remapping.
+    /// The glyph `c` maps to, through the subtable's remapping.
     pub(crate) fn glyph(self, c: u32) -> Option<GlyphId> {
         let remapped = |code: u32| (code != 0).then(|| self.get(code)).flatten();
         match self.remap {
@@ -266,8 +265,8 @@ impl Subtable<'_> {
         }
     }
 
-    /// `CmapSubtable::get_glyph` of the subtable's format; formats 2, 8 and
-    /// 14 map nothing.
+    /// The glyph `code` maps to by the rules of the subtable's format;
+    /// formats 2, 8 and 14 map nothing.
     fn get(self, code: u32) -> Option<GlyphId> {
         let t = self.table.at(self.at);
         let glyph = match t.u16(0) {
@@ -306,7 +305,7 @@ impl Subtable<'_> {
     }
 }
 
-/// Format 4 through HarfBuzz's accelerator: the segment found by binary
+/// Format 4 as HarfBuzz reads it: the segment found by binary
 /// search, its glyph array read to the end of the `cmap` table (`size`
 /// bytes from the subtable).
 fn format4(t: Data<'_>, size: usize, code: u32) -> Option<u32> {
@@ -347,18 +346,18 @@ fn trimmed(t: Data<'_>, array: usize, first: u32, count: u32, code: u32) -> Opti
     Some(u32::from(t.u16(at)))
 }
 
-/// `unicode_to_macroman`: zero for a code point Macintosh Roman lacks.
+/// The Macintosh Roman code of a code point; zero for one Macintosh Roman
+/// lacks.
 ///
-/// HarfBuzz compares the 32-bit code point through a 16-bit pointer
-/// (`_hb_cmp_operator<uint16_t, uint16_t>`), so on the little-endian targets
-/// this crate supports it reads the low 16 bits, and a code point above
-/// U+FFFF maps as its low 16 bits do.
+/// HarfBuzz compares the 32-bit code point through a 16-bit pointer, so on
+/// the little-endian targets this crate supports it reads the low 16 bits,
+/// and a code point above U+FFFF maps as its low 16 bits do.
 fn macroman(u: u32) -> u32 {
     let u = u as u16;
     bsearch(MACROMAN.len(), |i| MACROMAN[i].0.cmp(&u)).map_or(0, |i| u32::from(MACROMAN[i].1))
 }
 
-/// `_hb_arabic_pua_b4`: the 4-bit entry `i` of `a`.
+/// The 4-bit entry `i` of `a`.
 fn nibble(a: &[u8], i: usize) -> usize {
     usize::from(a.get(i >> 1).copied().unwrap_or(0) >> ((i & 1) << 2)) & 15
 }
@@ -371,8 +370,8 @@ fn code_point(i: usize) -> u32 {
     u32::from(ARABIC_PUA_U16.get(i).copied().unwrap_or(0))
 }
 
-/// `_hb_arabic_pua_simp_map`: the Unicode Arabic character a Simplified
-/// Arabic font page's private-use code stands for, or zero.
+/// The private-use code a Simplified Arabic font page gives the Unicode
+/// character `u`, or zero.
 fn arabic_simplified(u: u32) -> u32 {
     if u >= 65277 {
         return 0;
@@ -384,7 +383,7 @@ fn arabic_simplified(u: u32) -> u32 {
     code_point((leaf << 3) + (u & 7))
 }
 
-/// `_hb_arabic_pua_trad_map`: the same for a Traditional Arabic font page.
+/// The same for a Traditional Arabic font page.
 fn arabic_traditional(u: u32) -> u32 {
     if u >= 65277 {
         return 0;
