@@ -13,7 +13,6 @@ use crate::{
     seek::OpusRecoverySeek,
 };
 use std::{
-    mem,
     ops::Range,
     sync::{
         Arc,
@@ -452,30 +451,36 @@ enum RangeStage<'a> {
     /// Searching the reference track; `None` until the search starts.
     Reference(Option<TrackSeek<'a>>),
     /// The reference track has landed; the other tracks are searched from track `at`
-    /// on, and the seek is ready once `at` passes the last one.
+    /// on, and the seek is ready once `at` passes the last one. `scan` is `None` until
+    /// the search of track `at` starts.
     Tracks {
         landing: SeekLanding,
         at: usize,
-        scan: TrackScan<'a>,
+        scan: Option<TrackSearch<'a>>,
     },
     Failed(Error),
 }
 
-/// What a range seek does on track `at` once the reference track has landed.
+/// The search of one track after the reference track has landed.
 #[derive(Debug)]
-enum TrackScan<'a> {
-    /// Starting the track's search.
-    Start,
-    Search(TrackSeek<'a>),
-    /// The Opus track's search found its packet; finding its decoder recovery point
-    /// from the roll groups of `edit`.
-    Recovery {
-        seek: TrackSeek<'a>,
+struct TrackSearch<'a> {
+    seek: TrackSeek<'a>,
+    roll: Roll<'a>,
+}
+
+/// Where the decoder recovery of the secondary Opus track stands.
+#[derive(Debug)]
+enum Roll<'a> {
+    /// No recovery is wanted, or it is applied.
+    Unneeded,
+    /// The search finds the Opus packet from which recovery starts, over the roll
+    /// groups of the edit.
+    Pending(&'a EncodedEditPlan),
+    /// Finding the recovery point; the search restarts there.
+    Seeking {
         recovery: Box<OpusRecoverySeek<'a>>,
         edit: &'a EncodedEditPlan,
     },
-    /// Searching the Opus track again from its recovery point.
-    Recovered(TrackSeek<'a>),
 }
 
 /// A backward seek over the restart points a [`PacketCursor`] recorded. It lands the
@@ -545,108 +550,25 @@ impl<'a> RangeSeekJob<'a> {
                 return Err(Error::Cancelled);
             }
             let tracks = self.index.tracks.as_slice();
-            let complete = match &mut self.stage {
+            match &mut self.stage {
                 RangeStage::Failed(error) => return Err(*error),
-                RangeStage::Reference(None) => {
-                    if !work.try_charge(1) {
-                        return Ok(BuildStatus::Yield);
-                    }
+                RangeStage::Reference(scan) => {
                     let points = tracks[self.reference].points.as_slice();
-                    let seek = TrackSeek::new(points, search_target(points, self.timestamp)?)?;
-                    self.stage = RangeStage::Reference(Some(seek));
-                    false
-                }
-                RangeStage::Reference(Some(seek)) => {
-                    let points = tracks[self.reference].points.as_slice();
+                    let Some(seek) = scan else {
+                        if !work.try_charge(1) {
+                            return Ok(BuildStatus::Yield);
+                        }
+                        *scan = Some(TrackSeek::new(
+                            points,
+                            search_target(points, self.timestamp)?,
+                        )?);
+                        continue;
+                    };
                     if !seek.poll(points, work, cancel)? || !work.try_charge(1) {
                         return Ok(BuildStatus::Yield);
                     }
-                    true
-                }
-                RangeStage::Tracks { at, .. } if *at == tracks.len() => {
-                    return Ok(BuildStatus::Ready);
-                }
-                RangeStage::Tracks { landing, at, scan } => {
-                    let points = tracks[*at].points.as_slice();
-                    match scan {
-                        TrackScan::Start => {
-                            if !work.try_charge(1) {
-                                return Ok(BuildStatus::Yield);
-                            }
-                            if *at == self.reference {
-                                *at += 1;
-                                continue;
-                            }
-                            let reference_base = self.slots.as_slice()[0].clock()?.demux_base;
-                            let target_base = points[0].slot.clock()?.demux_base;
-                            let target =
-                                match self.opus {
-                                    Some(opus) if opus.at == *at => {
-                                        let pts =
-                                            landing.selected.occurrence.demux.pts.ok_or(
-                                                Error::Invalid("missing video landing PTS"),
-                                            )?;
-                                        opus.edit.opus_seek_timestamp(
-                                            pts,
-                                            reference_base,
-                                            target_base,
-                                        )?
-                                    }
-                                    _ => {
-                                        let timestamp = reference_base.rescale(
-                                            landing.selected.timestamp,
-                                            target_base,
-                                            Rounding::NearestAway,
-                                        )?;
-                                        if let Some(edit) = points[0].slot.encoded_edit {
-                                            edit.align_seek_timestamp(timestamp, target_base)?
-                                        } else {
-                                            timestamp
-                                        }
-                                    }
-                                };
-                            *scan = TrackScan::Search(TrackSeek::new(
-                                points,
-                                search_target(points, target)?,
-                            )?);
-                            false
-                        }
-                        TrackScan::Search(seek) | TrackScan::Recovered(seek) => {
-                            if !seek.poll(points, work, cancel)? || !work.try_charge(1) {
-                                return Ok(BuildStatus::Yield);
-                            }
-                            true
-                        }
-                        TrackScan::Recovery {
-                            seek,
-                            recovery,
-                            edit,
-                        } => {
-                            let Some(recovered) = recovery.poll(work, cancel)? else {
-                                return Ok(BuildStatus::Yield);
-                            };
-                            seek.restart_at(points, edit.opus_occurrence(recovered.first_sample)?)?;
-                            landing.opus_recovery = Some(recovered);
-                            true
-                        }
-                    }
-                }
-            };
-            if complete {
-                // The stage's search is done. The seek counts as failed until the next
-                // stage is in place; `poll` records the error if that fails.
-                let finished = mem::replace(&mut self.stage, RangeStage::Failed(Error::Cancelled));
-                self.stage = self.next_stage(finished)?;
-            }
-        }
-    }
-
-    /// The stage that follows `finished`, whose search is complete.
-    fn next_stage(&mut self, finished: RangeStage<'a>) -> Result<RangeStage<'a>> {
-        Ok(match finished {
-            RangeStage::Reference(Some(seek)) => {
-                let landing =
-                    self.finish_track(seek, |job, head, ordinal, timestamp, fallback| {
+                    let (best, fallback) = (seek.best.take(), seek.fallback);
+                    let landing = self.finish_track(best, |job, head, ordinal, timestamp| {
                         if head.demux.flags & 1 == 0 {
                             return Err(Error::Unsupported("native seek no observed key fallback"));
                         }
@@ -672,85 +594,110 @@ impl<'a> RangeSeekJob<'a> {
                             opus_recovery: None,
                         })
                     })?;
-                RangeStage::Tracks {
-                    landing,
-                    at: 0,
-                    scan: TrackScan::Start,
+                    self.stage = RangeStage::Tracks {
+                        landing,
+                        at: 0,
+                        scan: None,
+                    };
+                }
+                RangeStage::Tracks { at, .. } if *at == tracks.len() => {
+                    return Ok(BuildStatus::Ready);
+                }
+                RangeStage::Tracks { landing, at, scan } => {
+                    let points = tracks[*at].points.as_slice();
+                    let Some(search) = scan else {
+                        if !work.try_charge(1) {
+                            return Ok(BuildStatus::Yield);
+                        }
+                        if *at == self.reference {
+                            *at += 1;
+                            continue;
+                        }
+                        let reference_base = self.slots.as_slice()[0].clock()?.demux_base;
+                        let target_base = points[0].slot.clock()?.demux_base;
+                        let (target, roll) = match self.opus {
+                            Some(opus) if opus.at == *at => {
+                                let pts = landing
+                                    .selected
+                                    .occurrence
+                                    .demux
+                                    .pts
+                                    .ok_or(Error::Invalid("missing video landing PTS"))?;
+                                let target = opus.edit.opus_seek_timestamp(
+                                    pts,
+                                    reference_base,
+                                    target_base,
+                                )?;
+                                (target, Roll::Pending(opus.edit))
+                            }
+                            _ => {
+                                let timestamp = reference_base.rescale(
+                                    landing.selected.timestamp,
+                                    target_base,
+                                    Rounding::NearestAway,
+                                )?;
+                                let target = if let Some(edit) = points[0].slot.encoded_edit {
+                                    edit.align_seek_timestamp(timestamp, target_base)?
+                                } else {
+                                    timestamp
+                                };
+                                (target, Roll::Unneeded)
+                            }
+                        };
+                        *scan = Some(TrackSearch {
+                            seek: TrackSeek::new(points, search_target(points, target)?)?,
+                            roll,
+                        });
+                        continue;
+                    };
+                    if let Roll::Seeking { recovery, edit } = &mut search.roll {
+                        let Some(recovered) = recovery.poll(work, cancel)? else {
+                            return Ok(BuildStatus::Yield);
+                        };
+                        search
+                            .seek
+                            .restart_at(points, edit.opus_occurrence(recovered.first_sample)?)?;
+                        landing.opus_recovery = Some(recovered);
+                        search.roll = Roll::Unneeded;
+                        continue;
+                    }
+                    if !search.seek.poll(points, work, cancel)? || !work.try_charge(1) {
+                        return Ok(BuildStatus::Yield);
+                    }
+                    if let Roll::Pending(edit) = search.roll {
+                        search.roll = Roll::Seeking {
+                            recovery: opus_recovery(self.slots.budget(), &search.seek, edit)?,
+                            edit,
+                        };
+                        continue;
+                    }
+                    let best = search.seek.best.take();
+                    *scan = None;
+                    *at += 1;
+                    self.finish_track(best, |_, _, _, _| Ok(()))?;
                 }
             }
-            RangeStage::Tracks { landing, at, scan } => {
-                let scan = match (scan, self.opus) {
-                    (TrackScan::Search(seek), Some(opus)) if opus.at == at => TrackScan::Recovery {
-                        recovery: self.opus_recovery(&seek, opus.edit)?,
-                        seek,
-                        edit: opus.edit,
-                    },
-                    (TrackScan::Search(seek) | TrackScan::Recovered(seek), _) => {
-                        self.finish_track(seek, |_, _, _, _, _| Ok(()))?;
-                        return Ok(RangeStage::Tracks {
-                            landing,
-                            at: at + 1,
-                            scan: TrackScan::Start,
-                        });
-                    }
-                    (TrackScan::Recovery { seek, .. }, _) => TrackScan::Recovered(seek),
-                    (TrackScan::Start, _) => TrackScan::Start,
-                };
-                RangeStage::Tracks { landing, at, scan }
-            }
-            settled @ (RangeStage::Reference(None) | RangeStage::Failed(_)) => settled,
-        })
-    }
-
-    /// The decoder recovery search, over the roll groups of `edit`, for the Opus
-    /// track's packet that `seek` found.
-    fn opus_recovery(
-        &self,
-        seek: &TrackSeek<'a>,
-        edit: &'a EncodedEditPlan,
-    ) -> Result<Box<OpusRecoverySeek<'a>>> {
-        let best = seek
-            .best
-            .as_ref()
-            .ok_or(Error::Invalid("missing Opus seek sample"))?;
-        let sample = &best
-            .slot
-            .head
-            .as_ref()
-            .ok_or(Error::Invalid("missing Opus seek sample"))?
-            .source;
-        if best.ordinal != edit.opus_occurrence(sample.ordinal)? {
-            return Err(Error::Invalid("Opus seek occurrence order"));
         }
-        OpusRecoverySeek::new(
-            self.slots.budget(),
-            best.slot.track,
-            edit.opus_roll_scope()?,
-            sample,
-        )
     }
 
-    /// Keeps the slot `scan` landed on for the continuing cursor, after `land` has
-    /// read its head packet, ordinal, decode time and whether the search fell back to
-    /// the first restart point.
+    /// Keeps the slot of the checkpoint a search landed on for the continuing cursor,
+    /// after `land` has read its head packet, ordinal and decode time.
     fn finish_track<T>(
         &mut self,
-        scan: TrackSeek<'a>,
-        land: impl FnOnce(&Self, &PacketOccurrence, u64, i64, bool) -> Result<T>,
+        best: Option<Checkpoint<'a>>,
+        land: impl FnOnce(&Self, &PacketOccurrence, u64, i64) -> Result<T>,
     ) -> Result<T> {
         let Checkpoint {
             ordinal,
             timestamp,
             mut slot,
             ..
-        } = scan
-            .best
-            .ok_or(Error::Invalid("missing checked seek key"))?;
+        } = best.ok_or(Error::Invalid("missing checked seek key"))?;
         let head = slot
             .head
             .as_mut()
             .ok_or(Error::Invalid("missing checked seek head"))?;
-        let landed = land(self, head, ordinal, timestamp, scan.fallback)?;
+        let landed = land(self, head, ordinal, timestamp)?;
         head.scheduling_clock = if self.index.tracks.len() > 1 {
             SchedulingClock::from_demux_clock(head.demux.dts_field, head.media_clock.demux_base)?
         } else {
@@ -788,6 +735,29 @@ impl<'a> RangeSeekJob<'a> {
         cursor.seek_checkpoints = Some(self.index);
         Ok((cursor, landing))
     }
+}
+
+/// The decoder recovery search, over the roll groups of `edit`, for the Opus track's
+/// packet that `seek` found.
+fn opus_recovery<'a>(
+    pool: &Budget,
+    seek: &TrackSeek<'a>,
+    edit: &'a EncodedEditPlan,
+) -> Result<Box<OpusRecoverySeek<'a>>> {
+    let best = seek
+        .best
+        .as_ref()
+        .ok_or(Error::Invalid("missing Opus seek sample"))?;
+    let sample = &best
+        .slot
+        .head
+        .as_ref()
+        .ok_or(Error::Invalid("missing Opus seek sample"))?
+        .source;
+    if best.ordinal != edit.opus_occurrence(sample.ordinal)? {
+        return Err(Error::Invalid("Opus seek occurrence order"));
+    }
+    OpusRecoverySeek::new(pool, best.slot.track, edit.opus_roll_scope()?, sample)
 }
 
 /// The decode time a track's search looks for: `target` less the track's seek offset.
