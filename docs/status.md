@@ -113,9 +113,12 @@ controls compare complete source-byte/event records with explicit-offset
 traversal, including continuity and partial-tail diagnostics. Phases 0, 1 and
 187 also cover one-byte input and one-unit work grants. The hash-pinned
 `loewe.ts` integration control checks the same program facts and original
-carrier offsets as explicit-offset traversal; it requires the external sample
-cache. Native runtime, heap and kernel-bound RSS qualification of this opt-in
-operation remains open on AArch64 and ARMv7.
+carrier offsets as explicit-offset traversal. The [registered comparison](../harness/features/mpegts-ts188-discovery/contract.json)
+covers discovery and complete PES replay. The 23-packet fold matches on both
+targets at `ef4dfd67`. Linux AArch64 upper bounds are 0.861671 runtime,
+0.020404 peak heap and 0.637627 kernel-bound total RSS. The corresponding
+32-bit ARMv7 bounds are 1.190322, 0.019850 and 0.708871. The ARMv7 runtime
+case remains open. Every preceding transport case passes on both targets.
 
 For the original shifted `loewe.ts`, a discovery and replay control using the
 existing PES cutter recovers 23 selected-program payloads (85,990 bytes), with
@@ -363,6 +366,10 @@ runtime and total RSS:
 | Subtitles, DVB and workspace tests, partial gate run, ARMv7 | `fa7e4621bc8717bab7b75a4a9c2b0a078d34557c` | [`eb1d42b3994493e10615a3214061bbf96828c4a562e4a49b3695cc8e685c62ed`](../harness/evidence/sets/gate-run-armv7-fa7e4621-20261121-125820-shard-1.json) |
 | MPEG-TS and framing regressions, part 1, Linux AArch64 | `6a43f20bbf94a52514caae4034f2a2cc09c74fdb` | [`63258f960ec833225c04f71397692052fb28088125a56bbae3120940b92bd932`](../harness/evidence/sets/gate-run-aarch64-6a43f20b-20261121-164146-shard-1.json) |
 | MPEG-TS and framing regressions, part 2, Linux AArch64 | `6a43f20bbf94a52514caae4034f2a2cc09c74fdb` | [`636bdd78c4db2f6d07a239e4e690b2eb5ae36eb3c772686980d735d27e648cb5`](../harness/evidence/sets/gate-run-aarch64-6a43f20b-20261121-164146-shard-2.json) |
+| TS188 carrier discovery and transport regressions, Linux AArch64 on c6g.4xlarge (454/454 runtime pass, 454/454 parity and memory) | `ef4dfd67fc79834d18068130a699ddab12f135ae` | [`23a000a218b3268792e9fcbfeb6d7617f116d4f1cd91022b5314871d4a4a04a5`](../harness/evidence/sets/gate-run-aarch64-ef4dfd67-20261122-043137-shard-1.json) |
+| TS188 carrier discovery and transport regressions, 32-bit ARMv7 on c6g.4xlarge (453/454 runtime pass, 454/454 parity and memory) | `ef4dfd67fc79834d18068130a699ddab12f135ae` | [`35d21e2b97b1ed07045420548dddb4a3ea0cbae1a89c9fd422299879a176fbf6`](../harness/evidence/sets/gate-run-armv7-ef4dfd67-20261122-043149-shard-1.json) |
+| Playback with TS188 carrier discovery, Linux AArch64 on c6g.4xlarge (291/291 measured cases and 648 accepted ISO BMFF reader comparisons) | `ef4dfd67fc79834d18068130a699ddab12f135ae` | [`8f3b99306054cb9f655a952d382a713acffc51985204a1fd4ebb2d85bd8fcece`](../harness/evidence/sets/gate-run-aarch64-ef4dfd67-20261122-043211-shard-1.json) |
+| Playback with TS188 carrier discovery, 32-bit ARMv7 on c6g.4xlarge (291/291 measured cases and 648 accepted ISO BMFF reader comparisons) | `ef4dfd67fc79834d18068130a699ddab12f135ae` | [`90002ac00b42b50b482a74e246e42c98ef9288ff178c1ae8650c4700e0f0bb71`](../harness/evidence/sets/gate-run-armv7-ef4dfd67-20261122-043244-shard-1.json) |
 | MPEG-TS MPEG picture carriage and 453 passing transport comparisons, Linux AArch64 on c6g.4xlarge | `fac55c361a9cb46a9c4f5d053a4bd84403850235` | [`3fccc7f6e95583c2035a5a7ea7083103a1ea1251fed3cb3bfca11a61ee729df6`](../harness/evidence/sets/gate-run-aarch64-fac55c36-20261122-023943-shard-1.json) |
 | MPEG-TS MPEG picture carriage and 453 passing transport comparisons, 32-bit ARMv7 on c6g.4xlarge | `fac55c361a9cb46a9c4f5d053a4bd84403850235` | [`e5550539f13ae00ef1ab39abce920930e37e7bbf6c62d907544861f5f7d321d6`](../harness/evidence/sets/gate-run-armv7-fac55c36-20261122-023956-shard-1.json) |
 | MPEG-TS carriage and transport, Linux AArch64 (453 passes) | `16ab70baf749e525b11893b54e937f7d54f05b0d` | [`eb5d64d27be92271a7a8b94ae9f4a7467d6f0a902eb1965f93c1a9413058d9c0`](../harness/evidence/sets/gate-run-aarch64-16ab70ba-20261122-015444-shard-1.json) |
