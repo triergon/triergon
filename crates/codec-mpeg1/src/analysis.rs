@@ -154,6 +154,10 @@ impl Encoder {
                         u32::MAX
                     };
                     search.run(&candidates, coarse, mb_x, mb_y, neighbour)
+                } else if self.skipped_at[i] != 0 {
+                    // The source luma and the skipped zero-vector prediction
+                    // are both unchanged, so the previous SAD still holds.
+                    (Mv::ZERO, self.analysis[i].sad)
                 } else {
                     // Repeated luma predicts at zero motion, even when quantisation
                     // changed the reconstructed reference.

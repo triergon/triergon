@@ -198,9 +198,9 @@ fn skips_reused_for_a_repeated_picture_match_the_computed_path() {
     let mut computed = Encoder::new(cfg).unwrap();
     let (mut a, mut b) = (Vec::new(), Vec::new());
     for _ in 0..12 {
-        // `computed` never sees a repeated picture, so it codes every
-        // macroblock from its residual.
-        computed.previous_chroma.fill(0);
+        // Both apply the same rate plan. Only `computed` recalculates every
+        // macroblock's analysis and residual before choosing a skip.
+        computed.skipped_at.fill(0);
         reused.encode(&input, &mut a).unwrap();
         computed.encode(&input, &mut b).unwrap();
         assert_eq!(a, b);
