@@ -47,8 +47,8 @@ pub struct RawVideoFeedPacket {
 }
 
 impl RawVideoFeedPacket {
-    /// Existing video queues that use zero for an unstamped packet can take
-    /// this boundary value without turning it into a source timestamp.
+    /// Submission time rounded to the nearest nanosecond, with ties away from zero.
+    /// Returns zero when no submission time was assigned.
     pub const fn queue_timestamp_ns(&self) -> i64 {
         self.queue_timestamp_ns
     }

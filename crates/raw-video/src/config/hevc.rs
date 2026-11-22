@@ -99,7 +99,8 @@ pub fn startup_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<Startup
     })
 }
 
-/// Identify the active chain's three supported parameter-set headers.
+/// Returns the parameter-set slot (VPS 0, SPS 1, PPS 2) and the bytes after the
+/// two-byte NAL header. Returns `None` for any other header or a truncated one.
 pub fn parameter_set_payload(nal: &[u8]) -> Option<(usize, &[u8])> {
     let (header, payload) = nal.split_first_chunk::<2>()?;
     // The chain admits layer zero and temporal ID zero.

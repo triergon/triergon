@@ -53,7 +53,8 @@ pub struct RawVideoSource<S: Source> {
 }
 
 impl<S: Source> RawVideoSource<S> {
-    /// Reads `source` through `reader`.
+    /// Takes ownership of the reader and source for one raw Annex B stream.
+    /// Releases the source at EOF, on a terminal failure, or when dropped.
     pub fn new(reader: RawAnnexBReader, source: S) -> Self {
         Self {
             state: State::Active {

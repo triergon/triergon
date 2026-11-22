@@ -21,16 +21,14 @@ pub struct RawVideoConfiguration {
     pub height: u32,
     /// Timing fields carried by the active AVC SPS, when present.
     pub avc_timing: Option<AvcVuiTiming>,
-    /// The active HEVC video parameter set; `None` for AVC.
-    pub vps: Option<Bytes>,
-    /// The active sequence parameter set.
+    vps: Option<Bytes>,
+    /// The SPS NAL, including its header and excluding the Annex B start code.
     pub sps: Bytes,
-    /// The active picture parameter set.
-    pub pps: Bytes,
+    pps: Bytes,
 }
 
 impl RawVideoConfiguration {
-    /// The VPS (HEVC only), SPS and PPS, in that order.
+    /// Borrows the active VPS for HEVC, then the active SPS and PPS for either codec.
     pub fn parameter_sets(&self) -> impl Iterator<Item = &Bytes> {
         self.vps.iter().chain([&self.sps, &self.pps])
     }
