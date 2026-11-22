@@ -961,5 +961,15 @@ Verification:
   supply input for this compatibility comparison. Full source and evidence
   hashes are in [status](../../docs/status.md#measured-revisions).
 
+- The [source polling](../../harness/features/ts-source-poll/contract.json),
+  [standalone PES assembly](../../harness/features/ts-pes-assembler/contract.json)
+  and [demux observer](../../harness/features/ts-observer-forms/contract.json)
+  comparisons use every input from the PES packet corpus. They exercise five
+  source poll forms, four payload chunk sizes and three observer forms. The
+  strict source comparisons preserve encoded timestamp absence, period-zero
+  ticks and physical carrier positions. The observer comparison uses projected
+  demux clocks. The contracts list the outstanding differences and the
+  runtime and memory bounds awaiting native measurements.
+
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).
