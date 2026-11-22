@@ -99,7 +99,10 @@ pub fn views(command: &str, root: &Path, args: &[String]) -> Option<R<()>> {
     let run = match command {
         "codec-views" => crate::codec_views::main,
         "matroska-views" => crate::matroska_views::main,
+        "play-views" => crate::play_views::main,
+        "playback-views" => crate::playback_views::main,
         "subtitle-views" => crate::subtitle_views::main,
+        "transport-views" => crate::transport_views::main,
         _ => return None,
     };
     Some(run(root, args))
