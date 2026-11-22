@@ -24,8 +24,11 @@ pub(super) fn item<'a>(registry: &'a Value, name: &str) -> impl Iterator<Item = 
 }
 
 pub(super) fn video_workloads() -> String {
-    let list = json::parse(include_str!("../../../harness/codecs/workloads.json"))
-        .expect("video workload list");
+    video_workload_names(include_str!("../../../harness/codecs/workloads.json"))
+}
+
+pub(super) fn video_workload_names(list: &str) -> String {
+    let list = json::parse(list).expect("video workload list");
     workloads(&list)
         .iter()
         .filter(|row| {
