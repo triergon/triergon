@@ -87,8 +87,9 @@ take several instructions.
 
 The [CABAC engine comparison](../../harness/features/cabac-engine/contract.json) checks
 both layouts against serial arithmetic decoding, including context updates, bypass
-reads through 32 bins, offset refusals and cursor values. The capped unary cases
-record where a call advances past its requested limit.
+reads through 32 bins, offset refusals and cursor values. A capped unary read
+leaves every bin after the cap for the next read, as in H.264 §9.3.2.2 and
+H.265 §9.3.3.2 with a Rice parameter of zero.
 
 ```rust
 use triergon_bitstream::cabac::{Engine, InvalidOffset, init_state};

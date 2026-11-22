@@ -398,14 +398,23 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
         bins
     }
 
-    /// Counts a unary prefix of bypass 1-bins ended by a 0-bin, which is consumed. Stops
-    /// at `max` ones. Peeks 8 bins per division and consumes only what it uses.
+    /// Counts a unary prefix of bypass 1-bins. Consumes the terminating 0-bin
+    /// only when it occurs before `max` ones. A zero limit consumes no bins.
     #[inline(always)]
     pub fn bypass_unary(&mut self, max: u32) -> u32 {
+        if max == 0 {
+            return 0;
+        }
         let mut count = 0;
         loop {
             let bins = self.peek_bypass(8);
             let ones = (bins as u8).leading_ones();
+            if !max.is_multiple_of(8) && ones >= max - count {
+                let remaining = max - count;
+                self.consume_bypass(remaining, bins >> (8 - remaining));
+                self.refill();
+                return max;
+            }
             if ones < 8 {
                 self.consume_bypass(ones + 1, bins >> (7 - ones));
                 self.refill();
@@ -573,16 +582,12 @@ mod tests {
                     assert_eq!(engine.bypass_bits(count), expected, "bypass bits {i}");
                 }
                 2 => {
-                    let max = 1 + random() % 32;
+                    let max = random() % 33;
                     let mut ones = 0;
                     while ones < max && serial.bypass() == 1 {
                         ones += 1;
                     }
                     assert_eq!(engine.bypass_unary(max), ones, "unary {i}");
-                    // The engine consumes whole peeks at the limit; follow it.
-                    while serial.position < engine.bits_read() {
-                        serial.bypass();
-                    }
                 }
                 _ => {
                     assert_eq!(
