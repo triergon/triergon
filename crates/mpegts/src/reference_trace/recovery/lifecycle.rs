@@ -46,6 +46,33 @@ impl PatRoute {
     }
 }
 
+#[derive(Debug)]
+enum PatStep {
+    Header,
+    Sections {
+        index: usize,
+        bytes: usize,
+    },
+    Ranges {
+        index: usize,
+        section_bytes: usize,
+        range_bytes: usize,
+        entity: Option<SourceId>,
+    },
+    Programs {
+        index: usize,
+        entity: SourceId,
+        selected: Option<u16>,
+        programs: usize,
+    },
+    Finish {
+        entity: SourceId,
+        selected: Option<u16>,
+        programs: usize,
+    },
+    Done,
+}
+
 /// One actual source storage/range/entry per work unit. Borrows the table; no heap
 /// workspace, reparsing, source mutation or queue is involved.
 #[derive(Debug)]
@@ -54,14 +81,7 @@ pub struct PatSelection<'a> {
     budget: &'a Budget,
     requested: u16,
     context: SourceContext,
-    phase: u8,
-    index: usize,
-    entity: Option<SourceId>,
-    source_bytes: usize,
-    range_bytes: usize,
-    selected: Option<u16>,
-    programs: usize,
-    done: bool,
+    step: PatStep,
 }
 impl<'a> PatSelection<'a> {
     /// A selection of program `requested` from the complete PAT `table`.
@@ -83,14 +103,7 @@ impl<'a> PatSelection<'a> {
             budget,
             requested,
             context,
-            phase: 0,
-            index: 0,
-            entity: None,
-            source_bytes: 0,
-            range_bytes: 0,
-            selected: None,
-            programs: 0,
-            done: false,
+            step: PatStep::Header,
         })
     }
     /// Checks the table within `work` and returns the route to the requested program once (`None`
@@ -108,27 +121,43 @@ impl<'a> PatSelection<'a> {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if self.done {
+            if matches!(self.step, PatStep::Done) {
                 return Ok(TableStep::Done);
             }
             if work.remaining() == 0 {
                 return Ok(TableStep::Yield);
             }
             // End-of-array control transitions do not debit pretend syntax work.
-            if self.phase == 1 && self.index == self.table.source_sections.as_slice().len() {
-                self.index = 0;
-                self.phase = 2;
-                continue;
-            }
-            if self.phase == 3 && self.index == self.table.programs.as_slice().len() {
-                self.phase = 4;
-                continue;
+            match self.step {
+                PatStep::Sections { index, bytes } if index == self.table.source_sections.len() => {
+                    self.step = PatStep::Ranges {
+                        index: 0,
+                        section_bytes: bytes,
+                        range_bytes: 0,
+                        entity: None,
+                    };
+                    continue;
+                }
+                PatStep::Programs {
+                    index,
+                    entity,
+                    selected,
+                    programs,
+                } if index == self.table.programs.len() => {
+                    self.step = PatStep::Finish {
+                        entity,
+                        selected,
+                        programs,
+                    };
+                    continue;
+                }
+                _ => {}
             }
             if !work.try_charge(1) {
                 return Ok(TableStep::Yield);
             }
-            match self.phase {
-                0 => {
+            match &mut self.step {
+                PatStep::Header => {
                     let h = self.table.header;
                     if h.table_id != 0
                         || !h.current_next
@@ -142,88 +171,98 @@ impl<'a> PatSelection<'a> {
                             "selected PAT must be a complete current source table",
                         ));
                     }
-                    self.phase = 1;
+                    self.step = PatStep::Sections { index: 0, bytes: 0 };
                 }
-                1 => {
-                    if let Some(source) = self.table.source_sections.as_slice().get(self.index) {
+                PatStep::Sections { index, bytes } => {
+                    if let Some(source) = self.table.source_sections.as_slice().get(*index) {
                         if !source.belongs_to(self.budget) {
                             return Err(Error::ForeignPool);
                         }
-                        self.source_bytes = self
-                            .source_bytes
-                            .checked_add(source.len())
-                            .ok_or(Error::Overflow)?;
-                        self.index += 1;
+                        *bytes = bytes.checked_add(source.len()).ok_or(Error::Overflow)?;
+                        *index += 1;
                     } else {
                         return Err(Error::Invalid("selected PAT owner cursor"));
                     }
                 }
-                2 => {
-                    if let Some(item) = self.table.source_ranges.as_slice().get(self.index) {
+                PatStep::Ranges {
+                    index,
+                    section_bytes,
+                    range_bytes,
+                    entity,
+                } => {
+                    if let Some(item) = self.table.source_ranges.as_slice().get(*index) {
                         let r = item.range;
                         r.end()?;
                         if r.bytes == 0
                             || item.section_number > self.table.header.last_section_number
-                            || self.entity.is_some_and(|s| s != r.entity)
+                            || entity.is_some_and(|s| s != r.entity)
                         {
                             return Err(Error::Unsupported(
                                 "selected PAT entity/range context unobserved",
                             ));
                         }
-                        self.entity = Some(r.entity);
-                        self.range_bytes = self
-                            .range_bytes
-                            .checked_add(r.bytes)
-                            .ok_or(Error::Overflow)?;
-                        self.index += 1;
+                        *entity = Some(r.entity);
+                        *range_bytes = range_bytes.checked_add(r.bytes).ok_or(Error::Overflow)?;
+                        *index += 1;
                     } else {
-                        if self.range_bytes != self.source_bytes {
+                        if *range_bytes != *section_bytes {
                             return Err(Error::Invalid("selected PAT physical byte accounting"));
                         }
-                        self.index = 0;
-                        self.phase = 3;
+                        let Some(entity) = *entity else {
+                            return Err(Error::Invalid(
+                                "selected PAT must be a complete current source table",
+                            ));
+                        };
+                        self.step = PatStep::Programs {
+                            index: 0,
+                            entity,
+                            selected: None,
+                            programs: 0,
+                        };
                     }
                 }
-                3 => {
-                    if let Some(entry) = self.table.programs.as_slice().get(self.index) {
+                PatStep::Programs {
+                    index,
+                    selected,
+                    programs,
+                    ..
+                } => {
+                    if let Some(entry) = self.table.programs.as_slice().get(*index) {
                         if !entry.is_network_pid() {
-                            self.programs = self.programs.checked_add(1).ok_or(Error::Overflow)?;
+                            *programs = programs.checked_add(1).ok_or(Error::Overflow)?;
                             if entry.program_number == self.requested {
                                 crate::checked_pid(entry.pid)?;
-                                if self.selected.replace(entry.pid).is_some() {
+                                if selected.replace(entry.pid).is_some() {
                                     return Err(Error::Invalid("selected PAT duplicate program"));
                                 }
                             }
                         }
-                        self.index += 1;
+                        *index += 1;
                     } else {
                         return Err(Error::Invalid("selected PAT entry cursor"));
                     }
                 }
-                4 => {
-                    let route = self
-                        .selected
-                        .map(|pmt_pid| -> Result<PatRoute> {
-                            Ok(PatRoute {
-                                entity: self.entity.ok_or(Error::Invalid(
-                                    "selected PAT must be a complete current source table",
-                                ))?,
-                                tsid: self.table.header.extension,
-                                program: self.requested,
-                                pmt_pid,
-                                version: self.table.header.version,
-                                context: self.context,
-                                programs: self.programs,
-                            })
-                        })
-                        .transpose()?;
+                PatStep::Finish {
+                    entity,
+                    selected,
+                    programs,
+                } => {
+                    let route = selected.map(|pmt_pid| PatRoute {
+                        entity: *entity,
+                        tsid: self.table.header.extension,
+                        program: self.requested,
+                        pmt_pid,
+                        version: self.table.header.version,
+                        context: self.context,
+                        programs: *programs,
+                    });
                     if cancel.load(Ordering::Relaxed) {
                         return Err(Error::Cancelled);
                     }
-                    self.done = true;
+                    self.step = PatStep::Done;
                     return Ok(TableStep::Output(route));
                 }
-                _ => return Err(Error::Invalid("selected PAT phase")),
+                PatStep::Done => return Ok(TableStep::Done),
             }
         }
     }
@@ -251,6 +290,22 @@ enum Mode {
     Rebind,
 }
 
+#[derive(Debug)]
+enum BindStep {
+    Header,
+    Context,
+    Ranges {
+        target: DemuxScope,
+        index: usize,
+        bytes: usize,
+        previous_end: Option<u64>,
+    },
+    Commit {
+        target: DemuxScope,
+    },
+    Done,
+}
+
 /// Exclusive observer + immutable actual source Map, held only for this bounded
 /// transaction. Dropping before commit aborts; no pending input is fabricated.
 #[derive(Debug)]
@@ -260,12 +315,7 @@ pub struct PmtBindingJob<'a> {
     route: PatRoute,
     context: SourceContext,
     mode: Mode,
-    phase: u8,
-    range: usize,
-    bytes: usize,
-    previous_end: Option<u64>,
-    target: Option<DemuxScope>,
-    done: bool,
+    step: BindStep,
 }
 impl RecoveryObserver {
     /// The current PMT binding, once one has been made.
@@ -330,12 +380,7 @@ impl<'a> PmtBindingJob<'a> {
             route,
             context,
             mode,
-            phase: 0,
-            range: 0,
-            bytes: 0,
-            previous_end: None,
-            target: None,
-            done: false,
+            step: BindStep::Header,
         })
     }
     /// The observer's scope before the binding completes.
@@ -357,14 +402,14 @@ impl<'a> PmtBindingJob<'a> {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if self.done {
+            if matches!(self.step, BindStep::Done) {
                 return Ok(TableStep::Done);
             }
             if !work.try_charge(1) {
                 return Ok(TableStep::Yield);
             }
-            match self.phase {
-                0 => {
+            match &mut self.step {
+                BindStep::Header => {
                     if !self.map.source.belongs_to(&self.observer.budget) {
                         return Err(Error::ForeignPool);
                     }
@@ -387,9 +432,9 @@ impl<'a> PmtBindingJob<'a> {
                     {
                         return Err(Error::Invalid("selected PMT source range count"));
                     }
-                    self.phase = 1;
+                    self.step = BindStep::Context;
                 }
-                1 => {
+                BindStep::Context => {
                     let current = self.observer.scope();
                     let stream = &self.map.streams.as_slice()[0];
                     if self.route.entity != current.entity
@@ -464,34 +509,41 @@ impl<'a> PmtBindingJob<'a> {
                     }
                     target.stream_type = stream.stream_type;
                     target.epochs = self.context.epochs;
-                    self.target = Some(target);
-                    self.phase = 2;
+                    self.step = BindStep::Ranges {
+                        target,
+                        index: 0,
+                        bytes: 0,
+                        previous_end: None,
+                    };
                 }
-                2 => {
-                    if let Some(r) = self.map.source_ranges.as_slice().get(self.range) {
+                BindStep::Ranges {
+                    target,
+                    index,
+                    bytes,
+                    previous_end,
+                } => {
+                    if let Some(r) = self.map.source_ranges.as_slice().get(*index) {
                         let end = r.end()?;
                         if r.entity != self.route.entity
                             || r.bytes == 0
-                            || self.previous_end.is_some_and(|p| r.offset < p)
+                            || previous_end.is_some_and(|p| r.offset < p)
                         {
                             return Err(Error::Unsupported(
                                 "selected PMT entity/physical ranges unobserved",
                             ));
                         }
-                        self.bytes = self.bytes.checked_add(r.bytes).ok_or(Error::Overflow)?;
-                        self.previous_end = Some(end);
-                        self.range += 1;
+                        *bytes = bytes.checked_add(r.bytes).ok_or(Error::Overflow)?;
+                        *previous_end = Some(end);
+                        *index += 1;
                     } else {
-                        if self.bytes != self.map.source.len() {
+                        if *bytes != self.map.source.len() {
                             return Err(Error::Invalid("selected PMT physical byte accounting"));
                         }
-                        self.phase = 3;
+                        self.step = BindStep::Commit { target: *target };
                     }
                 }
-                3 => {
-                    let scope = self
-                        .target
-                        .ok_or(Error::Invalid("selected PMT target missing"))?;
+                BindStep::Commit { target } => {
+                    let scope = *target;
                     let binding = PmtBinding {
                         route: self.route,
                         version: self.map.header.version,
@@ -507,10 +559,10 @@ impl<'a> PmtBindingJob<'a> {
                         self.observer.selected_faults = false;
                     }
                     self.observer.pmt_binding = Some(binding);
-                    self.done = true;
+                    self.step = BindStep::Done;
                     return Ok(TableStep::Output(binding));
                 }
-                _ => return Err(Error::Invalid("selected PMT binding phase")),
+                BindStep::Done => return Ok(TableStep::Done),
             }
         }
     }
