@@ -258,6 +258,57 @@ fn side_data_projection_keeps_lcevc_and_rejects_foreign_mapping_context() {
 }
 
 #[test]
+fn side_data_projection_keeps_opaque_additions_beside_hdr10_plus() {
+    use triergon_matroska::compat::block_additions::{
+        BlockAdditionContainer::Matroska, PacketSideData, packet_side_data,
+    };
+
+    let mapped = e(0x41e4, &[u(0x41f0, 4), u(0x41e7, 4)].concat());
+    let config = [u(0x55ee, 4), mapped].concat();
+    let packet = e(
+        0xa0,
+        &[
+            block(),
+            additions(&[
+                more(Some(&[4]), b"\xb5\x00\x3c\x00\x01\x04hdr10+"),
+                more(None, b"opaque"),
+            ]),
+        ]
+        .concat(),
+    );
+    let raw = file(&config, &[packet]);
+    let cancel = AtomicBool::new(false);
+    let mut reader = BlockingReader::open(Cursor::new(&raw), Limits::default()).unwrap();
+    let packet = reader.next_typed_packet(&cancel).unwrap().unwrap();
+    let extensions = finish_mapping(
+        packet
+            .configuration
+            .track_extensions_job(0, Limits::default())
+            .unwrap(),
+    );
+    let ParseStep::Event(result) = packet_side_data(
+        &packet,
+        &extensions,
+        Matroska,
+        &mut WorkBudget::new(1024),
+        &cancel,
+    )
+    .unwrap() else {
+        panic!("projection has enough work");
+    };
+    assert_eq!(
+        result,
+        [
+            Some(PacketSideData::Opaque {
+                id: 1,
+                payload: b"opaque"
+            }),
+            None
+        ]
+    );
+}
+
+#[test]
 fn codec_state_has_exact_owned_bytes_and_preserves_initial_track_evidence() {
     use triergon_matroska::InitializationOrigin;
     let pool = Budget::new(2 * 1024 * 1024).unwrap();

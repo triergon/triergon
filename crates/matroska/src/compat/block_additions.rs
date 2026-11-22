@@ -52,7 +52,9 @@ fn t35(data: &[u8]) -> Result<Option<PacketSideData<'_>>> {
         [0xb4, _, 0x50, 0x00, payload @ ..] if payload.len() >= 2 => {
             Ok(Some(PacketSideData::Lcevc(payload)))
         }
-        [0xb5, 0, 0x3c, 0, 1, 4, ..] | [0xb5, 0, 0x90, 0, 1, _, ..] => Err(Error::Unsupported(
+        // HDR10+ is the packet's `hdr10_plus` event, not one of these entries.
+        [0xb5, 0, 0x3c, 0, 1, 4, ..] => Ok(None),
+        [0xb5, 0, 0x90, 0, 1, _, ..] => Err(Error::Unsupported(
             "Matroska ITU-T T.35 dynamic HDR needs a metadata decoder",
         )),
         _ => Ok(None),
@@ -156,8 +158,9 @@ pub fn hdr10_plus<'a>(
 /// kind replaces that kind in place. The original group remains available.
 ///
 /// The returned array is in encounter order, with unused slots at the end.
-/// A work yield leaves the operation retryable. A dynamic HDR T.35 addition is
-/// refused with `Unsupported`; decode it with [`hdr10_plus`].
+/// A work yield leaves the operation retryable. An HDR10+ T.35 addition is not
+/// an entry: [`hdr10_plus`] decodes it, and the packet's other additions are still
+/// projected. Any other dynamic HDR T.35 addition is refused with `Unsupported`.
 pub fn packet_side_data<'a>(
     packet: &'a TypedPacket,
     extensions: &TrackExtensions,
