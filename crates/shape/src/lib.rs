@@ -10,6 +10,9 @@
     clippy::expect_used
 )]
 
+#[cfg(test)]
+extern crate self as triergon_shape;
+
 pub mod bidi;
 mod buffer;
 mod cff;

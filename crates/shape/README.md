@@ -202,7 +202,8 @@ does.
 
 Faces read their tables from the font bytes without copying and do no work of
 their own. Plans, buffers and bidi resolvers charge their storage to the
-`Budget` they are given and keep it for reuse.
+`Budget` they are given and keep it for reuse. Shaping and bidi resolution
+bound the work of each call by their respective `Limits`.
 
 Planning is bounded by the face: a plan may spend 65536 units of work and 4 per
 byte of the face's GSUB and GPOS, charged for every feature variation condition

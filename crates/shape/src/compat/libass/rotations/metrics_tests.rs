@@ -2,6 +2,14 @@
 //! the first lookup of a glyph decides, for its face only, and a rotated
 //! glyph advances by its default-load vertical advance.
 
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    unreachable_pub,
+    reason = "shared test fixtures and assertions"
+)]
+
+#[path = "../../../../tests/support/mod.rs"]
 mod support;
 
 use std::cell::RefCell;
@@ -59,7 +67,8 @@ fn a_glyph_first_found_through_a_rotating_code_point_advances_vertically() {
     assert_eq!(metrics.h_advance(across), Ok(horizontal));
     let kept = rotations.borrow();
     assert_eq!(
-        [(0, 28), (0, 1), (0, 5), (1, 28)].map(|(face, g)| kept.get(face, GlyphId(g))),
+        [(0, 28), (0, 1), (0, 5), (1, 28)]
+            .map(|(face, g)| kept.decisions.get(&(face, GlyphId(g))).copied()),
         [Some(true), Some(false), Some(false), Some(false)]
     );
 }

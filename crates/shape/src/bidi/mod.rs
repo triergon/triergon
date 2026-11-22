@@ -131,12 +131,6 @@ impl Resolver {
         }
     }
 
-    /// The work units the last paragraph spent of the [`Limits`].
-    #[must_use]
-    pub fn work_spent(&self) -> u64 {
-        self.work.spent()
-    }
-
     /// Resolves the embedding level of every character of one paragraph and
     /// returns the paragraph's direction (left-to-right for
     /// [`BaseDirection::Auto`] without a strong letter).

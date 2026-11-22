@@ -47,21 +47,6 @@ impl<K: Copy + Eq + Hash> GlyphRotations<K> {
         }
     }
 
-    /// The decision kept for `glyph` of face `key`, if a lookup made one.
-    pub fn get(&self, key: K, glyph: GlyphId) -> Option<bool> {
-        self.decisions.get(&(key, glyph)).copied()
-    }
-
-    /// How many decisions are kept.
-    pub fn len(&self) -> usize {
-        self.decisions.len()
-    }
-
-    /// Whether no decision is kept.
-    pub fn is_empty(&self) -> bool {
-        self.decisions.is_empty()
-    }
-
     /// The decision kept for `glyph` of face `key`, else `rotate`, kept when
     /// its storage can be charged.
     fn decide(&mut self, key: K, glyph: GlyphId, rotate: bool) -> bool {
@@ -146,6 +131,9 @@ impl<K: Copy + Eq + Hash> Decide for FaceRotations<'_, K> {
 }
 
 #[cfg(test)]
+mod metrics_tests;
+
+#[cfg(test)]
 mod tests {
     use super::{Decide, FaceRotations, GlyphRotations, rotates};
     use std::cell::RefCell;
@@ -170,10 +158,11 @@ mod tests {
         assert!(!bold.decide(GlyphId(6), Some('\u{3001}')));
         let kept = rotations.borrow();
         assert_eq!(
-            [(1, 5), (2, 5), (2, 6), (1, 6)].map(|(k, g)| kept.get(k, GlyphId(g))),
+            [(1, 5), (2, 5), (2, 6), (1, 6)]
+                .map(|(k, g)| kept.decisions.get(&(k, GlyphId(g))).copied()),
             [Some(false), Some(true), Some(false), None]
         );
-        assert_eq!(kept.len(), 3);
+        assert_eq!(kept.decisions.len(), 3);
         assert!(!rotates(0x2f0) && rotates(0x2f1));
     }
 
@@ -186,7 +175,7 @@ mod tests {
         // is refused once.
         assert!(face.decide(GlyphId(1), Some('\u{3042}')));
         assert!(!face.decide(GlyphId(1), None));
-        assert!(rotations.borrow().is_empty());
+        assert!(rotations.borrow().decisions.is_empty());
         assert!(matches!(face.take_refusal(), Some(Error::Limit { .. })));
         assert_eq!(face.take_refusal(), None);
     }

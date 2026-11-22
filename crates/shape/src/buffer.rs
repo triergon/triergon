@@ -496,11 +496,6 @@ impl Buffer {
         }
     }
 
-    /// The work units the last shaping call spent of its [`Limits`].
-    pub fn work_spent(&self) -> u64 {
-        self.work.spent()
-    }
-
     /// The number of glyphs.
     pub fn len(&self) -> usize {
         self.info.len()

@@ -506,7 +506,7 @@ fn deep_nesting_costs_linear_work() {
             .expect("resolve");
         let levels: Vec<u8> = levels[depth..depth + 4].iter().map(|l| l.get()).collect();
         assert_eq!(levels, [125, 124, 124, 125]);
-        spent.push(resolver.work_spent() as f64 / text.len() as f64);
+        spent.push(resolver.work.spent() as f64 / text.len() as f64);
     }
     assert!(spent[1] < 32.0 && spent[1] < spent[0] * 1.1, "{spent:?}");
 }
@@ -524,11 +524,11 @@ fn work_beyond_the_limits_is_a_policy_error() {
     // Without brackets the isolates alone cost little.
     let mut resolver = Resolver::new(&budget);
     assert!(resolve(&mut resolver, None).is_ok());
-    assert!(resolver.work_spent() < 64 * chars);
+    assert!(resolver.work.spent() < 64 * chars);
     // With them, N0 looks inside every pair at every depth: thousands of units
     // per character, within the default limits but not within half of them.
     assert!(resolve(&mut resolver, Some(&brackets)).is_ok());
-    assert!(resolver.work_spent() > 2048 * chars);
+    assert!(resolver.work.spent() > 2048 * chars);
     let half = Limits {
         work_per_char: 2048,
         ..Limits::default()
