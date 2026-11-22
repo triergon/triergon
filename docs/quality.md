@@ -13,24 +13,133 @@ every case in its corpus. Results are in [status](status.md).
 |---|---|
 | Parity | Every declared feature matches the reference on every required case. Missing inputs, crashes, unsupported declared cases and unexplained differences are failures, never omitted rows. |
 | Runtime | `T_triergon / T_reference` at most **1.00** per case, using the upper bound of a paired 95% confidence interval ([early stop](#early-stop)). The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
-| Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval ([early stop](#early-stop)). |
-
-The harness reads these limits from `harness/policy.json`. Each feature's contract and
-corpus manifest live in `harness/features/<feature>/`. The contract and gate counts in
-[harness/gate-exceptions.json](../harness/gate-exceptions.json) include every
-declared exception and the public features in
-[harness/not-compared.json](../harness/not-compared.json) that lack a direct
-comparison. `cargo xtask check-design` verifies the counts. RSS growth from the start of the
-operation is reported separately when every pair has positive growth bounds.
+| Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval ([early stop](#early-stop)). RSS growth from the start of the operation is reported separately when every pair has positive growth bounds. |
 
 The work compared must be identical: the same selection, the same packets, the same
 output. A gate is never passed by narrowing the work, dropping slow cases or weakening a
 comparison. A failed result stays recorded against the exact source and binaries that
-produced it.
+produced it. The reference is the compatibility reference, not the specification:
+a disagreement is investigated against the standard and registered as the section
+[when a result differs](#when-a-result-differs) describes.
 
-The reference is the compatibility reference, not the specification. Disagreements are
-investigated against the standard. A reference bug or a deliberately stricter resource
-limit becomes an explicit, reviewed rule for that case.
+## Feature contracts
+
+A feature is one comparison: `harness/features/<feature>/contract.json` says what is
+compared and how, and `corpus.json` beside it lists the cases, each with its input file,
+SHA-256, `rights` and expected result. The contract names:
+
+- the work: `operation`, and `contract`, the sentences that state what is compared;
+- the two sides: `candidate`, the Triergon worker binary, which takes one input per
+  operation through the `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`,
+  `PREFIXmemory`), and either a `reference` worker or an `oracle`, an independent
+  model whose rows `cargo xtask oracle-compare` compares with the candidate's trace
+  exactly (such a contract names no reference and no runner);
+- the gate: `gate` is `"required"` (run by `cargo xtask check`), `"on-demand"` or
+  `"diagnostic"`; `"runner": "cargo xtask report"` puts the feature in the gate plan,
+  which takes the features other commands gate (the ISO BMFF suites, packet framing,
+  progressive TS188, the oracles) from `xtask/src/gate/plan.rs` and rejects a feature
+  that is in neither; `required_profiles` and `required_targets` name the case
+  profiles and the targets every case must pass on (every gated feature names Linux
+  AArch64 and 32-bit ARMv7, and accepting a module needs both targets' evidence);
+- the measurement: `iterations`, `minimum_pairs`, `confidence`; `timeout_seconds`
+  (1 to 3600, default 30) limits one worker run, `parity_timeout_seconds` the untimed
+  parity runs alone; `measurement_reference` names the uninstrumented build an
+  [instrumented reference](#reference-and-corpus) is timed against;
+- the cases: `corpus_directory` is the input directory when the manifest omits one.
+
+`cargo xtask check-design` checks every contract's timeouts, measurement reference,
+bound exceptions and oracle. Worker identities bind the registered contracts and their
+corpus inputs.
+
+**Generated manifests and pins.** The font, shaping, rasterising and ASS features
+commit no case rows: `cargo xtask fonts|shape|raster|ass manifest` generate them
+(`xtask/src/generators.rs`) and take each case's expected work from
+`harness/features/<feature>/pins.json`, the reference's folds; `pin_note` describes
+the pins and `compare_order` orders a generator's reports. Re-record pins with
+`COMMAND manifest --record` after `build-workers`, never by hand; `check-design` fails
+when case ids and pins differ. With `"pinned_per_target": true`, `pins.json` holds a
+fold per target (`unpinned_targets` lists exceptions with a reason), `COMMAND manifest
+--record --target TRIPLE --reference-worker PATH` records another target's, and a
+written manifest pins per target in `expected_by_target`. A diagnostic feature that
+compares another reference with these pins names them in `cases_from`. `cargo xtask
+subtitle-fixtures verify|record FEATURE REFERENCE` checks or writes a subtitle manifest
+against the independent FFmpeg worker (see the [subtitle worker
+guide](../crates/subtitle-worker/README.md#recording-and-verifying-subtitle-fixtures)).
+
+**Input rights.** A case is measured only when its `rights` are `authored-synthetic`,
+`reviewed-licence` with a `licence` under which a reviewed input manifest
+(`harness/fonts/corpus.json`) records the file's hash, or `fetched-not-redistributed`
+for an upstream regression sample (or a local remux of one) whose hash
+`harness/fate/samples.json` records: fetched into the ignored cache, compared locally,
+never redistributed. Any other case fails as `rights-unreviewed`.
+
+## When a result differs
+
+A case that differs from its pin, a refusal, a bound that fails and a bound not yet
+measured each fail the step until the difference is fixed or registered in one of the
+forms below. `report` and `grade` check each entry against the run, so an entry must
+stay true. An open case, a deviation and an open or unmeasured bound withhold
+acceptance of their feature until the entry is gone; a registered refusal whose proof
+holds counts as a declared refusal. Every entry lists the manifest's
+case ids it covers, each once; an entry with `targets` applies on those of the
+contract's `required_targets` only, and the cases must pass elsewhere.
+
+| The difference | Register it as | Fields |
+|---|---|---|
+| Our defect, not yet fixed | `open_cases` | `id`, the `requirement` (one of the contract's `pending_module_requirements`), optional `targets` |
+| The reference departs from the specification, and Triergon keeps to it | `open_deviations` | `reading` (the decided reading, one line), the specification `clause`, both observed results (`candidate`, `reference`), optionally the `compat` policy a consumer needing the reference's result would use, `cases`, optional `targets` |
+| Triergon refuses an input the reference decodes (prefix comparisons) | `open_refusals` | `reason`, `clause`, `detail` (the first typed unsupported detail), optional `targets`, and per case its `id`, input `sha256`, the exact `candidate` fold up to the refusal and optional `reference_pin_targets` |
+| A runtime, heap or total RSS bound fails | `open_bounds` | `bound` (`runtime`, `heap` or `total_rss`), `cases`, the measured `cause`, optional `targets` |
+| A bound is not yet measured | `open_unmeasured` | `bound`, `cases`, `cause` (one line), optional `targets` |
+
+- **Open cases and deviations.** `report` and `grade` still run every listed case.
+  The step passes only while every listed case still differs and every other case
+  passes; a listed case that passes fails the step until it leaves the list, so the
+  lists only shrink. A deviation is a decision, not a defect: write its reading from
+  the clause, and implement the reference's result, if a consumer needs it, as the
+  `compat` policy the entry names. Additional-coverage features (`shape-text`,
+  `shape-text-all`) do not block their module.
+- **Registered refusals.** The report checks the input hash, that the candidate stops
+  with exactly `detail` after exactly the registered fold, and that the reference
+  completes with a fold that equals the case's pin and differs from the candidate's.
+  A refusal is never timed or measured. A case whose reference fold depends on the
+  host lists the targets it is pinned on in `reference_pin_targets`; on another target
+  the report still verifies the candidate's refusal and the reference's completion,
+  marks the reference fold unpinned and withholds acceptance. Where both sides refuse
+  an input, the ISO BMFF suites list it under `required_refusals` (`id`, `profile`,
+  `sha256`) and the contract's `refusal` states the reference's exit and error codes
+  and the candidate's error prefixes; an unregistered refusal is a failure.
+- **Bounds.** `grade` fails a case whose runtime bound is above the ceiling, whose heap
+  or total RSS bound is not below 1, or whose measurement is not valid. A bound listed
+  in `open_bounds` fails as `open as listed` without failing the step, and one that
+  holds is printed for removal. A bound in `open_unmeasured` is not collected:
+  timing is skipped for a case whose runtime is listed and memory for one whose heap and
+  total RSS are both listed, each report row records the causes as `not_measured`, the
+  gate plan runs a feature with nothing left to measure on a target for parity only, and
+  the status page shows the row as unmeasured. A bound is listed in one of the two lists
+  at most. Suites without a grade apply the same verdicts to their own collections.
+- **Codec lanes.** The codec manifests and workload lists under `harness/codecs/` use
+  the same forms: `open_cases` and `open_deviations` (on every target) in the vector
+  manifests, `open_refusals` for video session and decoder refusals with their picture
+  counts, `open_unmeasured` and `open_workloads` (`id`, measured `cause`, optional
+  `targets`) in the workload lists. The reader comparisons keep their reviewed
+  differences in `harness/codecs/reader-differences.json`, and a reviewed seek
+  difference must reproduce its recorded observations.
+- **Public features without a comparison.** [`harness/not-compared.json`](../harness/not-compared.json)
+  lists, per library crate, each public feature no gated comparison compares directly:
+  its `name`, the public items it is reached through (`entry_points`), how near it
+  comes to a comparison (`degree`: `step`, `recorded`, `outside-gate`, `unit-tests`,
+  `untested` or `no-reference`) and what a comparison would need (`needs`). A crate
+  listed with no features was reviewed and has none. A feature leaves the list when a
+  gated comparison compares it.
+
+[`harness/gate-exceptions.json`](../harness/gate-exceptions.json) records how many
+features each gate requires and every exception: the entries of each list whose name
+starts with `open_`, counted per case and per target they are open on, the status
+page's `open_cells`, and the features per crate in `not-compared.json`.
+`cargo xtask check-design` counts them again and fails on any difference, so a change
+that adds an exception or drops a requirement changes that file in the same commit,
+where review sees it.
 
 ## Reference and corpus
 
@@ -99,53 +208,8 @@ limit becomes an explicit, reviewed rule for that case.
   assembles them and loads them through both workers, and each `.dump` beside a probe
   records the reference's load on 32-bit ARMv7 (`--record`). `cargo xtask fonts fetch`
   fetches the font corpus of `harness/fonts/corpus.json` (sources, licences, hashes).
-- **Generated manifests and pins.** The font, shaping, rasterising and ASS features
-  commit no case rows: `cargo xtask fonts|shape|raster|ass manifest` generate them
-  (`xtask/src/generators.rs`) and take each case's expected work from
-  `harness/features/<feature>/pins.json`, the reference's folds. Re-record pins with
-  `COMMAND manifest --record` after `build-workers`, never by hand; `cargo xtask
-  check-design` fails when case ids and pins differ. A diagnostic feature that compares
-  another reference with these pins names them in `cases_from`.
-- **Contract fields.** `gate` is `"required"` (run by `cargo xtask check`),
-  `"on-demand"` or `"diagnostic"`. `timeout_seconds` (1 to 3600, default 30) limits one
-  worker run; `parity_timeout_seconds` limits `report`'s untimed parity runs alone.
-  `required_targets` names the targets every case must pass on: every gated feature
-  names Linux AArch64 and 32-bit ARMv7, and accepting a module needs both targets'
-  evidence. With `"pinned_per_target": true`, `pins.json` holds a fold per target
-  (`unpinned_targets` lists exceptions with a reason), and `COMMAND manifest --record
-  --target TRIPLE --reference-worker PATH` records another target's. A written manifest
-  pins per target in `expected_by_target`. `cargo xtask subtitle-fixtures
-  verify|record FEATURE REFERENCE` checks or writes a subtitle manifest against the
-  independent FFmpeg worker (see the [subtitle worker
-  guide](../crates/subtitle-worker/README.md#recording-and-verifying-subtitle-fixtures)).
-- **Open cases.** A contract may list `open_cases`, each tied to one of its
-  `pending_module_requirements`. `report` and `grade` still run them, pass only while
-  every listed case still fails and every other case passes, and refuse a listed case
-  that passes. A module stays unaccepted while any case of a gating feature is listed;
-  additional-coverage features (`shape-text`, `shape-text-all`) do not block it.
-- **Registered decoder refusals.** A prefix comparison can register unsupported
-  inputs under `open_refusals` with a specification clause, the first typed
-  unsupported detail, and each case's input hash and exact candidate fold up to
-  the refusal. The report checks these values and requires a complete reference
-  fold that equals its pin and differs from the candidate fold. When a case
-  lists `reference_pin_targets` for a host-dependent fold, the report still
-  verifies the candidate refusal and reference completion on other targets,
-  and marks the reference fold unpinned and ineligible for gate acceptance.
-- **Bounds.** `grade` fails on a case whose runtime bound is above the ceiling, whose
-  heap or total RSS bound is not below 1, or whose measurement is not valid. A contract
-  may list `open_bounds` (`bound`, `cases`, measured `cause`, optional `targets`); such
-  a bound fails as `open as listed` without failing the step, and one that holds is
-  printed for removal. Suites without a grade apply the same verdict to their own
-  collections.
-- **Input rights.** A case is measured only when its `rights` are `authored-synthetic`,
-  `reviewed-licence` with a `licence` under which a reviewed input manifest
-  (`harness/fonts/corpus.json`) records the file's hash, or `fetched-not-redistributed`
-  for an upstream regression sample (or a local remux of one) whose hash
-  `harness/fate/samples.json` records: fetched into the ignored cache, compared locally,
-  never redistributed. Any other case fails as `rights-unreviewed`.
 - **Authored corpus.** Small canonical streams from synthetic signals and authored
-  structures, identical across encoder versions (`cargo xtask fixtures`,
-  `harness/features/<feature>/{contract,corpus}.json`).
+  structures, identical across encoder versions (`cargo xtask fixtures`).
 - **FATE.** Upstream regression identities are indexed as data without running Make
   (`cargo xtask fate-inventory`, `harness/fate/index.json`) and mapped case by case. A
   FATE name is not a test until its input, operation and expected result are mapped and
@@ -169,7 +233,8 @@ limit becomes an explicit, reviewed rule for that case.
 
 The harness runs the same operation through a Triergon worker and a reference worker and
 compares canonical output. Workers speak one line protocol with `trace`, `bench` and
-`memory` modes, framed by begin/end markers and a named digest.
+`memory` modes, framed by begin/end markers and a named digest
+([triergon-harness-protocol](../crates/harness-protocol/README.md)).
 
 ```sh
 cargo xtask prepare-check   # build the pinned references, fixtures and workers
@@ -185,33 +250,36 @@ what it reads: `lint` (format, lints, rustdoc and the repository checks), `test`
 workspace tests), `variants` (the reference-trace tests, the release build, the nightly
 SIMD tests and the core time oracle) and `parity` (the worker tests, the required
 feature reports, the fuzz smoke rounds and the link orders). CI
-([check.yml](../.github/workflows/check.yml)) runs the four parts as separate jobs and an
-`armv7 tests` job: the `checked`-profile tests of `triergon-framing`, `triergon-isobmff`
-and `triergon-mpegts` on `thumbv7neon-unknown-linux-gnueabihf` under user-mode QEMU,
-whose budget tests pin storage sizes. A pull request that changes only files the
-documentation checks read ([tools/ci-scope.py](../tools/ci-scope.py): files under
-`docs/` or `harness/evidence/sets/`, or Markdown edited in place outside `harness/`,
-`tests/` and `fixtures/` that no Rust source includes) runs `cargo xtask check docs`
-instead (format, check-design, check-links, check-revisions and the evidence index
-tests). The required `check` job passes when the jobs of its scope passed.
+([check.yml](../.github/workflows/check.yml)) runs the four parts as separate jobs, each
+restoring the packed reference builds and the target directory of an earlier run
+(`tools/target-cache.py` marks every tracked file whose content differs from that run's
+as new, so cargo rebuilds whatever reads it), and an `armv7 tests` job: the
+`checked`-profile tests of `triergon-framing`, `triergon-isobmff` and `triergon-mpegts`
+on `thumbv7neon-unknown-linux-gnueabihf` under user-mode QEMU, whose budget tests pin
+storage sizes. A pull request that changes only files the documentation checks read
+([tools/ci-scope.py](../tools/ci-scope.py): files under `docs/` or
+`harness/evidence/sets/`, or Markdown edited in place outside `harness/`, `tests/` and
+`fixtures/` that no Rust source includes) runs `cargo xtask check docs` instead
+(format, check-design, check-links, check-revisions and the evidence index tests). The
+required `check` job passes when the jobs of its scope passed.
 
 Commands: `report` compares one feature contract (`--contract`, `--manifest`,
 `--corpus`) and grades it, `--benchmark` adding paired runtime and `--memory` heap and
-RSS; a contract may name its own `candidate` and reference, whose workers take one input
-per operation through its `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`,
-`PREFIXmemory`). `isobmff-bench`, `isobmff-seek`, `framing` and `progressive` run their
-suites; `compare` one input; `external-vector` the mandatory external vector; `fate-run`
-one FATE case; `trace-identities` records every candidate trace's digest; `worker-tests`
-runs the built workers against the reference workers and the independent Python oracles
-(`harness/*_oracle.py`). `codecs` and `capture` grade, time and measure the codec crates
-and the capture pipeline ([harness/codecs/STATUS.md](../harness/codecs/STATUS.md),
-[harness/capture](../harness/capture/README.md)); codec timing and memory require passing
-parity. `fuzz` runs a deterministic, replayable byte-mutation campaign against debug,
-release and reference workers (`--contract` for a feature's cases; `codecs fuzz --lane
-L` for a codec lane's FATE vectors). `build-workers` builds the workers and observers
+RSS. `oracle-compare` compares the oracle features. `isobmff-bench`, `isobmff-seek`,
+`framing` and `progressive` run their suites; `compare` one input; `external-vector` the
+mandatory external vector; `fate-run` one FATE case; `trace-identities` records every
+candidate trace's digest; `worker-tests` runs the built workers against the reference
+workers and the independent Python oracles (`harness/*_oracle.py`). `codecs` and
+`capture` grade, time and measure the codec crates and the capture pipeline
+([harness/codecs/STATUS.md](../harness/codecs/STATUS.md),
+[harness/capture](../harness/capture/README.md)); codec timing and memory require
+passing parity. `fuzz` runs a deterministic, replayable byte-mutation campaign against
+debug, release and reference workers (`--contract` for a feature's cases; `codecs fuzz
+--lane L` for a codec lane's vectors). `build-workers` builds the workers and observers
 and records the build identity every collection is checked against (`--only WORKER`
 rebuilds `media-worker` and that worker alone); `memory-admission CANDIDATE REFERENCE`
-checks a pair's libraries against the Linux observer.
+checks a pair's libraries against the Linux observer. `cargo xtask help` lists every
+command.
 
 Memory is measured under the native observers (`harness/allocations*.c`), which count
 `malloc`, `calloc`, `realloc`, `free`, `posix_memalign`, `aligned_alloc`, `strdup` and
@@ -221,8 +289,7 @@ from the one library that defines them all, or a weak import nothing defines. In
 the operation the observer admits read-only file mappings and their exact `munmap`,
 counted in total RSS and reported as `file_mappings` and `file_mapped_bytes`; any other
 mapping voids the measurement. A report records the build identity, source provenance
-digest and input hashes; a cited result's source revision and raw-sample SHA-256 go in
-the [measured revisions](status.md#measured-revisions) table.
+digest and input hashes.
 
 ### Separate timing and memory collections
 
@@ -254,7 +321,7 @@ have the same hashes.
   `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`, `RUSTC`, `RUSTC_WRAPPER`, target or profile
   overrides and equivalent Cargo configuration, and the grader refuses a report that
   records any of them or doesn't say. `--comparison-build` (and the opt-in HEVC `simd`
-  lane) builds workers for comparisons only, never a gate result.
+  build) builds workers for comparisons only, never a gate result.
 - **Link policy** (`static-toolchain-runtime-trained-order-v1`). On GNU/Linux each side
   links its toolchain's runtime support libraries statically: `libgcc_eh` for the Rust
   workers; libgcc, libstdc++ and libatomic for the C and C++ references. libc with libm
@@ -283,10 +350,10 @@ have the same hashes.
   operations decide which of its code lies together: the playback worker's start with the
   two progressive TS188 operations, which run on Linux AArch64 only, so the code the
   progressive reader runs per packet lies in one stretch. `build-workers` fails when
-  committed orders disagree with the
-  manifest or a worker holds fewer than 95% of its order's names, and records each
-  order in `identity.json`; `cargo xtask link-order BINARY [OUT] --trained FILE` writes
-  one binary's ordering file. The linker arguments, after the policy's own, are
+  committed orders disagree with the manifest or a worker holds fewer than 95% of its
+  order's names, and records each order in `identity.json`; `cargo xtask link-order
+  BINARY [OUT] --trained FILE` writes one binary's ordering file. The linker arguments,
+  after the policy's own, are
 
   ```text
   -C link-arg=-B$(rustc --print sysroot)/lib/rustlib/HOST/bin/gcc-ld
@@ -301,7 +368,7 @@ have the same hashes.
 - **Release profile.** Gate results assume the workspace release profile, `lto = "fat"`
   and `codegen-units = 1`. A program that depends on these crates matches them only
   with the same settings and, on GNU/Linux, linked in the playback worker's trained
-  order (the [README](../README.md#getting-started) gives the commands). `panic =
+  order (the [README](../README.md#build-settings) gives the commands). `panic =
   "abort"` is safe: no library code catches or relies on unwinding.
 - **Paired runner.** `report`, `external-vector`, `codecs time` and `capture qualify`
   time through one runner: it holds the host-wide benchmark lock, checks one warm-up of
@@ -352,11 +419,11 @@ have the same hashes.
 `cargo xtask gate` holds the full gate as one plan of items, each the work for one
 measured thing (a feature's timing, memory and grade, a suite, a codec workload list's
 timing or memory part, a capture case, the `checked` and release tests, a comparison
-family). A contract with `"runner": "cargo xtask report"` adds its feature; other
-runners and exclusions are listed in `xtask/src/gate.rs`, and the planner rejects a
-feature with neither. The plan derives report items from the contracts and codec
-items from [gate-lanes.json](../harness/codecs/gate-lanes.json). Both targets run every item. `cargo xtask gate plan --shards N`
-splits the items into N shards of about equal planning weight, one per host.
+family). The plan derives report items from the contracts
+([feature contracts](#feature-contracts)) and codec items from
+[gate-lanes.json](../harness/codecs/gate-lanes.json). Both targets run every item.
+`cargo xtask gate plan --shards N` splits the items into N shards of about equal
+planning weight, one per host.
 
 `--items NAME,...`, given to every gate command of a run, narrows the plan; `gate
 summary` then writes `"partial": true` with the selection. A result cited as the full
@@ -374,12 +441,13 @@ workers link a crate it changes (`cargo tree -i CRATE`). For later runs to reuse
 results, add each `OUT/shard-I/entry.json` to the evidence index and promote it in the
 pull request that cites the run.
 
-A step that exits 0 with a case it did not measure fails, and `gate run` records its
-verdict in the step's `gate-result.json`. On native Linux with glibc, the gate build and
-a gate target, the codec gates fail on a workload whose bound does not hold unless the
-list's `open_workloads` names it with its `cause`; elsewhere those bounds are
-diagnostics. `memory_timeout_seconds` gives `codecs memory` its per-target run limit
-(30 s when absent).
+A step that exits 0 with a case it did not measure fails, unless the contract lists that
+bound in `open_unmeasured`, and `gate run` records its verdict in the step's
+`gate-result.json`. On native Linux with glibc, the gate build and a gate target, the
+codec gates fail on a workload whose bound does not hold unless the list's
+`open_workloads` names it with its `cause`; elsewhere those bounds are diagnostics.
+`memory_timeout_seconds` gives `codecs memory` its per-target run limit (30 s when
+absent).
 
 `cargo xtask gate check --shards N` runs on any machine before a host exists and fails,
 naming the item and path, on any input a prepared host would not have; `tools/gate-aws.sh
@@ -390,7 +458,7 @@ HarfBuzz builds); `build-workers --all-references` exits 1 without writing a bui
 identity when a profile is not prepared:
 
 ```sh
-for profile in matroska formats transport-dts transport-mpeg-video video subtitles decode capture capture-small; do
+for profile in matroska formats framing-views transport-dts transport-mpeg-video video subtitles decode capture capture-small; do
     cargo xtask prepare-ffmpeg --jobs 8 --profile "$profile"
 done
 cargo xtask prepare-mpg123 --jobs 8
@@ -415,7 +483,7 @@ On one host, a shard's run is:
 3. It [proves](../harness/rss-bound/README.md) the kernel bound, rebuilds the workers
    with the proof, checks them with `gate preflight --kernel`, and collects memory on
    the remaining CPUs (`taskset -c 1-15`, `gate run --stage memory`); the capture
-   memory steps run as one `capture qualify` batch (`memory-capture`).
+   memory steps run as one `capture qualify` collection (`memory-capture`).
 4. It grades with the module loaded, several grades at once.
 
 Never time while memory, a build or anything else runs on the host. `cargo xtask gate
@@ -444,11 +512,11 @@ smallest. The validator and memory evaluator replay the rule on the recorded pai
 the record must name the ceiling of [`harness/policy.json`](../harness/policy.json).
 Packet framing, comparisons with another build (`--baseline-worker`, quick checks) and
 gate runs with `--no-early-stop` collect every planned report, progressive and codec
-pair. The rule is a sign test that
-keeps the one-sided 5% false-pass guarantee of a 95% bound for independent pairs; its
-replays, simulations and runs are evidence sets `gate-early-stop-two-blocks`,
-`gate-early-stop-runs-aarch64` and `gate-early-stop-runs-armv7`, over the archived
-sessions `armv7-thumb2-3df7ae6d-linux-armv7`, `runners-gate-build-linux-arm64`,
+pair. The rule is a sign test that keeps the one-sided 5% false-pass guarantee of a 95%
+bound for independent pairs; its replays, simulations and runs are evidence sets
+`gate-early-stop-two-blocks`, `gate-early-stop-runs-aarch64` and
+`gate-early-stop-runs-armv7`, over the archived sessions
+`armv7-thumb2-3df7ae6d-linux-armv7`, `runners-gate-build-linux-arm64`,
 `mpegts-pes-gate-build-linux-arm64` and `isobmff-armv7-runtime-regate-linux-arm64`.
 
 #### Memory in parallel
@@ -517,11 +585,11 @@ The user space is the Ubuntu 24.04 armhf image archived as evidence set
 it at `/srv/armhf`, binds `/proc`, `/sys`, `/dev` and debugfs into it at every boot, and
 installs Rust with the gate target and the packages the `subtitles` reference's libzvbi
 build needs (`autoconf automake libtool autopoint gettext`); every command then runs
-inside it under `setarch linux32` as user `ubuntu`. The image was made with `debootstrap
+inside it under `setarch linux32` as user `ubuntu`. The image is made with `debootstrap
 --arch=armhf --variant=buildd --components=main,universe noble` from
 `http://ports.ubuntu.com/ubuntu-ports`, with `noble-updates` and `noble-security`
 enabled, then `apt-get install build-essential pkg-config zlib1g-dev python3
-python3-numpy make git zstd curl ca-certificates sudo jq time`. Compare a later image's
+python3-numpy make git zstd curl ca-certificates sudo jq time`. Compare another image's
 `dpkg-query -W` list before treating its results as comparable, and record the CPU,
 kernel and package list with results.
 
@@ -578,13 +646,12 @@ and edit recipe.
 
 A result names its exact source revision, worker binaries, reference build, corpus and
 input hashes, platform and all per-case outcomes. Summaries go in the pull request that
-changes the result and in [status](status.md), whose [measured
-revisions](status.md#measured-revisions) table names the revision and raw-sample SHA-256
-behind each cited result. Raw samples are archived by content hash outside the
-repository; [harness/evidence/sets/SET.json](../harness/evidence/sets/) indexes each set
-(key, SHA-256, kept or expiring, each file's path and SHA-256). Sets under
-`qualification/` expire 90 days after upload; sets under `evidence/` are kept. With
-`TRIERGON_EVIDENCE_ARCHIVE` set:
+changes the result, and [status](status.md) shows them. Raw samples are archived by
+content hash outside the repository;
+[harness/evidence/sets/SET.json](../harness/evidence/sets/) indexes each set (key,
+SHA-256, kept or expiring, each file's path and SHA-256, the gate results it holds).
+Sets under `qualification/` expire 90 days after upload; sets under `evidence/` are
+kept. With `TRIERGON_EVIDENCE_ARCHIVE` set:
 
 1. `cargo xtask evidence pack DIR OUT` writes the deterministic archive of a run
    (`.tar.gz`, or `.tar.zst` through the system `zstd`).
@@ -598,11 +665,15 @@ repository; [harness/evidence/sets/SET.json](../harness/evidence/sets/) indexes 
 4. `cargo xtask evidence fetch SET` downloads, verifies and unpacks a set into
    `.research/evidence/SET/`. Packing and fetching stream, so a set larger than memory
    unpacks on a 32-bit host.
+5. `cargo xtask evidence measure [SET]...` records in each index entry the target of
+   every gate result it holds and what that result measured, read from the archived
+   packs.
 
 [harness/evidence/index.json](../harness/evidence/index.json) records where keys lie
-and how identifiers were renamed. A result key is listed by one kept set at most.
+and how identifiers were renamed. A result key is listed by one kept set at most, so
+reuse finds one result for it.
 
-### Measured records
+### Measured records and the status page
 
 A gate result's measured record is what the status tables show of it, read from the
 report its command wrote beside it and graded against `harness/policy.json` when the set
@@ -628,16 +699,15 @@ whose timing, memory and grade share it, such as `matroska-demux` for
 followed by `-shard-N`, at one revision on one target. A directory's runtime and memory
 come from its grade where it has one, else from its one collection of each kind; a row
 joins its directories by their largest bounds and summed counts, and its cells round
-each bound up to four decimals and name the run's revision. `cargo xtask check-design`
-renders every cell and fails on a difference, on a cited run that is not kept or whose
-sets record another source revision, and on a cited directory its run does not hold.
-`open_cells` lists the rows whose cells are written by hand: a row may be listed only
-while none of its results records its target, and `harness/gate-exceptions.json`
-counts the list, so it only shrinks.
-
-[harness/evidence/index.json](../harness/evidence/index.json) records where keys lie
-and how identifiers were renamed. A result key is listed by one kept set at most, so
-reuse finds one result for it.
+each bound up to four decimals and name the run's revision. A row that names a feature
+as `unmeasured` shows the causes its contract's `open_unmeasured` gives, marked
+`parity only` when nothing of the feature is measured on that target. `cargo xtask status --write`
+renders the cells into [status](status.md); `cargo xtask check-design` renders them
+again and fails on a difference, on a cited run that is not kept or whose sets record
+another source revision, and on a cited directory its run does not hold. `open_cells`
+lists the rows whose cells are written by hand: a row may be listed only while none of
+its results records its target, and `harness/gate-exceptions.json` counts the list, so
+it only shrinks.
 
 Every revision status cites stays reachable from `main`: `cargo xtask check-revisions`,
 part of `check`, fails when `HEAD` does not reach a cited commit. A pull request that
