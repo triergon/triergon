@@ -110,12 +110,6 @@
       "rights": "authored-synthetic"
     }
   ],
-  "open_cases": [
-    "replay-avc-ac3-00"
-  ],
-  "open_case_readings": {
-    "replay-avc-ac3-00": "The ordered AVC and AC-3 payloads match within each track, but the AC-3 parser returns a different cross-track interleave. Verify both sequences against physical AU completion and define the equivalent cross-track order before closing this case."
-  },
   "open_deviations": [
     {
       "reading": "Matroska packet clocks keep nanosecond CodecDelay and DefaultDuration and omit DTS",
@@ -150,6 +144,16 @@
       "cases": [
         "replay-avc-eac3-00",
         "dvb-hevc-eac3-32000"
+      ]
+    },
+    {
+      "reading": "AVC and AC-3 access units retain their track decode order and coded PES anchors",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.3 and 2.4.3.6–2.4.3.7 describe carrier multiplexing, contiguous per-stream PES data and timestamp anchoring. ContainerReader's Packet event promises decode order within a track.",
+      "candidate": "Reports all 87 access units in track decode order with source clock presence. The lead AVC unit has PTS 126480 and absent DTS and duration. Its second AVC unit follows seven AC-3 units in the published sequence.",
+      "reference": "Publishes the same 87 units in the same per-track sequences. It gives the lead AVC unit DTS 126480 and duration 7500 and returns its second AVC unit after six AC-3 units.",
+      "compat": "A consumer reproducing the native demux packet sequence and inferred metadata would use compat::mpegts::demux_access_unit_order.",
+      "cases": [
+        "replay-avc-ac3-00"
       ]
     }
   ],
