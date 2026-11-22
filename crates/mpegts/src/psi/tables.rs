@@ -243,11 +243,18 @@ pub struct ProgramMap {
     pub source_ranges: BudgetVec<SourceRange>,
 }
 
+#[derive(Debug)]
+enum Loop {
+    Program,
+    Stream(ElementaryStream),
+    Between,
+}
+
 /// Incremental parser of one PMT section's descriptor and elementary stream loops.
 #[derive(Debug)]
 #[repr(C)]
 pub struct PmtReader {
-    pending: Option<ElementaryStream>,
+    descriptor_loop: Loop,
     streams: BudgetVec<ElementaryStream>,
     source_ranges: BudgetVec<SourceRange>,
     header: SectionHeader,
@@ -260,7 +267,6 @@ pub struct PmtReader {
     descriptor_start: usize,
     descriptor_count: usize,
     pcr_pid: u16,
-    program_phase: bool,
     done: bool,
     namespace: super::DescriptorNamespace,
 }
@@ -323,8 +329,7 @@ impl PmtReader {
             descriptor_end: end,
             descriptor_start: 12,
             namespace,
-            pending: None,
-            program_phase: true,
+            descriptor_loop: Loop::Program,
             streams: BudgetVec::new(budget),
             source_ranges,
             descriptor_count: 0,
@@ -372,18 +377,17 @@ impl PmtReader {
                     if descriptor.tag == 0x59 {
                         descriptor.dvb_subtitling()?;
                     }
-                    if let Some(stream) = self.pending.as_mut() {
+                    if let Loop::Stream(stream) = &mut self.descriptor_loop {
                         stream
                             .dvb
                             .observe(descriptor, self.position - self.descriptor_start)?;
                     }
                 }
                 if descriptor.tag == 0x38
-                    && (self.program_phase
-                        || !self
-                            .pending
-                            .as_ref()
-                            .is_some_and(|stream| matches!(stream.stream_type, 0x24 | 0x25 | 0x31)))
+                    && !matches!(
+                        &self.descriptor_loop,
+                        Loop::Stream(stream) if matches!(stream.stream_type, 0x24 | 0x25 | 0x31)
+                    )
                 {
                     return Err(Error::Invalid("HEVC descriptor stream type"));
                 }
@@ -391,16 +395,18 @@ impl PmtReader {
                 self.descriptor_count += 1;
                 continue;
             }
-            if self.program_phase {
-                self.program_phase = false;
-            }
-            if self.pending.is_some() {
-                self.streams.try_reserve_exact(1)?;
-                let stream = self
-                    .pending
-                    .take()
-                    .ok_or(Error::Invalid("missing pending stream"))?;
-                self.streams.try_push(stream).map_err(|error| error.error)?;
+            match self.descriptor_loop {
+                Loop::Program => self.descriptor_loop = Loop::Between,
+                Loop::Stream(_) => {
+                    self.streams.try_reserve_exact(1)?;
+                    let Loop::Stream(stream) =
+                        std::mem::replace(&mut self.descriptor_loop, Loop::Between)
+                    else {
+                        return Err(Error::Invalid("missing pending stream"));
+                    };
+                    self.streams.try_push(stream).map_err(|error| error.error)?;
+                }
+                Loop::Between => {}
             }
             if self.position == self.source.len() - 4 {
                 self.done = true;
@@ -453,7 +459,7 @@ impl PmtReader {
             if info_end > end {
                 return Err(Error::Invalid("PMT elementary-info length"));
             }
-            self.pending = Some(ElementaryStream {
+            self.descriptor_loop = Loop::Stream(ElementaryStream {
                 stream_type: data[0],
                 pid,
                 descriptor_bytes: self.source.slice(info_start..info_end)?,
