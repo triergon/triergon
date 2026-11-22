@@ -9,8 +9,8 @@
   "reference": "ffmpeg-isobmff-views-native",
   "contract": [
     "Compare SourceSeekPlanner and SourceCompositionLookup on regular movies. Both operate on media time without edit lists. The reference opens MOV with ignore_editlist=1 and +noparse+nofillin.",
-    "Plan arguments are plan, track ID, one-based target ordinal, preroll samples, window bytes and work quantum. The reference uses regular index entry i for sample i+1. It finds the last key at or before the target and subtracts the requested preroll from that key ordinal, clamping to one. AVSEEK_FLAG_BACKWARD|AVSEEK_FLAG_ANY passes the resulting entry timestamp to the public seek without requesting a second key snap. Clocks and the actual packet range are compared as delivered.",
-    "Compare every sample from decode start through the target inclusive with the selected stream's demuxed packets. Fold kind 1, position, size, DTS presence, signed DTS if present and every byte. Fold kind 7 at the completed range and kind 8 for a refusal.",
+    "Plan arguments are plan, track ID, one-based target ordinal, preroll samples, window bytes and work quantum. The reference uses regular index entry i for sample i+1, finds the last key at or before the target and subtracts preroll from the key ordinal, clamped to one. It seeks with BACKWARD|ANY using the indexed start expressed in zero-based source ticks.",
+    "Compare every sample from decode start through the target inclusive with the selected stream's demuxed packets. Fold kind 1, position, size, DTS presence, signed DTS on the zero-based source clock and every byte. A negative first index DTS is the demux decode origin subtracted from packet DTS. Fold kind 7 at the completed range and kind 8 for a refusal.",
     "Lookup arguments are lookup, track ID, window bytes, work quantum and one to 64 query ticks. Apply the contract selection to the reference packet PTS in decode order: latest at or before the query, with a tie reported and any unknown PTS taking precedence.",
     "Fold kind 3, signed query ticks and one result per query. Result zero means before first, one gives the chosen ordinal, file position and signed PTS, two gives the first and second tied ordinals and signed PTS, and three gives the first unknown ordinal. Lookup uses reference packet clocks for parity only.",
     "Input loading and argument parsing precede the observation window. Open, plan or lookup, read the requested payloads and release all operation state inside it."
@@ -13444,656 +13444,157 @@
       "cause": "the reference reads every packet for presentation times while the candidate reads tables"
     }
   ],
-  "pending_module_requirements": [
-    "Resolve the reference header refusal on the private carriage sample entries.",
-    "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets.",
-    "Compare strict sample timing coverage with demux recovery of surplus timing runs.",
-    "Compare an explicitly empty sync table with the demuxer synthesized key entry."
-  ],
-  "open_cases": [
-    {
-      "id": "r-private-carriage-t1-plan-n1-p0",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n1-p1",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n1-p2",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n1-p7",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n2-p0",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n2-p1",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n2-p3",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n2-p7",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n3-p0",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n3-p1",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n3-p4",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n3-p7",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n4-p0",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n4-p1",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n4-p5",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n4-p7",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n5-p0",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n5-p1",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n5-p6",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n5-p7",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n6-p0",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n6-p1",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-plan-n6-p7",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup--1",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-0",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-500",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-1000",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-1500",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-2000",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-2500",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-3000",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-3500",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-4000",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-4500",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-5000",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "r-private-carriage-t1-lookup-5001",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n1-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n1-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n1-p2",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n1-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n2-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n2-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n2-p3",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n2-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n3-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n3-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n3-p4",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n3-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n4-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n4-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n4-p5",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n4-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n5-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n5-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n5-p6",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n5-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n6-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n6-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "follow-clock-later-minimum-four-t1-plan-n6-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n1-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n1-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n1-p2",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n1-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n2-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n2-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n2-p3",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n2-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n3-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n3-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n3-p4",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n3-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n4-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n4-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n4-p5",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n4-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n5-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n5-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n5-p6",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n5-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n6-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n6-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-plan-n6-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup--1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-500",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-1000",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-1500",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-2000",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-2500",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-3000",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-3500",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-4000",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-4500",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-5000",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-stts-count-mismatch-t1-lookup-5001",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n1-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n1-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n1-p2",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n1-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n2-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n2-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n2-p3",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n2-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n3-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n3-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n3-p4",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n3-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n4-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n4-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n4-p5",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n4-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n5-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n5-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n5-p6",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n5-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n6-p0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n6-p1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-plan-n6-p7",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-0",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-1",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-501",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-1001",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-1501",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-2001",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-2501",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-3001",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-3501",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-4001",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-4501",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-5001",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "bad-ctts-count-mismatch-t1-lookup-5002",
-      "requirement": "Compare strict sample timing coverage with demux recovery of surplus timing runs."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n1-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n1-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n1-p2",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n1-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n2-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n2-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n2-p3",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n2-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n3-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n3-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n3-p4",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n3-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n4-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n4-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n4-p5",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n4-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n5-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n5-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n5-p6",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n5-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n6-p0",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n6-p1",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-ctts-v1-t1-plan-n6-p7",
-      "requirement": "Compare raw decode clocks and ranges with the demuxer clock shift for signed composition offsets."
-    },
-    {
-      "id": "r-stss-empty-t1-plan-n1-p0",
-      "requirement": "Compare an explicitly empty sync table with the demuxer synthesized key entry."
-    },
-    {
-      "id": "r-stss-empty-t1-plan-n1-p1",
-      "requirement": "Compare an explicitly empty sync table with the demuxer synthesized key entry."
-    },
-    {
-      "id": "r-stss-empty-t1-plan-n1-p2",
-      "requirement": "Compare an explicitly empty sync table with the demuxer synthesized key entry."
-    },
-    {
-      "id": "r-stss-empty-t1-plan-n1-p7",
-      "requirement": "Compare an explicitly empty sync table with the demuxer synthesized key entry."
-    },
-    {
-      "id": "r-stss-empty-t1-plan-n6-p0",
-      "requirement": "Compare an explicitly empty sync table with the demuxer synthesized key entry."
-    },
-    {
-      "id": "r-stss-empty-t1-plan-n6-p1",
-      "requirement": "Compare an explicitly empty sync table with the demuxer synthesized key entry."
-    },
-    {
-      "id": "r-stss-empty-t1-plan-n6-p7",
-      "requirement": "Compare an explicitly empty sync table with the demuxer synthesized key entry."
+  "open_deviations": [
+    {
+      "reading": "Surplus decode timing entries",
+      "clause": "ISO/IEC 14496-12:2015 §§8.6.1.2.1–.3 and 8.7.3.2.2: the decode deltas count the samples whose extents the size table describes",
+      "candidate": "refuses a source table whose decode run count exceeds the size-table sample count",
+      "reference": "publishes packet ranges or presentation selections from the readable timing prefix",
+      "compat": "compat::mov::recovery TimingRunPolicy::BoundedPrefix admits the final surplus run",
+      "cases": [
+        "bad-stts-count-mismatch-t1-plan-n1-p0",
+        "bad-stts-count-mismatch-t1-plan-n1-p1",
+        "bad-stts-count-mismatch-t1-plan-n1-p2",
+        "bad-stts-count-mismatch-t1-plan-n1-p7",
+        "bad-stts-count-mismatch-t1-plan-n2-p0",
+        "bad-stts-count-mismatch-t1-plan-n2-p1",
+        "bad-stts-count-mismatch-t1-plan-n2-p3",
+        "bad-stts-count-mismatch-t1-plan-n2-p7",
+        "bad-stts-count-mismatch-t1-plan-n3-p0",
+        "bad-stts-count-mismatch-t1-plan-n3-p1",
+        "bad-stts-count-mismatch-t1-plan-n3-p4",
+        "bad-stts-count-mismatch-t1-plan-n3-p7",
+        "bad-stts-count-mismatch-t1-plan-n4-p0",
+        "bad-stts-count-mismatch-t1-plan-n4-p1",
+        "bad-stts-count-mismatch-t1-plan-n4-p5",
+        "bad-stts-count-mismatch-t1-plan-n4-p7",
+        "bad-stts-count-mismatch-t1-plan-n5-p0",
+        "bad-stts-count-mismatch-t1-plan-n5-p1",
+        "bad-stts-count-mismatch-t1-plan-n5-p6",
+        "bad-stts-count-mismatch-t1-plan-n5-p7",
+        "bad-stts-count-mismatch-t1-plan-n6-p0",
+        "bad-stts-count-mismatch-t1-plan-n6-p1",
+        "bad-stts-count-mismatch-t1-plan-n6-p7",
+        "bad-stts-count-mismatch-t1-lookup--1",
+        "bad-stts-count-mismatch-t1-lookup-0",
+        "bad-stts-count-mismatch-t1-lookup-500",
+        "bad-stts-count-mismatch-t1-lookup-1000",
+        "bad-stts-count-mismatch-t1-lookup-1500",
+        "bad-stts-count-mismatch-t1-lookup-2000",
+        "bad-stts-count-mismatch-t1-lookup-2500",
+        "bad-stts-count-mismatch-t1-lookup-3000",
+        "bad-stts-count-mismatch-t1-lookup-3500",
+        "bad-stts-count-mismatch-t1-lookup-4000",
+        "bad-stts-count-mismatch-t1-lookup-4500",
+        "bad-stts-count-mismatch-t1-lookup-5000",
+        "bad-stts-count-mismatch-t1-lookup-5001"
+      ]
+    },
+    {
+      "reading": "Surplus composition offsets",
+      "clause": "ISO/IEC 14496-12:2015 §§8.6.1.3.1–.3 and 8.7.3.2.2: the composition runs provide one offset for each sample described by the size table",
+      "candidate": "refuses a source table whose composition run count exceeds the size-table sample count",
+      "reference": "publishes packet ranges or presentation selections from the readable timing prefix",
+      "compat": "compat::mov::recovery TimingRunPolicy::BoundedPrefix admits the usable composition prefix",
+      "cases": [
+        "bad-ctts-count-mismatch-t1-plan-n1-p0",
+        "bad-ctts-count-mismatch-t1-plan-n1-p1",
+        "bad-ctts-count-mismatch-t1-plan-n1-p2",
+        "bad-ctts-count-mismatch-t1-plan-n1-p7",
+        "bad-ctts-count-mismatch-t1-plan-n2-p0",
+        "bad-ctts-count-mismatch-t1-plan-n2-p1",
+        "bad-ctts-count-mismatch-t1-plan-n2-p3",
+        "bad-ctts-count-mismatch-t1-plan-n2-p7",
+        "bad-ctts-count-mismatch-t1-plan-n3-p0",
+        "bad-ctts-count-mismatch-t1-plan-n3-p1",
+        "bad-ctts-count-mismatch-t1-plan-n3-p4",
+        "bad-ctts-count-mismatch-t1-plan-n3-p7",
+        "bad-ctts-count-mismatch-t1-plan-n4-p0",
+        "bad-ctts-count-mismatch-t1-plan-n4-p1",
+        "bad-ctts-count-mismatch-t1-plan-n4-p5",
+        "bad-ctts-count-mismatch-t1-plan-n4-p7",
+        "bad-ctts-count-mismatch-t1-plan-n5-p0",
+        "bad-ctts-count-mismatch-t1-plan-n5-p1",
+        "bad-ctts-count-mismatch-t1-plan-n5-p6",
+        "bad-ctts-count-mismatch-t1-plan-n5-p7",
+        "bad-ctts-count-mismatch-t1-plan-n6-p0",
+        "bad-ctts-count-mismatch-t1-plan-n6-p1",
+        "bad-ctts-count-mismatch-t1-plan-n6-p7",
+        "bad-ctts-count-mismatch-t1-lookup-0",
+        "bad-ctts-count-mismatch-t1-lookup-1",
+        "bad-ctts-count-mismatch-t1-lookup-501",
+        "bad-ctts-count-mismatch-t1-lookup-1001",
+        "bad-ctts-count-mismatch-t1-lookup-1501",
+        "bad-ctts-count-mismatch-t1-lookup-2001",
+        "bad-ctts-count-mismatch-t1-lookup-2501",
+        "bad-ctts-count-mismatch-t1-lookup-3001",
+        "bad-ctts-count-mismatch-t1-lookup-3501",
+        "bad-ctts-count-mismatch-t1-lookup-4001",
+        "bad-ctts-count-mismatch-t1-lookup-4501",
+        "bad-ctts-count-mismatch-t1-lookup-5001",
+        "bad-ctts-count-mismatch-t1-lookup-5002"
+      ]
+    },
+    {
+      "reading": "Codec-specific boxes carried inside a raw visual entry",
+      "clause": "ISO/IEC 14496-12:2015 §§4.2 and 8.5.2.1 and ETSI TS 102 114 V1.6.1 Annex E §E.2.2.2: ddts is part of a DTS audio sample entry; codec admission is distinct from reading the size, timing and chunk tables",
+      "candidate": "returns the positions, source ticks and bytes of the structurally readable raw track without interpreting its private codec children",
+      "reference": "refuses the MOV open after diagnosing an unsupported DTS layout and a ddts overread inside that visual entry",
+      "compat": "compat::mov::sample_entry SampleEntryHeaderProfile models codec configuration admission at open",
+      "cases": [
+        "r-private-carriage-t1-plan-n1-p0",
+        "r-private-carriage-t1-plan-n1-p1",
+        "r-private-carriage-t1-plan-n1-p2",
+        "r-private-carriage-t1-plan-n1-p7",
+        "r-private-carriage-t1-plan-n2-p0",
+        "r-private-carriage-t1-plan-n2-p1",
+        "r-private-carriage-t1-plan-n2-p3",
+        "r-private-carriage-t1-plan-n2-p7",
+        "r-private-carriage-t1-plan-n3-p0",
+        "r-private-carriage-t1-plan-n3-p1",
+        "r-private-carriage-t1-plan-n3-p4",
+        "r-private-carriage-t1-plan-n3-p7",
+        "r-private-carriage-t1-plan-n4-p0",
+        "r-private-carriage-t1-plan-n4-p1",
+        "r-private-carriage-t1-plan-n4-p5",
+        "r-private-carriage-t1-plan-n4-p7",
+        "r-private-carriage-t1-plan-n5-p0",
+        "r-private-carriage-t1-plan-n5-p1",
+        "r-private-carriage-t1-plan-n5-p6",
+        "r-private-carriage-t1-plan-n5-p7",
+        "r-private-carriage-t1-plan-n6-p0",
+        "r-private-carriage-t1-plan-n6-p1",
+        "r-private-carriage-t1-plan-n6-p7",
+        "r-private-carriage-t1-lookup--1",
+        "r-private-carriage-t1-lookup-0",
+        "r-private-carriage-t1-lookup-500",
+        "r-private-carriage-t1-lookup-1000",
+        "r-private-carriage-t1-lookup-1500",
+        "r-private-carriage-t1-lookup-2000",
+        "r-private-carriage-t1-lookup-2500",
+        "r-private-carriage-t1-lookup-3000",
+        "r-private-carriage-t1-lookup-3500",
+        "r-private-carriage-t1-lookup-4000",
+        "r-private-carriage-t1-lookup-4500",
+        "r-private-carriage-t1-lookup-5000",
+        "r-private-carriage-t1-lookup-5001"
+      ]
+    },
+    {
+      "reading": "An explicit empty sync sample table",
+      "clause": "ISO/IEC 14496-12:2015 §§8.6.2.1–.3: absent stss means all samples are sync samples; a present table with zero entries means none are",
+      "candidate": "refuses a plan because the source declares no usable sync sample",
+      "reference": "makes the first index entry a key and reads a packet range starting there",
+      "compat": "compat::mov::seek synthesized_first_key would permit a landing on the first demux key",
+      "cases": [
+        "r-stss-empty-t1-plan-n1-p0",
+        "r-stss-empty-t1-plan-n1-p1",
+        "r-stss-empty-t1-plan-n1-p2",
+        "r-stss-empty-t1-plan-n1-p7",
+        "r-stss-empty-t1-plan-n6-p0",
+        "r-stss-empty-t1-plan-n6-p1",
+        "r-stss-empty-t1-plan-n6-p7"
+      ]
     }
   ]
 }

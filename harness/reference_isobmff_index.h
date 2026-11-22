@@ -105,11 +105,15 @@ static int track_seek_main(AVFormatContext *format, AVStream *stream,
     return 0;
 }
 
-static void source_seek_packet(ViewWork *work, FILE *trace, const AVPacket *packet)
+static int source_seek_packet(ViewWork *work, FILE *trace, const AVPacket *packet,
+                              int64_t decode_origin)
 {
     const int known = packet->dts != AV_NOPTS_VALUE;
+    if (known && decode_origin < 0 && packet->dts > INT64_MAX + decode_origin)
+        return AVERROR_INVALIDDATA;
     const uint64_t words[] = {
-        (uint64_t)packet->pos, (uint64_t)packet->size, known, (uint64_t)packet->dts,
+        (uint64_t)packet->pos, (uint64_t)packet->size, known,
+        known ? (uint64_t)(packet->dts - decode_origin) : 0,
     };
     const size_t size = (size_t)packet->size;
     view_record(work, 1, words, 3 + known, packet->data, size);
@@ -124,6 +128,7 @@ static void source_seek_packet(ViewWork *work, FILE *trace, const AVPacket *pack
         }
         fputc('\n', trace);
     }
+    return 0;
 }
 
 static int source_seek_main(AVFormatContext *format, AVStream *stream,
@@ -142,7 +147,16 @@ static int source_seek_main(AVFormatContext *format, AVStream *stream,
     /* Save values before seeking, which may change the index. The preroll
      * start can be a non-key entry, so a second keyframe snap would add samples. */
     const AVIndexEntry end = *avformat_index_get_entry(stream, target);
-    const int64_t timestamp = avformat_index_get_entry(stream, start)->timestamp;
+    const int64_t first = avformat_index_get_entry(stream, 0)->timestamp;
+    if (first == AV_NOPTS_VALUE)
+        return AVERROR_INVALIDDATA;
+    /* Regular, unedited stts starts at zero. MOV can shift the public index and
+     * packet DTS back for signed composition offsets. The seek uses media time. */
+    const int64_t decode_origin = first < 0 ? first : 0;
+    const int64_t indexed = avformat_index_get_entry(stream, start)->timestamp;
+    if (indexed > INT64_MAX + decode_origin)
+        return AVERROR_INVALIDDATA;
+    const int64_t timestamp = indexed - decode_origin;
     int code = av_seek_frame(format, stream->index, timestamp,
                              AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_ANY);
     if (code < 0)
@@ -161,7 +175,9 @@ static int source_seek_main(AVFormatContext *format, AVStream *stream,
     int reached = 0;
     while ((code = av_read_frame(format, packet)) >= 0) {
         if (packet->stream_index == stream->index) {
-            source_seek_packet(work, trace, packet);
+            code = source_seek_packet(work, trace, packet, decode_origin);
+            if (code < 0)
+                break;
             reached = packet->pos == end.pos && packet->dts == end.timestamp;
         }
         av_packet_unref(packet);
