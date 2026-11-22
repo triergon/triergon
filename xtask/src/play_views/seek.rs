@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::harness::{report, validation, worker};
+use crate::harness::{oracle, report, validation, worker};
 use crate::json::{self, Value};
 use crate::{python, sha256};
 
@@ -275,11 +275,151 @@ fn reference_seek(
     run(root, worker, "seek-trace", case, &arguments)
 }
 
+/// Identify repeated payloads by the complete sequential packet row and its
+/// occurrence. Extra preroll must be earlier than the first wanted occurrence
+/// on its track, even where the wanted packet itself precedes the request.
+fn matroska_preroll(
+    root: &Path,
+    worker: &Path,
+    case: &Case,
+    received: Vec<Value>,
+    reference: &[Value],
+    extra: usize,
+) -> Result<Vec<Value>> {
+    if received.len() != reference.len() + extra {
+        return Err(format!(
+            "{}: playback preroll packet count changed",
+            case.id
+        ));
+    }
+    let source = run(root, worker, "trace", case, &[])?;
+    if source.code != 0 {
+        return Err(format!("{}: sequential Matroska reference failed", case.id));
+    }
+    let source_rows = rows(&source.stdout)?;
+    let [source] = source_rows.as_slice() else {
+        return Err("expected one sequential Matroska trace".into());
+    };
+    let tracks = list(source, "tracks")?;
+    let source = list(source, "packets")?
+        .iter()
+        .map(|row| packet(row, true, true))
+        .collect::<Result<Vec<_>>>()?;
+    let mut ordered = source.iter().enumerate();
+    let wanted = reference
+        .iter()
+        .map(|row| {
+            ordered
+                .find(|(_, original)| *original == row)
+                .map(|(position, _)| position)
+                .ok_or("native seek packet missing from sequential trace".to_owned())
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let timing = oracle::run(root, oracle::Kind::Timing, &case.input)??;
+    let timing = list(&timing, "packets")?;
+    if timing.len() != source.len() {
+        return Err("sequential Matroska and Block packet counts differ".into());
+    }
+    let ticks = |packet: &Value, field| -> Result<Value> {
+        let time = get(packet, field)?;
+        if time == &Value::Null {
+            return Ok(Value::Null);
+        }
+        let denominator = number(get(time, "denominator")?)?;
+        if denominator <= 0 {
+            return Err("invalid source clock denominator".into());
+        }
+        Ok(Value::int(
+            number(get(time, "numerator")?)?.div_euclid(denominator),
+        ))
+    };
+    let source_clock = source
+        .into_iter()
+        .zip(timing)
+        .map(|(packet, timing)| {
+            let Value::Array(mut fields) = packet else {
+                return Err("invalid sequential Matroska packet".into());
+            };
+            if &fields[0] != get(timing, "track")? {
+                return Err("sequential Matroska and Block tracks differ".into());
+            }
+            fields[2] = ticks(timing, "pts")?;
+            fields[3] = Value::Null;
+            fields[4] = ticks(timing, "duration")?;
+            Ok(Value::Array(fields))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let track_at = |position: usize| -> Result<usize> {
+        let fields = source_clock[position]
+            .as_array()
+            .ok_or("invalid Block packet")?;
+        let track = usize::try_from(number(&fields[0])?).map_err(|_| "invalid Block track")?;
+        (track < tracks.len())
+            .then_some(track)
+            .ok_or("unknown Block track".to_owned())
+    };
+    let mut first_wanted = vec![source_clock.len(); tracks.len()];
+    for &position in &wanted {
+        let track = track_at(position)?;
+        first_wanted[track] = first_wanted[track].min(position);
+    }
+    let mut wanted = wanted.into_iter().peekable();
+    let mut ordered = source_clock.iter().enumerate();
+    let target: i128 = case.reference[0]
+        .parse()
+        .map_err(|_| "invalid Matroska seek time")?;
+    let mut matched = Vec::new();
+    let mut anchor = vec![None; tracks.len()];
+    for packet in received {
+        let (position, _) = ordered
+            .find(|(_, original)| **original == packet)
+            .ok_or("playback seek packet differs from the sequential Block view")?;
+        if wanted.peek() == Some(&position) {
+            wanted.next();
+            matched.push(packet);
+            continue;
+        }
+        let track = track_at(position)?;
+        if position >= first_wanted[track]
+            || !matches!(number(get(&tracks[track], "kind")?)?, 2 | 17)
+        {
+            return Err("extra packet lies outside the playback preroll".into());
+        }
+        let fields = packet.as_array().ok_or("invalid preroll packet")?;
+        if fields[2] == Value::Null {
+            let start =
+                anchor[track].ok_or("untimestamped preroll lacks its timestamped packet")?;
+            for previous in start + 1..position {
+                if track_at(previous)? == track
+                    && source_clock[previous]
+                        .as_array()
+                        .is_some_and(|row| row[2] != Value::Null)
+                {
+                    return Err("untimestamped preroll skips a source timestamp".into());
+                }
+            }
+        } else if number(&fields[2])? < target {
+            anchor[track] = Some(position);
+        } else {
+            return Err("extra preroll reaches the presentation target".into());
+        }
+    }
+    if wanted.next().is_some() {
+        return Err("playback seek dropped a packet from the native suffix".into());
+    }
+    Ok(matched)
+}
+
 fn compare(
+    root: &Path,
+    worker: &Path,
     case: &Case,
     ours: &worker::Finished,
     landing: &Value,
     reference: &[Value],
+    extra: usize,
 ) -> Result<Value> {
     if ours.code != 0 {
         return Err(format!(
@@ -296,6 +436,12 @@ fn compare(
         .filter(|row| row.get("payload").is_some())
         .map(|row| packet(row, false, case.matroska))
         .collect::<Result<Vec<_>>>()?;
+    let packet_count = received.len();
+    let received = if extra != 0 {
+        matroska_preroll(root, worker, case, received, reference, extra)?
+    } else {
+        received
+    };
     let receipt_matches =
         if let Some([requested, actual, discard]) = receipt.and_then(Value::as_array) {
             let target = case.reference[usize::from(!case.matroska)]
@@ -342,7 +488,7 @@ fn compare(
         ),
         ("candidate_receipt", receipt.cloned().unwrap_or(Value::Null)),
         ("reference_landing", landing.clone()),
-        ("candidate_packets", Value::int(received.len() as i64)),
+        ("candidate_packets", Value::int(packet_count as i64)),
         ("reference_packets", Value::int(reference.len() as i64)),
         ("first_difference", first_diff),
     ]))
@@ -452,7 +598,14 @@ pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
             ));
         }
         let ours = run(root, &candidate, "any-seek-trace", &case, &case.candidate)?;
-        let report = compare(&case, &ours, &landing, &packets)?;
+        let extra = previous
+            .get("playback_preroll")
+            .and_then(|cases| cases.get(&case.id))
+            .map_or(Ok(0), |extra| {
+                usize::try_from(number(extra)?)
+                    .map_err(|_| "invalid expected preroll count".to_owned())
+            })?;
+        let report = compare(root, &reference, &case, &ours, &landing, &packets, extra)?;
         let pass = text(&report, "status")? == "pass";
         let listed = open_ids.remove(case.id.as_str());
         if pass == listed {
