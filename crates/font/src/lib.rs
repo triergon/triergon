@@ -280,6 +280,57 @@ enum Outlines {
     Cff(Box<Cff>),
 }
 
+/// A required table of the directory.
+fn required(table: Option<sfnt::Table>) -> Result<sfnt::Table> {
+    table.ok_or(Error::Invalid("missing required table"))
+}
+
+impl Outlines {
+    /// The `glyf` outlines of a TrueType face and its glyph count, with the
+    /// hinting its default load uses, which `family` names a tricky font
+    /// for.
+    fn truetype(
+        bytes: &[u8],
+        tables: &Tables,
+        head: &Head,
+        maxp_glyphs: u16,
+        family: Option<NameRecord<'_>>,
+        budget: &Budget,
+    ) -> Result<(Self, u16)> {
+        let (glyf, count) = Glyf::new(
+            required(tables.glyf)?,
+            required(tables.loca)?,
+            head.long_offsets,
+            maxp_glyphs,
+            tables.loca_room,
+        )?;
+        let program = |t: Option<sfnt::Table>| t.map(|t| t.bytes(bytes));
+        let hinting =
+            sized::TrueTypeHinting::new(program(tables.fpgm), program(tables.prep), family, budget);
+        Ok((Self::Glyf(glyf, hinting), count))
+    }
+
+    /// The `CFF ` or, without it, `CFF2` charstrings of a face and its
+    /// glyph count.
+    fn cff(
+        bytes: &[u8],
+        tables: &Tables,
+        units_per_em: u16,
+        budget: &Budget,
+        work: &mut WorkBudget,
+    ) -> Result<(Self, u16)> {
+        let (table, version) = match (tables.cff, tables.cff2) {
+            (Some(t), _) => (t, Version::Cff1),
+            (None, Some(t)) => (t, Version::Cff2),
+            (None, None) => return Err(Error::Invalid("missing CFF table")),
+        };
+        let axes = sfnt::fvar_axes(bytes, tables.fvar);
+        let cff = Cff::parse(bytes, table, version, units_per_em, axes, budget, work)?;
+        let count = u16::try_from(cff.glyph_count()).map_err(|_| Error::Overflow)?;
+        Ok((Self::Cff(Box::new(cff)), count))
+    }
+}
+
 /// One parsed face of an OpenType or TrueType font file or collection.
 ///
 /// Parsing reads the table directory and the fixed headers and checks every
@@ -331,8 +382,6 @@ impl Font {
         let mut work = WorkBudget::new(limits.work);
         let bytes = data.as_ref();
         let (flavor, tables) = sfnt::directory(bytes, index, &mut work)?;
-        let required =
-            |table: Option<sfnt::Table>| table.ok_or(Error::Invalid("missing required table"));
         let head = metrics::head(required(tables.head)?.bytes(bytes))?;
         // A face needs horizontal metrics, and has vertical ones where both
         // tables load.
@@ -362,41 +411,10 @@ impl Font {
         };
         let (outlines, glyph_count) = match flavor {
             Flavor::TrueType => {
-                let (glyf, count) = Glyf::new(
-                    required(tables.glyf)?,
-                    required(tables.loca)?,
-                    head.long_offsets,
-                    maxp_glyphs,
-                    tables.loca_room,
-                )?;
-                let program = |t: Option<sfnt::Table>| t.map(|t| t.bytes(bytes));
-                let hinting = sized::TrueTypeHinting::new(
-                    program(tables.fpgm),
-                    program(tables.prep),
-                    first_name(names, bytes, os2, &FAMILY_NAMES),
-                    budget,
-                );
-                (Outlines::Glyf(glyf, hinting), count)
+                let family = first_name(names, bytes, os2, &FAMILY_NAMES);
+                Outlines::truetype(bytes, &tables, &head, maxp_glyphs, family, budget)?
             }
-            Flavor::Cff => {
-                let (table, version) = match (tables.cff, tables.cff2) {
-                    (Some(t), _) => (t, Version::Cff1),
-                    (None, Some(t)) => (t, Version::Cff2),
-                    (None, None) => return Err(Error::Invalid("missing CFF table")),
-                };
-                let axes = sfnt::fvar_axes(bytes, tables.fvar);
-                let cff = Cff::parse(
-                    bytes,
-                    table,
-                    version,
-                    head.units_per_em,
-                    axes,
-                    budget,
-                    &mut work,
-                )?;
-                let count = u16::try_from(cff.glyph_count()).map_err(|_| Error::Overflow)?;
-                (Outlines::Cff(Box::new(cff)), count)
-            }
+            Flavor::Cff => Outlines::cff(bytes, &tables, head.units_per_em, budget, &mut work)?,
         };
         let hmtx = LongMetrics::new(hmtx, hhea.metrics, glyph_count);
         let vmtx = vertical
@@ -409,9 +427,8 @@ impl Font {
         let underline = metrics::underline(tables.post.map(|t| t.bytes(bytes)));
         // A CFF face without a Windows BMP or Unicode-platform charmap gets a
         // Unicode charmap built from its glyph names.
-        let unicode = cmap.has_unicode();
         let name_map = match &outlines {
-            Outlines::Cff(cff) if !unicode && cff.has_charset() => {
+            Outlines::Cff(cff) if !cmap.has_unicode() && cff.has_charset() => {
                 postscript::UnicodeMap::new(cff.glyph_names(bytes), budget)?
             }
             _ => None,
