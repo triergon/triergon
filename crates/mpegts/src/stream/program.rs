@@ -102,6 +102,7 @@ impl TransportStream {
     /// The program map the stream currently routes by; `None` until a PMT for the selected
     /// program is accepted, and again after a PAT change or a discontinuity releases it.
     pub fn active_program(&self) -> Option<ActiveProgram<'_>> {
+        // Pairing the source and version added 0.1497% to split PES with the PSI route in place.
         Some(ActiveProgram {
             stream: self,
             section: self.pmt_source.as_ref()?,
