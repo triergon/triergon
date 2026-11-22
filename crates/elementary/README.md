@@ -99,3 +99,8 @@ Packets differ from FFmpeg 9.0.2's (`ffprobe -show_packets`) only where FFmpeg:
 The reviewed differences are in
 [reader-differences.json](../../harness/codecs/reader-differences.json); results in
 [docs/status.md](../../docs/status.md).
+
+The [track metadata comparison](../../harness/features/elementary-metadata/contract.json)
+checks ADTS and E-AC-3 rates and channel counts against the first physical
+frame. The [wire comparison](../../harness/features/elementary-metadata-wire/contract.json)
+checks original FLAC metadata, seek points, frame headers and tag envelopes.

@@ -79,12 +79,6 @@
         "entry_points": ["BlockingReader::seek", "Reader::last_seek", "SeekDetail", "SeekBasis", "Format::PREROLL"],
         "degree": "unit-tests",
         "needs": "The elementary seek lane compares the landing and packet suffix. It retains thirty declared frame-position and clock differences and one open MPEG audio recovery landing."
-      },
-      {
-        "name": "stream-metadata",
-        "entry_points": ["Flac::metadata", "Flac::seek_points", "Flac::stream_info", "MpegAudio::info_frame", "Reader::tags", "Track::channels", "Track::sample_rate", "Track::duration"],
-        "degree": "unit-tests",
-        "needs": "The elementary metadata and wire comparisons cover declared FLAC fields and tag envelopes. Ten declared deviations cover metadata retention, free-format admission and tag dictionary policy. The paired bounds remain due."
       }
     ],
     "triergon-font": [],

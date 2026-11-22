@@ -259,6 +259,12 @@ fn elementary_fields<F: Format>(
     let Some(track) = reader.reader().stream() else {
         return record(work, trace, 8, &[], &[]);
     };
+    if matches!(family, "aac" | "eac3") {
+        let first = first
+            .as_ref()
+            .ok_or("audio track has no first source packet")?;
+        check_audio_properties(input, family, track, first)?;
+    }
     let config = streaminfo(track.configuration());
     let fields = [
         match track.codec_tag() {
@@ -328,6 +334,73 @@ fn elementary_fields<F: Format>(
     let pairs: Vec<_> = pairs.into_iter().collect();
     emit_comments(&pairs, work, &mut trace)?;
     record(work, trace, 7, &[pairs.len() as u64], &[])
+}
+
+fn check_audio_properties(
+    input: &[u8],
+    family: &str,
+    track: &elementary::Track,
+    first: &elementary::Packet,
+) -> Result<(), String> {
+    let start = usize::try_from(first.offset()).map_err(|error| error.to_string())?;
+    let end = start
+        .checked_add(first.payload().len())
+        .ok_or("audio extent overflow")?;
+    let payload = input
+        .get(start..end)
+        .ok_or("audio extent lies outside the original source")?;
+    if payload != first.payload() {
+        return Err("first audio packet differs from its raw source extent".into());
+    }
+    let (rate, channels) = if family == "aac" {
+        let [0xff, sync, mode, flags, ..] = payload else {
+            return Err("ADTS metadata has no complete identification prefix".into());
+        };
+        if sync & 0xf6 != 0xf0 {
+            return Err("ADTS metadata did not use a valid sync and layer".into());
+        }
+        let rates = [
+            96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350,
+        ];
+        let rate = *rates
+            .get(usize::from((mode >> 2) & 15))
+            .ok_or("reserved ADTS frequency")?;
+        let channels = [
+            None,
+            Some(1),
+            Some(2),
+            Some(3),
+            Some(4),
+            Some(5),
+            Some(6),
+            Some(8),
+        ];
+        let channel = usize::from((mode & 1) << 2 | flags >> 6);
+        (rate, channels[channel])
+    } else {
+        let [0x0b, 0x77, _, _, coding, _, ..] = payload else {
+            return Err("E-AC-3 metadata has no complete identification prefix".into());
+        };
+        let rates = [48000, 44100, 32000];
+        let rate = match coding >> 6 {
+            3 => {
+                *rates
+                    .get(usize::from((coding >> 4) & 3))
+                    .ok_or("reserved E-AC-3 half-rate code")?
+                    / 2
+            }
+            code => rates[usize::from(code)],
+        };
+        let channels = [2, 1, 2, 3, 3, 4, 4, 5];
+        (
+            rate,
+            Some(channels[usize::from((coding >> 1) & 7)] + (coding & 1)),
+        )
+    };
+    if track.sample_rate() != rate || track.channels() != channels {
+        return Err("elementary track rate or channels differ from the source bits".into());
+    }
+    Ok(())
 }
 
 pub(super) fn elementary(
