@@ -142,9 +142,10 @@ macro_rules! idct_n {
             const N: usize = $n;
             let TransformScratch { gt, out } = ts;
             // Stage 1 on L lanes (columns 0..L hold all non-zero coefficients); writes the
-            // clipped (8-314) result transposed: gt[x * N + y] = g[y][x].
+            // clipped (8-314) result transposed: gt[x * N + y] = g[y][x]. The last lane count
+            // is N, which holds every column.
             $(
-                if max_x < $lim {
+                if $lim == N || max_x < $lim {
                     const L: usize = $lim;
                     $pass::<L>(coef, N, max_y + 1, out);
                     for y in 0..N {
@@ -155,9 +156,7 @@ macro_rules! idct_n {
                     }
                 } else
             )*
-            {
-                unreachable!()
-            }
+            {}
             // Stage 2: rows of g are rows of gt; lanes run over y. out[x * N + y] = r[y][x].
             $pass::<N>(gt, N, max_x + 1, out);
             let rnd = 1 << (bd_shift - 1);
