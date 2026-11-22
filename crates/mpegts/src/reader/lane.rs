@@ -376,26 +376,27 @@ pub(super) enum PesRun {
     Active(SourceEpochs, u64),
 }
 
+#[repr(C)]
 pub(super) struct Lane {
-    pub track: Track,
-    pub unsupported: Option<Error>,
-    framer: Option<Framer>,
-    pool: Budget,
     limits: ReaderLimits,
-    input: Option<Input>,
-    pieces: BudgetVec<Piece>,
     build: Option<Build>,
     incomplete: Option<Incomplete>,
+    pub run: PesRun,
+    framer: Option<Framer>,
+    input: Option<Input>,
     residue: Option<ResidueScan>,
+    pieces: BudgetVec<Piece>,
+    pub track: Track,
+    pub unsupported: Option<Error>,
+    pool: Budget,
     supplied: u64,
     serial: u64,
     last_anchor: u64,
     retire: usize,
     retire_credit: usize,
-    eof: bool,
     completed: usize,
     published: u64,
-    pub run: PesRun,
+    eof: bool,
 }
 
 impl Lane {
