@@ -1262,11 +1262,6 @@ impl Decoder {
             && self.dpb.bump(leave(&mut self.out, &mut self.free))
         {}
     }
-
-    /// Number of NAL units that failed to decode so far (diagnostics).
-    pub fn error_count(&self) -> u64 {
-        self.errors
-    }
 }
 
 /// The session view of the decoder. A received picture is held until the next call, so

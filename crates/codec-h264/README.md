@@ -56,7 +56,7 @@ Assemble a complete NAL before sending when reading in arbitrary byte chunks.
   through reordering.
 - Errors are typed (`DecodeError`, the one of triergon-codec): `Unsupported(&str)` names
   the feature, `Invalid(&str)`, `Policy(&str)`, `Budget(StorageError)`. The decoder does not panic on
-  malformed input.
+  malformed input. A send call returns the first decoding error it encounters.
 - Refused with `Unsupported`: bit depth above 8, 4:2:2 and 4:4:4, lossless transform
   bypass, flexible macroblock ordering (more than one slice group), SP/SI slices, data
   partitioning.
