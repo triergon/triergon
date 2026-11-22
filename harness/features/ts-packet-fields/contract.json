@@ -7,7 +7,7 @@
   "worker_operation": "ts-packets-",
   "contract": [
     "Compare the wire fields and strict carrier validity with an independent H.222.0 2.4.3.2\u20132.4.3.5 oracle using the same transport inputs as ts-packets.",
-    "Kind 6 contains offset, size, sync, TEI, PUSI, priority, PID, scrambling, adaptation control, counter, payload offset and size, then optional adaptation length and flags, PCR including raw and exact time and reserved bits, OPCR including raw and exact time, and signed splice countdown.",
+    "Kind 6 contains the whole-carrier offset and size, sync, TEI, PUSI, priority, PID, scrambling, adaptation control, counter, payload offset and payload size. When adaptation is present the row continues with encoded adaptation length and flags, PCR presence, then PCR base, extension, ticks, reduced time numerator and denominator and reserved bits if present. OPCR uses the same time fields without the reserved bits. A signalled splice countdown is folded as its signed word.",
     "Kind 3 contains carrier offset, block identity, size and bytes for each opaque M2TS prefix, private field and adaptation extension. Check attached rejected carrier ranges and any final partial carrier with kind 8, and clean end with kind 7. The compact control expands the actual null run."
   ],
   "required_profiles": [

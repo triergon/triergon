@@ -7,7 +7,7 @@
   "worker_operation": "ts-video-descriptors-",
   "contract": [
     "Compare AVC and HEVC video descriptors in accepted current PMTs against an independent H.222.0 2.6.64 and 2.6.95 oracle.",
-    "Kind 3 includes the program number, PMT version, stream PID, descriptor tag, and all decoded descriptor fields in the contract trace order. Include both presence and absence of the HEVC temporal bounds. Kind 7 marks clean end."
+    "Kind 3 begins with program number, PMT version, stream PID and descriptor tag. The AVC row then includes profile, six constraint flags in source order, compatibility flags, level, still-picture flag, 24-hour flag and frame-packing SEI absence flag. The HEVC row includes profile space, tier, profile, profile compatibility, progressive, interlaced, non-packed and frame-only constraints, the copied 44-bit field, level, still-picture flag, 24-hour flag, sub-picture HRD absence, HDR/WCG ID, temporal subset presence and any temporal minimum and maximum. Kind 7 marks clean end."
   ],
   "required_profiles": [
     "avc-hevc-flags"
