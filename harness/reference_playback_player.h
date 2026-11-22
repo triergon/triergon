@@ -268,6 +268,54 @@ static int player_movie_empty(Mp4View input, uint32_t track_id, int64_t timestam
     return AVERROR_STREAM_NOT_FOUND;
 }
 
+/* Use the backward seek to identify the edited video occurrence, then replay
+ * it in a fresh demux session. The seek's per-stream indices can skip audio
+ * that is delivered after this occurrence in the selected movie replay. */
+static int player_movie_read(AVFormatContext *format, AVPacket *landing,
+                             const ViewCase *input, const PlaybackPlayerCase *player,
+                             int video, PacketWork *work)
+{
+    int rc;
+    while ((rc = av_read_frame(format, landing)) >= 0 && landing->stream_index != video)
+        av_packet_unref(landing);
+    if (rc < 0)
+        return rc;
+    PacketInput reader = {input->data, (int64_t)input->size, 0, player->window};
+    AVFormatContext *replay = NULL;
+    AVPacket *packet = av_packet_alloc();
+    if (!packet)
+        return AVERROR(ENOMEM);
+    rc = player_open(&replay, &reader, player);
+    if (rc < 0)
+        goto done;
+    const int track = player_stream(replay, PLAYER_MOV, AVMEDIA_TYPE_VIDEO, player->video);
+    if (track < 0) {
+        rc = track;
+        goto done;
+    }
+    while ((rc = av_read_frame(replay, packet)) >= 0) {
+        if (packet->stream_index == track && packet->pos == landing->pos &&
+            packet->pts == landing->pts && packet->dts == landing->dts &&
+            packet->duration == landing->duration && packet->flags == landing->flags &&
+            packet->size == landing->size &&
+            (!packet->size || !memcmp(packet->data, landing->data, (size_t)packet->size))) {
+            player_field(work, 4, (uint64_t)packet->pos);
+            rc = player_packet(work, player, replay->streams[track], packet);
+            av_packet_unref(packet);
+            if (rc >= 0)
+                rc = player_read(replay, packet, player, work, -1, -1, -1, 1);
+            goto done;
+        }
+        av_packet_unref(packet);
+    }
+    if (rc == AVERROR_EOF)
+        rc = AVERROR_INVALIDDATA;
+done:
+    av_packet_free(&packet);
+    packet_close(&replay);
+    return rc;
+}
+
 typedef struct {
     int64_t position, pts, dts, duration;
     size_t order;
@@ -645,7 +693,8 @@ static int player_seek(AVFormatContext *format, AVPacket *packet,
         result = av_seek_frame(format, video, player->timestamp, AVSEEK_FLAG_BACKWARD);
         if (result < 0)
             return result;
-
+        if (player->seek == PLAYER_MOVIE)
+            return player_movie_read(format, packet, input, player, video, work);
     }
     return player_read(format, packet, player, work, -1, -1, video, 1);
 }

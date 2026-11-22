@@ -10,7 +10,7 @@
   "contract": [
     "Compare the landed video position and complete packet suffix for each backward seek.",
     "Source-clock seeks select in unedited composition time and carry the preceding sync sample within its description. Compare the entire physical replay with black-box demux packet bytes and coded sample durations, descriptions and sync flags. Demux-clock seeks use the projected video clock and the public backward MOV demux seek.",
-    "A movie-time request inside an empty edit emits an empty mapping and no packets. The AV1 source seek compares the coded sync flag and traces the demuxer disposable assertion.",
+    "A request inside an empty edit emits an empty mapping and no packets. A mapped movie seek verifies the edited video occurrence against a fresh demux and compares its entire suffix including secondary-track packets. The AV1 source seek compares the coded sync flag and traces the demuxer disposable assertion.",
     "Compare track, PTS, DTS, duration, flags, size, payload, position, time base and encoded trim. Preserve every original range case, including start-up and Opus roll recovery.",
     "For range playback compare the nonzero usable MovieHeaderBox duration in microseconds, or the maximum packet presentation endpoint of the playable tracks when the header has no usable duration. Preserve the reference stream-info estimate in the trace. Release seek checkpoints before the checkpoint control and compare the resulting seek.",
     "Preload input outside the measurement window."
@@ -451,7 +451,7 @@
   "pending_module_requirements": [
     "Admit valid edited AV1 and RTP hint tracks in the demux seek plan. The basic EditCursor rejects the reordered or zero-delta input before an index or packet can be delivered.",
     "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
-    "Compare mapped replay from the same physical landing, including early secondary audio. Apply each selected track edit to the replay so its last partial encoded packet reports the clipped duration and tail discard."
+    "Apply each selected track edit to the mapped movie replay so its last partial encoded packet reports the clipped duration and tail discard."
   ],
   "open_cases": [
     {
@@ -526,7 +526,7 @@
     },
     {
       "id": "movie-mapped-edit",
-      "requirement": "Compare mapped replay from the same physical landing, including early secondary audio. Apply each selected track edit to the replay so its last partial encoded packet reports the clipped duration and tail discard.",
+      "requirement": "Apply each selected track edit to the mapped movie replay so its last partial encoded packet reports the clipped duration and tail discard.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
