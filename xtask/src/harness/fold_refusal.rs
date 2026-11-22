@@ -17,6 +17,7 @@ pub(super) struct Refusal<'a> {
     sha256: &'a str,
     detail: &'a str,
     candidate: &'a Value,
+    compare_reference: bool,
 }
 
 pub(super) fn read<'a>(
@@ -73,10 +74,23 @@ pub(super) fn read<'a>(
                     "{id}: candidate refusal fold has unexpected fields"
                 ));
             }
+            let compare_reference = match case.get("reference_pin_targets") {
+                None => true,
+                Some(pins) => {
+                    let pins = pins
+                        .as_array()
+                        .filter(|pins| !pins.is_empty() && pins.iter().all(|p| targets.contains(p)))
+                        .ok_or_else(|| {
+                            format!("{id}: reference_pin_targets must name required targets")
+                        })?;
+                    pins.iter().any(|pin| pin.as_str() == Some(target))
+                }
+            };
             let entry = Refusal {
                 sha256,
                 detail,
                 candidate,
+                compare_reference,
             };
             if all.insert(id, active.then_some(entry)).is_some() {
                 return Err(format!("{id}: duplicate registered fold refusal"));
@@ -92,6 +106,10 @@ pub(super) fn read<'a>(
 impl Refusal<'_> {
     pub(super) fn binds_input(&self, sha256: Option<&str>) -> bool {
         sha256 == Some(self.sha256)
+    }
+
+    pub(super) fn compares_reference(&self) -> bool {
+        self.compare_reference
     }
 
     pub(super) fn proof(
@@ -122,21 +140,27 @@ impl Refusal<'_> {
         expected: &Value,
         fields: &[String],
     ) -> bool {
-        let fold = |observed: &Value, pin: &Value| {
-            observed.get("eof") == Some(&Value::Bool(true))
-                && comparison::work_summary(observed, fields)
-                    .is_ok_and(|actual| diff::equal(&actual, pin))
-        };
-        text(candidate, "unsupported") == Some(self.detail)
-            && !crate::generators::host_dependent(reference)
-            && !crate::generators::host_dependent(expected)
-            && !diff::equal(self.candidate, expected)
-            && fold(candidate, self.candidate)
-            && fold(reference, expected)
+        let eof = Some(&Value::Bool(true));
+        if text(candidate, "unsupported") != Some(self.detail)
+            || candidate.get("eof") != eof
+            || reference.get("eof") != eof
+            || !comparison::work_summary(candidate, fields)
+                .is_ok_and(|actual| diff::equal(&actual, self.candidate))
+        {
+            return false;
+        }
+        comparison::work_summary(reference, fields).is_ok_and(|actual| {
+            !self.compare_reference
+                || (!crate::generators::host_dependent(reference)
+                    && !crate::generators::host_dependent(expected)
+                    && !diff::equal(self.candidate, expected)
+                    && diff::equal(&actual, expected))
+        })
     }
 
     pub(super) fn matches_row(&self, row: &Value, expected: &Value, fields: &[String]) -> bool {
-        self.binds_input(text(row, "input_sha256"))
+        self.compare_reference
+            && self.binds_input(text(row, "input_sha256"))
             && ["timing", "memory"]
                 .iter()
                 .all(|key| row.get(key).is_none_or(|value| *value == Value::Null))
@@ -160,14 +184,27 @@ mod tests {
     use crate::json::parse;
 
     #[test]
-    fn refusal_requires_the_exact_typed_error_and_both_complete_folds() {
+    fn registered_refusal_requires_candidate_evidence_and_compares_only_pinned_references() {
+        const PINNED: &str = "aarch64-unknown-linux-gnu";
+        const UNPINNED: &str = "x86_64-unknown-linux-gnu";
+        const SHA: &str = "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade";
+        let contract = parse(&format!(
+            r#"{{
+                "worker_operation": "picture-properties",
+                "required_targets": ["{PINNED}"],
+                "open_refusals": [{{
+                    "reason": "Slice groups", "clause": "H.264 §8.2.2", "detail": "slice groups",
+                    "cases": [
+                        {{"id":"strict","sha256":"{SHA}",
+                          "candidate":{{"packets":2,"bytes":11,"digest":22}}}},
+                        {{"id":"marked","sha256":"{SHA}","reference_pin_targets":["{PINNED}"],
+                          "candidate":{{"packets":2,"bytes":11,"digest":22}}}}
+                    ]
+                }}]
+            }}"#
+        ))
+        .unwrap();
         let expected = parse(r#"{"packets":4,"bytes":19,"digest":42}"#).unwrap();
-        let candidate = parse(r#"{"packets":2,"bytes":11,"digest":22}"#).unwrap();
-        let refusal = Refusal {
-            sha256: "input",
-            detail: "slice groups",
-            candidate: &candidate,
-        };
         let outcome = |data| Value::object([("status", Value::str("ok")), ("data", data)]);
         let left = outcome(
             parse(
@@ -176,26 +213,77 @@ mod tests {
             .unwrap(),
         );
         let right = outcome(parse(r#"{"packets":4,"bytes":19,"digest":42,"eof":true}"#).unwrap());
-        assert!(refusal.proof(&left, &right, &expected, &[]).is_some());
-        for (side, key, value) in [
-            (true, "unsupported", Value::str("other")),
-            (true, "digest", Value::int(23)),
-            (true, "eof", Value::Bool(false)),
-            (false, "digest", Value::int(43)),
-            (false, "eof", Value::Bool(false)),
-        ] {
-            let mut data = worker::data(if side { &left } else { &right }).clone();
+        let changed = |worker, key, value| {
+            let mut data = worker::data(worker).clone();
             super::super::validation::put(&mut data, key, value).unwrap();
-            let changed = outcome(data);
-            let (a, b) = if side {
-                (&changed, &right)
-            } else {
-                (&left, &changed)
-            };
-            assert!(refusal.proof(a, b, &expected, &[]).is_none(), "{key}");
+            outcome(data)
+        };
+        for target in [PINNED, UNPINNED] {
+            let refusals = read(&contract, target).unwrap();
+            for (id, refusal) in refusals {
+                let compares = id == "strict" || target == PINNED;
+                assert_eq!(refusal.compares_reference(), compares);
+                let proof = refusal.proof(&left, &right, &expected, &[]).unwrap();
+                let row = |sha| {
+                    Value::object([
+                        ("input_sha256", Value::str(sha)),
+                        (
+                            "parity",
+                            Value::object([
+                                ("comparison", Value::str(COMPARISON)),
+                                ("refusal_proof", proof.clone()),
+                            ]),
+                        ),
+                    ])
+                };
+                assert!(refusal.binds_input(Some(SHA)));
+                assert!(!refusal.binds_input(Some("different")));
+                assert_eq!(refusal.matches_row(&row(SHA), &expected, &[]), compares);
+                assert!(!refusal.matches_row(&row("different"), &expected, &[]));
+                for (key, value) in [
+                    ("unsupported", Value::str("other")),
+                    ("digest", Value::int(23)),
+                    ("eof", Value::Bool(false)),
+                ] {
+                    let bad = changed(&left, key, value);
+                    assert!(
+                        refusal.proof(&bad, &right, &expected, &[]).is_none(),
+                        "{key}"
+                    );
+                }
+                for (key, value, passes) in [
+                    ("digest", Value::int(43), !compares),
+                    ("host_dependent", Value::Bool(true), !compares),
+                    ("eof", Value::Bool(false), false),
+                    ("digest", Value::Null, false),
+                ] {
+                    let other = changed(&right, key, value);
+                    assert_eq!(
+                        refusal.proof(&left, &other, &expected, &[]).is_some(),
+                        passes,
+                        "{key}"
+                    );
+                }
+                let mut flagged = expected.clone();
+                super::super::validation::put(&mut flagged, "host_dependent", Value::Bool(true))
+                    .unwrap();
+                assert_eq!(
+                    refusal.proof(&left, &right, &flagged, &[]).is_some(),
+                    !compares
+                );
+                assert_eq!(
+                    refusal
+                        .proof(&left, &left, refusal.candidate, &[])
+                        .is_some(),
+                    !compares
+                );
+                assert!(refusal.proof(&left, &Value::Null, &expected, &[]).is_none());
+                assert!(
+                    refusal
+                        .proof(&Value::Null, &right, &expected, &[])
+                        .is_none()
+                );
+            }
         }
-        assert!(refusal.proof(&left, &Value::Null, &expected, &[]).is_none());
-        assert!(refusal.proof(&left, &left, &candidate, &[]).is_none());
-        assert!(!refusal.binds_input(Some("different")));
     }
 }

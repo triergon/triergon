@@ -746,6 +746,12 @@ pub(super) fn feed_parity(
         run.candidate(&mode, arguments)
     };
     let right = run.exec(run.reference, &format!("{reference_prefix}fold"), arguments);
+    let unpinned_reference = refusal.is_some_and(|spec| !spec.compares_reference());
+    let expected = if unpinned_reference {
+        &Value::Null
+    } else {
+        expected
+    };
     let mut result = feed_result(&left, &right, expected, work_fields, per_target);
     if let Some(refusal) = refusal {
         let proof = refusal.proof(&left, &right, expected, work_fields);
@@ -755,6 +761,15 @@ pub(super) fn feed_parity(
             "source_timing_status",
             status_of(proof.is_some()),
         );
+        if unpinned_reference {
+            let reason = if proof.is_some() {
+                "reference fold not compared on this target"
+            } else {
+                "registered refusal evidence changed. Reference fold not compared on this target"
+            };
+            set(&mut result, "reference_comparison", Value::str("unpinned"));
+            set(&mut result, "reason", Value::str(reason));
+        }
         if let Some(proof) = proof {
             set(
                 &mut result,
@@ -762,7 +777,7 @@ pub(super) fn feed_parity(
                 Value::str(super::fold_refusal::COMPARISON),
             );
             set(&mut result, "refusal_proof", proof);
-        } else {
+        } else if !unpinned_reference {
             set(
                 &mut result,
                 "reason",
