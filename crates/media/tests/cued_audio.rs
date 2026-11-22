@@ -154,3 +154,24 @@ fn ac3_seek_refuses_unsupported_track_and_missing_preceding_cue() {
         BlockingReader::open_seekable(Cursor::new(altered), Limits::default()).unwrap();
     assert!(reader.seek_cued_ac3(0, 130_000_000, &cancel).is_err());
 }
+
+#[test]
+fn eac3_seek_accepts_profile_and_refuses_outside_it() {
+    let bytes = ebml::cued_eac3_coded();
+    let cancel = AtomicBool::new(false);
+    let mut reader =
+        BlockingReader::open_seekable(Cursor::new(bytes.clone()), Limits::default()).unwrap();
+    let landing = reader.seek_cued_eac3(0, 130_000_000, &cancel).unwrap();
+    assert!(landing.used_index);
+    assert_eq!(landing.actual_ns, 128_000_000);
+    assert_eq!(
+        reader.next_packet(&cancel).unwrap().unwrap().pts_ns,
+        Some(128_000_000)
+    );
+    let mut reader = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
+    assert!(reader.seek_cued_eac3(0, -1, &cancel).is_err());
+    let mut reader =
+        BlockingReader::open_seekable(Cursor::new(ebml::cued_eac3_opaque()), Limits::default())
+            .unwrap();
+    assert!(reader.seek_cued_eac3(0, 130_000_000, &cancel).is_err());
+}

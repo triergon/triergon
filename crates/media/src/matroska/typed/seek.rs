@@ -68,8 +68,24 @@ pub(crate) fn cued_ac3_profile(tracks: &[crate::matroska::Track], track: usize) 
         })
 }
 
+pub(crate) fn cued_eac3_profile(tracks: &[crate::matroska::Track], track: usize) -> bool {
+    tracks.len() == 1
+        && track == 0
+        && tracks.first().is_some_and(|t| {
+            t.kind == 2
+                && t.codec.as_str() == "A_EAC3"
+                && t.codec_private.is_empty()
+                && t.sample_rate.to_bits() == 48_000_f64.to_bits()
+                && t.channels == 1
+                && t.codec_delay_ns == 0
+                && t.seek_preroll_ns == 0
+        })
+}
+
 pub(crate) fn cued_audio_profile(tracks: &[crate::matroska::Track], track: usize) -> bool {
-    cued_aac_profile(tracks, track) || cued_ac3_profile(tracks, track)
+    cued_aac_profile(tracks, track)
+        || cued_ac3_profile(tracks, track)
+        || cued_eac3_profile(tracks, track)
 }
 
 impl RecoveryAudio {

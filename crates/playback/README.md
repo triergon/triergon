@@ -118,7 +118,7 @@ Cues. HEVC startup requires one distinct parameter set of each type. Legacy
 `Player::seek_and_select` also seeks a single-track `A_AAC` Segment with
 AudioSpecificConfig `12 10` and zero codec delay and seek preroll to its preceding
 validated Cue. Packets before the requested time are marked decode-only.
-The same route accepts a single `A_AC3` track at 48 kHz and one channel, with
+The same route accepts a single `A_AC3` or `A_EAC3` track at 48 kHz and one channel, with
 empty CodecPrivate and zero delay and preroll. The Dolby clock probe can project
 the resulting packet clocks.
 `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC` tracks without an initialization record get

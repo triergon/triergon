@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "matroska-cued-eac3",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "matroska-cued-eac3-source-seek",
+  "candidate": "media-worker",
+  "worker_operation": "cued-eac3-",
+  "reference": "ffmpeg-native",
+  "contract": [
+    "Seek to the preceding Cue for a single 48 kHz mono E-AC-3 track with empty CodecPrivate, zero CodecDelay and zero SeekPreRoll.",
+    "Each operation opens a seekable view of the full preloaded input, seeks backward, reads every packet to EOF and releases the reader.",
+    "Use the public libavformat source view with NOPARSE and NOFILLIN and floor the target to the stream time base before seeking.",
+    "Fold the landing, the track, timestamp and duration presence and values, length and bytes of every packet, and successful EOF."
+  ],
+  "required_profiles": [
+    "preceding-cue",
+    "fraction-before-second-cue"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}
