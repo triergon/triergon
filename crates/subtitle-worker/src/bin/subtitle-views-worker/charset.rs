@@ -37,6 +37,9 @@ pub(super) fn operation<'a>(
             run: Box::new(move |work, trace| {
                 let mut records = Records { work, trace };
                 match packet_conversion(input, &label, glibc, &pool, &cancel) {
+                    Ok(Some(text)) if input.is_empty() && text.is_empty() => {
+                        records.row(9, &[], &[])
+                    }
                     Ok(Some(text)) => records.row(3, &[text.len() as u64], &text),
                     Ok(None) | Err(_) => records.refused(),
                 }

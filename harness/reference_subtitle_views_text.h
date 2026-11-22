@@ -295,10 +295,15 @@ static int subtitle_view_charset(const ViewCase *input, ViewWork *work)
     }
     if (packet_view) {
         AVSubtitle subtitle = {0};
-        if (subtitle_charset_decode(context, packet, input->data, input->size, &subtitle) == 1) {
+        const int decoded = subtitle_charset_decode(context, packet, input->data, input->size,
+                                                    &subtitle);
+        if (decoded == 1) {
             const char *ass = subtitle.rects[0]->ass;
             const uint64_t words[] = {strlen(ass)};
             SUBTITLE_ROW(work, 3, words, (const uint8_t *)ass, words[0]);
+        } else if (decoded == 0 && input->size == 0) {
+            /* A zero-size input supplies no ASS event. */
+            subtitle_view_row(work, 9, NULL, 0, NULL, 0);
         } else {
             subtitle_view_refusal(work);
         }
