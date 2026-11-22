@@ -19,8 +19,7 @@ use triergon_core::{Error, Result, WorkBudget};
 pub struct RecoveryObservation {
     raw: BoxView,
     groups: u32,
-    validated: Option<RecoveryFacts>,
-    fault: Option<SourceProfileFault>,
+    outcome: std::result::Result<RecoveryFacts, SourceProfileFault>,
 }
 impl RecoveryObservation {
     /// The `stbl` box the groups were read from.
@@ -36,29 +35,36 @@ impl RecoveryObservation {
     /// `Error::Unsupported` or `Error::Truncated` with its `sgpd` or `sbgp` box. A group
     /// of a type other than `roll` or `prol` is such a fault.
     pub fn source_result(&self) -> std::result::Result<&RecoveryFacts, &SourceProfileFault> {
-        match (&self.validated, &self.fault) {
-            (Some(v), None) => Ok(v),
-            (_, Some(e)) => Err(e),
-            _ => unreachable!("constructed source outcome"),
-        }
+        self.outcome.as_ref()
     }
 }
+
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)] // Keep the validation walk inline without another allocation.
+enum Phase {
+    Validate {
+        scan: Option<BoxChildren>,
+        strict: RecoveryWalk,
+    },
+    Ready(RecoveryObservation),
+    Finished,
+}
+
 #[derive(Debug)]
 pub(crate) struct RecoveryContextReceiver {
     raw: BoxView,
-    scan: Option<BoxChildren>,
-    strict: Option<RecoveryWalk>,
     groups: u32,
-    ready: Option<RecoveryObservation>,
+    phase: Phase,
 }
 impl RecoveryContextReceiver {
     pub(crate) fn new(table: &SampleTable, maximum: u64) -> Result<Self> {
         Ok(Self {
             raw: table.raw().clone(),
-            scan: Some(table.raw().children(0, Limits::default())?),
-            strict: Some(RecoveryWalk::new_with_recovery_contexts(table, maximum)?),
             groups: 0,
-            ready: None,
+            phase: Phase::Validate {
+                scan: Some(table.raw().children(0, Limits::default())?),
+                strict: RecoveryWalk::new_with_recovery_contexts(table, maximum)?,
+            },
         })
     }
     pub(crate) fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
@@ -66,13 +72,17 @@ impl RecoveryContextReceiver {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if self.ready.is_some() {
-                return Ok(true);
-            }
-            if let Some(scan) = &mut self.scan {
-                match scan.poll(work)? {
+            let (scan, strict) = match &mut self.phase {
+                Phase::Validate { scan, strict } => (scan, strict),
+                Phase::Ready(_) => return Ok(true),
+                Phase::Finished => {
+                    return Err(Error::Invalid("encoded context view recovery not ready"));
+                }
+            };
+            if let Some(children) = scan {
+                match children.poll(work)? {
                     Next::Yield => return Ok(false),
-                    Next::End => self.scan = None,
+                    Next::End => *scan = None,
                     Next::Item(raw) => {
                         let atom = raw.header().kind;
                         if atom == *b"sgpd" || atom == *b"sbgp" {
@@ -88,25 +98,14 @@ impl RecoveryContextReceiver {
                 }
                 continue;
             }
-            let strict = self.strict.as_mut().ok_or(Error::Invalid(
-                "encoded context view recovery walk invariant",
-            ))?;
-            match strict.poll(work, cancel) {
+            let outcome = match strict.poll(work, cancel) {
                 Ok(false) => return Ok(false),
                 Ok(true) => {
-                    let validated = self
-                        .strict
-                        .take()
-                        .ok_or(Error::Invalid(
-                            "encoded context view recovery commit invariant",
-                        ))?
-                        .finish()?;
-                    self.ready = Some(RecoveryObservation {
-                        raw: self.raw.clone(),
-                        groups: self.groups,
-                        validated: Some(validated),
-                        fault: None,
-                    });
+                    let phase = std::mem::replace(&mut self.phase, Phase::Finished);
+                    let Phase::Validate { strict, .. } = phase else {
+                        continue;
+                    };
+                    Ok(strict.finish()?)
                 }
                 Err(error) => {
                     if !matches!(
@@ -118,24 +117,24 @@ impl RecoveryContextReceiver {
                     let Some(raw) = strict.error_backing().cloned() else {
                         return Err(error);
                     };
-                    self.ready = Some(RecoveryObservation {
-                        raw: self.raw.clone(),
-                        groups: self.groups,
-                        validated: None,
-                        fault: Some(SourceProfileFault {
-                            error,
-                            raw,
-                            ordinal: None,
-                        }),
-                    });
-                    self.strict = None;
+                    Err(SourceProfileFault {
+                        error,
+                        raw,
+                        ordinal: None,
+                    })
                 }
-            }
+            };
+            self.phase = Phase::Ready(RecoveryObservation {
+                raw: self.raw.clone(),
+                groups: self.groups,
+                outcome,
+            });
         }
     }
-    pub(crate) fn finish(mut self) -> Result<RecoveryObservation> {
-        self.ready
-            .take()
-            .ok_or(Error::Invalid("encoded context view recovery not ready"))
+    pub(crate) fn finish(self) -> Result<RecoveryObservation> {
+        match self.phase {
+            Phase::Ready(observation) => Ok(observation),
+            _ => Err(Error::Invalid("encoded context view recovery not ready")),
+        }
     }
 }
