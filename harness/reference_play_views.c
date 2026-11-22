@@ -1,5 +1,6 @@
 /* Public FFmpeg operations for play views. */
 #include "reference_play_raw.h"
+#include "reference_playback_probe.h"
 
 int main(int argc, char **argv)
 {
@@ -8,7 +9,7 @@ int main(int argc, char **argv)
     const ViewDispatch operations[] = {
         {"views-smoke-", view_smoke_prepare},
         {"play-", play_raw_prepare},
-        {"facade-probe-", play_raw_prepare},
+        {"facade-probe-", playback_probe_prepare},
         {"any-ts-au-", play_raw_prepare},
         {"any-seek-", play_raw_prepare},
     };

@@ -1,0 +1,34 @@
+{
+  "schema": "triergon.codecs.workloads.v1",
+  "note": "Both workers load bytes before observation. During the operation both probe, demux the whole source, decode the selected streams, convert pictures to a 1920 by 1080 RGBA canvas, rematrix stereo s16 PCM, fold the outputs and release the operation state. Reference discovery obtains decoder configuration and reorder delay.",
+  "open_workloads": [],
+  "workloads": [
+    {
+      "id": "three-tracks",
+      "path": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "bytes": 14534,
+      "operation": "play",
+      "iterations": 1,
+      "origin": "authored-synthetic"
+    },
+    {
+      "id": "avc-aac-quicktime-reordered",
+      "path": "crates/playback/tests/fixtures/mp4/avc-aac-quicktime-reordered.mov",
+      "sha256": "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b",
+      "bytes": 66458,
+      "operation": "play",
+      "iterations": 1,
+      "origin": "authored-synthetic"
+    },
+    {
+      "id": "media-00",
+      "path": "crates/playback/tests/fixtures/hls/media-00.ts",
+      "sha256": "3409e83a9dfae77c7e61e87046575e1c240ed8aeea921245faae19152d576dcc",
+      "bytes": 22560,
+      "operation": "play",
+      "iterations": 1,
+      "origin": "authored-synthetic"
+    }
+  ]
+}

@@ -1,3 +1,5 @@
+mod probe;
+
 use std::ffi::OsString;
 use std::io::{Cursor, Write};
 
@@ -5,7 +7,7 @@ use triergon::mpegts::{AccessUnit, Packet};
 use triergon::{
     AnyPacket, AnyReader, Blocking, Budget, ContainerReader, Event, PacketInfo, Probe,
     RandomAccess, Rounding, SeekPolicy, SeekRequest, SourceCapabilities, SourceId, Time, TimeBase,
-    TrackId, TrackInfo,
+    TrackId,
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, fold_framed, signed};
 
@@ -41,10 +43,11 @@ fn native_clocks(packet: &impl PacketInfo) -> [u64; 3] {
 }
 
 fn access_units<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a>, String> {
-    let [size, "1"] = args else {
-        return Err("expected SIZE 1 for a single-program default reader".into());
+    let [size, program] = args else {
+        return Err("expected SIZE PROGRAM for a single-program default reader".into());
     };
     let (size, format) = transport_size(size)?;
+    let program: u16 = program.parse().map_err(|_| "invalid program")?;
     let pool = Budget::new(256 << 20).map_err(|error| error.to_string())?;
     Ok(Operation {
         name: "mpegts-access-unit-packets",
@@ -55,6 +58,9 @@ fn access_units<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a>, Str
                 let AnyPacket::MpegTs(packet) = packet else {
                     return Err("the facade returned a non-TS packet".into());
                 };
+                if packet.track_info().program() != program {
+                    return Err("the facade selected a different transport program".into());
+                }
                 let track = packet.track();
                 let reader = driver.reader();
                 let index = (0..reader.track_count())
@@ -252,6 +258,188 @@ fn transport_seek<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a>, S
     })
 }
 
+#[derive(Clone, Copy)]
+enum ContainerSeek {
+    Matroska {
+        ticks: i128,
+    },
+    Mp4 {
+        track: TrackId,
+        ticks: i128,
+        limit: usize,
+    },
+}
+
+fn container_seek<'a>(
+    input: &'a [u8],
+    format: Probe,
+    args: &[&str],
+) -> Result<Operation<'a>, String> {
+    let (selection, state) = match (format, args) {
+        (Probe::Matroska, [ticks, state]) => (
+            ContainerSeek::Matroska {
+                ticks: ticks.parse().map_err(|_| "invalid seek time")?,
+            },
+            *state,
+        ),
+        (Probe::Isobmff, [track, ticks, limit, state]) => (
+            ContainerSeek::Mp4 {
+                track: TrackId(track.parse().map_err(|_| "invalid track ID")?),
+                ticks: ticks.parse().map_err(|_| "invalid seek ticks")?,
+                limit: limit.parse().map_err(|_| "invalid packet count")?,
+            },
+            *state,
+        ),
+        _ => return Err("expected mkv TICKS STATE or mp4 TRACK TICKS COUNT STATE".into()),
+    };
+    let after_eof = match state {
+        "fresh" => false,
+        "after-eof" => true,
+        _ => return Err("expected fresh or after-eof".into()),
+    };
+    let pool = Budget::new(256 << 20).map_err(|error| error.to_string())?;
+    Ok(Operation {
+        name: "facade-container-seek",
+        run: Box::new(move |work, trace| {
+            let mut reader = reader(input, &pool, format)?;
+            reader.reset().map_err(|error| error.to_string())?;
+            let mut driver = Blocking::seekable(reader, Cursor::new(input), &pool);
+            if after_eof {
+                while driver
+                    .next_packet()
+                    .map_err(|error| error.to_string())?
+                    .is_some()
+                {}
+            } else {
+                driver.next_packet().map_err(|error| error.to_string())?;
+            }
+            let (track, base, ticks, policy, limit) = match selection {
+                ContainerSeek::Matroska { ticks } => {
+                    let reader = driver.reader();
+                    let track = (0..reader.track_count())
+                        .filter_map(|index| reader.track(index))
+                        .find(|track| track.kind() == triergon::MediaKind::Video)
+                        .ok_or("no video seek track")?;
+                    (
+                        track.id(),
+                        TimeBase::NANOSECONDS,
+                        ticks,
+                        SeekPolicy::PlaybackPreroll,
+                        usize::MAX,
+                    )
+                }
+                ContainerSeek::Mp4 {
+                    track,
+                    ticks,
+                    limit,
+                } => {
+                    let AnyReader::Isobmff(reader) = driver.reader() else {
+                        return Err("expected an ISO BMFF reader".into());
+                    };
+                    let media = reader
+                        .tracks()
+                        .iter()
+                        .find(|media| u64::from(media.header().track_id) == track.0)
+                        .ok_or("no selected ISO BMFF track")?;
+                    let base = media
+                        .header()
+                        .time_base()
+                        .map_err(|error| error.to_string())?;
+                    (track, base, ticks, SeekPolicy::PreviousRandomAccess, limit)
+                }
+            };
+            let target = Time::from_ticks(ticks, base).map_err(|error| error.to_string())?;
+            let request = SeekRequest {
+                track,
+                target,
+                policy,
+            };
+            driver.seek(request).map_err(|error| error.to_string())?;
+            container_suffix(&mut driver, request, base, limit, work, trace)
+        }),
+    })
+}
+
+fn container_suffix(
+    driver: &mut Blocking<AnyReader, Cursor<&[u8]>>,
+    request: SeekRequest,
+    base: TimeBase,
+    limit: usize,
+    work: &mut Work,
+    mut trace: Option<&mut dyn Write>,
+) -> Result<(), String> {
+    let mut receipt = false;
+    let mut packets = 0;
+    while packets < limit
+        && let Some(event) = driver.next_event().map_err(|error| error.to_string())?
+    {
+        match event {
+            Event::Seek(seek) if !receipt => {
+                if seek.requested != request.target {
+                    return Err("seek receipt changed its request".into());
+                }
+                let ticks = |time: Time| {
+                    time.to_ticks(base, Rounding::TowardZero)
+                        .map_err(|error| error.to_string())
+                };
+                let (requested, landing, discard) = (
+                    ticks(seek.requested)?,
+                    ticks(seek.landing)?,
+                    ticks(seek.discard_until)?,
+                );
+                work.record(3, &[requested as u64, landing as u64, discard as u64], &[]);
+                if let Some(trace) = &mut trace {
+                    writeln!(trace, "{{\"receipt\":[{requested},{landing},{discard}]}}")
+                        .map_err(|error| error.to_string())?;
+                }
+                receipt = true;
+            }
+            Event::Packet(packet) if receipt => {
+                let reader = driver.reader();
+                let stream = (0..reader.track_count())
+                    .find(|&i| {
+                        reader
+                            .track(i)
+                            .is_some_and(|track| track.id() == packet.track())
+                    })
+                    .ok_or("seek packet track is absent")?;
+                let [pts, dts, duration] = native_clocks(&packet);
+                let payload = packet.payload();
+                let sync = packet.random_access() == RandomAccess::Sync;
+                work.record(
+                    1,
+                    &[
+                        stream as u64,
+                        packet.track().0,
+                        pts,
+                        dts,
+                        duration,
+                        u64::from(sync),
+                    ],
+                    payload,
+                );
+                if let Some(trace) = &mut trace {
+                    let tick =
+                        |value: Option<i64>| value.map_or("null".into(), |tick| tick.to_string());
+                    writeln!(
+                        trace,
+                        "{{\"stream\":{stream},\"track\":{},\"pts\":{},\"dts\":{},\"duration\":{},\"key\":{sync},\"payload\":\"{}\"}}",
+                        packet.track().0, tick(packet.pts()), tick(packet.dts()), tick(packet.duration()),
+                        triergon_harness_protocol::hex(payload),
+                    ).map_err(|error| error.to_string())?;
+                }
+                packets += 1;
+            }
+            Event::Packet(_) => return Err("a packet preceded the facade seek receipt".into()),
+            _ => {}
+        }
+    }
+    if !receipt {
+        return Err("the facade did not publish a seek receipt".into());
+    }
+    Ok(())
+}
+
 pub(super) fn operation<'a>(
     prefix: &str,
     input: &'a [u8],
@@ -262,8 +450,11 @@ pub(super) fn operation<'a>(
         .map(|arg| arg.to_str().ok_or("expected UTF-8 arguments"))
         .collect::<Result<Vec<_>, _>>()?;
     match (prefix, args.as_slice()) {
+        ("facade-probe-", args) => probe::prepare(input, args),
         ("any-ts-au-" | "ts-au-", args) => access_units(input, args),
         ("ts-seek-", args) | ("any-seek-", ["ts", args @ ..]) => transport_seek(input, args),
+        ("any-seek-", ["mkv", args @ ..]) => container_seek(input, Probe::Matroska, args),
+        ("any-seek-", ["mp4", args @ ..]) => container_seek(input, Probe::Isobmff, args),
         _ => Err(format!(
             "usage: {prefix}{{fold,trace,memory}} FILE [ARG...] | {prefix}bench FILE ITERATIONS [ARG...]"
         )),

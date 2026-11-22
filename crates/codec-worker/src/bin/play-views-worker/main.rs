@@ -14,7 +14,9 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
     ("play-", raw::operation),
     ("facade-probe-", facade::operation),
     ("any-ts-au-", facade::operation),
+    ("ts-au-", facade::operation),
     ("any-seek-", facade::operation),
+    ("ts-seek-", facade::operation),
 ];
 
 #[cfg_attr(test, allow(dead_code))]

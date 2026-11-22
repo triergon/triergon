@@ -46,12 +46,16 @@ fn read_file(pool: &Budget, path: &Path) -> Result<Bytes> {
     bytes.freeze().map_err(|refused| refused.error)
 }
 
+pub(super) type TransportOpen =
+    fn(&Budget, SourceId, SourceCapabilities, Format) -> Result<AnyReader>;
+
 #[derive(Clone, Copy)]
 pub(super) struct Options {
     pub(super) canvas: Canvas,
     pub(super) format: Option<Format>,
     pub(super) video: Option<usize>,
     pub(super) audio: Option<usize>,
+    pub(super) transport: Option<TransportOpen>,
 }
 
 pub(super) trait Observer {
@@ -325,7 +329,13 @@ pub(super) fn play_with(
         framer: None,
     };
     if matches!(selected.format, Format::Ts(_)) {
-        let reader = AnyReader::open(&media, pool, id, caps)?;
+        let format = selected.format;
+        drop(selected);
+        let reader = if let Some(open) = opts.transport {
+            open(pool, id, caps, format)?
+        } else {
+            AnyReader::open(&media, pool, id, caps)?
+        };
         let mut driver = Blocking::seekable(reader, Cursor::new(media), pool);
         while let Some(packet) = driver.next_packet()? {
             let reader = driver.reader();
@@ -360,6 +370,7 @@ pub(super) fn play(media: &Path, subtitles: &Path, now_ms: i64) -> ExampleResult
             format: Some(Format::Matroska),
             video: None,
             audio: None,
+            transport: None,
         },
         &mut observer,
     )?;

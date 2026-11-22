@@ -83,6 +83,10 @@ can release it and retry the same pipe. Fixed signatures allocate only the bytes
 consumed. Longer elementary probes use one buffer. The sequential adapter
 releases its retained capacity after replaying the last byte.
 
+The [facade probe comparison](../../harness/features/facade-probe/contract.json)
+checks prefix verdicts, the format selected by both adapters and the bytes
+available again after rewinding or replay.
+
 ## Features and lower-level crates
 
 | Feature | Default | Module | Through `AnyReader` |
@@ -177,4 +181,12 @@ authored MP4 through `AnyReader`; `tests/any_reader_ogg.rs` and
 streams with their trims. `tests/blocking_probe.rs` checks short reads, interruptions,
 reader features, container precedence and budgeted prefix replay.
 `tests/play.rs` runs the example pipeline with the tracked AVC/AAC and ASS
-fixtures under plain `cargo test`. See [quality gates](../../docs/quality.md).
+fixtures under plain `cargo test`.
+
+The playback comparisons run the example's demux, framing and decode loop over
+Matroska, MP4 and MPEG-TS, checking packet fields and payloads, ordered RGBA
+pictures with presentation times, and stereo PCM. Matroska and MP4 use
+`Player`. MPEG-TS uses its source access-unit reader. The facade also has
+separate comparisons for strict MPEG-TS access units and seek delivery.
+See the [play corpus](../../harness/codecs/play-manifest.json) and
+[quality gates](../../docs/quality.md).

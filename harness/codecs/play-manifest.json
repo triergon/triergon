@@ -1,0 +1,527 @@
+{
+  "schema": "triergon.codecs.correctness-manifest.v1",
+  "reference": "ffmpeg-play-views-native",
+  "contract": [
+    "Probe and demux the full container and decode the chosen video and audio tracks through the facade example and the pinned FFmpeg 9.0.2 reference.",
+    "Matroska and MP4 use the playback engine packet view. MPEG-TS uses the facade source access-unit reader, because the transport playback engine does not supply that view.",
+    "Compare every RGBA canvas byte and each picture presentation timestamp in output order. Require identical stereo s16 sample counts and rates and apply the existing audio_device_path LSB bound.",
+    "Compare every packet in demux order by stream ordinal, time base, signed PTS, DTS, duration, key flag, byte length and payload MD5. Matroska packet ticks are expressed in nanoseconds. Compare differences in source and reference-derived clocks as open cases.",
+    "Use a 1920 by 1080 canvas. The 640 by 360 example canvas is outside this grade until there is pixel parity across the corpus.",
+    "Both workers use explicit stream ordinals for three-tracks.mkv. The fixture rights and inputs are inherited from the existing authored corpora.",
+    "The two private ATSC audio stream types use the declared ATSC namespace. The DVB E-AC-3 input uses its service profile."
+  ],
+  "vectors": [
+    {
+      "lane": "play-mkv",
+      "name": "three-tracks",
+      "path": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "rights": "authored-synthetic",
+      "tracks": [
+        0,
+        1
+      ]
+    },
+    {
+      "lane": "play-mkv",
+      "name": "avc-high-b",
+      "path": "harness/fixtures/playback/avc-high-b.mkv",
+      "sha256": "9eecf9c54905332e8da7dd31c78f8f3f38098f95cf3eb867d3152a7386931693",
+      "rights": "authored-synthetic"
+    },
+    {
+      "lane": "play-mkv",
+      "name": "hevc-b1",
+      "path": "harness/fixtures/playback/hevc-b1.mkv",
+      "sha256": "f70b123a68fb3da0683c5d7d9a9f5a07afbef996e7eb529e4eb7c0c323335f4f",
+      "rights": "authored-synthetic"
+    },
+    {
+      "lane": "play-mkv",
+      "name": "avc-seek",
+      "path": "harness/fixtures/playback/avc-seek.mkv",
+      "sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "rights": "authored-synthetic"
+    },
+    {
+      "lane": "play-mp4",
+      "name": "avc-aac-quicktime-surround",
+      "path": "crates/playback/tests/fixtures/mp4/avc-aac-quicktime-surround.mov",
+      "sha256": "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5",
+      "rights": "authored-synthetic",
+      "candidate_exit": 2
+    },
+    {
+      "lane": "play-mp4",
+      "name": "avc-aac-quicktime-reordered",
+      "path": "crates/playback/tests/fixtures/mp4/avc-aac-quicktime-reordered.mov",
+      "sha256": "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b",
+      "rights": "authored-synthetic",
+      "candidate_exit": 2
+    },
+    {
+      "lane": "play-mp4",
+      "name": "encoded-hevc-aac-front",
+      "path": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic"
+    },
+    {
+      "lane": "play-ts",
+      "name": "baseline-stereo",
+      "path": "crates/playback/tests/fixtures/hls/baseline-stereo.ts",
+      "sha256": "7aa124baf0dab938ac55b937726e381e8acf6d4f337f82cda6da0395db35eec9",
+      "rights": "authored-synthetic"
+    },
+    {
+      "lane": "play-ts",
+      "name": "media-00",
+      "path": "crates/playback/tests/fixtures/hls/media-00.ts",
+      "sha256": "3409e83a9dfae77c7e61e87046575e1c240ed8aeea921245faae19152d576dcc",
+      "rights": "authored-synthetic"
+    },
+    {
+      "lane": "play-ts",
+      "name": "replay-avc-ac3-00",
+      "path": "harness/fixtures/hls/replay-avc-ac3-00.ts",
+      "sha256": "7efdc50ca87d044af2af8bfe5afd1e26c25daeca0e948193bc7e180db11a2510",
+      "rights": "authored-synthetic",
+      "tracks": [
+        0,
+        1
+      ],
+      "namespace": "atsc"
+    },
+    {
+      "lane": "play-ts",
+      "name": "replay-avc-eac3-00",
+      "path": "harness/fixtures/hls/replay-avc-eac3-00.ts",
+      "sha256": "330ce3642fee3469a310400097b9889d751943d4185e754a160646eaf67ab133",
+      "rights": "authored-synthetic",
+      "tracks": [
+        0,
+        1
+      ],
+      "namespace": "atsc"
+    },
+    {
+      "lane": "play-ts",
+      "name": "dvb-hevc-eac3-32000",
+      "path": "harness/fixtures/hls/dvb-hevc-eac3-32000.ts",
+      "sha256": "67fbe16dea5d0466b122b69d4d03c46f2740080c5fa176fb4a0c3e4709e87969",
+      "rights": "authored-synthetic"
+    }
+  ],
+  "open_cases": [
+    "three-tracks",
+    "avc-high-b",
+    "hevc-b1",
+    "avc-seek",
+    "avc-aac-quicktime-surround",
+    "avc-aac-quicktime-reordered",
+    "encoded-hevc-aac-front",
+    "baseline-stereo",
+    "media-00",
+    "replay-avc-ac3-00",
+    "replay-avc-eac3-00",
+    "dvb-hevc-eac3-32000"
+  ],
+  "open_case_readings": {
+    "three-tracks": "Matroska CodecDelay and BlockDuration are source facts. The pipeline retains nanosecond clocks and discards 16 samples from the first selected AAC block. The native demuxer reports rounded clocks and its decode returns the complete first block.",
+    "avc-high-b": "Matroska DefaultDuration is in nanoseconds. The decoded canvases and presentation order match while the source durations or missing DTS differ from the native demuxer packets in Segment ticks.",
+    "hevc-b1": "Matroska DefaultDuration is in nanoseconds. The decoded canvases and presentation order match while the source durations or missing DTS differ from the native demuxer packets in Segment ticks.",
+    "avc-seek": "Matroska DefaultDuration is in nanoseconds. The decoded canvases and presentation order match while the source durations or missing DTS differ from the native demuxer packets in Segment ticks.",
+    "avc-aac-quicktime-surround": "ISO/IEC 14496-12 edit lists map media time to presentation time. The pipeline uses source media times. It also reaches an idle decode session before the full suffix where FFmpeg completes both streams.",
+    "avc-aac-quicktime-reordered": "ISO/IEC 14496-12 edit lists map media time to presentation time. The pipeline uses source media times. It also reaches an idle decode session before the full suffix where FFmpeg completes both streams.",
+    "encoded-hevc-aac-front": "The ISO BMFF sample rows match. The pipeline publishes no picture or PCM output on the supplied HEVC/AAC configuration. The reference decodes two pictures and two AAC frames, leaving the configuration-to-session seam open.",
+    "baseline-stereo": "H.222.0 PES headers carry selected PTS/DTS anchors. The source AU reader keeps unanchored clocks absent. The reference derives per-packet times and durations. The delivered RGBA and stereo PCM outputs match their numeric rules.",
+    "media-00": "H.222.0 PES headers carry selected PTS/DTS anchors. The source AU reader keeps unanchored clocks absent. The reference derives per-packet times and durations. The delivered RGBA and stereo PCM outputs match their numeric rules.",
+    "replay-avc-ac3-00": "H.222.0 PES headers and A/52 coded frames distinguish source clock anchors from derived timing. The strict AU reader and FFmpeg can report different packet clocks or order. The stereo PCM grade retains every sample.",
+    "replay-avc-eac3-00": "H.222.0 PES headers and A/52 coded frames distinguish source clock anchors from derived timing. The strict AU reader and FFmpeg can report different packet clocks or order. The stereo PCM grade retains every sample.",
+    "dvb-hevc-eac3-32000": "H.222.0 PES headers and A/52 coded frames distinguish source clock anchors from derived timing. The strict AU reader and FFmpeg can report different packet clocks or order. The stereo PCM grade retains every sample."
+  },
+  "observations": {
+    "three-tracks": {
+      "ours_rc": 0,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 8,
+        "pictures_ref": 8,
+        "pictures_equal": 8,
+        "bytes_ours": 66355200,
+        "bytes_ref": 66355200,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 48112,
+        "samples_ref": 48128,
+        "max_abs_lsb": 3823,
+        "differing_samples": 96216,
+        "ours_sha256": "6a772a71eaaa33c1909b762a9bf62b4ecfc80e3af3a89166c14506a31879385d",
+        "reference_sha256": "d02efcac1c040bb11fef4c51d042b3b3c2cd9e9ef924eea8fd4d6a6c2818864e"
+      },
+      "packets": {
+        "packets_ours": 101,
+        "packets_ref": 101,
+        "ours_sha256": "5f824107997f79ca6e665ccf2e283b0d88b8e2d2cfb3f366149a95707910b926",
+        "reference_sha256": "9d4237177163f23bf4ad3960d39a396612285efcf4cff64953acb27999550aef",
+        "first_diff": {
+          "index": 0,
+          "ours": "2 1/1000000000 -23219955 - 23219954 1 136 540c011093eb73a1cc2efbf841e43f03",
+          "reference": "2 1/1000000000 -23000000 -23000000 23000000 1 136 540c011093eb73a1cc2efbf841e43f03"
+        }
+      },
+      "timeline_equal": false
+    },
+    "avc-high-b": {
+      "ours_rc": 0,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 12,
+        "pictures_ref": 12,
+        "pictures_equal": 12,
+        "bytes_ours": 99532800,
+        "bytes_ref": 99532800,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 0,
+        "samples_ref": 0,
+        "max_abs_lsb": 0,
+        "differing_samples": 0,
+        "ours_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "reference_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "packets": {
+        "packets_ours": 12,
+        "packets_ref": 12,
+        "ours_sha256": "9209e1519af7b28943e1c923a0f5d3d9bf260a8fe92626597df32732947f500e",
+        "reference_sha256": "ec374490fe67e9610804520fcc026323dc62d11a91237f4f547ca9b3d94bbd88",
+        "first_diff": {
+          "index": 0,
+          "ours": "0 1/1000000000 0 - 41666666 1 1620 4c944ffabaafd043ecda2261ec3b4c23",
+          "reference": "0 1/1000000000 0 - 41000000 1 1620 4c944ffabaafd043ecda2261ec3b4c23"
+        }
+      },
+      "timeline_equal": true
+    },
+    "hevc-b1": {
+      "ours_rc": 0,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 12,
+        "pictures_ref": 12,
+        "pictures_equal": 12,
+        "bytes_ours": 99532800,
+        "bytes_ref": 99532800,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 0,
+        "samples_ref": 0,
+        "max_abs_lsb": 0,
+        "differing_samples": 0,
+        "ours_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "reference_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "packets": {
+        "packets_ours": 12,
+        "packets_ref": 12,
+        "ours_sha256": "631209b1b00df7d082757a751905ef82a39af900bcd13e09f4bf6ff419676640",
+        "reference_sha256": "9afa5d8515f7eb14e3e5da2b5035962b69780883f4deed1abbeebfc3acceadd4",
+        "first_diff": {
+          "index": 0,
+          "ours": "0 1/1000000000 0 - 41666666 1 805 b47628be5de3f8c432b170d5ab9a6216",
+          "reference": "0 1/1000000000 0 - 41000000 1 805 b47628be5de3f8c432b170d5ab9a6216"
+        }
+      },
+      "timeline_equal": true
+    },
+    "avc-seek": {
+      "ours_rc": 0,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 64,
+        "pictures_ref": 64,
+        "pictures_equal": 64,
+        "bytes_ours": 530841600,
+        "bytes_ref": 530841600,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 0,
+        "samples_ref": 0,
+        "max_abs_lsb": 0,
+        "differing_samples": 0,
+        "ours_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "reference_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "packets": {
+        "packets_ours": 64,
+        "packets_ref": 64,
+        "ours_sha256": "05bc44ae43af14eb10b860c33c87e7145476d1ffb934599daea247fdbf05869b",
+        "reference_sha256": "63138b40b9aaa73a43151a6ca644ec9640616f4e3466648dbcd639a17a2040b6",
+        "first_diff": {
+          "index": 0,
+          "ours": "0 1/1000000000 0 - 41666666 1 2070 b227cd107fc571f28bb040d92caabbfd",
+          "reference": "0 1/1000000000 0 - 41000000 1 2070 b227cd107fc571f28bb040d92caabbfd"
+        }
+      },
+      "timeline_equal": true
+    },
+    "avc-aac-quicktime-surround": {
+      "ours_rc": 2,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 0,
+        "pictures_ref": 100,
+        "pictures_equal": 0,
+        "bytes_ours": 0,
+        "bytes_ref": 829440000,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 0,
+        "samples_ref": 192000,
+        "max_abs_lsb": 0,
+        "differing_samples": 0,
+        "ours_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "reference_sha256": "ad88c733e08aa659b7504a7c868ca859bbf92317bb7f6c3075cb32c36e43aec0"
+      },
+      "packets": {
+        "packets_ours": 43,
+        "packets_ref": 289,
+        "ours_sha256": "e9f6b0c16c1436bafbc0dafb08df54e2635393c083a0eac7eef0599a657b117e",
+        "reference_sha256": "63bc2e5b032132e0f0e8d99907bb8d369832e03a04b67443f6f26ecdb6d14f1a",
+        "first_diff": {
+          "index": 0,
+          "ours": "1 1/48000 0 0 1024 1 364 48ff69a98c0cb0dc23a9e20a824c964c",
+          "reference": "1 1/48000 -1024 -1024 1024 1 364 48ff69a98c0cb0dc23a9e20a824c964c"
+        }
+      },
+      "timeline_equal": false,
+      "candidate_diagnostic": "decode session is idle"
+    },
+    "avc-aac-quicktime-reordered": {
+      "ours_rc": 2,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 0,
+        "pictures_ref": 100,
+        "pictures_equal": 0,
+        "bytes_ours": 0,
+        "bytes_ref": 829440000,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 0,
+        "samples_ref": 176400,
+        "max_abs_lsb": 0,
+        "differing_samples": 0,
+        "ours_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "reference_sha256": "60021ef9111742bc37459917a1f33d7e5d030eaff3fa5c3602db148104be5711"
+      },
+      "packets": {
+        "packets_ours": 62,
+        "packets_ref": 274,
+        "ours_sha256": "86a2288e525eb27a8e779a0ba9f0889aabbd7536903476027cac27cfbf147f03",
+        "reference_sha256": "47d109df27499b3fe136b1ccd3e721aec763877b63e5f82d2e9e19ca192d89ed",
+        "first_diff": {
+          "index": 0,
+          "ours": "0 1/12800 1024 0 512 1 1540 06a8516696b32a61f1cc5b3145fc7759",
+          "reference": "0 1/12800 0 -1024 512 1 1540 06a8516696b32a61f1cc5b3145fc7759"
+        }
+      },
+      "timeline_equal": false,
+      "candidate_diagnostic": "decode session is idle"
+    },
+    "encoded-hevc-aac-front": {
+      "ours_rc": 0,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 0,
+        "pictures_ref": 2,
+        "pictures_equal": 0,
+        "bytes_ours": 0,
+        "bytes_ref": 16588800,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 0,
+        "samples_ref": 2048,
+        "max_abs_lsb": 0,
+        "differing_samples": 0,
+        "ours_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "reference_sha256": "51195ad4a3dc60a6576484582ed3a2bbbbeb94a82e6b4309e37f5fed32d24fff"
+      },
+      "packets": {
+        "packets_ours": 4,
+        "packets_ref": 4,
+        "ours_sha256": "de1ee93dcb7e1e77f23f54232b778924e547ba8fd7593db0dd7fdc4485463f2e",
+        "reference_sha256": "de1ee93dcb7e1e77f23f54232b778924e547ba8fd7593db0dd7fdc4485463f2e",
+        "first_diff": null
+      },
+      "timeline_equal": false
+    },
+    "baseline-stereo": {
+      "ours_rc": 0,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 12,
+        "pictures_ref": 12,
+        "pictures_equal": 12,
+        "bytes_ours": 99532800,
+        "bytes_ref": 99532800,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 24576,
+        "samples_ref": 24576,
+        "max_abs_lsb": 1,
+        "differing_samples": 17,
+        "ours_sha256": "20d743c4be9d5ccd4757782cd3791c002a4b57ac6f955a896991a7004da4944d",
+        "reference_sha256": "ca9da2dbcdeda8b3ab919432d9f39aa0b07eeb85ad3db377a36741ccb81729fa"
+      },
+      "packets": {
+        "packets_ours": 36,
+        "packets_ref": 36,
+        "ours_sha256": "f01c163443c6fd3f73c1eab27f1880886975ed7b79f73e278911a09615f353b5",
+        "reference_sha256": "cba6506c87db2168a3529fb02de8f783d42c13e7c76108c3c1564460667272ec",
+        "first_diff": {
+          "index": 0,
+          "ours": "0 1/90000 128090 - - 1 1688 628899538779c0a18aeb47e8ad6cb860",
+          "reference": "0 1/90000 128090 128090 3750 1 1688 628899538779c0a18aeb47e8ad6cb860"
+        }
+      },
+      "timeline_equal": true
+    },
+    "media-00": {
+      "ours_rc": 0,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 60,
+        "pictures_ref": 60,
+        "pictures_equal": 60,
+        "bytes_ours": 497664000,
+        "bytes_ref": 497664000,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 87040,
+        "samples_ref": 87040,
+        "max_abs_lsb": 1,
+        "differing_samples": 28,
+        "ours_sha256": "bcd10eb510d9788492ee9b5bcdab90887890b8fe02ab3fca4a783a2fa3304cf0",
+        "reference_sha256": "e5e97d79f0fffcc9263553456e9608406f10cf22cc234924e039deb24f560716"
+      },
+      "packets": {
+        "packets_ours": 145,
+        "packets_ref": 145,
+        "ours_sha256": "3597d4eb455de5fbe46b624f50c2b9c141fa918448a5ec5aec033cc26147dfb3",
+        "reference_sha256": "b5be2ae4e92187b0fc57167116de1022d48e710a2bafcd434a2d57dfb58f2cd2",
+        "first_diff": {
+          "index": 0,
+          "ours": "0 1/90000 132006 126000 - 1 1502 14beb0ccd2120715c372b824208ac06c",
+          "reference": "0 1/90000 132006 126000 3003 1 1502 14beb0ccd2120715c372b824208ac06c"
+        }
+      },
+      "timeline_equal": true
+    },
+    "replay-avc-ac3-00": {
+      "ours_rc": 0,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 24,
+        "pictures_ref": 24,
+        "pictures_equal": 24,
+        "bytes_ours": 199065600,
+        "bytes_ref": 199065600,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 96768,
+        "samples_ref": 96768,
+        "max_abs_lsb": 1,
+        "differing_samples": 37,
+        "ours_sha256": "77c08ae0820abf90918ecf5f922db2afcdc5d472c55b5a259578794239f232a3",
+        "reference_sha256": "21f27a224509bc42ee744dcbe75978100e423fb9c8325c4ba3cedc0628ee7003"
+      },
+      "packets": {
+        "packets_ours": 87,
+        "packets_ref": 87,
+        "ours_sha256": "29fc99db30808af23152455a05dce7d4a44a01413e23e71c49df83f0ea835d72",
+        "reference_sha256": "aab667ac808fc3ebe38363bf1fea6570a77eff0d8c1bb8389e7f7ba4d9d98c90",
+        "first_diff": {
+          "index": 0,
+          "ours": "0 1/90000 126480 - - 1 1305 3cb9eb121874e3aaff5afc8dc872e150",
+          "reference": "0 1/90000 126480 126480 7500 1 1305 3cb9eb121874e3aaff5afc8dc872e150"
+        }
+      },
+      "timeline_equal": true
+    },
+    "replay-avc-eac3-00": {
+      "ours_rc": 0,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 24,
+        "pictures_ref": 24,
+        "pictures_equal": 24,
+        "bytes_ours": 199065600,
+        "bytes_ref": 199065600,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 96768,
+        "samples_ref": 96768,
+        "max_abs_lsb": 1,
+        "differing_samples": 38,
+        "ours_sha256": "d4a825d7a4cd0d405290ec0ce1a05cdba99d576d13ff03dda4102b2def2b6b15",
+        "reference_sha256": "80570f54f2465f7333796b4c066abf3fce81acfcc0ab9360aab5e77bbf20f652"
+      },
+      "packets": {
+        "packets_ours": 87,
+        "packets_ref": 87,
+        "ours_sha256": "3202b442245e66f6c195355f551b1bd50f92a59866dc0b86dbafd20617b1685b",
+        "reference_sha256": "abcf6580cd4439d626b9d2a567f0f408682c3bb3ab404185cba5e04ef247b7fe",
+        "first_diff": {
+          "index": 0,
+          "ours": "0 1/90000 126480 - - 1 1305 3cb9eb121874e3aaff5afc8dc872e150",
+          "reference": "0 1/90000 126480 126480 7500 1 1305 3cb9eb121874e3aaff5afc8dc872e150"
+        }
+      },
+      "timeline_equal": true
+    },
+    "dvb-hevc-eac3-32000": {
+      "ours_rc": 0,
+      "reference_rc": 0,
+      "video": {
+        "pictures_ours": 24,
+        "pictures_ref": 24,
+        "pictures_equal": 24,
+        "bytes_ours": 199065600,
+        "bytes_ref": 199065600,
+        "first_diff": null
+      },
+      "audio": {
+        "samples_ours": 64512,
+        "samples_ref": 64512,
+        "max_abs_lsb": 1,
+        "differing_samples": 11,
+        "ours_sha256": "db5c542d0206edd925629613374d51be01a8e5dd2c72a0cb2111ac6b522205ad",
+        "reference_sha256": "04bbb63b23387205155d5b2ccc01fa5a3af72488736d986fd77d1d10cfa59509"
+      },
+      "packets": {
+        "packets_ours": 66,
+        "packets_ref": 66,
+        "ours_sha256": "7efaf82626f502ee7872cacaae259e66bd2742bdf10119edef10631d64c381b4",
+        "reference_sha256": "35ec0cdf8bef2844bbb745cbaea3c2f5d216f85d69b801094bbd684ae69a6577",
+        "first_diff": {
+          "index": 0,
+          "ours": "1 1/90000 640530 - 4320 0 576 212f575d6320a7b4c4297e3a894432de",
+          "reference": "1 1/90000 640530 640530 4320 1 576 212f575d6320a7b4c4297e3a894432de"
+        }
+      },
+      "timeline_equal": true
+    }
+  }
+}

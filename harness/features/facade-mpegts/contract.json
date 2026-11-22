@@ -1,0 +1,2552 @@
+{
+  "schema": 1,
+  "id": "facade-mpegts",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "mpegts-access-unit-packets",
+  "candidate": "play-views-worker",
+  "worker_operation": "ts-au-",
+  "reference": "ffmpeg-formats-native",
+  "contract": [
+    "Open every single-entity default-limits case selected from mpegts-access-units through AnyReader::open. The sole media program is discovered by the facade.",
+    "Compare the strict AnyReader access-unit stream with the unchanged formats-profile MPEG-TS parser. Preserve source PTS, DTS and duration, PES stream ID, position and payload bytes in the MPEG-TS access-unit fold.",
+    "TS188 and M2TS192 positions refer to the start of the source carrier. The strict path folds no opaque continuity or unsupported PES fallback. Refusals and any difference from the compatibility stream remain explicit cases."
+  ],
+  "required_profiles": [
+    "ts188-basic",
+    "m2ts192-opaque-prefix",
+    "pes-header-every-byte",
+    "psi-header-every-byte",
+    "pes-multiple-ts",
+    "pes-unbounded-next-pusi",
+    "pes-unbounded-definitive-eof",
+    "pes-time-unknown",
+    "pts-wrap-forward",
+    "pts-reorder",
+    "pts-dts-common-epoch",
+    "pts-negative-against-dts",
+    "pts-half-wrap-ambiguous",
+    "cc-wrap-15-to-zero",
+    "cc-one-duplicate",
+    "cc-third-copy",
+    "cc-same-counter-changed-payload",
+    "cc-adaptation-only",
+    "cc-duplicate-pcr-update",
+    "cc-loss-mid-pes",
+    "cc-loss-clean-pusi",
+    "pcr-timeline-discontinuity",
+    "pcr-extension-preserved",
+    "pcr-extension-invalid",
+    "transport-tei",
+    "transport-scrambled",
+    "transport-afc-reserved",
+    "transport-adaptation-overrun",
+    "transport-null-pid",
+    "transport-partial-final-packet",
+    "transport-sync-loss",
+    "psi-crc-invalid",
+    "psi-pointer-overrun",
+    "psi-length-over-policy",
+    "psi-pending-not-current",
+    "pat-atomic-two-sections",
+    "pat-incomplete-version",
+    "pat-network-pid-not-track",
+    "psi-pointer-finishes-old-starts-new",
+    "psi-two-sections-one-payload",
+    "pmt-version-wrap-retypes-pid",
+    "pmt-opaque-language-descriptors",
+    "pmt-descriptor-overrun",
+    "pmt-multi-section-forbidden",
+    "psi-stuffing-tail-invalid",
+    "psi-truncated-eof",
+    "carriage-ac3-dvb",
+    "carriage-eac3-dvb",
+    "carriage-ac3-direct",
+    "carriage-eac3-direct",
+    "carriage-aac-adts-direct",
+    "carriage-aac-latm-direct",
+    "carriage-hevc-direct",
+    "pes-timestamp-marker",
+    "pes-forbidden-time-flags",
+    "pes-optional-header-overrun",
+    "pes-start-prefix-invalid",
+    "pes-finite-truncated-eof",
+    "pes-finite-extra-payload",
+    "pes-audio-zero-length-invalid",
+    "elementary-bytes-cross-pes",
+    "pat-pointer-then-clean-pusi",
+    "pmt-pointer-then-clean-pusi",
+    "di-continuous-pes-payload",
+    "di-continuous-pes-header",
+    "di-continuous-adaptation-only",
+    "di-duplicate-complete",
+    "di-duplicate-start",
+    "di-continuous-pat",
+    "di-continuous-pmt",
+    "partial-start-duplicate",
+    "partial-middle-duplicate",
+    "interleaved-other-pid-duplicate",
+    "m2ts-prefix-only-duplicate",
+    "same-content-new-counters",
+    "loss-then-clean-pusi",
+    "loss-at-clean-pusi",
+    "opcr-change-is-not-duplicate",
+    "third-middle-copy-then-clean",
+    "opcr-without-pcr-invalid",
+    "duplicate-middle-low-occupancy-finite",
+    "duplicate-middle-low-occupancy-unbounded",
+    "finite-continuation-body-400",
+    "finite-continuation-body-401",
+    "finite-continuation-body-408",
+    "finite-continuation-body-409",
+    "finite-continuation-body-414",
+    "finite-continuation-body-415",
+    "au-avc-one",
+    "au-avc-multiple-per-pes",
+    "au-avc-header-across-pes",
+    "au-avc-body-across-pes",
+    "au-avc-header-only-eof",
+    "au-avc-final-au-at-eof",
+    "au-avc-truncated-final",
+    "au-avc-missing-clocks",
+    "au-avc-pts-dts",
+    "au-avc-clock-wrap",
+    "au-avc-m2ts192",
+    "au-hevc-one",
+    "au-hevc-multiple-per-pes",
+    "au-hevc-header-across-pes",
+    "au-hevc-body-across-pes",
+    "au-hevc-header-only-eof",
+    "au-hevc-final-au-at-eof",
+    "au-hevc-truncated-final",
+    "au-hevc-missing-clocks",
+    "au-hevc-pts-dts",
+    "au-hevc-clock-wrap",
+    "au-hevc-m2ts192",
+    "au-adts-aac-lc-one",
+    "au-adts-aac-lc-multiple-per-pes",
+    "au-adts-aac-lc-header-across-pes",
+    "au-adts-aac-lc-body-across-pes",
+    "au-adts-aac-lc-header-only-eof",
+    "au-adts-aac-lc-final-au-at-eof",
+    "au-adts-aac-lc-truncated-final",
+    "au-adts-aac-lc-missing-clocks",
+    "au-adts-aac-lc-pts-dts",
+    "au-adts-aac-lc-clock-wrap",
+    "au-adts-aac-lc-m2ts192",
+    "au-adts-aac-lc-two-opaque-pes",
+    "au-adts-aac-lc-opaque-then-coded",
+    "au-adts-aac-lc-coded-then-opaque",
+    "au-adts-aac-lc-opaque-prefix-in-pes",
+    "au-adts-aac-lc-opaque-suffix-in-pes",
+    "au-adts-aac-lc-recover-pat-pointer",
+    "au-adts-aac-lc-recover-pmt-pointer",
+    "au-latm-aac-lc-three-frames-in-pes",
+    "au-latm-aac-lc-header-across-pes",
+    "au-latm-aac-lc-opaque-prefix-in-pes",
+    "au-latm-aac-lc-opaque-then-coded",
+    "au-latm-aac-lc-coded-then-opaque",
+    "au-latm-aac-lc-two-opaque-pes",
+    "au-latm-aac-lc-truncated-envelope",
+    "au-latm-aac-lc-empty-envelope",
+    "au-adts-aac-lc-unbounded-at-eof",
+    "au-adts-aac-lc-unbounded-before-pes",
+    "au-adts-aac-lc-unbounded-split-frame",
+    "au-adts-aac-lc-unbounded-opaque-prefix",
+    "au-mpeg1-layer1-multiple-per-pes",
+    "au-mpeg1-layer1-header-across-pes",
+    "au-mpeg1-layer1-44100-multiple-per-pes",
+    "au-mpeg1-layer1-44100-header-across-pes",
+    "au-mpeg1-layer2-multiple-per-pes",
+    "au-mpeg1-layer2-header-across-pes",
+    "au-mpeg2-layer2-multiple-per-pes",
+    "au-mpeg2-layer2-header-across-pes",
+    "au-mpeg2-layer3-multiple-per-pes",
+    "au-mpeg2-layer3-header-across-pes"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "ts188-basic",
+        "m2ts192-opaque-prefix",
+        "pes-header-every-byte",
+        "psi-header-every-byte",
+        "pes-multiple-ts",
+        "pes-unbounded-next-pusi",
+        "pes-unbounded-definitive-eof",
+        "pes-time-unknown",
+        "pts-wrap-forward",
+        "pts-reorder",
+        "pts-dts-common-epoch",
+        "pts-negative-against-dts",
+        "pts-half-wrap-ambiguous",
+        "cc-wrap-15-to-zero",
+        "cc-one-duplicate",
+        "cc-third-copy",
+        "cc-same-counter-changed-payload",
+        "cc-adaptation-only",
+        "cc-duplicate-pcr-update",
+        "cc-loss-mid-pes",
+        "cc-loss-clean-pusi",
+        "pcr-timeline-discontinuity",
+        "pcr-extension-preserved",
+        "pcr-extension-invalid",
+        "transport-tei",
+        "transport-scrambled",
+        "transport-afc-reserved",
+        "transport-adaptation-overrun",
+        "transport-null-pid",
+        "transport-partial-final-packet",
+        "transport-sync-loss",
+        "psi-crc-invalid",
+        "psi-pointer-overrun",
+        "psi-length-over-policy",
+        "psi-pending-not-current",
+        "pat-atomic-two-sections",
+        "pat-incomplete-version",
+        "pat-network-pid-not-track",
+        "psi-pointer-finishes-old-starts-new",
+        "psi-two-sections-one-payload",
+        "pmt-version-wrap-retypes-pid",
+        "pmt-opaque-language-descriptors",
+        "pmt-descriptor-overrun",
+        "pmt-multi-section-forbidden",
+        "psi-stuffing-tail-invalid",
+        "psi-truncated-eof",
+        "carriage-ac3-dvb",
+        "carriage-eac3-dvb",
+        "carriage-ac3-direct",
+        "carriage-eac3-direct",
+        "carriage-aac-adts-direct",
+        "carriage-aac-latm-direct",
+        "carriage-hevc-direct",
+        "pes-timestamp-marker",
+        "pes-forbidden-time-flags",
+        "pes-optional-header-overrun",
+        "pes-start-prefix-invalid",
+        "pes-finite-truncated-eof",
+        "pes-finite-extra-payload",
+        "pes-audio-zero-length-invalid",
+        "elementary-bytes-cross-pes",
+        "pat-pointer-then-clean-pusi",
+        "pmt-pointer-then-clean-pusi",
+        "di-continuous-pes-payload",
+        "di-continuous-pes-header",
+        "di-continuous-adaptation-only",
+        "di-duplicate-complete",
+        "di-duplicate-start",
+        "di-continuous-pat",
+        "di-continuous-pmt",
+        "partial-start-duplicate",
+        "partial-middle-duplicate",
+        "interleaved-other-pid-duplicate",
+        "m2ts-prefix-only-duplicate",
+        "same-content-new-counters",
+        "loss-then-clean-pusi",
+        "loss-at-clean-pusi",
+        "opcr-change-is-not-duplicate",
+        "third-middle-copy-then-clean",
+        "opcr-without-pcr-invalid",
+        "duplicate-middle-low-occupancy-finite",
+        "duplicate-middle-low-occupancy-unbounded",
+        "finite-continuation-body-400",
+        "finite-continuation-body-401",
+        "finite-continuation-body-408",
+        "finite-continuation-body-409",
+        "finite-continuation-body-414",
+        "finite-continuation-body-415",
+        "au-avc-one",
+        "au-avc-multiple-per-pes",
+        "au-avc-header-across-pes",
+        "au-avc-body-across-pes",
+        "au-avc-header-only-eof",
+        "au-avc-final-au-at-eof",
+        "au-avc-truncated-final",
+        "au-avc-missing-clocks",
+        "au-avc-pts-dts",
+        "au-avc-clock-wrap",
+        "au-avc-m2ts192",
+        "au-hevc-one",
+        "au-hevc-multiple-per-pes",
+        "au-hevc-header-across-pes",
+        "au-hevc-body-across-pes",
+        "au-hevc-header-only-eof",
+        "au-hevc-final-au-at-eof",
+        "au-hevc-truncated-final",
+        "au-hevc-missing-clocks",
+        "au-hevc-pts-dts",
+        "au-hevc-clock-wrap",
+        "au-hevc-m2ts192",
+        "au-adts-aac-lc-one",
+        "au-adts-aac-lc-multiple-per-pes",
+        "au-adts-aac-lc-header-across-pes",
+        "au-adts-aac-lc-body-across-pes",
+        "au-adts-aac-lc-header-only-eof",
+        "au-adts-aac-lc-final-au-at-eof",
+        "au-adts-aac-lc-truncated-final",
+        "au-adts-aac-lc-missing-clocks",
+        "au-adts-aac-lc-pts-dts",
+        "au-adts-aac-lc-clock-wrap",
+        "au-adts-aac-lc-m2ts192",
+        "au-adts-aac-lc-two-opaque-pes",
+        "au-adts-aac-lc-opaque-then-coded",
+        "au-adts-aac-lc-coded-then-opaque",
+        "au-adts-aac-lc-opaque-prefix-in-pes",
+        "au-adts-aac-lc-opaque-suffix-in-pes",
+        "au-adts-aac-lc-recover-pat-pointer",
+        "au-adts-aac-lc-recover-pmt-pointer",
+        "au-latm-aac-lc-three-frames-in-pes",
+        "au-latm-aac-lc-header-across-pes",
+        "au-latm-aac-lc-opaque-prefix-in-pes",
+        "au-latm-aac-lc-opaque-then-coded",
+        "au-latm-aac-lc-coded-then-opaque",
+        "au-latm-aac-lc-two-opaque-pes",
+        "au-latm-aac-lc-truncated-envelope",
+        "au-latm-aac-lc-empty-envelope",
+        "au-adts-aac-lc-unbounded-at-eof",
+        "au-adts-aac-lc-unbounded-before-pes",
+        "au-adts-aac-lc-unbounded-split-frame",
+        "au-adts-aac-lc-unbounded-opaque-prefix",
+        "au-mpeg1-layer1-multiple-per-pes",
+        "au-mpeg1-layer1-header-across-pes",
+        "au-mpeg1-layer1-44100-multiple-per-pes",
+        "au-mpeg1-layer1-44100-header-across-pes",
+        "au-mpeg1-layer2-multiple-per-pes",
+        "au-mpeg1-layer2-header-across-pes",
+        "au-mpeg2-layer2-multiple-per-pes",
+        "au-mpeg2-layer2-header-across-pes",
+        "au-mpeg2-layer3-multiple-per-pes",
+        "au-mpeg2-layer3-header-across-pes"
+      ],
+      "cause": "Paired runtime, peak live heap and total RSS need isolated AArch64 and ARMv7 gate hosts."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "ts188-basic",
+        "m2ts192-opaque-prefix",
+        "pes-header-every-byte",
+        "psi-header-every-byte",
+        "pes-multiple-ts",
+        "pes-unbounded-next-pusi",
+        "pes-unbounded-definitive-eof",
+        "pes-time-unknown",
+        "pts-wrap-forward",
+        "pts-reorder",
+        "pts-dts-common-epoch",
+        "pts-negative-against-dts",
+        "pts-half-wrap-ambiguous",
+        "cc-wrap-15-to-zero",
+        "cc-one-duplicate",
+        "cc-third-copy",
+        "cc-same-counter-changed-payload",
+        "cc-adaptation-only",
+        "cc-duplicate-pcr-update",
+        "cc-loss-mid-pes",
+        "cc-loss-clean-pusi",
+        "pcr-timeline-discontinuity",
+        "pcr-extension-preserved",
+        "pcr-extension-invalid",
+        "transport-tei",
+        "transport-scrambled",
+        "transport-afc-reserved",
+        "transport-adaptation-overrun",
+        "transport-null-pid",
+        "transport-partial-final-packet",
+        "transport-sync-loss",
+        "psi-crc-invalid",
+        "psi-pointer-overrun",
+        "psi-length-over-policy",
+        "psi-pending-not-current",
+        "pat-atomic-two-sections",
+        "pat-incomplete-version",
+        "pat-network-pid-not-track",
+        "psi-pointer-finishes-old-starts-new",
+        "psi-two-sections-one-payload",
+        "pmt-version-wrap-retypes-pid",
+        "pmt-opaque-language-descriptors",
+        "pmt-descriptor-overrun",
+        "pmt-multi-section-forbidden",
+        "psi-stuffing-tail-invalid",
+        "psi-truncated-eof",
+        "carriage-ac3-dvb",
+        "carriage-eac3-dvb",
+        "carriage-ac3-direct",
+        "carriage-eac3-direct",
+        "carriage-aac-adts-direct",
+        "carriage-aac-latm-direct",
+        "carriage-hevc-direct",
+        "pes-timestamp-marker",
+        "pes-forbidden-time-flags",
+        "pes-optional-header-overrun",
+        "pes-start-prefix-invalid",
+        "pes-finite-truncated-eof",
+        "pes-finite-extra-payload",
+        "pes-audio-zero-length-invalid",
+        "elementary-bytes-cross-pes",
+        "pat-pointer-then-clean-pusi",
+        "pmt-pointer-then-clean-pusi",
+        "di-continuous-pes-payload",
+        "di-continuous-pes-header",
+        "di-continuous-adaptation-only",
+        "di-duplicate-complete",
+        "di-duplicate-start",
+        "di-continuous-pat",
+        "di-continuous-pmt",
+        "partial-start-duplicate",
+        "partial-middle-duplicate",
+        "interleaved-other-pid-duplicate",
+        "m2ts-prefix-only-duplicate",
+        "same-content-new-counters",
+        "loss-then-clean-pusi",
+        "loss-at-clean-pusi",
+        "opcr-change-is-not-duplicate",
+        "third-middle-copy-then-clean",
+        "opcr-without-pcr-invalid",
+        "duplicate-middle-low-occupancy-finite",
+        "duplicate-middle-low-occupancy-unbounded",
+        "finite-continuation-body-400",
+        "finite-continuation-body-401",
+        "finite-continuation-body-408",
+        "finite-continuation-body-409",
+        "finite-continuation-body-414",
+        "finite-continuation-body-415",
+        "au-avc-one",
+        "au-avc-multiple-per-pes",
+        "au-avc-header-across-pes",
+        "au-avc-body-across-pes",
+        "au-avc-header-only-eof",
+        "au-avc-final-au-at-eof",
+        "au-avc-truncated-final",
+        "au-avc-missing-clocks",
+        "au-avc-pts-dts",
+        "au-avc-clock-wrap",
+        "au-avc-m2ts192",
+        "au-hevc-one",
+        "au-hevc-multiple-per-pes",
+        "au-hevc-header-across-pes",
+        "au-hevc-body-across-pes",
+        "au-hevc-header-only-eof",
+        "au-hevc-final-au-at-eof",
+        "au-hevc-truncated-final",
+        "au-hevc-missing-clocks",
+        "au-hevc-pts-dts",
+        "au-hevc-clock-wrap",
+        "au-hevc-m2ts192",
+        "au-adts-aac-lc-one",
+        "au-adts-aac-lc-multiple-per-pes",
+        "au-adts-aac-lc-header-across-pes",
+        "au-adts-aac-lc-body-across-pes",
+        "au-adts-aac-lc-header-only-eof",
+        "au-adts-aac-lc-final-au-at-eof",
+        "au-adts-aac-lc-truncated-final",
+        "au-adts-aac-lc-missing-clocks",
+        "au-adts-aac-lc-pts-dts",
+        "au-adts-aac-lc-clock-wrap",
+        "au-adts-aac-lc-m2ts192",
+        "au-adts-aac-lc-two-opaque-pes",
+        "au-adts-aac-lc-opaque-then-coded",
+        "au-adts-aac-lc-coded-then-opaque",
+        "au-adts-aac-lc-opaque-prefix-in-pes",
+        "au-adts-aac-lc-opaque-suffix-in-pes",
+        "au-adts-aac-lc-recover-pat-pointer",
+        "au-adts-aac-lc-recover-pmt-pointer",
+        "au-latm-aac-lc-three-frames-in-pes",
+        "au-latm-aac-lc-header-across-pes",
+        "au-latm-aac-lc-opaque-prefix-in-pes",
+        "au-latm-aac-lc-opaque-then-coded",
+        "au-latm-aac-lc-coded-then-opaque",
+        "au-latm-aac-lc-two-opaque-pes",
+        "au-latm-aac-lc-truncated-envelope",
+        "au-latm-aac-lc-empty-envelope",
+        "au-adts-aac-lc-unbounded-at-eof",
+        "au-adts-aac-lc-unbounded-before-pes",
+        "au-adts-aac-lc-unbounded-split-frame",
+        "au-adts-aac-lc-unbounded-opaque-prefix",
+        "au-mpeg1-layer1-multiple-per-pes",
+        "au-mpeg1-layer1-header-across-pes",
+        "au-mpeg1-layer1-44100-multiple-per-pes",
+        "au-mpeg1-layer1-44100-header-across-pes",
+        "au-mpeg1-layer2-multiple-per-pes",
+        "au-mpeg1-layer2-header-across-pes",
+        "au-mpeg2-layer2-multiple-per-pes",
+        "au-mpeg2-layer2-header-across-pes",
+        "au-mpeg2-layer3-multiple-per-pes",
+        "au-mpeg2-layer3-header-across-pes"
+      ],
+      "cause": "Paired runtime, peak live heap and total RSS need isolated AArch64 and ARMv7 gate hosts."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "ts188-basic",
+        "m2ts192-opaque-prefix",
+        "pes-header-every-byte",
+        "psi-header-every-byte",
+        "pes-multiple-ts",
+        "pes-unbounded-next-pusi",
+        "pes-unbounded-definitive-eof",
+        "pes-time-unknown",
+        "pts-wrap-forward",
+        "pts-reorder",
+        "pts-dts-common-epoch",
+        "pts-negative-against-dts",
+        "pts-half-wrap-ambiguous",
+        "cc-wrap-15-to-zero",
+        "cc-one-duplicate",
+        "cc-third-copy",
+        "cc-same-counter-changed-payload",
+        "cc-adaptation-only",
+        "cc-duplicate-pcr-update",
+        "cc-loss-mid-pes",
+        "cc-loss-clean-pusi",
+        "pcr-timeline-discontinuity",
+        "pcr-extension-preserved",
+        "pcr-extension-invalid",
+        "transport-tei",
+        "transport-scrambled",
+        "transport-afc-reserved",
+        "transport-adaptation-overrun",
+        "transport-null-pid",
+        "transport-partial-final-packet",
+        "transport-sync-loss",
+        "psi-crc-invalid",
+        "psi-pointer-overrun",
+        "psi-length-over-policy",
+        "psi-pending-not-current",
+        "pat-atomic-two-sections",
+        "pat-incomplete-version",
+        "pat-network-pid-not-track",
+        "psi-pointer-finishes-old-starts-new",
+        "psi-two-sections-one-payload",
+        "pmt-version-wrap-retypes-pid",
+        "pmt-opaque-language-descriptors",
+        "pmt-descriptor-overrun",
+        "pmt-multi-section-forbidden",
+        "psi-stuffing-tail-invalid",
+        "psi-truncated-eof",
+        "carriage-ac3-dvb",
+        "carriage-eac3-dvb",
+        "carriage-ac3-direct",
+        "carriage-eac3-direct",
+        "carriage-aac-adts-direct",
+        "carriage-aac-latm-direct",
+        "carriage-hevc-direct",
+        "pes-timestamp-marker",
+        "pes-forbidden-time-flags",
+        "pes-optional-header-overrun",
+        "pes-start-prefix-invalid",
+        "pes-finite-truncated-eof",
+        "pes-finite-extra-payload",
+        "pes-audio-zero-length-invalid",
+        "elementary-bytes-cross-pes",
+        "pat-pointer-then-clean-pusi",
+        "pmt-pointer-then-clean-pusi",
+        "di-continuous-pes-payload",
+        "di-continuous-pes-header",
+        "di-continuous-adaptation-only",
+        "di-duplicate-complete",
+        "di-duplicate-start",
+        "di-continuous-pat",
+        "di-continuous-pmt",
+        "partial-start-duplicate",
+        "partial-middle-duplicate",
+        "interleaved-other-pid-duplicate",
+        "m2ts-prefix-only-duplicate",
+        "same-content-new-counters",
+        "loss-then-clean-pusi",
+        "loss-at-clean-pusi",
+        "opcr-change-is-not-duplicate",
+        "third-middle-copy-then-clean",
+        "opcr-without-pcr-invalid",
+        "duplicate-middle-low-occupancy-finite",
+        "duplicate-middle-low-occupancy-unbounded",
+        "finite-continuation-body-400",
+        "finite-continuation-body-401",
+        "finite-continuation-body-408",
+        "finite-continuation-body-409",
+        "finite-continuation-body-414",
+        "finite-continuation-body-415",
+        "au-avc-one",
+        "au-avc-multiple-per-pes",
+        "au-avc-header-across-pes",
+        "au-avc-body-across-pes",
+        "au-avc-header-only-eof",
+        "au-avc-final-au-at-eof",
+        "au-avc-truncated-final",
+        "au-avc-missing-clocks",
+        "au-avc-pts-dts",
+        "au-avc-clock-wrap",
+        "au-avc-m2ts192",
+        "au-hevc-one",
+        "au-hevc-multiple-per-pes",
+        "au-hevc-header-across-pes",
+        "au-hevc-body-across-pes",
+        "au-hevc-header-only-eof",
+        "au-hevc-final-au-at-eof",
+        "au-hevc-truncated-final",
+        "au-hevc-missing-clocks",
+        "au-hevc-pts-dts",
+        "au-hevc-clock-wrap",
+        "au-hevc-m2ts192",
+        "au-adts-aac-lc-one",
+        "au-adts-aac-lc-multiple-per-pes",
+        "au-adts-aac-lc-header-across-pes",
+        "au-adts-aac-lc-body-across-pes",
+        "au-adts-aac-lc-header-only-eof",
+        "au-adts-aac-lc-final-au-at-eof",
+        "au-adts-aac-lc-truncated-final",
+        "au-adts-aac-lc-missing-clocks",
+        "au-adts-aac-lc-pts-dts",
+        "au-adts-aac-lc-clock-wrap",
+        "au-adts-aac-lc-m2ts192",
+        "au-adts-aac-lc-two-opaque-pes",
+        "au-adts-aac-lc-opaque-then-coded",
+        "au-adts-aac-lc-coded-then-opaque",
+        "au-adts-aac-lc-opaque-prefix-in-pes",
+        "au-adts-aac-lc-opaque-suffix-in-pes",
+        "au-adts-aac-lc-recover-pat-pointer",
+        "au-adts-aac-lc-recover-pmt-pointer",
+        "au-latm-aac-lc-three-frames-in-pes",
+        "au-latm-aac-lc-header-across-pes",
+        "au-latm-aac-lc-opaque-prefix-in-pes",
+        "au-latm-aac-lc-opaque-then-coded",
+        "au-latm-aac-lc-coded-then-opaque",
+        "au-latm-aac-lc-two-opaque-pes",
+        "au-latm-aac-lc-truncated-envelope",
+        "au-latm-aac-lc-empty-envelope",
+        "au-adts-aac-lc-unbounded-at-eof",
+        "au-adts-aac-lc-unbounded-before-pes",
+        "au-adts-aac-lc-unbounded-split-frame",
+        "au-adts-aac-lc-unbounded-opaque-prefix",
+        "au-mpeg1-layer1-multiple-per-pes",
+        "au-mpeg1-layer1-header-across-pes",
+        "au-mpeg1-layer1-44100-multiple-per-pes",
+        "au-mpeg1-layer1-44100-header-across-pes",
+        "au-mpeg1-layer2-multiple-per-pes",
+        "au-mpeg1-layer2-header-across-pes",
+        "au-mpeg2-layer2-multiple-per-pes",
+        "au-mpeg2-layer2-header-across-pes",
+        "au-mpeg2-layer3-multiple-per-pes",
+        "au-mpeg2-layer3-header-across-pes"
+      ],
+      "cause": "Paired runtime, peak live heap and total RSS need isolated AArch64 and ARMv7 gate hosts."
+    }
+  ],
+  "pending_module_requirements": [
+    "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+    "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+    "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+    "H.222.0 permits more than one PAT program. The facade requires exactly one media program and the reference is told to select program 1.",
+    "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+    "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+    "An unfinished coded audio frame at EOF has no complete access unit under ISO/IEC 14496-3. The strict reader returns truncation while the native parser exposes the remaining fragment."
+  ],
+  "open_cases": [
+    {
+      "id": "ts188-basic",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "m2ts192-opaque-prefix",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 8637207689052002347
+      }
+    },
+    {
+      "id": "pes-header-every-byte",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "psi-header-every-byte",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 9921810301599277183
+      }
+    },
+    {
+      "id": "pes-multiple-ts",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 512,
+        "digest": 15463357684512389673
+      }
+    },
+    {
+      "id": "pes-unbounded-next-pusi",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 31,
+        "digest": 259831140731694758
+      }
+    },
+    {
+      "id": "pes-unbounded-definitive-eof",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "pes-time-unknown",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 5189187993285138615
+      }
+    },
+    {
+      "id": "pts-wrap-forward",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 16990955868162189420
+      }
+    },
+    {
+      "id": "pts-reorder",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 16520777674330161996
+      }
+    },
+    {
+      "id": "pts-dts-common-epoch",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 17220451788516813700
+      }
+    },
+    {
+      "id": "pts-negative-against-dts",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 9514069927527362964
+      }
+    },
+    {
+      "id": "pts-half-wrap-ambiguous",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 17174552604445888844
+      }
+    },
+    {
+      "id": "cc-wrap-15-to-zero",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 2,
+        "digest": 16520777674330161996
+      }
+    },
+    {
+      "id": "cc-one-duplicate",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 54,
+        "digest": 721451836577352255
+      }
+    },
+    {
+      "id": "cc-third-copy",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 81,
+        "digest": 10013462900046159905
+      }
+    },
+    {
+      "id": "cc-same-counter-changed-payload",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 36,
+        "digest": 14886647742272178221
+      }
+    },
+    {
+      "id": "cc-adaptation-only",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 9089964102301322958
+      }
+    },
+    {
+      "id": "cc-duplicate-pcr-update",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 54,
+        "digest": 721451836577352255
+      }
+    },
+    {
+      "id": "cc-loss-mid-pes",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 354,
+        "digest": 8524302181987922236
+      }
+    },
+    {
+      "id": "cc-loss-clean-pusi",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 9089964102301322958
+      }
+    },
+    {
+      "id": "pcr-timeline-discontinuity",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 30,
+        "digest": 1602270805323916750
+      }
+    },
+    {
+      "id": "pcr-extension-preserved",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "pcr-extension-invalid",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "transport-tei",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "transport-scrambled",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "transport-null-pid",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "transport-partial-final-packet",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "transport-sync-loss",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "psi-crc-invalid",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "psi-pointer-overrun",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "psi-length-over-policy",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "psi-pending-not-current",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "pat-atomic-two-sections",
+      "requirement": "H.222.0 permits more than one PAT program. The facade requires exactly one media program and the reference is told to select program 1.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: segment PAT has multiple media programs"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "pat-incomplete-version",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "pat-network-pid-not-track",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "psi-pointer-finishes-old-starts-new",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "psi-two-sections-one-payload",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "pmt-opaque-language-descriptors",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "pmt-descriptor-overrun",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "pmt-multi-section-forbidden",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "psi-stuffing-tail-invalid",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "psi-truncated-eof",
+      "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
+      "candidate": {
+        "exit": 2,
+        "error": "unsupported: source format not recognised"
+      },
+      "reference": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "carriage-ac3-dvb",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 9949399113737223988
+      }
+    },
+    {
+      "id": "carriage-eac3-dvb",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 9949399113737223988
+      }
+    },
+    {
+      "id": "carriage-ac3-direct",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 9949399113737223988
+      }
+    },
+    {
+      "id": "carriage-eac3-direct",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 9949399113737223988
+      }
+    },
+    {
+      "id": "carriage-aac-adts-direct",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: ADTS sync/layer"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 9949399113737223991
+      }
+    },
+    {
+      "id": "carriage-aac-latm-direct",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: LOAS syncword"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 6277932050482529078
+      }
+    },
+    {
+      "id": "carriage-hevc-direct",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 6277932050482529110
+      }
+    },
+    {
+      "id": "pes-timestamp-marker",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "pes-forbidden-time-flags",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 5189187993285138615
+      }
+    },
+    {
+      "id": "pes-finite-truncated-eof",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 4907315518400620928
+      }
+    },
+    {
+      "id": "pes-finite-extra-payload",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "pes-audio-zero-length-invalid",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 11581988676067009176
+      }
+    },
+    {
+      "id": "elementary-bytes-cross-pes",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 5,
+        "digest": 8203004531478402716
+      }
+    },
+    {
+      "id": "pat-pointer-then-clean-pusi",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 6997440758094392699
+      }
+    },
+    {
+      "id": "pmt-pointer-then-clean-pusi",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 6997440758094392699
+      }
+    },
+    {
+      "id": "di-continuous-pes-payload",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 240,
+        "digest": 13839270040222557329
+      }
+    },
+    {
+      "id": "di-continuous-pes-header",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 7910521612812314295
+      }
+    },
+    {
+      "id": "di-continuous-adaptation-only",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 240,
+        "digest": 13839270040222557329
+      }
+    },
+    {
+      "id": "di-duplicate-complete",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 54,
+        "digest": 721451836577352255
+      }
+    },
+    {
+      "id": "di-duplicate-start",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 354,
+        "digest": 11810546308006601532
+      }
+    },
+    {
+      "id": "di-continuous-pat",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 6997440758094392699
+      }
+    },
+    {
+      "id": "di-continuous-pmt",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 6997440758094392699
+      }
+    },
+    {
+      "id": "partial-start-duplicate",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 682,
+        "digest": 1212521382984876328
+      }
+    },
+    {
+      "id": "partial-middle-duplicate",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 696,
+        "digest": 6776344600959560765
+      }
+    },
+    {
+      "id": "interleaved-other-pid-duplicate",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 54,
+        "digest": 721451836577352255
+      }
+    },
+    {
+      "id": "m2ts-prefix-only-duplicate",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 54,
+        "digest": 14599650728403439691
+      }
+    },
+    {
+      "id": "same-content-new-counters",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 54,
+        "digest": 721451836577352255
+      }
+    },
+    {
+      "id": "loss-then-clean-pusi",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 528,
+        "digest": 178975925244385769
+      }
+    },
+    {
+      "id": "loss-at-clean-pusi",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 186,
+        "digest": 1472868352923905000
+      }
+    },
+    {
+      "id": "opcr-change-is-not-duplicate",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 54,
+        "digest": 721451836577352255
+      }
+    },
+    {
+      "id": "third-middle-copy-then-clean",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 896,
+        "digest": 8454704867915823633
+      }
+    },
+    {
+      "id": "opcr-without-pcr-invalid",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 54,
+        "digest": 721451836577352255
+      }
+    },
+    {
+      "id": "duplicate-middle-low-occupancy-finite",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 464,
+        "digest": 2206633110332191569
+      }
+    },
+    {
+      "id": "duplicate-middle-low-occupancy-unbounded",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 464,
+        "digest": 2206633110332191569
+      }
+    },
+    {
+      "id": "finite-continuation-body-400",
+      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: Annex B leading bytes"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 400,
+        "digest": 16869101003598167857
+      }
+    },
+    {
+      "id": "finite-continuation-body-401",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 401,
+        "digest": 16203249262521375477
+      }
+    },
+    {
+      "id": "finite-continuation-body-408",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 408,
+        "digest": 9612112129987823033
+      }
+    },
+    {
+      "id": "finite-continuation-body-409",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 409,
+        "digest": 10076691746746783341
+      }
+    },
+    {
+      "id": "finite-continuation-body-414",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 414,
+        "digest": 1104262977870271519
+      }
+    },
+    {
+      "id": "finite-continuation-body-415",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 415,
+        "digest": 1975334822625632647
+      }
+    },
+    {
+      "id": "au-avc-one",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 2045,
+        "digest": 4256458061758026870
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 2045,
+        "digest": 4753204930410131174
+      }
+    },
+    {
+      "id": "au-avc-multiple-per-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 2670,
+        "digest": 18237479913512177632
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 2670,
+        "digest": 2901707930030164848
+      }
+    },
+    {
+      "id": "au-avc-header-across-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 2045,
+        "digest": 4256458061758026870
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 2045,
+        "digest": 4753204930410131174
+      }
+    },
+    {
+      "id": "au-avc-body-across-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 2045,
+        "digest": 4256458061758026870
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 2045,
+        "digest": 4753204930410131174
+      }
+    },
+    {
+      "id": "au-avc-header-only-eof",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 731,
+        "digest": 13863135286758084553
+      }
+    },
+    {
+      "id": "au-avc-final-au-at-eof",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 2670,
+        "digest": 8422972602777562999
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 2670,
+        "digest": 11533944693005101831
+      }
+    },
+    {
+      "id": "au-avc-truncated-final",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 2669,
+        "digest": 12206819316557203041
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 2669,
+        "digest": 11712116994509396177
+      }
+    },
+    {
+      "id": "au-avc-clock-wrap",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 2670,
+        "digest": 16750366389764671935
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 2670,
+        "digest": 6633828299847614983
+      }
+    },
+    {
+      "id": "au-avc-m2ts192",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 2670,
+        "digest": 4668423811618869224
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 2670,
+        "digest": 7779395901846408056
+      }
+    },
+    {
+      "id": "au-hevc-one",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 4295,
+        "digest": 7841102784593857107
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 4295,
+        "digest": 12975641439368779971
+      }
+    },
+    {
+      "id": "au-hevc-multiple-per-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 5432,
+        "digest": 8284136314485587433
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 5432,
+        "digest": 13278326684646622585
+      }
+    },
+    {
+      "id": "au-hevc-header-across-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 4295,
+        "digest": 7841102784593857107
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 4295,
+        "digest": 12975641439368779971
+      }
+    },
+    {
+      "id": "au-hevc-body-across-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 4295,
+        "digest": 7841102784593857107
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 4295,
+        "digest": 12975641439368779971
+      }
+    },
+    {
+      "id": "au-hevc-header-only-eof",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 2418,
+        "digest": 14450656509375418947
+      }
+    },
+    {
+      "id": "au-hevc-final-au-at-eof",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 5432,
+        "digest": 14453359213174532784
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 5432,
+        "digest": 1000805509626016320
+      }
+    },
+    {
+      "id": "au-hevc-truncated-final",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 5431,
+        "digest": 9376034342313861375
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 5431,
+        "digest": 13107474820133807983
+      }
+    },
+    {
+      "id": "au-hevc-clock-wrap",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 5432,
+        "digest": 1711614690364985080
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 5432,
+        "digest": 14601194724955097408
+      }
+    },
+    {
+      "id": "au-hevc-m2ts192",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 5432,
+        "digest": 149040313143399409
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 5432,
+        "digest": 5143230683304434561
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-one",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 2519069260726871620
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 16555830350569948468
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-multiple-per-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 4770917279879141705
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 606781640086066393
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-header-across-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 2519069260726871620
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 16555830350569948468
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-body-across-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 2519069260726871620
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 16555830350569948468
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-header-only-eof",
+      "requirement": "An unfinished coded audio frame at EOF has no complete access unit under ISO/IEC 14496-3. The strict reader returns truncation while the native parser exposes the remaining fragment.",
+      "candidate": {
+        "exit": 2,
+        "error": "truncated input"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 11955137421171832738
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-final-au-at-eof",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 12910583052745502072
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 8746447412952426760
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-truncated-final",
+      "requirement": "An unfinished coded audio frame at EOF has no complete access unit under ISO/IEC 14496-3. The strict reader returns truncation while the native parser exposes the remaining fragment.",
+      "candidate": {
+        "exit": 2,
+        "error": "truncated input"
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 389,
+        "digest": 12222211940478850660
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-missing-clocks",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 16032706175649559257
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 13421966569507758809
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-pts-dts",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 16385791968697379080
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 13775052362555578632
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-clock-wrap",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 4715606778403851200
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 10541251894405824520
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-m2ts192",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 17671637046694838609
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 10734489253454835941
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-two-opaque-pes",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: ADTS sync/layer"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 25,
+        "digest": 2031204361098929596
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-opaque-then-coded",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: ADTS sync/layer"
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 208,
+        "digest": 507070727244423008
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-coded-then-opaque",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: ADTS sync/layer"
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 207,
+        "digest": 13352404034386126096
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-opaque-prefix-in-pes",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: ADTS sync/layer"
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 208,
+        "digest": 2630892234460979701
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-opaque-suffix-in-pes",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: ADTS sync/layer"
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 207,
+        "digest": 15947745093917374559
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-recover-pat-pointer",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 4257311274557364488
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 18294072364400441336
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-recover-pmt-pointer",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 4257311274557364488
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 18294072364400441336
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-three-frames-in-pes",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 584,
+        "digest": 1868825820481466936
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 584,
+        "digest": 15074905587973214698
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-header-across-pes",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 584,
+        "digest": 15980559000496894032
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 584,
+        "digest": 1769109294796948231
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-opaque-prefix-in-pes",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: LOAS syncword"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 220,
+        "digest": 16613187259993382962
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-opaque-then-coded",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: LOAS syncword"
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 220,
+        "digest": 12059753546944082767
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-coded-then-opaque",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: LOAS syncword"
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 220,
+        "digest": 6566358389590218443
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-two-opaque-pes",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: LOAS syncword"
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 26,
+        "digest": 15095274907949675884
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-truncated-envelope",
+      "requirement": "An unfinished coded audio frame at EOF has no complete access unit under ISO/IEC 14496-3. The strict reader returns truncation while the native parser exposes the remaining fragment.",
+      "candidate": {
+        "exit": 2,
+        "error": "truncated input"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 197,
+        "digest": 3226882278880041755
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-empty-envelope",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: empty LOAS multiplex element"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 3,
+        "digest": 14082017935433025708
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-at-eof",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 16555830350569948468
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-before-pes",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 13540346467430524196
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 390,
+        "digest": 16773510934581463536
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-split-frame",
+      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
+      "candidate": {
+        "exit": 2,
+        "error": "invalid data: ADTS sync/layer"
+      },
+      "reference": {
+        "packets": 1,
+        "bytes": 195,
+        "digest": 16555830350569948468
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-opaque-prefix",
+      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
+      "candidate": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      },
+      "reference": {
+        "packets": 2,
+        "bytes": 208,
+        "digest": 3856042665398456175
+      }
+    },
+    {
+      "id": "au-mpeg1-layer1-multiple-per-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 9874117384827487370
+      },
+      "reference": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 7584938453221359850
+      }
+    },
+    {
+      "id": "au-mpeg1-layer1-header-across-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 14560930580732867219
+      },
+      "reference": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 7884658440279607035
+      }
+    },
+    {
+      "id": "au-mpeg1-layer1-44100-multiple-per-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 16424744412178263942
+      },
+      "reference": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 8142651324380835256
+      }
+    },
+    {
+      "id": "au-mpeg1-layer1-44100-header-across-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 2664813534374092175
+      },
+      "reference": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 8442371311439082441
+      }
+    },
+    {
+      "id": "au-mpeg1-layer2-multiple-per-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 9490004708347727220
+      },
+      "reference": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 14043593463747707764
+      }
+    },
+    {
+      "id": "au-mpeg1-layer2-header-across-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 12214702591156482941
+      },
+      "reference": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 16768291346556463485
+      }
+    },
+    {
+      "id": "au-mpeg2-layer2-multiple-per-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 6573524863728196620
+      },
+      "reference": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 13126905746382481532
+      }
+    },
+    {
+      "id": "au-mpeg2-layer2-header-across-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 9298222746536952341
+      },
+      "reference": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 15851603629191237253
+      }
+    },
+    {
+      "id": "au-mpeg2-layer3-multiple-per-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 3727455605558005942
+      },
+      "reference": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 15895778888605610054
+      }
+    },
+    {
+      "id": "au-mpeg2-layer3-header-across-pes",
+      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
+      "candidate": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 7692252905564450495
+      },
+      "reference": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 10022219321387664983
+      }
+    }
+  ]
+}

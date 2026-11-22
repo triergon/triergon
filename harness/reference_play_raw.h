@@ -30,12 +30,14 @@ static int play_options(int count, char **args, PlayOptions *options)
     if (!count)
         return 0;
     int used = 0;
-    if ((count != 1 && count != 3) ||
+    if ((count != 1 && count != 3 && count != 4) ||
         sscanf(args[0], "%dx%d%n", &options->width, &options->height, &used) != 2 ||
         args[0][used] || options->width < 1 || options->height < 1 ||
         options->width > 8192 || options->height > 8192)
         return 2;
-    if (count == 3) {
+    if (count == 4 && strcmp(args[3], "atsc"))
+        return 2;
+    if (count >= 3) {
         int *tracks[] = {&options->video, &options->audio};
         for (int i = 0; i < 2; i++) {
             const char *arg = args[i + 1];
@@ -360,7 +362,7 @@ static int play_raw_command(int argc, char **argv)
 {
     PlayOptions opts;
     if (argc < 6 || play_options(argc - 6, argv + 6, &opts)) {
-        fputs("usage: play-raw FILE VIDEO AUDIO PACKETS [WxH [VIDEO_TRACK AUDIO_TRACK]]\n", stderr);
+        fputs("usage: play-raw FILE VIDEO AUDIO PACKETS [WxH [VIDEO_TRACK AUDIO_TRACK [atsc]]]\n", stderr);
         return 2;
     }
     ViewCase input = {0};

@@ -2,8 +2,15 @@ use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::{self, BufWriter, Read, Write};
 
+use triergon::mpegts::{
+    Reader, ReaderLimits,
+    psi::{DescriptorNamespace, DvbNamespaceEvidence},
+};
+use triergon::playback::Format;
 use triergon::session::{Canvas, PcmBlock, Published};
-use triergon::{Budget, Bytes, PacketInfo, RandomAccess, Result};
+use triergon::{
+    AnyReader, Budget, Bytes, Error, PacketInfo, RandomAccess, Result, SourceCapabilities, SourceId,
+};
 use triergon_harness_protocol::digest::signed;
 use triergon_harness_protocol::md5;
 
@@ -30,26 +37,76 @@ fn options(arguments: &[OsString]) -> std::result::Result<Options, String> {
                 .ok_or("invalid track index")
         }
     };
-    let (size, video, audio) = match arguments {
-        [] => ("1920x1080", None, None),
-        [size] => (size.to_str().ok_or("invalid canvas")?, None, None),
-        [size, video, audio] => (
-            size.to_str().ok_or("invalid canvas")?,
-            parse_track(video)?,
-            parse_track(audio)?,
-        ),
-        _ => return Err("expected [WxH [VIDEO_TRACK AUDIO_TRACK]]".into()),
+    let (size, video, audio, atsc) = match arguments {
+        [] => ("1920x1080", None, None, false),
+        [size] => (size.to_str().ok_or("invalid canvas")?, None, None, false),
+        [size, video, audio, namespace @ ..]
+            if namespace.is_empty() || namespace == [OsStr::new("atsc")] =>
+        {
+            (
+                size.to_str().ok_or("invalid canvas")?,
+                parse_track(video)?,
+                parse_track(audio)?,
+                !namespace.is_empty(),
+            )
+        }
+        _ => return Err("expected [WxH [VIDEO_TRACK AUDIO_TRACK [atsc]]]".into()),
     };
     let (width, height) = size.split_once('x').ok_or("invalid canvas")?;
     let width = width.parse::<usize>().map_err(|_| "invalid canvas")?;
     let height = height.parse::<usize>().map_err(|_| "invalid canvas")?;
-    let canvas = Canvas::new(width, height).ok_or("invalid canvas")?;
+    let canvas = Canvas::new(width, height)
+        .filter(|canvas| canvas.width().max(canvas.height()) <= 8192)
+        .ok_or("invalid canvas")?;
     Ok(Options {
         canvas,
         format: None,
         video,
         audio,
+        transport: Some(if atsc { open_atsc } else { open_dvb }),
     })
+}
+
+fn open_atsc(
+    pool: &Budget,
+    id: SourceId,
+    caps: SourceCapabilities,
+    format: Format,
+) -> Result<AnyReader> {
+    open_ts(pool, id, caps, format, DescriptorNamespace::Atsc)
+}
+
+fn open_dvb(
+    pool: &Budget,
+    id: SourceId,
+    caps: SourceCapabilities,
+    format: Format,
+) -> Result<AnyReader> {
+    open_ts(
+        pool,
+        id,
+        caps,
+        format,
+        DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile),
+    )
+}
+
+fn open_ts(
+    pool: &Budget,
+    id: SourceId,
+    caps: SourceCapabilities,
+    format: Format,
+    descriptor_namespace: DescriptorNamespace,
+) -> Result<AnyReader> {
+    let Format::Ts(format) = format else {
+        return Err(Error::Invalid("expected a transport stream"));
+    };
+    let limits = ReaderLimits {
+        format,
+        descriptor_namespace,
+        ..ReaderLimits::default()
+    };
+    Reader::new(pool, id, caps, limits, 64 << 10).map(AnyReader::MpegTs)
 }
 
 struct Raw {
@@ -141,14 +198,10 @@ fn word(value: Option<i64>) -> u64 {
     signed(value.unwrap_or(i64::MIN))
 }
 
-fn play(
-    input: &[u8],
-    options: Options,
-    output: &mut Output<'_, '_>,
-) -> std::result::Result<(), String> {
+fn preload(input: &[u8]) -> std::result::Result<(Budget, Bytes), String> {
     let pool = Budget::new(384 << 20).map_err(|error| error.to_string())?;
     let bytes = Bytes::copy_from_slice(&pool, input).map_err(|error| error.to_string())?;
-    pipeline::play_with(&pool, bytes, options, output).map_err(|error| error.to_string())
+    Ok((pool, bytes))
 }
 
 pub(super) fn operation<'a>(
@@ -157,11 +210,13 @@ pub(super) fn operation<'a>(
     arguments: &[OsString],
 ) -> std::result::Result<Operation<'a>, String> {
     let opts = options(arguments)?;
+    let (pool, bytes) = preload(input)?;
     Ok(Operation {
         name: "play",
         run: Box::new(move |work, trace| {
-            play(
-                input,
+            pipeline::play_with(
+                &pool,
+                bytes.clone(),
                 opts,
                 &mut Output {
                     raw: None,
@@ -169,6 +224,7 @@ pub(super) fn operation<'a>(
                     work,
                 },
             )
+            .map_err(|error| error.to_string())
         }),
     })
 }
@@ -176,7 +232,8 @@ pub(super) fn operation<'a>(
 pub(super) fn command(arguments: &[OsString]) -> std::result::Result<(), String> {
     let [file, video, audio, packets, arguments @ ..] = arguments else {
         return Err(
-            "usage: play-raw FILE VIDEO AUDIO PACKETS [WxH [VIDEO_TRACK AUDIO_TRACK]]".into(),
+            "usage: play-raw FILE VIDEO AUDIO PACKETS [WxH [VIDEO_TRACK AUDIO_TRACK [atsc]]]"
+                .into(),
         );
     };
     let run = || -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -199,7 +256,8 @@ pub(super) fn command(arguments: &[OsString]) -> std::result::Result<(), String>
             trace: Some(&mut stdout),
             work: &mut work,
         };
-        let result = play(&input, opts, &mut output);
+        let (pool, bytes) = preload(&input)?;
+        let result = pipeline::play_with(&pool, bytes, opts, &mut output);
         if let Some(raw) = &mut output.raw {
             raw.video.flush()?;
             raw.audio.flush()?;
