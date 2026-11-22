@@ -9,6 +9,7 @@ use triergon::{
     PacketInfo, Result, Rounding, SourceCapabilities, SourceId, TimeBase, TrackInfo, WorkBudget,
     bridge::access::{AccessUnitLimits, AccessUnits},
     framing::BuildStep,
+    isobmff::config::ConfigurationLimits,
     matroska,
     playback::{
         ByteSource, Engine, Format, Output, Player, PlayerPolicy, Progress, Selection, Source,
@@ -111,10 +112,9 @@ fn play_source<S: Source>(
             let opened = open.finish()?;
             let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default())?;
             while !index.poll(&mut work(), cancel)? {}
-            (
-                Engine::mp4(opened.input, index.finish()?, 1 << 20)?,
-                opened.source,
-            )
+            let mut plan = index.finish()?;
+            while !plan.identify_tracks(ConfigurationLimits::default(), &mut work())? {}
+            (Engine::mp4(opened.input, plan, 1 << 20)?, opened.source)
         }
         Format::Ts(_) => return Err(Error::Invalid("transport needs an access-unit reader")),
     };

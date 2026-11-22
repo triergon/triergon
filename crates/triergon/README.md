@@ -11,6 +11,8 @@ With `playback,codecs,render`, open the source with `playback::probe::Probe` and
 read outputs from a `playback::Player`. Look up the packet's track with
 `Engine::track`, load the audio and video sessions with the matching decoders,
 and step `AccessUnits::for_track` once per selected track to obtain its framer.
+For indexed MP4, finish `PreparedMp4::identify_tracks` before selecting tracks
+or creating framers so their codec identities and sample descriptions are available.
 Here `ready` supplies a fresh work budget when the framing job yields.
 
 ```rust,no_run
