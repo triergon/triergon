@@ -20,10 +20,11 @@ triergon-matroska = { path = "../matroska" }
 triergon-mpegts = { path = "../mpegts" }
 triergon-playback = { path = "../playback", features = ["reference-trace"] }
 triergon-raw-video = { path = "../raw-video" }
+triergon-subtitles = { path = "../subtitles", optional = true }
 triergon-worker-entry = { path = "../worker-entry" }
 
 [features]
-views = []
+views = ["dep:triergon-subtitles"]
 
 [[bin]]
 name = "playback-views-worker"
