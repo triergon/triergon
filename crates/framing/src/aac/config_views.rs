@@ -25,9 +25,9 @@ pub enum AacDecoderChannelReason {
 /// The channels a decoder outputs for a configuration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AacDecoderChannelView {
-    /// Output channels.
+    /// Channels the selected decoder policy would output for the parsed record.
     pub channels: u16,
-    /// Where the count comes from.
+    /// Whether the count is signalled or follows the mono SBR decoder rule.
     pub reason: AacDecoderChannelReason,
 }
 /// What a decoder accepts, for [`decoder_configuration_view`].
@@ -56,9 +56,9 @@ pub enum AacDecoderConfigRefusal {
 /// Whether a configuration is within an [`AacDecoderConfigPolicy`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AacDecoderConfigDecision {
-    /// It is; a decoder outputs these channels.
+    /// The policy accepts the coded core frequency and derived channel count.
     Eligible(AacDecoderChannelView),
-    /// It is not, for this reason.
+    /// The first policy rule that fails, with frequency checked before channels.
     Refused(AacDecoderConfigRefusal),
 }
 /// Decides whether `config` is within `policy`: first its core frequency coding,

@@ -140,9 +140,8 @@ pub struct DtsCoreHeader {
 }
 
 impl DtsCoreHeader {
-    /// Samples per channel that follow the coded audio as padding in a
-    /// termination frame (TS 102 114 clause 5.4.2). Normal frames have no
-    /// termination padding.
+    /// Termination padding in core samples per channel. Returns `SHORT + 1`
+    /// when `FTYPE` is 0 and `SHORT` is below 31, otherwise `None`.
     pub const fn termination_padding_samples(self) -> Option<u8> {
         if self.normal == 0 && self.short < 31 {
             Some(self.short + 1)

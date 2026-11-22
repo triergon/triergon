@@ -195,7 +195,8 @@ impl Ac3FrameHeader {
         }
         Ok((numerator, denominator))
     }
-    /// acmod's full-bandwidth count, not aggregate programme/channel-map layout.
+    /// Full-bandwidth channels named by `acmod`, 1 to 5. Returns `None` for
+    /// codes above 7. The LFE and any dependent substream channels are excluded.
     pub fn acmod_full_bandwidth_channels(self) -> Option<u8> {
         [2, 1, 2, 3, 3, 4, 4, 5]
             .get(usize::from(self.acmod))
@@ -619,7 +620,7 @@ impl Ac3FrameReader {
             failure: None,
         })
     }
-    /// Capacity of the mutable frame buffer, excluding buffered source bytes.
+    /// Frame buffer capacity in bytes, excluding source windows. Zero without a buffer.
     #[doc(hidden)]
     pub fn input_wait_buffer_capacity(&self) -> usize {
         self.buffer.as_ref().map_or(0, BudgetVec::capacity)

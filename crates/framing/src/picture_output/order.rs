@@ -9,7 +9,7 @@ pub enum AvcPocCoding<'a> {
     /// Type 0: `pic_order_cnt_lsb` of `log2_max_lsb` bits and
     /// `delta_pic_order_cnt_bottom`.
     Lsb {
-        /// `pic_order_cnt_lsb`.
+        /// Low `log2_max_lsb` bits of the coded picture order count.
         lsb: u32,
         /// `log2_max_pic_order_cnt_lsb_minus4 + 4`; a value above 16 counts
         /// as 16.
@@ -21,9 +21,9 @@ pub enum AvcPocCoding<'a> {
     /// Type 1: the SPS's cycle of reference frame offsets and the slice's
     /// `delta_pic_order_cnt[ 0..2 ]`.
     Cycle {
-        /// `offset_for_non_ref_pic`.
+        /// Signed increment to the expected order count of a non-reference picture.
         offset_for_non_ref_pic: i32,
-        /// `offset_for_top_to_bottom_field`.
+        /// Signed distance from the expected top field count to the bottom field count.
         offset_for_top_to_bottom_field: i32,
         /// `offset_for_ref_frame[ ]`, one entry for each of the
         /// `num_ref_frames_in_pic_order_cnt_cycle` frames of the cycle.
@@ -47,8 +47,7 @@ pub struct AvcPocFields<'a> {
     pub frame_num: u32,
     /// `log2_max_frame_num_minus4 + 4`.
     pub log2_max_frame_num: u32,
-    /// The field of a field picture (`field_pic_flag` and
-    /// `bottom_field_flag`).
+    /// Parity from `bottom_field_flag` for a field picture. `None` for a frame.
     pub field: Option<Parity>,
     /// The picture has `memory_management_control_operation` equal to 5.
     pub mmco5: bool,
@@ -64,8 +63,7 @@ pub enum AfterMmco5 {
     /// frame whose bottom field does not come first).
     #[default]
     Specified,
-    /// Its `pic_order_cnt_lsb` as coded (observed in FFmpeg's H.264 output,
-    /// case `h264-mmco5-ts`).
+    /// Its coded `pic_order_cnt_lsb`, as used by FFmpeg's H.264 output.
     CodedLsb,
 }
 
@@ -80,8 +78,8 @@ pub enum AfterGap {
     Specified,
     /// No frame is inferred: the previous `frame_num` is the one before the
     /// picture's and FrameNumOffset that of the last picture decoded, so a
-    /// gap across `frame_num` 0 does not advance FrameNumOffset (observed in
-    /// FFmpeg's H.264 output, case `h264-gap-ts`).
+    /// gap across `frame_num` 0 does not advance FrameNumOffset, as in
+    /// FFmpeg's H.264 output.
     OffsetKept,
 }
 

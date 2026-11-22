@@ -304,8 +304,9 @@ impl AacAudioSpecificConfig {
     }
 }
 
-/// Channel count for the fixed MPEG-4 AAC configurations of up to eight channels
-/// (ISO/IEC 14496-3:2009/Amd.4, Table 1.19).
+/// Counts channels in MPEG-4 AAC configurations 1 to 7, 11, 12 and 14
+/// (ISO/IEC 14496-3:2009/Amd.4, Table 1.19). Returns `None` for other codes,
+/// including 0, which obtains its count from a program config element.
 pub const fn fixed_channel_count(configuration: u8) -> Option<u8> {
     match configuration {
         1..=6 => Some(configuration),

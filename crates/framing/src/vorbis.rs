@@ -196,8 +196,8 @@ impl VorbisModes {
     }
 }
 
-/// The type byte a Vorbis header packet starts with: 1, 3 or 5 for identification,
-/// comment and setup.
+/// Packet type 1, 3 or 5 for identification, comment or setup. Returns `None`
+/// unless the type byte is followed by the complete `vorbis` signature.
 pub fn header_type(packet: &[u8]) -> Option<u8> {
     match packet {
         [kind @ (1 | 3 | 5), b'v', b'o', b'r', b'b', b'i', b's', ..] => Some(*kind),

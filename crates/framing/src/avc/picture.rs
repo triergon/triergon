@@ -55,7 +55,8 @@ pub enum AvcPocSyntax {
 /// The VUI fields of picture output (E.1.1).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AvcVui {
-    /// `num_units_in_tick` and `time_scale`, both above 0.
+    /// Positive clock units per tick and per second, respectively. Absent
+    /// when no VUI timing is signalled.
     pub timing: Option<(u32, u32)>,
     /// `max_num_reorder_frames` as coded; `None` when the VUI states no bitstream
     /// restriction.
@@ -128,7 +129,8 @@ pub struct AvcSliceHeader {
     pub pps_id: u8,
     /// `frame_num`, of [`AvcSps::frame_num_bits`] bits.
     pub frame_num: u16,
-    /// `bottom_field_flag` of a field picture.
+    /// `Some(true)` for a bottom field, `Some(false)` for a top field and
+    /// `None` for a frame picture.
     pub bottom_field: Option<bool>,
     idr_pic_id: Option<u16>,
     /// `pic_order_cnt_lsb`; 0 when the order count type is not 0.

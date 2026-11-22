@@ -177,7 +177,7 @@ impl AacAdtsStreamReader {
             selected_error: None,
         })
     }
-    /// Capacity of the mutable frame buffer, excluding buffered source bytes.
+    /// Frame buffer capacity in bytes, excluding source windows. Zero without a buffer.
     #[doc(hidden)]
     pub fn input_wait_buffer_capacity(&self) -> usize {
         self.buffer.as_ref().map_or(0, BudgetVec::capacity)

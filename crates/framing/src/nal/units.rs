@@ -43,7 +43,8 @@ impl<'a> Iterator for AnnexBUnits<'a> {
     }
 }
 
-/// The index of the next `00 00 01` at or after `from`.
+/// Byte index of the next complete `00 00 01` at or after `from`, or `None`
+/// when no match remains.
 #[must_use]
 pub fn start_code(data: &[u8], from: usize) -> Option<usize> {
     let mut i = from;

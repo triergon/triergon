@@ -143,7 +143,8 @@ pub struct Eac3BsiFacts {
     pub effective_block_id: Option<bool>,
     /// `frmsizecod`, 6 bits; coded when `effective_block_id` is `Some(true)`.
     pub converted_frame_size_code: Option<u8>,
-    /// Payload bits only, excluding addbsie and addbsil. May be byte-unaligned.
+    /// Range of `addbsi` payload bits, possibly byte-unaligned. Absent when
+    /// `addbsie` is clear.
     pub additional_bsi: Option<Eac3BitRange>,
     /// The fields that end the frame.
     pub trailer: Eac3Trailer,
@@ -178,8 +179,8 @@ impl Eac3Bsi {
             range,
         })
     }
-    /// Weighted locations, not merely set bits. ATSC Table E2.5 has six pair
-    /// locations; its bit zero is the source word's most significant bit.
+    /// Channels in the E-AC-3 channel map, counting two per paired location.
+    /// Returns `None` when the frame carries no map (ATSC Table E2.5).
     pub fn channel_map_channels(&self) -> Option<u8> {
         let Ac3FrameDetails::Eac3 {
             channel_map: Some(map),

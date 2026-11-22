@@ -186,7 +186,8 @@ pub struct Av1ObuFacts {
     pub header: Av1ObuHeader,
     /// The `obu_size` field as coded; `None` when `obu_has_size_field` is 0.
     pub size_field: Option<Av1Leb128>,
-    /// The whole OBU's length as the source gives it in [`Av1ObuFraming::OneObu`].
+    /// Whole OBU length in bytes supplied by [`Av1ObuFraming::OneObu`].
+    /// Absent for low-overhead streams.
     pub external_length: Option<u64>,
 }
 

@@ -335,7 +335,8 @@ impl DtsInspection {
     pub const fn identity(&self) -> DtsSourceIdentity {
         self.identity
     }
-    /// What the record holds of `field`.
+    /// Bits observed for `field`, including a partial prefix at EOF.
+    /// Distinguishes an absent field from one the inspector did not reach.
     pub const fn field(&self, field: DtsCoreField) -> FieldObservation {
         self.fields[field as usize]
     }

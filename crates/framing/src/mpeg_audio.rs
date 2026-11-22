@@ -171,7 +171,7 @@ impl MpegAudioHeader {
         Self::parse(u32::from_be_bytes([word[0], word[1], word[2], word[3]]))
     }
 
-    /// Output channels.
+    /// One channel for mono, two for stereo, joint stereo or dual channel.
     pub fn channels(&self) -> u8 {
         if self.channel_mode == MpegChannelMode::Mono {
             1
@@ -252,11 +252,12 @@ pub enum MpegInfoKind {
 pub struct MpegInfoFrame {
     /// The tag the frame carries.
     pub kind: MpegInfoKind,
-    /// Audio frames in the stream, not counting this one.
+    /// Coded count of audio frames in the stream. Absent when no count is read.
     pub frames: Option<u32>,
-    /// Bytes of the stream, this frame included for Xing and Info.
+    /// Coded stream size in bytes, including this frame for Xing and Info.
+    /// Absent when no size is read.
     pub bytes: Option<u32>,
-    /// The 100-entry seek table of a Xing or Info frame.
+    /// The 100-byte seek table, present only when signalled in Xing or Info.
     pub toc: Option<[u8; 100]>,
     /// The LAME extension of a Xing or Info frame; `None` when the frame ends
     /// before it or its encoder string holds anything but printable ASCII and
@@ -264,7 +265,9 @@ pub struct MpegInfoFrame {
     pub lame: Option<LameTag>,
 }
 
-/// The information frame carried by `frame`, one whole frame with header `header`.
+/// Reads Xing, Info or version 1 VBRI metadata from a Layer III frame with
+/// the given header. Returns `None` for other layers, missing or unknown
+/// tags, and truncated required fields.
 pub fn info_frame(frame: &[u8], header: &MpegAudioHeader) -> Option<MpegInfoFrame> {
     if header.layer != MpegLayer::III {
         return None;

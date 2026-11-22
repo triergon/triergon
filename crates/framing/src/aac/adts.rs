@@ -40,7 +40,7 @@ pub struct AacAdtsHeader {
 }
 
 impl AacAdtsHeader {
-    /// The seven header bytes.
+    /// The seven fixed and variable header bytes as coded, before any CRC.
     pub const fn raw_prefix(self) -> [u8; 7] {
         self.prefix
     }
@@ -65,11 +65,11 @@ impl AacAdtsHeader {
     pub const fn profile_code(self) -> u8 {
         self.prefix[2] >> 6
     }
-    /// `sampling_frequency_index`, 4 bits.
+    /// The four-bit sampling frequency index, including reserved codes.
     pub const fn frequency_index(self) -> u8 {
         (self.prefix[2] >> 2) & 15
     }
-    /// `private_bit`.
+    /// The private-use bit as coded. It has no effect on framing.
     pub const fn private_bit(self) -> bool {
         self.prefix[2] & 2 != 0
     }
@@ -78,19 +78,19 @@ impl AacAdtsHeader {
     pub const fn channel_configuration(self) -> u8 {
         ((self.prefix[2] & 1) << 2) | (self.prefix[3] >> 6)
     }
-    /// `original_copy`.
+    /// Set when the header marks the stream as an original copy.
     pub const fn original_copy(self) -> bool {
         self.prefix[3] & 32 != 0
     }
-    /// `home`.
+    /// The coded home-use flag.
     pub const fn home(self) -> bool {
         self.prefix[3] & 16 != 0
     }
-    /// `copyright_identification_bit`.
+    /// This frame's one bit of the serial copyright identifier.
     pub const fn copyright_id_bit(self) -> bool {
         self.prefix[3] & 8 != 0
     }
-    /// `copyright_identification_start`.
+    /// Set when this frame carries the first bit of the copyright identifier.
     pub const fn copyright_id_start(self) -> bool {
         self.prefix[3] & 4 != 0
     }
@@ -381,19 +381,19 @@ pub struct AacAdtsParameters {
     pub mpeg2_id: bool,
     /// `sampling_frequency_index`: 0 to 12, an index that names a frequency.
     pub frequency_index: u8,
-    /// `channel_configuration`, 0 to 7.
+    /// Three-bit channel configuration. Zero signals an in-band program config element.
     pub channel_configuration: u8,
     /// `adts_buffer_fullness`, at most `0x7ff`, which signals a variable bit rate.
     pub buffer_fullness: u16,
-    /// `private_bit`.
+    /// Application-defined bit copied to the header.
     pub private_bit: bool,
-    /// `original_copy`.
+    /// Whether to mark the stream as an original copy.
     pub original_copy: bool,
-    /// `home`.
+    /// Home-use flag to write to the header.
     pub home: bool,
-    /// `copyright_identification_bit`.
+    /// One bit of the copyright identifier carried by this frame.
     pub copyright_id_bit: bool,
-    /// `copyright_identification_start`.
+    /// Whether that bit starts the copyright identifier.
     pub copyright_id_start: bool,
 }
 impl AacAdtsParameters {

@@ -88,8 +88,8 @@ impl Dts14CarrierPacket {
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
-    /// Whole canonical bytes of the unpacked payload. `None` for an opaque
-    /// packet or when unpacking did not produce a usable prefix.
+    /// Whole bytes of the unpacked payload in canonical order. Returns `None`
+    /// for an opaque packet or a packet ending in half a source word.
     pub fn canonical_bytes(&self) -> Option<&Bytes> {
         self.payload.as_ref().map(Dts14BitPayload::canonical_bytes)
     }

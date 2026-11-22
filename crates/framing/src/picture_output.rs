@@ -293,7 +293,7 @@ pub struct NewPicture {
     pub output: bool,
     /// Its marking after decoding; `Unused` for a non-reference picture.
     pub marking: Marking,
-    /// The field, for a field picture.
+    /// Field parity for a field picture, or `None` for a frame.
     pub field: Option<Parity>,
     /// Kept out of bumping until [`Entry::release`] or its second field.
     pub hold: bool,
@@ -332,7 +332,7 @@ pub struct HevcLimits {
     /// `sps_max_dec_pic_buffering_minus1 + 1`, or `None` to leave the
     /// fullness condition of C.5.2.2 out.
     pub max_dec_pic_buffering: Option<u32>,
-    /// `sps_max_num_reorder_pics`.
+    /// Most pictures that may wait for output before reorder bumping.
     pub max_num_reorder: u32,
     /// `SpsMaxLatencyPictures` (7-9), `None` when
     /// `sps_max_latency_increase_plus1` is 0.
@@ -395,7 +395,7 @@ impl<P> DecodedPictures<P> {
         }
     }
 
-    /// The pictures stored: the DPB fullness.
+    /// Number of occupied picture slots, including pictures kept for reference after output.
     #[must_use]
     pub fn len(&self) -> usize {
         self.stored.len()
@@ -441,12 +441,12 @@ impl<P> DecodedPictures<P> {
         self.stored.try_reserve(additional)
     }
 
-    /// The stored picture `id`.
+    /// Borrows `id` for reading and marking. Returns `None` if it is absent.
     pub fn entry(&mut self, id: PictureId) -> Option<Entry<'_, P>> {
         self.stored.iter_mut().find(|p| p.id == id).map(Entry)
     }
 
-    /// The payload of the stored picture `id`, borrowed for as long as the buffer is.
+    /// Borrows the payload of `id` mutably. Returns `None` for an absent picture.
     pub fn picture_mut(&mut self, id: PictureId) -> Option<&mut P> {
         self.stored
             .iter_mut()
@@ -454,8 +454,7 @@ impl<P> DecodedPictures<P> {
             .map(|p| &mut p.picture)
     }
 
-    /// Removes the stored picture `id` without output and gives its payload
-    /// back.
+    /// Removes `id` without output and gives its payload back, if it was stored.
     pub fn take(&mut self, id: PictureId) -> Option<P> {
         let at = self.stored.iter().position(|p| p.id == id)?;
         self.stored.as_mut_slice()[at..].rotate_left(1);

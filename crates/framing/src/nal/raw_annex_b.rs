@@ -493,9 +493,8 @@ impl RawAnnexBReader {
         }
     }
 
-    /// Mutable buffers and completed NALs held while requesting more input.
-    ///
-    /// Returns an error if input or an unprocessed NAL is buffered.
+    /// Mutable buffer capacity in bytes and completed NALs awaiting a picture
+    /// boundary. Fails if input or an unprocessed NAL is buffered, or sizing overflows.
     #[doc(hidden)]
     pub fn input_wait_storage(&self) -> Result<(usize, &[NalUnit])> {
         if self.pending.is_some() {
