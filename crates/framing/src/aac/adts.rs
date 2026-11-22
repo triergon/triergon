@@ -356,18 +356,15 @@ impl AacAdtsParser {
                         .single_block_header_bytes()
                         .ok_or(Error::Unsupported("ADTS block layout"))?;
                     let payload = raw.slice(header_size..raw.len())?;
-                    let ParseState::Parsing { raw, .. } =
-                        std::mem::replace(&mut self.state, ParseState::Complete)
-                    else {
-                        unreachable!("the parser is parsing")
-                    };
-                    return Ok(BuildStep::Ready(AacAdtsFrame {
+                    let frame = AacAdtsFrame {
                         payload,
-                        raw,
+                        raw: raw.clone(),
                         source: self.source,
                         header,
                         crc,
-                    }));
+                    };
+                    self.state = ParseState::Complete;
+                    return Ok(BuildStep::Ready(frame));
                 }
             }
         }
@@ -524,14 +521,11 @@ pub struct AacAdtsWriter {
 
 #[derive(Debug)]
 enum WriteState {
-    /// The header and the payload are copied into the frame, empty until it is
-    /// reserved.
-    Copying {
-        input: Bytes,
+    Writing {
+        /// Released after the last byte is copied, before freezing the frame.
+        input: Option<Bytes>,
         output: BudgetVec<u8>,
     },
-    /// Every byte is copied and the payload released; the frame is frozen.
-    Freezing(BudgetVec<u8>),
     Complete,
     Failed(Error),
 }
@@ -583,8 +577,8 @@ impl AacAdtsWriter {
             total,
             copied: 0,
             reserved: false,
-            state: WriteState::Copying {
-                input: payload,
+            state: WriteState::Writing {
+                input: Some(payload),
                 output: BudgetVec::new(pool),
             },
         })
@@ -617,13 +611,15 @@ impl AacAdtsWriter {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AacAdtsOutput>> {
-        if matches!(self.state, WriteState::Complete) {
-            return Ok(BuildStep::Complete);
-        }
+        let (input, output) = match &mut self.state {
+            WriteState::Writing { input, output } => (input, output),
+            WriteState::Complete => return Ok(BuildStep::Complete),
+            WriteState::Failed(error) => return Err(*error),
+        };
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if let WriteState::Copying { input, output } = &mut self.state {
+        if let Some(payload) = input.as_ref() {
             if !self.reserved {
                 if !work.try_charge(1) {
                     return Ok(BuildStep::Yield);
@@ -651,33 +647,17 @@ impl AacAdtsWriter {
                     output.try_extend_from_slice(&self.header[self.copied..self.copied + count])?;
                 } else {
                     let start = self.copied - 7;
-                    output.try_extend_from_slice(&input[start..start + count])?;
+                    output.try_extend_from_slice(&payload[start..start + count])?;
                 }
                 self.copied += count;
             }
-            // Every source byte has been copied. Release the payload's owner before
-            // adding the frozen output's owner header; retries retain real output.
-            let WriteState::Copying { output, .. } =
-                std::mem::replace(&mut self.state, WriteState::Complete)
-            else {
-                unreachable!("the writer is copying")
-            };
-            self.state = WriteState::Freezing(output);
+            *input = None;
         }
         if !work.try_charge(1) {
             return Ok(BuildStep::Yield);
         }
-        let WriteState::Freezing(output) = std::mem::replace(&mut self.state, WriteState::Complete)
-        else {
-            unreachable!("the writer is freezing")
-        };
-        let bytes = match output.freeze() {
-            Ok(bytes) => bytes,
-            Err(refused) => {
-                self.state = WriteState::Freezing(refused.value);
-                return Err(refused.error);
-            }
-        };
+        let bytes = crate::freeze_whole(output)?;
+        self.state = WriteState::Complete;
         Ok(BuildStep::Ready(AacAdtsOutput {
             bytes,
             source: self.source,
