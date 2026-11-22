@@ -266,4 +266,8 @@ and [timed text semantics](../../harness/features/tx3g-semantics/contract.json).
 The [tx3g decoder header comparison](../../harness/features/tx3g-configuration/contract.json)
 covers the fields the reference derives from each distinct sample description.
 The source views preserve signed Matroska presentation clocks without inferring
-DTS, and keep the full unsigned sample delta of an ISO BMFF time-to-sample entry.
+DTS, keep the full unsigned sample delta of an ISO BMFF time-to-sample entry, and
+expose empty ASS packets as opaque source data.
+The Matroska carriage comparison checks BlockGroup positions, key flags and
+the exported BlockAdditional bytes. The VobSub comparison uses file order
+within each track and preserves the index's written language and clock values.
