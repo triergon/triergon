@@ -1,10 +1,8 @@
 //! The codec a PMT entry names: H.222.0 Table 2-34 stream types and, for PES
 //! private data, the EN 300 468 descriptors that name a codec.
+use super::stream_type::PES_PRIVATE_DATA;
 use super::{DescriptorNamespace, ElementaryStream};
 use triergon_core::container::CodecId;
-
-/// `stream_type` 0x06: PES packets containing private data.
-pub(crate) const PES_PRIVATE_DATA: u8 = 0x06;
 
 impl ElementaryStream {
     /// The codec this entry names, or `None` when it names none [`CodecId`] has.

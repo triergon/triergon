@@ -124,8 +124,6 @@ pub enum AssemblyStep<T> {
     Finished,
 }
 
-pub(crate) const ELEMENTARY_PID_RANGE: std::ops::RangeInclusive<u16> = 0x0010..=0x1ffe;
-
 pub(crate) fn checked_pid(pid: u16) -> Result<()> {
     if pid > 0x1ffe {
         Err(Error::Invalid("assembly PID"))

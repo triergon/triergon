@@ -1,5 +1,6 @@
 //! DVB DTS-HD descriptor views from EN 300 468 Annex G.3.
-use super::{Descriptor, DescriptorNamespace, ElementaryStream, PES_PRIVATE_DATA};
+use super::stream_type::PES_PRIVATE_DATA;
+use super::{Descriptor, DescriptorNamespace, ElementaryStream};
 use triergon_core::{Error, Result};
 
 const EXTENSION_DESCRIPTOR: u8 = 0x7f;

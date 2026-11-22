@@ -9,7 +9,8 @@
 //!
 //! [`TransportStream`]: crate::stream::TransportStream
 //! [`ElementaryStream::codec`]: crate::psi::ElementaryStream::codec
-use crate::psi::{Descriptor, ElementaryStream, PES_PRIVATE_DATA, Section, SectionAssembler};
+use crate::psi::stream_type::PES_PRIVATE_DATA;
+use crate::psi::{Descriptor, ElementaryStream, Section, SectionAssembler};
 use crate::transport::TransportPacket;
 use crate::{AssemblyStep, ParseLimits, limit};
 use std::sync::atomic::AtomicBool;

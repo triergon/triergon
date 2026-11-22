@@ -1,7 +1,7 @@
 //! Identifies canonical DTS core frames in a descriptor-free private PES.
 use super::Track;
 use crate::pes::Pes;
-use crate::psi::PES_PRIVATE_DATA;
+use crate::psi::stream_type::PES_PRIVATE_DATA;
 use triergon_core::WorkBudget;
 use triergon_framing::dts::probe_core_header;
 

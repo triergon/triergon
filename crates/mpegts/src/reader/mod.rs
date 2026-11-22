@@ -145,7 +145,8 @@ impl Reader {
         input_window: usize,
     ) -> Result<Self> {
         if let Some(selection) = limits.unlabelled_dts_core
-            && (selection.program == 0 || !crate::ELEMENTARY_PID_RANGE.contains(&selection.pid))
+            && (selection.program == 0
+                || !crate::transport::pid::ELEMENTARY.contains(&selection.pid))
         {
             return Err(Error::Invalid("unlabelled DTS core selection"));
         }
@@ -225,7 +226,7 @@ impl Reader {
         for track in tracks {
             let pid = u16::try_from(track.0)
                 .ok()
-                .filter(|pid| crate::ELEMENTARY_PID_RANGE.contains(pid))
+                .filter(|pid| crate::transport::pid::ELEMENTARY.contains(pid))
                 .ok_or(Error::Invalid("MPEG-TS packet track selection"))?;
             selection.try_push(pid).map_err(|rejected| rejected.error)?;
         }

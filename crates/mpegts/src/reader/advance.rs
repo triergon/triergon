@@ -132,7 +132,7 @@ impl Reader {
         }
         let lane = &self.lanes.as_slice()[index];
         if self.limits.probe_unlabelled_dts_core
-            && lane.track.stream().stream_type == crate::psi::PES_PRIVATE_DATA
+            && lane.track.stream().stream_type == crate::psi::stream_type::PES_PRIVATE_DATA
             && lane.track.stream().descriptor_bytes.is_empty()
         {
             return false;
@@ -773,7 +773,7 @@ impl Reader {
         let unlabelled_dts_core = self.limits.unlabelled_dts_core.is_some_and(|selection| {
             selection.program == map.header.extension
                 && selection.pid == stream.pid
-                && stream.stream_type == crate::psi::PES_PRIVATE_DATA
+                && stream.stream_type == crate::psi::stream_type::PES_PRIVATE_DATA
                 && stream.descriptor_bytes.is_empty()
                 && map.program_descriptors.is_empty()
         });

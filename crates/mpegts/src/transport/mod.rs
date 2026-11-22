@@ -3,6 +3,7 @@ pub(crate) mod carrier;
 pub(crate) mod continuity;
 pub(crate) mod framer;
 pub(crate) mod packet;
+pub mod pid;
 
 pub(crate) use carrier::{OPCR_WITHOUT_PCR, SYNC_BYTE};
 pub use carrier::{

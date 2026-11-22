@@ -738,7 +738,9 @@ impl Reader {
         }
         let pid = u16::try_from(request.track.0)
             .ok()
-            .filter(|pid| crate::ELEMENTARY_PID_RANGE.contains(pid) && self.selected_track(*pid))
+            .filter(|pid| {
+                crate::transport::pid::ELEMENTARY.contains(pid) && self.selected_track(*pid)
+            })
             .ok_or(Error::Invalid("MPEG-TS seek track is not selected"))?;
         if selected_epochs.is_none()
             && entities.is_none()

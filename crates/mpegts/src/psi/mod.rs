@@ -1,15 +1,16 @@
 //! H.222.0 2.4.4/2.6 and Annex A; DVB descriptor framing from EN 300 468.
 mod classification;
 mod codec;
+pub mod descriptor_tag;
 mod descriptors;
 mod dts_hd;
 pub(crate) mod dvb;
 mod pat_table;
 mod section;
 mod signalling;
+pub mod stream_type;
 mod tables;
 
-pub(crate) use codec::PES_PRIVATE_DATA;
 #[cfg(feature = "reference-trace")]
 pub(crate) use descriptors::DESCRIPTOR_LENGTH;
 pub use descriptors::{Descriptor, Descriptors};

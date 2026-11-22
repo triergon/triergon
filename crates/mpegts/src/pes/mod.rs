@@ -2,6 +2,7 @@
 //! This module deliberately does not group codec access units or infer DTS.
 mod assembler;
 mod header;
+pub mod stream_id;
 
 pub use assembler::PesAssembler;
 pub(crate) use assembler::UNBOUNDED_NON_VIDEO;
