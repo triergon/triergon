@@ -116,8 +116,8 @@
     {"area": "MP4 AAC packet bridge", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-mp4-packets"},
     {"area": "AV1 temporal-unit bridge", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-av1-low-overhead"},
     {"area": "Matroska bridge discovery", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-matroska-discovery"},
-    {"area": "Text subtitle bridges", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-text-subtitles"},
-    {"area": "Bitmap subtitle bridges", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-bitmap-subtitles"},
+    {"area": "Text subtitle bridges", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-text-subtitles", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/bridge-text-subtitles/contract.json) lists 59 declared deviations."}},
+    {"area": "Bitmap subtitle bridges", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-bitmap-subtitles", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/bridge-bitmap-subtitles/contract.json) lists 11 declared deviations."}},
     {"area": "Caption and teletext bridges", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-captions-teletext"},
     {
       "area": "Matroska audio clocks",
@@ -214,7 +214,7 @@
     },
     {"area": "ISO BMFF segment indexes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "isobmff-segment-indexes"},
     {"area": "ISO BMFF index landings", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "isobmff-index-landings"},
-    {"area": "MOV comparison models", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mov-reference-trace"},
+    {"area": "MOV comparison models", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mov-reference-trace", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/mov-reference-trace/contract.json) lists 1 declared deviation."}},
     {
       "area": "MP4 range playback",
       "targets": [
@@ -276,8 +276,8 @@
     {"area": "MPEG-TS source polling", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-source-poll"},
     {"area": "MPEG-TS PES assembly", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-pes-assembler"},
     {"area": "MPEG-TS demux observer forms", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-observer-forms"},
-    {"area": "MPEG-TS source catalogue", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-psi-readers"},
-    {"area": "MPEG-TS catalogue projection", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-catalogue"},
+    {"area": "MPEG-TS source catalogue", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-psi-readers", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/ts-psi-readers/contract.json) lists 16 declared deviations."}},
+    {"area": "MPEG-TS catalogue projection", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-catalogue", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/ts-catalogue/contract.json) lists 9 declared deviations."}},
     {"area": "MPEG-TS video descriptors", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-video-descriptors"},
     {"area": "MPEG-TS carrier boundaries", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-packets"},
     {"area": "MPEG-TS carrier fields", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-packet-fields"},
@@ -517,9 +517,9 @@
         "hls-segments"
       ]
     },
-    {"area": "HLS packet views", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hls-unit-packets"},
-    {"area": "HLS AAC segment clocks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hls-aac-clocks"},
-    {"area": "HLS compact access-unit readers", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hls-compact-push"},
+    {"area": "HLS packet views", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hls-unit-packets", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/hls-unit-packets/contract.json) lists 1 declared deviation."}},
+    {"area": "HLS AAC segment clocks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hls-aac-clocks", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/hls-aac-clocks/contract.json) lists 1 declared deviation."}},
+    {"area": "HLS compact access-unit readers", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hls-compact-push", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/hls-compact-push/contract.json) lists 2 declared deviations."}},
     {"area": "HLS segment push input", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hls-push-input"},
     {
       "area": "Packet framing",
@@ -663,18 +663,18 @@
       ],
       "unmeasured": "dts-parser-trace"
     },
-    {"area": "Subtitle extraction", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "text-extraction"},
+    {"area": "Subtitle extraction", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "text-extraction", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/text-extraction/contract.json) lists 3 declared deviations."}},
     {"area": "Subtitle extraction source facts", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "text-extraction-oracle"},
-    {"area": "Subtitle charset streams", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "charset-streams"},
+    {"area": "Subtitle charset streams", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "charset-streams", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/charset-streams/contract.json) lists 16 declared deviations."}},
     {"area": "Subtitle charset packets", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "charset-packets"},
-    {"area": "tx3g decoder configuration", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "tx3g-configuration"},
+    {"area": "tx3g decoder configuration", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "tx3g-configuration", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/tx3g-configuration/contract.json) lists 56 declared deviations."}},
     {"area": "tx3g description fields", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "tx3g-config-oracle"},
     {"area": "tx3g semantics", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "tx3g-semantics"},
     {"area": "Subtitle renderer context", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "renderer-context"},
-    {"area": "DVB source packets", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "dvb-source"},
+    {"area": "DVB source packets", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "dvb-source", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/dvb-source/contract.json) lists 27 declared deviations."}},
     {"area": "PGS segment fields", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "pgs-segments"},
-    {"area": "VobSub index lines", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "vobsub-index"},
-    {"area": "Subtitle carriage traces", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "carriage-trace"},
+    {"area": "VobSub index lines", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "vobsub-index", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/vobsub-index/contract.json) lists 4 declared deviations."}},
+    {"area": "Subtitle carriage traces", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "carriage-trace", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/carriage-trace/contract.json) lists 9 declared deviations."}},
     {
       "area": "Subtitles, text",
       "targets": [
@@ -743,7 +743,7 @@
         "thumbv7neon-unknown-linux-gnueabihf"
       ],
       "unmeasured": "subtitle-dvd",
-      "parity": {"aarch64-unknown-linux-gnu": "230/231 match. The [DVD contract](../harness/features/subtitle-dvd/contract.json) declares the palette difference at a 2³²-byte IFO table offset."}
+      "parity": {"aarch64-unknown-linux-gnu": "230/231 match. The [DVD contract](../harness/features/subtitle-dvd/contract.json) declares the palette difference at a 2³²-byte IFO table offset.", "thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/subtitle-dvd/contract.json) lists 1 declared deviation."}
     },
     {
       "area": "Subtitles, DVD host variants",
@@ -936,16 +936,16 @@
       ]
     },
     {"area": "Capture configurations", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "11 stream cases awaiting measurement"},
-    {"area": "Playback input probes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-probe"},
-    {"area": "Playback source packets and tracks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-source-view", "parity": {"aarch64-unknown-linux-gnu": "99 of 134 cases match, with 32 declared deviations and 3 open cases. [Comparison](../harness/features/playback-source-view/contract.json) The neutral MPEG-TS track reports its first well-formed ISO 639 code in PMT order."}},
-    {"area": "MP4 player seeks and duration", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-mp4-seek"},
+    {"area": "Playback input probes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-probe", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/playback-probe/contract.json) lists 1,362 declared deviations."}},
+    {"area": "Playback source packets and tracks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-source-view", "parity": {"aarch64-unknown-linux-gnu": "99 of 134 cases match, with 32 declared deviations and 3 open cases. [Comparison](../harness/features/playback-source-view/contract.json) The neutral MPEG-TS track reports its first well-formed ISO 639 code in PMT order.", "thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/playback-source-view/contract.json) lists 3 open cases and 32 declared deviations."}},
+    {"area": "MP4 player seeks and duration", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-mp4-seek", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/playback-mp4-seek/contract.json) lists 11 open cases."}},
     {"area": "MP4 catalogue replacement", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-catalogue-replacement"},
-    {"area": "Player FIFO and sink delivery", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-delivery"},
-    {"area": "Player track selection", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-track-selection"},
-    {"area": "MOV index and terminal media", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-mov-index"},
-    {"area": "MPEG-TS PES openers", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-ts-open"},
-    {"area": "MP4 source clocks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mp4-source-clock"},
-    {"area": "Facade input probes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "facade-probe"},
+    {"area": "Player FIFO and sink delivery", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-delivery", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/playback-delivery/contract.json) lists 129 declared deviations."}},
+    {"area": "Player track selection", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-track-selection", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/playback-track-selection/contract.json) lists 3 declared deviations."}},
+    {"area": "MOV index and terminal media", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-mov-index", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/playback-mov-index/contract.json) lists 1 open case and 36 declared deviations."}},
+    {"area": "MPEG-TS PES openers", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-ts-open", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/playback-ts-open/contract.json) lists 5 declared deviations."}},
+    {"area": "MP4 source clocks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mp4-source-clock", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/mp4-source-clock/contract.json) lists 2 open cases."}},
+    {"area": "Facade input probes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "facade-probe", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/facade-probe/contract.json) lists 1,581 declared deviations."}},
     {
       "area": "Bit readers",
       "targets": [
@@ -1007,15 +1007,15 @@
     },
     {"area": "CRC values", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "crc-values"},
     {"area": "Exact time rescale", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "time-rescale"},
-    {"area": "Decoded picture properties", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "picture-properties", "parity": {"aarch64-unknown-linux-gnu": "358 matching views, including two paired refusals. 31 registered profile refusals. [Comparison](../harness/features/picture-properties/contract.json)"}},
-    {"area": "H.264 stream inspection", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "h264-stream-inspection"},
+    {"area": "Decoded picture properties", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "picture-properties", "parity": {"aarch64-unknown-linux-gnu": "358 matching views, including two paired refusals. 31 registered profile refusals. [Comparison](../harness/features/picture-properties/contract.json)", "thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/picture-properties/contract.json) lists 31 registered refusals."}},
+    {"area": "H.264 stream inspection", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "h264-stream-inspection", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/h264-stream-inspection/contract.json) lists 3 declared deviations."}},
     {"area": "HEVC access unit splitting", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hevc-access-units"},
     {"area": "ADTS synchronization search", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "adts-sync"},
     {"area": "AC-3 and E-AC-3 frame headers", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ac3-frame-header"},
     {"area": "AC-3 and E-AC-3 frame information", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ac3-frame-info"},
     {"area": "AC-3 audio block features", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ac3-features"},
-    {"area": "Codec channel layouts and downmix", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "codec-layouts"},
-    {"area": "Video NAL input", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "video-nal-input", "parity": {"aarch64-unknown-linux-gnu": "543 matches, including two paired refusals. Two declared deviations and 52 registered profile refusals. [Comparison](../harness/features/video-nal-input/contract.json)"}},
+    {"area": "Codec channel layouts and downmix", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "codec-layouts", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/codec-layouts/contract.json) lists 1 declared deviation."}},
+    {"area": "Video NAL input", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "video-nal-input", "parity": {"aarch64-unknown-linux-gnu": "543 matches, including two paired refusals. Two declared deviations and 52 registered profile refusals. [Comparison](../harness/features/video-nal-input/contract.json)", "thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/video-nal-input/contract.json) lists 2 declared deviations and 52 registered refusals."}},
     {"area": "Video NAL workloads", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "Runtime, peak heap and total RSS collection pending on isolated gate hosts."}
   ],
   "open_cells": [
