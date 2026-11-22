@@ -23,6 +23,12 @@ impl DtsCoreDescription {
         self.sample_entry_rate_hz
     }
 
+    /// The declared access-unit clock as (sampling frequency, samples per access unit).
+    #[cfg(feature = "reference-trace")]
+    pub fn access_unit_clock(self) -> Option<(u32, u32)> {
+        self.access_unit_clock
+    }
+
     /// Media ticks per sample-entry tick and, when signalled, per access unit.
     /// `Error::Unsupported` unless `base` is `1/n` and both are whole numbers of ticks.
     pub(crate) fn media_clock(self, base: TimeBase) -> Result<(u32, Option<u32>)> {

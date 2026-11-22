@@ -42,7 +42,8 @@ pub mod mov {
             RawVideoTransportModel, RawVideoTransportProfile,
         };
         pub use super::root_walk_transport::{
-            RootWalkTransportBuilder, RootWalkTransportModel, RootWalkTransportProfile,
+            RootWalkAccess, RootWalkTransportBuilder, RootWalkTransportModel,
+            RootWalkTransportProfile,
         };
     }
 

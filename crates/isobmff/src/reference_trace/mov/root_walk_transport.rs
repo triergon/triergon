@@ -12,14 +12,16 @@ use crate::{
     BuildStatus, Limits, Next,
     boxes::{BoxChildren, BoxHeader, BoxView},
     fields,
-    reference_trace::mov::raw_video_transport::{ModeledInitialRead, ModeledOpenState},
+    reference_trace::mov::raw_video_transport::{
+        EntryRevisit, ModeledInitialRead, ModeledOpenState,
+    },
     table::recovery::{DescriptionContext, DescriptionRecoveryTable},
 };
 use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
-use triergon_core::{Budget, Error, Result, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 const CONSUMPTION_BOUNDS: &str = "root-walk transport metadata consumption bounds";
 const PLAIN_ATOMS: &str = "root-walk transport requires bounded plain source atoms";
@@ -28,6 +30,21 @@ const RGB24_FIELDS: &str = "root-walk transport unreviewed RGB24 entry fields";
 /// Selects the root-walk transport model; pass it to [`RootWalkTransportBuilder::new`].
 #[derive(Clone, Copy, Debug)]
 pub struct RootWalkTransportProfile;
+
+/// Consecutive read fills and absolute seeks during open with fixed callback geometry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RootWalkAccess {
+    /// Fill contiguously from the last physical position through this exclusive offset.
+    ReadUntil(u64),
+    /// Reset the physical position to this absolute byte offset.
+    Seek(u64),
+}
+
+#[derive(Debug)]
+struct FixedGeometry {
+    rewind: Option<u64>,
+    accesses: BudgetVec<RootWalkAccess>,
+}
 
 /// The buffer states FFmpeg's reader can be in after opening a QuickTime raw-video file
 /// and walking its top-level boxes to the end, built by [`RootWalkTransportBuilder`].
@@ -48,6 +65,7 @@ pub struct RootWalkTransportModel {
     root_headers: [Option<BoxHeader>; CHILD_LIMIT as usize],
     absolute_seek_min: u32,
     absolute_seek_max: u32,
+    accesses: Option<BudgetVec<RootWalkAccess>>,
 }
 impl RootWalkTransportModel {
     pub(crate) fn context(&self) -> DescriptionContext {
@@ -84,6 +102,11 @@ impl RootWalkTransportModel {
     /// over the possible buffer states.
     pub fn modeled_absolute_seek_bounds(&self) -> (u32, u32) {
         (self.absolute_seek_min, self.absolute_seek_max)
+    }
+    /// Data reads and seeks in open order, starting at byte zero, when fixed geometry was
+    /// supplied to the builder. File-length queries do not change the physical position.
+    pub fn open_accesses(&self) -> Option<&[RootWalkAccess]> {
+        self.accesses.as_ref().map(BudgetVec::as_slice)
     }
     /// Whether a buffer state FFmpeg reports after open is exactly one of the possible
     /// states. `source_position` is the absolute file offset just past the buffered bytes;
@@ -222,6 +245,7 @@ pub struct RootWalkTransportBuilder<'a> {
     seek_min: u32,
     seek_max: u32,
     logical_position: Option<u64>,
+    fixed: Option<FixedGeometry>,
 }
 impl<'a> RootWalkTransportBuilder<'a> {
     /// Starts a model of the file with these `ftyp` and `moov` boxes, `roots` its top-level
@@ -313,8 +337,27 @@ impl<'a> RootWalkTransportBuilder<'a> {
             seek_min: u32::MAX,
             seek_max: 0,
             logical_position: None,
+            fixed: None,
         })
     }
+
+    /// Fixes the sample-entry rewind callback before polling, so only one window is
+    /// produced. `None` uses the entry offset if the revisit needs a callback. An
+    /// explicit offset must be an admissible rewind anchor for the configured read size.
+    pub fn with_fixed_rewind(mut self, offset: Option<u64>) -> Result<Self> {
+        if self.root_at != 0 {
+            return Err(Error::Invalid("root walk has started"));
+        }
+        let mut accesses = BudgetVec::new(self.table.bytes().budget());
+        // Two records per root skip, two for the entry rewind, and the final fill.
+        accesses.try_reserve_exact(2 * self.roots.len() + 3)?;
+        self.fixed = Some(FixedGeometry {
+            rewind: offset,
+            accesses,
+        });
+        Ok(self)
+    }
+
     /// Checks further box headers and metadata boxes, then follows the reader through the
     /// boxes after `moov` in each possible buffer state. Fails with `Error::Unsupported`
     /// where the file leaves the accepted set or the states end at different read positions.
@@ -501,6 +544,27 @@ impl<'a> RootWalkTransportBuilder<'a> {
                         self.entry.header().start,
                         "root-walk transport unreviewed forward entry revisit",
                     )?;
+                    if let Some(fixed) = &mut self.fixed {
+                        let anchor = fixed.rewind.unwrap_or(self.revisit.last_anchor);
+                        if !(self.revisit.first_anchor..=self.revisit.last_anchor).contains(&anchor)
+                            || (fixed.rewind.is_some()
+                                && self.revisit.kind == EntryRevisit::Buffered)
+                        {
+                            return Err(Error::Invalid("rewind outside root-walk geometry"));
+                        }
+                        self.revisit.first_anchor = anchor;
+                        self.revisit.last_anchor = anchor;
+                        if self.revisit.kind != EntryRevisit::Buffered {
+                            fixed
+                                .accesses
+                                .try_push(RootWalkAccess::ReadUntil(self.window.end))
+                                .map_err(|refused| refused.error)?;
+                            fixed
+                                .accesses
+                                .try_push(RootWalkAccess::Seek(anchor))
+                                .map_err(|refused| refused.error)?;
+                        }
+                    }
                     self.next_anchor = self.revisit.first_anchor;
                 }
                 2 => {
@@ -559,7 +623,18 @@ impl<'a> RootWalkTransportBuilder<'a> {
                             if payload.end == self.context.physical_length {
                                 self.action = 4;
                             } else {
+                                let previous_end = candidate.end;
                                 if candidate.forward_skip(payload.end, self.context)? {
+                                    if let Some(fixed) = &mut self.fixed {
+                                        fixed
+                                            .accesses
+                                            .try_push(RootWalkAccess::ReadUntil(previous_end))
+                                            .map_err(|refused| refused.error)?;
+                                        fixed
+                                            .accesses
+                                            .try_push(RootWalkAccess::Seek(payload.end))
+                                            .map_err(|refused| refused.error)?;
+                                    }
                                     self.candidate_seeks = self
                                         .candidate_seeks
                                         .checked_add(1)
@@ -581,6 +656,12 @@ impl<'a> RootWalkTransportBuilder<'a> {
                         .candidate
                         .take()
                         .ok_or(Error::Invalid("root-walk transport missing completed path"))?;
+                    if let Some(fixed) = &mut self.fixed {
+                        fixed
+                            .accesses
+                            .try_push(RootWalkAccess::ReadUntil(candidate.end))
+                            .map_err(|refused| refused.error)?;
+                    }
                     if self.logical_position.is_some_and(|p| p != candidate.cursor) {
                         return Err(Error::Unsupported(
                             "root-walk transport path-dependent logical operation end",
@@ -646,6 +727,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
             root_headers: std::array::from_fn(|i| self.roots.get(i).copied()),
             absolute_seek_min: self.seek_min,
             absolute_seek_max: self.seek_max,
+            accesses: self.fixed.map(|fixed| fixed.accesses),
         })
     }
 }
