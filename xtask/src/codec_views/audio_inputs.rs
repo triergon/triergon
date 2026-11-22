@@ -116,17 +116,7 @@ fn ogg(root: &Path, stage: &Path) -> Result<(), String> {
             continue;
         }
         let name = validation::text(row, "name")?;
-        let label = if name == "chained-meta.ogg" {
-            let directory = Path::new(source)
-                .parent()
-                .and_then(Path::file_name)
-                .and_then(|name| name.to_str())
-                .ok_or("chained Ogg source without a directory")?;
-            format!("{directory}-{name}")
-        } else {
-            name.to_owned()
-        };
-        let file = format!("page-a-{label}");
+        let file = format!("page-a-{}", name.replace('/', "-"));
         let file = Path::new(&file);
         let Some(pin) = pins.get(file) else {
             continue;
