@@ -37,7 +37,11 @@ pub fn run(
         .find(|(name, _)| *name == lane)
         .map(|(_, operation)| *operation)
         .ok_or_else(|| format!("unknown lane {lane}"))?;
-    cargo_build(root, &["-p", "codec-worker"], false)?;
+    cargo_build(
+        root,
+        &["-p", "codec-worker", "--bin", "codec-worker"],
+        false,
+    )?;
     let status = std::process::Command::new("cargo")
         .args([
             "build",

@@ -17,6 +17,7 @@
     "The 97 retained PES input/argument tuples preserve their 272 request associations and use parser-enabled AU expectations. Opaque, damaged and unsupported inputs remain observations that may fail; they are never reclassified as genuine access units or removed.",
     "Additional controls reuse pinned coded AVC, HEVC, AAC-LC and AC-3 bytes with independently authored PAT/PMT, PES packetization and source clocks. They include multiple AUs per PES, one AU across PES, header-only and truncated EOF, missing clocks, PTS/DTS, 33-bit wrap, M2TS192 and interleaved AC-3/AAC source clocks with delayed AC-3 output. Ordered controls cover ADTS across entities, an M2TS initialization section and AC-3 lookahead at a discontinuity. DVB AC-3 has explicit caller-declared descriptor namespace.",
     "The coded 32 kHz DVB E-AC-3 control reuses the complete TS188 fixture. It compares both streams in the selected program with an explicit caller-declared DVB namespace.",
+    "The MPEG audio controls cover MPEG-1 Layers I/II and MPEG-2 Layers II/III, including fractional 90 kHz durations, multiple frames in one PES, a header split between PES packets and a 192-byte carrier. The reference formats build enables its MPEG audio parser.",
     "The ATSC audio controls use direct private stream types 0x81 and 0x87 with two complete syncframes in one PES and an explicit caller-declared ATSC namespace.",
     "The ADTS fragment controls compare opaque bytes across consecutive PES packets, leading bytes before a complete envelope and trailing bytes at logical EOF, including shared and separate PES timestamps. The candidate uses the ADTS packet policy and keeps fragments separate from complete access units.",
     "The Annex B EOF policy can report an unframed run of validated AVC or HEVC PES bytes with no start code. The candidate folds that observation as opaque parser output, separately from complete video access units.",
@@ -194,7 +195,17 @@
     "au-adts-aac-lc-unbounded-at-eof",
     "au-adts-aac-lc-unbounded-before-pes",
     "au-adts-aac-lc-unbounded-split-frame",
-    "au-adts-aac-lc-unbounded-opaque-prefix"
+    "au-adts-aac-lc-unbounded-opaque-prefix",
+    "au-mpeg1-layer1-multiple-per-pes",
+    "au-mpeg1-layer1-header-across-pes",
+    "au-mpeg1-layer1-44100-multiple-per-pes",
+    "au-mpeg1-layer1-44100-header-across-pes",
+    "au-mpeg1-layer2-multiple-per-pes",
+    "au-mpeg1-layer2-header-across-pes",
+    "au-mpeg2-layer2-multiple-per-pes",
+    "au-mpeg2-layer2-header-across-pes",
+    "au-mpeg2-layer3-multiple-per-pes",
+    "au-mpeg2-layer3-header-across-pes"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

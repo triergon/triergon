@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-armv7-0e2366db-20261121-073050-shard-1",
+ "path": "gate-run-armv7-0e2366db-20261121-073050-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at 0e2366db (the ASS render caches' lookups without shared-count traffic and borders stroked into scratch, on main d66c90dd) on one c6g.4xlarge host, ARMv7, of the item ass-render: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, graded reports, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/0e2366db5c4d5a4c2b1699955d37edb4ad3fadf1-armv7-20261121-073050/shard-1/d58ee4e28d01ccb118c8d86f1968c6ff2f43d890ec821027744c479895824464.tar.zst",
+ "sha256": "d58ee4e28d01ccb118c8d86f1968c6ff2f43d890ec821027744c479895824464",
+ "bytes": 14276804,
+ "results": [
+  {
+   "path": "memory/ass-render/gate-result.json",
+   "command": "report --memory",
+   "key": "9e1c070b5f3ce61f9f10cfa57fc9093aff8644d8e549067135d459fb2a88a082",
+   "status": 0,
+   "report_sha256": "bddaad5f17bae7de9acca4b3746f9be75eba1a6ed08084e2b064aa1c4af13d63",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ass-render/gate-result.json",
+   "command": "report --benchmark",
+   "key": "56c95bd62fe2533d19214bb96a4b4cd0e059df69532ce6d52e47ec77d03aa1e7",
+   "status": 0,
+   "report_sha256": "174a33a6b0b6c778add6bdb4b794154f15280b7e35caec0c29bd93cd44a20855",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/ass-render/gate-result.json",
+   "command": "grade",
+   "key": "9066c504b16fc21f2a882aff6b7fbd39d5c5ba33a7f86cc1781c145b164dfa9b",
+   "status": 0,
+   "report_sha256": "68580409e68eab1866e171c7423225b2431590ac6f7cdf19150bada0e102f1b1"
+  }
+ ]
+}

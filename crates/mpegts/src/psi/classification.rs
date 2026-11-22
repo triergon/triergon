@@ -11,7 +11,12 @@ impl TrackInfo for ElementaryStream {
         match ElementaryStream::codec(self) {
             Some(CodecId::Mpeg2Video | CodecId::H264 | CodecId::Hevc) => MediaKind::Video,
             Some(
-                CodecId::MpegAudio | CodecId::Aac | CodecId::AacLatm | CodecId::Ac3 | CodecId::Eac3,
+                CodecId::MpegAudio
+                | CodecId::Aac
+                | CodecId::AacLatm
+                | CodecId::Ac3
+                | CodecId::Eac3
+                | CodecId::Dts,
             ) => MediaKind::Audio,
             Some(CodecId::DvbSubtitle | CodecId::DvbTeletext) => MediaKind::Subtitle,
             _ => MediaKind::Unknown,

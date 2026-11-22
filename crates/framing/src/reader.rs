@@ -223,6 +223,34 @@ impl NalReader {
         Ok(reader)
     }
 
+    pub(crate) fn resume_annex_b(&mut self, offset: u64, completed: usize) -> Result<()> {
+        if let Some(error) = self.failure {
+            return Err(error);
+        }
+        if !matches!(self.phase, Phase::AnnexPrefix)
+            || self.cursor.position() != 0
+            || self.cursor.buffered_owner().is_some()
+            || self.zeroes != 0
+            || self.completed != 0
+            || completed >= self.limits.maximum_nal_units
+        {
+            return Err(Error::SourceMismatch);
+        }
+        let mut cursor = InputCursor::new(
+            self.cursor.budget(),
+            self.cursor.source(),
+            SourceCapabilities {
+                random_access: true,
+                ..self.cursor.capabilities()
+            },
+            self.limits.maximum_input_window,
+        )?;
+        cursor.request_range(offset)?;
+        self.cursor = cursor;
+        self.completed = completed;
+        Ok(())
+    }
+
     pub fn request(&self) -> InputRequest {
         self.cursor.request()
     }

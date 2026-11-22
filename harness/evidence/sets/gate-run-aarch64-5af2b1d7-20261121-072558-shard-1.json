@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-aarch64-5af2b1d7-20261121-072558-shard-1",
+ "path": "gate-run-aarch64-5af2b1d7-20261121-072558-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at 5af2b1d7 (raw video probe skipping NAL body runs and the raw-video runner deriving its picture period on configuration change, on main d66c90dd) on one c6g.4xlarge host, Linux AArch64, item raw-annex-b: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/5af2b1d7744165d39afc291e5553579382183ba2-aarch64-20261121-072558/shard-1/6e19fa500e8a67e70b3f56c10ed760210ad896c9cacc560c460171a0a26dc217.tar.zst",
+ "sha256": "6e19fa500e8a67e70b3f56c10ed760210ad896c9cacc560c460171a0a26dc217",
+ "bytes": 3032465,
+ "results": [
+  {
+   "path": "memory/raw-annex-b/gate-result.json",
+   "command": "report --memory",
+   "key": "56d0db509823d5f4242f03be70b195ea61922e0123a78cfe1da6a4f01a81f261",
+   "status": 0,
+   "report_sha256": "4564df27921b8bd9b8015853c7ebccef8a49848ec99f873054150c121f634141",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/raw-annex-b/gate-result.json",
+   "command": "report --benchmark",
+   "key": "67f27273c7810b4c26c402db581d3eed93ddcd179d1a1ef6c8f0c9f36970f7d4",
+   "status": 0,
+   "report_sha256": "5f579404d09b539d108b8b9cf98571a4ea15a63ceed753fa620ce75219b55b65",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/raw-annex-b/gate-result.json",
+   "command": "grade",
+   "key": "eb185ee06c06bcb91813d221814711cc4fb2e9a9a610e696f91e00935fd691bd",
+   "status": 0,
+   "report_sha256": "c32f0ae392af3bc8e5642160d98b69c899b2d09c51331959f885e405a3856b7d"
+  }
+ ]
+}

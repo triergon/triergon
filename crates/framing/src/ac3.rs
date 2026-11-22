@@ -635,18 +635,14 @@ impl Ac3FrameReader {
         if frame.len() != length {
             return Ok(None);
         }
-        let frame = frame.freeze().map_err(|rejected| rejected.error)?;
-        self.cursor.provide_owned(InputWindow::new(
-            current.source,
-            current.token,
-            current.offset,
-            frame,
-        )?)?;
-        // Use the copy's byte grant to retrieve the completed frame.
+        let bytes = frame.freeze().map_err(|rejected| rejected.error)?;
+        // The response already belongs to the completed frame. Advance the
+        // cursor using the copy's byte grant without retaining a second view.
         let mut prepaid = WorkBudget::new(length as u64);
-        let Step::Ready(bytes) = self.cursor.read_span(length, &mut prepaid, cancel)? else {
-            unreachable!("validated complete frame window");
-        };
+        let consumed =
+            self.cursor
+                .consume_response(&current, length, &mut prepaid, cancel, || Ok(()))?;
+        debug_assert!(consumed);
         self.completed += 1;
         self.phase = Phase::Start;
         Ok(Some(Ac3Frame {

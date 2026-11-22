@@ -42,7 +42,7 @@
   ],
   "recorded_reference": {
     "id": "ffmpeg-formats-native",
-    "worker_sha256": "4d39156e5c3153bdea90f88b8d15d67683db8464d336f087134387daf2dfefd5",
+    "worker_sha256": "f2d223b642035fcc1830cf26d123dd89b4d03416216e8921fa6e23d447c424a3",
     "mode": "ts-au-fold"
   },
   "cases": [
@@ -5437,6 +5437,301 @@
         "digest": 3856042665398456175
       },
       "reference_result_sha256": "94f8c6b823fc6f47254430ed3af3fc6c11c4faf35980649e5b44fc119d25903e"
+    },
+    {
+      "id": "au-mpeg1-layer1-multiple-per-pes",
+      "profile": "au-mpeg1-layer1-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer1-multiple-per-pes.ts",
+      "sha256": "13c13980bb59184e3bb621f2ed7e248adc2c0d71833eb5f4a78f7fdc39f557d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer1",
+        "pes": [
+          {
+            "payload_bytes": 96,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 7584938453221359850
+      },
+      "reference_result_sha256": "6581dec53c1c562f8bcaeb729481115e288f32613d61aa5fb8987841beb66308"
+    },
+    {
+      "id": "au-mpeg1-layer1-header-across-pes",
+      "profile": "au-mpeg1-layer1-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer1-header-across-pes.m2ts",
+      "sha256": "78993fe8220c78b48f2e7a8b10ba81f98f119556da5fd1fb4d36029a8645450b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer1",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 94,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 7884658440279607035
+      },
+      "reference_result_sha256": "ed8ea4f51141da772529ee777a910672428f69e80210468ea1be2815626bf4b9"
+    },
+    {
+      "id": "au-mpeg1-layer1-44100-multiple-per-pes",
+      "profile": "au-mpeg1-layer1-44100-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer1-44100-multiple-per-pes.ts",
+      "sha256": "c1f63cea4e6109cb282800c9f1cba42944dfdba7181c0f3df5cd21e8ca9d0393",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer1-44100",
+        "pes": [
+          {
+            "payload_bytes": 96,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 8142651324380835256
+      },
+      "reference_result_sha256": "6f9b48c29b00e3908b6a6d07e2eb86814790450c9a57d0978adf0517f18a9859"
+    },
+    {
+      "id": "au-mpeg1-layer1-44100-header-across-pes",
+      "profile": "au-mpeg1-layer1-44100-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer1-44100-header-across-pes.m2ts",
+      "sha256": "d11efd357501a6baee24d5008f6a2281086d4db6cb47eb32a634f242aca8e78f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer1-44100",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 94,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 8442371311439082441
+      },
+      "reference_result_sha256": "3dd95707897b627d57eaf8fb1fa3e14b32809554a0302be537f1262edc8c90cf"
+    },
+    {
+      "id": "au-mpeg1-layer2-multiple-per-pes",
+      "profile": "au-mpeg1-layer2-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer2-multiple-per-pes.ts",
+      "sha256": "603c7b8c486ba9f46048bfa51b87bda2d8515d48cd7adabcdf76f67b4f147696",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer2",
+        "pes": [
+          {
+            "payload_bytes": 576,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 14043593463747707764
+      },
+      "reference_result_sha256": "45b5cfbb740d2279116770c79e9b445b70a0a2b98afc054beb2cf183dfd0b207"
+    },
+    {
+      "id": "au-mpeg1-layer2-header-across-pes",
+      "profile": "au-mpeg1-layer2-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer2-header-across-pes.m2ts",
+      "sha256": "6476c45acf8fb0e27627afc5fc6580b9c1ed7b9cb34948a2bd13036c13c98710",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer2",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 574,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 16768291346556463485
+      },
+      "reference_result_sha256": "79ef1965aa83ec55671048a69dacab6b627565f8541d53aff258712314e80cd1"
+    },
+    {
+      "id": "au-mpeg2-layer2-multiple-per-pes",
+      "profile": "au-mpeg2-layer2-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg2-layer2-multiple-per-pes.ts",
+      "sha256": "63da217ef60a361bc9ecae92c658585ed6f56e0a81bee38ef214936ed0927d92",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg2-layer2",
+        "pes": [
+          {
+            "payload_bytes": 576,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 13126905746382481532
+      },
+      "reference_result_sha256": "282591f40fc784a2761bc2e617a818253e0e340cd4f69a4b903e7b1f9ee087fb"
+    },
+    {
+      "id": "au-mpeg2-layer2-header-across-pes",
+      "profile": "au-mpeg2-layer2-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg2-layer2-header-across-pes.m2ts",
+      "sha256": "c4b77001f3727bd7ae3c2a1d476f5f194291954089d370e2e60deb17f6de753a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg2-layer2",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 574,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 15851603629191237253
+      },
+      "reference_result_sha256": "86429473ae9de7feb6cfddd4cd1b880ce0e322b08949a2a2c35bc9c0594e4092"
+    },
+    {
+      "id": "au-mpeg2-layer3-multiple-per-pes",
+      "profile": "au-mpeg2-layer3-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg2-layer3-multiple-per-pes.ts",
+      "sha256": "9fab25de6757c74ca4baf25bd7b6f96c3ed51bdf60824bd15910e2db4c866cdb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg2-layer3",
+        "pes": [
+          {
+            "payload_bytes": 288,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 15895778888605610054
+      },
+      "reference_result_sha256": "8dde704178e9be7c12975fce2f8b8e7f2d6bc89c357c0c3c29b7e145ff305204"
+    },
+    {
+      "id": "au-mpeg2-layer3-header-across-pes",
+      "profile": "au-mpeg2-layer3-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg2-layer3-header-across-pes.m2ts",
+      "sha256": "c78e3367142a42f3e78dc8d4e9eebbc9b4be00e3acb0895f2305749657184c2b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg2-layer3",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 286,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 10022219321387664983
+      },
+      "reference_result_sha256": "33223226ad2e48cd61fcfd2ac7872b4197271fd393f0800b6ef16f5c10a4cd7a"
     }
   ]
 }

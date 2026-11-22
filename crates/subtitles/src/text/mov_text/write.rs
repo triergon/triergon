@@ -39,14 +39,16 @@ impl<const N: usize> fmt::Write for Fixed<N> {
     }
 }
 
+/// Output bytes staged in a fixed buffer of `N` bytes before they are funded
+/// and moved to the output.
 #[derive(Debug)]
-pub(super) struct Writer {
-    pub pending: Fixed<2048>,
+pub(super) struct Writer<const N: usize> {
+    pub pending: Fixed<N>,
     at: usize,
     data: BudgetVec<u8>,
     pub frozen: Option<Bytes>,
 }
-impl Writer {
+impl<const N: usize> Writer<N> {
     pub(super) fn new(pool: &Budget) -> Self {
         Self {
             pending: Fixed::new(),

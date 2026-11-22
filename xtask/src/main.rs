@@ -25,6 +25,7 @@ mod harness;
 mod isobmff_bench;
 mod isobmff_seek;
 mod json;
+mod mpg123;
 mod numpy;
 mod playback_golds;
 mod prepare;
@@ -40,6 +41,7 @@ mod shape;
 mod stats;
 mod subtitle_fixtures;
 mod toml;
+mod transport_fate;
 mod transport_fixtures;
 mod walk;
 mod worker_tests;
@@ -80,8 +82,9 @@ commands:
   subtitle-fixtures record|verify FEATURE REFERENCE [options]   record or verify subtitle folds
   prepare-ffmpeg [--jobs N] [--profile PROFILE]
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
-                 matroska (default), formats, video, subtitles (git revision on the 9.0 branch);
+                 matroska (default), formats, video, subtitles, transport-dts, transport-mpeg-video (git revision on the 9.0 branch);
                  decode, capture, capture-small (the 9.0.2 release)
+  prepare-mpg123 [--jobs N]   build the pinned static free-format MPEG audio reference
   references     keys|pack|fetch|upload   the keys of the pinned reference builds, and
                  their packs in .research/reference-cache and the evidence archive, which
                  the prepare commands restore instead of building (see `cargo xtask
@@ -163,6 +166,8 @@ commands:
                  fails above the quick-check limit
   screen         REPORTS   grade one paired timing round, with each contract's report
                  under REPORTS/<contract>, against the quick-check tolerances
+  transport-fate check | inventory OUTPUT | observe SPEC OUTPUT_DIR
+                 check TS identity coverage or record pinned original-input observations
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed
   codecs         aac-access-units|manifest|grade|summarize|time|equivalence
@@ -221,6 +226,7 @@ fn main() -> ExitCode {
         Some("fixture") => fixture(&root, &args[1..]),
         Some("subtitle-fixtures") => subtitle_fixtures::main(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
+        Some("transport-fate") => transport_fate::main(&root, &args[1..]),
         Some("compare") => compare(&root, &args[1..]),
         Some("link-order") => link_order(&root, &args[1..]),
         Some("same-code") => match &args[1..] {
@@ -262,6 +268,7 @@ fn main() -> ExitCode {
         Some("isobmff-seek") => {
             return failing(isobmff_seek::main(&root, &args[1..]), isobmff_seek::USAGE);
         }
+        Some("prepare-mpg123") => mpg123::prepare(&root, &args[1..]),
         Some("external-vector") => return external_vector(&root, &args[1..]),
         Some("fate-run") => return fate_run(&root, &args[1..]),
         Some("graph") => graph(&root, &args[1..]),
@@ -851,9 +858,21 @@ fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
 const FIXTURE_USAGE: &str = "usage: cargo xtask fixture <family> [options] --output FILE
 
 families and options:
+  m2ts-program --record REFERENCE   record the complete authored M2TS program
   m2ts INPUT.ts OUTPUT.m2ts   wrap TS188 packets for the program fixtures
   transport-access-units --output ROOT [--record --reference-worker FILE --observations DIR]
            regenerate MPEG-TS access-unit inputs and their reference-pinned corpus
+  transport-dts --record REFERENCE   regenerate DVB DTS core transport inputs and pins
+  transport-dts-discovery FATE_DTS_TS [--record REFERENCE]   generate automatic DTS controls
+  transport-dts-hd --record REFERENCE   regenerate DTS-HD transport inputs and pins
+  transport-eac3-six-block [--record REFERENCE]   generate and pin E-AC-3 controls
+  transport-eac3-probe OUTPUT   generate ATSC short-group packet-boundary probes
+  transport-dts-hd-grouped [--record REFERENCE]   generate DTS-HD source AU controls
+  transport-dts-seek --record REFERENCE   regenerate DTS core seek inputs and pins
+  transport-audio-seek --record REFERENCE   regenerate additional MPEG-TS audio seek inputs and pins
+  transport-mpeg-video --record REFERENCE [--reference-library PATH]   generate MPEG video picture inputs and observations
+  transport-matched --record SEEK_REFERENCE AUDIO_REFERENCE
+           regenerate MPEG-TS seek and free-format audio controls and pins
   zlib     [--kind stored|fixed|dynamic] [--scope N] [--lace 0-3] [--aac] [--mixed] [--empty]
   header   [--scope N] [--lace] [--aac]
   colour   --mastering-width 4|8 --values V0,...,V9   (empty Colour with one MasteringMetadata)";
@@ -861,14 +880,53 @@ families and options:
 /// One corpus variant, for harness tests that need cases beyond the manifests.
 fn fixture(root: &Path, args: &[String]) -> Task {
     let family = args.first().map(String::as_str).ok_or(FIXTURE_USAGE)?;
+    if family == "m2ts-program" {
+        let [flag, reference] = &args[1..] else {
+            return Err(FIXTURE_USAGE.into());
+        };
+        if flag != "--record" {
+            return Err(FIXTURE_USAGE.into());
+        }
+        return transport_fixtures::program::record(root, Path::new(reference));
+    }
     if family == "m2ts" {
         let [source, target] = &args[1..] else {
             return Err(FIXTURE_USAGE.into());
         };
         return transport_fixtures::program_m2ts(Path::new(source), Path::new(target));
     }
+    if family == "transport-eac3-six-block" {
+        return transport_fixtures::eac3_probe::report_main(root, &args[1..]);
+    }
+    if family == "transport-eac3-probe" {
+        return transport_fixtures::eac3_probe::main(root, &args[1..]);
+    }
     if family == "transport-access-units" {
         return transport_fixtures::main(root, &args[1..]);
+    }
+    if family == "transport-dts-discovery" {
+        return transport_fixtures::dts_discovery::main(root, &args[1..]);
+    }
+    if family == "transport-dts-hd-grouped" {
+        return transport_fixtures::dts_hd::main(root, &args[1..]);
+    }
+    if family == "transport-dts-hd" {
+        return transport_fixtures::matched::author_dts_hd(root, &args[1..]);
+    }
+    if family == "transport-dts-seek" {
+        return transport_fixtures::matched::author_dts_seek(root, &args[1..]);
+    }
+    if family == "transport-dts" {
+        return transport_fixtures::matched::author_dts(root, &args[1..]);
+    }
+    if family == "transport-audio-seek" {
+        return transport_fixtures::matched::author_audio_seek(root, &args[1..]);
+    }
+    if family == "transport-mpeg-video" {
+        return transport_fixtures::matched::author_mpeg_video(root, &args[1..]);
+    }
+    if family == "transport-matched" {
+        return transport_fixtures::matched::author(root, &args[1..]);
     }
     let mut options = std::collections::BTreeMap::new();
     let mut rest = args[1..].iter();
@@ -1007,6 +1065,9 @@ fn prepare_check(part: Option<Part>) -> Task {
         None | Some(Part::Parity) => &[
             &["prepare-ffmpeg"],
             &["prepare-ffmpeg", "--profile", "formats"],
+            &["prepare-ffmpeg", "--profile", "transport-dts"],
+            &["prepare-ffmpeg", "--profile", "transport-mpeg-video"],
+            &["prepare-mpg123"],
             &["prepare-ffmpeg", "--profile", "video"],
             &["fixtures"],
             &["fetch-vectors"],

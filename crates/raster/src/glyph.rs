@@ -696,9 +696,10 @@ impl Raster {
     }
 
     /// The border of `glyph` for [`PlacedBorder::Stroke`]: its first outline
-    /// scaled and stroked, as libass builds a border outline. `None` when it
-    /// cannot be stroked within the coordinate range; the glyph then has no
-    /// border.
+    /// scaled and stroked, as libass builds a border outline, in storage of
+    /// exactly its size (the stroker grows it in the context's scratch).
+    /// `None` when it cannot be stroked within the coordinate range; the glyph
+    /// then has no border.
     ///
     /// # Errors
     ///
@@ -710,9 +711,8 @@ impl Raster {
         work: &mut WorkBudget,
     ) -> Result<Option<Shape>> {
         let source = &glyph.outlines()[0];
-        let mut border = Shape::new(&self.budget);
         if stroke.is_empty() || source.is_empty() {
-            return Ok(Some(border));
+            return Ok(Some(Shape::new(&self.budget)));
         }
         let pen = Pen {
             width: Vector::new(
@@ -722,12 +722,13 @@ impl Raster {
             tolerance: STROKER_PRECISION,
         };
         let scaled = &mut self.transformed;
+        let border = &mut self.stroked;
         let points = self.limits.outline_points;
         let stroked = scaled
             .rebuild(|[first, _]| source.scale_pow2_into(first, stroke.scale_order))
-            .and_then(|()| stroke_outline(&scaled.outlines()[0], &pen, points, &mut border, work));
+            .and_then(|()| stroke_outline(&scaled.outlines()[0], &pen, points, border, work));
         match stroked {
-            Ok(()) => Ok(Some(border)),
+            Ok(()) => border.try_clone().map(Some),
             Err(Error::Invalid(_)) => Ok(None),
             Err(error) => Err(error),
         }

@@ -35,14 +35,14 @@ glibc iconv when converting ASS packets (`compat::charset::AssPacketJob`).
 
 ## Data and licences
 
-Production tables are in `mapping-data/` as sorted big-endian `(u16 code, u16
-scalar)` records; no mapping exceeds U+FFFF. Unicode and Microsoft tables are
+Production tables are in `charset/mapping-data/` as sorted big-endian `(u16 code,
+u16 scalar)` records; no mapping exceeds U+FFFF. Unicode and Microsoft tables are
 under the Unicode License V3 (`charset/UNICODE-LICENSE.txt`,
-`mapping-data/UNICODE-LICENSE.txt`). The GNU Big5 charmap, with its
-free-distribution notice, is `mapping-data/RECEIVER-BIG5-DATA.txt`. The original text tables, including
-KSC5601 for cross-checking, are in `tests/multibyte-mapping-data/` and
-`tests/receiver-mapping-data/`. Mapping code is original; no iconv or FFmpeg
-code is used.
+`charset/mapping-data/UNICODE-LICENSE.txt`). The GNU Big5 charmap, with its
+free-distribution notice, is `charset/mapping-data/RECEIVER-BIG5-DATA.txt`. The
+original text tables, including KSC5601 for cross-checking, are in the crate's
+`tests/multibyte-mapping-data/` and `tests/receiver-mapping-data/`. Mapping code is
+original; no iconv or FFmpeg code is used.
 
 ## Decoder behaviour
 

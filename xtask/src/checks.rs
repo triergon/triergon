@@ -532,6 +532,10 @@ pub fn safety(root: &Path) -> Result<String, String> {
     let text = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
     let metadata = json::parse(&text).map_err(|e| format!("cargo metadata: {e}"))?;
     let owned = [root.join("crates"), root.join("xtask")];
+    let workspace_toml = fs::read_to_string(root.join("Cargo.toml")).map_err(|e| e.to_string())?;
+    let worker_lints = lint_table(&workspace_toml, "[workspace.lints.")
+        .replace("[workspace.lints.", "[lints.")
+        .replace("unsafe_code = \"forbid\"", "unsafe_code = \"deny\"");
     let packages = metadata
         .get("packages")
         .and_then(Value::as_array)
@@ -559,6 +563,16 @@ pub fn safety(root: &Path) -> Result<String, String> {
         if !local || !owned.iter().any(|dir| manifest.starts_with(dir)) {
             return Err(format!("Unadmitted dependency: {name}"));
         }
+        let cargo_toml =
+            fs::read_to_string(&manifest).map_err(|e| format!("{}: {e}", manifest.display()))?;
+        if manifest.starts_with(root.join("crates"))
+            && !cargo_toml.contains("[lints]\nworkspace = true\n")
+            && lint_table(&cargo_toml, "[lints.") != worker_lints
+        {
+            return Err(format!(
+                "{name}: [lints] is neither the workspace's nor the workers' (the workspace's with unsafe_code denied)"
+            ));
+        }
         for target in package
             .get("targets")
             .and_then(Value::as_array)
@@ -582,7 +596,9 @@ pub fn safety(root: &Path) -> Result<String, String> {
             }
             let text =
                 fs::read_to_string(&source).map_err(|e| format!("{}: {e}", source.display()))?;
-            if !text.contains("#![forbid(unsafe_code)]") {
+            let denied_worker =
+                text.contains("#![deny(unsafe_code)]") && text.contains(WORKER_ENTRY);
+            if !text.contains("#![forbid(unsafe_code)]") && !denied_worker {
                 return Err(format!(
                     "Missing crate-level unsafe prohibition: {}",
                     source.display()
@@ -591,12 +607,14 @@ pub fn safety(root: &Path) -> Result<String, String> {
         }
     }
     // The library crates are scanned as text as well; xtask relies on its
-    // `forbid` attribute because its own tests spell out the patterns.
+    // `forbid` attribute because its own tests spell out the patterns. A worker
+    // binary's C entry point is the one unsafe item admitted.
     for source in walk::files(&root.join("crates"), &|rel| {
         rel.extension().is_some_and(|e| e == "rs")
     }) {
         let text = fs::read_to_string(&source).map_err(|e| format!("{}: {e}", source.display()))?;
-        if has_unsafe_syntax(&text) {
+        let rest = without_worker_entry(&text).map_err(|e| format!("{}: {e}", source.display()))?;
+        if has_unsafe_syntax(&rest) {
             return Err(format!(
                 "Unsafe syntax requires investigation: {}",
                 source.display()
@@ -604,12 +622,49 @@ pub fn safety(root: &Path) -> Result<String, String> {
         }
     }
     Ok(format!(
-        "Strict-safe workspace: {} owned packages; no third-party packages, build scripts or unsafe syntax",
+        "Strict-safe workspace: {} owned packages; no third-party packages, build scripts or unsafe syntax but each worker's C entry point",
         packages.len()
     ))
 }
 
-/// `unsafe` as a word followed by a block, `impl`, `trait`, `fn` or `extern`.
+/// The C entry point of a worker binary, the one item its `deny(unsafe_code)` allows.
+const WORKER_ENTRY: &str = "#[allow(unsafe_code)]\n#[unsafe(no_mangle)]\nextern \"C\" fn main(";
+
+/// `text` without its worker entry point. A file may hold one, in a crate root that
+/// denies unsafe code and has no `main` of Rust's own outside its tests.
+fn without_worker_entry(text: &str) -> Result<String, String> {
+    match text.matches(WORKER_ENTRY).count() {
+        0 => Ok(text.to_owned()),
+        1 if text.contains("#![deny(unsafe_code)]")
+            && text.contains("#![cfg_attr(not(test), no_main)]") =>
+        {
+            Ok(text.replace(WORKER_ENTRY, ""))
+        }
+        count => Err(format!(
+            "{count} worker entry points; a worker binary has one, with #![deny(unsafe_code)] and #![cfg_attr(not(test), no_main)]"
+        )),
+    }
+}
+
+/// The lint tables of a Cargo manifest whose headers start with `prefix`, without
+/// comments or blank lines.
+fn lint_table(manifest: &str, prefix: &str) -> String {
+    let mut table = String::new();
+    let mut inside = false;
+    for line in manifest.lines().map(str::trim) {
+        if line.starts_with('[') {
+            inside = line.starts_with(prefix);
+        }
+        if inside && !line.is_empty() && !line.starts_with('#') {
+            table.push_str(line);
+            table.push('\n');
+        }
+    }
+    table
+}
+
+/// `unsafe` as a word followed by a block, `impl`, `trait`, `fn`, `extern` or an
+/// attribute's parenthesis.
 pub fn has_unsafe_syntax(text: &str) -> bool {
     let word = |c: char| c.is_alphanumeric() || c == '_';
     text.match_indices("unsafe").any(|(at, _)| {
@@ -617,7 +672,7 @@ pub fn has_unsafe_syntax(text: &str) -> bool {
             return false;
         }
         let rest = text[at + "unsafe".len()..].trim_start();
-        ["{", "impl", "trait", "fn", "extern"]
+        ["{", "impl", "trait", "fn", "extern", "("]
             .iter()
             .any(|next| rest.starts_with(next))
     })
@@ -717,6 +772,28 @@ mod tests {
     }
 
     #[test]
+    fn admits_one_worker_entry_point_in_a_denying_crate_root() {
+        let entry = "#![deny(unsafe_code)]\n#![cfg_attr(not(test), no_main)]\n\
+                     #[allow(unsafe_code)]\n#[unsafe(no_mangle)]\nextern \"C\" fn main() -> i32 { 0 }\n";
+        assert!(!has_unsafe_syntax(&without_worker_entry(entry).unwrap()));
+        assert!(without_worker_entry(&entry.replace("deny", "warn")).is_err());
+        let twice = format!("{entry}{}", &entry[entry.find("#[allow").unwrap()..]);
+        assert!(without_worker_entry(&twice).is_err());
+        let exported = entry.replace("#[allow(unsafe_code)]\n", "");
+        assert!(has_unsafe_syntax(&without_worker_entry(&exported).unwrap()));
+    }
+
+    #[test]
+    fn reads_lint_tables_without_comments() {
+        let manifest = "[package]\nname = \"x\"\n\n[lints.rust]\n# why\nunsafe_code = \"deny\"\n\n\
+                        [lints.clippy]\nall = \"warn\"\n\n[features]\nf = []\n";
+        assert_eq!(
+            lint_table(manifest, "[lints."),
+            "[lints.rust]\nunsafe_code = \"deny\"\n[lints.clippy]\nall = \"warn\"\n"
+        );
+    }
+
+    #[test]
     fn detects_unsafe_syntax_only_at_word_starts() {
         for text in [
             "unsafe { x }",
@@ -724,6 +801,8 @@ mod tests {
             "pub unsafe fn f()",
             "unsafe\n  extern \"C\"",
             "unsafe trait T",
+            "#[unsafe(no_mangle)]",
+            "#[unsafe (export_name = \"f\")]",
         ] {
             assert!(has_unsafe_syntax(text), "{text}");
         }

@@ -1,0 +1,154 @@
+{
+ "name": "gate-run-aarch64-5b8dd88f-20261121-085805-shard-3",
+ "path": "gate-run-aarch64-5b8dd88f-20261121-085805-shard-3",
+ "retention": "retained",
+ "reason": "Full gate run at 5b8dd88f (main 133ad93d with the runtime ceiling at 1.0) on eight c6g.4xlarge hosts, Linux AArch64, shard 3 of 8: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results).",
+ "key": "evidence/gate-runs/5b8dd88fde60314257060bf7f594d1886812219d-aarch64-20261121-085805/shard-3/76b2d6014dcc1ba3c016e68af4c4a5e32b6086864fa8abaad84c7455fec40278.tar.zst",
+ "sha256": "76b2d6014dcc1ba3c016e68af4c4a5e32b6086864fa8abaad84c7455fec40278",
+ "bytes": 395075948,
+ "results": [
+  {
+   "path": "capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "1632bbbefae237816271c4ad2e72909cc1ba624cc24f647790cd83d25748400b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "4d4d2598d120f7b96da5297cdf37d4004263cbe8c1a919cb86a7536d7221303e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "c5f5016ec112bfe003f0ac8d98a1cec9b057259bd9f63294a9b076258c4959f8",
+   "status": 0,
+   "report_sha256": "e14fd08983cb6633b0e017d064ac0a7b26567b1345af410b7e02e5991456c180",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-segment-metadata/gate-result.json",
+   "command": "report --memory",
+   "key": "114c0a797f504f2d23fbed63363eed91dd1e23cc186558fab2c233934987496f",
+   "status": 0,
+   "report_sha256": "ad4c6ead18d0d3a0c218fe628d471f8636aa77b7864eac92b1a8ead7e0fa35ec",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "1aff4d096fde97bcd990a80f48562723269eae10d7758845fe8d5c2b600515fb",
+   "status": 0,
+   "report_sha256": "1de14221e986846738f7df0e0a9ebfd93d6d45a63ac0858f4f53063d4943d60c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "e230ebb3498ce351528ae841cada29046cb6f7eccfd776b2db2af6affdbf4076",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "fc98aa09ed17a1ae55664e52b30b6afc320264da066a5f71d3dbfc371ca5d389",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/matroska-audio-clocks/gate-result.json",
+   "command": "report --memory",
+   "key": "3553c574337cad39d20e4d1c344a79d6b7faa43ba0463881a4dcdc3d28274e0d",
+   "status": 0,
+   "report_sha256": "944bfc2bb86ace7c901c772e5ce890d29635a171198bad21ded168613b31acfa",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-free-audio/gate-result.json",
+   "command": "report --memory",
+   "key": "b17726416a083142e4ba47afb54c00643a452b7103a50f742185c7b3000e291d",
+   "status": 0,
+   "report_sha256": "9ef98d0457aac02457908ce83e191c5dcd3dcfd482b3994229aa8cd2bf3d4d4e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "0f689bd00d74851198ce54256e73f03537867f79d0abf19d0b38b7aea706d715",
+   "status": 0,
+   "report_sha256": "1cfdbb7b977f334fbe54c86775cb6a1b6c2b7a01914c7d9290df883a3db801c5",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-segment-metadata/gate-result.json",
+   "command": "report --benchmark",
+   "key": "8156eea9591027045fee6866107da6e6c5518f82d92518739aded0473c4764b7",
+   "status": 0,
+   "report_sha256": "e71d5c7a9e4a7efe53592556937eeb4eb9b651036bb7446d47c225839ada728d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "aee5dd8893bd8fe8ad7c1ce771de620ad3dd848e97c969b381646afc4dc2fcb7",
+   "status": 0,
+   "report_sha256": "bf0ec7156a806f409992b551ff3fad8426772c2d0da5235e57dfde02fda1a379",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-audio-clocks/gate-result.json",
+   "command": "report --benchmark",
+   "key": "deda4fa5f3442a9e84dfd2bc013fc631bc00674c0fbf74aa3d8df730bd5a5c27",
+   "status": 0,
+   "report_sha256": "15ef2a89ca948091f92550d3da568330fd8c230e06412c0f766f8ab1741527f7",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-free-audio/gate-result.json",
+   "command": "report --benchmark",
+   "key": "675a2ab8c4d6e1607bb93ac51a75993c5350581c248bc11f0bda78c7b7c4cef3",
+   "status": 0,
+   "report_sha256": "543ee9893e71fdeda7325d1c2be0521f42aaf5b4f516d3147300c72efca8cb9f",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/isobmff-2/gate-result.json",
+   "command": "grade",
+   "key": "c78bd09996654e3782baf536f65e642a56d09b8d00bbdc29f5a834ac6eb2d1a2",
+   "status": 0,
+   "report_sha256": "4033e56280e49b13fbb4bb281c6fbaa2256063c7d2de78a7f62e93ce4cc1f645"
+  },
+  {
+   "path": "graded/matroska-segment-metadata/gate-result.json",
+   "command": "grade",
+   "key": "3fbc7bd4dc125aa7553303cfeecd73c2e6fa665b3e72e73abf54c5f61f99b4bc",
+   "status": 0,
+   "report_sha256": "b0c3639106b004503630d712a972c5f8e8362fa9e5a5c6ef42f13c6a601bd078"
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "a4ff7ac5ab46ffa61363550ffb2cfef45aaa01a4eceb95f0c5d442b6e2216427",
+   "status": 0,
+   "report_sha256": "4c5045ca40b2a4c000c5ee5f80080f70f2d6ac9404884b8f3fc2d3820be21d66"
+  },
+  {
+   "path": "graded/matroska-audio-clocks/gate-result.json",
+   "command": "grade",
+   "key": "c94144036ec169aa7e47ba3c622f0e370306d6e5d4f46268c593f013a0845726",
+   "status": 0,
+   "report_sha256": "66982ac8f29b68681405610159869957d38c2a64224ab722c7d5fedbf069096a"
+  },
+  {
+   "path": "graded/mpegts-free-audio/gate-result.json",
+   "command": "grade",
+   "key": "cdcf0168186227552dcdaa57c43a25ffb388bf8b5b0f422e8814a12c654a27bf",
+   "status": 0,
+   "report_sha256": "ab4e9360bc88af6340e692760f3db9b96ac1be794da72f721104c62758a06565"
+  }
+ ]
+}

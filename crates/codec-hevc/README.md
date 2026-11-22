@@ -1,11 +1,12 @@
 # triergon-codec-hevc
 
-H.265/HEVC decoder for Annex B byte streams, written from Rec. ITU-T H.265 (V11, 01/2026).
-It is a codec-layer crate that depends on [triergon-bitstream](../bitstream/README.md),
-[triergon-codec](../codec/README.md) (it implements `VideoDecoder`) and
-[triergon-framing](../framing/README.md) (Annex B units and the decoded picture buffer). It decodes the Main,
-Main 10 and Main Still Picture profiles (4:2:0, 8 and 10 bit) to cropped pictures in
-output order, single-threaded. It does not scale, convert colour or conceal errors.
+H.265/HEVC decoder for Annex B byte streams, written from Rec. ITU-T H.265 (V11,
+01/2026). It is a codec-layer crate that depends on
+[triergon-bitstream](../bitstream/README.md), [triergon-codec](../codec/README.md) (it
+implements `VideoDecoder`) and [triergon-framing](../framing/README.md) (Annex B units
+and the decoded picture buffer). It decodes the Main, Main 10 and Main Still Picture
+profiles (4:2:0, 8 and 10 bit) to cropped pictures in output order, single-threaded. It
+does not scale, convert colour or conceal errors.
 
 ## Usage
 
@@ -30,11 +31,11 @@ fn decode_stream(stream: &[u8]) -> Result<(), DecodeError> {
 ```
 
 `send_nal` takes one NAL unit without start code; `reset` drops the DPB and any partial
-picture. `Decoder::with_limits(Limits { live_storage_bytes })` sets the storage budget (it
-fails only for a budget below a pool's own charge); `Decoder::new_in` charges a caller's
-`Budget` instead. `Plane::raw()` gives zero-copy access to the backing plane and `write_raw`
-appends u8 or little-endian u16 samples. `examples/decode_hevc.rs IN.hevc OUT.yuv|-|null`
-writes planar YUV and one JSON line per picture.
+picture. `Decoder::with_limits(Limits { live_storage_bytes })` sets the storage budget;
+`Decoder::new_in` charges a caller's `Budget` instead. `Plane::raw()` gives zero-copy
+access to the backing plane and `write_raw` appends u8 or little-endian u16 samples.
+`examples/decode_hevc.rs IN.hevc OUT.yuv|-|null` writes planar YUV and one JSON line per
+picture.
 
 ## Features
 
@@ -76,34 +77,22 @@ identical output.
   nor output, as in FFmpeg.
 - Limits: picture size capped at level 6.2 (35,651,584 luma samples, 16,888 per side)
   before allocation; DPB size from `sps_max_dec_pic_buffering` (at most 16).
-- Storage: decoded and reference pictures (also while a caller holds a `Picture`), the
-  decoded picture buffer, the frame pool, collocated motion, per-picture block and CTB maps, parameter sets, tile and
-  scan tables, the SAO band buffer and the RBSP of the NAL unit being parsed are charged
-  to the budget before they are allocated; a refused charge is `DecodeError::Budget`,
-  the picture it was for is not started, and decoding resumes once the storage fits. A frame returns to the pool (one spare per bit depth) when the last picture
-  showing it drops; the maps follow the picture size in both directions. The default, 1.25 GiB, holds the largest picture the size cap accepts
-  (8192×4352, 107 MB in 10-bit storage) in the 6-picture DPB level 6.2 allows at that
-  size (A.4.2), plus the frame pool and two held output pictures: nine frames, 963 MB,
-  and about 70 MB of collocated motion, maps and tables, which leaves about 30% for slice
+- Storage: pictures (also while a caller holds one), the decoded picture buffer, the
+  frame pool, collocated motion, block and CTB maps, parameter sets, tile and scan
+  tables, the SAO band buffer and the RBSP being parsed are charged to the budget before
+  they are allocated; a refused charge is `DecodeError::Budget` and that picture is not
+  started. A frame returns to the pool (one spare per bit depth) when the last picture
+  showing it drops; the maps follow the picture size. The 1.25 GiB default holds the
+  largest accepted picture (8192×4352, 107 MB in 10-bit storage) in the 6-picture DPB
+  level 6.2 allows at that size (A.4.2), plus the pool and two held output pictures (nine
+  frames, 963 MB) and about 70 MB of motion, maps and tables, leaving about 30% for slice
   data. A 2160p Main 10 stream with a full 16-picture DPB needs about 0.5 GB.
 - A slice error abandons the rest of the picture; what was decoded is still output.
   Behaviour on corrupt streams is not compared with FFmpeg's concealment.
 
 ## Conformance
 
-- Specification: Rec. ITU-T H.265 (V11, 01/2026). Tables are transcribed or regenerated
-  from the text with the table or equation number in a comment.
-- Reference: FFmpeg 9.0.2 raw output on the FATE `hevc-conformance` suite and on
-  x265-encoded 8- and 10-bit streams. Every output picture must be bit-exact, with
-  identical count and order; out-of-set vectors must be refused. Both the `simd` and
-  the scalar build are checked.
-- `cargo test -p triergon-codec-hevc` runs unit tests (CABAC, transforms against the
-  direct matrix product, scans); `tests/conformance.rs` compares MD5s against
-  `tests/ffmpeg_ref_md5.txt` when `.research/fate-samples/hevc-conformance/` is
-  present (a subset by default, all with `HEVC_CONFORMANCE_FULL=1`) and skips otherwise.
-- `cargo xtask codecs compare-hevc` streams individual files through the planar
-  comparison used by `codecs grade`. An exact match requires both processes to exit
-  successfully with complete, identical frames. The first mismatch records the frame,
-  plane, sample and 64×64 luma region. [Command and report fields](../../harness/codecs/hevc/STATUS.md).
-- The manifest grade also compares the 1920×1080 RGBA output. If the planar decoder
-  refuses a declared feature, any RGBA output must still match in full. [Project-wide gates](../../docs/quality.md).
+Rec. ITU-T H.265 (V11, 01/2026). Tables are transcribed or regenerated from the text with
+the table or equation number in a comment. The comparison commands are in
+[harness/codecs/hevc](../../harness/codecs/hevc/STATUS.md); results in
+[docs/status.md](../../docs/status.md).

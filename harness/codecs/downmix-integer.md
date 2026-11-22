@@ -26,12 +26,11 @@ hexagonal, 6.1, 6.1(back), 6.1(front), 7.0, 7.0(front), 7.1, 7.1(wide),
   does not clip. No mismatches in 3,500 to 36,000 random and extreme frames per layout.
 - 5.0 and 5.0(side) gains are 13573, 9598, 9598, which sum to 32769. A full-scale frame
   overshoots and wraps: every channel at 32767 gives -32768, every channel at -32768 gives
-  32767. Our clipping made this the 65534 LSB difference.
+  32767.
 - 5.1, 5.1(side) and 7.1 (FL FR FC LFE then BL BR, SL SR or both) give the centre the
   row's remainder, so each row sums to 32768: 9597 instead of 9598 for 5.1, 7424
   instead of 7423 for 7.1. This depends on the layout, not the matrix: FL+FR+FC+TC+BL+BR
-  and 5.1.2 have the same matrices and use plain rounding. The centre gain caused the
-  2 LSB differences.
+  and 5.1.2 have the same matrices and use plain rounding.
 - Open: with non-default levels (`aresample=center_mix_level=…`, `lfe_mix_level`,
   `surround_mix_level`) those three layouts follow neither rule. Gains move by more
   than one unit from the matrix, the L and R rows differ, and the channels do not
@@ -49,21 +48,8 @@ hexagonal, 6.1, 6.1(back), 6.1(front), 7.0, 7.0(front), 7.1, 7.1(wide),
   significant bits). Above 24 bits, rounding to `f32` moves about 0.03% of samples by
   1 LSB.
 
-## Result
+## Limits
 
-`codec-worker audio-flac-raw` against the reference worker linked to the same FFmpeg
-(interleaved stereo s16, maximum absolute difference per sample):
-
-| Files | Before | After |
-|---|---|---|
-| s16 3, 4 and 7 channels, quad(side) mask, 8- and 12-bit 7 channels | 1 | 0 |
-| s16 5 channels, 5.0(back) mask | 65534 | 0 |
-| s16 6 and 8 channels | 2 | 0 |
-| s16 mono and stereo | 0 | 0 |
-| 24-bit stereo and mono | 0 | 0 |
-| 20/24/32-bit 6, 7 and 8 channels, 28-32-bit stereo | 1 (25-54 samples) | unchanged |
-
-The FLAC planes stay `f32`, so 25-to-32-bit stereo keeps its rounding differences. The
-`FL+TBC+TBR` mask fixture is refused by FFmpeg's resampler. Linux AArch64 was not
-re-measured. The integer path has no float rounding, but that has not been confirmed
-on Linux.
+The FLAC planes stay `f32`, so 25-to-32-bit stereo keeps its rounding differences.
+FFmpeg's resampler refuses the `FL+TBC+TBR` mask fixture. The rules were measured on
+macOS only; Linux AArch64 was not re-measured.

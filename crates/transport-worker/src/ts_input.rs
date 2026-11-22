@@ -5,6 +5,8 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceCapabilities, SourceId};
 use triergon_mpegts::PacketFormat;
+use triergon_mpegts::compat::dts::UnlabelledCore;
+use triergon_mpegts::compat::pes::PcrPolicy;
 use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
 
 /// Bound the preloaded entity list independently of the byte budget.
@@ -30,6 +32,9 @@ pub(crate) struct Request {
     pub(crate) format: PacketFormat,
     pub(crate) program: u16,
     pub(crate) namespace: DescriptorNamespace,
+    pub(crate) unlabelled_dts_core: Option<UnlabelledCore>,
+    pub(crate) probe_dts_core: bool,
+    pub(crate) pcr_policy: PcrPolicy,
     /// The first physical entity, with source ID 1.
     pub(crate) input: Bytes,
     pub(crate) following: BudgetVec<Entity>,
@@ -46,6 +51,60 @@ impl Request {
             .get(index)
             .map(|entity| entity.position_base)
     }
+}
+
+pub(crate) fn parse_access_units(
+    pool: &Budget,
+    path: &Path,
+    arguments: &[String],
+) -> Result<Request> {
+    let (pcr_policy, arguments) = match arguments.split_last() {
+        Some((last, rest)) if last == "--ignore-pcr-reserved-bits" => {
+            (PcrPolicy::IgnoreReservedBits, rest)
+        }
+        _ => (PcrPolicy::Strict, arguments),
+    };
+    let mut request = parse_access_unit_selection(pool, path, arguments)?;
+    request.pcr_policy = pcr_policy;
+    Ok(request)
+}
+
+fn parse_access_unit_selection(
+    pool: &Budget,
+    path: &Path,
+    arguments: &[String],
+) -> Result<Request> {
+    if let Some((last, rest)) = arguments.split_last()
+        && last == "--probe-dts-core"
+    {
+        if !matches!(rest, [size, _] if size == "188") {
+            return Err("--probe-dts-core requires one TS188 entity and no namespace".into());
+        }
+        let mut request = parse(pool, path, rest)?;
+        request.probe_dts_core = true;
+        return Ok(request);
+    }
+    let Some((pid, rest)) = arguments
+        .split_last()
+        .and_then(|(last, rest)| last.strip_prefix("--dts-core=").map(|pid| (pid, rest)))
+    else {
+        return parse(pool, path, arguments);
+    };
+    let pid = pid.parse()?;
+    let single_entity = match rest {
+        [_, _] => true,
+        [_, _, namespace] => namespace == "--dvb" || namespace == "--atsc",
+        _ => false,
+    };
+    if !single_entity {
+        return Err("--dts-core requires one physical entity".into());
+    }
+    let mut request = parse(pool, path, rest)?;
+    request.unlabelled_dts_core = Some(UnlabelledCore {
+        program: request.program,
+        pid,
+    });
+    Ok(request)
 }
 
 pub(crate) fn parse(pool: &Budget, path: &Path, arguments: &[String]) -> Result<Request> {
@@ -98,6 +157,9 @@ pub(crate) fn parse(pool: &Budget, path: &Path, arguments: &[String]) -> Result<
         format,
         program,
         namespace,
+        unlabelled_dts_core: None,
+        probe_dts_core: false,
+        pcr_policy: PcrPolicy::Strict,
         input,
         following,
     })
@@ -124,4 +186,36 @@ fn entity(first: &Path, name: &str) -> Result<PathBuf> {
         return Err(format!("entity must be a file name next to the input: {name}").into());
     }
     Ok(first.with_file_name(name))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn automatic_dts_selection_requires_one_ts188_entity_without_a_pid() {
+        let pool = Budget::new(1024 * 1024).unwrap();
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../mpegts/tests/data/ts188-basic.ts");
+        let args = |values: &[&str]| values.iter().map(ToString::to_string).collect::<Vec<_>>();
+        let automatic = parse_access_units(
+            &pool,
+            &path,
+            &args(&["188", "7", "--probe-dts-core", "--ignore-pcr-reserved-bits"]),
+        )
+        .unwrap();
+        assert!(automatic.probe_dts_core);
+        assert!(automatic.unlabelled_dts_core.is_none());
+        assert!(automatic.following.is_empty());
+        let ordinary = parse_access_units(&pool, &path, &args(&["188", "7"])).unwrap();
+        assert!(!ordinary.probe_dts_core);
+        for options in [
+            vec!["192", "7", "--probe-dts-core"],
+            vec!["188", "7", "--dvb", "--probe-dts-core"],
+            vec!["188", "7", "--dts-core=256", "--probe-dts-core"],
+            vec!["188", "7", "other.ts", "--probe-dts-core"],
+        ] {
+            assert!(parse_access_units(&pool, &path, &args(&options)).is_err());
+        }
+    }
 }

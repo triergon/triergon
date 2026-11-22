@@ -347,9 +347,7 @@ impl<'a> TrackSeek<'a> {
     fn restart_at(&mut self, points: &[Checkpoint<'a>], ordinal: u64) -> Result<()> {
         let at = points.partition_point(|point| point.ordinal <= ordinal);
         let point = &points[at - 1];
-        self.cursor = point
-            .slot
-            .try_clone_with_edit_storage(self.cursor.edited.take())?;
+        point.slot.try_clone_into(&mut self.cursor)?;
         self.next = point.ordinal;
         self.previous_sync = Some(ordinal);
         self.best = None;
@@ -401,13 +399,19 @@ impl<'a> TrackSeek<'a> {
                 return Err(Error::Invalid("checked seek lost sync"));
             }
             if previous_sync || (self.search == Search::Forward && key) {
-                let storage = self.best.take().and_then(|point| point.slot.edited);
-                self.best = Some(Checkpoint {
-                    ordinal: self.next,
-                    timestamp,
-                    previous_sync: Some(self.next),
-                    slot: self.cursor.try_clone_with_edit_storage(storage)?,
-                });
+                if let Some(best) = &mut self.best {
+                    best.ordinal = self.next;
+                    best.timestamp = timestamp;
+                    best.previous_sync = Some(self.next);
+                    self.cursor.try_clone_into(&mut best.slot)?;
+                } else {
+                    self.best = Some(Checkpoint {
+                        ordinal: self.next,
+                        timestamp,
+                        previous_sync: Some(self.next),
+                        slot: self.cursor.try_clone()?,
+                    });
+                }
                 if previous_sync || timestamp == self.target {
                     self.search = Search::Ready;
                     continue;

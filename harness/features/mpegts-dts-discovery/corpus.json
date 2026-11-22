@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "fate",
+      "profile": "fate",
+      "file": ".research/fixtures-mpegts-dts-discovery/fate.ts",
+      "sha256": "749561299cf838d55f52d5697f78c273a6c381c5e6c8300f859dfe23252ae2c2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "188",
+        "1",
+        "--probe-dts-core",
+        "--ignore-pcr-reserved-bits"
+      ],
+      "expected": {
+        "packets": 253,
+        "bytes": 254518,
+        "digest": 7472862154947781891,
+        "eof": true
+      }
+    },
+    {
+      "id": "dts-core-unlabelled-private-data",
+      "profile": "dts-core-unlabelled-private-data",
+      "file": ".research/fixtures-mpegts-dts-discovery/dts-core-unlabelled-private-data.ts",
+      "sha256": "fd1d4fb7ca84f1dd39eb2ae65f1aea93fc8f291ca0a9f444984ec1808bb4cdbd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--probe-dts-core",
+        "--ignore-pcr-reserved-bits"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 24576,
+        "digest": 282797149400285436,
+        "eof": true
+      }
+    },
+    {
+      "id": "dts-core-pcr-reserved-bits",
+      "profile": "dts-core-pcr-reserved-bits",
+      "file": ".research/fixtures-mpegts-dts-discovery/dts-core-pcr-reserved-bits.ts",
+      "sha256": "b316bc11f3cfe7954c56d3d7c2921028650299d0db35f4ed617c8c88563e8e35",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--probe-dts-core",
+        "--ignore-pcr-reserved-bits"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 24576,
+        "digest": 10625325230334478316,
+        "eof": true
+      }
+    },
+    {
+      "id": "false-sync",
+      "profile": "false-sync",
+      "file": ".research/fixtures-mpegts-dts-discovery/false-sync.ts",
+      "sha256": "861185df4157bd517cd77e982340b2c906ef51c3373be8d07a9c66c3cfadd297",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "188",
+        "1",
+        "--probe-dts-core",
+        "--ignore-pcr-reserved-bits"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0,
+        "eof": false
+      }
+    },
+    {
+      "id": "second-sync",
+      "profile": "second-sync",
+      "file": ".research/fixtures-mpegts-dts-discovery/second-sync.ts",
+      "sha256": "24181cba3c4925761996e8d72f9949b926c276fdeb32c4d8773ff663aad7d376",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "188",
+        "1",
+        "--probe-dts-core",
+        "--ignore-pcr-reserved-bits"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0,
+        "eof": false
+      }
+    },
+    {
+      "id": "different-mode",
+      "profile": "different-mode",
+      "file": ".research/fixtures-mpegts-dts-discovery/different-mode.ts",
+      "sha256": "41b927f0750ab899861839b5e87cedd79b76bf0ec96e20bfcaf373b682351cd4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "188",
+        "1",
+        "--probe-dts-core",
+        "--ignore-pcr-reserved-bits"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0,
+        "eof": false
+      }
+    },
+    {
+      "id": "ambiguous",
+      "profile": "ambiguous",
+      "file": ".research/fixtures-mpegts-dts-discovery/ambiguous.ts",
+      "sha256": "73fae338b8afa9345c510fd260342239d59fcceaf3692f860f1bfa0cfca42509",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "188",
+        "1",
+        "--probe-dts-core",
+        "--ignore-pcr-reserved-bits"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0,
+        "eof": false
+      }
+    }
+  ]
+}

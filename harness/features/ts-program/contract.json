@@ -7,7 +7,7 @@
   "worker_operation": "ts-program-",
   "reference": "ffmpeg-formats-native",
   "contract": [
-    "one TS188 program through Engine::ts_native_program_v1 from a preloaded seekable source, or one M2TS192 PID through NativeStartup::new_m2ts_prefix_v2 from a forward-only source; 32 KiB windows; the reference uses the mpegts demuxer without parsers or timestamp fill-in",
+    "one TS188 program through Engine::ts_native_program_v1 from a preloaded seekable source, or one M2TS192 program through NativeStartup::new_m2ts_prefix_v2 and PreparedNative::into_program_player (single-PID controls retain PreparedNative::into_player) from a forward-only source; 32 KiB windows; the reference uses the mpegts demuxer without parsers or timestamp fill-in",
     "explicit PIDs of program 1 with their carriage; the native clock projection on every selected PES packet through a clean end of file",
     "each selected packet folded in demux order with PID, PTS, DTS and duration in 90 kHz ticks, packet flags, size and every payload byte",
     "the progressive AVC and AAC access-unit feed is not part of this operation",
@@ -48,7 +48,8 @@
     "m2ts-replay-avc-aac-00-video",
     "m2ts-replay-avc-aac-00-audio",
     "m2ts-replay-hevc-aac-00-video",
-    "m2ts-entry-hevc-aac-44100-01-video"
+    "m2ts-entry-hevc-aac-44100-01-video",
+    "m2ts-replay-avc-aac-00-program"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

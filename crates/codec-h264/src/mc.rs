@@ -352,6 +352,10 @@ fn chroma_mc_w<const W: usize>(
     }
 }
 
+/// Gathered chroma rows: h + 1 rows of W samples from column x (`at`) and from column x + 1
+/// (`next`), packed at stride W.
+const GATHER: usize = 72;
+
 #[allow(clippy::too_many_arguments)]
 fn chroma_kernel<const W: usize>(
     src: &[u8],
@@ -363,71 +367,98 @@ fn chroma_kernel<const W: usize>(
     dst: &mut [u8],
     ds: usize,
 ) {
-    let (fx, fy) = (fx as u16, fy as u16);
     if fx == 0 && fy == 0 {
-        for y in 0..h {
-            let r0: &[u8; W] = src[base + y * st..base + y * st + W].try_into().unwrap();
-            let d: &mut [u8; W] = (&mut dst[y * ds..y * ds + W]).try_into().unwrap();
-            d.copy_from_slice(r0);
-        }
+        copy_block::<W>(src, base, st, h, dst, ds);
         return;
     }
-    if fy == 0 {
-        // Horizontal-only interpolation ((8 - xF) * A + xF * B + 4) >> 3 == equation 8-266 with yF = 0.
-        let (a, b) = (8 - fx, fx);
-        for y in 0..h {
-            let r0 = &src[base + y * st..base + y * st + W + 1];
-            let d: &mut [u8; W] = (&mut dst[y * ds..y * ds + W]).try_into().unwrap();
-            for x in 0..W {
-                d[x] = (((a * r0[x] as u16 + b * r0[x + 1] as u16) * 8 + 32) >> 6) as u8;
-            }
-        }
-        return;
+    // Equation 8-266 over the block's rows packed end to end, so that the loop runs over
+    // W * h samples and vectorises at every width: output sample i takes A and B at i of the
+    // gathered rows and C and D one row (W samples) on. The weights sum to 64, so 16-bit lanes
+    // hold every intermediate; fx = 0 or fy = 0 zeroes two weights, as 8-266 then reads.
+    let mut at = [0u8; GATHER];
+    let mut next = [0u8; GATHER];
+    for y in 0..=h {
+        let row = &src[base + y * st..base + y * st + W + 1];
+        at[y * W..y * W + W].copy_from_slice(&row[..W]);
+        next[y * W..y * W + W].copy_from_slice(&row[1..]);
     }
+    let (fx, fy) = (fx as u16, fy as u16);
     let c00 = (8 - fx) * (8 - fy);
     let c10 = fx * (8 - fy);
     let c01 = (8 - fx) * fy;
     let c11 = fx * fy;
-    let mut r0 = &src[base..base + W + 1];
-    for y in 0..h {
-        let r1 = &src[base + (y + 1) * st..base + (y + 1) * st + W + 1];
-        let d: &mut [u8; W] = (&mut dst[y * ds..y * ds + W]).try_into().unwrap();
-        for x in 0..W {
-            let v = c00 * r0[x] as u16
-                + c10 * r0[x + 1] as u16
-                + c01 * r1[x] as u16
-                + c11 * r1[x + 1] as u16
-                + 32;
-            d[x] = (v >> 6) as u8;
-        }
-        r0 = r1;
+    let mut out = [0u8; 64];
+    let n = W * h;
+    let rows = at[..n]
+        .iter()
+        .zip(&next[..n])
+        .zip(&at[W..W + n])
+        .zip(&next[W..W + n]);
+    for (o, (((&a, &b), &c), &d)) in out[..n].iter_mut().zip(rows) {
+        let v = c00 * a as u16 + c10 * b as u16 + c01 * c as u16 + c11 * d as u16;
+        *o = ((v + 32) >> 6) as u8;
     }
+    copy_block::<W>(&out, 0, W, h, dst, ds);
 }
 
-/// Default weighted sample prediction (8-273): `d` = rounded average of `a` and `b`.
-#[allow(clippy::too_many_arguments)]
+/// Copy the first `w` samples (8, 4 or 2) of h rows of `src` (stride `ss`) into `dst` (stride
+/// `ds`).
 #[inline]
-pub(crate) fn avg2(
-    d: &mut [u8],
-    ds: usize,
-    a: &[u8],
-    sa: usize,
-    b: &[u8],
-    sb: usize,
-    w: usize,
-    h: usize,
-) {
+pub(crate) fn store_narrow(w: usize, src: &[u8], ss: usize, h: usize, dst: &mut [u8], ds: usize) {
     match w {
-        16 => avg_w::<16>(d, ds, a, sa, b, sb, h),
-        8 => avg_w::<8>(d, ds, a, sa, b, sb, h),
-        4 => avg_w::<4>(d, ds, a, sa, b, sb, h),
-        _ => avg_w::<2>(d, ds, a, sa, b, sb, h),
+        8 => copy_block::<8>(src, 0, ss, h, dst, ds),
+        4 => copy_block::<4>(src, 0, ss, h, dst, ds),
+        _ => copy_block::<2>(src, 0, ss, h, dst, ds),
     }
 }
 
+/// How weighted sample prediction combines the two predictions of a block (8.4.2.3), on N
+/// samples at a time.
+trait Combine: Copy {
+    fn apply<const N: usize>(self, d: &mut [u8; N], a: &[u8; N], b: &[u8; N]);
+}
+
+/// Default weights (8-273): (a + b + 1) >> 1.
+#[derive(Clone, Copy)]
+struct Average;
+
+impl Combine for Average {
+    #[inline(always)]
+    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays keeps the loop vectorisable
+    fn apply<const N: usize>(self, d: &mut [u8; N], a: &[u8; N], b: &[u8; N]) {
+        for x in 0..N {
+            d[x] = ((a[x] as u16 + b[x] as u16 + 1) >> 1) as u8;
+        }
+    }
+}
+
+/// ((a*w0 + b*w1 + 2^logWD) >> (logWD + 1)) + o, with o folded into `round` (8-272), in lanes
+/// of `T`.
+#[derive(Clone, Copy)]
+struct Weighted<T> {
+    sh: u32,
+    w0: T,
+    w1: T,
+    round: T,
+}
+
+impl<T: WLane> Combine for Weighted<T> {
+    #[inline(always)]
+    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays keeps the loop vectorisable
+    #[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
+    fn apply<const N: usize>(self, d: &mut [u8; N], a: &[u8; N], b: &[u8; N]) {
+        for x in 0..N {
+            let r = (T::from(a[x]) * self.w0 + T::from(b[x]) * self.w1 + self.round) >> self.sh;
+            d[x] = r.max(T::ZERO).min(T::MAX8).to_u8();
+        }
+    }
+}
+
+/// Combine h rows of W samples of `a` and `b` (strides `sa`, `sb`) into `d` (stride `ds`).
 #[allow(clippy::too_many_arguments)]
 #[inline(always)]
-fn avg_w<const W: usize>(
+fn combine_rows<const W: usize, C: Combine>(
+    c: C,
     d: &mut [u8],
     ds: usize,
     a: &[u8],
@@ -440,10 +471,98 @@ fn avg_w<const W: usize>(
         let rd: &mut [u8; W] = (&mut d[y * ds..y * ds + W]).try_into().unwrap();
         let ra: &[u8; W] = a[y * sa..y * sa + W].try_into().unwrap();
         let rb: &[u8; W] = b[y * sb..y * sb + W].try_into().unwrap();
-        for x in 0..W {
-            rd[x] = ((ra[x] as u16 + rb[x] as u16 + 1) >> 1) as u8;
-        }
+        c.apply(rd, ra, rb);
     }
+}
+
+/// Whether bi-prediction of a block narrower than 16 samples combines its two predictions in
+/// scratch, 16 samples at a time over rows end to end ([`weight_bi_narrow`]), instead of row by
+/// row in place ([`weight_bi`]): on 32-bit ARM loops over 16 samples vectorise and loops over
+/// 8 or fewer do not.
+pub(crate) const NARROW_IN_SCRATCH: bool = cfg!(target_arch = "arm");
+
+/// Run `$body` with `$c` bound to the combination of weights (logWD, w0, w1, o) (8-272 /
+/// 8-273).
+macro_rules! with_combine {
+    ($log_wd:expr, $w0:expr, $w1:expr, $o:expr, |$c:ident| $body:expr) => {{
+        let (log_wd, w0, w1, o): (u32, i32, i32, i32) = ($log_wd, $w0, $w1, $o);
+        let round = (1 << log_wd) + (o << (log_wd + 1));
+        let sh = log_wd + 1;
+        if o == 0 && w0 == 1 << log_wd && w1 == w0 {
+            // Equal default weights: (a + b + 1) >> 1.
+            let $c = Average;
+            $body
+        } else if 255 * (w0.abs() + w1.abs()) + round.abs() <= i16::MAX as i32 {
+            // Every intermediate of 8-272 fits in 16 bits (always true for implicit weights,
+            // whose sum is 64): same result with twice the lanes per vector.
+            let $c = Weighted {
+                sh,
+                w0: w0 as i16,
+                w1: w1 as i16,
+                round: round as i16,
+            };
+            $body
+        } else {
+            let $c = Weighted { sh, w0, w1, round };
+            $body
+        }
+    }};
+}
+
+/// Weighted sample prediction (8-272 / 8-273) of a w x h block: predictions `a` and `b`
+/// (strides `sa`, `sb`) combined into `d` (stride `ds`).
+#[allow(clippy::too_many_arguments)]
+#[inline]
+pub(crate) fn weight_bi(
+    d: &mut [u8],
+    ds: usize,
+    a: &[u8],
+    sa: usize,
+    b: &[u8],
+    sb: usize,
+    w: usize,
+    h: usize,
+    log_wd: u32,
+    w0: i32,
+    w1: i32,
+    o: i32,
+) {
+    with_combine!(log_wd, w0, w1, o, |c| match w {
+        16 => combine_rows::<16, _>(c, d, ds, a, sa, b, sb, h),
+        8 => combine_rows::<8, _>(c, d, ds, a, sa, b, sb, h),
+        4 => combine_rows::<4, _>(c, d, ds, a, sa, b, sb, h),
+        _ => combine_rows::<2, _>(c, d, ds, a, sa, b, sb, h),
+    });
+}
+
+/// Weighted sample prediction (8-272 / 8-273) of a block narrower than 16 samples whose two
+/// predictions are rows of stride `st` in `a` and `b`, each with room for a whole number of
+/// 16-sample chunks: the 16-sample loop runs over the rows end to end, the result replaces `a`
+/// and the block's `w` samples of each row are copied into `d` (stride `ds`).
+#[allow(clippy::too_many_arguments)]
+#[inline]
+pub(crate) fn weight_bi_narrow(
+    d: &mut [u8],
+    ds: usize,
+    a: &mut [u8],
+    b: &[u8],
+    st: usize,
+    w: usize,
+    h: usize,
+    log_wd: u32,
+    w0: i32,
+    w1: i32,
+    o: i32,
+) {
+    let n = (st * h).next_multiple_of(16);
+    with_combine!(log_wd, w0, w1, o, |c| {
+        for (ra, rb) in a[..n].chunks_exact_mut(16).zip(b[..n].chunks_exact(16)) {
+            let ra: &mut [u8; 16] = ra.try_into().unwrap();
+            let x = *ra;
+            c.apply::<16>(ra, &x, rb.try_into().unwrap());
+        }
+    });
+    store_narrow(w, a, st, h, d, ds);
 }
 
 /// Explicit weighted prediction, single list (8-270, 8-271).
@@ -480,46 +599,6 @@ fn weight_uni_w<const W: usize>(a: &mut [u8], sa: usize, h: usize, log_wd: u32, 
     }
 }
 
-/// Bi-predictive weighted prediction (8-272) of `a` and `b` into `d`.
-#[allow(clippy::too_many_arguments)]
-#[inline]
-pub(crate) fn weight_bi(
-    d: &mut [u8],
-    ds: usize,
-    a: &[u8],
-    sa: usize,
-    b: &[u8],
-    sb: usize,
-    w: usize,
-    h: usize,
-    log_wd: u32,
-    w0: i32,
-    w1: i32,
-    o: i32,
-) {
-    if o == 0 && w0 == 1 << log_wd && w1 == w0 {
-        return avg2(d, ds, a, sa, b, sb, w, h); // equal default weights: (a + b + 1) >> 1
-    }
-    let round = (1 << log_wd) + (o << (log_wd + 1));
-    if 255 * (w0.abs() + w1.abs()) + round.abs() <= i16::MAX as i32 {
-        // Every intermediate of 8-272 fits in 16 bits (always true for implicit weights, whose
-        // sum is 64): same result with twice the lanes per vector.
-        let (w0, w1, round) = (w0 as i16, w1 as i16, round as i16);
-        return match w {
-            16 => weight_bi_w::<16, i16>(d, ds, a, sa, b, sb, h, log_wd, w0, w1, round),
-            8 => weight_bi_w::<8, i16>(d, ds, a, sa, b, sb, h, log_wd, w0, w1, round),
-            4 => weight_bi_w::<4, i16>(d, ds, a, sa, b, sb, h, log_wd, w0, w1, round),
-            _ => weight_bi_w::<2, i16>(d, ds, a, sa, b, sb, h, log_wd, w0, w1, round),
-        };
-    }
-    match w {
-        16 => weight_bi_w::<16, i32>(d, ds, a, sa, b, sb, h, log_wd, w0, w1, round),
-        8 => weight_bi_w::<8, i32>(d, ds, a, sa, b, sb, h, log_wd, w0, w1, round),
-        4 => weight_bi_w::<4, i32>(d, ds, a, sa, b, sb, h, log_wd, w0, w1, round),
-        _ => weight_bi_w::<2, i32>(d, ds, a, sa, b, sb, h, log_wd, w0, w1, round),
-    }
-}
-
 /// Lane type of the bi-prediction weighting: i32 in general, i16 when the caller has checked
 /// that 255 * (|w0| + |w1|) + |round| fits.
 trait WLane:
@@ -551,35 +630,6 @@ impl WLane for i32 {
     }
 }
 
-/// ((a*w0 + b*w1 + 2^logWD) >> (logWD + 1)) + o with o folded into `round` (8-272).
-#[allow(clippy::too_many_arguments)]
-#[inline(always)]
-#[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
-fn weight_bi_w<const W: usize, T: WLane>(
-    d: &mut [u8],
-    ds: usize,
-    a: &[u8],
-    sa: usize,
-    b: &[u8],
-    sb: usize,
-    h: usize,
-    log_wd: u32,
-    w0: T,
-    w1: T,
-    round: T,
-) {
-    let sh = log_wd + 1;
-    for y in 0..h {
-        let rd: &mut [u8; W] = (&mut d[y * ds..y * ds + W]).try_into().unwrap();
-        let ra: &[u8; W] = a[y * sa..y * sa + W].try_into().unwrap();
-        let rb: &[u8; W] = b[y * sb..y * sb + W].try_into().unwrap();
-        for x in 0..W {
-            let r = (T::from(ra[x]) * w0 + T::from(rb[x]) * w1 + round) >> sh;
-            rd[x] = r.max(T::ZERO).min(T::MAX8).to_u8();
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -607,16 +657,65 @@ mod tests {
                 )
             };
             let a: Vec<u8> = (0..256).map(|_| rnd() as u8).collect();
+            let want = |i: usize| {
+                let v = ((a[i] as i32 * w0 + b[i] as i32 * w1 + (1 << log_wd)) >> (log_wd + 1)) + o;
+                v.clamp(0, 255) as u8
+            };
             let mut x = vec![0u8; 256];
             weight_bi(&mut x, 16, &a, 16, &b, 16, 16, 16, log_wd, w0, w1, o);
-            let want: Vec<u8> = (0..256)
-                .map(|i| {
-                    let v =
-                        ((a[i] as i32 * w0 + b[i] as i32 * w1 + (1 << log_wd)) >> (log_wd + 1)) + o;
-                    v.clamp(0, 255) as u8
-                })
-                .collect();
-            assert_eq!(x, want, "{log_wd} {w0} {w1} {o}");
+            assert_eq!(
+                x,
+                (0..256).map(want).collect::<Vec<_>>(),
+                "{log_wd} {w0} {w1} {o}"
+            );
+            // Narrower blocks: packed predictions into rows of a wider destination.
+            for (w, h) in [(8, 16), (8, 4), (4, 8), (4, 2), (2, 4), (2, 2)] {
+                let mut pa: Vec<u8> = a.clone();
+                let mut d = vec![9u8; 24 * h];
+                weight_bi_narrow(&mut d, 24, &mut pa, &b, w, w, h, log_wd, w0, w1, o);
+                for y in 0..h {
+                    let got = &d[y * 24..y * 24 + w];
+                    let exp: Vec<u8> = (0..w).map(|x| want(y * w + x)).collect();
+                    assert_eq!(got, exp, "{w}x{h} {log_wd} {w0} {w1} {o}");
+                    assert!(d[y * 24 + w..y * 24 + 24].iter().all(|&v| v == 9));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn chroma_matches_equation_8_266() {
+        let mut seed = 0x9e37_79b9u32;
+        let mut rnd = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            seed
+        };
+        let data: Vec<u8> = (0..32 * 32).map(|_| rnd() as u8).collect();
+        let r = PlaneRef::new(&data, 32, 32, 0);
+        for (w, h) in [(8, 8), (8, 4), (4, 8), (4, 4), (4, 2), (2, 4), (2, 2)] {
+            for fx in 0..8u32 {
+                for fy in 0..8u32 {
+                    let (xi, yi) = (3 + fx as i32, 5 + fy as i32);
+                    let mut d = [0u8; 64];
+                    chroma_mc(&r, xi, yi, fx, fy, w, h, &mut d, w);
+                    for y in 0..h {
+                        for x in 0..w {
+                            let s = |dx: usize, dy: usize| {
+                                data[(yi as usize + y + dy) * 32 + xi as usize + x + dx] as u32
+                            };
+                            let v = ((8 - fx) * (8 - fy) * s(0, 0)
+                                + fx * (8 - fy) * s(1, 0)
+                                + (8 - fx) * fy * s(0, 1)
+                                + fx * fy * s(1, 1)
+                                + 32)
+                                >> 6;
+                            assert_eq!(d[y * w + x] as u32, v, "{w}x{h} {fx} {fy} {x} {y}");
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -1,16 +1,17 @@
 # triergon-harness-runner
 
 The command line and measured loop the Rust harness workers (`playback-worker`,
-`subtitle-worker`) share. A worker mode is `{prefix}fold FILE ARGS`,
+`subtitle-worker`, `transport-worker`) share. A worker mode is `{prefix}fold FILE ARGS`,
 `{prefix}bench FILE ITERATIONS ARGS`, `{prefix}memory FILE ARGS` and, where the worker
 traces, `{prefix}trace FILE ARGS`. [`Invocation`] parses it, and [`measure`] runs the
 operation as often as it asks and prints the result line the reference worker
 (`harness/reference.c`) prints for the same mode; [`measure_with`] adds named values
 the worker works out outside the operation, such as a digest of its prepared input.
-Input preparation, process start-up
-and the result line stay outside the timed loop and the allocation window; an
-operation that leaves storage charged to the preloaded input's pool fails the run.
-It is tooling, not part of the library.
+Input preparation, process start-up and the result line stay outside the timed loop
+and the allocation window; an operation that leaves storage charged to the preloaded
+input's pool fails the run. A refused operation ([`Totals::refusal`]) ends the loop:
+the line counts the operations that ran, says `"eof":false` and carries the refusal
+and its cause. It is tooling, not part of the library.
 
 ## Usage
 

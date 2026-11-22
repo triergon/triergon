@@ -1,0 +1,326 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "au-atsc-eac3-one-block-dep0",
+      "profile": "au-atsc-eac3-one-block-dep0",
+      "file": ".research/fixtures-mpegts-eac3-six-block/au-atsc-eac3-one-block-dep0.ts",
+      "sha256": "c3672dc0b3f127b014bb217e8cc1139796433285824558df4b33e7fbef3db047",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 384,
+            "pts_raw": 90000,
+            "dts_raw": 80000
+          },
+          {
+            "payload_bytes": 192,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 4931118181656872344
+      }
+    },
+    {
+      "id": "au-atsc-eac3-one-block-dep2",
+      "profile": "au-atsc-eac3-one-block-dep2",
+      "file": ".research/fixtures-mpegts-eac3-six-block/au-atsc-eac3-one-block-dep2.ts",
+      "sha256": "c4a65e6e4d29a8f501ae8e02dfa7ca8bfec88d94d8493db25f5ced5f59097e4a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 1152,
+            "pts_raw": 90000,
+            "dts_raw": 80000
+          },
+          {
+            "payload_bytes": 576,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 1728,
+        "digest": 9010230201963547148
+      }
+    },
+    {
+      "id": "au-atsc-eac3-two-block-dep0",
+      "profile": "au-atsc-eac3-two-block-dep0",
+      "file": ".research/fixtures-mpegts-eac3-six-block/au-atsc-eac3-two-block-dep0.ts",
+      "sha256": "5da112f4f8e18ee8c065abbe4be8b2ebbfc7963716a993355cae9a155b2b0032",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 192,
+            "pts_raw": 90000,
+            "dts_raw": 80000
+          },
+          {
+            "payload_bytes": 96,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 9341172979077238791
+      }
+    },
+    {
+      "id": "au-atsc-eac3-two-block-dep2",
+      "profile": "au-atsc-eac3-two-block-dep2",
+      "file": ".research/fixtures-mpegts-eac3-six-block/au-atsc-eac3-two-block-dep2.ts",
+      "sha256": "cf5b84fc087661c865937c7b8d74d1fd84c1df7c7d774bf44935d67ccf63e716",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 576,
+            "pts_raw": 90000,
+            "dts_raw": 80000
+          },
+          {
+            "payload_bytes": 288,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 864,
+        "digest": 8335105489591770401
+      }
+    },
+    {
+      "id": "au-atsc-eac3-three-block-dep0",
+      "profile": "au-atsc-eac3-three-block-dep0",
+      "file": ".research/fixtures-mpegts-eac3-six-block/au-atsc-eac3-three-block-dep0.ts",
+      "sha256": "82e63ab469c21ae77000411a6ae015fa27d0554043360f5c2b7a27f5055d141e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 128,
+            "pts_raw": 90000,
+            "dts_raw": 80000
+          },
+          {
+            "payload_bytes": 64,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 192,
+        "digest": 10056975916167440644
+      }
+    },
+    {
+      "id": "au-atsc-eac3-three-block-dep2",
+      "profile": "au-atsc-eac3-three-block-dep2",
+      "file": ".research/fixtures-mpegts-eac3-six-block/au-atsc-eac3-three-block-dep2.ts",
+      "sha256": "635b3eac87fed4b3dd7f612e5c13dfeea4c3417ae4d504472360c7b84183965a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 384,
+            "pts_raw": 90000,
+            "dts_raw": 80000
+          },
+          {
+            "payload_bytes": 192,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 576,
+        "digest": 9836296303524275752
+      }
+    },
+    {
+      "id": "au-atsc-eac3-mixed-block-dep0",
+      "profile": "au-atsc-eac3-mixed-block-dep0",
+      "file": ".research/fixtures-mpegts-eac3-six-block/au-atsc-eac3-mixed-block-dep0.ts",
+      "sha256": "f5ea0db26e697ff23dc66fb5822954c37749b0631dbe2f425fbb10641a2b6761",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 192,
+            "pts_raw": 90000,
+            "dts_raw": 80000
+          },
+          {
+            "payload_bytes": 96,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 4393127636328960007
+      }
+    },
+    {
+      "id": "au-atsc-eac3-mixed-block-dep2",
+      "profile": "au-atsc-eac3-mixed-block-dep2",
+      "file": ".research/fixtures-mpegts-eac3-six-block/au-atsc-eac3-mixed-block-dep2.ts",
+      "sha256": "13f25d51bdf1f0991f0be81905ef2871a87f025ace60b7db8ab061e8ada3324d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 576,
+            "pts_raw": 90000,
+            "dts_raw": 80000
+          },
+          {
+            "payload_bytes": 288,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 864,
+        "digest": 7620691429583559969
+      }
+    },
+    {
+      "id": "au-atsc-eac3-six-block-dep0",
+      "profile": "au-atsc-eac3-six-block-dep0",
+      "file": ".research/fixtures-mpegts-eac3-six-block/au-atsc-eac3-six-block-dep0.ts",
+      "sha256": "658e712b8949f19e4a53a1327d063e26ac18a0b4b9ee30e76bf6cde5238b8d45",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 64,
+            "pts_raw": 90000,
+            "dts_raw": 80000
+          },
+          {
+            "payload_bytes": 32,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 96,
+        "digest": 6814399669389160617
+      }
+    },
+    {
+      "id": "au-atsc-eac3-six-block-dep2",
+      "profile": "au-atsc-eac3-six-block-dep2",
+      "file": ".research/fixtures-mpegts-eac3-six-block/au-atsc-eac3-six-block-dep2.ts",
+      "sha256": "ba18d007b6ccc1e569619ca2aa2a3d5ab9add8227afd0310e706574b4835def0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 192,
+            "pts_raw": 90000,
+            "dts_raw": 80000
+          },
+          {
+            "payload_bytes": 96,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 10729622621970055899
+      }
+    }
+  ]
+}

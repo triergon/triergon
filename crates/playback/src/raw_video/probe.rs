@@ -9,7 +9,7 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, InputCursor, InputRequest, InputWindow, SourceCapabilities, SourceId,
-    Step, WorkBudget,
+    Step, WorkBudget, nonzero_prefix_len,
 };
 use triergon_framing::{Codec, NalHeader, RawAnnexBLimits, RawAnnexBReader};
 
@@ -279,17 +279,18 @@ impl<S: Source> ProbeDriver<S> {
                 self.container_pending =
                     self.prefix.len() < CONTAINER_SIGNATURE_BYTES && self.end.is_none();
             }
-            if !self.container_pending
-                && let Some(&byte) = self.prefix.as_slice().get(self.scanned)
-            {
-                if !work.try_charge(1) {
-                    return Ok(PlaybackProbeStep::Yield);
-                }
-                self.scanned += 1;
-                self.detected = self
+            if !self.container_pending && self.scanned < self.prefix.len() {
+                // One work unit per scanned byte, as many as the budget allows.
+                let pending = &self.prefix.as_slice()[self.scanned..];
+                let allowed = usize::try_from(work.remaining())
+                    .unwrap_or(usize::MAX)
+                    .min(pending.len());
+                let (scanned, codec) = self
                     .scan
-                    .push(byte, self.limits.maximum_nals)?
-                    .map(PlaybackInputKind::RawVideo);
+                    .scan(&pending[..allowed], self.limits.maximum_nals)?;
+                work.take(scanned as u64);
+                self.scanned += scanned;
+                self.detected = codec.map(PlaybackInputKind::RawVideo);
                 continue;
             }
             if self.end.is_some() {
@@ -511,6 +512,34 @@ struct Signatures {
 }
 
 impl Signatures {
+    /// Push `bytes` in order until one selects a codec. Returns the number of
+    /// bytes consumed, the selecting byte included, and the selection.
+    ///
+    /// Past the five bytes a NAL head keeps, a nonzero byte that follows a
+    /// nonzero byte only lengthens the NAL, so such runs are skipped whole.
+    fn scan(&mut self, bytes: &[u8], maximum_nals: usize) -> Result<(usize, Option<Codec>)> {
+        let mut at = 0;
+        while at < bytes.len() {
+            if self.zeros == 0
+                && let Some(head) = &mut self.head
+                && head.len >= head.prefix.len()
+            {
+                let run = nonzero_prefix_len(&bytes[at..]);
+                head.len = head.len.checked_add(run).ok_or(Error::Overflow)?;
+                at += run;
+                if at == bytes.len() {
+                    break;
+                }
+            }
+            let byte = bytes[at];
+            at += 1;
+            if let Some(codec) = self.push(byte, maximum_nals)? {
+                return Ok((at, Some(codec)));
+            }
+        }
+        Ok((at, None))
+    }
+
     fn push(&mut self, byte: u8, maximum_nals: usize) -> Result<Option<Codec>> {
         if byte == 0 {
             self.zeros = self.zeros.checked_add(1).ok_or(Error::Overflow)?;
@@ -600,5 +629,77 @@ impl Signatures {
             ));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Signatures;
+    use crate::Result;
+    use triergon_framing::Codec;
+
+    const MAXIMUM_NALS: usize = 64;
+
+    /// The bytes consumed and the selection of one byte at a time.
+    fn pushed(bytes: &[u8]) -> Result<(usize, Option<Codec>)> {
+        let mut signatures = Signatures::default();
+        for (index, &byte) in bytes.iter().enumerate() {
+            if let Some(codec) = signatures.push(byte, MAXIMUM_NALS)? {
+                return Ok((index + 1, Some(codec)));
+            }
+        }
+        Ok((bytes.len(), None))
+    }
+
+    /// The same through `scan`, given `chunk` bytes at a time.
+    fn scanned(bytes: &[u8], chunk: usize) -> Result<(usize, Option<Codec>)> {
+        let mut signatures = Signatures::default();
+        let mut consumed = 0;
+        for piece in bytes.chunks(chunk) {
+            let (count, codec) = signatures.scan(piece, MAXIMUM_NALS)?;
+            consumed += count;
+            if codec.is_some() {
+                return Ok((consumed, codec));
+            }
+            assert_eq!(count, piece.len());
+        }
+        Ok((consumed, None))
+    }
+
+    #[test]
+    fn scanning_runs_selects_at_the_byte_one_byte_at_a_time_does() {
+        let inputs: [&[u8]; 9] = [
+            include_bytes!("../../../framing/fixtures/raw-annex-b/hevc-aud0.hevc"),
+            include_bytes!("../../../framing/fixtures/raw-annex-b/hevc-aud1.hevc"),
+            include_bytes!("../../../framing/fixtures/raw-annex-b/avc-aud0.h264"),
+            include_bytes!("../../../framing/fixtures/raw-annex-b/avc-aud1.h264"),
+            include_bytes!("../../tests/fixtures/raw-video/avc-80x48.h264"),
+            include_bytes!("../../tests/fixtures/raw-video/avc-short.h264"),
+            // A NAL body with emulation prevention, then padding inside it.
+            &[
+                0, 0, 1, 0x40, 1, 0x0c, 1, 0xff, 0, 0, 3, 1, 0x5a, 0, 0, 0, 7,
+            ],
+            // A body byte before any start code.
+            &[0, 5, 0, 0, 1, 0x40, 1],
+            // Nothing but padding.
+            &[0; 40],
+        ];
+        for input in inputs {
+            let expected = pushed(input);
+            for end in (0..input.len().min(800)).chain([input.len()]) {
+                let prefix = &input[..end];
+                let whole = pushed(prefix);
+                for chunk in [1, 2, 3, 7, 8, 64, 4096] {
+                    assert_eq!(
+                        scanned(prefix, chunk),
+                        whole,
+                        "{end} bytes, {chunk} at a time"
+                    );
+                }
+            }
+            assert_eq!(scanned(input, 4096), expected);
+        }
+        // The HEVC fixtures select at their first slice, after a 2.3 KB SEI.
+        assert!(matches!(pushed(inputs[1]), Ok((2431, Some(Codec::Hevc)))));
     }
 }

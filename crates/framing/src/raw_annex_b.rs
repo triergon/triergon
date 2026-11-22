@@ -197,6 +197,23 @@ impl RawAnnexBReader {
         self.nal.provide_owned(window)
     }
 
+    /// Start a fresh reader at an independently established access-unit boundary
+    /// in the same elementary coordinate system. `preceding_nals` preserves the
+    /// original NAL-count limit. No parameter sets or picture history are restored:
+    /// the resumed bytes must supply all setup needed for framing and decoding.
+    /// Refuses a reader which has consumed input or a count at its limit.
+    #[doc(hidden)]
+    pub fn resume_at(&mut self, offset: u64, preceding_nals: usize) -> Result<()> {
+        self.healthy()?;
+        if self.next_offset != 0 || self.pending.is_some() || !self.unit.is_empty() {
+            return Err(Error::SourceMismatch);
+        }
+        self.nal.resume_annex_b(offset, preceding_nals)?;
+        self.unit_start = offset;
+        self.next_offset = offset;
+        Ok(())
+    }
+
     /// Consume a borrowed slice that fits wholly inside the current NAL
     /// payload. If the reader needs to inspect a possible boundary, the caller
     /// can provide the same slice as a regular input window.

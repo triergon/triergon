@@ -30,7 +30,7 @@ pub(crate) fn copy_annex_b_segment(
     // A segment that fits one chunk and the remaining work is copied in one
     // pass, with the charge and cancellation check of the chunked copy.
     if *copied == 0 && end != 0 && end <= COPY_CHUNK && end as u64 <= work.remaining() {
-        output.try_extend_from_slice(&START_CODE[4 - prefix..])?;
+        push_start_code(output, prefix)?;
         output.try_extend_from_slice(payload)?;
         work.take(end as u64);
         *copied = end;
@@ -78,7 +78,7 @@ pub(crate) fn copy_annex_b_whole<'a>(
     }
     for copy in copies {
         let (prefix, payload) = copy?;
-        output.try_extend_from_slice(&START_CODE[4 - prefix..])?;
+        push_start_code(output, prefix)?;
         output.try_extend_from_slice(payload)?;
     }
     work.take(units);
@@ -86,6 +86,18 @@ pub(crate) fn copy_annex_b_whole<'a>(
         return Err(Error::Cancelled);
     }
     Ok(true)
+}
+
+/// Append the last `prefix` bytes of the four-byte start code. The three- and
+/// four-byte codes are fixed-size copies, which compile to stores rather than
+/// a call to copy a few bytes.
+#[inline(always)]
+fn push_start_code(output: &mut BudgetVec<u8>, prefix: usize) -> Result<()> {
+    match prefix {
+        4 => output.try_extend_from_slice(&START_CODE),
+        3 => output.try_extend_from_slice(&START_CODE[1..]),
+        _ => output.try_extend_from_slice(&START_CODE[4 - prefix..]),
+    }
 }
 
 /// Start an output of exactly `bytes`, charged together with the header of the
@@ -760,7 +772,7 @@ impl NalPacketSegment {
     }
 }
 
-const INLINE_PACKET_SEGMENTS: usize = 6;
+const INLINE_PACKET_SEGMENTS: usize = 7;
 
 type PacketSegmentStorage = InlineStorage<NalPacketSegment, INLINE_PACKET_SEGMENTS>;
 

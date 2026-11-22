@@ -28,7 +28,7 @@ type R<T> = Result<T, String>;
 pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N] [--target TARGET]
        cargo xtask gate check [--shards N] [--target TARGET]
        cargo xtask gate preflight [--shard I/N] [--review FILE] [--kernel]
-       cargo xtask gate run --stage timing|memory --output DIR [--shard I/N] [--full]
+       cargo xtask gate run --stage timing|memory --output DIR [--shard I/N] [--full] [--no-early-stop]
        cargo xtask gate summary --output FILE DIR...
        cargo xtask gate test --profile checked|release --output DIR [--full]
 
@@ -47,7 +47,7 @@ pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N] [--target TAR
              steps, then timing on CPU 1) or memory (memory on CPUs 1 to the last,
              then the grades); each step's output goes under DIR, its log to
              DIR/logs and its record to DIR/steps; --full measures what a kept
-             evidence set holds
+             evidence set holds; --no-early-stop collects every planned report, progressive or codec pair
   summary    join the outputs of every shard of a run into FILE: each step's
              status and time, with a failure if a planned step did not run, a
              step failed, or the shards measured different sources or workers
@@ -1059,6 +1059,7 @@ struct Options {
     review: Option<String>,
     kernel: bool,
     full: bool,
+    no_early_stop: bool,
     profile: Option<String>,
     target: Option<String>,
     selection: Option<Vec<String>>,
@@ -1075,6 +1076,7 @@ impl Options {
             review: None,
             kernel: false,
             full: false,
+            no_early_stop: false,
             profile: None,
             target: None,
             selection: None,
@@ -1107,6 +1109,7 @@ impl Options {
                 "--review" => options.review = Some(value()?),
                 "--kernel" => options.kernel = true,
                 "--full" => options.full = true,
+                "--no-early-stop" => options.no_early_stop = true,
                 "--profile" => options.profile = Some(value()?),
                 "--target" => options.target = Some(value()?),
                 "--items" => {
@@ -1183,6 +1186,7 @@ struct Tree {
     /// The generated fixtures, under their repository-relative paths.
     generated: Option<PathBuf>,
     fetched: BTreeMap<String, String>,
+    prepared: BTreeMap<String, String>,
     /// Path to SHA-256.
     kept: BTreeMap<String, String>,
     hashes: BTreeMap<PathBuf, String>,
@@ -1209,6 +1213,18 @@ impl Tree {
             tree.fetched
                 .insert(format!("{}/{}", pin.directory, pin.file), pin.sha256);
         }
+        use crate::transport_fixtures::dts_discovery;
+        let dts_inputs = dts_discovery::prepared_inputs(root)?;
+        if !dts_inputs.is_empty() {
+            let seed = tree
+                .fetched
+                .get(dts_discovery::FATE_FILE)
+                .map(String::as_str);
+            if seed != Some(dts_discovery::FATE_SHA) {
+                return Err("DTS discovery preparation seed is not fetched with its pin".into());
+            }
+            tree.prepared.extend(dts_inputs);
+        }
         tree.kept = kept_files(root)?;
         Ok(tree)
     }
@@ -1233,6 +1249,7 @@ impl Tree {
                 .collect(),
             generated: None,
             fetched: BTreeMap::new(),
+            prepared: BTreeMap::new(),
             kept: BTreeMap::new(),
             hashes: BTreeMap::new(),
         })
@@ -1293,6 +1310,8 @@ impl Tree {
             (Source::Generated, self.hash(path)?)
         } else if let Some(pin) = self.fetched.get(&relative) {
             (Source::Fetched, pin.clone())
+        } else if let Some(pin) = self.prepared.get(&relative) {
+            (Source::Generated, pin.clone())
         } else if let Some(hash) = self.kept.get(&relative) {
             (Source::Kept, hash.clone())
         } else if generated_manifest(&self.root, &input.path).is_some() {
@@ -1562,6 +1581,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
                 stage,
                 options.shard,
                 options.full,
+                options.no_early_stop,
                 options.selection.as_deref(),
             )
         }
@@ -1615,6 +1635,17 @@ fn append(path: &Path, line: &str) -> R<()> {
     writeln!(file, "{} {line}", crate::python::utc_now()).map_err(|e| e.to_string())
 }
 
+fn collect_all_pairs(command: &mut Vec<String>) {
+    let subcommand = command.get(1).map(String::as_str);
+    let operation = command.get(2).map(String::as_str);
+    if matches!(
+        (subcommand, operation),
+        (Some("report" | "progressive"), _) | (Some("codecs"), Some("time" | "memory"))
+    ) {
+        command.push("--no-early-stop".into());
+    }
+}
+
 /// Runs the steps of one stage of a shard; returns 1 if any failed.
 fn run(
     root: &Path,
@@ -1622,6 +1653,7 @@ fn run(
     stage: Stage,
     shard: (usize, usize),
     full: bool,
+    no_early_stop: bool,
     selection: Option<&[String]>,
 ) -> R<i32> {
     fs::create_dir_all(output).map_err(|e| format!("{}: {e}", output.display()))?;
@@ -1629,7 +1661,12 @@ fn run(
         .canonicalize()
         .map_err(|e| format!("{}: {e}", output.display()))?;
     let out = output.display().to_string();
-    let items = shard_items(root, &out, full, shard, selection)?;
+    let mut items = shard_items(root, &out, full, shard, selection)?;
+    if no_early_stop {
+        for step in items.iter_mut().flat_map(|item| &mut item.steps) {
+            collect_all_pairs(&mut step.command);
+        }
+    }
     // A stage's records describe this run of it alone: the timing stage starts a
     // run afresh, and the memory stage replaces only its own steps' records.
     let records = output.join("steps");
@@ -3117,17 +3154,46 @@ done
                     continue;
                 }
                 let id = &args[index + 1];
-                let inputs = format!("harness/features/{id}/inputs");
-                if !root.join(&inputs).is_dir() {
+                let directory = root.join(format!("harness/features/{id}/inputs"));
+                if !directory.is_dir() {
                     continue;
                 }
-                let corpus = format!("{id}={inputs}");
+                let prefix = format!("{id}=");
+                let mut feature_args = owned(&["--feature", id]);
+                for pair in args.windows(2) {
+                    if matches!(pair[0].as_str(), "--corpus" | "--manifest")
+                        && pair[1].starts_with(&prefix)
+                    {
+                        feature_args.extend_from_slice(pair);
+                    }
+                }
+                // A manifest can locate its inputs without a corpus override.
+                // Check the paths and pins the generated preflight actually uses.
+                let inputs = crate::harness::preflight::inputs(
+                    root,
+                    &feature_args,
+                    &crate::checks::read_json,
+                )
+                .unwrap();
+                let mut pinned = inputs
+                    .iter()
+                    .filter_map(|input| Some((&input.path, input.sha256.as_deref()?)))
+                    .peekable();
                 assert!(
-                    args.windows(2)
-                        .any(|pair| pair[0] == "--corpus" && pair[1] == corpus),
-                    "{}: preflight of {id} without --corpus {corpus}",
+                    pinned.peek().is_some(),
+                    "{}: preflight of {id} has no pinned inputs",
                     item.name
                 );
+                for (file, pin) in pinned {
+                    assert!(
+                        file.starts_with(&directory),
+                        "{}: preflight of {id} resolves {} outside {}",
+                        item.name,
+                        file.display(),
+                        directory.display()
+                    );
+                    assert_eq!(sha256::file_hex(file).unwrap(), pin, "{}", file.display());
+                }
             }
         }
     }
@@ -3191,6 +3257,19 @@ done
             Placement::Timed,
             xtask(args),
         )
+    }
+
+    #[test]
+    fn full_pair_count_reaches_codec_collections_only() {
+        for operation in ["time", "memory", "grade", "readers", "summarize"] {
+            let mut command = xtask(&["codecs", operation]);
+            collect_all_pairs(&mut command);
+            assert_eq!(
+                command.last().unwrap() == "--no-early-stop",
+                matches!(operation, "time" | "memory"),
+                "{operation}"
+            );
+        }
     }
 
     fn parsed(raw: &str) -> Value {

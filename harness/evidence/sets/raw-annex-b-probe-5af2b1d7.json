@@ -1,0 +1,9 @@
+{
+ "name": "raw-annex-b-probe-5af2b1d7",
+ "path": "raw-annex-b-probe-5af2b1d7",
+ "retention": "retained",
+ "reason": "Counts, profiles and tests of the raw video probe's NAL body runs and the raw-video runner's picture period, one c6g.4xlarge host (Graviton2) from the Linux AArch64 gate image: loop-only perf stat counts and 21 paired elapsed times of the seven raw-annex-b cases at main d66c90dd and 5af2b1d7 against the reference, cycle profiles of hevc-aud1 for both builds and the reference, trace identities of the seven cases, instruction counts of other playback-worker runners, link-order holdings, worker SHA-256 and the playback crate and worker tests; cited by docs/status.md for the Linux AArch64 raw Annex B timing.",
+ "key": "evidence/raw-annex-b-probe-5af2b1d7/b95019528cb90c653e988d0df2d2b6c28834c2350a313014196775cd21bc409f.tar.gz",
+ "sha256": "b95019528cb90c653e988d0df2d2b6c28834c2350a313014196775cd21bc409f",
+ "bytes": 46615
+}

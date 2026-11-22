@@ -17,6 +17,7 @@ mod range;
 mod silk;
 mod stream;
 
+use celt::Emphasis;
 use multistream::Mapping;
 use packet::Packet;
 use stream::{Staging, StreamDecoder, Workspace};
@@ -166,33 +167,67 @@ impl Decoder {
     /// decodes, so a refused packet leaves every stream as it was.
     fn decode_packet(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
         out.samples_per_channel = 0;
-        let samples = self.check(au)?;
+        let (samples, emphasis) = self.check(au)?;
         out.try_resize(self.mapping.channels(), samples, &mut self.output_charge)?;
         // `check` parsed every sub-packet.
         let packets = sub_packets(au, self.streams.len()).map_while(Result::ok);
         for (index, (stream, packet)) in self.streams.iter_mut().zip(packets).enumerate() {
-            let produced = stream.decode(&packet, self.staging.stream(index), &mut self.work);
+            let staged = self.staging.stream(index);
+            let produced = stream.decode(&packet, staged, &mut self.work, emphasis);
             debug_assert_eq!(produced, samples);
             self.mapping
                 .distribute(index, &self.work.pcm, samples, &mut out.planes);
+        }
+        if emphasis == Emphasis::Defer {
+            self.deemphasise(samples, &mut out.planes);
         }
         self.finish(samples, out);
         Ok(())
     }
 
+    /// De-emphasise the first `samples` of every plane a stream channel feeds, with and
+    /// into that channel's filter memory. A channel that feeds several planes runs from
+    /// the same memory in each and leaves the same memory. Not inlined: its per-plane
+    /// arrays would otherwise enlarge the stack frame of every packet's decoding.
+    #[inline(never)]
+    fn deemphasise(&mut self, samples: usize, planes: &mut [Vec<f32>]) {
+        const CAPACITY: usize = ChannelLayout::CAPACITY;
+        let mut memory = [0f32; CAPACITY];
+        let mut lanes: [&mut [f32]; CAPACITY] = core::array::from_fn(|_| <&mut [f32]>::default());
+        let mut fed = 0;
+        for (plane, source) in planes.iter_mut().zip(self.mapping.sources()) {
+            if let Some((stream, channel)) = source {
+                memory[fed] = self.streams[stream].deemphasis_memory()[channel];
+                lanes[fed] = &mut plane[..samples];
+                fed += 1;
+            }
+        }
+        celt::deemphasise_channels(&mut memory[..fed], &mut lanes[..fed]);
+        for (&m, source) in memory.iter().zip(self.mapping.sources().flatten()) {
+            let (stream, channel) = source;
+            self.streams[stream].deemphasis_memory()[channel] = m;
+        }
+    }
+
     /// Check every sub-packet of `au` against its stream, staging what decoding them
     /// continues from, and return the samples per channel they decode to, which must
-    /// agree.
-    fn check(&mut self, au: &[u8]) -> Result<usize, DecodeError> {
+    /// agree, and where their de-emphasis runs: for all channels together once the
+    /// streams are decoded when every stream decodes CELT frames alone.
+    fn check(&mut self, au: &[u8]) -> Result<(usize, Emphasis), DecodeError> {
         let mut samples = None;
+        let mut emphasis = Emphasis::Defer;
         let packets = sub_packets(au, self.streams.len());
         for (index, (stream, packet)) in self.streams.iter().zip(packets).enumerate() {
-            let len = stream.check(&packet?, self.staging.stream_mut(index))?;
+            let packet = packet?;
+            let len = stream.check(&packet, self.staging.stream_mut(index))?;
             if *samples.get_or_insert(len) != len {
                 return Err(DecodeError::Invalid("streams of unequal duration"));
             }
+            if !stream.can_defer_emphasis(&packet) {
+                emphasis = Emphasis::Apply;
+            }
         }
-        Ok(samples.unwrap_or(0))
+        Ok((samples.unwrap_or(0), emphasis))
     }
 
     fn finish(&self, samples: usize, out: &mut AudioFrame) {

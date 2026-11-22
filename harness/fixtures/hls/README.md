@@ -8,10 +8,10 @@ reproducible across encoder builds.
 
 | Source | Segments | What they cover |
 |---|---|---|
-| `vod` | 60 | consecutive segments of six video/audio pairings from a VOD playlist |
-| `system-b` | 6 | the same pairings from a second multiplexer layout, including other audio rates |
-| `closed-gop-vod` | 4 | entry segments with closed GOPs and other audio rates |
-| `allocation-control` | 1 | a control input for allocation checks; not scored |
+| `vod` (`replay-*`) | 60 | consecutive segments of six video/audio pairings from a VOD playlist |
+| `system-b` (`dvb-*`) | 6 | the same pairings from a second multiplexer layout, including other audio rates |
+| `closed-gop-vod` (`entry-*`) | 4 | entry segments with closed GOPs and other audio rates |
+| `allocation-control` (`allocating-control.ts`) | 1 | a control input for allocation checks; not scored |
 
-`corpus.json` lists all 71 with their independently recorded packet count, byte count
-and fold; `measured.json` lists the ten that are timed and measured.
+The contract's `corpus.json` lists all 71 with their independently recorded packet
+count, byte count and fold; its `measured.json` lists the ten that are timed and measured.

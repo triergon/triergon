@@ -1,12 +1,19 @@
+mod aligned_audio;
+mod dts_hd;
+mod dts_probe;
 mod dvb;
 mod eac3;
 mod loas;
+mod mpeg_audio;
+mod mpeg_video;
+mod pes_storage;
 mod unframed_audio;
 
 use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
+use super::seek::{PictureDelivery, SeekProbe};
 use super::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, Packet, PacketClock, PayloadSource,
-    ReaderLimits, SourceEvent, Track, UnframedAudio,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, DtsExtensionFrame, IncompleteVideo,
+    LoasFrame, Packet, PacketClock, PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::adts::PacketPolicy;
@@ -20,22 +27,29 @@ use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
+use triergon_core::container::CodecId;
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities,
-    SourceId, SourceLocation, Step, WorkBudget,
+    SourceId, SourceLocation, Step, Time, WorkBudget,
 };
 use triergon_framing::{
     AacAdtsCarrierLimits, AacAdtsCarrierReader, AacAdtsStreamLimits, AacAdtsStreamReader,
     Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, RawAnnexBReader,
+    probe_dts_core_header,
 };
 
 // Keep concrete readers inline; their containing BudgetVec charges the whole state.
 #[allow(clippy::large_enum_variant)]
 enum Framer {
     Video(RawAnnexBReader),
+    MpegVideo(mpeg_video::Reader),
     Adts(AacAdtsStreamReader),
     AdtsFragments(AacAdtsCarrierReader),
-    Loas(loas::Reader),
+    Loas(aligned_audio::Reader<3, ()>),
+    MpegAudio(mpeg_audio::Reader),
+    Dts(aligned_audio::Reader<15, Time>),
+    DtsHd(dts_hd::Reader),
+    DtsExtension(dts_hd::ExtensionReader),
     LatmPes,
     Ac3(Ac3FrameReader),
     Eac3(eac3::Reader),
@@ -49,10 +63,14 @@ impl Framer {
             Self::Adts(reader) => reader.input_wait_buffer_capacity(),
             Self::AdtsFragments(reader) => reader.input_wait_buffer_capacity(),
             Self::Loas(reader) => reader.input_wait_buffer_capacity(),
+            Self::MpegAudio(reader) => reader.input_wait_buffer_capacity()?,
+            Self::Dts(reader) => reader.input_wait_buffer_capacity(),
+            Self::DtsHd(reader) => reader.input_wait_buffer_capacity(),
+            Self::DtsExtension(reader) => reader.input_wait_buffer_capacity(),
             Self::Ac3(reader) => reader.input_wait_buffer_capacity(),
             Self::Eac3(reader) => reader.input_wait_storage()?,
             // Direct PES carriages do not keep a pending unit between inputs.
-            Self::LatmPes | Self::Dvb(_) => 0,
+            Self::LatmPes | Self::Dvb(_) | Self::MpegVideo(_) => 0,
         })
     }
 
@@ -71,7 +89,14 @@ impl Framer {
     fn is_audio(&self) -> bool {
         matches!(
             self,
-            Self::Adts(_) | Self::Loas(_) | Self::Ac3(_) | Self::Eac3(_)
+            Self::Adts(_)
+                | Self::Loas(_)
+                | Self::MpegAudio(_)
+                | Self::Dts(_)
+                | Self::DtsHd(_)
+                | Self::DtsExtension(_)
+                | Self::Ac3(_)
+                | Self::Eac3(_)
         )
     }
     fn new(pool: &Budget, track: &Track, limits: ReaderLimits) -> Result<Self> {
@@ -84,6 +109,7 @@ impl Framer {
         let stream = track.stream();
         let namespace = stream.descriptor_namespace();
         match stream.stream_type {
+            1 | 2 => Ok(Self::MpegVideo(mpeg_video::Reader::default())),
             kind @ (0x1b | 0x24) => Ok(Self::Video(RawAnnexBReader::new(
                 pool,
                 if kind == 0x1b {
@@ -120,7 +146,16 @@ impl Framer {
             0x11 if limits.latm_packet_policy == latm::PacketPolicy::PreservePes => {
                 Ok(Self::LatmPes)
             }
-            0x11 => Ok(Self::Loas(loas::Reader::new(
+            // H.222.0 Table 2-34 assigns these streams to ISO/IEC 11172-3
+            // and ISO/IEC 13818-3 audio respectively.
+            0x03 | 0x04 => Ok(Self::MpegAudio(mpeg_audio::Reader::new(
+                pool,
+                source,
+                caps,
+                limits.maximum_audio_frame_bytes,
+                limits.elementary_input_window,
+            )?)),
+            0x11 => Ok(Self::Loas(aligned_audio::Reader::new(
                 pool,
                 source,
                 caps,
@@ -129,6 +164,39 @@ impl Framer {
             )?)),
             0x06 if stream.codec_identification() == CodecIdentification::DvbSubtitles => {
                 Ok(Self::Dvb(dvb::Reader::new(limits.dvb_subtitle_tail_policy)))
+            }
+            0x06 if track.unlabelled_dts_core || stream.codec() == Some(CodecId::Dts) => {
+                if !track.unlabelled_dts_core
+                    && stream.dvb_descriptor_codec() != Some(CodecId::Dts)
+                    && let Some(descriptor) = stream.dvb_dts_hd()?
+                {
+                    if descriptor.core.is_none() {
+                        return Ok(Self::DtsExtension(dts_hd::ExtensionReader::new(
+                            pool,
+                            source,
+                            caps,
+                            limits.maximum_dts_hd_pes_bytes,
+                            limits.elementary_input_window,
+                            descriptor,
+                        )?));
+                    }
+                    Ok(Self::DtsHd(dts_hd::Reader::new(
+                        pool,
+                        source,
+                        caps,
+                        limits.maximum_dts_hd_pes_bytes,
+                        limits.elementary_input_window,
+                        descriptor,
+                    )?))
+                } else {
+                    Ok(Self::Dts(aligned_audio::Reader::new(
+                        pool,
+                        source,
+                        caps,
+                        limits.maximum_audio_frame_bytes,
+                        limits.elementary_input_window,
+                    )?))
+                }
             }
             0x06 if matches!(namespace, DescriptorNamespace::Dvb(_)) => {
                 let descriptors = PrivateAudioDescriptors {
@@ -194,7 +262,29 @@ impl Framer {
         Ok(match self {
             Self::Video(reader) => map(reader.step(work, cancel)?, AccessUnit::Video),
             Self::Adts(reader) => map(reader.step(work, cancel)?, AccessUnit::Adts),
-            Self::Loas(reader) => map(reader.step(work, cancel)?, AccessUnit::Loas),
+            Self::Loas(reader) => map(reader.step(work, cancel, loas::parse)?, |frame| {
+                AccessUnit::Loas(LoasFrame {
+                    bytes: frame.bytes,
+                    offset: frame.offset,
+                })
+            }),
+            Self::MpegAudio(reader) => map(reader.step(work, cancel)?, AccessUnit::MpegAudio),
+            Self::Dts(reader) => map(
+                reader.step(work, cancel, |prefix| {
+                    let header = probe_dts_core_header(prefix)?;
+                    Ok((header.window, header.frame_bytes))
+                })?,
+                |frame| {
+                    AccessUnit::Dts(DtsAudioFrame {
+                        core_bytes: frame.bytes.len(),
+                        bytes: frame.bytes,
+                        offset: frame.offset,
+                        duration: frame.header,
+                    })
+                },
+            ),
+            Self::DtsHd(reader) => map(reader.step(work, cancel)?, AccessUnit::Dts),
+            Self::DtsExtension(reader) => map(reader.step(work, cancel)?, AccessUnit::DtsExtension),
             Self::AdtsFragments(reader) => map(reader.step(work, cancel)?, |carrier| match carrier
                 .into_selected_frame()
             {
@@ -205,7 +295,9 @@ impl Framer {
                 AccessUnit::Ac3(Ac3AccessUnit::single(frame))
             }),
             Self::Eac3(reader) => map(reader.step(work, cancel)?, AccessUnit::Ac3),
-            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
+            Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                unreachable!("this route uses validated PES input")
+            }
         })
     }
     fn provide(&mut self, window: InputWindow) -> Result<()> {
@@ -213,10 +305,16 @@ impl Framer {
             Self::Video(reader) => reader.provide_owned(window),
             Self::Adts(reader) => reader.provide_owned(window),
             Self::Loas(reader) => reader.provide(window),
+            Self::MpegAudio(reader) => reader.provide(window),
+            Self::Dts(reader) => reader.provide(window),
+            Self::DtsHd(reader) => reader.provide(window),
+            Self::DtsExtension(reader) => reader.provide(window),
             Self::AdtsFragments(reader) => reader.provide_owned(window),
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
-            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
+            Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                unreachable!("this route uses validated PES input")
+            }
         }
     }
     fn finish(&mut self, request: InputRequest) -> Result<()> {
@@ -224,10 +322,16 @@ impl Framer {
             Self::Video(reader) => reader.finish(request.source, request.token),
             Self::Adts(reader) => reader.finish(request.source, request.token),
             Self::Loas(reader) => reader.finish(request),
+            Self::MpegAudio(reader) => reader.finish(request),
+            Self::Dts(reader) => reader.finish(request),
+            Self::DtsHd(reader) => reader.finish(request),
+            Self::DtsExtension(reader) => reader.finish(request),
             Self::AdtsFragments(reader) => reader.finish(request.source, request.token),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),
-            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
+            Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                unreachable!("this route uses validated PES input")
+            }
         }
     }
 }
@@ -506,8 +610,17 @@ impl StorageScan {
             super::PacketTracks::Selected(tracks) => table_storage(tracks)?,
             _ => 0,
         };
+        let entities = if let Some(plan) = &reader.seek_entities {
+            plan.charged_bytes()
+                .checked_add(plan.entries_bytes()?)
+                .ok_or(Error::Overflow)?
+        } else {
+            0
+        };
         let total = total
-            .checked_add(table_storage(&reader.lanes)?)
+            .checked_add(table_storage(&reader.seek)?)
+            .and_then(|n| n.checked_add(entities))
+            .and_then(|n| n.checked_add(table_storage(&reader.lanes).ok()?))
             .and_then(|n| n.checked_add(table_storage(&reader.tracks).ok()?))
             .and_then(|n| n.checked_add(table_storage(&reader.staged_tracks).ok()?))
             .and_then(|n| n.checked_add(selection))
@@ -892,6 +1005,8 @@ struct Build {
     origins: BuildOrigins,
     origin: usize,
     clock: Option<PacketClock>,
+    picture_origin: Option<(SourceEpochs, u64, u64)>,
+    picture_anchor: Option<usize>,
     last_anchor: u64,
     retire: usize,
     recovered_adts_bytes: bool,
@@ -921,6 +1036,8 @@ impl Build {
             origins: BuildOrigins::Ready(origins),
             origin: 0,
             clock: None,
+            picture_origin: None,
+            picture_anchor: None,
             last_anchor,
             retire: 0,
             recovered_adts_bytes: false,
@@ -999,6 +1116,7 @@ impl Build {
 
 pub(super) enum LaneStep {
     Packet(Packet),
+    PictureProbe(SeekProbe),
     IncompleteVideo(IncompleteVideo),
     LatmPes(latm::PesPacket),
     UnframedAudio(UnframedAudio),
@@ -1018,6 +1136,7 @@ pub(super) enum PesRun {
 pub(super) struct Lane {
     pub track: Track,
     pub unsupported: Option<Error>,
+    probe: Option<dts_probe::Probe>,
     framer: Option<Framer>,
     pool: Budget,
     limits: ReaderLimits,
@@ -1038,12 +1157,24 @@ pub(super) struct Lane {
 }
 
 impl Lane {
+    pub(super) fn is_probing_dts(&self) -> bool {
+        self.probe.is_some()
+    }
+
     pub(super) fn new(
         pool: &Budget,
         track: Track,
         limits: ReaderLimits,
         frame: bool,
     ) -> Result<Self> {
+        let mut track = track;
+        if limits.probe_unlabelled_dts_core
+            && !limits.unlabelled_dts_core.is_some_and(|selection| {
+                selection.program == track.program() && selection.pid == track.stream().pid
+            })
+        {
+            track.unlabelled_dts_core = false;
+        }
         let (framer, unsupported, residue) = if frame {
             match Framer::new(pool, &track, limits) {
                 Ok(framer) => (Some(framer), None, None),
@@ -1057,9 +1188,15 @@ impl Lane {
         } else {
             (None, None, None)
         };
+        let probe = (frame
+            && limits.probe_unlabelled_dts_core
+            && !track.unlabelled_dts_core
+            && dts_probe::eligible(&track))
+        .then(dts_probe::Probe::default);
         Ok(Self {
             track,
             unsupported,
+            probe,
             framer,
             pool: pool.clone(),
             limits,
@@ -1082,6 +1219,34 @@ impl Lane {
     pub(super) fn unpublished(&self) -> Option<Range<u64>> {
         (self.published < self.supplied).then_some(self.published..self.supplied)
     }
+
+    /// Resume an independently framed PES with its proved original private
+    /// coordinates, output bounds and one-use PES anchor numbering.
+    pub(super) fn resume_independent(
+        &mut self,
+        offset: u64,
+        frames: usize,
+        nals: usize,
+        map: SourceEvent,
+    ) -> Result<()> {
+        if self.supplied != 0 || self.serial != 0 || self.completed != 0 {
+            return Err(Error::SourceMismatch);
+        }
+        match &mut self.framer {
+            Some(Framer::MpegAudio(framer)) if nals == 0 => {
+                framer.resume_at(offset, self.limits.elementary_input_window)?;
+            }
+            Some(Framer::Video(framer)) => framer.resume_at(offset, nals)?,
+            _ => return Err(Error::SourceMismatch),
+        }
+        self.supplied = offset;
+        self.published = offset;
+        self.serial = frames as u64;
+        self.last_anchor = frames as u64;
+        self.completed = frames;
+        self.track.source = map;
+        Ok(())
+    }
     pub(super) fn has_incomplete(&self) -> bool {
         self.incomplete.is_some()
     }
@@ -1098,6 +1263,27 @@ impl Lane {
         clock: ClockContext,
         work: &mut WorkBudget,
     ) -> Result<bool> {
+        if let Some(probe) = &mut self.probe {
+            let pes = pending.as_ref().expect("queued probe PES").pes();
+            let Some(accepted) = probe.step(pes, work) else {
+                return Ok(false);
+            };
+            if accepted {
+                let mut track = self.track.clone();
+                track.unlabelled_dts_core = true;
+                // Construction can backpressure. Keep the original probe and track
+                // until the complete framer is available for this same source PES.
+                let framer = Framer::new(&self.pool, &track, self.limits)?;
+                self.track = track;
+                self.framer = Some(framer);
+                self.unsupported = None;
+            } else {
+                self.unsupported = Some(Error::Unsupported(
+                    "MPEG-TS private PES does not prove DTS core",
+                ));
+            }
+            self.probe = None;
+        }
         if self.framer.is_none() && self.residue.is_none() {
             return Ok(true);
         }
@@ -1106,17 +1292,34 @@ impl Lane {
         }
         let source = pending.as_ref().expect("queued PES");
         let pes = source.pes();
-        if self.track.stream().stream_type == 0x11 {
-            if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
-                return Err(Error::Invalid("LATM audio PES stream ID"));
+        let payload_len = pes.payload_len;
+        match &self.framer {
+            Some(Framer::DtsHd(reader)) => reader.check_pes(pes)?,
+            Some(Framer::DtsExtension(reader)) => reader.check_pes(pes)?,
+            Some(Framer::Dts(_))
+                if self.track.unlabelled_dts_core && pes.header.stream_id != 0xbd =>
+            {
+                return Err(Error::Invalid("unlabelled DTS core PES stream ID"));
             }
-            if pes.payload_len == 0 && matches!(self.framer, Some(Framer::LatmPes)) {
-                return Ok(true);
+            _ => (),
+        }
+        let stream_type = self.track.stream().stream_type;
+        if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
+            match stream_type {
+                0x03 | 0x04 => return Err(Error::Invalid("MPEG audio PES stream ID")),
+                0x11 => return Err(Error::Invalid("LATM audio PES stream ID")),
+                _ => (),
             }
+        }
+        if stream_type == 0x11
+            && pes.payload_len == 0
+            && matches!(self.framer, Some(Framer::LatmPes))
+        {
+            return Ok(true);
         }
         if pes.header.stream_id != 0xbd {
             if self.track.stream().descriptor_namespace() == DescriptorNamespace::Atsc
-                && matches!(self.track.stream().stream_type, 0x81 | 0x87)
+                && matches!(stream_type, 0x81 | 0x87)
             {
                 return Err(Error::Invalid("ATSC private audio PES stream ID"));
             }
@@ -1158,6 +1361,11 @@ impl Lane {
             *pending = Some(rejected.value.source);
             return Err(rejected.error);
         }
+        match &mut self.framer {
+            Some(Framer::DtsHd(reader)) => reader.begin_pes(payload_len),
+            Some(Framer::DtsExtension(reader)) => reader.begin_pes(payload_len),
+            _ => (),
+        }
         self.serial = serial;
         self.run = run;
         self.input = self.framer.as_ref().map(|_| Input { span: 0, offset: 0 });
@@ -1174,6 +1382,7 @@ impl Lane {
     pub(super) fn step(
         &mut self,
         draining: bool,
+        picture_delivery: PictureDelivery,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<LaneStep> {
@@ -1198,7 +1407,7 @@ impl Lane {
                 continue;
             }
             if self.build.is_some() {
-                return self.publish(work, cancel);
+                return self.publish(picture_delivery, work, cancel);
             }
             if let Some(incomplete) = self.incomplete.as_mut() {
                 if incomplete.reader_storage.is_none() {
@@ -1275,6 +1484,25 @@ impl Lane {
                 }
                 return Ok(LaneStep::End);
             };
+            if let Framer::MpegVideo(reader) = framer {
+                if self.input.is_some() {
+                    let Some(unit) =
+                        reader.step(&self.pieces, self.track.stream().stream_type, work, cancel)?
+                    else {
+                        return Ok(LaneStep::Yield);
+                    };
+                    let end = unit.range.end;
+                    self.start_build(AccessUnit::MpegVideo(unit))?;
+                    self.supplied = end;
+                    self.input = None;
+                    continue;
+                }
+                return Ok(if draining {
+                    LaneStep::End
+                } else {
+                    LaneStep::NeedPayload
+                });
+            }
             if let Framer::Dvb(reader) = framer {
                 if self.input.is_some() {
                     let Some(unit) = reader.step(&self.pieces, work, cancel)? else {
@@ -1327,6 +1555,9 @@ impl Lane {
                 {
                     let maximum = match framer {
                         Framer::Eac3(reader) => reader.maximum_incomplete_bytes(),
+                        Framer::DtsHd(_) | Framer::DtsExtension(_) => {
+                            self.limits.maximum_dts_hd_pes_bytes
+                        }
                         _ => self.limits.maximum_audio_frame_bytes,
                     };
                     let range = self.unpublished().ok_or(Error::Truncated)?;
@@ -1406,15 +1637,20 @@ impl Lane {
                                 .checked_add(count as u64)
                                 .ok_or(Error::Overflow)?;
                             let range = input.offset..input.offset + count;
-                            let appended = if let Framer::Video(reader) = framer {
-                                reader.append_payload(
+                            let appended = match framer {
+                                Framer::Video(reader) => reader.append_payload(
                                     &request,
                                     &payload[range.clone()],
                                     work,
                                     cancel,
-                                )?
-                            } else {
-                                false
+                                )?,
+                                Framer::Loas(reader) => reader.append_payload(
+                                    &request,
+                                    &payload[range.clone()],
+                                    work,
+                                    cancel,
+                                )?,
+                                _ => false,
                             };
                             if !appended {
                                 let bytes = span.payload_bytes()?;
@@ -1500,8 +1736,133 @@ impl Lane {
         Ok(())
     }
 
-    fn publish(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<LaneStep> {
+    fn finish_build(&mut self, consumed_end: u64) -> Build {
+        let build = self.build.take().expect("prepared publication");
+        self.retire = build.retire;
+        self.last_anchor = build.last_anchor;
+        self.completed += 1;
+        self.published = consumed_end;
+        build
+    }
+
+    fn probe_picture(
+        &mut self,
+        range: Range<u64>,
+        anchor_offset: u64,
+        (has_vcl, random_access): (bool, bool),
+        scan: bool,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<LaneStep> {
+        let build = self.build.as_mut().expect("pending picture");
+        let pieces = self.pieces.as_slice();
+        // Track the same source extent and anchor as a delivered packet without
+        // retaining PES owners or computing decode times for discarded pictures.
+        while let Some(piece) = pieces.get(build.origin) {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(LaneStep::Yield);
+            }
+            if piece.range.start < range.end
+                && range.start < piece.range.end
+                && build.picture_origin.is_none()
+            {
+                let pes = piece.source.pes();
+                build.picture_origin =
+                    Some((pes.epochs, pes.byte_run_epoch, pes.elementary_offset));
+            }
+            if piece.range.start <= anchor_offset && piece.serial > build.last_anchor {
+                build.picture_anchor = Some(build.origin);
+                build.last_anchor = piece.serial;
+            }
+            build.origin += 1;
+        }
+        while let Some(piece) = pieces.get(build.retire) {
+            if piece.range.end > range.end || piece.serial > build.last_anchor {
+                break;
+            }
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(LaneStep::Yield);
+            }
+            build.retire += 1;
+        }
+        if !work.try_charge(1) {
+            return Ok(LaneStep::Yield);
+        }
+        let (epochs, byte_run, pes_offset) = build
+            .picture_origin
+            .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?;
+        let anchor = build.picture_anchor.map(|index| &pieces[index]);
+        let (ticks, time) = if scan
+            && has_vcl
+            && let Some(anchor) = anchor
+            && !anchor.clock.quarantined
+        {
+            let pts = anchor.source.pes().header.pts_raw33;
+            if self.limits.time_policy == SourceTimePolicy::RelativeEpochZero && !random_access {
+                // The validated raw PTS is sufficient for detecting a wrap.
+                (pts.map(i128::from), None)
+            } else if random_access {
+                let stamp = source_timestamp(pts, anchor.clock.key, self.limits.time_policy)?;
+                (stamp.ticks90, stamp.exact)
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+        self.finish_build(range.end);
+        Ok(LaneStep::PictureProbe(SeekProbe {
+            offset: range.start,
+            epochs,
+            byte_run,
+            pes_offset,
+            ticks,
+            time,
+            random_access,
+            has_vcl,
+        }))
+    }
+
+    fn publish(
+        &mut self,
+        picture_delivery: PictureDelivery,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<LaneStep> {
         let build = self.build.as_mut().expect("pending publication");
+        let (range, anchor_offset) = build.unit.range_and_anchor();
+        let probing = match picture_delivery {
+            PictureDelivery::Full => false,
+            PictureDelivery::Scan | PictureDelivery::Discard => true,
+            PictureDelivery::Landing {
+                offset,
+                byte_run,
+                publish_headers,
+            } => {
+                let header_group = publish_headers
+                    && matches!(&build.unit, BuildUnit::Packet(AccessUnit::Video(unit)) if !unit.has_vcl);
+                !header_group
+                    && (offset != range.start
+                        || !matches!(self.run, PesRun::Active(_, run) if run == byte_run))
+            }
+        };
+        if probing && let BuildUnit::Packet(AccessUnit::Video(unit)) = &build.unit {
+            let flags = (unit.has_vcl, unit.random_access);
+            return self.probe_picture(
+                range,
+                anchor_offset,
+                flags,
+                matches!(picture_delivery, PictureDelivery::Scan),
+                work,
+                cancel,
+            );
+        }
         if let BuildOrigins::ReserveTable(count) = build.origins {
             if !work.try_charge(1) {
                 return Ok(LaneStep::Yield);
@@ -1516,7 +1877,6 @@ impl Lane {
         let BuildOrigins::Ready(origins) = &mut build.origins else {
             unreachable!("prepared PES sources");
         };
-        let (range, anchor_offset) = build.unit.range_and_anchor();
         let consumed_end = match &build.unit {
             BuildUnit::Packet(AccessUnit::DvbSubtitle(unit)) => unit.pes_end,
             _ => range.end,
@@ -1584,6 +1944,13 @@ impl Lane {
         if !work.try_charge(1) {
             return Ok(LaneStep::Yield);
         }
+        let epochs = origins
+            .as_slice()
+            .first()
+            .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?
+            .pes
+            .pes()
+            .epochs;
         let (charge, duration) = match &build.unit {
             BuildUnit::Packet(unit) => {
                 (Shared::<PacketData>::reserve(&self.pool)?, unit.duration()?)
@@ -1592,16 +1959,17 @@ impl Lane {
         };
         let duration90 = duration
             .map(|time| -> Result<Option<i64>> {
-                let n = time
-                    .numerator()
-                    .checked_mul(90_000)
-                    .ok_or(Error::Overflow)?;
-                let d = i128::try_from(time.denominator()).map_err(|_| Error::Overflow)?;
-                if n % d == 0 {
-                    Ok(Some(i64::try_from(n / d).map_err(|_| Error::Overflow)?))
-                } else {
-                    Ok(None)
+                const TICKS_PER_SECOND: u32 = 90_000;
+                // Time is reduced, so the denominator must divide the clock rate.
+                let Ok(denominator) = u32::try_from(time.denominator()) else {
+                    return Ok(None);
+                };
+                if !TICKS_PER_SECOND.is_multiple_of(denominator) {
+                    return Ok(None);
                 }
+                let numerator = i64::try_from(time.numerator()).map_err(|_| Error::Overflow)?;
+                let scale = i64::from(TICKS_PER_SECOND / denominator);
+                Ok(Some(numerator.checked_mul(scale).ok_or(Error::Overflow)?))
             })
             .transpose()?
             .flatten();
@@ -1619,22 +1987,11 @@ impl Lane {
             .map(i64::try_from)
             .transpose()
             .map_err(|_| Error::Overflow)?;
-        let epochs = origins
-            .as_slice()
-            .first()
-            .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?
-            .pes
-            .pes()
-            .epochs;
-        let build = self.build.take().expect("prepared publication");
+        let build = self.finish_build(consumed_end);
         let recovered_adts = build.recovered_adts_bytes
             || build.clock.as_ref().is_some_and(|clock| {
                 matches!(clock.pes.event(), crate::TraceEvent::UnboundedAdtsPes(_))
             });
-        self.retire = build.retire;
-        self.last_anchor = build.last_anchor;
-        self.completed += 1;
-        self.published = consumed_end;
         let track = self.track.clone();
         let BuildOrigins::Ready(origins) = build.origins else {
             unreachable!("prepared PES sources");

@@ -1,0 +1,53 @@
+{
+ "name": "gate-run-armv7-c945c5e0-20261120-161532-shard-1",
+ "path": "gate-run-armv7-c945c5e0-20261120-161532-shard-1",
+ "retention": "retained",
+ "reason": "MPEG-TS PES and access-unit parity, 30 timing pairs and 30 kernel-bound memory pairs per case on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/c945c5e00f317b93f597146196dbe9bea8609ee0-armv7-20261120-161532/shard-1/acf19ba35d25678df876c6449cbb5ee144e553278208b4ede5f19e93bb50ccdf.tar.zst",
+ "sha256": "acf19ba35d25678df876c6449cbb5ee144e553278208b4ede5f19e93bb50ccdf",
+ "bytes": 29843876,
+ "results": [
+  {
+   "path": "memory/mpegts-access-units/gate-result.json",
+   "command": "report --memory",
+   "key": "91f1d16d689faaabd1a568df46fd7bf5abc1cfc16aa75ba7b35213cc45376bb9",
+   "status": 0,
+   "report_sha256": "61cb8c295cf9852a6a15aaa4b31c83b52ecf7c7672fa3ea49f88eb2df8c93c0d"
+  },
+  {
+   "path": "memory/mpegts-pes/gate-result.json",
+   "command": "report --memory",
+   "key": "f0435242f12aef3cfeb0166f72d706f89100e9f6b559f34399fd4646a1024216",
+   "status": 0,
+   "report_sha256": "a42569e264d5d5453e7c3103a92d60add249f35039f5b912c5e6a12b349a493b"
+  },
+  {
+   "path": "benchmark/mpegts-access-units/gate-result.json",
+   "command": "report --benchmark",
+   "key": "19f81544c78ddf1069d26f64e5fc6cf405ef5d4a2c3ed515a8647b953bb3aa5f",
+   "status": 0,
+   "report_sha256": "beb7d5533674ef0e330f02df7df7ded4342ae832aa7f1b1c5d1d1cc8840e04c7"
+  },
+  {
+   "path": "benchmark/mpegts-pes/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9e208cdcebdb6c9bd1ca31230f7366a63bf3f8c2789a27242fe9164f3c9e61fa",
+   "status": 0,
+   "report_sha256": "64d82c371d79cd3cad4fb51444272561758674361615783f6742c97b367814cf"
+  },
+  {
+   "path": "graded/mpegts-access-units/gate-result.json",
+   "command": "grade",
+   "key": "02e6925507670b6bd68d606a40a906f2019e650723cb2c4fbfc006be15000f42",
+   "status": 0,
+   "report_sha256": "8b88f7480093e772bff35549128c9aea9906ca780e51b384319aec87612f74f8"
+  },
+  {
+   "path": "graded/mpegts-pes/gate-result.json",
+   "command": "grade",
+   "key": "021e5b0da8e43b05f27d95f425d230fb77a1ee2795b640aed0b3ba65b85b9b7d",
+   "status": 0,
+   "report_sha256": "5ea29ecf8a78d7759293f24ed69855cfa147c1eed15ac156a310ebc419309f60"
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-aarch64-c2bffebc-20261121-080236-shard-1",
+ "path": "gate-run-aarch64-c2bffebc-20261121-080236-shard-1",
+ "retention": "retained",
+ "reason": "Packet framing runtime, peak heap and total RSS for all 135 AVC and HEVC workloads, with seven segment descriptors inline, start codes copied as fixed-size stores and outputs published into their retained slot.",
+ "key": "evidence/gate-runs/c2bffebc3d7e2d6a0443119e1cfbdeff6b4d89cb-aarch64-20261121-080236/shard-1/b0395c11d63e47794ed80fe28403a2ef6693bfe161f363fa16b05e2b8595ff50.tar.zst",
+ "sha256": "b0395c11d63e47794ed80fe28403a2ef6693bfe161f363fa16b05e2b8595ff50",
+ "bytes": 19080569,
+ "results": [
+  {
+   "path": "memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "e3030d705096e2849c3c928717d769fe63e593cd3ca160fcf4d0d19817371b7f",
+   "status": 0,
+   "report_sha256": "029bdfb6825cbd81348b6b2e137e174f471fa8fb17a230cbdce62f8cadd69259",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "cae1d9de56b5cde184f9fb447fa07eecc567fc045267fbb1ad21c122ddf13c12",
+   "status": 0,
+   "report_sha256": "28d083f5f94f181ade7b6361683dbc8517b0dc77764a5c9cf764bdf352f0f4b7",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "43209b5ca3453706d00c5274f91b819e73c74deb04ab5bea4e037a79006d69df",
+   "status": 0,
+   "report_sha256": "81c1da49663f4da6c030f4adeb56580fbb2a080dabfa96b735de19e169baea1a"
+  }
+ ]
+}

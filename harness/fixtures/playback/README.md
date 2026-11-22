@@ -1,8 +1,8 @@
 # Playback startup and seek sources
 
 Synthetic Matroska files for the `matroska-startup-seek` contract
-(`harness/features/matroska-startup-seek/`). Together with five files in
-`crates/playback/tests/fixtures/mkv-feed/`, they are the sources of its 44 capsules,
+(`harness/features/matroska-startup-seek/`). Together with six files in
+`crates/playback/tests/fixtures/mkv-feed/`, they are the sources of its 45 capsules,
 which `cargo xtask fixtures` builds and checks against the manifest's SHA-256.
 
 The files were produced from synthetic test signals and muxed by FFmpeg 9.0.2

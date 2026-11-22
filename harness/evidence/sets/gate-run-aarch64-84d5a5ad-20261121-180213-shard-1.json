@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-aarch64-84d5a5ad-20261121-180213-shard-1",
+ "path": "gate-run-aarch64-84d5a5ad-20261121-180213-shard-1",
+ "retention": "retained",
+ "reason": "Picture seek comparisons on Linux AArch64 with 30 timing and 30 kernel-bound memory pairs per case.",
+ "key": "evidence/gate-runs/84d5a5ad6749e4d88a9312eac0cd5403ced7ba5f-aarch64-20261121-180213/shard-1/d36f6f2c45183ccd9a05dfb19be2e549142d6c7945783085c86fdab32d7e6229.tar.zst",
+ "sha256": "d36f6f2c45183ccd9a05dfb19be2e549142d6c7945783085c86fdab32d7e6229",
+ "bytes": 6918941,
+ "results": [
+  {
+   "path": "memory/mpegts-previous-picture/gate-result.json",
+   "command": "report --memory",
+   "key": "ea81d8bfe5475ec7ec9361066eb462c431e9afc6e0bc5de7a7e32c3726117abf",
+   "status": 0,
+   "report_sha256": "f9ebd43180a2acf8ff39f362a235d996420d81201a93711bf0c886c79770e7f3",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-previous-picture/gate-result.json",
+   "command": "report --benchmark",
+   "key": "19ac562ec86879fb39528e731b212b0c0477f965f38d8c34fe075e842c8e2396",
+   "status": 0,
+   "report_sha256": "95adb6357d893609422a9536027fe30ed3c4658be00a23047cea45f52aacfb5a",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-previous-picture/gate-result.json",
+   "command": "grade",
+   "key": "dad7259e4858d507898e7f9f97f6c446596374a4e7a74b1bb0165a2b181c19b0",
+   "status": 0,
+   "report_sha256": "5e0fe743a076eee9987ec226fbfe1fb1d07088c026d6faaed3649164032d46bb"
+  }
+ ]
+}

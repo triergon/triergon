@@ -12,7 +12,11 @@ use triergon_isobmff::{
 
 fn regular_tables(budget: &Budget, name: &str) -> Vec<(u32, SampleTable)> {
     let case = CASES.iter().find(|c| c.name == name).unwrap();
-    let roots = common::roots(budget, case.bytes).unwrap();
+    regular_tables_from_bytes(budget, case.bytes)
+}
+
+fn regular_tables_from_bytes(budget: &Budget, bytes: &[u8]) -> Vec<(u32, SampleTable)> {
+    let roots = common::roots(budget, bytes).unwrap();
     let movie = roots.iter().find(|b| b.header().kind == *b"moov").unwrap();
     common::children(movie, 0)
         .unwrap()
@@ -35,6 +39,80 @@ fn regular_tables(budget: &Budget, name: &str) -> Vec<(u32, SampleTable)> {
             (header.track_id, table)
         })
         .collect()
+}
+
+#[test]
+fn regular_movie_with_backward_chunk_preserves_decode_order_or_refuses_physical_order() {
+    // Move track 1's one-sample second chunk to the end of the existing mdat.
+    // The original bytes become unreferenced; the other track is unchanged.
+    let original = include_bytes!("fixtures/r-multitrack.mov");
+    let mut movie = original.to_vec();
+    assert_eq!(movie.len(), 1256);
+    assert_eq!(&movie[1147..1151], b"mdat");
+    assert_eq!(&movie[619..623], b"stco");
+    assert_eq!(&movie[635..639], &1184u32.to_be_bytes());
+    movie[1143..1147].copy_from_slice(&125u32.to_be_bytes());
+    movie[635..639].copy_from_slice(&1256u32.to_be_bytes());
+    movie.extend_from_slice(&original[1184..1196]);
+
+    for quantum in [1, 4096] {
+        let budget = Budget::new(1024 * 1024).unwrap();
+        let tables = regular_tables_from_bytes(&budget, &movie);
+        let tracks: Vec<_> = tables
+            .iter()
+            .map(|(id, table)| SourceTrack::new(*id, Some(table), &[]).unwrap())
+            .collect();
+        let media = 1151..1268;
+        let mut cursor = PhysicalSampleCursor::new_with_media_extents(
+            &budget,
+            &tracks,
+            std::slice::from_ref(&media),
+            PhysicalInterleaveLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            poll_until_physical_decision(&mut cursor, quantum),
+            Err(Error::Unsupported(
+                "physical merge needs nondecreasing per-track source offsets"
+            ))
+        );
+        assert_eq!(cursor.validated_samples(), 12);
+        assert!(cursor.resume_in_track_order());
+        let mut samples = Vec::new();
+        loop {
+            match poll_until_physical_decision(&mut cursor, quantum).unwrap() {
+                InterleaveStatus::Ready => {
+                    let item = cursor.take_sample().unwrap();
+                    samples.push((
+                        item.track_id,
+                        item.sample.ordinal,
+                        item.sample.range.start,
+                        item.sample.dts_ticks,
+                    ));
+                }
+                InterleaveStatus::End => break,
+                InterleaveStatus::Yield => unreachable!(),
+            }
+        }
+        assert_eq!(
+            samples,
+            [
+                (1, 1, 1151, Some(0)),
+                (1, 2, 1163, Some(1000)),
+                (1, 3, 1256, Some(2000)),
+                (1, 4, 1203, Some(3000)),
+                (1, 5, 1215, Some(4000)),
+                (1, 6, 1227, Some(5000)),
+                (2, 1, 1175, Some(0)),
+                (2, 2, 1182, Some(1000)),
+                (2, 3, 1196, Some(2000)),
+                (2, 4, 1239, Some(3000)),
+                (2, 5, 1244, Some(4000)),
+                (2, 6, 1250, Some(5000)),
+            ]
+        );
+        assert_eq!(&movie[1256..1268], &original[1184..1196]);
+    }
 }
 
 // Original Adobe v0 fragment construction, independent of production field readers.

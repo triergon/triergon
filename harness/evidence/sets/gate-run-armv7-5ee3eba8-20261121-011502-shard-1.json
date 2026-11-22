@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-armv7-5ee3eba8-20261121-011502-shard-1",
+ "path": "gate-run-armv7-5ee3eba8-20261121-011502-shard-1",
+ "retention": "retained",
+ "reason": "Packet framing runtime, peak heap and total RSS for all 135 AVC and HEVC workloads, every worker entering through C's main.",
+ "key": "evidence/gate-runs/5ee3eba8ad5563ee1ccccbfdd0e9a4c023133c65-armv7-20261121-011502/shard-1/d5ec5abaca96d81af2691680e3e01b9ceecf0a1734b33dd56bdc0f5f97af518c.tar.zst",
+ "sha256": "d5ec5abaca96d81af2691680e3e01b9ceecf0a1734b33dd56bdc0f5f97af518c",
+ "bytes": 16177506,
+ "results": [
+  {
+   "path": "memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "ee0d05ad47d7d054a18f392fc57439e1ea90623eeedd443741275e940990ed8e",
+   "status": 0,
+   "report_sha256": "6067cfdadcdf92c347df6937ff487fe3e6aff0cbcb09d36ed8f451829390ff37",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "40ab055c4f105801da8b2e7aa13b6255e9e8f950282d2592a672fdc234dcfc06",
+   "status": 0,
+   "report_sha256": "2f666d93622edf2cab85cd5f4b65089baba1c11051e74cb397a272cb1ed10a11",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "8504eec5668415207b42f211a0058587c8d3b4212f181912c921a05dddf7bbf9",
+   "status": 0,
+   "report_sha256": "2e603c519ae37a03387dd98b72c30eb862c78ab1c7390e5c23c0e18f436d6b5d"
+  }
+ ]
+}

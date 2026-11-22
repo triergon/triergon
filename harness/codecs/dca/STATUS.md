@@ -34,8 +34,8 @@ Synthetic stream names below are scenarios of `examples/synth.rs`.
 - 24-bit saturation, including LFE saturation of decimated samples: `scalehigh`,
   `adpcm_ovf`, `hfvq_loud`, `joint_huff`, `x96_s58`, `x96_s60`.
 - LFE history in 8-block frames: `blocks256s`, `lfe128_short`. History reset on growth:
-  `lfe_mixed`, `size_changes_adpcm`. Failed frame dropped without state change:
-  `bad_dsync5`.
+  `lfe_mixed`, `size_changes_adpcm`. Failed frame dropped without state change: `adpcm`
+  with the last DSYNC of frame 5 corrupted (`tests/synthetic.rs`).
 
 Other tools: `compare.py` (numeric rules), `fingerprint.py` and `make_fingerprints.sh`
 (`tests/data/*.fp`), `run_all.sh` (vector and synthetic sweep).

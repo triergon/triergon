@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-aarch64-ee4e5290-20261121-182522-shard-1",
+ "path": "gate-run-aarch64-ee4e5290-20261121-182522-shard-1",
+ "retention": "retained",
+ "reason": "DTS-HD mode-zero and retained transport comparisons on Linux AArch64.",
+ "key": "evidence/gate-runs/ee4e529052b754a93f78e1520a424fc3f376dc5c-aarch64-20261121-182522/shard-1/eca9890a389f7f3463222ec2e21504815b47f40ec4808869cac923cff13df584.tar.zst",
+ "sha256": "eca9890a389f7f3463222ec2e21504815b47f40ec4808869cac923cff13df584",
+ "bytes": 5591852,
+ "results": [
+  {
+   "path": "memory/mpegts-dts-seek/gate-result.json",
+   "command": "report --memory",
+   "key": "49d22a1ea5e4f63cd4da14d93f782ddca59619e64b2cd79c2807056e2c7d9ff3",
+   "status": 0,
+   "report_sha256": "35b993bf782fb73d9610bf46ae189e5049046eaebef4874d9d3c554319249d7b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-dts-seek/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a7dc7def61e7157c693c50b93580e319e31ad70f6214a790dc4dba6590d54e1f",
+   "status": 0,
+   "report_sha256": "62421feceb985382d6e1822afae3dd2d7f26ee24244d2cfc75952d5bcfece4ac",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-dts-seek/gate-result.json",
+   "command": "grade",
+   "key": "a7b235782221a4b8606838255ddc35e59ec90eb6570dbbf28af4d26944ee09e0",
+   "status": 0,
+   "report_sha256": "96af5e3c974307f2fbad41337724150ff63bdb3951aaf3c6321626c642bae7d4"
+  }
+ ]
+}

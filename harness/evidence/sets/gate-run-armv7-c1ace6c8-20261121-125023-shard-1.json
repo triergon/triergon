@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-armv7-c1ace6c8-20261121-125023-shard-1",
+ "path": "gate-run-armv7-c1ace6c8-20261121-125023-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at c1ace6c8 (exact time reduced without division on 32-bit targets, on main a0aede6d) on one c6g.4xlarge host, ARMv7, the mpegts-access-units item (timing, memory and grade): the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/c1ace6c80974a8ebf136bfdf4b9cf714fd068e9a-armv7-20261121-125023/shard-1/b0712bbf5be0add76cc1eae42af75ad9bf067fd20118c2f8fee59b72f2a00518.tar.zst",
+ "sha256": "b0712bbf5be0add76cc1eae42af75ad9bf067fd20118c2f8fee59b72f2a00518",
+ "bytes": 18431692,
+ "results": [
+  {
+   "path": "memory/mpegts-access-units/gate-result.json",
+   "command": "report --memory",
+   "key": "c907af601fbdbf92a65a4a34c450f5739c0b432dad342d83e8ca648fabc25073",
+   "status": 0,
+   "report_sha256": "253443e64a34daf6cb89477bd18b5bda6f9c2d691c5b71212e2d44ef6bd5ea2d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-access-units/gate-result.json",
+   "command": "report --benchmark",
+   "key": "402fa6f19ce5dc89b80a741077f6b6be32dfb38da5367bc7a79de547b6defad2",
+   "status": 0,
+   "report_sha256": "1d2ffd12f5e75b1bd7b75f75301097c0bd1bc06c02b10e43fe647f929b89d98c",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-access-units/gate-result.json",
+   "command": "grade",
+   "key": "d1104897912affe5e7ce4c5c5986a15e7cada6a3fb0fb7ae64180cc4970a97c3",
+   "status": 0,
+   "report_sha256": "5cf75813267d59f08150a5e90526da08135eec95ad9935da812f1c26afd24b87"
+  }
+ ]
+}

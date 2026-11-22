@@ -1,0 +1,195 @@
+{
+ "name": "gate-run-aarch64-fd9d1335-20261121-233727-shard-1",
+ "path": "gate-run-aarch64-fd9d1335-20261121-233727-shard-1",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/fd9d133518c21b049a3a622b8c34826308622f9b-aarch64-20261121-233727/shard-1/87667dbd153d78677da6c3e595039a731f530b218da7e36c47b333ebfc1253af.tar.zst",
+ "sha256": "87667dbd153d78677da6c3e595039a731f530b218da7e36c47b333ebfc1253af",
+ "bytes": 223922869,
+ "results": [
+  {
+   "path": "memory/subtitle-cc/gate-result.json",
+   "command": "report --memory",
+   "key": "99a50d04c46022d3d7705b7d81f4b26fbd7e0f4f91e0e0cd63715b655c0d8092",
+   "status": 0,
+   "report_sha256": "72b5729102f1f7674a62563d30a95f317163f2ff1f907fc04701cdec20feb766",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvd-host/gate-result.json",
+   "command": "report --memory",
+   "key": "21ba17d5c8eff221ba08edca044c768903a5e86737660900b889996a086ee4df",
+   "status": 0,
+   "report_sha256": "854f696aa310f093f0e3ddf183a6022e4580c0a6a250ca9c24a2d2bb59a0ce39",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "f21322a75eb2927767f7597681024eeef0f47565d8242172dc78b1751675ace7",
+   "status": 0,
+   "report_sha256": "210b1105bd1aa624545241d1680cde12d2ede2d6fa441338af5e8e7a4c8d7cfd",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "7a47fb6397612f75f81e632a5dda87325645052313c6a9a1ec099b4fd96f98fb",
+   "status": 0,
+   "report_sha256": "5e4a09134453c12b86e4139dc42452f3df0d54ddaa2bea85210f664a0ebdec64",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvd/gate-result.json",
+   "command": "report --memory",
+   "key": "ad18eafed5cad7d553b5e7ba5bd79ff2c51944cfc98ba6993d811c625f4ef95a",
+   "status": 0,
+   "report_sha256": "9e37ed7e9f5a0de0d05e5d87b60ccf1e7782743a4eb3648c30ca145de8de36c9",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "f2fc419ba767117bcf300f0bbc75179fd169ec861b60acd155b3be3adf0db218",
+   "status": 0,
+   "report_sha256": "3f4643f7f2c6b3b6bf9b34c89ddc74821a7fc40f0ffef733784557eebf1da2ea",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text/gate-result.json",
+   "command": "report --memory",
+   "key": "91e4b6e93337bc747b29e1e7db596697bb8f72a36171dd28a227a3fb2aa7757c",
+   "status": 0,
+   "report_sha256": "74e6580262961e2f09a594b96b75e17dbbbe6dcf393c0d05dcc163847ffea13f",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "a1a657cdf1e784fda890d83cd33955f2b65943e41af879a1cfca377d1d48643d",
+   "status": 0,
+   "report_sha256": "5f03aa2f62a94b90cb3957b65ec83b38b88c92a024b88579c5f1bd5714f3f1ed",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-cc/gate-result.json",
+   "command": "report --benchmark",
+   "key": "6be205db9d313dd399695166c26da625ddc7f491ac2dad9b498106c8df34292c",
+   "status": 0,
+   "report_sha256": "a8bb88d8510e2dc6baeea40d866c69c99c2423529a5c6fd1314530429b111e80",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvd-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4757686233e9b771adac8f86e007989821ac8d8a4616e4f5317a3e8963a8168b",
+   "status": 0,
+   "report_sha256": "19aaff600da9a539a0aa0eaa92e23b3ca7e745435d5c3bbe268c25f1db4fdb8a",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "98d5af476c1f2461323dc1a7e6d34dec9d9cd266a2f0537b7625dba39d63d017",
+   "status": 0,
+   "report_sha256": "c78e838c9c7490aeb6fdeb1308d9798080e636802a0f41e1bbdea2b557686b22",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "92690493e0cb4c5e99645945aeacb33567021197336e0416621593664c7fb73b",
+   "status": 0,
+   "report_sha256": "f5cf35eaaee4b6036b56d43d90b62fb845f8640adfcbc12235ce285a13154dba",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvd/gate-result.json",
+   "command": "report --benchmark",
+   "key": "2fdc8e157416bebaa3d913cc7d5835ede1013b0aa469a69d67be9f796a20e197",
+   "status": 0,
+   "report_sha256": "89d936d0261874bf431c960dfe0e6f2e740128640a8ffee47599268c68206e8a",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "58ed0244ae399ece6afaf41af6724a37b6c91c33a7ce0061f9e8ed5175679d81",
+   "status": 0,
+   "report_sha256": "ec2102e65adc43b907ab412d0b6e02b67923355c14d87794fcac71247c420b23",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text/gate-result.json",
+   "command": "report --benchmark",
+   "key": "ab03c0a3add5abc52c18452e6d9042a8c85f8efa9151267ba5912960ff3ae73e",
+   "status": 0,
+   "report_sha256": "493150ee9c6dd2990c30e1482619daecadefb153e7d08197e8d04f1ff3ebfa1b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a5060d87a3c477a3c7f76e8de0dadf9441c83898e543409a862be7761772e17f",
+   "status": 0,
+   "report_sha256": "ce476f8b2023e82f2a25a26fc52c96e8b8d26b790206abd786c8e129fcab4409",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-cc/gate-result.json",
+   "command": "grade",
+   "key": "3064a570099a8950953eb6242d57febd2383522b9cdc9535d08a5e0e5d026642",
+   "status": 0,
+   "report_sha256": "908e301afcce736770251a3be7cec91bf4ce84a18ed94c2d5154479705c07377"
+  },
+  {
+   "path": "graded/subtitle-dvd-host/gate-result.json",
+   "command": "grade",
+   "key": "5cf3683cb432424e99239149c061f0d2f0d564825918c645fdd081a5a06a1d5e",
+   "status": 1,
+   "report_sha256": "762d849aa01f5503ee7f48bc8e806e0517c4458e242168abc679cc45cc89e504"
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "19705181ac1b3289631a79c6b3b1d1a2cdc62f65041529444a3573680dd600d6",
+   "status": 0,
+   "report_sha256": "f123e0226216e7abaf8289f1500f8bd5e82a4c2eaa83a14a4e03f5e39a23fb06"
+  },
+  {
+   "path": "graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "9ed860b3e6f5030b26bccbe283764fc7da9a7761dc522dc4cbb45a338b218178",
+   "status": 0,
+   "report_sha256": "f46a0ff2b05d1777fb2b31da9c111a96a22042f21fd5176865f4d2abaca25d43"
+  },
+  {
+   "path": "graded/subtitle-dvd/gate-result.json",
+   "command": "grade",
+   "key": "54b27f94b2628f8f5190dad4254b25205739f62f8140934a0f1b55a1e381df4a",
+   "status": 0,
+   "report_sha256": "b1930ac4161013967f58f9c9f597ab38f32e652e45e726b6c2afc4605311447f"
+  },
+  {
+   "path": "graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "8205061bff998e8ab51d92a95129d6737935dd4a8d53e7f8c3b6497e2c24ea7d",
+   "status": 0,
+   "report_sha256": "e0f7b3915e39bf569709c0391f16deeda24906d78a58783754b106ad0fc21d9b"
+  },
+  {
+   "path": "graded/subtitle-text/gate-result.json",
+   "command": "grade",
+   "key": "a2b5bcfc75d42d765da3b8c3eb11cfe0dbaf043b22c96921838e88e5024326e9",
+   "status": 0,
+   "report_sha256": "b18b4a511b76f4655c27309a48061f2434963e984ed773564532c9e4d7beffb5"
+  },
+  {
+   "path": "graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "e9c2c184d897bc5322080d8ff4f2a65eb726775c20137ee840e4812e544f5e1d",
+   "status": 0,
+   "report_sha256": "ef197c1f4149392f6ee2b5f0dd10a942ae79f39b1876e545770b706a32b11623"
+  }
+ ]
+}

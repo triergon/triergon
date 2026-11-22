@@ -25,15 +25,13 @@ and reports:
 
 Any violation invalidates the session.
 
-A memory collection measures a pair again when its only fault is the third condition:
-the module reports (error 1) that another task updated a measured worker's resident
-counters during its window, which the kernel's own memory management can do to any
-process, for instance when it reclaims the worker's pages. The module decides this
-from the updating task, never from a value, so measuring the pair again, in the same
-order, favours neither worker. A collection measures at most two pairs again and
-records each voided pair under `retried_pairs`; the report and grading check that each
-was voided only in this way, and a third such pair, or any other fault, fails the
-collection.
+A memory collection measures a pair again when its only fault is the third condition
+(error 1: another task, such as the kernel reclaiming pages, updated a measured worker's
+resident counters during its window). The module decides this from the updating task,
+never from a value, so measuring the pair again, in the same order, favours neither
+worker. A collection measures at most two pairs again and records each voided pair under
+`retried_pairs`; the report and grading check that each was voided only in this way, and
+a third such pair, or any other fault, fails the collection.
 
 ## Proof
 
@@ -48,16 +46,13 @@ collection. It pins:
 - the boot, the kernel's build notes and the loaded module's build-id;
 - a review of this exact module source for this kernel release.
 
-Reviews are committed beside the module, as
-`harness/rss-bound/reviews/SOURCE-RELEASE.json`: SOURCE is the first 12 hexadecimal
-digits of the module source's SHA-256 and RELEASE the kernel release (`uname -r`). A
-review is a reading of one module source for one kernel, so it is versioned with that
-source; a review of a changed source names the review it follows by SHA-256
-(`prior_review_sha256`). `prove.sh` and `cargo xtask preflight` take the review that
-matches the tree's module source and the running kernel, and fail, naming the path
-they looked for, when there is none; `--review FILE` names another.
-
-A proof is valid only on the boot that produced it and is never reused.
+Reviews are committed as `harness/rss-bound/reviews/SOURCE-RELEASE.json`: SOURCE is the
+first 12 hexadecimal digits of the module source's SHA-256 and RELEASE the kernel release
+(`uname -r`); a review of a changed source names the review it follows by SHA-256
+(`prior_review_sha256`). `prove.sh` and `cargo xtask preflight` take the review matching
+the tree's module source and the running kernel, and fail, naming the path they looked
+for, when there is none; `--review FILE` names another. A proof is valid only on the boot
+that produced it.
 
 The result holds only 64-bit fields, so a 32-bit process on a 64-bit kernel reads the
 same layout through the module's 32-bit ioctl entry point. For such a user space,

@@ -4,21 +4,21 @@ Media containers, packet framing, subtitles, fonts and decoders in safe Rust, wi
 dependencies.
 
 Triergon reads Matroska/WebM, MP4/MOV, MPEG-TS, Ogg, native FLAC and raw MPEG audio,
-ADTS and AC-3 streams, frames H.264, HEVC, AV1, VP9, AAC, AC-3 and DTS packets for
-hardware or software decoders, decodes text and bitmap subtitles, closed captions and
-teletext, reads OpenType and TrueType fonts, shapes text, rasterises glyphs and subtitle
-bitmaps, reads ASS scripts and their override tags, and includes software decoders for
-H.264, HEVC, AAC, AC-3/E-AC-3, DTS, FLAC, Opus, Vorbis and MPEG audio Layer I, II and
-III. It is written from the published standards and measured case by case against a
-pinned reference: FFmpeg for media, FreeType for fonts, HarfBuzz and FriBidi for shaping,
-libass for rasterising and ASS parsing.
+ADTS and AC-3/E-AC-3 streams, frames H.264, HEVC, AV1, VP9, AAC, AC-3/E-AC-3 and
+DTS/DTS-HD packets for hardware or software decoders, decodes text and bitmap
+subtitles, closed captions and teletext, reads OpenType and TrueType fonts, shapes text,
+rasterises glyphs and subtitle bitmaps, reads ASS scripts and their override tags, and
+includes software decoders for H.264, HEVC, AAC, AC-3/E-AC-3, DTS, FLAC, Opus, Vorbis
+and MPEG audio Layer I, II and III. It is written from the published standards and
+measured case by case against a pinned reference: FFmpeg for media, FreeType for fonts,
+HarfBuzz and FriBidi for shaping, libass for rasterising and ASS parsing.
 
 > **Status: experimental.** APIs change without notice and nothing is published to
 > crates.io yet. See [status](docs/status.md) for what is verified today.
 
 ## Principles
 
-- **Safe Rust, zero dependencies.** Every crate forbids `unsafe`. The dependency graph
+- **Safe Rust, zero dependencies.** Every library crate forbids `unsafe`. The dependency graph
   is `std` and nothing else.
 - **As good as the reference, or it does not ship.** Each module must match its pinned
   reference (FFmpeg for media, FreeType for fonts, HarfBuzz and FriBidi for shaping,
@@ -43,10 +43,10 @@ libass for rasterising and ASS parsing.
 | [`triergon-bitstream`](crates/bitstream) | Bit readers, exp-Golomb, RBSP, CABAC and CRCs shared by the format, framing and codec crates |
 | [`triergon-matroska`](crates/media) | Matroska and WebM reader with seeking, chapters, tags, attachments, colour and HDR |
 | [`triergon-isobmff`](crates/isobmff) | MP4, MOV and fragmented MP4: sample tables, edit lists, range-based playback |
-| [`triergon-mpegts`](crates/mpegts) | MPEG-TS and M2TS: PSI, PES assembly, timestamps, HLS segments |
+| [`triergon-mpegts`](crates/mpegts) | MPEG-TS and M2TS: PSI, PES and access-unit assembly, timestamps, bounded seeking, HLS segments, a single-program writer |
 | [`triergon-ogg`](crates/ogg) | Ogg with the FLAC, Opus and Vorbis mappings: chained and multiplexed streams, granule timing, trims, seeking |
-| [`triergon-elementary`](crates/elementary) | Native FLAC, MPEG audio (ID3, Xing/Info/VBRI, LAME gapless), ADTS and AC-3 streams |
-| [`triergon-framing`](crates/framing) | Codec configuration and packet conversion for H.264, HEVC, AV1, VP9, AAC, AC-3, DTS |
+| [`triergon-elementary`](crates/elementary) | Native FLAC, MPEG audio (ID3, Xing/Info/VBRI, LAME gapless), ADTS and AC-3/E-AC-3 streams |
+| [`triergon-framing`](crates/framing) | Codec configuration and packet conversion for H.264, HEVC, AV1, VP9, AAC, AC-3/E-AC-3, DTS/DTS-HD |
 | [`triergon-subtitles`](crates/subtitles) | SRT, WebVTT, ASS, mov_text and tx3g; PGS, DVB and DVD bitmap subtitles; CEA-608 closed captions; DVB teletext |
 | [`triergon-font`](crates/font) | OpenType and TrueType faces and collections: cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | [`triergon-shape`](crates/shape) | OpenType shaping with the script shapers, the bidirectional algorithm, Unicode properties |
@@ -96,19 +96,14 @@ lto = "fat"
 codegen-units = 1
 ```
 
-Cargo's default profile runs measurably slower on 32-bit ARM: without fat LTO the
-playback worker executes up to 25.0% more instructions, and 16 codegen units add up to
-another 2.5%. `panic = "abort"` saves a further 2 to 3%; it is safe unless the program
-wraps calls into these crates in `catch_unwind`. See
-[measuring performance](docs/quality.md#measuring-performance).
+Cargo's default profile runs measurably slower, most of all on 32-bit ARM.
+`panic = "abort"` is faster still; it is safe unless the program wraps calls into these
+crates in `catch_unwind`. See [measuring performance](docs/quality.md#measuring-performance).
 
-On GNU/Linux the published memory also assumes the program's functions linked in the
-playback worker's trained order, as the measurement workers are: linked by the Rust
-toolchain's own `lld`, with a symbol ordering file that puts the functions a training
-corpus runs first, in the order it first runs them, and the rest grouped by crate,
-module and type. In your project, link once; in a checkout of this repository, write
-the ordering file for that binary from the trained order committed for the target; then
-link again in your project with it. The ordering file of the second link is the same.
+On GNU/Linux the published memory also assumes the program's functions are linked in
+the playback worker's trained order, as the measurement workers are: by the Rust
+toolchain's `lld` with a symbol ordering file. Link once, write the ordering file for
+that binary from the trained order committed for the target, then link again with it.
 With `TRIERGON` the checkout and `TARGET` `aarch64-unknown-linux-gnu` or
 `thumbv7neon-unknown-linux-gnueabihf`, from your project's directory (a cross build puts
 the binary under `target/$TARGET/release` instead):

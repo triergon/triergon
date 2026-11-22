@@ -184,8 +184,13 @@ impl BoxReader {
         work: u64,
         cancel: &AtomicBool,
     ) -> Result<Option<BoxEvent>> {
+        // Supplying a response changes neither the cursor's token nor its
+        // position, and a failed poll returns at once, so the checks that
+        // open every poll hold for each one after the first.
+        self.check(input)?;
         loop {
-            match self.poll(input, &mut WorkBudget::new(work), cancel)? {
+            let step = self.poll_inner(input, &mut WorkBudget::new(work), cancel);
+            match self.record(step)? {
                 Step::Ready(event) => return Ok(Some(event)),
                 Step::NeedInput(request) => feed.supply(input, request)?,
                 Step::Yield => {}
@@ -200,17 +205,25 @@ impl BoxReader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<BoxEvent>> {
+        self.check(input)?;
+        let step = self.poll_inner(input, work, cancel);
+        self.record(step)
+    }
+    /// The input is the one this reader last saw, and no poll has failed.
+    #[inline(always)]
+    fn check(&self, input: &InputCursor) -> Result<()> {
         self.binding(input)?;
-        if let Some(error) = self.failed {
-            return Err(error);
-        }
-        let result = self.poll_inner(input, work, cancel);
-        if let Err(error) = result
+        self.failed.map_or(Ok(()), Err)
+    }
+    /// Keeps a poll's failure, other than backpressure, for every later poll.
+    #[inline(always)]
+    fn record(&mut self, step: Result<Step<BoxEvent>>) -> Result<Step<BoxEvent>> {
+        if let Err(error) = step
             && !matches!(error, Error::Backpressure { .. })
         {
             self.failed = Some(error);
         }
-        result
+        step
     }
     #[inline(always)]
     fn poll_inner(

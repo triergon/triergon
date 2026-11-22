@@ -2,17 +2,19 @@
 //!
 //! The separate demux-clock policy places source PES anchors for comparison. It
 //! never changes the source packet's timestamps or supplies a clock to later AUs.
-use crate::runner::{Invocation, Refusal, Result, Totals, measure};
+use crate::runner::{Invocation, Refusal, Result, Totals, measure, measure_repeated};
 use crate::ts::{au_recovery, confirm_control_only_entity, fold_payload};
 use crate::ts_input::{self, FIRST_SOURCE, Request};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
-use triergon_core::container::{ContainerReader, Event, PacketInfo, TrackId, TrackInfo};
+use triergon_core::container::{
+    ContainerReader, Event, PacketInfo, RandomAccess, TrackId, TrackInfo,
+};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputWindow, Rounding, SourceCapabilities, SourceId,
     SourceLocation, Step, TimeBase, WorkBudget,
 };
-use triergon_framing::Ac3Family;
+use triergon_framing::{Ac3Family, Ac3FrameHeader, MpegLayer};
 use triergon_harness_protocol::digest::signed;
 use triergon_mpegts::compat::adts::{PacketPolicy, PesPolicy};
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, ContinuityResidue};
@@ -29,6 +31,7 @@ use triergon_mpegts::{
 mod malformed;
 
 pub const PREFIX: &str = "ts-au-";
+pub const EAC3_PREFIX: &str = "ts-eac3-six-block-";
 const OPERATION: &str = "mpegts-access-unit-packets";
 const WINDOW: usize = 64 * 1024;
 const WORK: u64 = 4096;
@@ -43,15 +46,16 @@ struct TrackProjection {
     id: TrackId,
     pending_ac3: Option<Packet>,
     ac3_duration_known: bool,
+    mpeg_audio_seen: bool,
 }
 
 #[derive(Clone, Copy)]
-struct PacketPosition<'a> {
+struct PacketPosition<'a, const TRACE: bool> {
     request: &'a Request,
     basis: PositionBasis,
 }
 
-impl PacketPosition<'_> {
+impl<const TRACE: bool> PacketPosition<'_, TRACE> {
     fn at(self, entity: SourceId, offset: u64) -> Result<i64> {
         let carrier = match self.request.format {
             PacketFormat::Ts188 => offset / 188 * 188,
@@ -83,7 +87,7 @@ fn is_ac3(packet: &Packet) -> bool {
     }
 }
 
-fn ac3_header(packet: &Packet) -> Option<triergon_framing::Ac3FrameHeader> {
+fn ac3_header(packet: &Packet) -> Option<Ac3FrameHeader> {
     match packet.access_unit() {
         AccessUnit::Ac3(frame) => Some(frame.facts().header),
         AccessUnit::IncompleteAudio { bytes, .. } if is_ac3(packet) => {
@@ -97,10 +101,18 @@ fn ac3_duration(packet: &Packet, known: bool) -> Result<i64> {
     if !known {
         return Ok(0);
     }
-    ac3_header(packet).map_or(Ok(0), |header| {
-        Ok(header
-            .sample_span()?
-            .to_i64_ticks(TimeBase::new(1, 90_000)?, Rounding::NearestAway)?)
+    if let Some(ticks) = packet.duration() {
+        return Ok(ticks);
+    }
+    let span = if let Some(span) = packet.sample_duration() {
+        Some(span)
+    } else {
+        ac3_header(packet)
+            .map(Ac3FrameHeader::sample_span)
+            .transpose()?
+    };
+    span.map_or(Ok(0), |span| {
+        Ok(span.to_i64_ticks(TimeBase::new(1, 90_000)?, Rounding::NearestAway)?)
     })
 }
 
@@ -182,11 +194,18 @@ fn refused(mut totals: Totals, error: &dyn std::fmt::Display, at: SourceLocation
     totals
 }
 
+#[derive(Clone, Copy)]
+enum PositionSource {
+    AlignedPayload,
+    FirstPes,
+    ClockAnchor,
+}
+
 enum Payload<'a> {
     Framed {
         sources: &'a [PayloadSource],
         bytes: &'a [u8],
-        pes_position: bool,
+        position: PositionSource,
     },
     PreservedPes(&'a latm::PesPacket),
 }
@@ -201,14 +220,29 @@ struct PacketProjection<'a> {
 
 impl<'a> From<&'a Packet> for PacketProjection<'a> {
     fn from(packet: &'a Packet) -> Self {
-        let flags = match packet.access_unit() {
-            AccessUnit::Video(unit) => u64::from(unit.random_access),
-            AccessUnit::Loas(_) => 0,
+        let (flags, position) = match packet.access_unit() {
+            AccessUnit::Video(unit) => (
+                u64::from(unit.random_access),
+                PositionSource::AlignedPayload,
+            ),
+            AccessUnit::MpegVideo(_) => (
+                u64::from(packet.random_access() == RandomAccess::Sync),
+                PositionSource::AlignedPayload,
+            ),
+            AccessUnit::Loas(_) => (0, PositionSource::AlignedPayload),
+            // DVB subtitle bytes start after the two-byte PES wrapper.
+            AccessUnit::DvbSubtitle(_) => (1, PositionSource::FirstPes),
+            // A PES beginning inside an aligned audio frame stamps the next
+            // frame, including that PES's carrier position.
+            AccessUnit::Dts(frame) if frame.core_bytes().len() < frame.bytes().len() => {
+                (0, PositionSource::FirstPes)
+            }
+            AccessUnit::DtsExtension(_) => (0, PositionSource::FirstPes),
+            AccessUnit::MpegAudio(_) | AccessUnit::Dts(_) => (1, PositionSource::ClockAnchor),
             AccessUnit::Adts(_)
             | AccessUnit::AdtsFragment(_)
             | AccessUnit::Ac3(_)
-            | AccessUnit::DvbSubtitle(_)
-            | AccessUnit::IncompleteAudio { .. } => 1,
+            | AccessUnit::IncompleteAudio { .. } => (1, PositionSource::AlignedPayload),
         };
         Self {
             pid: packet.track_info().stream().pid,
@@ -217,8 +251,7 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
             payload: Payload::Framed {
                 sources: packet.sources(),
                 bytes: packet.payload(),
-                // DVB subtitle bytes start after the two-byte PES wrapper.
-                pes_position: matches!(packet.access_unit(), AccessUnit::DvbSubtitle(_)),
+                position,
             },
             flags,
         }
@@ -234,7 +267,7 @@ impl<'a> From<&'a IncompleteVideo> for PacketProjection<'a> {
             payload: Payload::Framed {
                 sources: video.sources(),
                 bytes: video.bytes().as_ref(),
-                pes_position: false,
+                position: PositionSource::AlignedPayload,
             },
             flags: 0,
         }
@@ -263,18 +296,18 @@ impl<'a> From<&'a UnframedAudio> for PacketProjection<'a> {
             payload: Payload::Framed {
                 sources: audio.sources(),
                 bytes: audio.bytes().as_ref(),
-                pes_position: false,
+                position: PositionSource::AlignedPayload,
             },
             flags: 1,
         }
     }
 }
 
-fn fold_packet(
+fn fold_packet<const TRACE: bool>(
     totals: &mut Totals,
     packet: PacketProjection<'_>,
     index: usize,
-    position: PacketPosition<'_>,
+    position: PacketPosition<'_, TRACE>,
     duration: i64,
     clock: &mut DemuxClock,
     cancel: &AtomicBool,
@@ -302,11 +335,11 @@ fn fold_packet(
     let ticks = |value: Option<i128>| -> Result<i64> {
         Ok(value.map(i64::try_from).transpose()?.unwrap_or(i64::MIN))
     };
-    let (pes, at_start, bytes) = match packet.payload {
+    let (pes, position_pes, bytes) = match packet.payload {
         Payload::Framed {
             sources,
             bytes,
-            pes_position,
+            position: source,
         } => {
             let first = sources.first().ok_or("packet has no source PES")?;
             let pes = first
@@ -314,18 +347,21 @@ fn fold_packet(
                 .event()
                 .pes_source()
                 .ok_or("packet payload has no PES")?;
-            (
-                pes,
-                first.payload_range.start == 0 || pes_position,
-                bytes.len(),
-            )
+            let position_pes = match source {
+                PositionSource::AlignedPayload => (first.payload_range.start == 0).then_some(pes),
+                PositionSource::FirstPes => Some(pes),
+                PositionSource::ClockAnchor => packet
+                    .clock
+                    .and_then(|clock| clock.pes.event().pes_source()),
+            };
+            (pes, position_pes, bytes.len())
         }
         Payload::PreservedPes(packet) => {
             let pes = packet.pes();
-            (pes, true, pes.payload_len)
+            (pes, Some(pes), pes.payload_len)
         }
     };
-    let position = if at_start {
+    let position = if let Some(pes) = position_pes {
         let range = pes
             .header_source_ranges
             .as_slice()
@@ -346,6 +382,39 @@ fn fold_packet(
         bytes as u64,
     ];
     let stream_id = pes.header.stream_id;
+    if TRACE {
+        use std::io::Write;
+        let mut out = std::io::stdout().lock();
+        write!(
+            out,
+            "{{\"stream\":{},\"pid\":{},\"pts\":{},\"dts\":{},\"duration\":{},\"pos\":{},\"flags\":{},\"hex\":\"",
+            fields[0],
+            fields[1],
+            fields[2] as i64,
+            fields[3] as i64,
+            fields[4] as i64,
+            fields[5] as i64,
+            fields[6]
+        )?;
+        let mut hex = |bytes: &[u8]| -> Result<()> {
+            for byte in bytes {
+                write!(out, "{byte:02x}")?;
+            }
+            Ok(())
+        };
+        match &packet.payload {
+            Payload::Framed { bytes, .. } => hex(bytes)?,
+            Payload::PreservedPes(_) => {
+                for span in pes.payload() {
+                    hex(span)?;
+                }
+            }
+        }
+        writeln!(
+            out,
+            "\",\"side_data\":[{{\"type\":19,\"hex\":\"{stream_id:02x}\"}}]}}"
+        )?;
+    }
     match packet.payload {
         Payload::Framed { bytes, .. } => {
             fold_payload(totals, fields, stream_id, std::iter::once(bytes))
@@ -364,7 +433,10 @@ fn diagnostic_refusal(fault: &triergon_mpegts::TraceFault) -> Refusal {
     }
 }
 
-fn fold_continuity(residue: &ContinuityResidue, position: PacketPosition<'_>) -> Result<Totals> {
+fn fold_continuity<const TRACE: bool>(
+    residue: &ContinuityResidue,
+    position: PacketPosition<'_, TRACE>,
+) -> Result<Totals> {
     let first = residue
         .chunks()
         .first()
@@ -394,7 +466,11 @@ fn fold_continuity(residue: &ContinuityResidue, position: PacketPosition<'_>) ->
     Ok(totals)
 }
 
-fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<Totals> {
+fn operation<const TRACE: bool>(
+    pool: &Budget,
+    request: &Request,
+    cancel: &AtomicBool,
+) -> Result<Totals> {
     let mut totals = Totals::default();
     let mut at = SourceLocation {
         source: FIRST_SOURCE,
@@ -404,11 +480,14 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
         Ok(basis) => basis,
         Err(error) => return Ok(refused(totals, error.as_ref(), at)),
     };
-    let position = PacketPosition { request, basis };
+    let position = PacketPosition::<TRACE> { request, basis };
     let limits = ReaderLimits {
         format: request.format,
         program: Some(request.program),
         descriptor_namespace: request.namespace,
+        unlabelled_dts_core: request.unlabelled_dts_core,
+        probe_unlabelled_dts_core: request.probe_dts_core,
+        pcr_policy: request.pcr_policy,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
         unframed_audio_policy: UnframedAudioPolicy::ReportAtEof,
         adts_packet_policy: PacketPolicy::ReportFragments,
@@ -485,7 +564,36 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                     let duration = ac3_duration(&previous, track.ac3_duration_known)?;
                     (previous, duration)
                 } else {
-                    (packet, 0)
+                    let duration = match packet.access_unit() {
+                        // The parser-enabled NOFILLIN reference leaves MPEG video
+                        // packet duration absent without stream discovery. The source
+                        // picture retains its sequence-derived exact duration.
+                        AccessUnit::MpegVideo(_) => 0,
+                        AccessUnit::MpegAudio(frame) => {
+                            let first = !std::mem::replace(&mut track.mpeg_audio_seen, true);
+                            // The reference reports no initial Layer I/II duration
+                            // before it has a parsed sample rate for this track.
+                            if first && frame.header().layer != MpegLayer::III {
+                                0
+                            } else {
+                                // The parser's duration is truncated to whole
+                                // 90 kHz ticks. The source packet keeps its exact span.
+                                let header = frame.header();
+                                i64::from(header.samples_per_frame()) * 90_000
+                                    / i64::from(header.sample_rate)
+                            }
+                        }
+                        // In the parser-enabled comparison without stream discovery,
+                        // the DVB DTS-HD extension descriptor leaves PES duration unset.
+                        AccessUnit::Dts(frame)
+                            if frame.core_bytes().len() == frame.bytes().len() =>
+                        {
+                            let span = frame.sample_span();
+                            i64::try_from(span.numerator() * 90_000 / span.denominator() as i128)?
+                        }
+                        _ => 0,
+                    };
+                    (packet, duration)
                 };
                 if let Err(error) = fold_packet(
                     &mut totals,
@@ -631,6 +739,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
                                         id,
                                         pending_ac3: None,
                                         ac3_duration_known: false,
+                                        mpeg_audio_seen: false,
                                     })
                                     .map_err(|error| error.error)?;
                             }
@@ -653,6 +762,20 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
             Step::Ready(Event::Other(ContinuityEvent::Source(event))) => {
                 if let Some(original) = deferred_continuity {
                     return Ok(original);
+                }
+                if request.probe_dts_core
+                    && let ReaderEvent::Unsupported { track, error } = &event
+                {
+                    return Ok(refused(
+                        totals,
+                        &format_args!(
+                            "DTS discovery refused program {} PID {} configuration {} ({error})",
+                            track.program(),
+                            track.stream().pid,
+                            track.configuration_epoch(),
+                        ),
+                        at,
+                    ));
                 }
                 let recovery = match &event {
                     ReaderEvent::Interrupted { cause, .. }
@@ -806,22 +929,49 @@ fn prove_source(
 }
 
 pub fn run(args: &[String]) -> Result<()> {
+    let eac3 = args
+        .first()
+        .is_some_and(|mode| mode.starts_with(EAC3_PREFIX));
     let invocation = Invocation::parse(
         args,
-        PREFIX,
-        " SIZE PROGRAM [--dvb] [[--discontinuity] ENTITY]...",
+        if eac3 { EAC3_PREFIX } else { PREFIX },
+        " SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]... [--dts-core=PID|--probe-dts-core] [--ignore-pcr-reserved-bits]",
         2..=usize::MAX,
-        false,
+        true,
     )?;
+    if eac3
+        && (invocation.arguments.len() != 3
+            || invocation.arguments[0] != "188"
+            || invocation.arguments[2] != "--atsc")
+    {
+        return Err("six-block comparison requires SIZE 188, PROGRAM and --atsc".into());
+    }
     let pool = Budget::new(256 * 1024 * 1024)?;
-    let request = ts_input::parse(&pool, Path::new(invocation.path), invocation.arguments)?;
-    measure(&invocation, OPERATION, Some(&pool), || {
+    let request =
+        ts_input::parse_access_units(&pool, Path::new(invocation.path), invocation.arguments)?;
+    // Select a monomorphization before measurement; ordinary folds carry no trace flag.
+    let operation = if invocation.mode == triergon_harness_runner::Mode::Trace {
+        operation::<true>
+    } else {
+        operation::<false>
+    };
+    let name = if eac3 {
+        "mpegts-atsc-eac3-six-block"
+    } else {
+        OPERATION
+    };
+    let run = || {
         operation(
             &pool,
             std::hint::black_box(&request),
             &AtomicBool::new(false),
         )
-    })
+    };
+    if request.probe_dts_core {
+        measure_repeated(&invocation, OPERATION, Some(&pool), run)
+    } else {
+        measure(&invocation, name, Some(&pool), run)
+    }
 }
 
 #[cfg(test)]
@@ -847,12 +997,60 @@ mod tests {
             format: PacketFormat::Ts188,
             program: 1,
             namespace: DescriptorNamespace::Unspecified,
+            unlabelled_dts_core: None,
+            probe_dts_core: false,
+            pcr_policy: triergon_mpegts::compat::pes::PcrPolicy::Strict,
             following: BudgetVec::new(&pool),
         };
         let baseline = pool.used();
-        let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+        let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(pool.used(), baseline);
         totals
+    }
+
+    #[test]
+    fn repeated_dts_discovery_reports_the_same_source_refusal() {
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut input = include_bytes!(
+            "../../../harness/features/mpegts-dts-core/inputs/dts-core-unlabelled-private-data.ts"
+        )
+        .to_vec();
+        let sync = input
+            .windows(4)
+            .position(|window| window == [0x7f, 0xfe, 0x80, 0x01])
+            .expect("first source DTS sync");
+        input[sync] = 0;
+        let request = Request {
+            input: Bytes::copy_from_slice(&pool, &input).unwrap(),
+            format: PacketFormat::Ts188,
+            program: 7,
+            namespace: DescriptorNamespace::Unspecified,
+            unlabelled_dts_core: None,
+            probe_dts_core: true,
+            pcr_policy: triergon_mpegts::compat::pes::PcrPolicy::IgnoreReservedBits,
+            following: BudgetVec::new(&pool),
+        };
+        let retained = pool.used();
+        let mut first = None;
+        for _ in 0..50 {
+            let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
+            assert_eq!((totals.packets, totals.bytes, totals.digest), (0, 0, 0));
+            let refusal = totals.refusal.expect("malformed DTS remains unsupported");
+            assert!(
+                refusal
+                    .reason
+                    .starts_with("DTS discovery refused program 7 PID 256 configuration "),
+                "{refusal:?}"
+            );
+            assert!(
+                refusal
+                    .reason
+                    .contains("MPEG-TS private PES does not prove DTS core")
+            );
+            let facts = (refusal.reason, refusal.cause);
+            assert_eq!(first.get_or_insert_with(|| facts.clone()), &facts);
+            assert_eq!(pool.used(), retained);
+        }
     }
 
     #[test]
@@ -891,7 +1089,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let totals = operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+        let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(totals.packets, 0);
         assert_eq!(totals.refusal.unwrap().reason, "source diagnostic: Psi");
     }

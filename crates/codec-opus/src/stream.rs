@@ -2,7 +2,7 @@
 //! the redundant CELT frames and cross-fades of mode transitions.
 
 use crate::DecodeError;
-use crate::celt::{self, CeltDecoder, FrameLayout, HYBRID_START_BAND};
+use crate::celt::{self, CeltDecoder, Emphasis, FrameLayout, HYBRID_START_BAND};
 use crate::packet::{Mode, Packet, Toc};
 use crate::range::{Position, RangeDecoder};
 use crate::silk::{MAX_PACKET_PULSES, SilkConfig, SilkDecoder, SilkLayer};
@@ -210,15 +210,29 @@ impl StreamDecoder {
         self.held
     }
 
+    /// Whether decoding `packet` writes CELT frames alone, which can leave their
+    /// de-emphasis to the caller ([`Emphasis::Defer`]): a CELT-only packet while the SILK
+    /// resampler holds nothing back to release.
+    pub(crate) fn can_defer_emphasis(&self, packet: &Packet<'_>) -> bool {
+        packet.toc.mode == Mode::Celt && self.silk_rate.is_none()
+    }
+
+    /// The de-emphasis filter memory of each channel ([`CeltDecoder::deemphasis_memory`]).
+    pub(crate) fn deemphasis_memory(&mut self) -> &mut [f32] {
+        self.celt.deemphasis_memory()
+    }
+
     /// Decode every frame of a `packet` that [`StreamDecoder::check`] accepted, with
     /// what it staged, into `work.pcm[channel][..]` and return the samples per channel
-    /// written.
+    /// written. `Emphasis::Defer` requires [`StreamDecoder::can_defer_emphasis`].
     pub(crate) fn decode(
         &mut self,
         packet: &Packet<'_>,
         (staged, pulses): (&[StagedFrame], &[i32]),
         work: &mut Workspace,
+        emphasis: Emphasis,
     ) -> usize {
+        debug_assert!(emphasis == Emphasis::Apply || self.can_defer_emphasis(packet));
         let toc = packet.toc;
         let mut at = 0;
         match SilkConfig::of(toc) {
@@ -226,12 +240,13 @@ impl StreamDecoder {
                 let frames = packet.frames().iter().zip(staged);
                 for ((&data, staged), pulses) in frames.zip(pulses.chunks_exact(silk.pulses_len()))
                 {
-                    at += self.decode_frame(toc, data, Some((silk, staged, pulses)), at, work);
+                    let silk = Some((silk, staged, pulses));
+                    at += self.decode_frame(toc, data, silk, at, work, Emphasis::Apply);
                 }
             }
             None => {
                 for &data in packet.frames() {
-                    at += self.decode_frame(toc, data, None, at, work);
+                    at += self.decode_frame(toc, data, None, at, work, emphasis);
                 }
             }
         }
@@ -261,8 +276,8 @@ impl StreamDecoder {
         released
     }
 
-    /// Decode one frame into `work.pcm[..][at..]` (`opus_decode_frame`) and return the
-    /// samples per channel written. A frame with a SILK layer comes with what `check`
+    /// Decode one frame into `work.pcm[..][at..]` (`opus_decode_frame`), its CELT layer
+    /// de-emphasised as `emphasis` says, and return the samples per channel written. A frame with a SILK layer comes with what `check`
     /// staged of it and its pulses.
     fn decode_frame(
         &mut self,
@@ -271,6 +286,7 @@ impl StreamDecoder {
         silk: Option<(SilkConfig, &StagedFrame, &[i32])>,
         start: usize,
         work: &mut Workspace,
+        emphasis: Emphasis,
     ) -> usize {
         let mode = toc.mode;
         let (mut rc, redundancy) = match silk {
@@ -299,7 +315,7 @@ impl StreamDecoder {
             // The CELT-to-SILK frame continues the CELT signal before the SILK one starts.
             redundant_range = self.decode_redundant(&data[start..], toc, work);
         }
-        self.decode_celt(&mut rc, toc, at, work);
+        self.decode_celt(&mut rc, toc, at, work, emphasis);
         if mode != Mode::Celt {
             for (pcm, silk) in work.pcm.iter_mut().zip(&work.silk).take(self.channels) {
                 for (p, &s) in pcm[at..at + len].iter_mut().zip(&silk[..len]) {
@@ -356,7 +372,8 @@ impl StreamDecoder {
         len
     }
 
-    /// The CELT layer of a CELT-only or hybrid frame into `work.pcm[..][at..]`, or silence
+    /// The CELT layer of a CELT-only or hybrid frame into `work.pcm[..][at..]`
+    /// (de-emphasised unless `emphasis` defers it), or silence
     /// for a SILK-only frame. FFmpeg adds no CELT fade-out after a hybrid frame (the
     /// reference decodes a silent CELT frame into the first 2.5 ms of SILK).
     fn decode_celt(
@@ -365,6 +382,7 @@ impl StreamDecoder {
         toc: Toc,
         at: usize,
         work: &mut Workspace,
+        emphasis: Emphasis,
     ) {
         let mode = toc.mode;
         let n = toc.duration.samples();
@@ -389,7 +407,8 @@ impl StreamDecoder {
             end: toc.bandwidth.celt_end_band(),
             coded_channels: toc.channels(),
         };
-        self.celt.decode(rc, layout, &mut work.celt, [left, right]);
+        self.celt
+            .decode(rc, layout, &mut work.celt, [left, right], emphasis);
     }
 
     /// Fade the frame ending at `end` into the redundant frame over its last 2.5 ms, of
@@ -431,6 +450,7 @@ impl StreamDecoder {
             layout,
             &mut work.celt,
             [&mut left[..], &mut right[..]],
+            Emphasis::Apply,
         );
         rc.range()
     }

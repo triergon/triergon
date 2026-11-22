@@ -86,6 +86,9 @@ pub struct ConvertedText {
     pub charset: Charset,
     pub utf8: Bytes,
 }
+/// The most source bytes of a single-byte charset converted in one step.
+const SINGLE_BYTE_RUN: usize = 4096;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
     Probe,
@@ -192,6 +195,53 @@ impl CharsetJob {
         self.offset += 1;
         Ok(Poll::Ready(value))
     }
+    /// Counts or encodes the next source bytes of a single-byte charset, up
+    /// to [`SINGLE_BYTE_RUN`] of them, charging what converting them one at a
+    /// time charges: a unit per source byte and, when encoding, one per output
+    /// byte. It stops before a character the budget does not cover in full.
+    fn single_byte_run(&mut self, work: &mut WorkBudget) -> Result<()> {
+        let end = self
+            .range
+            .end
+            .min(self.offset.saturating_add(SINGLE_BYTE_RUN));
+        let source = &self.source.as_ref()[self.offset..end];
+        match self.phase {
+            Phase::Count => {
+                for &byte in source {
+                    if !work.try_charge(1) {
+                        break;
+                    }
+                    let value = self.charset.scalar(byte)?;
+                    self.offset += 1;
+                    self.length = self
+                        .length
+                        .checked_add(value.len_utf8())
+                        .ok_or(Error::Overflow)?;
+                    if self.length > self.limits.max_decoded_bytes {
+                        return Err(Error::Limit {
+                            requested: self.length,
+                            maximum: self.limits.max_decoded_bytes,
+                        });
+                    }
+                }
+            }
+            Phase::Encode => {
+                let mut utf8 = [0; 4];
+                for &byte in source {
+                    // The count validated every byte.
+                    let value = self.charset.scalar(byte)?;
+                    let encoded = value.encode_utf8(&mut utf8).as_bytes();
+                    if !work.try_charge(1 + encoded.len() as u64) {
+                        break;
+                    }
+                    self.output.try_extend_from_slice(encoded)?;
+                    self.offset += 1;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CharsetStatus> {
         cancelled(cancel)?;
         if let Some(error) = self.failed {
@@ -218,6 +268,16 @@ impl CharsetJob {
             }
             if work.remaining() == 0 {
                 return Ok(CharsetStatus::Pending);
+            }
+            if self.charset.cursor_encoding().is_none()
+                && matches!(self.phase, Phase::Count | Phase::Encode)
+                && self.pending_at == self.pending_len
+            {
+                let from = self.offset;
+                self.single_byte_run(work)?;
+                if self.offset != from {
+                    continue;
+                }
             }
             match self.phase {
                 Phase::Probe => match self

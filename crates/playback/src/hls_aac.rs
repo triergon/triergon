@@ -312,14 +312,20 @@ impl HlsAac {
             return Err(error);
         }
         let result = self.advance(work, cancel);
-        if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
-        {
+        if let Err(error) = result {
+            self.fail(error);
+        }
+        result
+    }
+
+    /// Retires the reader after a failure other than backpressure or allocation.
+    #[cold]
+    fn fail(&mut self, error: Error) {
+        if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
             self.failure = Some(error);
             self.pending = None;
             self.frame = BudgetVec::new(&self.pool);
         }
-        result
     }
 
     fn advance(
