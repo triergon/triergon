@@ -206,6 +206,9 @@ enum Unit<V, A> {
     Audio(A),
 }
 
+type AssembledSegment<C, V, A> =
+    HlsSegment<C, <V as LaneAssembler>::Unit, <A as LaneAssembler>::Unit>;
+
 /// Reads an independent segment through EOF and assembler drain.
 /// Failure releases the source and staged units. Retry with a fresh reader.
 #[derive(Debug)]
@@ -504,7 +507,7 @@ where
         &mut self,
         cancel: &AtomicBool,
         resolve: impl FnOnce(&Self) -> Result<BudgetVec<C>>,
-    ) -> Result<Option<HlsSegment<C, V::Unit, A::Unit>>> {
+    ) -> Result<Option<AssembledSegment<C, V, A>>> {
         if cancel.load(Ordering::Relaxed) {
             self.fail();
             return Err(Error::Cancelled);
