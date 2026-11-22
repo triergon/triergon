@@ -1,6 +1,7 @@
 //! Inputs and reference pins for the codec views worker.
 
 mod audio;
+mod audio_inputs;
 mod bits;
 mod blocks;
 mod budget;
@@ -15,6 +16,9 @@ pub(crate) use bits::fetch_opus;
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     if args == ["fixtures", "media"] {
         return inputs::prepare(root);
+    }
+    if args == ["fixtures", "audio"] {
+        return audio_inputs::prepare(root);
     }
     if let [command, flags @ .., id] = args
         && command == "fixtures"
