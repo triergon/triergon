@@ -3,9 +3,9 @@
  "path": "elementary-reader-inputs",
  "retention": "retained",
  "reason": "Pinned elementary reader, metadata, seek and media probe inputs. Authored metadata envelopes, damaged frames and competing signatures supplement the retained audio streams.",
- "key": "evidence/elementary-reader-inputs/18aed96d4c2e90259c15c315ee349c3415c43b2a137d4684ca22867fd28d9a0c.tar.gz",
- "sha256": "18aed96d4c2e90259c15c315ee349c3415c43b2a137d4684ca22867fd28d9a0c",
- "bytes": 8918169,
+ "key": "evidence/elementary-reader-inputs/b6e078154c41cb4aa9b7dc99b4db7a8eaa3e6996d0cca5a41295edd259ca52d1.tar.gz",
+ "sha256": "b6e078154c41cb4aa9b7dc99b4db7a8eaa3e6996d0cca5a41295edd259ca52d1",
+ "bytes": 9072607,
  "unpacked_at": "repository",
  "files": [
   {
@@ -141,6 +141,10 @@
    "sha256": "f3665b5e97344435bf620b91d32d12e5d011bc001220a2495befe6d135b3dfbf"
   },
   {
+   "path": ".research/elementary-reader-authored/mp3-id3-utf16.mp3",
+   "sha256": "c712a813f67e5218b29422f0a866e158277837507c50d7574df0d6d742417037"
+  },
+  {
    "path": ".research/elementary-reader-authored/mp3-id3v2.mp3",
    "sha256": "3970772488b2e9fab0cec2471340b9ea9baa7a3b0c0c0d27cd6ede8e22483215"
   },
@@ -171,6 +175,10 @@
   {
    "path": ".research/elementary-reader-authored/mp3-short-second.bin",
    "sha256": "76911a3ad025ea38417b2d3b038404d81bdf25554d376e637d740148cc0b2165"
+  },
+  {
+   "path": ".research/elementary-reader-authored/mp3-vbri.mp3",
+   "sha256": "a99bdb7d0ce98d0908159c4dc0f7f42ecb6c7b5055399f93ae61c0c9756062d3"
   },
   {
    "path": ".research/elementary-reader-authored/ts-both-spacings.bin",
