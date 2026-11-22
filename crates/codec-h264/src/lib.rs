@@ -43,7 +43,7 @@ use dpb::{Current, NewMarking, PicNums, PocState, Stored as _};
 use mbinfo::{MbInfo, MbWidth, SliceDbk};
 use nal::{parse_header, unescape};
 use picture::*;
-use ps::{Pps, Sps};
+use ps::{Pps, Sps, Vui};
 use slice::{SliceHeader, SliceType};
 use slicedec::{ColInfo, CurPic, Refs, SliceCtx, SliceDecoder, Wp};
 use std::collections::VecDeque;
@@ -771,7 +771,7 @@ impl Decoder {
             fs.pts = self.pending_pts;
             fs.non_existing = false;
             fs.idr = sh.idr;
-            let vui = sps.vui.clone().unwrap_or_default();
+            let vui = sps.vui.clone().unwrap_or_else(Vui::inferred);
             fs.info = OutputInfo {
                 crop: sps.crop_rect(),
                 sar: vui.sar,

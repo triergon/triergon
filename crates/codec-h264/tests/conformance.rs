@@ -5,12 +5,34 @@
 //! `DecodeError::Unsupported`. Skips cleanly when the vectors are absent.
 
 use std::path::PathBuf;
-use triergon_codec_h264::{DecodeError, Decoder, Picture};
+use triergon_codec_h264::{ColourDescription, DecodeError, Decoder, Picture};
 use triergon_framing::nal::AnnexBUnits;
 use triergon_harness_protocol::test_report::skipped;
 
 fn vectors_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/fate-samples/h264-conformance")
+}
+
+#[test]
+fn missing_video_usability_information_has_unspecified_colour() {
+    let path = vectors_dir().join("AUD_MW_E.264");
+    if !path.is_file() {
+        skipped(format_args!(
+            "the H.264 conformance vector {}: absent",
+            path.display()
+        ));
+        return;
+    }
+    let data = std::fs::read(&path).unwrap();
+    let mut decoder = Decoder::new();
+    for nal in AnnexBUnits::new(&data) {
+        decoder.send_nal(nal, None).unwrap();
+        if let Some(picture) = decoder.receive() {
+            assert_eq!(picture.colour, ColourDescription::default());
+            return;
+        }
+    }
+    panic!("the conformance vector produced no picture");
 }
 
 /// Vectors outside the selected feature matrix and the feature that refuses them.

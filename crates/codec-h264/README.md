@@ -115,6 +115,8 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
 
 The [picture properties comparison](../../harness/features/picture-properties/contract.json)
 checks sample aspect ratio, colour and interlaced coding alongside the visible plane hashes.
+When the stream omits VUI colour information, a decoded picture reports the
+Annex E unspecified colour codes.
 The [inspection comparison](../../harness/features/h264-stream-inspection/contract.json)
 checks syntax-element sets and flags. The [NAL-input
 comparison](../../harness/features/video-nal-input/contract.json) checks native planes and

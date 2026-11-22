@@ -30,6 +30,17 @@ pub(crate) struct Vui {
     pub(crate) time_offset_len: u8,
 }
 
+impl Vui {
+    pub(crate) fn inferred() -> Self {
+        Self {
+            colour_primaries: 2,
+            transfer_characteristics: 2,
+            matrix_coefficients: 2,
+            ..Self::default()
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Sps {
     pub(crate) profile_idc: u8,
@@ -225,7 +236,7 @@ fn hrd(r: &mut BitReader<'_>, v: &mut Vui) -> R<()> {
 }
 
 fn parse_vui(r: &mut BitReader<'_>) -> R<Vui> {
-    let mut v = Vui::default();
+    let mut v = Vui::inferred();
     if r.bit() {
         let idc = r.read(8);
         if idc == 255 {
@@ -239,9 +250,6 @@ fn parse_vui(r: &mut BitReader<'_>) -> R<Vui> {
     if r.bit() {
         r.bit(); // overscan_appropriate_flag
     }
-    v.colour_primaries = 2;
-    v.transfer_characteristics = 2;
-    v.matrix_coefficients = 2;
     if r.bit() {
         r.read(3); // video_format
         v.video_full_range = r.bit();
