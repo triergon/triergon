@@ -47,7 +47,7 @@ impl<'a> Cases<'a> {
         write: bool,
     ) -> Result<(String, String), String> {
         let directory = match self.id {
-            "ac3-features" | "time-rescale" => "inputs",
+            "time-rescale" => "inputs",
             _ => "authored",
         };
         let file = format!("harness/features/{}/{directory}/{name}", self.id);

@@ -5,7 +5,7 @@
     {
       "id": "no-flags",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/no-flags.ac3",
+      "file": "harness/features/ac3-features/authored/no-flags.ac3",
       "sha256": "5d4a1fa3d9bbedbbda1a36575eede0f86b40cf2b7324b01d5f422529e73fc8b4",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -16,7 +16,7 @@
     {
       "id": "switch-first",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/switch-first.ac3",
+      "file": "harness/features/ac3-features/authored/switch-first.ac3",
       "sha256": "6ef58f3081054d582a6cdf7e01e08c75ba0a9acacbfd9131e993cf53ef305b28",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -27,7 +27,7 @@
     {
       "id": "switch-last",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/switch-last.ac3",
+      "file": "harness/features/ac3-features/authored/switch-last.ac3",
       "sha256": "aab1188e1729afd9666a043db1b317c3385cc130af91d998802b26d8bacc8b14",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -38,7 +38,7 @@
     {
       "id": "dither-last",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/dither-last.ac3",
+      "file": "harness/features/ac3-features/authored/dither-last.ac3",
       "sha256": "eb75ee0b162ca5af92d0280c6e8b7714c172eecc97aa87fcc31efbfcefcbac2c",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -49,7 +49,7 @@
     {
       "id": "range-last",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/range-last.ac3",
+      "file": "harness/features/ac3-features/authored/range-last.ac3",
       "sha256": "5c559c6a67794e666d1a0d7fd9480e17c87b419d8a7938c60f387920fd588c0b",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -60,7 +60,7 @@
     {
       "id": "rematrix-last",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/rematrix-last.ac3",
+      "file": "harness/features/ac3-features/authored/rematrix-last.ac3",
       "sha256": "404b823f290a6ae9a531dd851fa60b1b931a93ee64f30f4c5c26b4c09e99409e",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -71,7 +71,7 @@
     {
       "id": "delta-first",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/delta-first.ac3",
+      "file": "harness/features/ac3-features/authored/delta-first.ac3",
       "sha256": "8f64d2bc55f0a1b106ea88ddf001ddeabe49187c6381fca64bc6f2dcfef2b41c",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -82,7 +82,7 @@
     {
       "id": "delta-last",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/delta-last.ac3",
+      "file": "harness/features/ac3-features/authored/delta-last.ac3",
       "sha256": "90d0f66b3cc172eaaf3b597a4cc66c2d006c29076d6ba05ae787e0e825a42431",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -93,7 +93,7 @@
     {
       "id": "plain-coupling",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/plain-coupling.ac3",
+      "file": "harness/features/ac3-features/authored/plain-coupling.ac3",
       "sha256": "46fbd7fce9c1297a8bfb9def21f1f6aa5ec5e3b6734b6b641cbb5b5383c1942f",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -104,7 +104,7 @@
     {
       "id": "phase-flags",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/phase-flags.ac3",
+      "file": "harness/features/ac3-features/authored/phase-flags.ac3",
       "sha256": "e8cada3bd20aedaba17ab059de083e8579657ec38e5ecb60ad0d4d0f5c754d5a",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -115,7 +115,7 @@
     {
       "id": "skip-first",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/skip-first.ac3",
+      "file": "harness/features/ac3-features/authored/skip-first.ac3",
       "sha256": "e29ad32a45bc515078f71f6734529eae7d9b8b0d7b59d2dac28dc5b900c32e45",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -126,7 +126,7 @@
     {
       "id": "skip-last",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/skip-last.ac3",
+      "file": "harness/features/ac3-features/authored/skip-last.ac3",
       "sha256": "c5505565fdabddfdf8eca094c27f3d0d2f7afc7d606ac8663689baab3e50d373",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -137,7 +137,7 @@
     {
       "id": "mixed",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/mixed.ac3",
+      "file": "harness/features/ac3-features/authored/mixed.ac3",
       "sha256": "79707f218e76f81e201ea2b5751d9514f08a7b15261beb72b26ed58e98c5271f",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -148,12 +148,34 @@
     {
       "id": "feature-reset",
       "profile": "zero-width",
-      "file": "harness/features/ac3-features/inputs/feature-reset.ac3",
+      "file": "harness/features/ac3-features/authored/feature-reset.ac3",
       "sha256": "32ca4c8e9df0f5de8cbecac05082d3f2b7a70b9fa14cd12880d7c72e53e3ec19",
       "rights": "authored-synthetic",
       "arguments": [],
       "expected": {
         "trace_sha256": "0217350eb53a310c511c37797ecc89a0b9625b4c3d86775b0b3737ab37fbe399"
+      }
+    },
+    {
+      "id": "diatonis.ac3",
+      "profile": "main-body",
+      "file": ".research/codec-derived/ac3/diatonis.ac3",
+      "sha256": "d4b9294410dbf587aeda7ee8f469d8e383ba9027ec5297eaaeed85f9bbac2b7c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "4b36e9163ab53a4e2168aaeee799199130294ab229604b4dfeed4bb3330d0e02"
+      }
+    },
+    {
+      "id": "millers_crossing_4.0.ac3",
+      "profile": "main-body",
+      "file": ".research/codec-derived/ac3/millers_crossing_4.0.ac3",
+      "sha256": "faa06c7b1ccbc5cf3c7897afb50004dd3d49feaa19d26bdeb03dc9bb4ec20802",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "7bd159201579c6896e6fba4d1ab2495a708bf6295a52c6a07e115d9d52c4df73"
       }
     }
   ]

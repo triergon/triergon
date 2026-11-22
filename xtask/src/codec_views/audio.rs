@@ -416,5 +416,25 @@ pub(super) fn audblk_fixtures(root: &Path, write: bool) -> Result<(), String> {
         "authored-synthetic",
         &[],
     );
+    let listing = json::read(&root.join("harness/codecs/correctness-manifest.json"))?;
+    let vectors = listing
+        .get("vectors")
+        .and_then(Value::as_array)
+        .ok_or("missing correctness vectors")?;
+    for id in ["diatonis.ac3", "millers_crossing_4.0.ac3"] {
+        let file = format!(".research/codec-derived/ac3/{id}");
+        let vector = vectors
+            .iter()
+            .find(|row| row.get("path").and_then(Value::as_str) == Some(&file))
+            .ok_or_else(|| format!("missing correctness vector {file}"))?;
+        cases.pinned(
+            id,
+            "main-body",
+            &file,
+            string(vector, "sha256")?,
+            "fetched-not-redistributed",
+            &[],
+        );
+    }
     cases.finish(write)
 }

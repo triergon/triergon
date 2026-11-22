@@ -7,7 +7,8 @@
   "worker_operation": "ac3-features-",
   "oracle": "ac3-features",
   "required_profiles": [
-    "zero-width"
+    "zero-width",
+    "main-body"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
@@ -15,9 +16,9 @@
   ],
   "iterations": 1,
   "contract": [
-    "Read AC-3 main-body syncframes through all six blocks under the A/52:2018 high-exponent, minimum-SNR profile. An independent wire reader checks exponent strategies, bit allocation side information and the zero-width mantissa domain.",
+    "Read complete AC-3 main-body bitstream-version-8 syncframes through all six blocks. The A/52:2018 specification oracle reconstructs exponents, allocation and grouped mantissa lengths to locate successive blocks.",
     "Compare one kind 4 row per syncframe: byte offset and the 16 FrameFeatures flags in declaration order.",
-    "The controls vary early and late block flags, coupling, phase words, rematrixing, delta allocation, dynamic range, dither and reuse across blocks. General bit allocation and Annex E tool usage remain outside this contract."
+    "The controls vary early and late block flags, coupling, phase words, rematrixing, delta allocation, dynamic range, dither and reuse across blocks. The 4.0 and 5.1 recordings exercise nonzero mantissa widths. Annex E and truncated syncframes are outside the oracle domain."
   ],
   "open_unmeasured": [
     {
@@ -36,7 +37,9 @@
         "skip-first",
         "skip-last",
         "mixed",
-        "feature-reset"
+        "feature-reset",
+        "diatonis.ac3",
+        "millers_crossing_4.0.ac3"
       ],
       "cause": "The specification oracle has no equivalent live reference operation."
     },
@@ -56,7 +59,9 @@
         "skip-first",
         "skip-last",
         "mixed",
-        "feature-reset"
+        "feature-reset",
+        "diatonis.ac3",
+        "millers_crossing_4.0.ac3"
       ],
       "cause": "The specification oracle has no equivalent live reference operation."
     },
@@ -76,7 +81,9 @@
         "skip-first",
         "skip-last",
         "mixed",
-        "feature-reset"
+        "feature-reset",
+        "diatonis.ac3",
+        "millers_crossing_4.0.ac3"
       ],
       "cause": "The specification oracle has no equivalent live reference operation."
     }
