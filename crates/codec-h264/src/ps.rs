@@ -2,6 +2,7 @@
 
 use crate::DecodeError;
 use crate::tables::*;
+use std::sync::Arc;
 use triergon_bitstream::BitReader;
 
 pub(crate) type R<T> = Result<T, DecodeError>;
@@ -438,7 +439,7 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
     Ok(sps)
 }
 
-pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<Pps> {
+pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Arc<Sps>>]) -> R<Pps> {
     let id = r.ue();
     if id > 255 {
         return Err(inval("pic_parameter_set_id"));

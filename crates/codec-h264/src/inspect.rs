@@ -5,6 +5,7 @@ use crate::nal::{parse_header, unescape};
 use crate::ps::{Pps, Sps, parse_pps, parse_sps};
 use crate::slice::{Prefix, SliceType, parse_slice_header};
 use std::collections::BTreeSet;
+use std::sync::Arc;
 use triergon_bitstream::BitReader;
 use triergon_codec::{Budget, BudgetVec};
 use triergon_framing::nal::AnnexBUnits;
@@ -84,8 +85,8 @@ pub struct StreamFeatures {
 /// [`StreamFeatures::errors`]; slice data is not decoded.
 pub fn inspect(data: &[u8]) -> StreamFeatures {
     let mut f = StreamFeatures::default();
-    let mut spss: Vec<Option<Box<Sps>>> = vec![None; 32];
-    let mut ppss: Vec<Option<Box<Pps>>> = vec![None; 256];
+    let mut spss: Vec<Option<Arc<Sps>>> = vec![None; 32];
+    let mut ppss: Vec<Option<Arc<Pps>>> = vec![None; 256];
     let Ok(pool) = Budget::new(crate::Limits::default().live_storage_bytes) else {
         return f;
     };
@@ -119,7 +120,7 @@ pub fn inspect(data: &[u8]) -> StreamFeatures {
                             Some((r.max_num_reorder_frames, r.max_dec_frame_buffering));
                     }
                     let id = s.id as usize;
-                    spss[id] = Some(Box::new(s));
+                    spss[id] = Some(Arc::new(s));
                 }
                 Err(e) => f.errors.push(format!("sps: {e:?}")),
             },
@@ -132,7 +133,7 @@ pub fn inspect(data: &[u8]) -> StreamFeatures {
                     f.scaling_matrices |= p.pic_scaling_matrix_present;
                     f.constrained_intra_pred |= p.constrained_intra_pred;
                     let id = p.id as usize;
-                    ppss[id] = Some(Box::new(p));
+                    ppss[id] = Some(Arc::new(p));
                 }
                 Err(e) => f.errors.push(format!("pps: {e:?}")),
             },

@@ -42,6 +42,7 @@ use ps::{PocType, Pps, Sps, Vui};
 use slice::{Mmco, SliceHeader, SliceType};
 use slicedec::{ColInfo, CurPic, Refs, SliceCtx, SliceDecoder, Wp};
 use std::collections::VecDeque;
+use std::sync::Arc;
 use tables::*;
 use triergon_bitstream::BitReader;
 pub use triergon_codec::DecodeError;
@@ -121,7 +122,7 @@ impl Default for ColourDescription {
 /// frame buffer (no copy); `row(y)` returns the `width` visible samples of row `y`.
 #[derive(Clone)]
 pub struct Plane {
-    frame: std::sync::Arc<FrameBuf>,
+    frame: Arc<FrameBuf>,
     component: Component,
     offset: usize,
     /// Visible samples per row.
@@ -212,7 +213,7 @@ enum Target {
 struct ActivePic {
     pic: CurPic,
     target: Target,
-    sps: Sps,
+    sps: Arc<Sps>,
     /// TopFieldOrderCnt and BottomFieldOrderCnt (8.2.1).
     poc: [i32; 2],
     /// PicOrderCntMsb for pic_order_cnt_type 0, FrameNumOffset for the other types.
@@ -225,8 +226,8 @@ struct ActivePic {
 /// H.264 decoder.
 #[derive(Debug)]
 pub struct Decoder {
-    spss: Vec<Option<Box<Sps>>>,
-    ppss: Vec<Option<Box<Pps>>>,
+    spss: Vec<Option<Arc<Sps>>>,
+    ppss: Vec<Option<Arc<Pps>>>,
     /// The decoded picture buffer: its frame stores, their marking and their output.
     dpb: DecodedPictures<FrameStore>,
     /// The frame stores not in the buffer, kept with their storage for reuse.
@@ -257,7 +258,7 @@ pub struct Decoder {
     mb_samples: inter::MbSamples,
     /// Sample buffers given up by frame stores while an output picture still shared them;
     /// reused once the caller has dropped that picture (avoids reallocating frames).
-    spare_bufs: Vec<std::sync::Arc<FrameBuf>>,
+    spare_bufs: Vec<Arc<FrameBuf>>,
     /// Motion arrays of non-reference pictures (never co-located), kept for reuse.
     spare_motion: Vec<Motion>,
 }
@@ -336,7 +337,7 @@ fn keep_decoded(
     spare_motion: &mut Vec<Motion>,
 ) -> (BudgetVec<MbInfo>, BudgetVec<SliceDbk>, deblock::Progress) {
     let slot = usize::from(structure == Structure::Bottom);
-    fs.buf = Some(std::sync::Arc::new(pic.buf));
+    fs.buf = Some(Arc::new(pic.buf));
     let spare = if reference && !(compact && fs.motion[slot].compact_from(&pic.motion).is_ok()) {
         std::mem::replace(&mut fs.motion[slot], pic.motion)
     } else {
@@ -355,15 +356,15 @@ fn keep_decoded(
 
 /// A sample buffer of the given size: a spare one no output picture shares any more, or a new one.
 fn recycle_buf(
-    spare: &mut Vec<std::sync::Arc<FrameBuf>>,
+    spare: &mut Vec<Arc<FrameBuf>>,
     w: usize,
     h: usize,
     budget: &Budget,
 ) -> Result<FrameBuf, StorageError> {
     if let Some(i) = spare
         .iter()
-        .position(|b| std::sync::Arc::strong_count(b) == 1 && b.width == w && b.height == h)
-        && let Ok(b) = std::sync::Arc::try_unwrap(spare.swap_remove(i))
+        .position(|b| Arc::strong_count(b) == 1 && b.width == w && b.height == h)
+        && let Ok(b) = Arc::try_unwrap(spare.swap_remove(i))
     {
         return Ok(b);
     }
@@ -371,7 +372,7 @@ fn recycle_buf(
 }
 
 /// Keep `b` (still shared by an output picture) as a future spare.
-fn keep_spare(spare: &mut Vec<std::sync::Arc<FrameBuf>>, b: std::sync::Arc<FrameBuf>) {
+fn keep_spare(spare: &mut Vec<Arc<FrameBuf>>, b: Arc<FrameBuf>) {
     if spare.len() >= MAX_SPARE {
         spare.remove(0);
     }
@@ -529,7 +530,7 @@ impl Decoder {
                 let mut r = BitReader::with_end(&self.rbsp, len * 8);
                 let sps = ps::parse_sps(&mut r)?;
                 let id = sps.id as usize;
-                self.spss[id] = Some(Box::new(sps));
+                self.spss[id] = Some(Arc::new(sps));
                 Ok(())
             }
             8 => {
@@ -538,7 +539,7 @@ impl Decoder {
                 let mut r = BitReader::with_end(&self.rbsp, len * 8);
                 let pps = ps::parse_pps(&mut r, &self.spss)?;
                 let id = pps.id as usize;
-                self.ppss[id] = Some(Box::new(pps));
+                self.ppss[id] = Some(Arc::new(pps));
                 Ok(())
             }
             // SEI, access unit delimiter, end of sequence, end of stream: a picture boundary.
@@ -578,14 +579,16 @@ impl Decoder {
         let len = unescape(&nal[1..], &mut self.rbsp)?;
         let mut r = BitReader::with_end(&self.rbsp, len * 8);
         let prefix = slice::Prefix::read(&mut r)?;
-        let pps = self.ppss[prefix.pps_id as usize]
-            .as_deref()
-            .ok_or(DecodeError::Invalid("missing PPS"))?
-            .clone();
-        let sps = self.spss[pps.sps_id as usize]
-            .as_deref()
-            .ok_or(DecodeError::Invalid("missing SPS"))?
-            .clone();
+        let pps = Arc::clone(
+            self.ppss[prefix.pps_id as usize]
+                .as_ref()
+                .ok_or(DecodeError::Invalid("missing PPS"))?,
+        );
+        let sps = Arc::clone(
+            self.spss[pps.sps_id as usize]
+                .as_ref()
+                .ok_or(DecodeError::Invalid("missing SPS"))?,
+        );
         Self::check_supported(&sps, &pps)?;
         let sh = slice::parse_slice_header(&mut r, prefix, h, &sps, &pps)?;
         if matches!(sh.slice_type, SliceType::SP | SliceType::SI) {
@@ -624,7 +627,7 @@ impl Decoder {
     }
 
     /// Begin decoding a new picture: frame_num gap handling, POC, frame store allocation.
-    fn start_picture(&mut self, sps: &Sps, sh: &SliceHeader) -> Result<(), DecodeError> {
+    fn start_picture(&mut self, sps: &Arc<Sps>, sh: &SliceHeader) -> Result<(), DecodeError> {
         let dims = (sps.pic_width_in_mbs, sps.frame_height_in_mbs());
         if self.cur_dims.is_some() && self.cur_dims != Some(dims) {
             // Resolution change: output everything and drop the DPB.
@@ -668,7 +671,7 @@ impl Decoder {
         self.active = Some(ActivePic {
             pic,
             target,
-            sps: sps.clone(),
+            sps: Arc::clone(sps),
             poc,
             poc_base: fno,
             sh: sh.clone(),
@@ -719,7 +722,7 @@ impl Decoder {
         motion.alloc(w * h)?;
         let fs = target_store(&mut self.dpb, target)
             .ok_or(DecodeError::Invalid("first field not stored"))?;
-        let mut buf = match fs.buf.take().map(std::sync::Arc::try_unwrap) {
+        let mut buf = match fs.buf.take().map(Arc::try_unwrap) {
             Some(Ok(b)) => b,
             // Still held by an output picture: the second field needs the first field's samples.
             Some(Err(a)) if second_field => match a.try_clone() {
@@ -829,7 +832,7 @@ impl Decoder {
             fs.buf = None;
             fs.motion = [Motion::empty(&self.budget), Motion::empty(&self.budget)];
             match recycle_buf(&mut self.spare_bufs, w, h, &self.budget) {
-                Ok(buf) => fs.buf = Some(std::sync::Arc::new(buf)),
+                Ok(buf) => fs.buf = Some(Arc::new(buf)),
                 Err(error) => {
                     self.free.push(fs);
                     return Err(error.into());
