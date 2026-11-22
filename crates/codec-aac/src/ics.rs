@@ -228,7 +228,9 @@ pub(crate) fn parse_ics_info(
                     }
                     let n = info.max_sfb.min(PRED_SFB_MAX[cfg.sf_index] as usize);
                     let (used, rest) = info.prediction_used.split_at_mut(n);
-                    used.iter_mut().for_each(|u| *u = br.bit());
+                    for u in used {
+                        *u = br.bit();
+                    }
                     rest.fill(false);
                 }
                 AOT_LTP => {
@@ -259,7 +261,9 @@ fn parse_ltp(br: &mut CachedBitReader<'_>, max_sfb: usize, ltp: &mut Ltp) {
     ltp.coef = br.read(3) as u8;
     let n = max_sfb.min(MAX_LTP_LONG_SFB);
     let (used, rest) = ltp.long_used.split_at_mut(n);
-    used.iter_mut().for_each(|u| *u = br.bit());
+    for u in used {
+        *u = br.bit();
+    }
     rest.fill(false);
 }
 

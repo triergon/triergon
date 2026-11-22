@@ -10,16 +10,6 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: these rewrites change the generated code of measured hot paths and are
-// adopted with an A/B timing run.
-#![allow(
-    clippy::bool_to_int_with_if,
-    clippy::needless_for_each,
-    clippy::nonminimal_bool,
-    clippy::redundant_closure_for_method_calls,
-    clippy::single_match_else,
-    clippy::unnested_or_patterns
-)]
 pub mod adts;
 mod cce;
 mod decoder;
@@ -328,7 +318,7 @@ fn decode_blocks<const RAW: bool>(
         }
     }
     if core.skip_samples > 0 {
-        let samples = out.planes.first().map_or(0, |p| p.len());
+        let samples = out.planes.first().map_or(0, Vec::len);
         let skip = core.skip_samples.min(samples);
         for plane in &mut out.planes {
             plane.drain(..skip);
@@ -338,7 +328,7 @@ fn decode_blocks<const RAW: bool>(
     core.frames_out += 1;
     out.sample_rate = core.output_rate();
     out.layout = core.layout;
-    out.samples_per_channel = out.planes.first().map_or(0, |p| p.len());
+    out.samples_per_channel = out.planes.first().map_or(0, Vec::len);
     Ok(())
 }
 

@@ -473,9 +473,9 @@ impl Sbr {
         parse_noise(br, c, ft, false)?;
         c.add_harmonic_flag = br.bit();
         if c.add_harmonic_flag {
-            c.add_harmonic[..ft.n_high]
-                .iter_mut()
-                .for_each(|h| *h = br.bit());
+            for h in &mut c.add_harmonic[..ft.n_high] {
+                *h = br.bit();
+            }
         } else {
             c.add_harmonic = [false; 49];
         }
@@ -517,9 +517,9 @@ impl Sbr {
         for c in [c0, c1] {
             c.add_harmonic_flag = br.bit();
             if c.add_harmonic_flag {
-                c.add_harmonic[..ft.n_high]
-                    .iter_mut()
-                    .for_each(|h| *h = br.bit());
+                for h in &mut c.add_harmonic[..ft.n_high] {
+                    *h = br.bit();
+                }
             } else {
                 c.add_harmonic = [false; 49];
             }
@@ -779,7 +779,9 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
                 *r = 2 * br.read(2) as usize + 2;
             }
             pointer = br.read(ptr_bits(num_env)) as usize;
-            c.freq_res[..num_env].iter_mut().for_each(|f| *f = br.bit());
+            for f in &mut c.freq_res[..num_env] {
+                *f = br.bit();
+            }
             abs1 = NUM_TIME_SLOTS;
         }
         _ => {
@@ -799,7 +801,9 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
                 *r = 2 * br.read(2) as usize + 2;
             }
             pointer = br.read(ptr_bits(num_env)) as usize;
-            c.freq_res[..num_env].iter_mut().for_each(|f| *f = br.bit());
+            for f in &mut c.freq_res[..num_env] {
+                *f = br.bit();
+            }
         }
     }
     if pointer > num_env {
@@ -893,7 +897,9 @@ fn parse_dtdf(br: &mut CachedBitReader<'_>, c: &mut Chan) {
 }
 
 fn parse_invf(br: &mut CachedBitReader<'_>, c: &mut Chan, n_q: usize) {
-    c.invf[..n_q].iter_mut().for_each(|v| *v = br.read(2) as u8);
+    for v in &mut c.invf[..n_q] {
+        *v = br.read(2) as u8;
+    }
 }
 
 fn huff(br: &mut CachedBitReader<'_>, v: &Vlc) -> Result<i32> {
@@ -1182,11 +1188,7 @@ fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
                 e_orig_m[e][mm - kx] = c.e_orig[e][i];
             }
         }
-        let nf = if c.num_noise > 1 && c.t_env[e] >= c.t_q[1] {
-            1
-        } else {
-            0
-        };
+        let nf = usize::from(c.num_noise > 1 && c.t_env[e] >= c.t_q[1]);
         for i in 0..ft.n_q {
             for mm in ft.noise[i]..ft.noise[i + 1] {
                 q_m[e][mm - kx] = c.q_orig[nf][i];

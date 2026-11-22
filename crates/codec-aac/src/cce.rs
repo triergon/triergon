@@ -70,19 +70,18 @@ pub(crate) fn parse_cce<const RAW: bool>(
     cfg: &CoreCfg,
 ) -> Result<usize> {
     let tag = br.read(4) as u8;
-    let ci = match core.cce.iter().position(|c| c.tag == tag) {
-        Some(i) => i,
-        None => {
-            if core.cce.len() >= 16 {
-                return Err(DecodeError::Policy("coupling channel elements"));
-            }
-            let mut c = CceState::new(&core.budget, tag)?;
-            if RAW {
-                c.targets.try_reserve_exact(8)?;
-            }
-            core.cce.push(Charged::boxed(&core.budget, c)?);
-            core.cce.len() - 1
+    let ci = if let Some(i) = core.cce.iter().position(|c| c.tag == tag) {
+        i
+    } else {
+        if core.cce.len() >= 16 {
+            return Err(DecodeError::Policy("coupling channel elements"));
         }
+        let mut c = CceState::new(&core.budget, tag)?;
+        if RAW {
+            c.targets.try_reserve_exact(8)?;
+        }
+        core.cce.push(Charged::boxed(&core.budget, c)?);
+        core.cce.len() - 1
     };
     let c: &mut CceState = &mut core.cce[ci];
     c.ind_sw = br.bit();
