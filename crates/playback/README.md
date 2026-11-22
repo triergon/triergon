@@ -300,13 +300,18 @@ a seek after releasing checkpoints. The
 [catalogue comparison](../../harness/features/playback-catalogue-replacement/contract.json)
 checks the packet prefix and suffix around an explicit source replacement.
 The [delivery comparison](../../harness/features/playback-delivery/contract.json)
-checks the packets returned by the FIFO and sink paths. The
+checks the packets returned by the FIFO and sink paths. Its Matroska seek
+operation includes the landing Cluster's packet prefix and retains the
+native timestamp and duration precision. The
 [track selection comparison](../../harness/features/playback-track-selection/contract.json)
 covers MP4, Matroska and MPEG-TS and includes an audio switch during a seek.
 The [MOV index comparison](../../harness/features/playback-mov-index/contract.json)
-includes every geometry from the terminal-media matrix. The
+includes every geometry from the terminal-media matrix, including recovery
+of a short final packet and confirmed EOF in a size-zero media box. The
 [TS opener comparison](../../harness/features/playback-ts-open/contract.json)
-checks demux PES from independent segments, explicit private audio and finite startup.
+checks demux PES from independent segments, explicit private audio and finite
+startup. Independent segment delivery compares supported video and audio PES.
+Other tracks remain visible as transport source events.
 
 Fixture provenance: [MP4](tests/fixtures/mp4/README.md),
 [AV1](tests/fixtures/av1/README.md),

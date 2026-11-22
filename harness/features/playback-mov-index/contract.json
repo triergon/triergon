@@ -2288,265 +2288,74 @@
     }
   ],
   "pending_module_requirements": [
-    "Check the edit-list and composition-time domain under ISO/IEC 14496-12 section 8.6. The basic MOV index refuses the edited reordered control before packets. FFmpeg and the encoded-range control read the same input.",
-    "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet."
+    "Index the valid reordered MOV edit without losing its decode prefix. The basic MOV cursor refuses this composition edit before yielding any packets."
   ],
   "open_cases": [
     {
       "id": "regular-encoded-avc-aac-indexed-seek",
-      "requirement": "Check the edit-list and composition-time domain under ISO/IEC 14496-12 section 8.6. The basic MOV index refuses the edited reordered control before packets. FFmpeg and the encoded-range control read the same input.",
+      "requirement": "Index the valid reordered MOV edit without losing its decode prefix. The basic MOV cursor refuses this composition edit before yielding any packets.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "A final size-zero media box ends at the confirmed source end",
+      "clause": "ISO/IEC 14496-12:2015 sections 4.2 and 8.1.1 define a size-zero final box as extending through EOF. The playback recovery opener confirms the end of the input.",
+      "candidate": "Emits six 12-byte samples and ends when the source confirms EOF for both the opaque-tail and ordinary cases.",
+      "reference": "Emits the same samples, then reports invalid data at root offset 0x7fffffffffffffff.",
+      "compat": "compat::mov::report_unknown_final_box_error for consumers reproducing the reference terminal return code.",
+      "cases": [
+        "terminal-open-ended--opaque-tail-terminal-pipe-known-1-1",
+        "terminal-open-ended--opaque-tail-terminal-pipe-known-1-4096",
+        "terminal-open-ended--opaque-tail-terminal-pipe-known-7-1",
+        "terminal-open-ended--opaque-tail-terminal-pipe-known-7-4096",
+        "terminal-open-ended--opaque-tail-terminal-pipe-known-4096-1",
+        "terminal-open-ended--opaque-tail-terminal-pipe-known-4096-4096",
+        "terminal-open-ended--opaque-tail-terminal-pipe-unknown-1-1",
+        "terminal-open-ended--opaque-tail-terminal-pipe-unknown-1-4096",
+        "terminal-open-ended--opaque-tail-terminal-pipe-unknown-7-1",
+        "terminal-open-ended--opaque-tail-terminal-pipe-unknown-7-4096",
+        "terminal-open-ended--opaque-tail-terminal-pipe-unknown-4096-1",
+        "terminal-open-ended--opaque-tail-terminal-pipe-unknown-4096-4096",
+        "terminal-open-ended--regular-terminal-pipe-known-1-1",
+        "terminal-open-ended--regular-terminal-pipe-known-1-4096",
+        "terminal-open-ended--regular-terminal-pipe-known-7-1",
+        "terminal-open-ended--regular-terminal-pipe-known-7-4096",
+        "terminal-open-ended--regular-terminal-pipe-known-4096-1",
+        "terminal-open-ended--regular-terminal-pipe-known-4096-4096",
+        "terminal-open-ended--regular-terminal-pipe-unknown-1-1",
+        "terminal-open-ended--regular-terminal-pipe-unknown-1-4096",
+        "terminal-open-ended--regular-terminal-pipe-unknown-7-1",
+        "terminal-open-ended--regular-terminal-pipe-unknown-7-4096",
+        "terminal-open-ended--regular-terminal-pipe-unknown-4096-1",
+        "terminal-open-ended--regular-terminal-pipe-unknown-4096-4096"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-known-1-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-known-1-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-known-7-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-known-7-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-known-4096-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-known-4096-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-unknown-1-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-unknown-1-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-unknown-7-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-unknown-7-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-unknown-4096-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--opaque-tail-terminal-pipe-unknown-4096-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-known-1-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-known-1-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-known-7-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-known-7-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-known-4096-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-known-4096-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-unknown-1-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-unknown-1-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-unknown-7-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-unknown-7-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-unknown-4096-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-open-ended--regular-terminal-pipe-unknown-4096-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-known-1-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-known-1-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-known-7-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-known-7-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-known-4096-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-known-4096-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-unknown-1-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-unknown-1-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-unknown-7-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-unknown-7-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-unknown-4096-1",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "terminal-mp4--bad-truncate-final-byte-pipe-unknown-4096-4096",
-      "requirement": "Compare a terminal size-zero mdat or a truncated sample under ISO/IEC 14496-12 sections 4.2 and 8.1.1. The packet lists agree, while Triergon reports logical end and the reference returns a read error after the last packet.",
+      "reading": "A terminal short sample completes the recovery delivery",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.1.1 and 8.7.3.2 define sample extents. The recovering playback API explicitly surfaces Mp4ShortPacket before closing the known source.",
+      "candidate": "Emits the identical truncated final packet with its corruption flag and ends after delivering it.",
+      "reference": "Emits the same packets and logs the short sample, then returns invalid data.",
+      "compat": "compat::mov::report_error_after_terminal_short_packet for consumers reproducing the reference terminal return code.",
+      "cases": [
+        "terminal-mp4--bad-truncate-final-byte-pipe-known-1-1",
+        "terminal-mp4--bad-truncate-final-byte-pipe-known-1-4096",
+        "terminal-mp4--bad-truncate-final-byte-pipe-known-7-1",
+        "terminal-mp4--bad-truncate-final-byte-pipe-known-7-4096",
+        "terminal-mp4--bad-truncate-final-byte-pipe-known-4096-1",
+        "terminal-mp4--bad-truncate-final-byte-pipe-known-4096-4096",
+        "terminal-mp4--bad-truncate-final-byte-pipe-unknown-1-1",
+        "terminal-mp4--bad-truncate-final-byte-pipe-unknown-1-4096",
+        "terminal-mp4--bad-truncate-final-byte-pipe-unknown-7-1",
+        "terminal-mp4--bad-truncate-final-byte-pipe-unknown-7-4096",
+        "terminal-mp4--bad-truncate-final-byte-pipe-unknown-4096-1",
+        "terminal-mp4--bad-truncate-final-byte-pipe-unknown-4096-4096"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
