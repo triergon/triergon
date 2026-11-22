@@ -8,8 +8,7 @@ struct SeekResult {
     method: SeekMethod,
 }
 
-#[path = "../../../../xtask/src/sha256.rs"]
-mod sha256;
+use crate::sha256;
 
 // One 24-bit stereo XLL asset without a core (construction 17, Table E-2).
 const DESCRIPTOR: &[u8] = &[0x7f, 8, 0x0e, 0x40, 5, 2, 0x64, 0x8c, 0, 0];

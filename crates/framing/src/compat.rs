@@ -44,11 +44,21 @@ pub mod nal {
 /// payload bytes. A standalone picture header still requires the strict
 /// access-unit prefix.
 pub mod vvc {
-    use crate::VvcAccessUnits;
-    use triergon_core::Result;
+    use crate::{RawAnnexBLimits, VvcAccessUnits, VvcAnnexBReader};
+    use triergon_core::{Budget, Result, SourceCapabilities, SourceId};
 
     /// Group a complete, bounded layer zero stream into borrowed access units.
     pub fn access_units(data: &[u8], maximum_bytes: usize) -> Result<VvcAccessUnits<'_>> {
         VvcAccessUnits::allow_short_embedded_prefix(data, maximum_bytes)
+    }
+
+    /// Incremental framing with the same embedded-header prefix policy.
+    pub fn access_unit_reader(
+        pool: &Budget,
+        source: SourceId,
+        caps: SourceCapabilities,
+        limits: RawAnnexBLimits,
+    ) -> Result<VvcAnnexBReader> {
+        Ok(VvcAnnexBReader::new(pool, source, caps, limits)?.with_short_embedded_prefix())
     }
 }

@@ -55,7 +55,10 @@ mod record_input;
 mod vorbis_config;
 mod vp9_config;
 mod vvc;
-pub use vvc::{VvcAccessUnit, VvcAccessUnits, VvcAnnexBUnits, VvcNal, VvcNalHeader};
+pub use vvc::{
+    VvcAccessUnit, VvcAccessUnits, VvcAnnexBReader, VvcAnnexBUnits, VvcNal, VvcNalHeader,
+    VvcStreamAccessUnit,
+};
 
 pub use ac3::{
     Ac3Family, Ac3Frame, Ac3FrameDetails, Ac3FrameFacts, Ac3FrameHeader, Ac3FrameLimits,
