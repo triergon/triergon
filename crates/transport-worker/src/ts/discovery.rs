@@ -1,11 +1,11 @@
 //! Opt-in discovery and replay of registered TS188 program streams.
 use super::*;
 use triergon_core::SourceCapabilities;
-use triergon_mpegts::compat::input::Ts188Startup;
-use triergon_mpegts::{ContinuityOutcome, psi::DescriptorNamespace};
+use triergon_mpegts::compat::{input::Ts188Startup, pes::ReadyContinuation};
+use triergon_mpegts::{ContinuityOutcome, FeedContinuation, psi::DescriptorNamespace};
 
 struct Track {
-    observer: TransportFaultRecovery,
+    observer: DemuxObserver,
     started: bool,
 }
 
@@ -18,7 +18,7 @@ fn drain(
 ) -> Result<()> {
     loop {
         match track.observer.poll(&mut WorkBudget::new(WORK), cancel)? {
-            AssemblyStep::Output(TransportObservation::Accepted(packet)) => {
+            AssemblyStep::Output(packet) => {
                 let time = clock
                     .project_header(
                         packet.pid,
@@ -43,8 +43,11 @@ fn drain(
                     packet.stream_id,
                     packet.payload(),
                 )?;
+                track.observer.reuse_payload_spans(packet.spans);
+                track
+                    .observer
+                    .reuse_header_ranges(packet.header_source_ranges);
             }
-            AssemblyStep::Output(_) => return Err("unsupported discovery observation".into()),
             AssemblyStep::Yield => {}
             AssemblyStep::NeedPayload | AssemblyStep::Finished => return Ok(()),
         }
@@ -111,7 +114,7 @@ pub(super) fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -
             ParseLimits::default(),
         )?;
         Ok(Track {
-            observer: TransportFaultRecovery::new(observer).map_err(|e| e.error)?,
+            observer,
             started: false,
         })
     };
@@ -137,7 +140,50 @@ pub(super) fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -
     )?;
     let mut pat_route = None;
     loop {
-        match replay.poll(&mut input, &mut WorkBudget::new(WORK), cancel)? {
+        let mut completed = None;
+        let step =
+            replay.poll_feed(
+                &mut input,
+                &mut WorkBudget::new(WORK),
+                cancel,
+                &mut |packet, _, _, work| {
+                    let Some((index, track)) = tracks.iter_mut().enumerate().find(|(_, track)| {
+                        track.started && track.observer.scope().pid == packet.pid
+                    }) else {
+                        return Ok(FeedContinuation::Emit);
+                    };
+                    // The source has checked this continuation's transport state.
+                    // Keep the original physical ordinal used by ordinary delivery.
+                    let context = SourceContext {
+                        source_event_ordinal: packet
+                            .source_offset
+                            .checked_sub(offset)
+                            .ok_or(Error::Invalid("replay carrier before the detected grid"))?
+                            / 188,
+                        epochs,
+                        byte_run_epoch: None,
+                    };
+                    // Leave the source's own unit for consuming the carrier.
+                    if work.remaining() < 3 {
+                        return Ok(FeedContinuation::Emit);
+                    }
+                    match track
+                        .observer
+                        .append_ready_continuation(packet, context, work, cancel)?
+                    {
+                        ReadyContinuation::Unhandled => Ok(FeedContinuation::Emit),
+                        ReadyContinuation::Buffered => Ok(FeedContinuation::Buffered),
+                        ReadyContinuation::Complete => {
+                            completed = Some(index);
+                            Ok(FeedContinuation::Yield)
+                        }
+                    }
+                },
+            )?;
+        if let Some(index) = completed {
+            drain(&mut tracks[index], index, &mut clock, &mut totals, cancel)?;
+        }
+        match step {
             Step::Ready(TraceEvent::Transport(packet)) => {
                 let ordinal = packet
                     .source_offset
