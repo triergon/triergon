@@ -34,6 +34,12 @@ assert!(pictures > 0);
 takes one NAL unit without start code. `reset` drops the DPB and keeps parameter sets.
 `examples/decode_h264.rs IN.264 OUT.yuv` writes raw yuv420p and one JSON line per picture.
 
+## Features
+
+| Feature | Default | Effect |
+|---|---|---|
+| `inspect` | off | `inspect::StreamFeatures`: the coding features a stream's parameter sets and slice headers use, without decoding it |
+
 ## Supported
 
 | Area | Coverage |
@@ -87,7 +93,7 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
 - Scaling and inverse transforms wrap on overflow, as FFmpeg's `int` arithmetic does; a
   conforming stream never overflows.
 
-## Standards
+## Conformance
 
 Rec. ITU-T H.264 (V15, 08/2024). Tables are transcribed from the text with the table
 number in a comment; Table 9-26 prints ctxIdx 641 where 541 is meant.

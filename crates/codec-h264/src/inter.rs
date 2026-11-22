@@ -1088,6 +1088,8 @@ struct PartMv {
     wbi: (i32, i32),
 }
 
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 struct McCtx<'s> {
     s: &'s SliceCtx,
     /// Destination geometry (picture position via mbx / y_pic, write offsets via off_* / stride_*).
@@ -1167,9 +1169,10 @@ impl McOut for MbSamples {
 }
 
 /// Reference-plane geometry of one list of a block.
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 struct ListPos<'r> {
     fb: &'r FrameBuf,
-    parity: u8,
     /// Luma integer position and quarter-sample fraction.
     xi: i32,
     yi: i32,
@@ -1180,6 +1183,7 @@ struct ListPos<'r> {
     yc: i32,
     cfx: u32,
     cfy: u32,
+    parity: u8,
 }
 
 fn list_pos<'r>(g: &MbGeom, p: &PartMv, list: usize, rp: &RefPic, fb: &'r FrameBuf) -> ListPos<'r> {

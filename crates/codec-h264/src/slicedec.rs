@@ -47,6 +47,8 @@ pub(crate) struct SliceCtx {
 
 /// Information about RefPicList1[0] for direct prediction.
 #[derive(Clone, Copy, Debug)]
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 pub(crate) struct ColInfo {
     /// Position in the decoded picture buffer of the frame store holding RefPicList1[0].
     pub(crate) idx: usize,
@@ -57,6 +59,8 @@ pub(crate) struct ColInfo {
 
 /// The picture being decoded.
 #[derive(Debug)]
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 pub(crate) struct CurPic {
     /// Position in the decoded picture buffer of the current frame's first field, while
     /// its second field is decoded into the same frame buffer.
@@ -64,17 +68,17 @@ pub(crate) struct CurPic {
     pub(crate) buf: FrameBuf,
     pub(crate) motion: Motion,
     pub(crate) mbs: BudgetVec<MbInfo>,
+    pub(crate) slices: BudgetVec<SliceDbk>,
+    pub(crate) dbk: crate::deblock::Progress,
     /// Width in MBs and height in MBs of this picture (field: half the frame height).
     pub(crate) w: MbWidth,
     pub(crate) h: usize,
+    pub(crate) poc: [i32; 2],
+    pub(crate) decoded_mbs: usize,
+    pub(crate) mbaff: bool,
+    pub(crate) chroma: bool,
     /// The picture's [`Structure`] code.
     pub(crate) structure: u8,
-    pub(crate) mbaff: bool,
-    pub(crate) poc: [i32; 2],
-    pub(crate) slices: BudgetVec<SliceDbk>,
-    pub(crate) decoded_mbs: usize,
-    pub(crate) chroma: bool,
-    pub(crate) dbk: crate::deblock::Progress,
 }
 
 impl CurPic {
@@ -105,6 +109,8 @@ impl<'a> Refs<'a> {
 
 /// Geometry of a macroblock in the current picture's planes.
 #[derive(Clone, Copy, Debug, Default)]
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 pub(crate) struct MbGeom {
     pub(crate) mbx: usize,
     /// Luma y of the MB's first row in its own (field or frame) coordinates.
@@ -126,32 +132,34 @@ pub(crate) struct NbAddr {
     pub(crate) d: Option<usize>,
 }
 
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 pub(crate) struct SliceDecoder<'a> {
+    pub(crate) nb: NbAddr,
     pub(crate) s: &'a SliceCtx,
     pub(crate) pic: &'a mut CurPic,
     pub(crate) refs: Refs<'a>,
     pub(crate) vlc: &'static CavlcTables,
     pub(crate) br: BitReader<'a>,
+    /// Prediction of the current macroblock when it may read its own picture.
+    pub(crate) mb_out: &'a mut crate::inter::MbSamples,
     pub(crate) cur: usize,
-    pub(crate) nb: NbAddr,
     pub(crate) geom: MbGeom,
-    pub(crate) qp: i32,
-    pub(crate) prev_qp_delta_nz: bool,
-    pub(crate) mb: crate::mbdec::MbData,
-    /// MBAFF: field flag decoded ahead for a skipped top MB (CAVLC) or for the pair (CABAC).
-    pub(crate) pending_field: Option<bool>,
     pub(crate) last_mb_in_slice: usize,
-    /// Spatial direct (refIdx, mvp, directZero) of the current MB.
-    pub(crate) spatial_cache: Option<([i32; 2], [[i32; 2]; 2], bool)>,
+    /// Second-list prediction scratch for motion compensation.
+    pub(crate) mc_tmp: crate::inter::McTmp,
     /// Whole-MB motion (refIdx and vector per list, refIdx -1 = list unused) when the MB is
     /// predicted as one 16x16 block, recorded while deriving it for motion compensation.
     pub(crate) mb_motion: Option<([i32; 2], [[i32; 2]; 2])>,
+    pub(crate) mb: crate::mbdec::MbData,
+    /// Spatial direct (refIdx, mvp, directZero) of the current MB.
+    pub(crate) spatial_cache: Option<([i32; 2], [[i32; 2]; 2], bool)>,
+    pub(crate) qp: i32,
+    pub(crate) prev_qp_delta_nz: bool,
     /// Some reference is the first field of the current frame (second-field decoding).
     pub(crate) self_ref_possible: bool,
-    /// Second-list prediction scratch for motion compensation.
-    pub(crate) mc_tmp: crate::inter::McTmp,
-    /// Prediction of the current macroblock when it may read its own picture.
-    pub(crate) mb_out: &'a mut crate::inter::MbSamples,
+    /// MBAFF: field flag decoded ahead for a skipped top MB (CAVLC) or for the pair (CABAC).
+    pub(crate) pending_field: Option<bool>,
 }
 
 impl<'a> SliceDecoder<'a> {

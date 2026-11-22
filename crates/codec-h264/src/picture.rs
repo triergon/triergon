@@ -312,14 +312,16 @@ impl FrameStore {
 
 /// An entry of RefPicList0/1: a frame or a field of a DPB entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 pub(crate) struct RefPic {
     pub(crate) idx: usize,
-    /// The [`Structure`] code.
-    pub(crate) parity: u8,
     pub(crate) poc: i32,
-    pub(crate) long: bool,
     /// Identity used to compare reference pictures (uid << 2 | field bits).
     pub(crate) id: i32,
+    /// The [`Structure`] code.
+    pub(crate) parity: u8,
+    pub(crate) long: bool,
 }
 
 /// The identity of field or frame `parity` ([`Structure`] code) of the store `uid`.

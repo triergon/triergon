@@ -9,11 +9,13 @@ use triergon_codec::{Budget, BudgetVec, StorageError};
 
 /// What the filter reads of the picture, borrowed beside its sample planes and the
 /// motion summaries it writes.
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 struct PicView<'a> {
     mbs: &'a [MbInfo],
     slices: &'a [SliceDbk],
-    motion: &'a Motion,
     w: MbWidth,
+    motion: &'a Motion,
     structure: u8,
     mbaff: bool,
     chroma: bool,
