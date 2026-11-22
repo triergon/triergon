@@ -331,7 +331,8 @@ The [index landing comparison](../../harness/features/isobmff-index-landings/con
 checks backward seek ranges and first-packet fragment clocks against the demuxer.
 The [MOV trace comparison](../../harness/features/mov-reference-trace/contract.json)
 checks public packet clocks, open diagnostics and configuration, the first packet
-read result, and open-time reads and seeks with fixed rewind geometry.
+read result, and open-time reads and seeks with fixed rewind geometry. For an
+unsupported `dOps` version, it reports the child box and the enclosing open failure.
 
 Comparison results and gates are in [docs/status.md](../../docs/status.md) and
 [docs/quality.md](../../docs/quality.md).

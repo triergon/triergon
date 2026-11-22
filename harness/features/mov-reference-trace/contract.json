@@ -610,18 +610,6 @@
       "cause": "comparison-only projections have no equivalent measured library operation"
     }
   ],
-  "pending_module_requirements": [
-    "Report the unsupported OpusSpecificBox version and the open refusal in PrivateDiagnosticJob without reading unknown-version fields."
-  ],
-  "open_cases": [
-    {
-      "id": "diagnostics-opus-version",
-      "requirement": "Report the unsupported OpusSpecificBox version and the open refusal in PrivateDiagnosticJob without reading unknown-version fields.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    }
-  ],
   "open_deviations": [
     {
       "reading": "Transport model stops at its root-box bound",
