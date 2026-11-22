@@ -307,7 +307,8 @@
     }
   ],
   "pending_module_requirements": [
-    "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+    "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+    "Catalogue::pmt rejects the declared ATSC private audio descriptor even after classifying the direct stream type. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.1 Table 2-45.",
     "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
     "The catalogue projection omits the roles carried alongside ISO 639 languages. H.222.0 \u00a7\u00a72.6.18\u20132.6.19 Table 2-63.",
     "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41."
@@ -315,119 +316,119 @@
   "open_cases": [
     {
       "id": "au-atsc-ac3-multiple-per-pes",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects the declared ATSC private audio descriptor even after classifying the direct stream type. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.1 Table 2-45.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "au-atsc-eac3-multiple-per-pes",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects the declared ATSC private audio descriptor even after classifying the direct stream type. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.1 Table 2-45.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "dvb-hevc-eac3-32000",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "entry-hevc-aac-44100-00",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "hls-entry-hevc-aac-44100-01",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "hls-replay-hevc-aac-00",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "replay-hevc-aac-01",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "replay-hevc-aac-02",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "replay-hevc-aac-03",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "replay-hevc-aac-04",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "replay-hevc-aac-05",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "replay-hevc-aac-06",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "replay-hevc-aac-07",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "replay-hevc-aac-08",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "replay-hevc-aac-09",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ts-program-entry-hevc-aac-44100-01",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ts-program-replay-hevc-aac-00",
-      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "requirement": "Catalogue::pmt rejects an otherwise readable HEVC or Enhanced AC-3 route with an elementary registration descriptor. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
