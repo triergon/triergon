@@ -13,13 +13,13 @@ fn text(rows: &mut Rows<'_, '_>, field: u64, value: Option<&str>) -> Result<()> 
     rows.optional(3, field, value.map(str::as_bytes))
 }
 
-fn attachment(rows: &mut Rows<'_, '_>, view: &Attachment) -> Result<()> {
+fn attachment(rows: &mut Rows<'_, '_>, view: &Attachment, title: Option<&str>) -> Result<()> {
     let data = view.data()?;
     rows.record(2, &[0, data.len() as u64], data)?;
     for (field, value) in [
         (1, Some(view.filename()?)),
         (2, Some(view.media_type()?)),
-        (3, view.description()?),
+        (3, title),
     ] {
         rows.optional(2, field, value.map(str::as_bytes))?;
     }
@@ -113,7 +113,7 @@ fn source(reader: &Reader, rows: &mut Rows<'_, '_>) -> Result<()> {
     }
     for view in reader.attachments() {
         rows.record(2, &[4, view.uid()?], &[])?;
-        attachment(rows, &view)?;
+        attachment(rows, &view, view.description()?)?;
     }
     Ok(())
 }
@@ -179,6 +179,28 @@ fn dictionary(
     for (key, value) in dict.values() {
         text(rows, 16, Some(key))?;
         text(rows, 17, Some(value))?;
+    }
+    Ok(())
+}
+
+/// Every attachment with the title RFC 9559 section 24.1 presents: a TITLE tag
+/// that targets the attachment takes precedence over its FileDescription.
+fn presented_attachments(reader: &Reader, rows: &mut Rows<'_, '_>) -> Result<()> {
+    let attachments: Vec<_> = reader.attachments().collect();
+    for view in &attachments {
+        let mut dict = Dictionary::new();
+        if let Some(description) = view.description()? {
+            set(&mut dict, "title", description);
+        }
+        let uid = view.uid()?;
+        for doc in reader.catalogue() {
+            for tag in doc.tags() {
+                if target(tag)? == Some((0x63c6, uid)) {
+                    apply(&mut dict, tag, "")?;
+                }
+            }
+        }
+        attachment(rows, view, dict.get("title").map(|&(_, title)| title))?;
     }
     Ok(())
 }
@@ -287,12 +309,7 @@ pub(super) fn operation<'a>(
     let (name, read): (_, fn(&Reader, &mut Rows<'_, '_>) -> Result<()>) = match (prefix, args) {
         ("mkv-metadata-", []) => ("mkv-metadata-fields", published),
         ("mkv-metadata-", [arg]) if arg == "source" => ("mkv-metadata-oracle", source),
-        ("mkv-attachments-", []) => ("mkv-attachments", |reader, rows| {
-            for view in reader.attachments() {
-                attachment(rows, &view)?;
-            }
-            Ok(())
-        }),
+        ("mkv-attachments-", []) => ("mkv-attachments", presented_attachments),
         _ => return Err(format!("invalid {prefix} arguments")),
     };
     Ok(Operation {

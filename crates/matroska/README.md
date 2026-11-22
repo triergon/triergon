@@ -258,5 +258,10 @@ The typed chapter, tag and attachment fields and raw track mappings have
 independent source comparisons. The [Matroska view
 contracts](../../harness/features/mkv-metadata-fields/contract.json) compare
 the published dictionaries, chapters, attachments, stream configuration
-and packet side-data subset against FFmpeg.
+and packet side-data subset against FFmpeg. They declare nine deviations where
+FFmpeg departs from RFC 9559 and the reader follows it: an absent TagDefault is
+1, TagLanguageBCP47 replaces TagLanguage, an empty FileData is still an
+attachment, BlockAddIDValue is at least 2, BlockAddID is unique per
+BlockAdditions and at most MaxBlockAdditionID, a mapping's extra data is not the
+container's to validate, and a truncated HDR10+ message is refused.
 Gates and harness: [docs/quality.md](../../docs/quality.md).

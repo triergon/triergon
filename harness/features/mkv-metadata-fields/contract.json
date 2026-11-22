@@ -251,23 +251,26 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "The typed view applies the RFC 9559 TagDefault value of 1 to a missing flag. FFmpeg publishes only the language-suffixed key.",
-    "The typed view uses TagLanguageBCP47 as required by RFC 9559. FFmpeg publishes the legacy TagLanguage suffix.",
-    "The typed view treats the absent TagDefault as true. FFmpeg publishes only the language-suffixed value."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "flags-absent",
-      "requirement": "The typed view applies the RFC 9559 TagDefault value of 1 to a missing flag. FFmpeg publishes only the language-suffixed key."
+      "reading": "An absent TagDefault is 1",
+      "clause": "RFC 9559 section 5.1.8.1.2.4: TagDefault defaults to 1, marking the default or original language of the tag",
+      "candidate": "publishes a SimpleTag without TagDefault under its plain key as well as its language-suffixed key",
+      "reference": "publishes only the language-suffixed key, treating the absent flag as 0",
+      "compat": "a consumer that needs the reference's tag keys would use a compat::matroska tag-dictionary policy that treats an absent TagDefault as 0 (not built)",
+      "cases": [
+        "flags-absent", "tags-multilingual"
+      ]
     },
     {
-      "id": "languages-ietf",
-      "requirement": "The typed view uses TagLanguageBCP47 as required by RFC 9559. FFmpeg publishes the legacy TagLanguage suffix."
-    },
-    {
-      "id": "tags-multilingual",
-      "requirement": "The typed view treats the absent TagDefault as true. FFmpeg publishes only the language-suffixed value."
+      "reading": "TagLanguageBCP47 replaces TagLanguage",
+      "clause": "RFC 9559 sections 5.1.8.1.2.2 and 5.1.8.1.2.3: when TagLanguageBCP47 is present, every TagLanguage of the same SimpleTag MUST be ignored",
+      "candidate": "suffixes the key with the BCP 47 language de-DE",
+      "reference": "suffixes it with the legacy TagLanguage ger",
+      "compat": "a consumer that needs the legacy suffix would use a compat::matroska tag-dictionary policy that keeps TagLanguage (not built)",
+      "cases": [
+        "languages-ietf"
+      ]
     }
   ]
 }

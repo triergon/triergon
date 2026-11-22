@@ -153,28 +153,34 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "Triergon refuses the truncated HDR10+ body. FFmpeg stops before emitting the affected packet and reports EOF.",
-    "FFmpeg emits opaque BlockAdditional alongside HDR10+. Triergon's packet_side_data call refuses dynamic HDR, so only the HDR10+ view can report this packet's additions.",
-    "Triergon refuses duplicate effective BlockAddID 1 per RFC 9559. FFmpeg keeps the last opaque entry and attaches it with LCEVC to both laces.",
-    "Triergon's implicit WebM VP9 rule permits ID 4. FFmpeg also admits undeclared IDs 2, 3 and 8 here, ignoring the track maximum and exporting the final opaque addition."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "hdr-truncated",
-      "requirement": "Triergon refuses the truncated HDR10+ body. FFmpeg stops before emitting the affected packet and reports EOF."
+      "reading": "An HDR10+ message the BlockAdditional ends inside",
+      "clause": "RFC 9559 section 5.1.3.5.2 with BlockAddIDType 4 (section 5.1.4.1.17): the BlockAdditional carries an ITU-T T.35 HDR10+ message, here cut after 13 bytes, before its syntax ends",
+      "candidate": "returns the packets before it and the affected packet, then refuses with the truncated HDR10+ syntax",
+      "reference": "returns the packets before it and reports the end of the stream without the affected packet",
+      "cases": [
+        "hdr-truncated"
+      ]
     },
     {
-      "id": "mixed-hdr-opaque",
-      "requirement": "FFmpeg emits opaque BlockAdditional alongside HDR10+. Triergon's packet_side_data call refuses dynamic HDR, so only the HDR10+ view can report this packet's additions."
+      "reading": "Two BlockMore elements with the same effective BlockAddID",
+      "clause": "RFC 9559 section 5.1.3.5.2.3: each BlockAddID MUST be unique among the BlockMore elements of a BlockAdditions element, and an omitted BlockAddID is 1",
+      "candidate": "returns the first packet, then refuses the BlockAdditions that repeats BlockAddID 1",
+      "reference": "keeps the last opaque addition and attaches it, with the LCEVC data, to both laces",
+      "cases": [
+        "laced-opaque-lcevc"
+      ]
     },
     {
-      "id": "laced-opaque-lcevc",
-      "requirement": "Triergon refuses duplicate effective BlockAddID 1 per RFC 9559. FFmpeg keeps the last opaque entry and attaches it with LCEVC to both laces."
-    },
-    {
-      "id": "opaque-webm",
-      "requirement": "Triergon's implicit WebM VP9 rule permits ID 4. FFmpeg also admits undeclared IDs 2, 3 and 8 here, ignoring the track maximum and exporting the final opaque addition."
+      "reading": "BlockAddID values above the track maximum",
+      "clause": "RFC 9559 section 5.1.4.1.16: MaxBlockAdditionID is the maximum value of BlockAddID for the track",
+      "candidate": "admits only WebM VP9's implicit ITU-T T.35 BlockAddID 4, then refuses the undeclared BlockAddID above the maximum",
+      "reference": "exports the undeclared BlockAddIDs 2, 3 and 8, ignoring the maximum, and ends normally",
+      "compat": "a consumer that needs additions above the maximum exported would use a compat::block_additions policy that admits them (not built)",
+      "cases": [
+        "opaque-webm"
+      ]
     }
   ]
 }

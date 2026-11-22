@@ -8,7 +8,7 @@
   "corpus_directory": ".",
   "contract": [
     "Open the same preloaded seekable input and enumerate attachments in source order. The reference uses attachment extradata and attached-picture packet bytes.",
-    "Fold attachment data plus filename, MIME and optional description from the public attachment stream fields. Attachment UID and the complete source attachment view are compared by mkv-metadata-oracle."
+    "Fold attachment data plus filename, MIME and optional description from the public attachment stream fields; the candidate's description is the title RFC 9559 section 24.1 presents, where a TITLE tag that targets the attachment takes precedence over FileDescription. Attachment UID and the complete source attachment view are compared by mkv-metadata-oracle."
   ],
   "required_profiles": [
     "flags-absent",
@@ -249,18 +249,15 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "A targeted TITLE overrides the FFmpeg attachment title. The typed FileDescription preserves the recorded description.",
-    "FFmpeg omits the attachment with empty FileData. The typed view retains the present zero-length payload."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "tags-attachment",
-      "requirement": "A targeted TITLE overrides the FFmpeg attachment title. The typed FileDescription preserves the recorded description."
-    },
-    {
-      "id": "attachments-empty",
-      "requirement": "FFmpeg omits the attachment with empty FileData. The typed view retains the present zero-length payload."
+      "reading": "An attachment with empty FileData",
+      "clause": "RFC 9559 section 5.1.6.1.4: FileData, the data of the file, occurs exactly once and has no minimum length",
+      "candidate": "returns the attachment with its zero-length data, name and media type",
+      "reference": "publishes no attachment stream for it",
+      "cases": [
+        "attachments-empty"
+      ]
     }
   ]
 }
