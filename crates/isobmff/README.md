@@ -313,14 +313,17 @@ comparison checks the concatenated PCM bytes and whole-frame counts per stream.
 The [sound entry oracle](../../harness/features/quicktime-sound-description/contract.json)
 checks the complete version 0 description and the supported PCM layout.
 [DTS configuration](../../harness/features/isobmff-dts-signalling/contract.json)
-compares the core-signalling verdict, sample rate and samples per access unit with the
-demuxed configuration. An [independent entry oracle](../../harness/features/isobmff-dts-entry-source/contract.json)
-checks the declared base rate and the exact access-unit clock.
+compares the core-signalling verdict, coded sampling frequency and samples per access
+unit with the demuxed configuration. Where an entry declares no access-unit clock,
+the comparison uses its sample-entry rate. An
+[independent entry oracle](../../harness/features/isobmff-dts-entry-source/contract.json)
+checks the declared base rate and the exact access-unit clock separately.
 The [one-track seek comparison](../../harness/features/mov-track-seek/contract.json)
-checks demux index landings after opening and after draining to EOF. The
+checks demux index landings after opening and after draining to EOF, including the
+first-key fallback. The
 [source seek comparison](../../harness/features/isobmff-source-seek/contract.json)
-checks sample ranges, decode clocks and payloads with caller-specified preroll, and
-compares composition-time selections with demuxed presentation timestamps.
+checks sample ranges, zero-based source decode clocks and payloads with caller-specified
+preroll, and compares composition-time selections with demuxed presentation timestamps.
 
 The [segment index oracle](../../harness/features/isobmff-segment-indexes/contract.json)
 checks the complete `sidx`, `tfra` and `mfro` fields and derived ranges.
