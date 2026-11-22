@@ -47,6 +47,8 @@ TRACE_ORACLES = {
     "windows": ("harness.codec_dsp_oracle", "windows"),
     "rbsp": ("harness.bitstream_oracle", "rbsp"),
     "bit-readers": ("harness.bitstream_oracle", "bit_readers"),
+    "cabac-engine": ("harness.cabac_oracle", "trace"),
+    "ycbcr-palette": ("harness.palette_oracle", "trace"),
     "qt-sound-v0": ("harness.isobmff_entry_oracle", "qt_sound"),
     "ddts": ("harness.isobmff_entry_oracle", "ddts"),
     "isobmff-index": ("harness.isobmff_index_oracle", "index_trace"),
