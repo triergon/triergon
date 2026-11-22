@@ -78,6 +78,7 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ),
     ("isobmff-dts-entry-source", Coverage::Item("oracle-compare")),
     ("isobmff-segment-indexes", Coverage::Item("oracle-compare")),
+    ("mp4-source-clock", Coverage::Item("oracle-compare")),
     ("packet-framing", Coverage::Item("framing")),
     ("progressive-ts188", Coverage::Item("progressive")),
     ("font-outlines", Coverage::Item("fonts compare")),
