@@ -532,6 +532,7 @@ fn decode_rejected_pmt(
             .try_push(Stream {
                 pid,
                 stream_type: head[0],
+                codec_tag: head[0].into(),
                 codec: if head[0] == 0x1b {
                     CatalogueCodec::Avc
                 } else {
@@ -855,6 +856,7 @@ impl Catalogue {
                 .find(|p| p.pid == stream.0)
             {
                 old.stream_type = stream.1;
+                old.codec_tag = decoded.codec_tag;
                 old.codec = decoded.codec;
                 old.language = language;
                 old.evidence = index;
@@ -866,6 +868,7 @@ impl Catalogue {
                     .try_push(Stream {
                         pid: stream.0,
                         stream_type: stream.1,
+                        codec_tag: decoded.codec_tag,
                         codec: decoded.codec,
                         language,
                         evidence: index,

@@ -6,7 +6,7 @@ use triergon_core::{
 };
 use triergon_mpegts::compat::pes::PacketCompletion;
 use triergon_mpegts::compat::pes::SourceContext;
-use triergon_mpegts::psi::DescriptorNamespace;
+use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence, PsiCrc32};
 use triergon_mpegts::reference_trace::catalogue::{
     Catalogue, CatalogueCodec, PsiCompatibilityPolicies,
 };
@@ -28,6 +28,15 @@ impl Run {
     }
 }
 fn parsed(data: &[u8], b: &Budget, format: PacketFormat, chunk: usize) -> Run {
+    parsed_with_namespace(data, b, format, chunk, DescriptorNamespace::Unspecified)
+}
+fn parsed_with_namespace(
+    data: &[u8],
+    b: &Budget,
+    format: PacketFormat,
+    chunk: usize,
+    namespace: DescriptorNamespace,
+) -> Run {
     let mut input = InputCursor::new(
         b,
         SourceId(1),
@@ -38,7 +47,14 @@ fn parsed(data: &[u8], b: &Budget, format: PacketFormat, chunk: usize) -> Run {
         4096,
     )
     .unwrap();
-    let mut demux = TransportStream::new(b.clone(), format, ParseLimits::default(), 1).unwrap();
+    let mut demux = TransportStream::new_with_namespace(
+        b.clone(),
+        format,
+        ParseLimits::default(),
+        1,
+        namespace,
+    )
+    .unwrap();
     let mut events = Vec::new();
     let cancel = AtomicBool::new(false);
     for _ in 0..1_000_000 {
@@ -88,6 +104,159 @@ fn parsed(data: &[u8], b: &Budget, format: PacketFormat, chunk: usize) -> Run {
 fn catalogue(b: &Budget, format: PacketFormat) -> Catalogue {
     Catalogue::new_selected_carriage(b.clone(), ParseLimits::default(), 1, format).unwrap()
 }
+
+const DVB: DescriptorNamespace =
+    DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);
+
+fn pmt_carrier(version: u8, streams: &[(u8, u16, &[u8])]) -> [u8; 188] {
+    let mut section = vec![
+        2,
+        0xb0,
+        0,
+        0,
+        1,
+        0xc1 | (version << 1),
+        0,
+        0,
+        0xe1,
+        0,
+        0xf0,
+        0,
+    ];
+    for &(stream_type, pid, descriptors) in streams {
+        section.push(stream_type);
+        section.extend((0xe000 | pid).to_be_bytes());
+        section.extend((0xf000 | u16::try_from(descriptors.len()).unwrap()).to_be_bytes());
+        section.extend_from_slice(descriptors);
+    }
+    section[2] = u8::try_from(section.len() + 1).unwrap();
+    section.extend(PsiCrc32::of(&section).to_be_bytes());
+    let mut carrier = [0xff; 188];
+    carrier[..5].copy_from_slice(&[0x47, 0x50, 0, 0x10 | version, 0]);
+    carrier[5..5 + section.len()].copy_from_slice(&section);
+    carrier
+}
+
+fn project(run: &Run, budget: &Budget, format: PacketFormat) -> Result<Catalogue, Error> {
+    let mut projection = catalogue(budget, format);
+    for (event, _) in run.events() {
+        let mut work = WorkBudget::new(Catalogue::required_work(event)?);
+        assert!(projection.observe(event, &mut work, &AtomicBool::new(false))?);
+    }
+    projection.finish(&run.end, &run.input)?;
+    Ok(projection)
+}
+
+#[test]
+fn elementary_registrations_publish_separate_tags_in_pmt_order() {
+    let hevc = b"\x05\x04HEVC";
+    let eac3 = b"\x05\x04EAC3\x7a\x01\x00";
+    let pmt = pmt_carrier(0, &[(0x24, 256, hevc), (6, 257, eac3)]);
+    for format in [PacketFormat::Ts188, PacketFormat::M2ts192] {
+        let mut data = Vec::new();
+        let mut repeated_pat = BASIC[..188].to_vec();
+        let mut repeated_pmt = pmt;
+        repeated_pat[3] |= 1;
+        repeated_pmt[3] |= 1;
+        for packet in [&BASIC[..188], &pmt, &repeated_pat, &repeated_pmt] {
+            if format == PacketFormat::M2ts192 {
+                data.extend_from_slice(&[0x23, 0x45, 0x67, 0x89]);
+            }
+            data.extend_from_slice(packet);
+        }
+        let budget = Budget::new(8 * 1024 * 1024).unwrap();
+        let run = parsed_with_namespace(&data, &budget, format, 1, DVB);
+        assert_eq!(
+            run.events()
+                .filter(|(event, _)| matches!(event, TraceEvent::Section(_)))
+                .count(),
+            4
+        );
+        assert_eq!(
+            run.events()
+                .filter(|(event, _)| matches!(
+                    event,
+                    TraceEvent::Pat(_) | TraceEvent::ProgramMap { .. }
+                ))
+                .count(),
+            2
+        );
+        let projection = project(&run, &budget, format).unwrap();
+        assert_eq!(projection.evidence().len(), 2);
+        let streams: Vec<_> = projection
+            .streams()
+            .iter()
+            .map(|stream| {
+                (
+                    stream.pid,
+                    stream.stream_type,
+                    stream.codec_tag,
+                    stream.codec(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            streams,
+            [
+                (
+                    256,
+                    0x24,
+                    u32::from_le_bytes(*b"HEVC"),
+                    CatalogueCodec::Hevc
+                ),
+                (257, 6, u32::from_le_bytes(*b"EAC3"), CatalogueCodec::Eac3),
+            ]
+        );
+    }
+}
+
+#[test]
+fn declared_atsc_admits_only_matching_private_audio_descriptors() {
+    for (kind, tag, codec) in [
+        (0x81, 0x81, CatalogueCodec::Ac3),
+        (0x87, 0xcc, CatalogueCodec::Eac3),
+    ] {
+        let pmt = pmt_carrier(0, &[(kind, 256, &[tag, 3, 0, 0, 0])]);
+        let data = [&BASIC[..188], &pmt].concat();
+        let budget = Budget::new(8 * 1024 * 1024).unwrap();
+        let run = parsed_with_namespace(
+            &data,
+            &budget,
+            PacketFormat::Ts188,
+            7,
+            DescriptorNamespace::Atsc,
+        );
+        let projection = project(&run, &budget, PacketFormat::Ts188).unwrap();
+        let stream = &projection.streams()[0];
+        assert_eq!(
+            (
+                stream.pid,
+                stream.stream_type,
+                stream.codec_tag,
+                stream.codec()
+            ),
+            (256, kind, u32::from(kind), codec)
+        );
+
+        let run = parsed(&data, &budget, PacketFormat::Ts188, 7);
+        assert!(matches!(
+            project(&run, &budget, PacketFormat::Ts188),
+            Err(Error::Unsupported(_))
+        ));
+    }
+}
+
+#[test]
+fn truncated_or_unrelated_registrations_do_not_publish_streams() {
+    for descriptors in [b"\x05\x03HEV".as_slice(), b"\x05\x04EAC3".as_slice()] {
+        let pmt = pmt_carrier(0, &[(0x24, 256, descriptors)]);
+        let data = [&BASIC[..188], &pmt].concat();
+        let budget = Budget::new(8 * 1024 * 1024).unwrap();
+        let run = parsed(&data, &budget, PacketFormat::Ts188, 7);
+        assert!(project(&run, &budget, PacketFormat::Ts188).is_err());
+    }
+}
+
 fn audio(data: &[u8], kind: u8, codec: CatalogueCodec) {
     for chunk in [1, 7, 4096] {
         let b = Budget::new(8 * 1024 * 1024).unwrap();

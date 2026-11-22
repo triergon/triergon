@@ -9,7 +9,7 @@
 //! The bounded catalogue preserves H.222.0 source validation. Compatibility
 //! observations carry their source status, and only accepted tables activate routes.
 use crate::psi::{DESCRIPTOR_LENGTH, PMT_PROGRAM_IDENTITY};
-use crate::psi::{PatTable, ProgramMap, PsiCrc32};
+use crate::psi::{DescriptorNamespace, ElementaryStream, PatTable, ProgramMap, PsiCrc32, Section};
 use crate::stream::{MediaEntityEnd, TraceEvent};
 use crate::{PacketFormat, ParseLimits, SourceRange};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -40,6 +40,9 @@ pub struct Stream {
     pub pid: u16,
     /// The 8-bit PMT stream type.
     pub stream_type: u8,
+    /// The demux codec tag: a matching registration FourCC in little-endian order, or the PMT
+    /// stream type when there is no such registration.
+    pub codec_tag: u32,
     /// The ISO 639 language codes of the first language descriptor, comma separated; empty without
     /// one.
     pub language: BudgetVec<u8>,
@@ -110,6 +113,8 @@ pub struct Catalogue {
     evidence: BudgetVec<CatalogueEvidence>,
     pending_pat: Option<(u16, u8)>,
     pending_pmt: Option<(u16, u8)>,
+    accepted_pat: Option<usize>,
+    accepted_pmt: Option<(u16, usize)>,
     retained_ranges: usize,
     ended: bool,
     fault: Option<Error>,
@@ -145,6 +150,8 @@ impl Catalogue {
             entity: None,
             pending_pat: None,
             pending_pmt: None,
+            accepted_pat: None,
+            accepted_pmt: None,
             retained_ranges: 0,
             ended: false,
             fault: None,
@@ -166,7 +173,8 @@ impl Catalogue {
         value.selected_carriage = true;
         Ok(value)
     }
-    fn codec(&self, kind: u8, program: &[u8], elementary: &[u8]) -> Result<CatalogueCodec> {
+    fn codec(&self, stream: &ElementaryStream, program: &[u8]) -> Result<CatalogueCodec> {
+        let kind = stream.stream_type;
         match kind {
             0x1b => Ok(CatalogueCodec::Avc),
             0x24 => Ok(CatalogueCodec::Hevc),
@@ -179,14 +187,26 @@ impl Catalogue {
                 use crate::compat::pes::observer::{
                     PrivateAudioCarriage as C, PrivateAudioDescriptors,
                 };
-                let observed = C::from_observed_pmt(
-                    kind,
-                    PrivateAudioDescriptors {
-                        program,
-                        elementary,
-                    },
-                    self.limits,
-                )?;
+                let descriptors = PrivateAudioDescriptors {
+                    program,
+                    elementary: stream.descriptor_bytes.as_ref(),
+                };
+                // A registered DVB E-AC-3 route has both the registration and the
+                // identifying audio descriptor. The registered-carriage check
+                // validates that pair and rejects conflicting descriptors.
+                let observed = if kind == 6
+                    && matches!(stream.descriptor_namespace(), DescriptorNamespace::Dvb(_))
+                    && stream.descriptors().any(|item| {
+                        item.is_ok_and(|descriptor| {
+                            descriptor.registration().is_ok_and(|registration| {
+                                &registration.format_identifier == b"EAC3"
+                            })
+                        })
+                    }) {
+                    C::from_hls_pmt(kind, descriptors, self.limits)?
+                } else {
+                    C::from_observed_pmt(kind, descriptors, self.limits)?
+                };
                 Ok(match observed {
                     C::DvbAc3Tag | C::PrivateType81Ac3 => CatalogueCodec::Ac3,
                     C::DvbEac3Tag | C::PrivateType87Eac3 => CatalogueCodec::Eac3,
@@ -273,7 +293,14 @@ impl Catalogue {
         if !work.try_charge(Self::required_work(event)?) {
             return Ok(false);
         }
-        let result = self.observe_inner(event, cancel);
+        let result = match event {
+            TraceEvent::Section(section)
+                if self.selected_carriage && self.is_accepted_repeat(section) =>
+            {
+                self.section_source(section)
+            }
+            _ => self.observe_inner(event, cancel),
+        };
         if let Err(e) = result {
             self.fault = Some(e);
             return Err(e);
@@ -289,6 +316,29 @@ impl Catalogue {
             self.entity = Some(r.entity);
         }
         Ok(())
+    }
+    fn section_source(&mut self, section: &Section) -> Result<()> {
+        if !section.bytes().belongs_to(&self.budget) {
+            return Err(Error::ForeignPool);
+        }
+        self.source(section.source_ranges())
+    }
+    fn is_accepted_repeat(&self, section: &Section) -> bool {
+        let raw = section.bytes().as_ref();
+        if section.crc_remainder() != Some(0) {
+            return false;
+        }
+        let index = match (section.pid(), raw.first()) {
+            (0, Some(0)) if self.pending_pat.is_none() => self.accepted_pat,
+            (pid, Some(2)) if self.pending_pmt.is_none() => self
+                .accepted_pmt
+                .filter(|&(pmt_pid, _)| pid == pmt_pid)
+                .map(|(_, index)| index),
+            _ => None,
+        };
+        index
+            .and_then(|index| self.evidence.as_slice().get(index))
+            .is_some_and(|e| e.bytes.len() == 1 && e.bytes.as_slice()[0].as_ref() == raw)
     }
     fn retain(&mut self, backings: &[Bytes], ranges: &[SourceRange]) -> Result<usize> {
         if self.evidence.len() >= self.limits.source_spans {
@@ -339,10 +389,7 @@ impl Catalogue {
     fn observe_inner(&mut self, event: &TraceEvent, cancel: &AtomicBool) -> Result<()> {
         match event {
             TraceEvent::Section(s) => {
-                if !s.bytes().belongs_to(&self.budget) {
-                    return Err(Error::ForeignPool);
-                }
-                self.source(s.source_ranges())?;
+                self.section_source(s)?;
                 let b = s.bytes().as_ref();
                 if s.crc_remainder() == Some(0) && b.len() >= 12 && b[5] & 1 != 0 {
                     let identity = (u16::from_be_bytes([b[3], b[4]]), (b[5] >> 1) & 31);
@@ -463,6 +510,16 @@ impl Catalogue {
             ranges.try_push(r.range).map_err(|e| e.error)?;
         }
         let evidence = self.retain(table.source_sections.as_slice(), ranges.as_slice())?;
+        self.accepted_pat = Some(evidence);
+        if self.accepted_pmt.is_some_and(|(pid, _)| {
+            !table
+                .programs
+                .as_slice()
+                .iter()
+                .any(|entry| entry.program_number == self.program && entry.pid == pid)
+        }) {
+            self.accepted_pmt = None;
+        }
         for e in table.programs.as_slice() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -589,17 +646,32 @@ impl Catalogue {
             map.source_ranges.as_slice(),
         )?;
         for stream in map.streams.as_slice() {
-            let codec = self.codec(
-                stream.stream_type,
-                map.program_descriptors.as_ref(),
-                stream.descriptor_bytes.as_ref(),
-            )?;
+            let codec = self.codec(stream, map.program_descriptors.as_ref())?;
+            let mut codec_tag = u32::from(stream.stream_type);
             let mut language = BudgetVec::new(&self.budget);
             for descriptor in stream.descriptors() {
                 if cancel.load(Ordering::Relaxed) {
                     return Err(Error::Cancelled);
                 }
                 let descriptor = descriptor?;
+                if descriptor.tag == 0x05 {
+                    let registration = descriptor.registration()?.format_identifier;
+                    if matches!(
+                        (&registration, codec),
+                        (b"HEVC", CatalogueCodec::Hevc) | (b"EAC3", CatalogueCodec::Eac3)
+                    ) {
+                        codec_tag = u32::from_le_bytes(registration);
+                        continue;
+                    }
+                }
+                if stream.descriptor_namespace() == DescriptorNamespace::Atsc
+                    && matches!(
+                        (stream.stream_type, codec, descriptor.tag),
+                        (0x81, CatalogueCodec::Ac3, 0x81) | (0x87, CatalogueCodec::Eac3, 0xcc)
+                    )
+                {
+                    continue;
+                }
                 if !(matches!(descriptor.tag, 0x0a | 0xee)
                     || self.selected_carriage
                         && matches!(codec, CatalogueCodec::Ac3 | CatalogueCodec::Eac3)
@@ -630,6 +702,7 @@ impl Catalogue {
                 .find(|s| s.pid == stream.pid)
             {
                 old.stream_type = stream.stream_type;
+                old.codec_tag = codec_tag;
                 old.codec = codec;
                 old.language = language;
                 old.evidence = evidence;
@@ -641,6 +714,7 @@ impl Catalogue {
                     .try_push(Stream {
                         pid: stream.pid,
                         stream_type: stream.stream_type,
+                        codec_tag,
                         codec,
                         language,
                         evidence,
@@ -648,14 +722,16 @@ impl Catalogue {
                     .map_err(|e| e.error)?;
             }
         }
-        self.programs
+        let program = self
+            .programs
             .as_mut_slice()
             .iter_mut()
             .find(|p| p.program == h.extension)
             .ok_or(Error::Invalid(
                 "demux catalogue program missing at PMT update",
-            ))?
-            .pcr_pid = map.pcr_pid;
+            ))?;
+        program.pcr_pid = map.pcr_pid;
+        self.accepted_pmt = Some((program.pmt_pid, evidence));
         if self.pending_pmt == Some((h.extension, h.version)) {
             self.pending_pmt = None;
         }

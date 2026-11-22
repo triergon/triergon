@@ -267,7 +267,7 @@ fn projected(
             for stream in view.streams() {
                 StreamRow {
                     pid: stream.pid,
-                    codec_tag: stream.stream_type.into(),
+                    codec_tag: stream.codec_tag,
                     codec: stream.codec().name(),
                     language: stream.language.as_slice(),
                     hearing_impaired: false,

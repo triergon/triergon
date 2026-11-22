@@ -58,6 +58,9 @@ Everything else lives in its module:
 - `reference_trace` (non-default feature `reference-trace`): the projections that
   exist only to compare traces with FFmpeg, in `recovery` (packets from rejected
   carriers), `catalogue` (programs and streams), `dvb` and `input`.
+  The catalogue keeps PMT stream types alongside registered HEVC and E-AC-3
+  codec tags and accepts matching private audio descriptors in a declared
+  ATSC namespace.
 
 `compat::pes::PacketCompletion` confirms that one physical input contained only
 control traffic. Poll the source with `TransportStream::poll_observed` and
