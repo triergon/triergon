@@ -72,6 +72,24 @@ impl<T> Queue<T> {
         self.slots.clear();
         self.head = 0;
     }
+
+    pub(crate) fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut T> {
+        self.slots.as_mut_slice()[self.head..]
+            .iter_mut()
+            .filter_map(Option::as_mut)
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.slots.len() - self.head
+    }
+
+    pub(crate) fn budget(&self) -> &Budget {
+        self.slots.budget()
+    }
+
+    pub(crate) fn release_spare_capacity(&mut self) {
+        let _ = self.slots.try_shrink_to(0);
+    }
 }
 
 #[cfg(test)]

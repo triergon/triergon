@@ -556,23 +556,6 @@
      "reference": "constant-offset"
     }
    ]
-  },
-  {
-   "id": "ogg-granule-zero-backfill",
-   "reason": "in a file with a video stream, FFmpeg times the Vorbis packets of the leading audio pages that state granule position 0 backwards from the first page stating a later one; the reader times them from the granule position each page states, and the compat view leaves them untimed, as FFmpeg does in audio-only files",
-   "scope": [
-    {
-     "views": [
-      "native",
-      "compat"
-     ],
-     "fields": [
-      "pts",
-      "dts"
-     ],
-     "packets": "zero-granule-page"
-    }
-   ]
   }
  ]
 }

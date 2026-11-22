@@ -43,32 +43,6 @@
    ]
   },
   {
-   "name": "bear.ogv",
-   "sha256": "c6281b645fc9ddcba7ecc8eb16c525758cec498de9645a5e6be44f6a8962ce57",
-   "view": "native",
-   "dispositions": ["ogg-granule-zero-backfill"],
-   "difference_sha256": "96eb96276dd5a4d196f9fc539f7c1cd673ce234b84953563079374b175991602",
-   "differences": [
-    [1, 0, 0, "pts", 0, -704, "ogg-granule-zero-backfill"],
-    [1, 0, 0, "dts", 0, -704, "ogg-granule-zero-backfill"],
-    [1, 1, 1, "pts", -128, -576, "ogg-granule-zero-backfill"],
-    [1, 1, 1, "dts", -128, -576, "ogg-granule-zero-backfill"]
-   ]
-  },
-  {
-   "name": "bear.ogv",
-   "sha256": "c6281b645fc9ddcba7ecc8eb16c525758cec498de9645a5e6be44f6a8962ce57",
-   "view": "compat",
-   "dispositions": ["ogg-granule-zero-backfill"],
-   "difference_sha256": "eace176f0ea400027dda5125fa8fc66b0facd98080e4aa57bf398c95f10c5d00",
-   "differences": [
-    [1, 0, 0, "pts", null, -704, "ogg-granule-zero-backfill"],
-    [1, 0, 0, "dts", null, -704, "ogg-granule-zero-backfill"],
-    [1, 1, 1, "pts", null, -576, "ogg-granule-zero-backfill"],
-    [1, 1, 1, "dts", null, -576, "ogg-granule-zero-backfill"]
-   ]
-  },
-  {
    "name": "chain_speex.spx",
    "sha256": "6688b5492f43b4f5812d8acb91dc426c63f0bbe8a31b4b6c1fed081cddff914d",
    "view": "native",

@@ -531,6 +531,234 @@ fn vorbis_identification() -> Vec<u8> {
     id
 }
 
+fn initial_vorbis_file(anchor: bool) -> Vec<u8> {
+    let mut file = Vec::new();
+    let mut muxer = Muxer::new(3);
+    muxer.packet(&vorbis_identification(), 0, &mut file);
+    muxer.flush(false, &mut file);
+    muxer.packet(b"\x03vorbis comment", 0, &mut file);
+    muxer.packet(&vorbis_setup(), 0, &mut file);
+    muxer.flush(false, &mut file);
+    for _ in 0..2 {
+        muxer.packet(&[0], 0, &mut file);
+        muxer.flush(false, &mut file);
+    }
+    if anchor {
+        muxer.packet(&[0], 128, &mut file);
+        muxer.flush(false, &mut file);
+    }
+    file
+}
+
+#[test]
+fn blocking_initial_vorbis_recovery_and_limit() {
+    let cancel = AtomicBool::new(false);
+    for (anchor, limit, expected) in [
+        (true, 8, vec![Some(-256), Some(-128), Some(0)]),
+        (true, 1, vec![None, None, Some(0)]),
+        (false, 8, vec![None, None]),
+    ] {
+        let file = initial_vorbis_file(anchor);
+        let mut reader =
+            triergon_ogg::BlockingReader::open_stream(&file[..], Limits::default()).unwrap();
+        reader
+            .recover_initial_vorbis(triergon_ogg::compat::clock::InitialVorbis {
+                max_events: limit,
+            })
+            .unwrap();
+        let mut times = Vec::new();
+        while let Some(packet) = reader.next_packet(&cancel).unwrap() {
+            times.push(packet_timing(&packet).pts);
+        }
+        assert_eq!(times, expected);
+    }
+}
+
+fn interleaved_vorbis_headers() -> (Vec<u8>, Muxer, Muxer) {
+    let mut file = Vec::new();
+    let mut a = Muxer::new(3);
+    let mut b = Muxer::new(4);
+    for mux in [&mut a, &mut b] {
+        mux.packet(&vorbis_identification(), 0, &mut file);
+        mux.flush(false, &mut file);
+    }
+    for mux in [&mut a, &mut b] {
+        mux.packet(b"\x03vorbis comment", 0, &mut file);
+        mux.packet(&vorbis_setup(), 0, &mut file);
+        mux.flush(false, &mut file);
+    }
+    (file, a, b)
+}
+
+fn initial_interleaved_vorbis(lost_before_packet: Option<usize>) -> Vec<u8> {
+    let (mut file, mut a, mut b) = interleaved_vorbis_headers();
+    if lost_before_packet == Some(0) {
+        b.sequence += 1;
+    }
+    for mux in [&mut a, &mut b] {
+        mux.packet(&[0], 0, &mut file);
+        mux.flush(false, &mut file);
+    }
+    if lost_before_packet == Some(1) {
+        b.sequence += 1;
+    }
+    for mux in [&mut b, &mut a] {
+        mux.packet(&[0], 128, &mut file);
+        mux.flush(false, &mut file);
+    }
+    file
+}
+
+#[test]
+fn blocking_recovery_keeps_interleaved_tracks_in_order() {
+    let file = initial_interleaved_vorbis(None);
+    let cancel = AtomicBool::new(false);
+    let mut reader =
+        triergon_ogg::BlockingReader::open_stream(&file[..], Limits::default()).unwrap();
+    reader
+        .recover_initial_vorbis(triergon_ogg::compat::clock::InitialVorbis { max_events: 16 })
+        .unwrap();
+    let mut packets = Vec::new();
+    while let Some(packet) = reader.next_packet(&cancel).unwrap() {
+        packets.push((
+            packet.track_index(),
+            packet.pts(),
+            packet_timing(&packet).pts,
+        ));
+    }
+    assert_eq!(
+        packets,
+        [
+            (0, Some(0), Some(-128)),
+            (1, Some(0), Some(-128)),
+            (1, Some(0), Some(0)),
+            (0, Some(0), Some(0))
+        ]
+    );
+}
+
+#[test]
+fn blocking_recovery_keeps_the_other_tracks_anchor_after_loss() {
+    let cancel = AtomicBool::new(false);
+    for (lost_before_packet, preceding_count) in [(0, 1), (1, 2)] {
+        let file = initial_interleaved_vorbis(Some(lost_before_packet));
+        let mut reader =
+            triergon_ogg::BlockingReader::open_stream(&file[..], Limits::default()).unwrap();
+        reader
+            .recover_initial_vorbis(triergon_ogg::compat::clock::InitialVorbis { max_events: 16 })
+            .unwrap();
+        let mut packets = Vec::new();
+        let mut loss = Vec::new();
+        while let Some(event) = reader.next_event(&cancel).unwrap() {
+            match event {
+                Event::Packet(packet) => {
+                    packets.push((packet.track_index(), packet_timing(&packet).pts));
+                }
+                Event::Other(ReaderEvent::Lost { track, .. }) => loss.push((track, packets.len())),
+                _ => {}
+            }
+        }
+        assert_eq!(loss, [(1, preceding_count)]);
+        assert_eq!(packets[0..2], [(0, Some(-128)), (1, None)]);
+        assert_eq!(packets.last(), Some(&(0, Some(0))));
+    }
+}
+
+#[test]
+fn blocking_recovery_returns_the_drained_prefix_budget() {
+    let (mut file, mut a, _) = interleaved_vorbis_headers();
+    for _ in 0..32 {
+        a.packet(&[0], 0, &mut file);
+        a.flush(false, &mut file);
+    }
+    a.packet(&[0], 128, &mut file);
+    a.flush(false, &mut file);
+
+    let cancel = AtomicBool::new(false);
+    let bytes_after_prefix = |recover: bool| {
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader = triergon_ogg::BlockingReader::open_in(
+            std::io::Cursor::new(file.as_slice()),
+            Limits::default(),
+            &pool,
+        )
+        .unwrap();
+        if recover {
+            reader
+                .recover_initial_vorbis(triergon_ogg::compat::clock::InitialVorbis {
+                    max_events: 64,
+                })
+                .unwrap();
+        }
+        for _ in 0..33 {
+            assert!(reader.next_packet(&cancel).unwrap().is_some());
+        }
+        // The other track still has no observed packet.
+        pool.used()
+    };
+    let ordinary = bytes_after_prefix(false);
+    assert!(bytes_after_prefix(true) <= ordinary + 2);
+}
+
+#[test]
+fn blocking_recovery_delivers_prefix_before_transport_error_and_honours_cancel() {
+    struct Failing(std::io::Cursor<Vec<u8>>);
+    impl std::io::Read for Failing {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            let count = std::io::Read::read(&mut self.0, buffer)?;
+            if count == 0 {
+                Err(std::io::Error::other("source failed"))
+            } else {
+                Ok(count)
+            }
+        }
+    }
+    let source = Failing(std::io::Cursor::new(initial_vorbis_file(false)));
+    let mut reader = triergon_ogg::BlockingReader::open_stream(source, Limits::default()).unwrap();
+    reader
+        .recover_initial_vorbis(triergon_ogg::compat::clock::InitialVorbis { max_events: 8 })
+        .unwrap();
+    let cancel = AtomicBool::new(true);
+    assert!(matches!(reader.next_event(&cancel), Err(Error::Cancelled)));
+    cancel.store(false, std::sync::atomic::Ordering::Relaxed);
+    for _ in 0..2 {
+        let packet = reader.next_packet(&cancel).unwrap().unwrap();
+        assert_eq!(packet_timing(&packet).pts, None);
+    }
+    assert!(matches!(reader.next_packet(&cancel), Err(Error::Io(_))));
+}
+
+#[test]
+fn blocking_seek_discards_recovered_prefix_packets() {
+    let file = initial_vorbis_file(true);
+    let cancel = AtomicBool::new(false);
+    let mut normal =
+        triergon_ogg::BlockingReader::open(std::io::Cursor::new(file.clone()), Limits::default())
+            .unwrap();
+    let mut recovered =
+        triergon_ogg::BlockingReader::open(std::io::Cursor::new(file), Limits::default()).unwrap();
+    recovered
+        .recover_initial_vorbis(triergon_ogg::compat::clock::InitialVorbis { max_events: 8 })
+        .unwrap();
+    normal.next_packet(&cancel).unwrap().unwrap();
+    recovered.next_packet(&cancel).unwrap().unwrap();
+    let request = SeekRequest {
+        track: normal.tracks()[0].id(),
+        target: Time::from_ticks(0, normal.tracks()[0].time_base()).unwrap(),
+        policy: SeekPolicy::PreviousRandomAccess,
+    };
+    normal.seek(request, &cancel).unwrap();
+    recovered.seek(request, &cancel).unwrap();
+    let collect = |reader: &mut triergon_ogg::BlockingReader<std::io::Cursor<Vec<u8>>>| {
+        let mut rows = Vec::new();
+        while let Some(packet) = reader.next_packet(&cancel).unwrap() {
+            rows.push((packet.page_offset(), packet.pts(), packet_timing(&packet)));
+        }
+        rows
+    };
+    assert_eq!(collect(&mut normal), collect(&mut recovered));
+}
+
 #[test]
 fn vorbis_durations_follow_the_block_sizes() {
     // Blocks: S L L S S L; mode bit after the type bit, then the long block's flags.

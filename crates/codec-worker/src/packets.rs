@@ -207,6 +207,14 @@ fn ogg_packets(file: File, seek: Option<&Seek>, out: &mut impl Write) -> std::io
         Ok(reader) => reader,
         Err(error) => return finish(out, &[], Err(error)),
     };
+    if reader
+        .tracks()
+        .iter()
+        .any(|track| track.kind() == triergon::MediaKind::Video)
+        && let Err(error) = reader.recover_initial_vorbis(clock::InitialVorbis { max_events: 4096 })
+    {
+        return finish(out, &[], Err(error));
+    }
     let sought = seek.map(|seek| {
         let track = reader
             .tracks()

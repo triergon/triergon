@@ -39,6 +39,17 @@
 /// FLAC and Speex files (`cargo xtask codecs readers`).
 pub mod clock {
     pub use crate::compat::{ReferenceTiming, packet_timing};
+
+    /// Bounded lookahead for unknown Vorbis compatibility clocks in the first link.
+    ///
+    /// At most `max_events` ordered events are retained. If the bound is reached
+    /// before an anchor is found, unresolved packets are delivered unchanged. This
+    /// opt-in calculation applies regardless of the other tracks; FFmpeg may leave
+    /// the initial packets untimed in audio-only files.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct InitialVorbis {
+        pub max_events: usize,
+    }
 }
 
 use crate::Packet;
