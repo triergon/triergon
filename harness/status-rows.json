@@ -840,7 +840,7 @@
     {"area": "AC-3 dither trace and noise option", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "unmeasured (comparison input generation and Off have no measured workload)", "parity": {"aarch64-unknown-linux-gnu": "5/12 match, with seven declared diagnostic and binary32 differences. [Dither trace lane](../harness/codecs/nodither-streams.json)"}},
     {"area": "Packed DTS decoding", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "unmeasured (no workload reads packed DTS)"},
     {"area": "Queued audio and video sessions", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "awaiting paired collection"},
-    {"area": "Track decoder reset", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "unmeasured (the measured file workloads decode sequentially)"},
+    {"area": "Track decoder reset", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "Track decoder restart after decoded input", "text": "unmeasured (the measured file workloads decode sequentially)", "parity": {"aarch64-unknown-linux-gnu": "6/8 restart cases match for E-AC-3, FLAC, MPEG audio, DTS, Vorbis and Opus. The [session grade](../harness/codecs/session-cases.json) declares two differences for AAC and AC-3 history."}},
     {"area": "AAC default build", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "awaiting paired collection"},
     {"area": "HEVC SIMD build", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "awaiting paired collection"},
     {

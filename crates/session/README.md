@@ -123,6 +123,11 @@ The [clocked video comparison](../../harness/features/video-session-clock/contra
 checks AVC and HEVC picture order, exact clock release and retained RGBA canvas
 bytes, plus queue and decoder refusals, flush and stop. The existing session
 grades compare decoded output and the declared mid-GOP reset behaviour.
+The [track reset comparison](../../harness/codecs/session-cases.json) covers
+`TrackDecoder` restarts after actual AAC, AC-3, E-AC-3, DTS, FLAC, MPEG
+audio, Opus and Vorbis packets. The [AAC access-unit comparison](../../harness/features/aac-access-units/contract.json)
+covers configured fixed and program layouts, and the clocked video gate
+exercises both standalone video factories.
 
 The letterbox and downmix rules are native observations of FFmpeg 9.0.2, recorded in
 [rgba-contract.json](../../harness/codecs/rgba-contract.json) and

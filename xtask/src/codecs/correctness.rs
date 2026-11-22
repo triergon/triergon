@@ -565,6 +565,8 @@ fn audio_decoder(
     };
     let format = if lane == "ac3-nodither" {
         vector.get("format").and_then(Value::as_str)
+    } else if lane == "track-reset" {
+        session::reset_audio_format(&media_lane, path)?
     } else {
         audio_format(&media_lane)?
     };

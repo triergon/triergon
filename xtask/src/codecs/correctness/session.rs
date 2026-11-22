@@ -315,6 +315,15 @@ pub(super) fn append_options(args: &mut Vec<String>, vector: &Value) {
     }
 }
 
+pub(super) fn reset_audio_format(lane: &str, path: &str) -> Result<Option<&'static str>, String> {
+    let suffix = Path::new(path).extension().and_then(|value| value.to_str());
+    match (lane, suffix) {
+        ("dts", Some("mka" | "mkv")) | ("opus", Some("mka" | "mkv")) => Ok(Some("matroska")),
+        ("opus", Some("opus" | "ogg")) => Ok(Some("ogg")),
+        _ => audio_format(lane),
+    }
+}
+
 pub(super) fn reference_args(
     a: &Grade,
     lane: &str,
@@ -324,8 +333,17 @@ pub(super) fn reference_args(
     form: &str,
 ) -> Option<Vec<String>> {
     let reset = vector.get("reset_at")?.as_str()?;
+    let track_reset = vector.get("lane").and_then(Value::as_str) == Some("track-reset");
     let format = if video(lane) {
         lane
+    } else if track_reset {
+        if lane == "flac" && vector.get("independent_frames") == Some(&Value::Bool(true)) {
+            // RFC 9639 §§6 and 9.2 put all predictor state in each frame.
+            // The ordinary natively decoded integer stream grades the full
+            // reset output; the reset worker's float interface cannot emit it.
+            return None;
+        }
+        reset_audio_format(lane, path).ok()??
     } else {
         audio_format(lane).ok()??
     };

@@ -2533,6 +2533,52 @@
    "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a",
    "base_lane": "eac3",
    "reset_at": "12,24"
+  },
+  {
+   "lane": "track-reset",
+   "name": "reset-track-flac-independent-frames",
+   "path": ".research/flac-generated/flac_b4_stereo.flac",
+   "bytes": 34687,
+   "sha256": "8cfc3fee961265c839230c38edd95e0137fd6faf7491ed6add9ae861e5d81f45",
+   "base_lane": "flac",
+   "reset_at": "3",
+   "independent_frames": true
+  },
+  {
+   "lane": "track-reset",
+   "name": "reset-track-mpeg-audio-layer3",
+   "path": ".research/mp3/vectors/l3_22k_intensity_s0_ms0_slen2.mp3",
+   "bytes": 4784,
+   "sha256": "03f409515f3fcec5719242df8d1d9352bcd13a0f77405781f093f0ae4e75539d",
+   "base_lane": "mp3",
+   "reset_at": "3"
+  },
+  {
+   "lane": "track-reset",
+   "name": "reset-track-dts-matroska",
+   "path": "harness/codecs/session-inputs/dts-reset.mka",
+   "bytes": 6671,
+   "sha256": "8038af77c19ac6894c5628d5d9b1c50619165e3e29ae959a0b18f9ef30fe9de2",
+   "base_lane": "dts",
+   "reset_at": "1"
+  },
+  {
+   "lane": "track-reset",
+   "name": "reset-track-vorbis-overlap",
+   "path": ".research/fate-samples/vorbis/1.0-test_small.ogg",
+   "bytes": 100000,
+   "sha256": "9f510e92b976eaf735009b444511f856db601eb13698b54fdfc9c4e078f9f3bc",
+   "base_lane": "vorbis",
+   "reset_at": "3"
+  },
+  {
+   "lane": "track-reset",
+   "name": "reset-track-opus-ogg",
+   "path": ".research/opus-generated/silk_nb_20.opus",
+   "bytes": 12364,
+   "sha256": "d8076bf272decce64ebddbccece975a7cff8b1d5a4fb8d1adf7d6693fad18e7e",
+   "base_lane": "opus",
+   "reset_at": "3"
   }
  ],
  "open_refusals": [
