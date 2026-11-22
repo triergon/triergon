@@ -86,6 +86,66 @@ fn mpeg_audio_frames_follow_their_headers_after_tags() {
 }
 
 #[test]
+fn free_format_spacing_survives_headers_inside_main_data() {
+    let mut file = Vec::new();
+    let mut extents = Vec::new();
+    for index in 0..8 {
+        let mut frame = mp3_frame(index, index % 3 == 1);
+        frame[2] &= 0x0f;
+        frame[90..94].copy_from_slice(&0xfffb_0064u32.to_be_bytes());
+        extents.push((file.len() as u64, frame.len()));
+        file.extend(frame);
+    }
+    let reading = invariant::<MpegAudio>(&file);
+    let tiny = read_file::<MpegAudio>(&file, 1, 1, false).unwrap();
+    assert_eq!(reading.packets, tiny.packets);
+    assert_eq!(
+        reading
+            .packets
+            .iter()
+            .map(|p| (p.offset, p.len))
+            .collect::<Vec<_>>(),
+        extents
+    );
+    assert!(reading.packets.iter().all(|p| p.complete));
+    let mut small_scan = BlockingReader::<MpegAudio, _>::open(
+        std::io::Cursor::new(&file),
+        Limits {
+            frame_bytes: 418,
+            sync_scan_bytes: 64,
+            ..Limits::default()
+        },
+    )
+    .unwrap();
+    let bounded = std::iter::from_fn(|| small_scan.next_packet().unwrap())
+        .map(|packet| Seen::of(&packet))
+        .collect::<Vec<_>>();
+    assert_eq!(reading.packets, bounded);
+
+    let (after, detail) =
+        seek::<MpegAudio>(&file, (4 * 1152, 44_100), SeekPolicy::PreviousRandomAccess);
+    assert_eq!(detail.basis, SeekBasis::Exact);
+    assert_eq!(after.packets, reading.packets[4..]);
+}
+
+#[test]
+fn a_free_format_info_frame_is_metadata() {
+    let mut frame = [0; 417];
+    frame[..4].copy_from_slice(&0xfffb_0064u32.to_be_bytes());
+    let mut file = frame.repeat(5);
+    file[36..40].copy_from_slice(b"Info");
+    file[40..44].copy_from_slice(&1u32.to_be_bytes());
+    file[44..48].copy_from_slice(&5u32.to_be_bytes());
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = open::<MpegAudio>(&pool, &file, true);
+    let reading = read(&mut reader, &pool, &file, 1, 1).unwrap();
+    let offsets: Vec<_> = reading.packets.iter().map(|p| p.offset).collect();
+    assert_eq!(offsets, [417, 834, 1251, 1668]);
+    assert_eq!(reader.format().info_frame().unwrap().frame.frames, Some(5));
+    assert_eq!(reader.stream().unwrap().duration(), Some(5760));
+}
+
+#[test]
 fn mpeg_audio_junk_joins_the_next_packet_and_a_short_tail_is_incomplete() {
     let frames: Vec<Vec<u8>> = (0..12).map(|i| mp3_frame(i, false)).collect();
     let mut file = noise(1, 700); // leading junk is dropped

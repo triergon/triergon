@@ -182,7 +182,7 @@ fn scan(view: &[u8], from: usize, sync: u8, work: &mut WorkBudget) -> Scan {
 /// The first `byte` in `hay`, eight bytes at a time: frame payloads are long and sync
 /// bytes rare.
 #[inline]
-fn find(hay: &[u8], byte: u8) -> Option<usize> {
+pub(crate) fn find(hay: &[u8], byte: u8) -> Option<usize> {
     const LOW: u64 = 0x0101_0101_0101_0101;
     const HIGH: u64 = 0x8080_8080_8080_8080;
     let pattern = LOW * u64::from(byte);
@@ -245,7 +245,12 @@ impl<F: Format> Reader<F> {
         let view = limits
             .frame_bytes
             .saturating_add(usize::try_from(limits.sync_scan_bytes).unwrap_or(usize::MAX))
-            .saturating_add(4 * TRAILING_DECIDE);
+            .saturating_add(4 * TRAILING_DECIDE)
+            .max(
+                F::OPENING_FRAMES
+                    .saturating_mul(limits.frame_bytes)
+                    .saturating_add(F::PROBE),
+            );
         Ok(Reader {
             input: Input::new(cursor, view),
             format: F::new(pool, &limits),
@@ -394,7 +399,10 @@ impl<F: Format> Reader<F> {
     fn prelude(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Next> {
         let mut at_end = false;
         loop {
-            match self.format.prelude(self.input.view(), at_end)? {
+            match self
+                .format
+                .prelude(self.input.view(), at_end, &self.limits, work)?
+            {
                 Prelude::Need(len) => match self.need(len, work, cancel)? {
                     Flow::Wait(wait) => return Ok(Flow::Wait(wait)),
                     Flow::Ready(true) => {}
@@ -415,6 +423,7 @@ impl<F: Format> Reader<F> {
                     }
                     return Ok(Flow::Ready(None));
                 }
+                Prelude::Yield => return Ok(Flow::Wait(Wait::Step(Step::Yield))),
                 Prelude::Done => {
                     self.phase = Phase::Sync { at: 0, scanned: 0 };
                     return Ok(Flow::Ready(None));

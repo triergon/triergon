@@ -6,7 +6,7 @@
 //! stream, and the format's own opening, timing and seeking facts.
 use crate::stream::Limits;
 use triergon_core::container::{CodecId, SeekMethod, Trim};
-use triergon_core::{Budget, BudgetVec, Bytes, Result};
+use triergon_core::{Budget, BudgetVec, Bytes, Result, WorkBudget};
 
 /// The answer of [`Syntax::probe`] at one position.
 #[derive(Clone, Copy, Debug)]
@@ -49,6 +49,8 @@ pub enum Prelude {
     Skip(u64),
     /// Consume bytes and hand them to [`Syntax::keep`], if the retention limit allows.
     Keep(u64),
+    /// The opening needs more work before it can decide.
+    Yield,
     /// Frames follow.
     Done,
 }
@@ -116,6 +118,8 @@ pub(crate) mod sealed {
         const CONFIRM: u8;
         /// Frames delivered before a seek target for decoder warm-up.
         const PREROLL: u32;
+        /// Whole frames the opening may need before it can confirm their lengths.
+        const OPENING_FRAMES: usize = 0;
 
         /// A format with no stream adopted; `budget` charges what it retains.
         fn new(budget: &Budget, limits: &Limits) -> Self;
@@ -146,7 +150,13 @@ pub(crate) mod sealed {
         }
 
         /// The opening after leading tags.
-        fn prelude(&mut self, _view: &[u8], _at_end: bool) -> Result<Prelude> {
+        fn prelude(
+            &mut self,
+            _view: &[u8],
+            _at_end: bool,
+            _limits: &Limits,
+            _work: &mut WorkBudget,
+        ) -> Result<Prelude> {
             Ok(Prelude::Done)
         }
         /// Bytes a [`Prelude::Keep`] retained.

@@ -1,10 +1,10 @@
 //! MPEG-1, MPEG-2 and MPEG-2.5 audio, Layer I, II and III (ISO/IEC 11172-3, 13818-3).
 //!
-//! Frames follow the header length; a free-format stream (bit rate index 0) runs each
-//! frame to the next header. A first Layer III frame carrying a Xing, Info or VBRI
-//! description is not audio and is not delivered. Bytes between frames go into the
-//! packet of the frame after them, and bytes after the last frame form a last,
-//! incomplete packet, as FFmpeg's demuxer delivers them.
+//! Frames follow the header length. Free-format Layer III can infer an unpadded
+//! frame length from three consecutive headers. A first Layer III frame carrying
+//! a Xing, Info or VBRI description is not delivered. Bytes between frames go
+//! into the packet of the frame after them. Bytes after the last frame form a
+//! final incomplete packet, as FFmpeg's demuxer delivers them.
 //!
 //! # Gapless trim (`compat::mpeg`)
 //!
@@ -15,10 +15,14 @@
 //! positive. The end trim is withheld, as FFmpeg withholds it, when the source's length
 //! is unknown (a pipe) or it holds more than a sixteenth more bytes after the
 //! information frame's header than the frame states.
+use crate::reader::find;
 use crate::stream::Limits;
-use crate::syntax::{Gap, Length, Plan, Probe, SeekBasis, SeekContext, Syntax, TrackFacts};
+use crate::syntax::{
+    Gap, Length, Plan, Prelude, Probe, SeekBasis, SeekContext, Syntax, TrackFacts,
+};
+use std::num::NonZeroUsize;
 use triergon_core::container::{CodecId, Trim};
-use triergon_core::{Budget, BudgetVec, Result};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 use triergon_framing::{
     LameTag, MpegAudioHeader, MpegInfoFrame, MpegInfoKind, MpegLayer, mpeg_info_frame,
 };
@@ -56,6 +60,92 @@ pub struct MpegAudio {
     first: Option<MpegAudioHeader>,
     info: Option<InfoFrame>,
     gapless: Option<Gapless>,
+    free_format: FreeFormatProbe,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct FreeFormatProbe {
+    second: usize,
+    base: Option<NonZeroUsize>,
+}
+
+impl FreeFormatProbe {
+    pub(crate) fn base(&self) -> Option<usize> {
+        self.base.map(NonZeroUsize::get)
+    }
+
+    /// Confirm two spans of the same unpadded length. One later sync could be payload.
+    #[cold]
+    pub(crate) fn step(
+        &mut self,
+        bytes: &[u8],
+        maximum: usize,
+        at_end: bool,
+        work: &mut WorkBudget,
+    ) -> Prelude {
+        if bytes.len() < 4 && !at_end {
+            return Prelude::Need(4);
+        }
+        let Some(first) = MpegAudioHeader::from_bytes(bytes) else {
+            return Prelude::Done;
+        };
+        if first.bitrate_kbps != 0 || first.layer != MpegLayer::III {
+            return Prelude::Done;
+        }
+        let header_bytes = |h: &MpegAudioHeader| 4 + usize::from(h.crc) * 2 + h.side_info_bytes();
+        let same_stream = |h: &MpegAudioHeader| h.bitrate_kbps == 0 && first.same_stream(h);
+        let first_padding = usize::from(first.padding);
+        self.second = self.second.max(header_bytes(&first));
+        // Both complete spans and the third header must fit the address space.
+        let maximum = maximum.min((usize::MAX - 4) / 2);
+        while self.second <= maximum {
+            let next_header = self.second + 4;
+            if bytes.len() < next_header {
+                return if at_end {
+                    Prelude::Done
+                } else {
+                    Prelude::Need(next_header)
+                };
+            }
+            if work.remaining() == 0 {
+                return Prelude::Yield;
+            }
+            let available = (maximum + 1).min(bytes.len() - 3);
+            let budget = usize::try_from(work.remaining()).unwrap_or(usize::MAX);
+            let scan_end = available.min(self.second.saturating_add(budget));
+            let scan = &bytes[self.second..scan_end];
+            let skipped = find(scan, 0xff).unwrap_or(scan.len());
+            self.second += skipped;
+            work.take(skipped as u64);
+            if self.second == scan_end {
+                continue;
+            }
+            if let Some(second) =
+                MpegAudioHeader::from_bytes(&bytes[self.second..]).filter(same_stream)
+            {
+                let base = self.second - first_padding;
+                let next_length = base + usize::from(second.padding);
+                let third = self.second + next_length;
+                if next_length >= header_bytes(&second) && next_length <= maximum {
+                    if bytes.len() < third + 4 && !at_end {
+                        return Prelude::Need(third + 4);
+                    }
+                    if bytes
+                        .get(third..)
+                        .and_then(MpegAudioHeader::from_bytes)
+                        .is_some_and(|h| same_stream(&h))
+                    {
+                        self.base = NonZeroUsize::new(base);
+                        work.take(1);
+                        return Prelude::Done;
+                    }
+                }
+            }
+            work.take(1);
+            self.second += 1;
+        }
+        Prelude::Done
+    }
 }
 
 impl MpegAudio {
@@ -115,12 +205,14 @@ impl Syntax for MpegAudio {
     const CONFIRM: u8 = 2;
     /// Layer III frames may take main data from the frames before them.
     const PREROLL: u32 = 2;
+    const OPENING_FRAMES: usize = 2;
 
     fn new(_budget: &Budget, _limits: &Limits) -> MpegAudio {
         MpegAudio {
             first: None,
             info: None,
             gapless: None,
+            free_format: FreeFormatProbe::default(),
         }
     }
 
@@ -142,10 +234,37 @@ impl Syntax for MpegAudio {
     fn length(&self, header: &MpegAudioHeader) -> Length {
         match header.frame_bytes() {
             Some(len) => Length::Known(len),
+            None if header.layer == MpegLayer::III
+                && let Some(base) = self.free_format.base() =>
+            {
+                Length::Known(base + usize::from(header.padding))
+            }
             None => Length::Search {
                 minimum: 4 + usize::from(header.crc) * 2,
             },
         }
+    }
+
+    fn prelude(
+        &mut self,
+        view: &[u8],
+        at_end: bool,
+        limits: &Limits,
+        work: &mut WorkBudget,
+    ) -> Result<Prelude> {
+        if view.get(2).is_some_and(|&byte| byte >> 4 != 0) {
+            return Ok(Prelude::Done);
+        }
+        let next = self
+            .free_format
+            .step(view, limits.frame_bytes, at_end, work);
+        if next == Prelude::Done && self.free_format.second > 0 && self.free_format.base().is_none()
+        {
+            return Err(Error::Policy(
+                "free-format frame spacing could not be confirmed",
+            ));
+        }
+        Ok(next)
     }
 
     /// Version, layer and sample rate stay fixed, and a free-format stream stays free.
@@ -174,9 +293,10 @@ impl Syntax for MpegAudio {
     }
 
     fn inspect_first(&self, header: &MpegAudioHeader) -> Option<usize> {
-        (header.layer == MpegLayer::III)
-            .then(|| header.frame_bytes())
-            .flatten()
+        match (header.layer, self.length(header)) {
+            (MpegLayer::III, Length::Known(length)) => Some(length),
+            _ => None,
+        }
     }
 
     fn describes(
@@ -309,6 +429,7 @@ impl Syntax for MpegAudio {
             first: None,
             info: None,
             gapless: None,
+            free_format: FreeFormatProbe::default(),
         };
     }
 }
