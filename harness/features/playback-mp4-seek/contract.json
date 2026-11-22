@@ -449,21 +449,22 @@
     }
   ],
   "pending_module_requirements": [
-    "Admit valid edited AV1 and RTP hint tracks in the demux seek plan. The basic EditCursor rejects the reordered or zero-delta input before an index or packet can be delivered.",
+    "Admit the AV1 sample dependency flags during edited demux seek. The basic EditCursor rejects the dependency table before an index or packet can be delivered.",
+    "Clip the final AAC packet in the RTP hint seek to 512 ticks and attach 512 trailing discard samples. The hint tracks now replay through their final zero decode delta.",
     "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
     "Apply each selected track edit to the mapped movie replay so its last partial encoded packet reports the clipped duration and tail discard."
   ],
   "open_cases": [
     {
       "id": "demux-dav1-seek",
-      "requirement": "Admit valid edited AV1 and RTP hint tracks in the demux seek plan. The basic EditCursor rejects the reordered or zero-delta input before an index or packet can be delivered.",
+      "requirement": "Admit the AV1 sample dependency flags during edited demux seek. The basic EditCursor rejects the dependency table before an index or packet can be delivered.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "demux-rtp-hints-seek",
-      "requirement": "Admit valid edited AV1 and RTP hint tracks in the demux seek plan. The basic EditCursor rejects the reordered or zero-delta input before an index or packet can be delivered.",
+      "requirement": "Clip the final AAC packet in the RTP hint seek to 512 ticks and attach 512 trailing discard samples. The hint tracks now replay through their final zero decode delta.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
