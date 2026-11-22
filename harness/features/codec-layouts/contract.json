@@ -1365,31 +1365,19 @@
       "cause": "Codec workloads measure audio decode. This operation adds layout views and downmix metadata."
     }
   ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "aac-al07_96.adts",
-      "requirement": "Resolve the side/back substitution for an explicitly back-labelled AAC program configuration element",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "aac-am05_44.adts",
-      "requirement": "Resolve the side/back substitution for an explicitly back-labelled AAC program configuration element",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "aac-aac-lc-5.1.aac",
-      "requirement": "Use the MPEG-4 Audio channel_configuration 6 speaker positions for the fixed ADTS layout",
+      "reading": "Fixed MPEG-4 AAC configuration 6 maps the surround pair to Ls and Rs",
+      "clause": "ISO/IEC 14496-3:2009/Amd.4 §1.6.3.5 and Table 1.19 name left and right surround. ISO/IEC 23001-8 Table 7 distinguishes Ls/Rs from rear Lsr/Rsr.",
+      "candidate": "Publishes FL, FR, FC, LFE, SL and SR (mask 1551) in plane order.",
+      "reference": "Publishes the corresponding PCM planes as FL, FR, FC, LFE, BL and BR (mask 63).",
+      "compat": "compat::layout::AdtsConventionalSurround",
+      "cases": [
+        "aac-aac-lc-5.1.aac"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     }
-  ],
-  "pending_module_requirements": [
-    "Resolve the side/back substitution for an explicitly back-labelled AAC program configuration element",
-    "Use the MPEG-4 Audio channel_configuration 6 speaker positions for the fixed ADTS layout"
   ]
 }
