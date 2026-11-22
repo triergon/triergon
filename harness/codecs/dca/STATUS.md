@@ -4,7 +4,7 @@ How the tables and FFmpeg-compatible behaviour of
 [crates/codec-dca](../../../crates/codec-dca/README.md) were obtained. Sources: ETSI
 TS 102 114 V1.6.1 (2019-08) and V1.3.1 (2011-08, Table D65 only). No FFmpeg, libdca or
 other decoder source was read; FFmpeg 9.0.2 was used only as a black-box binary.
-Synthetic stream names below are scenarios of `examples/synth.rs`.
+Synthetic stream names below are scenarios of the decoder's synthetic unit tests.
 
 ## Table provenance
 

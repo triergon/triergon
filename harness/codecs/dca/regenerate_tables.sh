@@ -2,7 +2,7 @@
 # Regenerate crates/codec-dca/src/{vq.rs,pr_table.rs} from the clean-room recovery chain and
 # compare them byte for byte with the committed tables.
 #
-#   examples/synth {adpcm,hfvq,pr}_probe -> FFmpeg 9.0.2 binary (black-box oracle, f32 output)
+#   synthetic::write_stream {adpcm,hfvq,pr}_probe -> FFmpeg 9.0.2 binary (f32 output)
 #   -> recover_vq.py / recover_pr.py -> gen_vq.py -> generated sources
 #
 # No FFmpeg source is read. Requires the pinned FFmpeg 9.0.2 `ffmpeg` on PATH and Python
@@ -19,10 +19,10 @@ T=${CARGO_TARGET_DIR:-$R/target}
 W=$T/dca-regenerate
 mkdir -p "$W"
 ffmpeg -version | head -1 | grep -q '^ffmpeg version 9\.0\.2 ' || { echo "need FFmpeg 9.0.2 on PATH" >&2; exit 2; }
-CARGO_INCREMENTAL=0 cargo build --quiet --release -p triergon-codec-dca --example synth --manifest-path "$R/Cargo.toml"
-SYNTH=$T/release/examples/synth
 for probe in adpcm_probe hfvq_probe pr_probe; do
-  "$SYNTH" "$probe" "$W/$probe.dts"
+  CARGO_INCREMENTAL=0 DCA_SYNTH_SCENARIO="$probe" DCA_SYNTH_OUT="$W/$probe.dts" \
+    cargo test --quiet --release -p triergon-codec-dca --manifest-path "$R/Cargo.toml" \
+    --lib synthetic::write_stream -- --ignored --exact
   ffmpeg -v error -y -f dts -i "$W/$probe.dts" -f f32le -c:a pcm_f32le "$W/$probe.ref.f32"
 done
 "$PY" -I "$R/harness/codecs/dca/recover_vq.py" "$W/adpcm_probe.dts.meta" "$W/adpcm_probe.ref.f32" "$W/adpcm.txt"

@@ -20,10 +20,12 @@ amode1 amode2 amode3 amode4 amode5 amode6 amode7 amode8 amode9 sfreq1 sfreq8 pac
 x96_basic x96_lin x96_hi x96_hi_lin x96_rev8 x96_vq x96_adpcm x96_joint x96_aspf x96_lfe128 x96_s58 x96_s60
 x96_rev9"
 OUT=$R/crates/codec-dca/tests/data/synthetic.fp
-echo "# FFmpeg 9.0.2 (Homebrew, macOS) float output of tests/support/scenarios.rs streams; harness/codecs/dca/fingerprint.py" > $OUT
+echo "# FFmpeg 9.0.2 (Homebrew, macOS) float output of src/synthetic/scenarios.rs streams; harness/codecs/dca/fingerprint.py" > $OUT
 S=$T/synth; mkdir -p $S
 for s in $SC; do
-  $T/release/examples/synth $s $S/$s.dts
+  CARGO_INCREMENTAL=0 CARGO_TARGET_DIR="$T" DCA_SYNTH_SCENARIO="$s" DCA_SYNTH_OUT="$S/$s.dts" \
+    cargo test --quiet --release -p triergon-codec-dca --manifest-path "$R/Cargo.toml" \
+    --lib synthetic::write_stream -- --ignored --exact
   ffmpeg -v error -y -f dts -i $S/$s.dts -f f32le -c:a pcm_f32le $S/$s.ref.f32
   python3 -I $FP $s $S/$s.ref.f32 $(ch_of $S/$s.dts) $(rate_of $S/$s.dts) 4096 8 >> $OUT
 done

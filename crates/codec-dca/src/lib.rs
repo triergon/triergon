@@ -23,13 +23,16 @@ mod pack;
 mod pr_table;
 mod qmf;
 mod subframe;
-#[doc(hidden)]
 #[rustfmt::skip]
-pub mod tables;
-#[doc(hidden)]
+pub(crate) mod tables;
 #[rustfmt::skip]
-pub mod vq;
+pub(crate) mod vq;
 mod x96;
+
+#[cfg(test)]
+extern crate self as triergon_codec_dca;
+#[cfg(test)]
+mod synthetic;
 
 pub use pack::Packing;
 pub use triergon_codec::{AudioFrame, ChannelLayout, DecodeError, Speaker};

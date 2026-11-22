@@ -3,8 +3,8 @@
 //! from explicit field values; it does no analysis or psychoacoustics.
 #![allow(dead_code, clippy::needless_range_loop, clippy::too_many_arguments)]
 
+use crate::tables::{self, HuffBook};
 use std::collections::HashMap;
-use triergon_codec_dca::tables::{self, HuffBook};
 
 pub struct BitWriter {
     pub bytes: Vec<u8>,
@@ -601,8 +601,8 @@ pub fn write_set_header(w: &mut BitWriter, chans: &[ChanCfg], cpf: bool) {
 }
 
 /// Convert a 16-bit big-endian stream into another packing.
-pub fn repack(be16: &[u8], to: triergon_codec_dca::Packing) -> Vec<u8> {
-    use triergon_codec_dca::Packing;
+pub fn repack(be16: &[u8], to: crate::Packing) -> Vec<u8> {
+    use crate::Packing;
     match to {
         Packing::Be16 => be16.to_vec(),
         Packing::Le16 => be16

@@ -172,12 +172,12 @@ w('')
 w('/// Two-level Huffman lookup: `(symbol, len)`; `len > 0` leaf with total code length,')
 w('/// `len < 0` subtable at offset `symbol` indexed by the next `-len` bits.')
 w('#[derive(Debug)]')
-w('pub struct HuffBook { pub primary_bits: u32, pub max_len: u32, pub lut: &\'static [(i16, i8)] }')
+w('pub(crate) struct HuffBook { pub(crate) primary_bits: u32, pub(crate) max_len: u32, pub(crate) lut: &\'static [(i16, i8)] }')
 w('')
 for name in order:
     pb, ml, table = build_lut(books[name])
     w('/// ETSI TS 102 114 Annex D.5 Table %s.' % name)
-    w('pub static HUFF_%s: HuffBook = HuffBook { primary_bits: %d, max_len: %d, lut: &[' % (name, pb, ml))
+    w('pub(crate) static HUFF_%s: HuffBook = HuffBook { primary_bits: %d, max_len: %d, lut: &[' % (name, pb, ml))
     row = []
     for (s, l) in table:
         row.append('(%d,%d)' % (s, l))
@@ -222,9 +222,9 @@ s7 = scale_table(d12, d2, 128)
 assert sorted(s6) == list(range(63)), sorted(s6)
 assert sorted(s7) == list(range(125)), sorted(s7)
 w('/// ETSI TS 102 114 Annex D.1.1: 6-bit scale factor quantization (index 63 invalid -> 0).')
-w('pub static SCALE_6BIT: [u32; 64] = [%s, 0];' % ', '.join(str(s6[i]) for i in range(63)))
+w('pub(crate) static SCALE_6BIT: [u32; 64] = [%s, 0];' % ', '.join(str(s6[i]) for i in range(63)))
 w('/// ETSI TS 102 114 Annex D.1.2: 7-bit scale factor quantization (indices 125..127 invalid -> 0).')
-w('pub static SCALE_7BIT: [u32; 128] = [%s, 0, 0, 0];' % ', '.join(str(s7[i]) for i in range(125)))
+w('pub(crate) static SCALE_7BIT: [u32; 128] = [%s, 0, 0, 0];' % ', '.join(str(s7[i]) for i in range(125)))
 
 d21 = find(r'^D\.2\.1', d2)
 d22 = find(r'^D\.2\.2', d21)
@@ -238,9 +238,9 @@ def step_table(a, b):
     assert sorted(vals) == list(range(27)), sorted(vals)
     return [vals[i] for i in range(27)]
 w('/// ETSI TS 102 114 Annex D.2.1: lossy quantization step size x 2^22, by ABITS.')
-w('pub static STEP_LOSSY: [u32; 27] = [%s];' % ', '.join(map(str, step_table(d21, d22))))
+w('pub(crate) static STEP_LOSSY: [u32; 27] = [%s];' % ', '.join(map(str, step_table(d21, d22))))
 w('/// ETSI TS 102 114 Annex D.2.2: lossless quantization step size x 2^22, by ABITS.')
-w('pub static STEP_LOSSLESS: [u32; 27] = [%s];' % ', '.join(map(str, step_table(d22, d3))))
+w('pub(crate) static STEP_LOSSLESS: [u32; 27] = [%s];' % ', '.join(map(str, step_table(d22, d3))))
 
 d4 = find(r'^D\.4\s+Dynamic Range Control', d3)
 js = {}
@@ -251,7 +251,7 @@ for i in range(d3, d4):
         js[int(a)] = b.replace(',', '.')
 assert sorted(js) == list(range(129)), sorted(js)
 w('/// ETSI TS 102 114 Annex D.3: joint intensity scale factors (index = code + 64).')
-w('pub static JOINT_SCALE: [f32; 129] = [%s];' % ', '.join(js[i] + ('' if '.' in js[i] else '.0') for i in range(129)))
+w('pub(crate) static JOINT_SCALE: [f32; 129] = [%s];' % ', '.join(js[i] + ('' if '.' in js[i] else '.0') for i in range(129)))
 
 # ---------------------------------------------------------------- D.8 / D.9 FIRs
 FLT = r'-?\d,\d+e[-+]\d+'
@@ -274,7 +274,7 @@ names = [('QMF_NONPERFECT', 'non-perfect reconstruction 32-band interpolation FI
          ('LFE_FIR_128', 'LFE 128x interpolation FIR')]
 for (n, desc), c in zip(names, cols[1:]):
     w('/// ETSI TS 102 114 Annex D.8: %s.' % desc)
-    w('pub static %s: [f64; 512] = [' % n)
+    w('pub(crate) static %s: [f64; 512] = [' % n)
     for k in range(0, 512, 8):
         w('    ' + ', '.join(c[j] for j in range(k, k + 8)) + ',')
     w('];')
@@ -285,7 +285,7 @@ for i in range(d9, d10):
         x96[int(m.group(1).replace(' ', ''))] = m.group(2).replace(',', '.')
 assert sorted(x96) == list(range(1, 1025)), len(x96)
 w('/// ETSI TS 102 114 Annex D.9: 1 024-tap sign-modified prototype FIR for the X96 64-band QMF.')
-w('pub static X96_FIR: [f64; 1024] = [')
+w('pub(crate) static X96_FIR: [f64; 1024] = [')
 for k in range(1, 1025, 8):
     w('    ' + ', '.join(x96[j] for j in range(k, k + 8)) + ',')
 w('];')

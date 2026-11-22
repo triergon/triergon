@@ -6,9 +6,9 @@
 //! checked against fingerprints of FFmpeg 9.0.2 decoding the same core-only bytes
 //! (tests/data/vectors.fp, harness/codecs/dca/make_fingerprints.sh).
 
-mod support;
+#[path = "support/harness.rs"]
+mod harness;
 use std::path::PathBuf;
-use support::harness;
 use triergon_harness_protocol::test_report::skipped;
 
 /// Reports a check that did not run on the test run's own standard error, where it shows
