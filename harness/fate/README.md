@@ -76,8 +76,11 @@ Run the source-only program reader controls with the hash-pinned originals in
 `.research/fate-samples/mpegts`:
 
 ```sh
-CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test original_program -- --ignored
+CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test original_program -- --ignored --skip original_packet_positions_match_positional_identities
 ```
+
+The [PMT identity comparison](../../crates/mpegts/tests/data/pmt-identity-cascades.md)
+checks the original packet positions and stream IDs with ffprobe.
 
 The controls assert the same source events for one-byte and 32 KiB delivery.
 They independently check original carrier bytes, PES payload ranges, encoded

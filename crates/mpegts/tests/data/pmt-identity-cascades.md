@@ -36,6 +36,23 @@ PID independently of the reference's stream index. Parser framing is disabled
 so codec parsing cannot combine successive marker PES. These marker bytes do
 not establish codec decoding or the default parser's packet boundaries.
 
+After the 48-output comparison passes, use the same executable to compare the
+original sample's packet positions and stream identities:
+
+```sh
+CARGO_INCREMENTAL=0 TRIERGON_PMT_FFPROBE=/path/to/ffprobe \
+  cargo test -p triergon-mpegts --test original_program original_packet_positions_match_positional_identities -- --ignored --nocapture
+```
+
+The test pins the complete output for this no-parser probe. For each of its 11
+packets it reads the wire PID at the reported TS position, selects the preceding
+PMT mapping and checks the stream identity. Five packets precede discovery and
+use the first complete mapping retrospectively. Online delivery, payloads,
+timestamps, default parser boundaries and complete stream metadata remain open.
+A local ffprobe with SHA-256
+`072b4ddb060a6173b274510da92a96a8433d200cd40b277ed8117ffb718f2cbe`
+reproduced the 48 authored observations and the original packet identity trace.
+
 `pmt-identity-cascades.txt` records each input hash, complete stdout/stderr hashes,
 all emitted packet PID/index assignments and global stream IDs. The test compares
 them exactly. Inputs and raw output remain in ignored `.research/pmt-identity`.

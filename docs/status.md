@@ -110,7 +110,11 @@ hash-pinned authored cascades (24 cumulative inputs, merge off/on) establish
 ordinal reuse with marker PES assignments and parser framing disabled. The
 [comparison](../crates/mpegts/tests/data/pmt-identity-cascades.md) can rerun all
 48 recorded outcomes with a local ffprobe and reports its executable hash. The
-operation accepts a fixed program/PMT route and stream count, unchanged PID
+same local probe matches all 11 original no-parser packet identities. The check
+uses the preceding map at each packet position and uses the first map
+retrospectively for five packets before PMT discovery. Online packet delivery
+and full packet-fold parity remain open. The operation accepts a fixed
+program/PMT route and stream count, unchanged PID
 order or complete replacement, and no elementary stream identifier (`0x52`)
 descriptors. Partial PID overlap, insertion/removal, duplicate PIDs and stream
 identifier matching are refused. Language and codec do not select identities.

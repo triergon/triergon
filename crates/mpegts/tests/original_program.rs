@@ -371,3 +371,126 @@ fn original_unaligned_program_reports_faults_at_aligned_offsets() {
     assert_eq!(facts, expected);
     assert_eq!(facts, read(&bytes, Some(769), 1, 64));
 }
+
+// Compare each reference packet's TS position with the preceding PMT mapping.
+// For packets before the first PMT, use the first mapping retrospectively.
+#[test]
+#[ignore = "requires the pinned original and a matrix-verified ffprobe"]
+fn original_packet_positions_match_positional_identities() {
+    use triergon_mpegts::compat::stream::{PositionalStreamIds, ProgramReader};
+    use triergon_mpegts::{PacketFormat, ParseLimits, parse_transport};
+
+    const INPUT_SHA: &str = "5185db2052de1174629acdf13382eb42449ebfa7ef2b09a822d9867ed8c80860";
+    const PACKETS_SHA: &str = "95b077027d062cf1170a97232a0b60950e57e0fba19c8f69b56b842cd4ae4ddf";
+    let bytes = original("pmtchange.ts", INPUT_SHA);
+    let probe = std::env::var_os("TRIERGON_PMT_FFPROBE").expect("matrix-verified ffprobe path");
+    let probe_hash = sha256::file_hex(std::path::Path::new(&probe)).unwrap();
+    eprintln!("ffprobe sha256 {probe_hash}");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../.research/fate-samples/mpegts/pmtchange.ts");
+    let output = std::process::Command::new(&probe)
+        .args([
+            "-v",
+            "error",
+            "-bitexact",
+            "-f",
+            "mpegts",
+            "-fflags",
+            "+noparse+nofillin",
+            "-merge_pmt_versions",
+            "1",
+            "-show_entries",
+            "stream=index,id,codec_tag:packet=stream_index,pos,size",
+            "-show_packets",
+            "-of",
+            "compact",
+            "-i",
+        ])
+        .arg(&path)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "ffprobe failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(sha256::hex(&output.stdout), PACKETS_SHA);
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = ProgramReader::new(pool.clone(), ParseLimits::default()).unwrap();
+    let mut identities = PositionalStreamIds::new(pool.clone(), ParseLimits::default()).unwrap();
+    let mut mappings = Vec::new();
+    assert!(bytes.chunks_exact(188).remainder().is_empty());
+    for (index, raw) in bytes.chunks_exact(188).enumerate() {
+        let offset = index * 188;
+        let packet = parse_transport(
+            Bytes::copy_from_slice(&pool, raw).unwrap(),
+            PacketFormat::Ts188,
+            offset as u64,
+        )
+        .unwrap();
+        reader.push(&packet).unwrap();
+        while let Some(program) = reader.poll().unwrap() {
+            let assigned = identities.apply(&program).unwrap();
+            mappings.push((offset, assigned.as_slice().to_vec()));
+        }
+    }
+    assert_eq!(mappings.len(), 2);
+    let stdout = std::str::from_utf8(&output.stdout).unwrap();
+    let mut packet_count = 0;
+    let mut before_first_map = 0;
+    let mut streams = Vec::new();
+    let mut mismatches = Vec::new();
+    for line in stdout.lines() {
+        let field = |key: &str| {
+            line.split('|')
+                .find_map(|part| part.strip_prefix(key))
+                .unwrap()
+        };
+        if line.starts_with("packet|") {
+            let offset: usize = field("pos=").parse().unwrap();
+            let index: usize = field("stream_index=").parse().unwrap();
+            assert_eq!(offset % 188, 0);
+            let raw = bytes
+                .get(offset..offset + 188)
+                .expect("packet position inside original");
+            assert_eq!(raw[0], 0x47);
+            let pid = (u16::from(raw[1] & 31) << 8) | u16::from(raw[2]);
+            let bound = mappings.partition_point(|(position, _)| *position <= offset);
+            before_first_map += usize::from(bound == 0);
+            let (_, identities) = &mappings[bound.saturating_sub(1)];
+            let identity = identities
+                .iter()
+                .find(|identity| identity.pid == pid)
+                .map(|identity| usize::from(identity.id));
+            if identity != Some(4677 + index) {
+                mismatches.push(format!(
+                    "position {offset}, PID {pid}, reference index {index}, candidate {identity:?}"
+                ));
+            }
+            packet_count += 1;
+        } else if line.starts_with("stream|") {
+            let index: usize = field("index=").parse().unwrap();
+            let id = u16::from_str_radix(field("id=").strip_prefix("0x").unwrap(), 16).unwrap();
+            streams.push((index, id));
+        }
+    }
+    assert_eq!(
+        streams,
+        (0..5).map(|i| (i, 4677 + i as u16)).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        packet_count, 11,
+        "complete reference packet observation changed"
+    );
+    assert_eq!(before_first_map, 5);
+    assert!(
+        mismatches.is_empty(),
+        "packet identity mismatches:\n{}",
+        mismatches.join("\n")
+    );
+    assert_eq!(
+        sha256::file_hex(std::path::Path::new(&probe)).unwrap(),
+        probe_hash
+    );
+    assert_eq!(sha256::file_hex(&path).unwrap(), INPUT_SHA);
+}

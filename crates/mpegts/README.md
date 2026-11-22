@@ -360,6 +360,8 @@ The opt-in PMT merge policy can preserve stream identities when a complete
 program map replaces every PID with streams of the same positional types.
 It retains the original PMT and descriptor bytes. The [PMT identity comparison](tests/data/pmt-identity-cascades.md) checks the recorded probe outcomes with a
 local ffprobe.
+It also checks the original sample's emitted packet positions and stream
+identities retrospectively against the discovered mappings.
 
 ## Verification
 
