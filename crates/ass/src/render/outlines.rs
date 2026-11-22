@@ -301,10 +301,9 @@ impl Outlines {
         // before it checks the range.
         let empty = scratch.points().is_empty() && lines.iter().all(Option::is_none);
         if decorations.rotate && !empty {
-            let y_scale = sized.metrics().y_scale;
-            let desc = source.os2().map_or(0, |os2| {
-                (i64::from(os2.typo_descender) * y_scale + 0x8000) >> 16
-            });
+            let desc = source
+                .os2()
+                .map_or(0, |os2| libass::scale_y(&sized, os2.typo_descender));
             let dv = i64::from(metrics.vertical_advance) + desc;
             let limit = 2 * i64::from(OUTLINE_MAX);
             if desc.abs() > limit || dv.abs() > limit {

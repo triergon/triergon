@@ -141,9 +141,10 @@ nothing. It gives:
   vertical advances libass uses for the glyphs of an `@` font it draws rotated
   (`vertical_advance`, `linear_vertical_advance`).
 - `metrics` (`FT_Size_Metrics`), `ascent_descent` (libass's line ascent and
-  descent), `harfbuzz_scale` (the scale libass sets on its HarfBuzz font),
-  `kerning` (`FT_KERNING_DEFAULT`), and `underline` and `strikeout` (the bands
-  libass adds from `post` and `OS/2`).
+  descent), `scale_y` (a face value scaled as libass scales it),
+  `harfbuzz_scale` (the scale libass sets on its HarfBuzz font), `kerning`
+  (`FT_KERNING_DEFAULT`), and `underline` and `strikeout` (the bands libass
+  adds from `post` and `OS/2`).
 
 At zero pixels per em, glyphs load unscaled and unhinted, in font units, as
 FreeType loads them.

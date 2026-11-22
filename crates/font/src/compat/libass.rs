@@ -290,13 +290,18 @@ pub fn strikeout(sized: &SizedFont<'_>) -> Option<Band> {
         .flatten()
 }
 
+/// A vertical distance of the face in font units at the size, in 26.6
+/// pixels, as libass scales the face's own values: times the y scale,
+/// halves rounded up.
+pub fn scale_y(sized: &SizedFont<'_>, units: i16) -> i64 {
+    (i64::from(units) * sized.metrics().y_scale + 0x8000) >> 16
+}
+
 /// A decoration line centred on `position`, rounded as libass rounds it.
 fn band(sized: &SizedFont<'_>, position: i16, size: i16) -> Option<Band> {
-    let y_scale = sized.metrics().y_scale;
-    let scale = |v: i16| (i64::from(v) * y_scale + 0x8000) >> 16;
-    let size = scale(size);
+    let size = scale_y(sized, size);
     // libass works y down: the band's top edge and its height.
-    let top = -scale(position) - (size >> 1);
+    let top = -scale_y(sized, position) - (size >> 1);
     (top >= -OUTLINE_MAX && top + size <= OUTLINE_MAX).then(|| Band {
         y_min: -(top + size) as i32,
         y_max: -top as i32,
