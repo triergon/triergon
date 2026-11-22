@@ -25,6 +25,11 @@ assert_eq!((track.codec_tag(), track.sample_rate()), (b"mp3".as_slice(), 44100))
 # Ok::<(), triergon_core::Error>(())
 ```
 
+`Reader::request` gives the source, token and byte range for the next input window.
+`MpegAudio::header`, `Adts::header` and `Ac3::header` expose the first confirmed
+audio frame's header. `MpegAudio::lame` gives the encoder identifier and the
+coded encoder delay and padding when an information frame carries them.
+
 ## Behaviour
 
 All four formats run one frame-stream engine: leading ID3v2 tags, the format's

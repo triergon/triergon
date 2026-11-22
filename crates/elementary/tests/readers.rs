@@ -569,3 +569,58 @@ fn a_flac_stream_whose_first_block_is_not_streaminfo_is_refused() {
         Error::Invalid("FLAC first metadata block is not STREAMINFO")
     );
 }
+
+#[test]
+fn request_names_the_current_input_after_a_short_window() {
+    let input = mp3_stream(3);
+    let pool = Budget::new(1 << 20).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut reader = open::<MpegAudio>(&pool, &input, true);
+    for offset in 0..2 {
+        let Step::NeedInput(needed) = reader.step(&mut WorkBudget::new(100), &cancel).unwrap()
+        else {
+            panic!("expected a byte request");
+        };
+        let request = reader.request();
+        assert_eq!(
+            (
+                request.source,
+                &request.token,
+                request.offset,
+                request.maximum
+            ),
+            (needed.source, &needed.token, offset, needed.maximum)
+        );
+        supply(&mut reader, &pool, &input, &request, 1);
+    }
+}
+
+#[test]
+fn first_frame_headers_and_lame_tag_remain_available_after_opening() {
+    let mut mp3 = mp3_info(3, 417 * 4, 576, 700);
+    mp3.extend(mp3_stream(3));
+    let cancel = AtomicBool::new(false);
+    let mut mpeg =
+        BlockingReader::<MpegAudio, _>::open(std::io::Cursor::new(mp3), Limits::default()).unwrap();
+    assert!(mpeg.next_packet(&cancel).unwrap().is_some());
+    let facts = mpeg.reader().format();
+    let header = facts.header().unwrap();
+    assert_eq!(
+        (header.sample_rate, header.bitrate_kbps, header.channels()),
+        (44100, 128, 2)
+    );
+    let lame = facts.lame().unwrap();
+    assert_eq!((lame.encoder_delay, lame.encoder_padding), (576, 700));
+
+    let aac: Vec<_> = (0..3).flat_map(|n| adts_frame(n, 32)).collect();
+    let mut adts =
+        BlockingReader::<Adts, _>::open(std::io::Cursor::new(aac), Limits::default()).unwrap();
+    assert!(adts.next_packet(&cancel).unwrap().is_some());
+    assert_eq!(adts.reader().format().header().unwrap().frame_length(), 32);
+
+    let ac3: Vec<_> = (0..3).flat_map(ac3_frame).collect();
+    let mut a52 =
+        BlockingReader::<Ac3, _>::open(std::io::Cursor::new(ac3), Limits::default()).unwrap();
+    assert!(a52.next_packet(&cancel).unwrap().is_some());
+    assert_eq!(a52.reader().format().header().unwrap().blocks, 6);
+}

@@ -1072,3 +1072,61 @@ fn speex_packets_are_timed_from_the_header_frames_with_granule_trims() {
     assert_eq!(packets[0].trim().start, Some(100));
     assert_eq!(packets[19].trim().end, Some(70));
 }
+
+#[test]
+fn request_names_the_current_input_after_a_short_window() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = Reader::new(
+        &pool,
+        SourceId(1),
+        SourceCapabilities {
+            length: None,
+            random_access: false,
+        },
+        Limits::default(),
+        64,
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    for (offset, byte) in b"Og".iter().enumerate() {
+        let Step::NeedInput(needed) = reader.step(&mut WorkBudget::new(100), &cancel).unwrap()
+        else {
+            panic!("expected a byte request");
+        };
+        let request = reader.request();
+        assert_eq!(
+            (
+                request.source,
+                &request.token,
+                request.offset,
+                request.maximum
+            ),
+            (needed.source, &needed.token, offset as u64, needed.maximum)
+        );
+        let bytes = Bytes::copy_from_slice(&pool, std::slice::from_ref(byte)).unwrap();
+        reader
+            .provide(
+                &InputWindow::new(request.source, request.token, request.offset, bytes).unwrap(),
+            )
+            .unwrap();
+    }
+}
+
+#[test]
+fn open_stream_configures_opus_without_an_end_scan() {
+    let mut source = Vec::new();
+    opus_stream(5, 4, 2, 0, &mut source);
+    let mut reader =
+        triergon_ogg::BlockingReader::open_stream(source.as_slice(), Limits::default()).unwrap();
+    let track = &reader.tracks()[0];
+    assert!(track.is_configured());
+    assert!(track.header_error().is_none());
+    assert_eq!(track.configuration(), opus_head(312));
+    assert_eq!(track.end(), None);
+    let cancel = AtomicBool::new(false);
+    let mut count = 0;
+    while reader.next_packet(&cancel).unwrap().is_some() {
+        count += 1;
+    }
+    assert_eq!(count, 4);
+}

@@ -28,7 +28,10 @@ while let Some(packet) = reader.next_packet(&cancel)? {
 ```
 
 `BlockingReader::open` takes `Read + Seek` (seeking bisects); `open_stream` takes a
-sequential `Read`. `Reader` is the push reader: it performs no I/O, accepts windows of
+sequential `Read` and discovers tracks without scanning the end.
+`Track::is_configured` tells whether the track's headers are complete.
+`Reader::request` gives the source, token and byte range for the next input window.
+`Reader` is the push reader: it performs no I/O, accepts windows of
 any size down to one byte, steps under a `WorkBudget` and a cancellation flag, and
 charges its storage to the caller's `Budget`.
 
