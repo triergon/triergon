@@ -205,7 +205,7 @@ impl<'a> State<'a> {
                 return PlainStep::GiveUp;
             };
             let key = sample.sync || (explicit_empty_sync && sample.ordinal == 1);
-            if !self.record(timestamp, key, false) {
+            if !self.record::<false>(timestamp, key, false) {
                 return PlainStep::GiveUp;
             }
             if key {
@@ -292,7 +292,7 @@ impl<'a> State<'a> {
             });
             // The first fragment sample may start the index without a key.
             let first = self.entries == 0;
-            if !self.record(timestamp, sample.sync, sample.ordinal == 1) {
+            if !self.record::<false>(timestamp, sample.sync, sample.ordinal == 1) {
                 return PlainStep::GiveUp;
             }
             // A fragment track's first entry stands in for a key.
@@ -322,8 +322,11 @@ impl<'a> State<'a> {
         if table.has_composition_offsets() || table.has_dependency_table() {
             return PlainStep::GiveUp;
         }
+        if *ended {
+            return self.finish();
+        }
         loop {
-            if *ended || cursor.ordinal() == table.sample_count() {
+            if cursor.ordinal() == table.sample_count() {
                 return self.finish();
             }
             if !work.try_charge(1) {
@@ -358,16 +361,20 @@ impl<'a> State<'a> {
             }) else {
                 return PlainStep::GiveUp;
             };
-            *ended = sample.sync
-                && sample
-                    .dts
-                    .checked_add(i128::from(sample.delta))
-                    .is_some_and(|end| end >= i128::from(edit.end));
-            if !self.record(timestamp, sample.sync, false) {
+            // The emitted samples have nonzero decode deltas and one constant shift.
+            if !self.record::<true>(timestamp, sample.sync, false) {
                 return PlainStep::GiveUp;
             }
             if sample.sync {
                 self.keep(PlainStart::Edited(sample.ordinal), timestamp);
+                if sample
+                    .dts
+                    .checked_add(i128::from(sample.delta))
+                    .is_some_and(|end| end >= i128::from(edit.end))
+                {
+                    *ended = true;
+                    return self.finish();
+                }
             }
         }
     }
@@ -375,7 +382,12 @@ impl<'a> State<'a> {
     /// Counts an entry and follows its timestamp; `false` where the index would
     /// refuse it. `starts_index` is whether a non-key entry may still start the
     /// index.
-    fn record(&mut self, timestamp: i64, key: bool, starts_index: bool) -> bool {
+    fn record<const INCREASING: bool>(
+        &mut self,
+        timestamp: i64,
+        key: bool,
+        starts_index: bool,
+    ) -> bool {
         let first = self.entries == 0;
         self.entries += 1;
         if self.entries > self.track.max_entries
@@ -384,17 +396,19 @@ impl<'a> State<'a> {
         {
             return false;
         }
-        if self
-            .previous_timestamp
-            .is_some_and(|prior| timestamp <= prior)
-            || self.unordered_minimum.is_some()
-        {
-            self.unordered_minimum = Some(
-                self.unordered_minimum
-                    .map_or(timestamp, |least| least.min(timestamp)),
-            );
+        if !INCREASING {
+            if self
+                .previous_timestamp
+                .is_some_and(|prior| timestamp <= prior)
+                || self.unordered_minimum.is_some()
+            {
+                self.unordered_minimum = Some(
+                    self.unordered_minimum
+                        .map_or(timestamp, |least| least.min(timestamp)),
+                );
+            }
+            self.previous_timestamp = Some(timestamp);
         }
-        self.previous_timestamp = Some(timestamp);
         true
     }
 
