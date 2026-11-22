@@ -2,6 +2,7 @@
 //! run's shadow, border and fill clipped by the event's clip rectangle and
 //! split for `\kf` karaoke, multiplied by a vector clip, and the opaque
 //! background of `BorderStyle` 4.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::sync::Arc;
 

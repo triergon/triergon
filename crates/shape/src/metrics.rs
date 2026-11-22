@@ -1,5 +1,6 @@
 //! Glyph lookup and metrics: the font functions shaping asks for, and HarfBuzz's
 //! scaling arithmetic.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::cff;
 use crate::cmap::{Cmap, Subtable};

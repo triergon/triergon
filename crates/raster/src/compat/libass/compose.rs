@@ -1,5 +1,6 @@
 //! Combining a run's glyph bitmaps into its fill, border and shadow bitmaps:
 //! blur, `\be`, the border's subtraction of the fill and the sub-pixel shadow.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::Deref;
 

@@ -1,4 +1,5 @@
 //! The `Banner` and `Scroll` transition effects of the event effect field.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_raster::fp;
 

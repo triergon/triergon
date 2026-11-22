@@ -1,5 +1,6 @@
 //! What the stroker offsets: the pen's tolerances, normals in normal space,
 //! and the segments the pen draws along an outline's curves.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use super::Pen;
 use super::border::BySide;

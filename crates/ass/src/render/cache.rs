@@ -16,6 +16,7 @@
 //! libass's holds the bitmaps. Equal bitmap keys draw equal bitmaps, so it
 //! finds the same composites, and the bitmaps a shown composite was made
 //! from can leave the cache.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::collections::HashMap;
 use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher, RandomState};

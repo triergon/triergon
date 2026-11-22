@@ -1,4 +1,5 @@
 //! Styles and the values styles, override tags and glyphs share.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::{Index, IndexMut};
 

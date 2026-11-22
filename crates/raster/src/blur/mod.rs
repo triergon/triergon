@@ -6,6 +6,7 @@
 //! [1, 10, 5]: vertically then horizontally on the way down, in the opposite
 //! order on the way up. Every stage is a convolution of the zero-extended
 //! image, so the bitmap grows by the stages' support.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 mod coeff;
 

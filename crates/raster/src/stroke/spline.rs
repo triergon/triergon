@@ -1,6 +1,7 @@
 //! Offsetting a spline: each side is fitted by one offset spline of the same
 //! order when the error bounds allow, cut short where its offset intersects
 //! itself, and otherwise split in half and offset again.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::Result;
 

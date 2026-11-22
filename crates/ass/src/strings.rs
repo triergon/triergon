@@ -1,4 +1,5 @@
 //! A record's byte strings in one budgeted allocation.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
 

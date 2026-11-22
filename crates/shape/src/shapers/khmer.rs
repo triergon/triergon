@@ -1,5 +1,6 @@
 //! Khmer: syllables, the coeng Ro and pre-base vowels moved before the base,
 //! and the split vowels Unicode does not decompose.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::Pause;
 use super::syllabic::{self, ANY, DottedCircle, Machine, for_each_syllable, syllable_type};

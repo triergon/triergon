@@ -1,4 +1,5 @@
 //! Glyph substitution subtables.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::apply::{Apply, Values};
 use super::context;

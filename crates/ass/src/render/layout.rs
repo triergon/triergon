@@ -2,6 +2,7 @@
 //! outline and metrics, the pen positions on one line, the lines
 //! ([`super::wrap`]), karaoke timing, the visual order, alignment, the text
 //! box and the baseline shear.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget, round_ties_even_i32};
 use triergon_raster::{Vector, fp, pixels_26_6};

@@ -8,6 +8,7 @@
 //! parenthesised ones. Names match by prefix in libass's order, so `\fsize`
 //! is `\fs` with the argument `ize`. Numbers convert from the argument's
 //! start and, as in libass, may read on past its end.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::Range;
 

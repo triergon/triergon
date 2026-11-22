@@ -1,6 +1,7 @@
 //! The structures GSUB and GPOS share: script, language system, feature and
 //! lookup lists, feature variations at the default instance, lookups and their
 //! flags, coverage and class definitions.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::data::Data;
 use crate::buffer::GlyphClass;

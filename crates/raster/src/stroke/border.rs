@@ -1,4 +1,5 @@
 //! The two sides of a border and the outlines they are written to.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::{Index, IndexMut};
 

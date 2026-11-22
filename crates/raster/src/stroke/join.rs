@@ -1,6 +1,7 @@
 //! Joins between segments: normals that nearly agree merge; at a corner the
 //! side the turn folds over gets a spike to the corner and the other side a
 //! round cap of quadratic arcs.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::Result;
 

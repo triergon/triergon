@@ -8,6 +8,7 @@
 //! pairs linearly and reads Apple's version 1 table as empty. This one applies
 //! every horizontal subtable, refuses other formats, cross-stream subtables
 //! and Apple's table, and bisects the pairs whatever their order.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::apply::{Apply, Next, Values};
 use super::data::Data;

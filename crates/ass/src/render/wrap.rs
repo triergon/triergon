@@ -2,6 +2,7 @@
 //! every `\N`, a soft one before a word that overflows, soft breaks moved
 //! back while that evens out the lines, the whitespace at the ends of each
 //! line trimmed and the lines measured.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::Range;
 

@@ -1,6 +1,7 @@
 //! The last stage: an event's placed glyphs drawn and combined run by run,
 //! through a bitmap cache and a composite cache: each glyph's fill and
 //! border, then each run's fill, border and shadow composited.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::Deref;
 

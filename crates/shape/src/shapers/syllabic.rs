@@ -10,6 +10,7 @@
 //! allocation and no backtracking within a syllable. As HarfBuzz's Ragel
 //! scanners do, each syllable is the longest match of any rule, the earliest
 //! rule winning among equally long ones.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::buffer::{Buffer, CharFlag, Info, ShaperProps};
 use crate::metrics::Scaled;

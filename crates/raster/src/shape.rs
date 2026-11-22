@@ -1,5 +1,6 @@
 //! A shape: one or two outlines drawn together as the union of their nonzero
 //! fills, with the control box of both.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Budget, Result};
 

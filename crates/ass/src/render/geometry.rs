@@ -1,6 +1,7 @@
 //! The renderer's settings and the frame geometry they give a script: the
 //! content area, the pixel aspect, the layout resolution, the mapping from
 //! script to frame coordinates and each event's scales.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Error, Result};
 

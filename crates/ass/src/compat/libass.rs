@@ -3,6 +3,7 @@
 //! `ass_set_cache_limits` sets ([`cache_limits`]).
 //!
 //! Reference: libass 0.17.5.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use crate::CacheLimits;
 

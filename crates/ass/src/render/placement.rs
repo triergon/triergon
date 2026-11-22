@@ -2,6 +2,7 @@
 //! `\pos` or `\move`, a scroll, or its alignment and margins; its rotation
 //! origin; the runs its drawn glyphs are composited in; and each glyph's
 //! placement and effects as it is drawn. Drawing them is the painter's.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::Range;
 

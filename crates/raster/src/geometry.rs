@@ -1,5 +1,6 @@
 //! Integer points and rectangles, y down: 26.6 fixed point (1/64 pixel) for
 //! outlines, whole pixels for bitmap positions.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 /// The largest coordinate magnitude an outline point may have: 2²⁸ − 1, so that
 /// cubic subdivision (`8 · max + 4`) stays within 32 bits.

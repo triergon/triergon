@@ -4,6 +4,7 @@
 //! Coordinates are 26.6 fixed point (1/64 script pixel, `lrint(v * 64)`),
 //! with y growing downwards as on screen. Outlines are unscaled: the `\p`
 //! level divides them by [`drawing_scale`] when they are placed.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Result, WorkBudget};
 use triergon_raster::{Outline, Rect, SegmentKind, Vector, pixels_26_6};

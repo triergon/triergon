@@ -1,6 +1,7 @@
 //! One glyph's bitmaps: the 3D transform of `\frx` `\fry` `\frz` `\fax` `\fay`,
 //! its quantisation against the glyph's run, the border or opaque box, and their
 //! rasterisation, as libass draws them.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::Deref;
 use std::sync::Arc;

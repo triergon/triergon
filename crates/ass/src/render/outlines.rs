@@ -2,6 +2,7 @@
 //! drawn size without hinting, with libass's synthetic styles and
 //! decoration lines, or a drawing parsed, with its advance and the face's
 //! ascent and descent; and a glyph's border stroked.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;

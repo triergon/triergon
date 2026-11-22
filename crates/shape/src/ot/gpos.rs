@@ -1,5 +1,6 @@
 //! Glyph positioning subtables, and the passes before and after them that clear
 //! and resolve attachments.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::apply::{Apply, Values};
 use super::context;

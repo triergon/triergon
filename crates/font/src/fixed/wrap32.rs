@@ -12,6 +12,7 @@
 //! bits and return the low 32 bits of the result. Font-unit values that fit
 //! 16 bits, and thresholds derived from them, stay far inside 32 bits and
 //! need none of this.
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 use crate::fixed;
 

@@ -1,5 +1,6 @@
 //! The Arabic joining and fallback shaping data of HarfBuzz's Arabic shaper
 //! (`hb-ot-shaper-arabic-table.hh`).
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::code_point::general_category;
 use super::{GeneralCategory, tables};

@@ -1,6 +1,7 @@
 //! The shape plan: which features apply, the mask bits they get, the lookups of
 //! each stage in order, and which positioning methods run — HarfBuzz's map
 //! builder and shape planner.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::Language;
 use crate::face::Face;

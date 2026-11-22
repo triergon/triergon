@@ -1,4 +1,5 @@
 //! The script model and libass's line-oriented reader for it.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 mod event;
 mod fonts;

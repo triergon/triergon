@@ -1,5 +1,6 @@
 //! Arabic and Syriac: joining forms, `stch` stretching and the order of modifier
 //! combining marks.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::Pause;
 use crate::buffer::{Buffer, Info, ShaperProps};

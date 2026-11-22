@@ -5,6 +5,7 @@
 //! pixel, and the remaining matrix is rounded to steps that keep the position
 //! error near 1/8 pixel. [`BitmapTransform`] is that quantised transform, and
 //! [`BitmapTransform::restore`] rebuilds the matrix the bitmap is drawn with.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::round_ties_even_i32;
 

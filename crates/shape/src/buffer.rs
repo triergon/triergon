@@ -5,6 +5,7 @@
 //! a lookup reads glyphs at `idx` and writes its output after `out_len`, either in
 //! place (while the output is no longer than what was read) or into a separate
 //! vector, and [`Buffer::sync`] makes the output the new content.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::ot::digest::Digest;
 use crate::shapers::{ArabicAction, Jamo};

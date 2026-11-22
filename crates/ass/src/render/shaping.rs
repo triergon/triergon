@@ -3,6 +3,7 @@
 //! style, bidi levels per paragraph, and OpenType shaping of each run at the
 //! drawn size, which gives each character a cluster of glyphs. The bidi
 //! levels give the visual order of each line once lines are known.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::cell::RefCell;
 use std::collections::HashMap;

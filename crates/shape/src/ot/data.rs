@@ -5,6 +5,7 @@
 //! view, so a damaged structure reads as the absent (all-zero) structure, the way
 //! HarfBuzz substitutes its null objects for rejected subtables. Counts are never
 //! trusted beyond the bytes that hold the records.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 /// A view of layout data starting at one structure.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

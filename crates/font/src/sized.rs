@@ -3,6 +3,8 @@
 //!
 //! A size is requested, scaled and rounded as FreeType 2.15.0 does it, so the
 //! outlines and metrics are the ones a renderer built on FreeType draws with.
+//! The load-flag handling is translated from FreeType 2.15.0 (see
+//! `docs/provenance.md`).
 
 use crate::autofit::Autofit;
 use crate::bytecode::{Bytecode, GlyphPoints, Hinter, Phantoms, Programs, Tables};

@@ -12,6 +12,7 @@
 //! `long` to `int`) follows libass on 32-bit ARM with GCC on every
 //! target, as do the casts from `double` to `int` C leaves undefined out of
 //! range; see the crate's documentation.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use core::ffi::c_long;
 

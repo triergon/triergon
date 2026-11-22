@@ -3,6 +3,7 @@
 //!
 //! Values are in script units: sizes, borders, shadows and positions in
 //! script pixels, before the renderer's screen scaling.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Error, Result, WorkBudget};
 

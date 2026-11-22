@@ -4,6 +4,7 @@
 //! and grouping; these helpers cover the macros and library calls whose
 //! semantics differ from Rust's own. [`max`] and [`min`] are public for the
 //! renderer above this crate, which computes with the same macros.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 /// The larger value as C's `a > b ? a : b`: `b` when they are equal or
 /// either is NaN, where [`f64::max`] gives the other operand for a NaN.

@@ -4,6 +4,7 @@
 //! Coverage inside a tile is 16-bit fixed point with full coverage at
 //! [`FULL`]; the arithmetic wraps at 16 bits exactly where libass's engines
 //! truncate to `int16_t`.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use super::{Line, LineFlag};
 

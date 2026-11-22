@@ -8,6 +8,7 @@
 //! one with a single segment is a half-plane; otherwise its segments are summed
 //! as trapezoids. Two outlines can be rasterised together as the union of
 //! their own nonzero fills, which is how both border offsets combine.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 mod tile;
 

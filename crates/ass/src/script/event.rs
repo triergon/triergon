@@ -1,4 +1,5 @@
 //! Events and libass's reading of their fields.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Result, WorkBudget};
 

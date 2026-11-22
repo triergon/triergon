@@ -1,4 +1,5 @@
 //! Three-stage lookup tables over code points.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 /// A table mapping every code point to a value, as `cargo xtask shape ucd` packs it.
 ///

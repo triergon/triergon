@@ -2,6 +2,7 @@
 //! and ligature substitutions from the font's Arabic Presentation Forms glyphs and
 //! applies them under the joining-form and `rlig` masks. The lookups are built
 //! here as OpenType data and applied like the font's own.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::buffer::Buffer;
 use crate::face::Face;

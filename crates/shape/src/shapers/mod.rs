@@ -1,5 +1,6 @@
 //! Script shapers: what HarfBuzz does differently for some scripts around the
 //! common pipeline.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 mod arabic;
 mod arabic_fallback;

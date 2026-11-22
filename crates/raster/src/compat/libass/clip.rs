@@ -1,5 +1,6 @@
 //! Rectangle clipping of a placed bitmap into the image parts libass emits,
 //! with the `\kf` karaoke split into a left and a right colour.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use crate::bitmap::Bitmap;
 use crate::geometry::{Rect, Vector};

@@ -3,6 +3,7 @@
 //! around the base consonant, reph and pre-base forms, as HarfBuzz's Indic
 //! shaper does it for both the old (`deva`) and new (`dev2`) OpenType script
 //! specifications.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::Pause;
 use super::syllabic::{self, ANY, DottedCircle, Machine, for_each_syllable, syllable_type};

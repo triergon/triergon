@@ -4,6 +4,7 @@
 //! requested font keeps the faces it was given and adds one for a character
 //! none of them maps, and each of its faces keeps the charmap the last such
 //! lookup left it on.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::collections::HashMap;
 use std::sync::Arc;

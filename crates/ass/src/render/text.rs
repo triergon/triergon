@@ -1,6 +1,7 @@
 //! The first stage: an event's text evaluated at a time, each character
 //! with the font it asks for and its glyph state scaled to the frame, and
 //! where its style runs start.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::Range;
 

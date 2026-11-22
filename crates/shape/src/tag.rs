@@ -1,4 +1,5 @@
 //! Scripts, languages, directions and OpenType tags.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use std::fmt;
 

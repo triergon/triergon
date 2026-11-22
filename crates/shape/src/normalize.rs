@@ -3,6 +3,7 @@
 //! their base where the font has the composite — HarfBuzz's "composed
 //! diacritics" mode. Shapers that ask for no normalisation get only the
 //! decomposition of characters the font lacks and the mark order.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::buffer::{Buffer, CharFlag, Info};
 use crate::metrics::Scaled;

@@ -1,5 +1,6 @@
 //! The glyph definition table: glyph classes, mark attachment classes and mark
 //! glyph sets.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::data::Data;
 use super::layout::{class, coverage};

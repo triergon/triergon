@@ -1,5 +1,6 @@
 //! The shaping pipeline: HarfBuzz's `hb_ot_shape` from characters to positioned
 //! glyphs.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::buffer::{Buffer, GlyphClass, GlyphProps, Info, LigProps};
 use crate::face::Face;

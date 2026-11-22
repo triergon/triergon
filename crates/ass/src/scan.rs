@@ -3,6 +3,7 @@
 //! Scripts are byte strings: libass never validates UTF-8, and every input is
 //! read only up to its first NUL byte, as libass reads C strings. The slices
 //! here never contain NUL; their end plays the part of the terminator.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 /// Spaces and tabs, the only blanks libass trims around fields and tokens.
 pub(crate) const fn is_blank(c: u8) -> bool {

@@ -13,6 +13,7 @@
 //! the positive-winding area. Closing a contour joins its end to its start
 //! and moves the first point to the merged normal. Two outlines come out
 //! because a self-intersecting source needs both offsets.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 mod border;
 mod cubic;

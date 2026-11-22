@@ -1,5 +1,6 @@
 //! Outlines: closed contours of lines and quadratic and cubic splines with
 //! points in 26.6 fixed point, y down.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Budget, BudgetVec, Error, Result, round_ties_even_i32};
 use triergon_font::{OutlinePoint, Point, PointKind};

@@ -1,4 +1,5 @@
 //! Fonts embedded in `[Fonts]` with SSA's uuencode variant.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{BudgetVec, Bytes, Result};
 

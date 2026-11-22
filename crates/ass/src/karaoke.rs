@@ -1,4 +1,5 @@
 //! Karaoke timing over laid-out glyphs.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::Range;
 

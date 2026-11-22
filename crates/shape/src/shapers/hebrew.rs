@@ -1,5 +1,6 @@
 //! Hebrew: presentation-form composition for fonts without mark positioning, and
 //! the order of a vowel before meteg.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::buffer::Buffer;
 use crate::plan::Plan;

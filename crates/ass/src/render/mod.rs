@@ -7,6 +7,7 @@
 //! ([`text`]), shaped into clusters ([`shaping`]), laid out in lines
 //! ([`layout`], [`wrap`]), placed in the frame ([`placement`]), and drawn
 //! ([`bitmaps`]) into images ([`images`]).
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 mod bitmaps;
 mod cache;

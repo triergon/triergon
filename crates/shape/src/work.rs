@@ -9,6 +9,7 @@
 //! system or feature record searched, each lookup a feature lists and each
 //! coverage record a lookup's digest reads. Loops bounded by a constant (the 64
 //! glyphs of one match, the 64 nesting levels) are not charged separately.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::face::Face;
 use triergon_core::{Error, Result, WorkBudget};

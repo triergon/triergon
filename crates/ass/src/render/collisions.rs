@@ -1,6 +1,7 @@
 //! Collision handling: events of one layer that are placed by their margins
 //! move up or down out of each other's way, and keep the place they were
 //! given on later frames.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::Range;
 

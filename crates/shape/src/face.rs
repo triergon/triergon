@@ -1,4 +1,5 @@
 //! A face's layout tables.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::ot::gdef::Gdef;
 use crate::ot::kern::Kern;

@@ -1,5 +1,7 @@
 //! The sfnt container: collection header and table directory (OpenType "Font file"
 //! and "Font collections").
+//! The `fvar` header check is translated from FreeType 2.15.0 (see
+//! `docs/provenance.md`).
 
 use crate::read::{Reader, TRUNCATED};
 use crate::work::charge;

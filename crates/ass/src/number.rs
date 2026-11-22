@@ -6,6 +6,7 @@
 //! Every function reads from the start of a slice whose end stands for the C
 //! terminator, and returns the value with the number of bytes consumed (0 when
 //! nothing converted).
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use crate::scan::{is_blank, is_space, starts_with_ignore_case};
 

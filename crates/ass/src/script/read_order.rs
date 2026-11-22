@@ -1,4 +1,5 @@
 //! Duplicate detection for Matroska packets by their ReadOrder field.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Budget, BudgetVec, Result};
 

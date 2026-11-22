@@ -1,4 +1,5 @@
 //! Alpha bitmaps and the blends libass combines them with.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Budget, BudgetVec, Error, Result};
 

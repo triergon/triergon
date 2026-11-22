@@ -1,4 +1,5 @@
 //! Characters of event text: libass's lenient UTF-8 and its escapes.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use crate::WrapStyle;
 

@@ -1,4 +1,5 @@
 //! The `[Script Info]` section.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use crate::number::{header_bool, header_int, strtod};
 use crate::scan::{is_space, trim_end, trim_start};
