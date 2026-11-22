@@ -69,12 +69,8 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
         &self.reader
     }
 
-    /// The reader, mutably.
-    pub fn reader_mut(&mut self) -> &mut R {
-        &mut self.reader
-    }
-
-    /// The source, at whatever offset the last read left it.
+    /// Takes the source at its current position to check the reader's input handoff.
+    #[cfg(feature = "reference-trace")]
     pub fn into_inner(self) -> S {
         self.source
     }
@@ -215,11 +211,6 @@ impl<S: Read + Seek> Feed<S> {
     /// last answer, so a caller that moves the source moves it back.
     pub fn source_mut(&mut self) -> &mut S {
         &mut self.source
-    }
-
-    /// The source, at whatever offset the last read left it.
-    pub fn into_inner(self) -> S {
-        self.source
     }
 
     /// Answer `request` on `input`: with the bytes read, or with the end of the source

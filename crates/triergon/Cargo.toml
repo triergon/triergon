@@ -40,10 +40,11 @@ triergon-shape = { path = "../shape", optional = true }
 
 [dev-dependencies]
 # Exercise the full playback example in plain cargo test.
-triergon = { path = ".", default-features = false, features = ["isobmff", "ogg", "elementary", "playback", "codecs", "render"] }
+triergon = { path = ".", default-features = false, features = ["isobmff", "ogg", "elementary", "playback", "codecs", "render", "reference-trace"] }
 
 [features]
 default = ["matroska"]
+reference-trace = ["triergon-core/reference-trace"]
 matroska = ["dep:triergon-matroska"]
 isobmff = ["dep:triergon-isobmff"]
 mpegts = ["dep:triergon-mpegts"]
