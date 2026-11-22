@@ -65,6 +65,37 @@ fn strict_loas_assembles_split_headers_and_preserves_pes_clocks() {
 }
 
 #[test]
+fn split_loas_retains_a_following_header_across_buffered_and_borrowed_input() {
+    let first = envelope(&[0x24; 1381]);
+    let second = envelope(&[0x82; 19]);
+    let mut ts = transport();
+    ts.pes(PID, 0xc0, &first[..459], Some(90_000), None);
+    ts.pes(
+        PID,
+        0xc0,
+        &[&first[459..], &second].concat(),
+        Some(180_000),
+        None,
+    );
+
+    for (window, work) in [(7, 1), (4096, 4096)] {
+        let mut reader = Drive::new(&ts.bytes, ReaderLimits::default(), window, work);
+        let mut count = 0;
+        while let Some(event) = reader.next().unwrap() {
+            let Event::Packet(packet) = event else {
+                continue;
+            };
+            let bytes = [&first, &second][count];
+            assert_eq!(packet.payload(), bytes);
+            assert_eq!(packet.pts(), Some([90_000, 180_000][count]));
+            assert_eq!(packet.sources().len(), [2, 1][count]);
+            count += 1;
+        }
+        assert_eq!(count, 2);
+    }
+}
+
+#[test]
 fn complete_buffered_loas_reuses_source_storage() {
     let frame = envelope(&[0x24; 23]);
     let mut ts = transport();

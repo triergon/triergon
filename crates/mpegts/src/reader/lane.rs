@@ -1637,15 +1637,20 @@ impl Lane {
                                 .checked_add(count as u64)
                                 .ok_or(Error::Overflow)?;
                             let range = input.offset..input.offset + count;
-                            let appended = if let Framer::Video(reader) = framer {
-                                reader.append_payload(
+                            let appended = match framer {
+                                Framer::Video(reader) => reader.append_payload(
                                     &request,
                                     &payload[range.clone()],
                                     work,
                                     cancel,
-                                )?
-                            } else {
-                                false
+                                )?,
+                                Framer::Loas(reader) => reader.append_payload(
+                                    &request,
+                                    &payload[range.clone()],
+                                    work,
+                                    cancel,
+                                )?,
+                                _ => false,
                             };
                             if !appended {
                                 let bytes = span.payload_bytes()?;

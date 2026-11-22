@@ -50,7 +50,7 @@ limit becomes an explicit, reviewed rule for that case.
 
   | Reference | Prepare | Builds | Features |
   |---|---|---|---|
-  | FFmpeg git `d32b387f` (9.0 branch) | `prepare-ffmpeg --profile P` | `matroska` (container harness), `formats` (MOV, TS, HLS segments, playback; 12 demuxers), `video` (Matroska with the H.264 and HEVC decoders), `transport-dts` (MPEG-TS demuxer and DTS parser), `subtitles` (PGS, DVB, DVD, closed-caption and teletext decoders, with libzvbi 0.2.46) | containers, framing, playback, [DTS transport](../harness/features/mpegts-dts-core/contract.json), subtitles |
+  | FFmpeg git `d32b387f` (9.0 branch) | `prepare-ffmpeg --profile P` | `matroska` (container harness), `formats` (MOV, TS, HLS segments, playback; 12 demuxers), `video` (Matroska with the H.264 and HEVC decoders), `transport-dts` (MPEG-TS demuxer and DTS parser), `transport-mpeg-video` (MPEG-TS demuxer and MPEG-1/2 video parser), `subtitles` (PGS, DVB, DVD, closed-caption and teletext decoders, with libzvbi 0.2.46) | containers, framing, playback, [DTS transport](../harness/features/mpegts-dts-core/contract.json), [MPEG picture carriage](../harness/features/mpegts-mpeg-video/contract.json), subtitles |
   | FFmpeg 9.0.2 release | `prepare-ffmpeg --profile P` | `decode` (its `ffmpeg` and `ffprobe` also decode capture output), `capture` (gating), `capture-small`; the capture builds link FFmpeg's libraries into the worker so the observer audits them | codecs, capture |
   | mpg123 1.33.7 | `prepare-mpg123` | static | MPEG-TS free-format audio |
   | FreeType 2.15.0 | `fonts prepare` | static, no optional dependencies | `font-outlines`, `font-hinting-none`, `font-hinting-default`; `font-hinting-modes` on demand |
@@ -377,7 +377,7 @@ HarfBuzz builds); `build-workers --all-references` exits 1 without writing a bui
 identity when a profile is not prepared:
 
 ```sh
-for profile in matroska formats transport-dts video subtitles decode capture capture-small; do
+for profile in matroska formats transport-dts transport-mpeg-video video subtitles decode capture capture-small; do
     cargo xtask prepare-ffmpeg --jobs 8 --profile "$profile"
 done
 cargo xtask prepare-mpg123 --jobs 8
