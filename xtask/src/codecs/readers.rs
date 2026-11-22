@@ -871,8 +871,8 @@ fn packet_output(
     ];
     argv.extend_from_slice(arguments);
     let os_args: Vec<std::ffi::OsString> = argv.iter().map(std::ffi::OsString::from).collect();
-    let done = crate::harness::worker::run(&os_args, &[], RUN_TIMEOUT)?
-        .ok_or_else(|| Stop::Timeout(argv))?;
+    let done =
+        crate::harness::worker::run(&os_args, &[], RUN_TIMEOUT)?.ok_or(Stop::Timeout(argv))?;
     Ok(if done.code == 0 {
         String::from_utf8(done.stdout).map_err(|error| format!("{}: {error}", worker.display()))
     } else {
