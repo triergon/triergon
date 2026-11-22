@@ -73,6 +73,7 @@ const IMAGE_INPUTS: [&str; 9] = [
     "codec-vector-inputs",
     "codec-file-lane-inputs",
     "elementary-reader-inputs",
+    "ogg-page-inputs",
     "opus-testvectors",
 ];
 
