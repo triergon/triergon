@@ -185,25 +185,19 @@
         "name": "unit-packet-views",
         "entry_points": ["packet::UnitPacket", "progressive::TsProgressiveReader::packet", "segment::HlsSegment::packet"],
         "degree": "unit-tests",
-        "needs": "the hls-segments and progressive-ts188 folds read through PacketInfo"
+        "needs": "hls-unit-packets compares both PacketInfo views. The legal duplicate carrier case remains open."
       },
       {
         "name": "aac-segment-clocks",
         "entry_points": ["clock::resolve_hls_aac_clocks", "clock::HlsAacClock"],
         "degree": "unit-tests",
-        "needs": "an hls-segments operation folding the resolved AAC clocks; the gated operation folds take_with_ns_clocks only"
+        "needs": "hls-aac-clocks compares the exact AAC clock and its 90 kHz projection. The legal duplicate carrier case remains open."
       },
       {
         "name": "standalone-access-unit-readers",
         "entry_points": ["avc::AvcTsReader", "aac::HlsAac", "avc::AvcTsReader::push_compact", "aac::HlsAac::push_compact", "avc::AvcTsAccessUnit::source_bytes"],
         "degree": "step",
-        "needs": "hls-segments and progressive-ts188 cases fed through push_compact with each unit's source bytes folded; the gated readers run both types through push only"
-      },
-      {
-        "name": "segment-push-input-and-tails",
-        "entry_points": ["segment::HlsSegmentReader::provide", "segment::HlsMediaSegmentReader::provide", "segment::HlsSegment::audio_tail90", "segment::HlsMediaVideoUnit::feed_spans"],
-        "degree": "unit-tests",
-        "needs": "hls-segments cases fed through provide in varied windows, folding the 90 kHz audio tail and each video unit's feed spans beside the existing fold"
+        "needs": "hls-compact-push uses both public compact push methods and folds the video source bytes. The reference duplicate refusal and the standalone AVC initial delimiter requirement remain open."
       }
     ],
     "triergon-isobmff": [],
@@ -372,7 +366,7 @@
         "name": "configuration-tracking-on-its-own",
         "entry_points": ["RawVideoConfigTracker", "RawVideoConfiguration", "AvcVuiTiming", "HevcVuiTiming", "hevc_startup"],
         "degree": "step",
-        "needs": "a README sentence naming raw-annex-b, hls-segments and matroska-startup-seek as the comparisons it runs inside, with a coverage run showing every public method reached; VUI timing beyond the picture period is folded by none"
+        "needs": "raw-annex-b, hls-segments and matroska-startup-seek reach the tracker and HEVC startup APIs; playback-source-view compares the initial SPS-derived frame rate. The sample aspect ratio and additional VUI fields are diagnostic only."
       }
     ],
     "triergon-session": [
