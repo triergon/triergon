@@ -1568,9 +1568,6 @@
       "compat": "compat::matroska::vobsub_default_canvas for consumers recovering tracks without VobSub initialization.",
       "cases": [
         "dvd-mkv-private-no-private"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -1581,9 +1578,6 @@
       "compat": "compat::dvb::accept_unbounded_subtitle_pes for consumers recovering malformed subtitle input.",
       "cases": [
         "dvb-pes-unbounded-ts"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -1597,9 +1591,6 @@
         "dvb-services-two-ordered-ts",
         "dvb-source-combined-services",
         "dvb-source-separate-descriptors"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -1612,9 +1603,6 @@
         "dvb-pages-ancillary-after-ts",
         "dvb-pages-other-first-ts",
         "dvb-pages-unsignalled-ts"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -1624,9 +1612,6 @@
       "reference": "Publishes no event when asked for that service; the black-box demux exposes the later descriptor.",
       "cases": [
         "dvb-source-separate-descriptors-service-0"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -1637,9 +1622,6 @@
       "compat": "compat::psi::allow_zero_pid_reserved_bits for callers recovering nonconforming captured tables.",
       "cases": [
         "dvb-fate-dvbsubtest_filter"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
