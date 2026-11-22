@@ -1,5 +1,6 @@
 mod probe;
 mod source_control;
+mod ts_controls;
 
 use std::ffi::OsString;
 use std::io::{Cursor, Write};
@@ -505,6 +506,7 @@ pub(super) fn operation<'a>(
     match (prefix, args.as_slice()) {
         ("facade-probe-", args) => probe::prepare(input, args),
         ("any-ts-au-" | "ts-au-", args) => access_units(input, args),
+        ("any-ts-controls-", [size]) => ts_controls::prepare(input, size),
         ("ts-seek-", args) | ("any-seek-", ["ts", args @ ..]) => transport_seek(input, args),
         ("any-seek-", ["mkv", args @ ..]) => container_seek(input, Probe::Matroska, args),
         ("any-seek-", ["mp4", args @ ..]) => container_seek(input, Probe::Isobmff, args),

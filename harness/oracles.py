@@ -45,6 +45,7 @@ TRACE_ORACLES = {
     "core-budgets": ("harness.core_budget_oracle", "budget_trace"),
     "source-signatures": ("harness.signature_oracle", "trace"),
     "facade-source-control": ("harness.oracles", "facade_source_control"),
+    "facade-mpegts-controls": ("harness.ts_facade_oracle", "trace"),
     "ac3-features": ("harness.ac3_audblk_oracle", "trace"),
     "divide": ("harness.codec_dsp_oracle", "divide"),
     "windows": ("harness.codec_dsp_oracle", "windows"),

@@ -206,6 +206,9 @@ audio carriage and for video delimiters without a coded picture. It checks
 short-input and multi-program refusals and compares LOAS and MPEG audio
 frame boundaries across PES packets. The MPEG Layer I cases also compare
 exact fractional frame durations.
+The [transport control comparison](../../harness/features/facade-mpegts-controls/contract.json)
+checks carrier bytes and positions, ordinary continuity, PAT and PMT
+selection, and separate PES boundaries through `AnyOther::MpegTs`.
 The Matroska seek comparison verifies earlier audio and subtitle packets
 against a sequential read and checks their exact Block clocks.
 The [source lifecycle comparison](../../harness/features/facade-source-control/contract.json)

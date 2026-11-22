@@ -798,7 +798,7 @@
       ]
     },
     {"area": "Facade playback pipeline", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "comparison only (runtime, peak live heap and total RSS pending)", "parity": {"aarch64-unknown-linux-gnu": "All twelve cases match picture bytes, picture times and presented PCM counts, with PCM within 1 LSB. Three also match every packet field. The ASS overlay matches all 17 images and both frame records, including expiry."}},
-    {"area": "Facade MPEG-TS access units", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "facade-mpegts"},
+    {"area": "Facade MPEG-TS access units", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "facade-mpegts", "parity": {"aarch64-unknown-linux-gnu": "27/150 access-unit cases match, with 123 declared differences. The [control-event oracle](../harness/features/facade-mpegts-controls/contract.json) matches five TS188 and M2TS192 cases for carriers, PSI, continuity and PES boundaries."}},
     {"area": "Facade seeks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "facade-seek", "parity": {"aarch64-unknown-linux-gnu": "8/8 MPEG-TS, 96/252 Matroska and 33/33 ISO BMFF seeks match. The Matroska comparison verifies delivered preroll against sequential source packets. The [source lifecycle oracle](../harness/features/facade-source-control/contract.json) verifies capabilities, reset and input failure in all four container cases."}},
     {
       "area": "Codecs",

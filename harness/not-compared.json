@@ -7,8 +7,8 @@
       {
         "name": "any-reader-mpegts",
         "entry_points": ["AnyOther::MpegTs"],
-        "degree": "unit-tests",
-        "needs": "Facade-mpegts compares admission and packet delivery. A paired comparison of MPEG-TS control events through AnyOther remains due."
+        "degree": "step",
+        "needs": "Facade-mpegts compares admission and packet delivery. Facade-mpegts-controls compares carrier, ordinary continuity, PSI, PES and EOF events through AnyOther. Loss, clock discontinuity, interrupted PES, header-only video and unsupported-framer events need checked results."
       }
     ],
     "triergon-ass": [],

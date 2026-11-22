@@ -34,6 +34,7 @@ impl Kind {
             "core-budgets",
             "source-signatures",
             "facade-source-control",
+            "facade-mpegts-controls",
             "ac3-features",
             "elementary-metadata",
             "opus-final-range",

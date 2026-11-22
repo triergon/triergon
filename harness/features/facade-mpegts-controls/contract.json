@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "facade-mpegts-controls",
+  "gate": "required",
+  "operation": "facade-mpegts-controls",
+  "candidate": "play-views-worker",
+  "worker_operation": "any-ts-controls-",
+  "oracle": "facade-mpegts-controls",
+  "contract": [
+    "Read one selected programme through AnyReader and Blocking::next_event, retaining each AnyOther::MpegTs carrier and control event in delivery order.",
+    "Compare carrier bytes, source positions, PID, payload start and continuity counter against ITU-T H.222.0 (08/2023) §§2.4.3.2–2.4.3.5. The M2TS arrival prefix remains part of the physical carrier.",
+    "Compare PID continuity, CRC-checked PSI and route selection against §§2.4.3.3, 2.4.4.2–2.4.4.6, 2.4.4.9–2.4.4.10 and Annex A. Exercise a PMT version wrap that retypes a PID. The configuration epoch follows SourceEpochs::configuration.",
+    "Compare the distinct PES headers and their exact payloads and elementary offsets under §§2.4.3.6–2.4.3.7. Exercise a PES spread across multiple carriers, two PES packets containing one AAC unit, PTS and DTS, and clean EOF. The facade-mpegts gate compares the resulting access units separately."
+  ],
+  "required_profiles": ["ts188", "m2ts192"],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["ts188", "m2ts192", "pts-dts", "pes-boundary", "pmt-retype"], "cause": "The wire oracle only compares parity."},
+    {"bound": "heap", "cases": ["ts188", "m2ts192", "pts-dts", "pes-boundary", "pmt-retype"], "cause": "The wire oracle only compares parity."},
+    {"bound": "total_rss", "cases": ["ts188", "m2ts192", "pts-dts", "pes-boundary", "pmt-retype"], "cause": "The wire oracle only compares parity."}
+  ]
+}

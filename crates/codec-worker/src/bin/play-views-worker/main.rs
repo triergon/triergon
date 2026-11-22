@@ -14,6 +14,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
     ("play-", raw::operation),
     ("facade-probe-", facade::operation),
     ("any-ts-au-", facade::operation),
+    ("any-ts-controls-", facade::operation),
     ("ts-au-", facade::operation),
     ("any-seek-", facade::operation),
     ("any-source-control-", facade::operation),
