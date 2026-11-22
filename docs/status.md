@@ -100,6 +100,31 @@ on `pmtchange.ts` and transport faults on the unaligned `loewe.ts` sync grid
 under two delivery granularities. Probe metadata and full packet-fold parity
 remain open on both inputs.
 
+An original `pmtchange.ts` control also exercises
+`compat::stream::ProgramReader` with one-unit and larger work grants. It reports
+program 4 on PMT PID 73 twice, with PCR PIDs 4680 then 4694 and five streams
+per PMT. AC-3/MPEG-2 classification and the three audio languages agree with
+the pinned probe's corresponding fields. This is partial discovery coverage:
+the opt-in `compat::stream::PositionalStreamIds` operation retains the probe's
+stream IDs 4677–4681 separately from replacement wire PIDs 4691–4695. Nine
+hash-pinned authored cascades (24 cumulative inputs, merge off/on) establish
+ordinal reuse with marker PES assignments and parser framing disabled. The
+[comparison](../crates/mpegts/tests/data/pmt-identity-cascades.md) can rerun all
+48 recorded outcomes with a local ffprobe and reports its executable hash. The
+same local probe matches all 11 original no-parser packet identities. The check
+uses the preceding map at each packet position and uses the first map
+retrospectively for five packets before PMT discovery. Online packet delivery
+and full packet-fold parity remain open. The operation accepts a fixed
+program/PMT route and stream count, unchanged PID
+order or complete replacement, and no elementary stream identifier (`0x52`)
+descriptors. Partial PID overlap, insertion/removal, duplicate PIDs and stream
+identifier matching are refused. Language and codec do not select identities.
+Source PMTs, descriptors, PIDs and existing packet traces remain unchanged.
+The probe identifies SCTE-35 with codec tag zero while the reader retains
+unknown wire type 0x86. Full metadata, broader identity matching and original
+packet parity remain open. Native runtime/heap/RSS gates for these operations
+have not been measured.
+
 The [DTS seek comparison](../harness/features/mpegts-dts-seek/contract.json)
 includes 12 coded suffix cases for static mode-zero component navigation.
 All 38 DTS seek cases meet the runtime and memory requirements on both targets.

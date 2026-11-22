@@ -224,6 +224,127 @@ fn original_pmt_replacement_retains_tracks_clocks_and_faults() {
     assert_eq!(facts, read(&bytes, None, 187, 128));
 }
 
+// Projection of the ordinary probe's programs[0] and its streams, not a packet
+// fold. Reference d32b387f2b0a484599d4587d651891f0c63c4238, ffprobe SHA-256
+// d9d0840413169e2ec50eb1a2e3c9bebf3aa5a15ab97217ac987ca9a901b33896:
+// -v error -bitexact -of json -merge_pmt_versions 1 -show_programs
+// -show_streams -i pmtchange.ts
+// Original stdout SHA-256:
+// 9e76e1d93d554fb236a74dc97a741c527f5996cc6f960499d15d42ddb28950bb.
+#[test]
+#[ignore = "requires hash-pinned original mpegts/pmtchange.ts in the FATE cache"]
+fn original_compat_program_discovery_and_probe_identity_difference() {
+    use triergon_mpegts::compat::stream::{PositionalStreamIds, ProgramReader, codec};
+    use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, parse_transport};
+
+    let bytes = original(
+        "pmtchange.ts",
+        "5185db2052de1174629acdf13382eb42449ebfa7ef2b09a822d9867ed8c80860",
+    );
+    let discover = |grant| {
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader = ProgramReader::new(pool.clone(), ParseLimits::default()).unwrap();
+        let mut identities =
+            PositionalStreamIds::new(pool.clone(), ParseLimits::default()).unwrap();
+        let cancel = AtomicBool::new(false);
+        let mut found = Vec::new();
+        assert!(bytes.chunks_exact(188).remainder().is_empty());
+        for (index, raw) in bytes.chunks_exact(188).enumerate() {
+            let packet = parse_transport(
+                Bytes::copy_from_slice(&pool, raw).unwrap(),
+                PacketFormat::Ts188,
+                index as u64 * 188,
+            )
+            .unwrap();
+            reader.push(&packet).unwrap();
+            let mut drained = false;
+            for _ in 0..4096 {
+                match reader
+                    .poll_with_work(&mut WorkBudget::new(grant), &cancel)
+                    .unwrap()
+                {
+                    AssemblyStep::Output(program) => {
+                        let assigned = identities.apply(&program).unwrap();
+                        for (index, identity) in assigned.as_slice().iter().enumerate() {
+                            assert_eq!(usize::from(identity.id), 4677 + index);
+                            assert_eq!(identity.pid, program.streams.as_slice()[index].pid);
+                        }
+                        let mut rows = vec![format!(
+                            "program {} pmt {} pcr {}",
+                            program.number,
+                            program.pmt_pid,
+                            program.pcr_pid.unwrap()
+                        )];
+                        for stream in program.streams.as_slice() {
+                            let language = stream
+                                .descriptors()
+                                .map(Result::unwrap)
+                                .find(|descriptor| descriptor.tag == 10)
+                                .map_or("-", |descriptor| {
+                                    std::str::from_utf8(&descriptor.data[..3]).unwrap()
+                                });
+                            rows.push(format!(
+                                "{} {} {:?} {}",
+                                stream.pid,
+                                stream.stream_type,
+                                codec(stream),
+                                language
+                            ));
+                        }
+                        found.push(rows);
+                    }
+                    AssemblyStep::Yield => {}
+                    AssemblyStep::NeedPayload => {
+                        drained = true;
+                        break;
+                    }
+                    AssemblyStep::Finished => panic!("unexpected terminal assembler"),
+                }
+            }
+            assert!(drained, "discovery must finish within bounded packet work");
+        }
+        found
+    };
+    let found = discover(4096);
+    assert_eq!(found, discover(1));
+    assert_eq!(found.len(), 2);
+    let reference: Vec<_> = include_str!("data/pmt-merge-probe.txt").lines().collect();
+    assert_eq!(found[1][0], reference[0]);
+    for (map, first_pid, pcr) in [(&found[0], 4677, 4680), (&found[1], 4691, 4694)] {
+        assert_eq!(map[0], format!("program 4 pmt 73 pcr {pcr}"));
+        assert_eq!(map.len(), reference.len());
+        for (index, (kind, codec, language)) in [
+            (129, "Some(Ac3)", "eng"),
+            (129, "Some(Ac3)", "spa"),
+            (129, "Some(Ac3)", "por"),
+            (2, "Some(Mpeg2Video)", "-"),
+            (134, "None", "-"),
+        ]
+        .iter()
+        .enumerate()
+        {
+            assert_eq!(
+                map[index + 1],
+                format!("{} {kind} {codec} {language}", first_pid + index)
+            );
+        }
+    }
+    // Keep source and compatibility identities separate: the probe retains the first
+    // stream IDs through replacement and identifies SCTE-35 with codec tag 0;
+    // the PMT reader exposes current wire PIDs and unknown stream type 0x86.
+    // The opt-in positional operation above retains IDs without rewriting them.
+    assert_eq!(
+        reference[1..],
+        [
+            "4677 129 Ac3 eng",
+            "4678 129 Ac3 spa",
+            "4679 129 Ac3 por",
+            "4680 2 Mpeg2Video -",
+            "4681 0 scte_35 -",
+        ]
+    );
+}
+
 #[test]
 #[ignore = "requires hash-pinned original mpegts/loewe.ts in the FATE cache"]
 fn original_unaligned_program_reports_faults_at_aligned_offsets() {
@@ -249,4 +370,127 @@ fn original_unaligned_program_reports_faults_at_aligned_offsets() {
     expected.push("finished".into());
     assert_eq!(facts, expected);
     assert_eq!(facts, read(&bytes, Some(769), 1, 64));
+}
+
+// Compare each reference packet's TS position with the preceding PMT mapping.
+// For packets before the first PMT, use the first mapping retrospectively.
+#[test]
+#[ignore = "requires the pinned original and a matrix-verified ffprobe"]
+fn original_packet_positions_match_positional_identities() {
+    use triergon_mpegts::compat::stream::{PositionalStreamIds, ProgramReader};
+    use triergon_mpegts::{PacketFormat, ParseLimits, parse_transport};
+
+    const INPUT_SHA: &str = "5185db2052de1174629acdf13382eb42449ebfa7ef2b09a822d9867ed8c80860";
+    const PACKETS_SHA: &str = "95b077027d062cf1170a97232a0b60950e57e0fba19c8f69b56b842cd4ae4ddf";
+    let bytes = original("pmtchange.ts", INPUT_SHA);
+    let probe = std::env::var_os("TRIERGON_PMT_FFPROBE").expect("matrix-verified ffprobe path");
+    let probe_hash = sha256::file_hex(std::path::Path::new(&probe)).unwrap();
+    eprintln!("ffprobe sha256 {probe_hash}");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../.research/fate-samples/mpegts/pmtchange.ts");
+    let output = std::process::Command::new(&probe)
+        .args([
+            "-v",
+            "error",
+            "-bitexact",
+            "-f",
+            "mpegts",
+            "-fflags",
+            "+noparse+nofillin",
+            "-merge_pmt_versions",
+            "1",
+            "-show_entries",
+            "stream=index,id,codec_tag:packet=stream_index,pos,size",
+            "-show_packets",
+            "-of",
+            "compact",
+            "-i",
+        ])
+        .arg(&path)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "ffprobe failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(sha256::hex(&output.stdout), PACKETS_SHA);
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = ProgramReader::new(pool.clone(), ParseLimits::default()).unwrap();
+    let mut identities = PositionalStreamIds::new(pool.clone(), ParseLimits::default()).unwrap();
+    let mut mappings = Vec::new();
+    assert!(bytes.chunks_exact(188).remainder().is_empty());
+    for (index, raw) in bytes.chunks_exact(188).enumerate() {
+        let offset = index * 188;
+        let packet = parse_transport(
+            Bytes::copy_from_slice(&pool, raw).unwrap(),
+            PacketFormat::Ts188,
+            offset as u64,
+        )
+        .unwrap();
+        reader.push(&packet).unwrap();
+        while let Some(program) = reader.poll().unwrap() {
+            let assigned = identities.apply(&program).unwrap();
+            mappings.push((offset, assigned.as_slice().to_vec()));
+        }
+    }
+    assert_eq!(mappings.len(), 2);
+    let stdout = std::str::from_utf8(&output.stdout).unwrap();
+    let mut packet_count = 0;
+    let mut before_first_map = 0;
+    let mut streams = Vec::new();
+    let mut mismatches = Vec::new();
+    for line in stdout.lines() {
+        let field = |key: &str| {
+            line.split('|')
+                .find_map(|part| part.strip_prefix(key))
+                .unwrap()
+        };
+        if line.starts_with("packet|") {
+            let offset: usize = field("pos=").parse().unwrap();
+            let index: usize = field("stream_index=").parse().unwrap();
+            assert_eq!(offset % 188, 0);
+            let raw = bytes
+                .get(offset..offset + 188)
+                .expect("packet position inside original");
+            assert_eq!(raw[0], 0x47);
+            let pid = (u16::from(raw[1] & 31) << 8) | u16::from(raw[2]);
+            let bound = mappings.partition_point(|(position, _)| *position <= offset);
+            before_first_map += usize::from(bound == 0);
+            let (_, identities) = &mappings[bound.saturating_sub(1)];
+            let identity = identities
+                .iter()
+                .find(|identity| identity.pid == pid)
+                .map(|identity| usize::from(identity.id));
+            if identity != Some(4677 + index) {
+                mismatches.push(format!(
+                    "position {offset}, PID {pid}, reference index {index}, candidate {identity:?}"
+                ));
+            }
+            packet_count += 1;
+        } else if line.starts_with("stream|") {
+            let index: usize = field("index=").parse().unwrap();
+            let id = u16::from_str_radix(field("id=").strip_prefix("0x").unwrap(), 16).unwrap();
+            streams.push((index, id));
+        }
+    }
+    assert_eq!(
+        streams,
+        (0..5).map(|i| (i, 4677 + i as u16)).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        packet_count, 11,
+        "complete reference packet observation changed"
+    );
+    assert_eq!(before_first_map, 5);
+    assert!(
+        mismatches.is_empty(),
+        "packet identity mismatches:\n{}",
+        mismatches.join("\n")
+    );
+    assert_eq!(
+        sha256::file_hex(std::path::Path::new(&probe)).unwrap(),
+        probe_hash
+    );
+    assert_eq!(sha256::file_hex(&path).unwrap(), INPUT_SHA);
 }

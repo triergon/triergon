@@ -448,6 +448,22 @@ fn observe(root: &Path, spec: &Value, output: &Path) -> R<()> {
 
 pub fn main(root: &Path, args: &[String]) -> R<()> {
     match args {
+        [mode, probe] if mode == "pmt-identity" => {
+            let probe = fs::canonicalize(probe).map_err(|e| format!("ffprobe: {e}"))?;
+            let hash = sha256::file_hex(&probe).map_err(|e| format!("ffprobe: {e}"))?;
+            eprintln!("ffprobe SHA-256: {hash}");
+            let status = std::process::Command::new("cargo")
+                .current_dir(root)
+                .env("CARGO_INCREMENTAL", "0")
+                .env("TRIERGON_PMT_FFPROBE", &probe)
+                .args([
+                    "test", "-p", "triergon-mpegts", "--test", "demux_streams",
+                    "identity_black_box_output_comparison", "--", "--ignored", "--exact",
+                ])
+                .status()
+                .map_err(|e| format!("run PMT comparison: {e}"))?;
+            if status.success() { Ok(()) } else { Err(format!("PMT comparison failed: {status}")) }
+        }
         [mode] if mode == "check" => {
             if read_json(&root.join(INVENTORY))? != inventory(root)? {
                 return Err(
@@ -461,7 +477,7 @@ pub fn main(root: &Path, args: &[String]) -> R<()> {
             observe(root, &read_json(Path::new(spec))?, Path::new(output))
         }
         _ => Err(
-            "usage: cargo xtask transport-fate check | inventory OUTPUT | observe SPEC OUTPUT_DIR"
+            "usage: cargo xtask transport-fate check | inventory OUTPUT | observe SPEC OUTPUT_DIR | pmt-identity FFPROBE"
                 .into(),
         ),
     }
