@@ -208,5 +208,8 @@ frame boundaries across PES packets. The MPEG Layer I cases also compare
 exact fractional frame durations.
 The Matroska seek comparison verifies earlier audio and subtitle packets
 against a sequential read and checks their exact Block clocks.
+The [source lifecycle comparison](../../harness/features/facade-source-control/contract.json)
+checks source capabilities, restart requests and sticky input failures for Matroska,
+ISO BMFF, TS188 and M2TS192 alongside the native seek comparisons.
 See the [play corpus](../../harness/codecs/play-manifest.json) and
 [quality gates](../../docs/quality.md).

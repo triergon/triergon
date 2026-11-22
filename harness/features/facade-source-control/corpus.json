@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "mkv",
+      "profile": "mkv",
+      "file": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv"
+      ],
+      "expected": {
+        "trace_sha256": "9b1a36087733847847e0a37b4b05eeb66a80f4d589ed7502c65c506ddbf4d00f"
+      }
+    },
+    {
+      "id": "mp4",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "trace_sha256": "db71b3e0c700b22b1e6ad5421fe7803bb4a09ddedee7650f503021ce92d8558d"
+      }
+    },
+    {
+      "id": "ts188",
+      "profile": "ts188",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc.ts",
+      "sha256": "8c0e8f659fc8b4eeb9094a2d201a5fc80c95e023f4f8f052ad80f8c03c03bb87",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188"
+      ],
+      "expected": {
+        "trace_sha256": "0ecc361e15e7306f6bfedcca07ec8284c5ec1b984a204c2cd54e0d63170d83f0"
+      }
+    },
+    {
+      "id": "m2ts192",
+      "profile": "m2ts192",
+      "file": "harness/features/mpegts-previous-picture/inputs/hevc.m2ts",
+      "sha256": "20320afc50e97b5806a556808171dcfc220747797a9133d5882616ec2ae80163",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192"
+      ],
+      "expected": {
+        "trace_sha256": "cbbeb81c94ad3254c6e8256170bc83333ccb3d45b0a90c1998978c2351f02979"
+      }
+    }
+  ]
+}

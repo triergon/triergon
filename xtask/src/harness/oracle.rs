@@ -33,6 +33,7 @@ impl Kind {
             "divide",
             "core-budgets",
             "source-signatures",
+            "facade-source-control",
             "ac3-features",
             "elementary-metadata",
             "opus-final-range",

@@ -44,6 +44,7 @@ TRACE_ORACLES = {
     "opus-final-range": ("harness.opus_range_oracle", "ranges"),
     "core-budgets": ("harness.core_budget_oracle", "budget_trace"),
     "source-signatures": ("harness.signature_oracle", "trace"),
+    "facade-source-control": ("harness.oracles", "facade_source_control"),
     "ac3-features": ("harness.ac3_audblk_oracle", "trace"),
     "divide": ("harness.codec_dsp_oracle", "divide"),
     "windows": ("harness.codec_dsp_oracle", "windows"),
@@ -71,6 +72,19 @@ TRACE_ORACLES = {
 def views_smoke(path):
     data = path.read_bytes()
     return [f"3 {len(data)} {zlib.adler32(data)}"]
+
+
+def facade_source_control(path, container):
+    """The source capabilities and failure responses promised by ContainerReader."""
+    size = path.stat().st_size
+    rows = []
+    for length in (0, size):
+        if container == "mp4":
+            rows.append(f"3 {length} 0")
+        else:
+            rows.extend((f"1 {length} 0", f"2 {length} 0"))
+        rows.extend((f"1 {length} 1", f"2 {length} 1"))
+    return rows
 
 
 # Oracles that read no input file.

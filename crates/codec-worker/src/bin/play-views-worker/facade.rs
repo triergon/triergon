@@ -1,4 +1,5 @@
 mod probe;
+mod source_control;
 
 use std::ffi::OsString;
 use std::io::{Cursor, Write};
@@ -507,6 +508,7 @@ pub(super) fn operation<'a>(
         ("ts-seek-", args) | ("any-seek-", ["ts", args @ ..]) => transport_seek(input, args),
         ("any-seek-", ["mkv", args @ ..]) => container_seek(input, Probe::Matroska, args),
         ("any-seek-", ["mp4", args @ ..]) => container_seek(input, Probe::Isobmff, args),
+        ("any-source-control-", args) => source_control::prepare(input, args),
         _ => Err(format!(
             "usage: {prefix}{{fold,trace,memory}} FILE [ARG...] | {prefix}bench FILE ITERATIONS [ARG...]"
         )),

@@ -16,6 +16,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
     ("any-ts-au-", facade::operation),
     ("ts-au-", facade::operation),
     ("any-seek-", facade::operation),
+    ("any-source-control-", facade::operation),
     ("ts-seek-", facade::operation),
 ];
 

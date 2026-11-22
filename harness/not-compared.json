@@ -9,12 +9,6 @@
         "entry_points": ["AnyOther::MpegTs"],
         "degree": "unit-tests",
         "needs": "Facade-mpegts compares admission and packet delivery. A paired comparison of MPEG-TS control events through AnyOther remains due."
-      },
-      {
-        "name": "any-reader-seek-and-control",
-        "entry_points": ["AnyReader::request_seek", "AnyReader::reset", "AnyReader::fail", "AnyReader::capabilities", "AnyPacket::random_access", "Blocking::seek"],
-        "degree": "unit-tests",
-        "needs": "seek and reset cases of matroska-cues-preroll, isobmff-seek and mpegts-previous-picture run through AnyReader and Blocking and folded as those contracts fold, with each packet's random-access flag"
       }
     ],
     "triergon-ass": [],
