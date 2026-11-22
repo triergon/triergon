@@ -4,6 +4,7 @@ mod audio;
 mod bits;
 mod blocks;
 mod budget;
+mod inputs;
 mod time;
 mod video;
 
@@ -12,6 +13,9 @@ use std::path::Path;
 pub(crate) use bits::fetch_opus;
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
+    if args == ["fixtures", "media"] {
+        return inputs::prepare(root);
+    }
     if let [command, flags @ .., id] = args
         && command == "fixtures"
         && (flags.is_empty() || flags == ["--write-manifests"])

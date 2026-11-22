@@ -561,13 +561,23 @@ fn fate_corpus_pins(root: &Path) -> Result<Vec<Pin>, String> {
 /// The FATE sample at `relative` below `directory`: fetched by its pin when it is
 /// absent, verified when it is there.
 pub fn fate_sample(directory: &Path, relative: &str, sha256: &str) -> Result<(), String> {
+    fate_sample_bounded(directory, relative, sha256, VECTOR_LIMIT)
+}
+
+/// A pinned FATE sample of a corpus with an explicit download bound.
+pub(crate) fn fate_sample_bounded(
+    directory: &Path,
+    relative: &str,
+    sha256: &str,
+    limit: usize,
+) -> Result<(), String> {
     fetch_vector(
         directory,
         relative,
         sha256,
         &Network,
         download_cache().as_deref(),
-        VECTOR_LIMIT,
+        limit,
     )
 }
 
