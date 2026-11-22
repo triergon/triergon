@@ -1,6 +1,7 @@
 {
  "schema": 1,
  "items": {
+  "codecs-play": ["play-mkv", "play-mp4", "play-ts"],
   "codecs-sessions": ["session-aac", "session-ac3", "session-eac3", "session-dts", "session-flac", "session-mp3", "session-vorbis", "session-opus", "session-h264", "session-hevc", "track-reset"],
   "codec-dsp": ["imdct"],
   "codecs": ["h264", "hevc", "hevc-simd"],
@@ -10,6 +11,9 @@
   "elementary-readers": ["reader-flac", "reader-mp3", "reader-aac", "reader-ac3", "reader-eac3", "reader-flac-push", "reader-mp3-push", "reader-aac-push", "reader-ac3-push", "reader-eac3-push", "reader-flac-seek", "reader-mp3-seek", "reader-aac-seek", "reader-ac3-seek"]
  },
  "lanes": {
+  "play-mkv": {"build": "stable", "measured_by": "play-workloads"},
+  "play-mp4": {"build": "stable", "measured_by": "play-workloads"},
+  "play-ts": {"build": "stable", "measured_by": "play-workloads"},
   "flac-crc-reject": {"build": "session", "measured_by": null},
   "ac3-crc-reject": {"build": "stable", "measured_by": null},
   "eac3-crc-reject": {"build": "stable", "measured_by": null},
@@ -63,6 +67,9 @@
   "reader-eac3": {"build": "stable", "measured_by": null}
  },
  "open_unmeasured": [
+  {"bound": "runtime", "cases": ["play-mkv", "play-mp4", "play-ts"], "cause": "The three play workloads need paired collection on isolated AArch64 and ARMv7 gate hosts."},
+  {"bound": "heap", "cases": ["play-mkv", "play-mp4", "play-ts"], "cause": "The three play workloads need paired collection on isolated AArch64 and ARMv7 gate hosts."},
+  {"bound": "total_rss", "cases": ["play-mkv", "play-mp4", "play-ts"], "cause": "The three play workloads need paired collection on isolated AArch64 and ARMv7 gate hosts."},
   {"bound": "runtime", "cases": ["flac-crc-reject", "ac3-crc-reject", "eac3-crc-reject"], "cause": "The existing codec workloads use the default CRC policy. Reject needs paired collection with CRC validation enabled."},
   {"bound": "heap", "cases": ["flac-crc-reject", "ac3-crc-reject", "eac3-crc-reject"], "cause": "The existing codec workloads use the default CRC policy. Reject needs paired collection with CRC validation enabled."},
   {"bound": "total_rss", "cases": ["flac-crc-reject", "ac3-crc-reject", "eac3-crc-reject"], "cause": "The existing codec workloads use the default CRC policy. Reject needs paired collection with CRC validation enabled."},
