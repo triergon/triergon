@@ -603,6 +603,8 @@ impl Plan<'_> {
             preflight.extend(owned(&[
                 "--feature",
                 "matroska-cues-preroll",
+                "--corpus",
+                "matroska-cues-preroll=.research/seek-fixtures",
                 "--isobmff-seek",
             ]));
         }

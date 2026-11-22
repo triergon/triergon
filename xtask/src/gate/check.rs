@@ -59,6 +59,16 @@ impl Tree {
             tree.fetched
                 .insert(format!("{}/{}", pin.directory, pin.file), pin.sha256);
         }
+        for (source, files) in crate::fonts::corpus(root)? {
+            if source.get("generator").is_none() {
+                for file in files {
+                    tree.fetched.insert(
+                        format!(".research/fonts/files/{}", file.path),
+                        file.sha256,
+                    );
+                }
+            }
+        }
         let fate = json::read(&root.join("harness/fate/samples.json"))?;
         if let Some(samples) = fate.get("samples").and_then(Value::as_array) {
             for sample in samples {
