@@ -42,15 +42,15 @@ pub struct PhysicalCarrier {
     kind: ControlCarrierKind,
 }
 impl PhysicalCarrier {
-    /// The carrier with its original bytes and parsed fields.
+    /// The original carrier, including the physical offset, header and charged payload.
     pub fn packet(&self) -> &TransportPacket {
         &self.packet
     }
-    /// The source context the carrier was issued with.
+    /// The source event ordinal and epochs attached to this carrier.
     pub fn context(&self) -> SourceContext {
         self.context
     }
-    /// How the carrier was classified.
+    /// The control-only classification, or the requirement for a scoped media observer.
     pub fn kind(&self) -> ControlCarrierKind {
         self.kind
     }
@@ -62,7 +62,7 @@ pub struct PhysicalNullRun {
     first_context: SourceContext,
 }
 impl PhysicalNullRun {
-    /// The null carriers of the run.
+    /// A compact range of consecutive null carriers with the original width and backing.
     pub fn run(&self) -> &NullCarrierRun {
         &self.run
     }
@@ -78,11 +78,11 @@ pub struct ControlPatFact {
     context: SourceContext,
 }
 impl ControlPatFact {
-    /// The decoded PAT section.
+    /// The CRC-validated PAT section and its ordered entries as admitted from the source.
     pub fn section(&self) -> &PatSection {
         &self.section
     }
-    /// The source context the section was issued with.
+    /// The source event ordinal and epochs at publication of this PAT section.
     pub fn context(&self) -> SourceContext {
         self.context
     }
@@ -97,7 +97,7 @@ struct ControlRoute {
     anchored: bool,
     sections: usize,
 }
-/// Proof of absence of media carriers, not proof of a source-validated PES scope.
+/// Confirmation that one completely covered physical input contained only control traffic.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NoMediaConfirmation {
     source: SourceId,
@@ -223,7 +223,8 @@ impl PacketCompletion {
     pub fn confirmation(&self) -> Option<NoMediaConfirmation> {
         self.confirmation
     }
-    /// Explicit physical format. The default constructor stays TS188.
+    /// Track control-only completion for either TS188 or M2TS192. The selected program must
+    /// be nonzero and the parser limits must be valid, as for [`Self::new`].
     pub fn new_for_format(
         budget: Budget,
         limits: ParseLimits,
@@ -669,7 +670,9 @@ impl PacketCompletion {
         Ok(())
     }
 
-    /// Admit a literal source event. False leaves it available to retry.
+    /// Admit one event from the bound parser, cursor and source epoch. `Ok(false)`
+    /// leaves it available for retry with a larger work grant. A mismatched event
+    /// is rejected, and errors after admission stop the completion proof.
     pub fn observe_issued(
         &mut self,
         event: &ObservedTrace<TraceEvent>,
@@ -697,7 +700,9 @@ impl PacketCompletion {
         Ok(consumed)
     }
 
-    /// Admit one source-bound compact event. The budget still counts every carrier.
+    /// Admit one source-bound event or compact null run. The work and extent limits
+    /// count each carrier. Source identity, cancellation and admission rules are those
+    /// of [`Self::observe_issued`].
     pub fn observe_compact(
         &mut self,
         event: &ObservedTrace<CompactTraceEvent>,

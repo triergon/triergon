@@ -49,7 +49,8 @@ impl NullCarrierRun {
         self.bytes.is_empty()
     }
 
-    /// Expand one retained carrier through the normal strict inspector.
+    /// Expand the zero-based carrier index to its original packet and physical byte offset.
+    /// An index outside `0..len()` returns `Invalid`.
     pub fn packet(&self, index: usize) -> Result<TransportPacket> {
         if index >= self.len() {
             return Err(Error::Invalid("null carrier index"));

@@ -30,8 +30,6 @@
 //! [`DemuxClock`] places a packet's timestamps in the demuxer's 33-bit interval,
 //! fixed by the first timestamp it sees, and returns a [`DemuxTimeView`] beside
 //! the raw source values ([`DemuxClock::place`] for raw values alone).
-//!
-//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
 
 pub(crate) mod clock;
 pub(crate) mod completion;

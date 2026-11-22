@@ -62,8 +62,6 @@ pub mod annex_b;
 
 pub mod dts {
     //! Explicit selection of DTS core on private-data routes without a descriptor.
-    //! The comparison uses the same codec declaration with FFmpeg git revision
-    //! `d32b387f` on the 9.0 branch.
 
     /// A caller-identified DTS core stream with empty program and elementary
     /// descriptor loops. The reader validates each frame and keeps the original
@@ -78,8 +76,7 @@ pub mod dts {
 }
 
 pub mod latm {
-    //! Packet boundaries for LATM in MPEG-TS, as observed with FFmpeg git
-    //! revision `d32b387f` on the 9.0 branch with parsers and NOFILLIN.
+    //! LOAS framing or preservation of nonempty LATM PES packet boundaries.
     use crate::Track;
     use crate::clock::ClockKey;
     use crate::pes::Pes;
@@ -120,17 +117,17 @@ pub mod latm {
             }
         }
 
-        /// The track the PES belongs to.
+        /// The retained PMT entry that identifies this LATM elementary stream.
         pub fn track_info(&self) -> &Track {
             &self.track
         }
 
-        /// The original PES event.
+        /// The source event owning the original LATM header, payload spans and byte ranges.
         pub fn source(&self) -> &SourceEvent {
             &self.source
         }
 
-        /// The clock the PES timestamps belong to.
+        /// Program, PCR PID and source epoch that apply to the encoded timestamps.
         pub fn clock_key(&self) -> ClockKey {
             self.clock_key
         }
@@ -141,7 +138,7 @@ pub mod latm {
             self.clock_quarantined
         }
 
-        /// The original PES.
+        /// The complete validated LATM PES, with its wire header and source ranges.
         pub fn pes(&self) -> &Pes {
             let TraceEvent::Pes(pes) = self.source.event() else {
                 unreachable!("LATM packet owns its source PES");

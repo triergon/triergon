@@ -46,7 +46,7 @@ impl DemuxProfile {
     }
 }
 
-/// Where a placed timestamp came from.
+/// Whether a demux timestamp comes from an encoded field, a PTS-only fallback or absence.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TimestampOrigin {
     /// The header carried no timestamp.
@@ -69,7 +69,7 @@ pub struct ClockOrigin {
     pub interval_origin90: i128,
 }
 
-/// A separate view, not replacement packet fields or a source/demux waiver.
+/// Raw source timestamps and their optional positions in the demuxer’s 90 kHz interval.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DemuxTimeView {
     /// The demux profile the time was placed under.
@@ -89,9 +89,9 @@ pub struct DemuxTimeView {
     /// The DTS placed in the demuxer's interval, in 90 kHz ticks; the PTS when the header has no
     /// DTS.
     pub dts90: Option<i128>,
-    /// Where `pts90` came from.
+    /// Whether `pts90` came from the encoded PTS or was absent.
     pub pts_origin: TimestampOrigin,
-    /// Where `dts90` came from.
+    /// Whether `dts90` came from the encoded DTS, the PTS-only fallback or was absent.
     pub dts_origin: TimestampOrigin,
     /// The interval the timestamps were placed in; `None` until a timestamp opens one.
     pub origin: Option<ClockOrigin>,
@@ -169,8 +169,9 @@ pub struct DemuxClock {
     origin: Option<ClockOrigin>,
 }
 impl DemuxClock {
-    /// Optional encoded timing from finite source-fault recovery. No source
-    /// timestamp or anchor is created, including for forbidden timing flags.
+    /// Place any encoded PTS from a recovered finite PES in the 90 kHz demux interval.
+    /// `Ok(None)` is a work yield. Cancellation, a mismatched program or an invalid
+    /// PID or timestamp fail without committing a new interval.
     pub fn project_pes_fault(
         &mut self,
         packet: &crate::compat::pes::fault::PesFaultPacket,
@@ -195,7 +196,8 @@ impl DemuxClock {
     }
     /// Place encoded PTS from a faulted transport packet in this demux interval.
     /// Raw DTS stays absent; `dts90` is only the compatibility PTS-only result.
-    /// This creates no source timestamp or clock anchor.
+    /// `Ok(None)` is a work yield. Cancellation, a mismatched program or an invalid
+    /// PID or timestamp fail without committing a new interval.
     pub fn project_transport_fault(
         &mut self,
         packet: &crate::compat::pes::fault::TransportFaultPacket,
@@ -274,15 +276,15 @@ impl DemuxClock {
             origin: None,
         })
     }
-    /// The program number this clock places timestamps for.
+    /// The nonzero 16-bit program number configured when this clock was created.
     pub fn selected_program(&self) -> u16 {
         self.program
     }
-    /// Time for an explicit demux packet header, including a headerless
-    /// continuation. None means that output has no applicable time header; its
-    /// separate packet still retains the original causal source header/raw33.
-    /// This is the same time operation as complete-source-PES project.
-    /// State commits only after a complete result and cancellation check.
+    /// Place the header’s raw PTS and DTS in the demuxer’s 90 kHz interval. A missing header
+    /// has no timestamp fields, and a PTS-only header uses PTS as compatibility DTS.
+    /// A short work grant yields `Ok(None)`. Invalid PIDs, out-of-width timestamps and
+    /// values that disagree with the timing flags are rejected. Cancellation leaves the
+    /// clock state unchanged.
     pub fn project_header(
         &mut self,
         pid: u16,
@@ -340,8 +342,8 @@ impl DemuxClock {
         self.origin = next_origin;
         Ok(Some(result))
     }
-    /// A packet's raw PTS and DTS in the demuxer's interval, the DTS falling
-    /// back to the PTS, as [`Self::project_header`] places them.
+    /// Place optional 33-bit PTS and DTS in the fixed demux interval, in 90 kHz ticks.
+    /// Missing DTS falls back to PTS. A value outside the 33-bit range is invalid.
     pub fn place(
         &mut self,
         pts: Option<u64>,
@@ -367,8 +369,9 @@ impl DemuxClock {
             representative(dts, origin)?,
         ))
     }
-    /// None is a work yield; timestamp absence is represented inside the result.
-    /// A fresh object represents a fresh demux context; source epochs do not reset it.
+    /// Position one PES’s timestamps in the demux interval, preserving its source epochs.
+    /// `Ok(None)` is a work yield. Timing validation and cancellation are the same as
+    /// [`Self::project_header`]. Source epochs do not reset the interval.
     pub fn project(
         &mut self,
         source: &Pes,

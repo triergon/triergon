@@ -122,7 +122,9 @@ impl PesCutter {
         self.pcr_pid = pid;
     }
 
-    /// One transport packet. Take the completed packets before the next push.
+    /// Feed a carrier. The selected PID contributes payload and the PCR PID can
+    /// supply a clock. Pending output or a push after logical EOF returns `Invalid`.
+    /// Malformed PES, an over-limit extent and allocation failures propagate.
     pub fn push(&mut self, packet: &TransportPacket) -> Result<()> {
         if self.ended {
             return Err(Error::Invalid("PES packet after the end"));
@@ -154,7 +156,8 @@ impl PesCutter {
         self.ready.iter_mut().find_map(Option::take)
     }
 
-    /// The end of the input: completes the packet in progress.
+    /// Declare logical EOF and complete a nonempty pending packet, if any. A full
+    /// output queue or refused packet allocation prevents completion.
     pub fn finish(&mut self) -> Result<()> {
         self.end(DemuxBoundary::LogicalEof)?;
         self.ended = true;

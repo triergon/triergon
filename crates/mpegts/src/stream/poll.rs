@@ -256,9 +256,11 @@ impl TransportStream {
         }
     }
 
-    /// Like poll_feed_carriers, with optional shared-window runs for progressive
-    /// feeds. A run is accepted by FeedPayloadRun::append_ready. The returned
-    /// FeedContinuation applies to ordinary carriers.
+    /// Like [`Self::poll_feed_carriers`], with shared-window runs of complete TS188 carriers
+    /// on progressive feeds. Accept a run with
+    /// [`FeedPayloadRun::append_ready`](crate::stream::FeedPayloadRun::append_ready). The
+    /// callback’s [`FeedContinuation`] applies to ordinary carriers. Invalid input and
+    /// cancellation use the same errors as the ordinary feed, and callback errors propagate.
     pub fn poll_feed_with_payload_runs(
         &mut self,
         input: &mut InputCursor,
@@ -320,7 +322,8 @@ impl TransportStream {
 
     /// Like [`poll`](Self::poll), returning each run of null packets as one
     /// [`CompactTraceEvent::NullRun`] instead of one transport event per packet. On a
-    /// feed stream, events are omitted and counted as by `poll`.
+    /// feed stream, suppressed events are counted as by [`Self::poll`]. The same validation,
+    /// cancellation and budget errors apply.
     pub fn poll_compact(
         &mut self,
         input: &mut InputCursor,

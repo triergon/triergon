@@ -6,13 +6,8 @@
 //! source view does not, and [`PsiCompatibilityEvidence`] records each one with
 //! its source status.
 //!
-//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-//!
-//! Bounded demux catalogue view of actual strict PAT/PMT events.
-//!
-//! H.222.0 2.4.4/2.6 remain the source grammar. The separate flags48
-//! compatibility view supplies demux stream order, absent-PCR zero and language
-//! tags. It does not activate incomplete PATs or rejected PMTs.
+//! The bounded catalogue preserves H.222.0 source validation. Compatibility
+//! observations carry their source status, and only accepted tables activate routes.
 use crate::psi::{DESCRIPTOR_LENGTH, PMT_PROGRAM_IDENTITY};
 use crate::psi::{PatTable, ProgramMap, PsiCrc32};
 use crate::stream::{MediaEntityEnd, TraceEvent};
@@ -33,7 +28,7 @@ pub struct Program {
     pub program: u16,
     /// The 13-bit PID of the program's PMT.
     pub pmt_pid: u16,
-    /// Demux AVProgram default when no valid PMT was observed; not a source PCR.
+    /// The demux view’s PCR PID, or zero when no valid PMT supplied one.
     pub pcr_pid: u16,
     /// Index into [`Catalogue::evidence`] of the section the entry was read from.
     pub evidence: usize,
@@ -226,8 +221,8 @@ impl Catalogue {
     pub fn fault(&self) -> Option<Error> {
         self.fault
     }
-    /// Atomic work grant, explicitly costed by actual bounded syntax bytes. A
-    /// false return leaves state untouched; callers may supply required_work().
+    /// Work units for atomically admitting one bounded source event.
+    /// Returns `Unsupported` for an over-limit PAT or `Overflow` if the count exceeds `u64`.
     pub fn required_work(event: &TraceEvent) -> Result<u64> {
         if matches!(event,TraceEvent::Pat(t) if t.source_sections.len()>256 || t.source_ranges.len()>4096 || t.programs.len()>64)
         {
@@ -700,7 +695,8 @@ impl Catalogue {
         }
         Ok(())
     }
-    /// Real core/framer witness; advertised length alone never establishes EOF.
+    /// Seal completion using the parser’s physical end and the bound input cursor.
+    /// A missing table, incomplete current PAT or mismatched EOF witness is refused.
     pub fn finish(&mut self, end: &MediaEntityEnd, input: &InputCursor) -> Result<()> {
         self.validate_terminal_witness(end, input)?;
         if self.pending_pat.is_some() {

@@ -1,8 +1,7 @@
 //! The demuxer's packet operation, separate from strict source PES.
 //!
-//! Independently authored from H.222.0 source syntax and recorded public-API
-//! observations. Assembly consumes real input
-//! boundaries; no complete source/demux output is split, repeated or repaired.
+//! Assembly uses actual carrier starts, declared lengths and logical EOF.
+//! Each packet retains those boundaries and the source extents of its payload.
 use crate::compat::pes::clock::DemuxProfile;
 use crate::pes::HEADER_MAX;
 use crate::pes::PesHeader;
@@ -132,7 +131,7 @@ pub struct SourceContext {
     pub byte_run_epoch: Option<u64>,
 }
 
-/// Why a [`DemuxPacket`] ended.
+/// The wire extent or source boundary that completed a compatibility packet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DemuxBoundary {
     /// Its declared PES length was reached.
@@ -146,7 +145,7 @@ pub enum DemuxBoundary {
     FiniteOverrun,
 }
 
-/// What a [`DemuxPacket`]'s payload holds.
+/// Relationship of a demux packet’s bytes to an original PES payload or continuation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DemuxPayloadKind {
     /// The whole declared payload of a finite PES.
@@ -504,9 +503,9 @@ impl DemuxObserver {
     fn reset_payload_extent(&mut self) {
         self.payload_extent = PayloadExtent::default();
     }
-    /// Explicit registered carriage.
-    /// All selected kinds share the existing bounded charged assembly.
-    /// Preflight is allocation-free; no source bytes, times or epochs are altered.
+    /// Observe one registered AVC, HEVC or AAC carriage in the selected program and PID.
+    /// Program zero, an invalid PID or limits, and a mismatched PMT stream type are invalid.
+    /// An unsupported PES stream ID returns `Unsupported`.
     pub fn new_registered(
         profile: DemuxProfile,
         scope: DemuxScope,
@@ -667,7 +666,7 @@ impl DemuxObserver {
     pub fn scope(&self) -> DemuxScope {
         self.scope
     }
-    /// The bounds the observer enforces.
+    /// Configured byte, span and table bounds for assembly, independent of live budget use.
     pub fn limits(&self) -> ParseLimits {
         self.limits
     }
@@ -774,7 +773,9 @@ impl DemuxObserver {
     ) -> Result<AssemblyStep<CompactDemuxPacket>> {
         self.poll_payload_bound(work, cancel, None, true)
     }
-    /// Poll compact delivery while validating the observer's input binding.
+    /// Return the next compact packet or progress step within the supplied work grant.
+    /// Uses the compact polling mode and requires the bound source cursor. Mode or
+    /// cursor mismatches are refused before assembly advances.
     pub fn poll_compact_payload_with_input(
         &mut self,
         input: &triergon_core::InputCursor,

@@ -43,9 +43,9 @@ pub struct ReaderLimits {
     pub transport: ParseLimits,
     /// Limits for AVC and HEVC Annex B access-unit framing.
     pub video: RawAnnexBLimits,
-    /// Maximum bytes in one audio syncframe. E-AC-3 groups have a derived bound.
+    /// Nonzero byte cap for one audio frame. E-AC-3 groups have a separate derived cap.
     pub maximum_audio_frame_bytes: usize,
-    /// Maximum bytes in a finite aligned DVB DTS-HD PES.
+    /// Nonzero byte cap for a finite aligned DVB DTS-HD PES.
     pub maximum_dts_hd_pes_bytes: usize,
     /// Reporting of unfinished audio bytes at logical source EOF.
     pub audio_eof_policy: AudioEofPolicy,
@@ -65,12 +65,11 @@ pub struct ReaderLimits {
     pub dvb_subtitle_tail_policy: DvbSubtitleTailPolicy,
     /// Reporting of an unframed AVC or HEVC run at logical source EOF.
     pub video_eof_policy: VideoEofPolicy,
-    /// Maximum access units one ADTS stream delivers between resets; must be nonzero. A further
-    /// unit fails with `Limit`.
+    /// Nonzero cap on units a track can publish before its lane is reset. An additional
+    /// unit returns `Limit`. Codec-specific framing limits also apply.
     pub maximum_access_units: usize,
-    /// Maximum PES packets that contribute to one access unit; must be nonzero. A larger access
-    /// unit
-    /// fails with `Limit`.
+    /// Nonzero cap on retained PES packets contributing to one unit. A larger extent
+    /// returns `Limit`.
     pub maximum_pes_per_access_unit: usize,
     /// Input window, in bytes, of the elementary-stream framers; must be nonzero.
     pub elementary_input_window: usize,

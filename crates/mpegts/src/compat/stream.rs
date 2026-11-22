@@ -1,4 +1,4 @@
-//! The demuxer's streams.
+//! Program, codec and descriptor interpretation for the compatible demux view.
 //!
 //! [`ProgramReader`] reads the PAT and PMT sections the demuxer accepts and
 //! reports each [`Program`] with its elementary streams. [`codec`] is the
@@ -6,8 +6,6 @@
 //! video stream, and [`configuration`] the decoder configuration it derives
 //! from the entry's DVB subtitling or teletext descriptor. The standard
 //! readings are [`TransportStream`] and [`ElementaryStream::codec`].
-//!
-//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
 //!
 //! [`TransportStream`]: crate::stream::TransportStream
 //! [`ElementaryStream::codec`]: crate::psi::ElementaryStream::codec
@@ -21,7 +19,7 @@ use triergon_core::{Budget, BudgetVec, Error, Result, SourceId, WorkBudget};
 /// One PMT the demuxer accepted.
 #[derive(Debug)]
 pub struct Program {
-    /// The program number.
+    /// The 16-bit program number in the PMT table extension.
     pub number: u16,
     /// `None` when the PMT names PID 0x1fff (no PCR).
     pub pcr_pid: Option<u16>,
@@ -78,8 +76,9 @@ impl ProgramReader {
         })
     }
 
-    /// One transport packet; only the PAT and PMT PIDs are read. Take the PMTs
-    /// it completes with [`Self::poll`] before the next push.
+    /// Feed a carrier on the PAT or a listed PMT PID. Drain [`Self::poll`] before
+    /// pushing again, or the pending first carrier makes the next push invalid.
+    /// Invalid or truncated table data is discarded. Other assembly errors propagate.
     pub fn push(&mut self, packet: &TransportPacket) -> Result<()> {
         if self.active.is_some() {
             return Err(Error::Invalid("PSI output not taken"));
@@ -117,7 +116,8 @@ impl ProgramReader {
         Ok(())
     }
 
-    /// The next PMT the last push completed.
+    /// Return the next accepted PMT from the last carrier, or `None` when drained.
+    /// Table scope limits and allocation failures propagate.
     pub fn poll(&mut self) -> Result<Option<Program>> {
         let cancel = AtomicBool::new(false);
         while let Some(route) = self.active {

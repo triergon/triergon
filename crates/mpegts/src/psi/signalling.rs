@@ -1,6 +1,6 @@
-//! Original bounded views from H.222.0 2.6 and EN 300 468 D.3/D.5.
-//! Each parser reads at most one 255-byte descriptor; dynamic tails stay borrowed
-//! from its charged source. Codec payload/profile conformance belongs downstream.
+//! Bounded descriptor views for H.222.0 §2.6 and EN 300 468 Annex D.
+//! Each parser reads at most one 255-byte descriptor body. Variable tails borrow
+//! the charged source, and the fields describe signalling without inspecting coded payloads.
 use super::Descriptor;
 use triergon_core::{Error, Result};
 
@@ -61,7 +61,7 @@ pub struct AvcVideo {
     /// `AVC_24_hour_picture_flag`: the stream may contain pictures presented more than 24 hours
     /// after decoding.
     pub picture_24h: bool,
-    /// `Frame_Packing_SEI_not_present_flag`.
+    /// Whether the AVC stream signals absence of frame-packing arrangement SEI messages.
     pub frame_packing_sei_not_present: bool,
 }
 
@@ -76,23 +76,23 @@ pub struct HevcVideo {
     pub profile_idc: u8,
     /// The 32 profile compatibility flags, first flag in the most significant bit.
     pub profile_compatibility_indication: u32,
-    /// `progressive_source_flag`.
+    /// Whether the descriptor signals progressive source content.
     pub progressive_source: bool,
-    /// `interlaced_source_flag`.
+    /// Whether the descriptor signals interlaced source content.
     pub interlaced_source: bool,
-    /// `non_packed_constraint_flag`.
+    /// Whether the profile-tier-level constraints exclude frame packing.
     pub non_packed_constraint: bool,
-    /// `frame_only_constraint_flag`.
+    /// Whether the profile-tier-level constraints restrict pictures to frames.
     pub frame_only_constraint: bool,
-    /// Copied profile-tier-level source bits; these are not reserved-zero bits.
+    /// Forty-four unmodified profile-tier-level constraint bits, right-aligned.
     pub copied_44bits: u64,
     /// The 8-bit `level_idc`.
     pub level_idc: u8,
-    /// `HEVC_still_present_flag`.
+    /// Whether this stream may carry HEVC still pictures.
     pub still_present: bool,
-    /// `HEVC_24hr_picture_present_flag`.
+    /// Whether pictures may be presented more than 24 hours after decoding.
     pub picture_24h: bool,
-    /// `sub_pic_hrd_params_not_present_flag`.
+    /// Whether the stream signals absence of sub-picture hypothetical reference decoder parameters.
     pub sub_pic_hrd_params_not_present: bool,
     /// Raw two-bit value. Descriptor signalling alone does not validate HDR video.
     pub hdr_wcg_idc: u8,
@@ -104,13 +104,13 @@ pub struct HevcVideo {
 /// A DVB AC-3 descriptor (tag 0x6A), borrowed from its descriptor bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbAc3<'a> {
-    /// The component type byte, when its flag is set.
+    /// Optional 8-bit audio component classification, as signalled by the descriptor.
     pub component_type: Option<u8>,
-    /// The `bsid` byte, when its flag is set.
+    /// Optional audio bitstream identification byte (`bsid`).
     pub bsid: Option<u8>,
-    /// The `mainid` byte, when its flag is set.
+    /// Optional identifier byte for the associated main audio service.
     pub mainid: Option<u8>,
-    /// The `asvc` byte, when its flag is set.
+    /// Optional associated-service information byte.
     pub asvc: Option<u8>,
     /// DVB recommends zero; retain the source bits rather than repair them.
     pub reserved_flags: u8,
@@ -121,15 +121,15 @@ pub struct DvbAc3<'a> {
 /// A DVB enhanced AC-3 descriptor (tag 0x7A), borrowed from its descriptor bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbEac3<'a> {
-    /// The component type byte, when its flag is set.
+    /// Optional 8-bit audio component classification, as signalled by the descriptor.
     pub component_type: Option<u8>,
-    /// The `bsid` byte, when its flag is set.
+    /// Optional audio bitstream identification byte (`bsid`).
     pub bsid: Option<u8>,
-    /// The `mainid` byte, when its flag is set.
+    /// Optional identifier byte for the associated main audio service.
     pub mainid: Option<u8>,
-    /// The `asvc` byte, when its flag is set.
+    /// Optional associated-service information byte.
     pub asvc: Option<u8>,
-    /// The `mixinfoexists` flag.
+    /// Whether mixing information is present in the signalled E-AC-3 stream.
     pub mix_info_exists: bool,
     /// The `substream1` to `substream3` bytes, each present when its flag is set.
     pub substreams: [Option<u8>; 3],
@@ -178,7 +178,8 @@ impl<'a> Descriptor<'a> {
             remaining: self.data,
         })
     }
-    /// H.222.0 Table 2-92 syntax; matching the signalled SPS is left to codec framing.
+    /// Borrow the AVC profile, level and source flags from a four-byte descriptor body.
+    /// A wrong tag, length or reserved-bit pattern returns `Invalid`.
     pub fn avc_video(self) -> Result<AvcVideo> {
         if self.tag != 0x28 {
             return Err(Error::Invalid("AVC descriptor tag"));
@@ -207,8 +208,9 @@ impl<'a> Descriptor<'a> {
             frame_packing_sei_not_present: data[3] & 32 != 0,
         })
     }
-    /// H.222.0 Table 2-113. Association to a permitted stream type is checked
-    /// by PmtReader; profile/HDR and actual temporal-layer conformance are left to codec framing.
+    /// Decode HEVC profile, tier and level, picture flags and optional temporal IDs.
+    /// A wrong tag, illegal length, invalid reserved bits or an inverted temporal-ID range
+    /// returns `Invalid`. The PMT reader checks the enclosing stream type.
     pub fn hevc_video(self) -> Result<HevcVideo> {
         if self.tag != 0x38 {
             return Err(Error::Invalid("HEVC descriptor tag"));
@@ -265,8 +267,8 @@ impl<'a> Descriptor<'a> {
             temporal_ids,
         })
     }
-    /// Invoke only after the caller establishes DVB descriptor context. This
-    /// does not identify an arbitrary private tag as AC-3 or strip PES bytes.
+    /// In a DVB descriptor loop, decode the AC-3 flags byte and its indicated fields.
+    /// A wrong tag, missing flags or missing signalled field returns `Invalid`.
     pub fn dvb_ac3(self) -> Result<DvbAc3<'a>> {
         if self.tag != 0x6a {
             return Err(Error::Invalid("DVB AC-3 descriptor tag"));
@@ -289,7 +291,9 @@ impl<'a> Descriptor<'a> {
             additional_info: &self.data[position..],
         })
     }
-    /// DVB EN 300 468 D.5; mix_info_exists is a flag, not an extra body byte.
+    /// In a DVB descriptor loop, decode the E-AC-3 fields and up to three substream bytes.
+    /// The mixing information bit consumes no extra byte. A wrong tag or missing
+    /// flags or fields returns `Invalid`.
     pub fn dvb_eac3(self) -> Result<DvbEac3<'a>> {
         if self.tag != 0x7a {
             return Err(Error::Invalid("DVB E-AC-3 descriptor tag"));

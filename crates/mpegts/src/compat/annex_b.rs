@@ -1,6 +1,4 @@
 //! Unframed AVC and HEVC observations through logical source EOF.
-//!
-//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
 
 mod continuity;
 
@@ -99,7 +97,8 @@ impl ContinuityReader {
     }
 
     /// Continue the ordinary reader across entities. The optional continuity
-    /// proof is confined to a single entity and is retired on a valid transition.
+    /// proof is confined to a single entity and ends on a valid transition. Request
+    /// and entity checks are those of [`Reader::finish_entity`].
     pub fn finish_entity(
         &mut self,
         source: SourceId,
@@ -139,7 +138,8 @@ impl ContinuityReader {
 
     /// Inspect carrier observations by reference and return the next packet,
     /// other source event or progress step. The continuity proof still sees
-    /// its original carriers and applies the same bounds.
+    /// its original carriers and applies the same bounds. The source reader’s validation
+    /// and cancellation errors propagate, as do errors from the continuity proof.
     pub fn step_with_carriers(
         &mut self,
         work: &mut WorkBudget,

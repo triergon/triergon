@@ -91,7 +91,9 @@ fn read_asset(bytes: &[u8]) -> Option<(DvbDtsHdAsset, &[u8])> {
 }
 
 impl<'a> Descriptor<'a> {
-    /// Parse an explicitly interpreted DVB DTS-HD extension descriptor.
+    /// Borrow the DTS-HD core, extension and asset fields of a DVB extension descriptor.
+    /// Wrong tags, invalid substream lengths and multiple core assets return `Invalid`.
+    /// Incomplete flagged fields or asset data return `Truncated`.
     pub fn dvb_dts_hd(self) -> Result<DvbDtsHd<'a>> {
         if self.tag != EXTENSION_DESCRIPTOR || self.data.first() != Some(&DTS_HD_EXTENSION) {
             return Err(Error::Invalid("DVB DTS-HD descriptor tag"));
@@ -140,8 +142,9 @@ impl<'a> Descriptor<'a> {
 }
 
 impl ElementaryStream {
-    /// DTS-HD signalling on DVB private-data PES. The elementary payload is
-    /// handled independently of the descriptor envelope.
+    /// Borrow DTS-HD signalling for a DVB private-data elementary stream. `None`
+    /// means the stream or descriptor is absent from this scope. A malformed, duplicate
+    /// or conflicting descriptor returns an error.
     pub fn dvb_dts_hd(&self) -> Result<Option<DvbDtsHd<'_>>> {
         if self.stream_type != PES_PRIVATE_DATA
             || !matches!(self.descriptor_namespace(), DescriptorNamespace::Dvb(_))

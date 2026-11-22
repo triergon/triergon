@@ -15,7 +15,8 @@ pub struct Descriptor<'a> {
 }
 
 impl Descriptor<'_> {
-    /// Syntax only; private descriptor identity still depends on namespace/context.
+    /// Validate the body of a registration, language, AVC or HEVC descriptor.
+    /// Invalid lengths and fields return `Invalid`. Other tags remain opaque.
     pub fn validate_selected_syntax(self) -> Result<()> {
         match self.tag {
             0x05 => self.registration().map(|_| ()),
@@ -25,7 +26,8 @@ impl Descriptor<'_> {
             _ => Ok(()),
         }
     }
-    /// Only use after the format coordinator establishes a DVB namespace.
+    /// In a DVB namespace, validate the body of an AC-3 or E-AC-3 descriptor.
+    /// Missing flagged bytes return `Invalid`. Other tags remain opaque.
     pub fn validate_dvb_audio_syntax(self) -> Result<()> {
         match self.tag {
             0x6a => self.dvb_ac3().map(|_| ()),

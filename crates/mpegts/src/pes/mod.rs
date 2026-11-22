@@ -42,16 +42,16 @@ impl HeaderBytes {
 pub struct PesHeader {
     /// The 8-bit stream ID after the start code prefix.
     pub stream_id: u8,
-    /// The 16-bit PES packet length field; 0 declares an unbounded PES.
+    /// Wire byte count following the 6-byte prefix and length field. Zero marks an unbounded PES.
     pub declared_packet_length: u16,
     /// The raw 33-bit PTS in 90 kHz ticks, when the header carries one.
     pub pts_raw33: Option<u64>,
     /// The raw 33-bit DTS in 90 kHz ticks, when the header carries one. Never inferred from the
     /// PTS.
     pub dts_raw33: Option<u64>,
-    /// The data alignment indicator.
+    /// Whether the header signals that a data unit starts at the beginning of the payload.
     pub data_alignment_indicator: bool,
-    /// The PES priority bit.
+    /// Whether the wire header marks this PES as higher priority.
     pub priority: bool,
     raw: HeaderBytes,
 }
@@ -71,7 +71,8 @@ impl PesHeader {
             HeaderBytes::Extended(bytes) => bytes.retained_storage_bytes(),
         }
     }
-    /// Raw period-zero view only. Clock extension/epoch selection remains explicit.
+    /// Raw PTS interpreted as exact 90 kHz time in period zero. The fixed rate is valid,
+    /// so this succeeds and preserves `None` when the header has no PTS.
     pub fn raw_pts_time(&self) -> Result<Option<Time>> {
         self.pts_raw33
             .map(|ticks| Time::new(i128::from(ticks), 90_000))
@@ -99,12 +100,13 @@ impl AsRef<[u8]> for PesSpan {
     }
 }
 impl PesSpan {
-    /// An exact charged alias of this elementary payload span.
+    /// Alias exactly this elementary byte range in the original charged carrier payload.
+    /// Validated spans are in bounds, so aliasing one normally succeeds without copying.
     pub fn payload_bytes(&self) -> Result<Bytes> {
         self.bytes.slice(self.start..self.start + self.source.bytes)
     }
 
-    /// Where these payload bytes lie in the source entity.
+    /// Physical source entity, starting byte offset and byte count of the span.
     pub fn source_range(&self) -> SourceRange {
         self.source
     }
@@ -120,7 +122,7 @@ impl PesSpan {
 pub struct Pes {
     /// The 13-bit PID that carried the packet.
     pub pid: u16,
-    /// The parsed PES header.
+    /// Validated wire header with its original bytes and optional 33-bit timestamps.
     pub header: PesHeader,
     /// The clock and configuration epochs in force when the packet was assembled.
     pub epochs: SourceEpochs,
@@ -135,7 +137,7 @@ pub struct Pes {
     spans: BudgetVec<PesSpan>,
 }
 impl Pes {
-    /// The payload spans in stream order.
+    /// Carrier-backed byte spans in elementary order, covering exactly `payload_len` bytes.
     pub fn spans(&self) -> &[PesSpan] {
         self.spans.as_slice()
     }

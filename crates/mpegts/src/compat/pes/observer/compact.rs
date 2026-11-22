@@ -12,11 +12,11 @@ use triergon_core::{Budget, BudgetVec, BudgetVecIntoIter, BytesView};
 pub struct DemuxSpanView<'a> {
     /// The span's bytes, borrowed from the carrier or cursor.
     pub bytes: BytesView<'a>,
-    /// Where the span's bytes lie in the source.
+    /// Physical input entity, starting byte offset and length of the payload span.
     pub source: SourceRange,
-    /// The whole transport carrier the span was taken from.
+    /// Complete carrier range in the input, including its prefix when present.
     pub transport: SourceRange,
-    /// The source context of that carrier.
+    /// The event ordinal and epochs of the carrier that supplied the payload.
     pub context: SourceContext,
 }
 
@@ -110,7 +110,8 @@ impl CompactPayload {
             grouped,
         }
     }
-    /// Adopt ordinary independently owned spans without copying or cloning.
+    /// Adopt an ordered table of individually owned spans. Every entry becomes one logical
+    /// payload span without copying its bytes or adding another owner.
     pub fn from_spans(records: BudgetVec<DemuxSpan>) -> Self {
         let logical = records.len();
         Self::new(records, logical, false)

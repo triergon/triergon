@@ -14,7 +14,7 @@ pub struct ActiveProgram<'a> {
 }
 
 impl<'a> ActiveProgram<'a> {
-    /// The program number.
+    /// The 16-bit program number selected for this transport reader.
     pub fn program_number(self) -> u16 {
         self.stream.program
     }
@@ -57,7 +57,7 @@ impl<'a> ProgramStream<'a> {
     pub fn pid(self) -> u16 {
         self.route.pid
     }
-    /// The 8-bit stream type.
+    /// The 8-bit PMT stream type that describes the PID’s carriage.
     pub fn stream_type(self) -> u8 {
         self.route.stream_type
     }
@@ -65,7 +65,7 @@ impl<'a> ProgramStream<'a> {
     pub fn descriptor_bytes(self) -> &'a Bytes {
         &self.route.descriptors
     }
-    /// Iterates the entry's descriptors.
+    /// A borrowed traversal of the validated descriptor loop in wire order.
     pub fn descriptors(self) -> Descriptors<'a> {
         Descriptors::new(self.route.descriptors.as_ref())
     }
@@ -99,7 +99,7 @@ impl TrackInfo for ProgramStream<'_> {
 }
 
 impl TransportStream {
-    /// The program map the stream currently routes by; `None` until a PMT for the selected
+    /// The accepted program map used for routing. Returns `None` until a PMT for the selected
     /// program is accepted, and again after a PAT change or a discontinuity releases it.
     pub fn active_program(&self) -> Option<ActiveProgram<'_>> {
         // Pairing the source and version added 0.1497% to split PES with the PSI route in place.

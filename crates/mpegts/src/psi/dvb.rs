@@ -100,8 +100,8 @@ impl ExactSizeIterator for DvbSubtitlingServices<'_> {}
 impl std::iter::FusedIterator for DvbSubtitlingServices<'_> {}
 
 impl<'a> Descriptor<'a> {
-    /// Explicit DVB interpretation; ordinary unscoped descriptor parsing keeps
-    /// this tag opaque. A u8 descriptor length allows at most 31 complete entries.
+    /// Borrow the DVB subtitle service table, of at most 31 eight-byte entries.
+    /// A wrong tag, body beyond 255 bytes or incomplete entry returns `Invalid`.
     pub fn dvb_subtitling(self) -> Result<DvbSubtitling<'a>> {
         if self.tag != 0x59 {
             return Err(Error::Invalid("DVB subtitling descriptor tag"));

@@ -47,10 +47,10 @@ impl PrivateAudioCarriage {
             Self::PrivateType87Eac3 => 0x87,
         }
     }
-    /// Allocation-free bounded admission, using existing descriptor views.
-    /// At most section_bytes (<=4096) bytes / descriptors entries are inspected.
-    /// A private tag is interpreted ONLY in this explicitly named demux view.
-    /// This does not backfill DescriptorNamespace or source codec identity.
+    /// Identify private AC-3 or E-AC-3 from PMT signalling for the demux view.
+    /// The descriptor scan is allocation-free and bounded by `limits`, at most
+    /// 4096 bytes. Invalid syntax, excessive extent or unsupported signalling
+    /// returns an error.
     pub fn from_observed_pmt(
         stream_type: u8,
         source: PrivateAudioDescriptors<'_>,
@@ -59,9 +59,10 @@ impl PrivateAudioCarriage {
         Self::from_pmt(stream_type, source, limits, false)
     }
 
-    /// Admit the same carriage types in a negotiated independent media
-    /// segment. An elementary registration may confirm the stream type or
-    /// audio descriptor. The source PMT and its namespace stay intact.
+    /// Identify private AC-3 or E-AC-3 in an independent HLS media segment.
+    /// Stream type `0x06` requires a matching elementary registration. A missing
+    /// or unsupported registration returns `Unsupported`. The remaining
+    /// descriptor and budget checks follow [`Self::from_observed_pmt`].
     pub fn from_hls_pmt(
         stream_type: u8,
         source: PrivateAudioDescriptors<'_>,
@@ -173,8 +174,9 @@ impl PrivateAudioCarriage {
 }
 
 impl DemuxObserver {
-    /// Opt-in finite clean private-audio PES, independent of source namespace.
-    /// Reuses charged real transport assembly; no codec AU parser or output repair.
+    /// Observe finite private-audio PES with an explicitly identified carriage.
+    /// The scope and PES ID must agree with the PMT signalling. Invalid limits,
+    /// unsupported signalling and a mismatched declared carriage are refused.
     pub fn new_private_audio(
         profile: DemuxProfile,
         scope: DemuxScope,

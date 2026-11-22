@@ -106,28 +106,28 @@ pub struct TransportPacket {
     pub source: Bytes,
     /// Byte offset of the packet's first byte (prefix included) in the source entity.
     pub source_offset: u64,
-    /// Attached by the InputCursor adapter. Detached packet syntax may omit it.
+    /// Identifier of the input entity that owns these bytes, when supplied by the input cursor.
     pub source_id: Option<SourceId>,
     /// The opaque 4-byte M2TS prefix; `None` for 188-byte packets.
     pub prefix: Option<Bytes>,
     /// The 13-bit packet identifier.
     pub pid: u16,
-    /// The payload unit start indicator.
+    /// Whether the payload signals the start of a unit in the PID’s table or PES syntax.
     pub payload_unit_start: bool,
-    /// The transport priority bit.
+    /// Whether the carrier has higher priority than other packets with the same PID.
     pub transport_priority: bool,
-    /// The transport error indicator.
+    /// Whether transport marked one or more bits in this carrier as uncorrectable.
     pub transport_error: bool,
     /// The 2-bit transport scrambling control; 0 means not scrambled.
     pub scrambling: u8,
-    /// The 4-bit continuity counter.
+    /// Per-PID continuity count modulo 16, as encoded in the transport header.
     pub continuity_counter: u8,
     /// The adaptation field, when the adaptation field control signals one.
     pub adaptation: Option<Adaptation>,
     /// The payload bytes after the header and adaptation field, when the adaptation field control
     /// signals a payload.
     pub payload: Option<Bytes>,
-    /// Byte offset of the payload's first byte in the source entity.
+    /// Physical byte offset after the prefix, transport header and adaptation field.
     pub payload_source_offset: u64,
     pub(crate) sync: usize,
     pub(crate) pcr_range: Option<Range<usize>>,
@@ -169,7 +169,9 @@ pub(crate) fn pcr_with_policy(data: &[u8], policy: PcrPolicy) -> Result<Pcr> {
     Ok(Pcr { base, extension })
 }
 
-/// Strict detached syntax API. The incremental inspector is the only validator.
+/// Validate one complete carrier of the specified width at `source_offset` and retain its
+/// header, adaptation and payload fields from the supplied charged bytes. Invalid carrier
+/// syntax or width and a physical byte extent that overflows are rejected.
 pub fn parse_transport(
     source: Bytes,
     format: PacketFormat,

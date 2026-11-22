@@ -76,11 +76,11 @@ impl MalformedInputFact {
     pub fn source_fault(&self) -> &TraceFault {
         &self.fault
     }
-    /// The source context the carrier was issued with.
+    /// The event ordinal and source epochs of the carrier that was discarded.
     pub fn input_context(&self) -> SourceContext {
         self.input
     }
-    /// The source context of the matching diagnostic.
+    /// The event ordinal and source epochs at the matching discarded-carrier fault.
     pub fn diagnostic_context(&self) -> SourceContext {
         self.diagnostic
     }
@@ -119,15 +119,15 @@ pub struct MalformedSourceEvent<'a> {
     context: SourceContext,
 }
 impl MalformedSourceEvent<'_> {
-    /// The issued source event.
+    /// The event issued by the bound parser, with its original bytes and source facts.
     pub fn event(&self) -> &TraceEvent {
         &self.event
     }
-    /// The source context the event was issued with.
+    /// The bound source event’s ordinal, epochs and optional elementary byte run.
     pub fn context(&self) -> SourceContext {
         self.context
     }
-    /// The input cursor the event was read from.
+    /// The issuing cursor at the physical input position reached by this event.
     pub fn input(&self) -> &InputCursor {
         self.input
     }
@@ -136,7 +136,8 @@ impl MalformedSourceEvent<'_> {
         self.completion.stream.clock_is_quarantined()
     }
 
-    /// Stage this source's terminal diagnostic in its transport observer.
+    /// Stage a parser-issued final-carrier diagnostic in the matching recovery observer.
+    /// A foreign pool, unrelated observer or diagnostic outside its terminal policy is refused.
     pub fn hold_terminal_transport(&self, observer: &mut TransportFaultRecovery) -> Result<()> {
         let origin = self.completion.stream.trace_origin(self.input)?;
         observer.hold_terminal_diagnostic(&self.event, &origin, self.context)
@@ -148,8 +149,9 @@ impl MalformedSourceEvent<'_> {
     pub fn required_work(&self) -> Result<u64> {
         MalformedInputCompletion::required_work(&self.event)
     }
-    /// Apply the policy to this issued event. A short grant leaves it available
-    /// for retry. Forwarded events remain available through [`Self::event`].
+    /// Classify this issued event within the work grant. `Ok(None)` leaves it pending
+    /// for retry. A mismatched source or recovery observer is refused, and forwarded
+    /// source facts remain available through [`Self::event`].
     pub fn observe(
         &mut self,
         observer: Option<&mut TransportFaultRecovery>,
@@ -185,7 +187,7 @@ impl NoPacketsConfirmation {
     pub fn physical_end(&self) -> SourceLocation {
         self.end.location()
     }
-    /// The source context of the source `Finished` event.
+    /// The event ordinal and source epochs at confirmed logical EOF.
     pub fn source_finished(&self) -> SourceContext {
         self.finished
     }
@@ -325,7 +327,8 @@ impl MalformedInputCompletion {
     pub fn source_epochs(&self) -> crate::SourceEpochs {
         self.stream.source_epochs()
     }
-    /// Bind the observed logical EOF to the original source parser.
+    /// Witness the original parser’s `Finished` event on the bound cursor.
+    /// A wrong cursor or missing logical EOF is invalid.
     pub fn source_finished(&self, input: &InputCursor) -> Result<ObservedTrace<()>> {
         self.identity(input)?;
         if self.finished.is_none() {
@@ -830,15 +833,17 @@ impl MalformedInputCompletion {
         self.end = Some(end.clone());
         Ok(Some(end))
     }
-    /// Start the logical drain after sealing this operation's physical End.
+    /// Start logical drain after sealing the physical end of this input.
+    /// Returns `Invalid` if the end has not been sealed or the parser is undrained.
     pub fn end_of_source(&mut self) -> Result<()> {
         if self.end.is_none() {
             return Err(Error::Invalid("malformed completion missing physical End"));
         }
         self.stream.end_of_source()
     }
-    /// Complete only the explicitly classified zero-packet branch. A real empty
-    /// physical source is allowed, without inventing a PAT, PMT or PES scope.
+    /// Confirm the zero-packet outcome of a completely classified input. An empty
+    /// physical source qualifies. Missing physical or logical EOF, a mismatched
+    /// cursor, or unproved packet work is refused. A short work grant yields `Ok(None)`.
     pub fn confirm_no_packets(
         &mut self,
         observer: Option<&mut TransportFaultRecovery>,

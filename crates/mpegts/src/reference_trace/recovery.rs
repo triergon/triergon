@@ -6,8 +6,6 @@
 //! ([`RecoveredPacket`], [`DiagnosticPacket`]). It follows one selected program
 //! through PAT and PMT changes ([`PatSelection`], [`PmtBindingJob`]).
 //!
-//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-//!
 //! Opt-in real rejected-carrier observation. No validated source packet/header
 //! is forged. OPCR and explicit selected-AVC diagnostic policies are separate.
 use crate::compat::pes::clock::DemuxProfile;
@@ -36,7 +34,7 @@ pub enum RejectedPolicy {
     OpcrWithoutPcr,
 }
 
-/// Independently checked encoding in a rejected carrier, NOT a source PesHeader.
+/// Checked header bytes and raw PTS retained from a carrier rejected by the source reader.
 #[derive(Debug)]
 pub struct EncodedHeader {
     bytes: Bytes,
@@ -47,7 +45,7 @@ impl EncodedHeader {
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_ref()
     }
-    /// The encoded 33-bit PTS.
+    /// The encoded PTS field, a 33-bit value in 90 kHz ticks.
     pub fn encoded_pts_raw33(&self) -> u64 {
         self.pts
     }
@@ -55,7 +53,7 @@ impl EncodedHeader {
     pub fn encoded_dts_raw33(&self) -> Option<u64> {
         None
     }
-    /// The storage that holds the header bytes.
+    /// Charged backing for the exact original header range, shared with the source carrier.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.bytes
     }
@@ -92,7 +90,7 @@ pub struct RecoveredPacket {
     pub header_source_ranges: BudgetVec<SourceRange>,
     /// Payload bytes after the header.
     pub payload_len: usize,
-    /// The payload spans.
+    /// Original carrier-backed byte spans in elementary order, covering `payload_len`.
     pub spans: BudgetVec<DemuxSpan>,
 }
 impl RecoveredPacket {
@@ -221,7 +219,8 @@ impl RecoveryObserver {
             fault: None,
         })
     }
-    /// Explicit DVB-signalled finite PES.
+    /// Observe finite DVB subtitle PES in the selected program. The namespace,
+    /// descriptors and stream identifiers must satisfy [`DemuxObserver::new_dvb_subtitles`].
     pub fn new_dvb_subtitles(
         profile: DemuxProfile,
         scope: DemuxScope,
@@ -285,7 +284,9 @@ impl RecoveryObserver {
     pub fn scope(&self) -> DemuxScope {
         self.inner.scope()
     }
-    /// Explicit contiguous media transaction; plain pushes stay single-entity.
+    /// Continue on the next physical entity after witnessing a contiguous end.
+    /// A short work grant yields `Ok(false)`. Undrained recovery, cursor or
+    /// source mismatches and cancellation are refused.
     pub fn continue_media_entity(
         &mut self,
         end: &crate::stream::MediaEntityEnd,
@@ -338,7 +339,9 @@ impl RecoveryObserver {
     ) -> std::result::Result<(), Refused<TransportPacket>> {
         self.push_accepted_bound(packet, context, None)
     }
-    /// As [`push_accepted`](Self::push_accepted), for an observer bound to `input`.
+    /// Admit an accepted carrier against the bound source cursor. A mismatch in
+    /// entity, request or byte pool returns the original carrier intact. Other
+    /// admission rules follow [`Self::push_accepted`].
     #[allow(
         clippy::result_large_err,
         reason = "recover original charged inline carrier"
@@ -527,7 +530,8 @@ impl RecoveryObserver {
     ) -> Result<AssemblyStep<DemuxObservation>> {
         self.poll_bound(work, cancel, None)
     }
-    /// As [`poll`](Self::poll), for an observer bound to `input`.
+    /// Poll recovery for the bound input, with the work and outcomes of [`Self::poll`].
+    /// A cursor identity or pool mismatch is refused before assembly advances.
     pub fn poll_with_input(
         &mut self,
         input: &triergon_core::InputCursor,

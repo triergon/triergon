@@ -1,25 +1,29 @@
 # triergon-mpegts
 
 Bounded, incremental MPEG-2 transport stream reader for 188-byte TS and
-192-byte M2TS. It is a format-layer crate on top of `triergon-core` (input cursor,
-budgets, exact time), `triergon-bitstream` (the section CRC) and
-`triergon-framing` (access-unit framing). It frames packets, checks
-continuity, assembles PSI sections and PAT/PMT tables, and assembles PES
-packets with their raw timestamps. `Reader` composes those source facts with
-the existing framers to implement `ContainerReader` over complete access units.
-A PES is a byte run, never an access-unit packet. Decoding belongs to the codec
-crates. The crate does no I/O. The `mux` module writes a
-single-program stream for one video elementary stream ([Writing TS](#writing-ts)).
+192-byte M2TS. It checks carrier syntax and continuity, assembles PAT, PMT and
+PES, and retains physical byte ranges and raw clocks. `Reader` implements
+`ContainerReader` and emits complete frames or access units for selected
+elementary streams. Original PES packets and other source observations
+remain available as events. The crate performs no I/O.
 
-The crate exposes two views:
+Poll within a `WorkBudget` and answer each input request with bytes from the
+requested entity, offset and token. Add work after a yield. Release retained
+output before retrying backpressure. Source and output buffers are charged to
+the caller’s `Budget`.
 
-- **Source view** (`Reader` and the modules `transport`, `psi`, `pes`, `stream`
-  and `clock`). Every value is a wire fact: raw 33-bit PTS/DTS, raw PCR,
-  descriptor bytes, source byte ranges. Unknown DTS stays unknown.
-- **FFmpeg-compatible view** (`compat::pes`, `compat::input`). It reproduces
-  the packets, positions, flags and timestamps of FFmpeg's MPEG-TS demuxer,
-  including its handling of damaged and headerless PES. It is fed from the same
-  transport packets and never rewrites source facts.
+- Use `Reader` for access units, track configurations and bounded seeks.
+  `Packet::sources` maps each unit’s elementary byte ranges back to its PES
+  payloads and physical source ranges.
+- Use `TransportStream` for individual carriers, accepted program maps,
+  completed PES packets and source diagnostics. PTS and DTS retain their
+  encoded presence and 33-bit values. `clock` also provides explicit policies
+  for interpreting those values as exact time.
+- Use `compat` for optional demux packet boundaries, time placement and
+  recovery policies. Compatibility observations retain their source facts
+  and any diagnostics separately.
+- Use `mux` to write one video elementary stream with a single program.
+  See [Writing TS](#writing-ts).
 
 ## Modules
 
@@ -211,24 +215,11 @@ The epoch distinction follows [H.222.0 (08/2023)](https://www.itu.int/rec/T-REC-
 §2.4.4.9–10 (current program definitions and their changes). Selecting an epoch
 is a reader policy; it does not alter those source facts or normalize timestamps.
 
-The required [picture comparison](../../harness/features/mpegts-previous-picture/contract.json)
-covers 36 explicit-epoch AVC seeks against the pinned FFmpeg formats build:
-a clock change or same-codec PMT descriptor change, each in TS188 and M2TS192,
-with both seek policies, ordered entity splits and repeated indexed seeks.
-Equal-PTS controls put overlapping epochs in separate entities. Each picture has its own PES. Both workers scan the full
-stable input through EOF and replay every suffix packet, comparing the requested,
-landing and discard times, PTS, effective DTS, random-access flags and all bytes.
-The candidate selects the source epoch pair; the reference selects landing
-candidates by its public packet positions over the authored physical boundary.
-After building the workers, run:
-
-```sh
-CARGO_INCREMENTAL=0 cargo xtask report \
-  --contract harness/features/mpegts-previous-picture/contract.json \
-  --manifest harness/features/mpegts-previous-picture/corpus.json --corpus .
-```
-
-Native Linux parity, runtime and memory qualification remain separate checks.
+The [picture comparison](../../harness/features/mpegts-previous-picture/contract.json)
+checks explicit-epoch AVC seeks, including overlapping timestamps,
+clock and PMT descriptor changes, ordered TS188 and M2TS192 entities,
+and repeated indexed seeks. It compares landing and discard times,
+random-access flags, source clocks and every coded suffix packet.
 
 DTS-HD seeking also supports a lossless XLL stream with no core, one extension
 substream at index zero, one presentation and one active speaker asset. An entry
@@ -410,7 +401,7 @@ See [A/53 Part 3 §5.5.2 and §5.7](https://www.atsc.org/wp-content/uploads/2023
 and [A/52 Annex G §3.3](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf).
 
 Existing framers delimit the complete source bytes before decoder-feed conversion.
-MPEG-1/2 video, other subtitle carriages and ambiguous private streams currently emit
+MPEG-1/2 video, other subtitle carriages and ambiguous private streams emit
 `ReaderEvent::Unsupported`. Their original PMTs and PES remain available as source events.
 For DVB DTS-HD signalling, `psi::Descriptor::dvb_dts_hd` reads Annex G.3
 substream and asset information from the original descriptor bytes.
@@ -884,139 +875,38 @@ probes compare the typed refusal with the reference muxer's admission or refusal
 
 ## Conformance
 
-Specification basis:
+Carrier, PES and PSI syntax follow ITU-T H.222.0 §2.4 and §2.6, with the
+section CRC defined in Annex A. DVB subtitling, AC-3 and E-AC-3 descriptor
+syntax follows ETSI EN 300 468 §6.2.41 and Annex D.
 
-- ITU-T H.222.0 (08/2023): §2.4.3.1–2.4.3.5 (transport packet, adaptation
-  field), §2.4.3.6–2.4.3.8 (PES), §2.4.4 and §2.6 (PSI and descriptors),
-  Annex A (CRC-32).
-- ETSI EN 300 468: §6.2.41 / Table 99 (subtitling descriptor), Annex D.3 and
-  D.5 (AC-3 and E-AC-3 descriptors).
+The [qualification status](../../docs/status.md) links the transport
+contracts and gives the native results and their scope. The source
+comparisons check [packet boundaries](../../harness/features/ts-packets/contract.json),
+[carrier fields](../../harness/features/ts-packet-fields/contract.json),
+[PAT and PMT](../../harness/features/ts-psi-readers/contract.json),
+[video descriptors](../../harness/features/ts-video-descriptors/contract.json),
+[PES assembly](../../harness/features/ts-pes-assembler/contract.json) and
+[bounded clocks](../../harness/features/ts-bounded-time-oracle/contract.json).
+Compatibility comparisons include [PES packets](../../harness/features/mpegts-pes/contract.json),
+[demux observer forms](../../harness/features/ts-observer-forms/contract.json),
+[recovery traces](../../harness/features/ts-recovery-trace/contract.json) and
+[reader views](../../harness/features/ts-reader-views/contract.json).
 
-Verification:
+The [DTS seek contract](../../harness/features/mpegts-dts-seek/contract.json)
+checks both seek policies and the complete suffix, including indexed backward
+seeks and missing DTS. The synthetic payloads exercise framing and recovery
+syntax. For a decoded comparison, the optional
+`fate_lossless_only_entries_decode_the_exact_pcm_suffix` test uses
+`dts/dcadec-suite/xll_51_24_48_none.dtshd` at SHA-256
+`c445bb746c6afc920761b55b00932053d64a96d3d08cd9cad4c759a892fae4cd`.
+Set `TRIERGON_DTS_HD_XLL` to the local sample and optionally set
+`TRIERGON_FFMPEG` to the decoder binary. The test compares each sought
+suffix with sequential decoding, including its PCM bytes.
 
-- The PAT and PMT readers and the comparison-only catalogue projection are
-  checked against the programs and streams FFmpeg exposes after draining each
-  transport entity. The comparison covers table and stream order, PIDs, PMT
-  versions, language tags and DVB subtitle service initialization.
-  The selected catalogue compares the whole PAT and the selected program's PMT.
-  The standalone catalogue compares the published registration identifier where
-  the demuxer uses it as the codec tag.
-  [Standalone readers](../../harness/features/ts-psi-readers/contract.json)
-  [Catalogue projection](../../harness/features/ts-catalogue/contract.json)
-- An independent H.222.0 oracle checks every AVC and HEVC video descriptor
-  field. The authored input exercises 512 flag combinations for each descriptor,
-  including both forms of the HEVC temporal-layer fields.
-  [Video descriptor comparison](../../harness/features/ts-video-descriptors/contract.json)
-- The raw packet comparison checks the TS body bytes and their physical offsets
-  at 1-, 7- and 4096-byte input windows. It reads clock-admitted inputs through
-  the raw TS demuxer and uses the public raw data reader on the supplied carrier
-  grid for short or clockless inputs. Its field oracle also checks the full
-  carrier, including opaque M2TS prefixes, PCR and OPCR, adaptation fields,
-  rejected-carrier ranges, truncated tails and expansion of compact null runs.
-  [Packet boundaries](../../harness/features/ts-packets/contract.json)
-  [Carrier fields](../../harness/features/ts-packet-fields/contract.json)
-- The [DTS seek comparison](../../harness/features/mpegts-dts-seek/contract.json)
-  contains two DTS core history cases and 24 authored XLL cases. Twelve XLL cases
-  use an extension alone and twelve carry an independently recoverable core.
-  The cases cover short extension headers in TS188 and long extension headers in M2TS192, both
-  seek policies at 90,000 and 91,920 source ticks, explicit and missing source DTS,
-  and an indexed backward seek after draining to EOF. Each suffix includes every
-  payload byte and its source clocks. The fixture author is
-  `cargo xtask fixture transport-dts-seek --record REFERENCE`; it records folds
-  through the FFmpeg TS audio seek worker and reproduces the existing core cases.
-  FFmpeg identifies the DVB extension descriptor as data and preserves the aligned
-  full PES payload. These inputs contain only self-contained XLL entries with
-  checked recovery navigation; the independent reader tests cover refusals.
-  Synthetic bodies exercise framing and recovery metadata, not audio decoding.
-  Run `CARGO_INCREMENTAL=0 cargo xtask build-workers --only transport-worker`, then
-  `CARGO_INCREMENTAL=0 cargo xtask report --contract harness/features/mpegts-dts-seek/contract.json --manifest harness/features/mpegts-dts-seek/corpus.json --corpus . --output DIR`.
-  Adding `--benchmark --memory --require-slice-acceptance` applies the complete
-  per-case runtime, live-heap and total-RSS contract on each required native target.
-  [Native results](../../docs/status.md) include both XLL profiles on AArch64 and ARMv7.
-- `CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test container_reader seek::dts_hd`
-  checks DTS-HD seek metadata, full original packet and PES provenance, exact clocks,
-  small input/work grants, TS188/M2TS192, previous/preroll landings, index reuse,
-  tied timestamps and explicit refusals. Synthetic payloads test recovery syntax,
-  not decoded audio.
-- The ignored test `fate_lossless_only_entries_decode_the_exact_pcm_suffix` uses
-  FATE `dts/dcadec-suite/xll_51_24_48_none.dtshd`, SHA-256
-  `c445bb746c6afc920761b55b00932053d64a96d3d08cd9cad4c759a892fae4cd`.
-  Set `TRIERGON_DTS_HD_XLL` to that local file and optionally `TRIERGON_FFMPEG`
-  to a decoder binary, then run
-  `CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test container_reader fate_lossless_only_entries -- --ignored`.
-  It checks every source field of three seek suffixes and compares their complete
-  PCM bytes with sequential decoding through the FFmpeg command-line interface.
-  The sample stays outside the repository. This is functional coverage, not
-  runtime or memory qualification.
+```sh
+CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test container_reader \
+  fate_lossless_only_entries_decode_the_exact_pcm_suffix -- --ignored
+```
 
-- Integration tests under `tests/` use independently authored transport
-  streams in `tests/data/` (listed in `tests/data/manifest.json`) with
-  expected values derived from the specifications.
-- The [access-unit comparison](../../harness/features/mpegts-access-units/contract.json)
-  includes an intact coded HEVC and 32 kHz E-AC-3 transport and six DVB subtitle
-  inputs, one with a truncated final segment. Their requests explicitly declare
-  the DVB namespace. The comparison opts in to reporting the subtitle prefix.
-- The [reader views](../../harness/features/ts-reader-views/contract.json) compare
-  track identity and configuration, packet time bases, AC-3 syncframes, DVB
-  subtitle decoder initialization and segment boundaries, and opaque elementary
-  ranges. AC-3 comparisons distinguish complete syncframes from an incomplete
-  residual extent at EOF. The
-  [continuity reader comparison](../../harness/features/ts-reader-container/contract.json)
-  also checks the packet outcome and carrier evidence of an opaque residue.
-- The [fault facts](../../harness/features/ts-fault-facts/contract.json) and
-  [recovery trace](../../harness/features/ts-recovery-trace/contract.json) compare
-  the packet consequences of damaged input, projected clocks and clean end.
-  The contracts retain the open differences in source admission and recovery.
-- The [indexed epoch seek comparison](../../harness/features/ts-epoch-index-seek/contract.json)
-  uses the exact clock and configuration pair for one entity, then checks the
-  landing and complete coded suffix. Repeated requests must reuse the index.
-- [Bounded source clocks](../../harness/features/ts-bounded-time/contract.json)
-  compare with FFmpeg where the anchor selects the same timestamp interval.
-  The [source-clock oracle](../../harness/features/ts-bounded-time-oracle/contract.json)
-  checks raw timestamps, exact time and refusals under PCR and PTS anchors.
-- The source view is compared field by field with an independent oracle over
-  the corpus. The FFmpeg-compatible view is compared packet by packet
-  (payload bytes, timestamps, flags, positions, stream-ID side data) with the
-  FFmpeg reference; nonmatching cases are kept as failures, not normalised.
-  `cargo xtask report` runs that comparison from
-  [`harness/features/mpegts-pes/`](../../harness/features/mpegts-pes/contract.json)
-  through `transport-worker`'s `ts-` modes, which use the public API only:
-  `TransportStream` selects the program, its first active PMT binds a
-  `compat::pes::DemuxObserver` to the one elementary stream, wrapped by
-  `TransportFaultRecovery`, and `DemuxClock` places the timestamps. A typed
-  program-policy or empty-observation refusal
-  with no emitted packets and one entity can complete through a bounded
-  control-only replay and a real `NoMediaConfirmation`. Other refusals remain
-  failures unless the separately reported malformed-input policy proves complete
-  original-cursor coverage and real EOF with `NoPacketsConfirmation`. That
-  proof runs on the original source operation. The control-only replay runs
-  inside the measured operation.
-  For an ordered sequence, each intermediate physical End is sealed before
-  the same cursor advances to its next request. Ordinary boundaries retain
-  PES assembly and the demux clock, including an initialization entity's
-  program map. A declared discontinuity requires drained PES assembly and
-  a new source map for the same elementary stream. Folded positions use the
-  sequence coordinate system. Source ranges and epochs remain physical
-  source facts.
-  The 272 recorded requests map to 97 PES compatibility-view operations.
-  All 97 match the pinned FFmpeg formats worker on AArch64 Linux and macOS.
-  In the full gate runs at `1c64b775`, all 97 pass the runtime ceiling on
-  Linux AArch64 and ARMv7 (highest upper bounds 0.7226 and 0.8548) and use
-  less peak heap and total resident RSS. The strict source requests
-  supply input for this compatibility comparison. Full source and evidence
-  hashes are in [status](../../docs/status.md#measured-revisions).
-
-- The [source polling](../../harness/features/ts-source-poll/contract.json),
-  [standalone PES assembly](../../harness/features/ts-pes-assembler/contract.json)
-  and [demux observer](../../harness/features/ts-observer-forms/contract.json)
-  comparisons use every input from the PES packet corpus. They exercise five
-  source poll forms, four work grants over complete transport payloads and three
-  observer forms. The
-  strict source comparisons preserve encoded timestamp absence, period-zero
-  ticks and physical carrier positions. The observer comparison uses projected
-  demux clocks and checks constructor and compact delivery scope refusals.
-  The contracts list the declared deviations and the
-  runtime and memory bounds awaiting native measurements.
-
-Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
-and [docs/status.md](../../docs/status.md).
+The [quality guide](../../docs/quality.md) describes the native gates and
+how to run the comparison contracts.

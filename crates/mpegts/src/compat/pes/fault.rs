@@ -147,7 +147,7 @@ impl PesFaultHeader {
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_ref()
     }
-    /// The storage that holds the header bytes.
+    /// The charged byte range for the encoded header, sharing the original backing.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.bytes
     }
@@ -225,11 +225,11 @@ impl TransportFaultHeader {
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_ref()
     }
-    /// The storage that holds the header bytes.
+    /// The charged byte range for the encoded header, sharing the original backing.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.bytes
     }
-    /// The encoded 33-bit PTS.
+    /// The encoded PTS in 90 kHz ticks, limited to its 33-bit wire width.
     pub fn encoded_pts_raw33(&self) -> u64 {
         self.pts
     }
@@ -328,7 +328,8 @@ impl TransportFaultRecovery {
     pub fn new(inner: DemuxObserver) -> std::result::Result<Self, Refused<DemuxObserver>> {
         Self::with_policy(inner, PesFaultPolicy::default())
     }
-    /// Explicit additional source-fault policies for drained finite AVC TS188.
+    /// Enable explicit recovery policies for finite AVC in TS188. An input-bound
+    /// or undrained observer is refused and returned intact.
     #[allow(
         clippy::result_large_err,
         reason = "return the original observer inline"
@@ -356,7 +357,7 @@ impl TransportFaultRecovery {
             boundaries: boundaries::Boundaries::default(),
         })
     }
-    /// The selected program and PID of the wrapped observer.
+    /// The program, elementary PID, input entity and epochs accepted for recovery.
     pub fn scope(&self) -> DemuxScope {
         self.inner.scope()
     }
@@ -405,7 +406,9 @@ impl TransportFaultRecovery {
             self.push_ordinary(packet, context)
         }
     }
-    /// A stale or unrelated diagnostic leaves the pending original input intact.
+    /// Seal the source diagnosis of the pending carrier. An absent staged carrier
+    /// or a mismatch in the diagnostic, source range or event context is refused.
+    /// A mismatch leaves the original carrier available for retry.
     pub fn confirm_source_fault(
         &mut self,
         fault: &TraceFault,
@@ -433,7 +436,9 @@ impl TransportFaultRecovery {
         self.boundaries.check_end()?;
         self.inner.end_of_source()
     }
-    /// Admit only a sole, fully checked PCR/OPCR rejection and keep it opaque.
+    /// Stage an opaque carrier whose sole transport rejection is its PCR or OPCR field.
+    /// The policy must enable this case, and the preceding carrier must be drained.
+    /// A refusal returns the original diagnostic intact.
     #[allow(
         clippy::result_large_err,
         reason = "return the original charged diagnostic inline"

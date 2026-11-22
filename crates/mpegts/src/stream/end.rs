@@ -10,8 +10,9 @@ use triergon_core::{BudgetVec, Error, InputCursor, Result, Step, WorkBudget};
 static NEXT_TRACE_ISSUER: AtomicUsize = AtomicUsize::new(1);
 
 impl TransportStream {
-    /// Explicit logical discontinuity, at an entity boundary after jobs drain.
-    /// Source IDs and core generations are not rewritten into clock/config epochs.
+    /// Discard partial transport and PES state and advance both source epochs.
+    /// A pending carrier, table job or deferred feed event is invalid at this boundary.
+    /// Returns `Overflow` if an epoch cannot advance.
     pub fn discontinuity(&mut self) -> Result<()> {
         if self.held.is_some() || self.deferred_feed_events != 0 || self.psi.blocks_carriers() {
             return Err(Error::Invalid(
@@ -39,8 +40,9 @@ impl TransportStream {
         self.boundary_event = true;
         Ok(())
     }
-    /// Seal the actual core End after this source operation has drained. Pending
-    /// PSI/PES may remain: an entity End is not a logical EOF or discontinuity.
+    /// Witness the actual physical byte offset at the drained entity end.
+    /// Partial PSI and PES can continue in the next entity. A mismatched or
+    /// undrained cursor is rejected, and a short work grant yields `Ok(None)`.
     pub fn media_entity_end(
         &self,
         input: &mut InputCursor,
@@ -153,7 +155,9 @@ impl TransportStream {
         })
     }
 
-    /// Poll the literal trace with its source identity for compatibility completion.
+    /// Poll one ordinary source event or progress step, attaching the issuing parser and
+    /// cursor identity to each event. A foreign pool or stale cursor generation is rejected.
+    /// Other failures follow [`Self::poll`].
     pub fn poll_observed(
         &mut self,
         input: &mut InputCursor,
@@ -165,7 +169,8 @@ impl TransportStream {
         self.bind_trace(step, input)
     }
 
-    /// Poll the compact trace with the same source identity as the literal trace.
+    /// Poll source events with consecutive null carriers represented as runs. Each event
+    /// carries the same source identity as [`Self::poll_observed`] and uses the same cursor checks.
     pub fn poll_compact_observed(
         &mut self,
         input: &mut InputCursor,
@@ -177,7 +182,8 @@ impl TransportStream {
         self.bind_trace(step, input)
     }
 
-    /// Bind a published logical EOF to the parser and drained core cursor.
+    /// Witness logical EOF for this parser and cursor after publication of `Finished`.
+    /// Before that event, an undrained cursor or a foreign byte pool is rejected.
     pub fn source_finished(&self, input: &InputCursor) -> Result<ObservedTrace<()>> {
         if !self.finished || !self.framer.observed_entity_end(input) {
             return Err(Error::Invalid("source has not published Finished"));
@@ -188,7 +194,8 @@ impl TransportStream {
         })
     }
 
-    /// Call after an observed entity End and only when that is the logical EOF.
+    /// Start draining incomplete source assembly at the last entity’s physical end.
+    /// Returns `Invalid` while the entity end is unobserved or a carrier or table job is pending.
     pub fn end_of_source(&mut self) -> Result<()> {
         // The compact end phase added 5.60% to PSI fault reads through an out-of-line constructor.
         if self.entity_end.is_none() || self.held.is_some() || self.psi.blocks_carriers() {

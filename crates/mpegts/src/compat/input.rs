@@ -1,4 +1,4 @@
-//! The demuxer's start position.
+//! Initial carrier-grid discovery for demux packet positions.
 //!
 //! FFmpeg's demuxer reports packet positions against the carrier grid it finds at
 //! the start of the input. [`InputBootstrap`] inspects the initial window for that
@@ -6,10 +6,8 @@
 //! [`DemuxObserver`](super::pes::DemuxObserver) to the same positions through
 //! [`bind_input`](super::pes::DemuxObserver::bind_input).
 //!
-//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-//!
-//! The demuxer's input startup. This is not transport validation or the
-//! normative source position. No reference source was consulted.
+//! The discovered grid determines compatibility byte positions. Each carrier
+//! still undergoes transport validation when the source reader consumes it.
 use crate::PacketFormat;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -17,8 +15,7 @@ use triergon_core::{
 };
 
 pub(crate) mod basis {
-    /// Explicit result of the observed default-callback, finite aligned operation.
-    /// Other delivery, mixed stride, damaged sync and ambiguous grids are unproven.
+    /// Byte position origin for each carrier on an admitted transport grid.
     #[cfg_attr(
         not(feature = "reference-trace"),
         allow(unreachable_pub, reason = "exported only with reference-trace")
@@ -59,12 +56,12 @@ pub struct InputContext {
     inspected_bytes: usize,
 }
 impl InputContext {
-    /// The position basis the demuxer reports packet positions in.
+    /// Reports whether packet byte positions include an M2TS carrier’s four-byte prefix.
     #[cfg(feature = "reference-trace")]
     pub fn basis(&self) -> PositionBasis {
         self.basis
     }
-    /// The startup probe establishes a carrier grid, with Source reads still open.
+    /// True when the carrier grid is known and physical reads can continue past the initial prefix.
     pub fn is_prefix(&self) -> bool {
         matches!(self.extent, Extent::Prefix(_))
     }
@@ -72,7 +69,7 @@ impl InputContext {
     pub fn inspected_bytes(&self) -> usize {
         self.inspected_bytes
     }
-    /// The initial window's bytes.
+    /// The charged input window used to identify the carrier grid.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.backing
     }

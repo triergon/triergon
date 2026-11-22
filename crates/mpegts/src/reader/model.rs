@@ -65,7 +65,7 @@ impl<T> Shared<T> {
 pub struct SourceEvent(pub(super) Shared<TraceEvent>);
 
 impl SourceEvent {
-    /// The shared transport stream event.
+    /// Borrow the event and its original source facts for as long as this handle is held.
     pub fn event(&self) -> &TraceEvent {
         &self.0
     }
@@ -99,15 +99,15 @@ pub struct Track {
 }
 
 impl Track {
-    /// The PMT entry this track reads.
+    /// The elementary PID, stream type and descriptors that configure this track.
     pub fn stream(&self) -> &ElementaryStream {
         &self.source.map().streams.as_slice()[usize::from(self.index)]
     }
-    /// The PMT that announced this track.
+    /// The retained program map for the track’s configuration, valid after reconfiguration.
     pub fn program_map(&self) -> &ProgramMap {
         self.source.map()
     }
-    /// The program number of the track's PMT.
+    /// The 16-bit program number from the retained PMT table extension.
     pub fn program(&self) -> u16 {
         self.program_map().header.extension
     }
@@ -150,12 +150,11 @@ impl TrackInfo for Track {
 /// elementary offset and uninterrupted-byte-run epoch unchanged.
 #[derive(Clone, Debug)]
 pub struct PayloadSource {
-    /// The intersection's range in the track's concatenated PES payload.
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub elementary_range: Range<u64>,
-    /// Exact intersection within the original PES payload, independent of
-    /// the elementary view's restart position.
+    /// Half-open byte range relative to the original PES payload’s first byte.
     pub payload_range: Range<usize>,
-    /// The original PES event.
+    /// Retains the PES header, source ranges and epoch of these payload bytes.
     pub pes: SourceEvent,
 }
 
@@ -208,7 +207,7 @@ impl PayloadSources {
 /// the next frame start. Missing DTS is never inferred from PTS.
 #[derive(Clone, Debug)]
 pub struct PacketClock {
-    /// The clock the timestamps belong to.
+    /// Program, PCR PID and epoch used to interpret both timestamps.
     pub key: ClockKey,
     /// Invalid source signalling quarantined interpretation at this PES.
     /// Raw fields remain available, while lifted timestamps stay unresolved.
@@ -276,7 +275,7 @@ impl Ac3AccessUnit {
         )
     }
 
-    /// The primary syncframe's raw trailing word.
+    /// The primary syncframe’s last two bytes as a big-endian word.
     pub fn crc2_word(&self) -> u16 {
         let end = self.first.header.frame_bytes;
         u16::from_be_bytes([self.bytes[end - 2], self.bytes[end - 1]])
@@ -300,12 +299,13 @@ impl DvbSubtitleUnit {
         &self.bytes
     }
 
-    /// The number of complete segments in this unit.
+    /// Complete DVB segment envelopes, excluding the wrapper, end marker and unfinished tail.
     pub const fn segment_count(&self) -> usize {
         self.segment_count
     }
 
-    /// The unfinished final segment's range in the lane's elementary coordinates.
+    /// Half-open byte range of the unfinished final segment, when the tail policy reports one.
+    /// Offsets are relative to the track’s concatenated PES payload.
     pub fn truncated_tail(&self) -> Option<Range<u64>> {
         self.truncated.then_some(self.range.end..self.pes_end)
     }
@@ -330,7 +330,7 @@ impl LoasFrame {
         &self.bytes.as_ref()[3..]
     }
 
-    /// Frame extent in the track's concatenated PES payload.
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.offset..self.offset + self.bytes.len() as u64
     }
@@ -350,12 +350,12 @@ impl MpegAudioFrame {
         &self.bytes
     }
 
-    /// Audio frame syntax and sample timing.
+    /// Header facts including layer, sampling rate in hertz and coded samples per frame.
     pub const fn header(&self) -> &MpegAudioHeader {
         &self.header
     }
 
-    /// Frame extent in the track's concatenated PES payload.
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.offset..self.offset + self.bytes.len() as u64
     }
@@ -386,7 +386,7 @@ impl DtsAudioFrame {
         self.duration
     }
 
-    /// Frame extent in the track's concatenated PES payload.
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.offset..self.offset + self.bytes.len() as u64
     }
@@ -411,7 +411,7 @@ impl DtsExtensionFrame {
         self.duration
     }
 
-    /// Frame extent in the track's concatenated PES payload.
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.offset..self.offset + self.bytes.len() as u64
     }
@@ -554,19 +554,19 @@ pub(super) struct PacketData {
 pub struct Packet(pub(super) Shared<PacketData>);
 
 impl Packet {
-    /// The track this packet belongs to.
+    /// The track configuration that applies to this packet, including its retained PMT.
     pub fn track_info(&self) -> &Track {
         &self.0.track
     }
-    /// The framed access unit.
+    /// Framing syntax and source payload for this unit, before decoder-feed conversion.
     pub fn access_unit(&self) -> &AccessUnit {
         &self.0.unit
     }
-    /// The PES packets the unit's bytes came from, in elementary order.
+    /// Intersections of the unit with its original PES payloads, in elementary byte order.
     pub fn sources(&self) -> &[PayloadSource] {
         self.0.sources.as_slice()
     }
-    /// The PES timestamps that anchor this unit, when an applicable PES header supplied them.
+    /// The applicable PES anchor, preserving whether its header had PTS and DTS.
     pub fn clock(&self) -> Option<&PacketClock> {
         self.0.clock.as_ref()
     }
@@ -574,11 +574,12 @@ impl Packet {
     pub fn epochs(&self) -> SourceEpochs {
         self.0.epochs
     }
-    /// Unit extent in the track's concatenated PES payload.
+    /// Half-open byte range of the unit in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.0.unit.range()
     }
-    /// Exact coded audio duration, including rates not integral in 90 kHz.
+    /// Exact coded audio duration in seconds, even when it is fractional in 90 kHz ticks.
+    /// Returns `None` when the unit supplies no usable sample count and rate.
     pub fn sample_duration(&self) -> Option<Time> {
         self.0.duration
     }
@@ -636,23 +637,23 @@ pub(super) struct UnframedData {
 pub struct IncompleteVideo(pub(super) Shared<UnframedData>);
 
 impl IncompleteVideo {
-    /// The track the run belongs to.
+    /// The retained track configuration at the start of the unframed video run.
     pub fn track_info(&self) -> &Track {
         &self.0.track
     }
-    /// Run extent in the track's concatenated PES payload.
+    /// Half-open byte range of the run in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.0.range.clone()
     }
-    /// The run's original payload bytes.
+    /// Original AVC or HEVC PES payload bytes, including the invalid leading bytes.
     pub fn bytes(&self) -> &Bytes {
         &self.0.bytes
     }
-    /// The PES packets the run came from, in elementary order.
+    /// Intersections with original PES payloads, ordered by elementary byte offset.
     pub fn sources(&self) -> &[PayloadSource] {
         self.0.sources.as_slice()
     }
-    /// The PES timestamps at the start of the run, when present.
+    /// The applicable PES anchor at the start of the run, when available.
     pub fn clock(&self) -> Option<&PacketClock> {
         self.0.clock.as_ref()
     }
@@ -672,27 +673,27 @@ pub struct UnframedAudio {
 }
 
 impl UnframedAudio {
-    /// Carriage selected by the compatibility policy.
+    /// The private AC-3 or E-AC-3 carriage admitted from the PMT’s signalling.
     pub fn carriage(&self) -> PrivateAudioCarriage {
         self.carriage
     }
-    /// The track the PES belongs to.
+    /// Track configuration retained from the PMT that admitted the private PES.
     pub fn track_info(&self) -> &Track {
         &self.data.track
     }
-    /// Payload extent in the track's concatenated PES payload.
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.data.range.clone()
     }
-    /// The PES payload bytes.
+    /// Original private PES payload bytes, including the bytes without an audio syncword.
     pub fn bytes(&self) -> &Bytes {
         &self.data.bytes
     }
-    /// The PES packets the payload came from.
+    /// The original PES and its contribution in track-relative elementary byte coordinates.
     pub fn sources(&self) -> &[PayloadSource] {
         self.data.sources.as_slice()
     }
-    /// The PES timestamps of the payload, when present.
+    /// The applicable PES anchor, including the presence or absence of its timestamp fields.
     pub fn clock(&self) -> Option<&PacketClock> {
         self.data.clock.as_ref()
     }
@@ -724,7 +725,7 @@ pub enum ReaderEvent {
     /// Both source events remain available for recovery without asserting an AU
     /// association across the changed map or clock binding.
     InterruptedPes {
-        /// The completed PES.
+        /// The completed PES with the header and original spans from before the boundary.
         source: SourceEvent,
         /// The program boundary that the PES header predates.
         boundary: SourceEvent,
@@ -732,9 +733,9 @@ pub enum ReaderEvent {
     /// No complete AU framer is admitted for this stream. Its PMT and PES
     /// still surface as source events; no PES is relabelled as an AU.
     Unsupported {
-        /// The track no framer was admitted for.
+        /// The retained PMT entry whose carriage has no admitted access-unit framer.
         track: Track,
-        /// Why the framer was refused.
+        /// The refusal returned when the track’s signalling was tested for framing support.
         error: Error,
     },
     /// A PMT, clock or byte-run boundary interrupted unpublished elementary

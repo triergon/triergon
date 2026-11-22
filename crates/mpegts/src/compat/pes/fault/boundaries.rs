@@ -27,7 +27,7 @@ impl TransportTailConfirmation {
     pub fn source_fault(&self) -> &TraceFault {
         &self.fault
     }
-    /// The source context of that diagnostic.
+    /// The original event ordinal and epochs of the final-carrier diagnostic.
     pub fn diagnostic_context(&self) -> SourceContext {
         self.diagnostic
     }
@@ -35,7 +35,7 @@ impl TransportTailConfirmation {
     pub fn physical_end(&self) -> SourceLocation {
         self.end
     }
-    /// The source context of the source `Finished` event.
+    /// The event ordinal and source epochs at confirmed logical EOF.
     pub fn source_finished(&self) -> SourceContext {
         self.finished
     }
@@ -150,7 +150,9 @@ impl TransportFaultRecovery {
 
     /// Advance the bound cursor through a proved contiguous entity boundary.
     /// Pending PES assembly survives. Per-entity terminal facts are retired
-    /// only after the inner observer commits the continuation.
+    /// only after the inner observer commits the continuation. A short work
+    /// grant yields `Ok(false)`. A foreign pool, stale token or undrained entity
+    /// is refused.
     pub fn continue_media_entity(
         &mut self,
         end: &MediaEntityEnd,
@@ -245,7 +247,8 @@ impl TransportFaultRecovery {
 
     /// Confirm only the actual next source Timeline after an admitted PCR/DI
     /// carrier has produced a complete finite packet. The caller keeps its
-    /// existing DemuxClock; this changes only the source epoch of future packets.
+    /// existing `DemuxClock`. Future packets carry the advanced source clock epoch.
+    /// An unmatched timeline, undrained packet or unobserved boundary is refused.
     pub fn confirm_source_timeline(
         &mut self,
         event: &TraceEvent,
@@ -374,8 +377,9 @@ impl TransportFaultRecovery {
             _ => None,
         }
     }
-    /// Seal a real drained TS/core End. A short grant leaves the pending fault
-    /// unchanged. No input-dependent allocation or payload copy is performed.
+    /// Check that the actual physical end is at the end of the pending TS188 fault.
+    /// A short grant yields `Ok(false)`. A wrong cursor, source token or final carrier
+    /// extent is refused.
     pub fn seal_terminal_end(
         &mut self,
         end: &MediaEntityEnd,

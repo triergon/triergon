@@ -225,8 +225,9 @@ pub(super) fn has_selected_hint(packet: &TransportPacket) -> bool {
 }
 
 impl RecoveryObserver {
-    /// Explicit default-options finite AVC diagnostic profile, distinct from the
-    /// plain observer. This does not recover other fault kinds.
+    /// Observe finite AVC packets under the selected diagnostic policies. A scope
+    /// other than stream type `0x1b` and PES stream ID `0xe0` returns `Unsupported`.
+    /// Other constructor failures follow [`Self::new`].
     pub fn new_selected_avc_faults(
         profile: DemuxProfile,
         scope: DemuxScope,
@@ -366,8 +367,10 @@ impl RecoveryObserver {
         }));
         Ok(())
     }
-    /// Accept the actual strict diagnostic with its complete original rejected
-    /// carrier. No TransportPacket, PCR or PesHeader is forged for this path.
+    /// Stage the source diagnostic and its complete original carrier after
+    /// checking that the PCR encoding is its sole transport failure. The source
+    /// scope and ordinal must match, and pending input must be drained. A refusal
+    /// returns the diagnostic and charged carrier intact.
     #[allow(
         clippy::result_large_err,
         reason = "recover the original charged source diagnostic inline"
@@ -475,8 +478,9 @@ impl RecoveryObserver {
         self.entity_first = false;
         Ok(())
     }
-    /// Acknowledge only the real next source Timeline after a previously seen
-    /// validated PCR/DI boundary has drained. No demux clock context is reset.
+    /// Advance the source clock epoch after draining a validated PCR discontinuity.
+    /// Missing or out-of-order timeline context and undrained input are refused.
+    /// The compatibility clock interval remains in effect.
     pub fn commit_source_timeline(&mut self, c: SourceContext) -> Result<()> {
         let Some((ordinal, old)) = self.pending_timeline else {
             return Err(Error::Unsupported(

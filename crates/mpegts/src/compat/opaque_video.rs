@@ -85,22 +85,22 @@ pub struct RecoveredOpaque {
 }
 
 impl RecoveredOpaque {
-    /// The source diagnostic reproduced by the recovery.
+    /// The original fault, including its physical source location and parser error.
     pub fn source_fault(&self) -> &TraceFault {
         &self.fault
     }
 
-    /// Context of the reproduced diagnostic.
+    /// Event ordinal and clock and configuration epochs of the matching fault.
     pub fn diagnostic_context(&self) -> SourceContext {
         self.diagnostic
     }
 
-    /// The issuing source's drained physical End.
+    /// The matching physical end witness, with the source entity and ending byte offset.
     pub fn physical_end(&self) -> &MediaEntityEnd {
         &self.end
     }
 
-    /// Context of the issuing source's Finished event.
+    /// Event ordinal and epochs at the logical EOF that certified the run.
     pub fn source_finished(&self) -> SourceContext {
         self.finished
     }
@@ -119,7 +119,7 @@ impl RecoveredOpaque {
             .map(AsRef::as_ref)
     }
 
-    /// Length of the opaque byte run.
+    /// Total original payload bytes across the run’s carrier-backed spans.
     pub fn payload_len(&self) -> usize {
         self.bytes
     }
@@ -270,7 +270,9 @@ impl OpaqueRecovery {
     }
 
     /// Advance the issuing source and its recovery observer. `Ready` publishes
-    /// the retained run once. Subsequent calls return its confirmed `End`.
+    /// the retained run once. Subsequent calls return its confirmed `End`. A foreign
+    /// pool, unrelated source or altered cursor is refused. Source and recovery errors
+    /// stop the operation, while `Cancelled` can be retried.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,

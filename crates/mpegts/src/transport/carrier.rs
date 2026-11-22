@@ -253,7 +253,9 @@ impl<'a> TransportObservation<'a> {
         }
     }
 
-    /// Keep a complete carrier with the original shared backing storage.
+    /// Retain the original carrier bytes without copying and return an owned packet.
+    /// A continuation is materialized from its validated field ranges. Invalid ranges
+    /// or overflowing offsets return an error.
     pub fn to_packet(self) -> Result<TransportPacket> {
         match self.0 {
             ObservedTransport::Packet(packet) => Ok(packet.clone()),

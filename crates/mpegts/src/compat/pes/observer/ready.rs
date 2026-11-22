@@ -27,7 +27,8 @@ impl DemuxObserver {
     }
 
     /// Append an ordinary TS188 continuation when it fits the existing arena.
-    /// Unhandled leaves the carrier, observer and budget ready for normal polling.
+    /// `Unhandled` leaves the carrier, observer and work grant ready for normal polling.
+    /// A missing admitted payload or a failed append returns an assembly error.
     pub fn append_ready_continuation(
         &mut self,
         packet: &mut TransportPacket,
@@ -46,7 +47,8 @@ impl DemuxObserver {
     }
 
     /// Append from a carrier whose full transport event is still needed.
-    /// The payload keeps its original charge and the event remains intact.
+    /// The payload keeps its original charge and the event remains intact. A foreign
+    /// or stale input binding is refused before the append.
     pub fn append_ready_borrowed_continuation(
         &mut self,
         packet: &TransportPacket,

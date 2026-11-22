@@ -295,21 +295,19 @@ impl Reader {
             *stream = Stream::Released;
         }
     }
-    /// The tracks of the selected program announced so far.
+    /// Tracks in the active PMT’s stream order. The slice is empty until a map is accepted.
     pub fn tracks(&self) -> &[Track] {
         self.tracks.as_slice()
     }
-    /// The input the reader needs next.
+    /// The outstanding input entity, byte offset, length bound and reply token.
     ///
     /// Fails with the reader's stopping error once it has failed or been closed.
     pub fn request(&self) -> Result<InputRequest> {
         Ok(self.input()?.request())
     }
-    /// Supplies input for the current request.
-    ///
-    /// Fails with the stopping error once the reader has stopped, and when the window does not
-    /// answer
-    /// the current request.
+    /// Supply charged bytes for the outstanding input request.
+    /// A stopped reader returns its stopping error. A reply must match the requested entity,
+    /// token and offset and use the reader’s byte pool.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.input_mut()?.provide(window)?;
         if self.storage.is_some() && !window.bytes().is_empty() {
@@ -321,9 +319,8 @@ impl Reader {
     /// Declares definitive end of the current entity's input. During a seek over a planned sequence
     /// of entities, this moves on to the next entity instead.
     ///
-    /// Fails with the stopping error once the reader has stopped, and when `source` and `token` do
-    /// not
-    /// match the current request; a `Truncated` result also stops the reader.
+    /// A stopped reader returns its stopping error. The source and token must match the
+    /// outstanding request. A `Truncated` result also stops the reader.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
         if let Some(next) = self.seek_entities.as_deref().and_then(|plan| plan.next()) {
@@ -356,7 +353,9 @@ impl Reader {
     /// Complete one entity and queue its successor. The reader consumes the
     /// final supplied bytes before requesting offset zero of the next entity.
     /// The generation is preserved and the request number advances.
-    /// Use [Self::finish] for the last entity of the logical stream.
+    /// Use [`Self::finish`] for the last entity of the logical stream. The current source and
+    /// token must match, and the successor must have a different source ID. A pending
+    /// continuation, stopped reader or active seek refuses the request.
     pub fn finish_entity(
         &mut self,
         source: SourceId,
@@ -469,9 +468,8 @@ impl Reader {
     }
     /// Advances within `work` to the next packet, other source event or progress step.
     ///
-    /// Backpressure is returned as a step. Any other error except `Allocation` stops the reader and
-    /// is
-    /// returned by every later call.
+    /// Backpressure is returned as a progress step. Other errors stop the reader and are
+    /// returned by later calls, except for `Allocation`, which can be retried.
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         self.step_observing::<false>(work, cancel, |_| ())
     }

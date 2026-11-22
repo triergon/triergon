@@ -89,8 +89,9 @@ impl PatCollector {
     pub(crate) fn has_pending(&self) -> bool {
         self.input.is_some() || self.building.is_some()
     }
-    /// Rejection returns the original charged source and metadata allocations.
-    /// Allocating a box on this failure path would need a new budget reservation.
+    /// Queue a validated PAT section for the current version’s coverage check.
+    /// An active assembly job or foreign byte pool is refused with the charged
+    /// section intact.
     #[allow(
         clippy::result_large_err,
         reason = "return the original charged PAT and source spans without allocating on rejection"

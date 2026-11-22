@@ -127,8 +127,9 @@ impl TransportStream {
             DescriptorNamespace::Unspecified,
         )
     }
-    /// An explicit, immutable caller contract supplies descriptor namespace evidence.
-    /// Raw source facts and clock/configuration epochs are unaffected by this choice.
+    /// Read a selected nonzero program with an explicit namespace for every PMT descriptor.
+    /// The PID and clock facts are read from the source. Program zero and invalid limits
+    /// return `Invalid`, as in [`Self::new`].
     pub fn new_with_namespace(
         budget: Budget,
         format: PacketFormat,
@@ -142,8 +143,9 @@ impl TransportStream {
         Self::new_with_program(budget, format, limits, Some(program), descriptor_namespace)
     }
 
-    /// Read one TS188 segment with an in-band PAT and PMT. The complete PAT
-    /// must identify exactly one media program. Program zero is a network PID.
+    /// Read a TS188 segment with an in-band PAT and PMT. The complete PAT
+    /// must identify exactly one media program, excluding the network PID entry.
+    /// Invalid limits fail construction, and a multi-program PAT fails during polling.
     pub fn new_single_program_segment(
         budget: Budget,
         limits: ParseLimits,
@@ -160,7 +162,8 @@ impl TransportStream {
 
     /// Read one independent segment, sharing complete carriers with the
     /// input window and validating source PES without retaining it. Feed
-    /// callers still receive transport packets, program tables and faults.
+    /// callers still receive transport packets, program tables and faults. Limits and
+    /// program selection follow [`Self::new_single_program_segment`].
     pub fn new_single_program_feed(
         budget: Budget,
         limits: ParseLimits,
@@ -173,7 +176,8 @@ impl TransportStream {
     }
 
     /// A sequential feed publishes PES carriers after continuity validation.
-    /// PAT, PMT, continuity breaks, clock transitions and faults remain visible.
+    /// PAT, PMT, continuity breaks, clock transitions and faults remain visible. The
+    /// constructor and program validation follow [`Self::new_single_program_segment`].
     pub fn new_single_program_progressive_feed(
         budget: Budget,
         limits: ParseLimits,

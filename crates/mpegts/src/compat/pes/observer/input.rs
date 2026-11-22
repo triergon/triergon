@@ -18,9 +18,8 @@ impl DemuxObserver {
         }
     }
 
-    /// As [`push`](Self::push), for an observer bound to `input`; the carrier is refused intact
-    /// when
-    /// `input` is not the bound source and request.
+    /// As [`Self::push`], using the cursor that owns the bound input. A mismatched
+    /// source, current request or byte pool returns the original carrier intact.
     #[allow(
         clippy::result_large_err,
         reason = "recover the original charged inline carrier"
@@ -121,8 +120,9 @@ impl DemuxObserver {
         .map_err(|_| Error::Overflow)
     }
 
-    /// Only the selected PID, in source order. Rejected input is recovered
-    /// intact without a fresh allocation. Drain poll before another push.
+    /// Admit one carrier on the selected PID in source order. A foreign pool, mismatched
+    /// scope or active pending carrier is refused. The returned refusal owns the original
+    /// charged packet, so it can be retried after draining the observer.
     #[allow(
         clippy::result_large_err,
         reason = "recover original inline charged transport input; no uncharged Box allocation"
@@ -137,6 +137,7 @@ impl DemuxObserver {
 
     /// Admit a carrier while the caller keeps the original transport event.
     /// The observer retains only the storage and fields used to assemble PES.
+    /// Admission checks are those of [`Self::push`] or [`Self::push_with_input`].
     pub fn push_borrowed(
         &mut self,
         packet: &TransportPacket,

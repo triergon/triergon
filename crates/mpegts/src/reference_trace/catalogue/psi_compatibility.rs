@@ -558,7 +558,8 @@ fn decode_rejected_pmt(
     })
 }
 impl Catalogue {
-    /// Opt-in only. Existing observe()/finish() retain their strict-source rules.
+    /// Select at least one PSI compatibility policy before observing input.
+    /// A second selection or a selection after observation returns `Invalid`.
     pub fn enable_psi_compatibility(&mut self, policies: PsiCompatibilityPolicies) -> Result<()> {
         if self.compatibility.is_some()
             || self.entity.is_some()
@@ -595,7 +596,9 @@ impl Catalogue {
                     && self.pending_pat == Some((route.tsid, route.version))
             })
     }
-    /// Includes bounded storage/provenance scans and possible pending PSI bytes.
+    /// Work units for admitting this event, including pending PSI and retained
+    /// source ranges. A disabled policy returns `Invalid`, and an out-of-range
+    /// work count returns `Overflow`.
     pub fn required_psi_compatibility_work(&self, event: &TraceEvent) -> Result<u64> {
         let s = self
             .compatibility
@@ -1176,8 +1179,9 @@ impl Catalogue {
         s.last_event = Some((source, context));
         Ok(())
     }
-    /// Named opt-in event entry point. None of this runs through observe(). A
-    /// false return means the exact input event is still unconsumed.
+    /// Admit an issued source event under the selected PSI policies. `Ok(false)`
+    /// leaves it unconsumed. Missing policies or logical EOF refuse admission.
+    /// Cancellation and errors in the event’s syntax or provenance propagate.
     pub fn observe_psi_compatibility(
         &mut self,
         event: &TraceEvent,
@@ -1216,7 +1220,9 @@ impl Catalogue {
         }
         Ok(true)
     }
-    /// Advance the literal event order over clear, unflagged null carriers.
+    /// Advance source event ordinals over a borrowed run of clear null carriers.
+    /// A short work grant yields `Ok(false)`. A foreign pool, mismatched carrier
+    /// format or out-of-order source context is refused.
     pub fn observe_psi_null_run(
         &mut self,
         run: &NullCarrierRun,
@@ -1312,8 +1318,9 @@ impl Catalogue {
             }
         }
     }
-    /// The actual source Section and actual later Strict diagnostic are both
-    /// required. section_context never pretends the diagnostic happened earlier.
+    /// Correlate an original PSI section with its later source diagnostic. Both
+    /// contexts must match retained carrier evidence and the chosen policy. A short
+    /// work grant yields `Ok(None)`. A mismatch after admission stops the catalogue.
     #[allow(
         clippy::too_many_arguments,
         reason = "explicit independent source and diagnostic contexts are required"
@@ -1392,8 +1399,9 @@ impl Catalogue {
         )
         .map_err(|_| Error::Overflow)
     }
-    /// Real EOF is separately witnessed. It does not make a pending Strict PAT
-    /// complete; the explicit demux per-section coverage is retained instead.
+    /// Seal catalogue completion at the actual physical end. An incomplete PAT
+    /// keeps its section coverage. An unmatched EOF witness or unconfirmed source
+    /// PMT is refused, and a short work grant yields `Ok(false)`.
     pub fn finish_psi_compatibility(
         &mut self,
         end: &MediaEntityEnd,

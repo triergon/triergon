@@ -14,11 +14,11 @@ pub struct SectionHeader {
     /// The 16-bit table ID extension: the transport stream ID of a PAT, the program number of a
     /// PMT.
     pub extension: u16,
-    /// The 5-bit version number.
+    /// Table version modulo 32, used to group sections of the same version.
     pub version: u8,
     /// The current/next indicator: `true` for the table in force, `false` for the next one.
     pub current_next: bool,
-    /// The 8-bit number of this section.
+    /// Zero-based section index within this table version.
     pub section_number: u8,
     /// The 8-bit number of the last section of the table; never below `section_number`.
     pub last_section_number: u8,
@@ -43,7 +43,7 @@ fn header(section: &Section, id: u8) -> Result<SectionHeader> {
     })
 }
 
-/// One step of incremental table parsing.
+/// A cooperative table parse outcome, governed by the caller’s work grant.
 #[derive(Debug)]
 pub enum TableStep<T> {
     /// The parsed table, returned once.
@@ -68,7 +68,7 @@ impl ProgramAssociation {
     }
 }
 
-/// One parsed PAT section.
+/// One CRC-validated PAT section, retaining the ordered entries and physical byte ranges.
 #[derive(Debug)]
 pub struct PatSection {
     /// The section header; its extension is the transport stream ID.
@@ -286,7 +286,8 @@ impl PmtReader {
             super::DescriptorNamespace::Unspecified,
         )
     }
-    /// Context is immutable for this parse; a private tag alone does not select DVB.
+    /// Parse one PMT with an explicit, immutable descriptor namespace.
+    /// Section identity, syntax, limit and budget errors follow [`Self::new`].
     pub fn new_with_namespace(
         section: &Section,
         budget: &Budget,
