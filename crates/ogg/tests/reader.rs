@@ -11,7 +11,7 @@ use triergon_core::{
 use triergon_framing::{flac, vorbis::VorbisHeaders};
 use triergon_ogg::compat::clock::{ReferenceTiming, packet_timing};
 use triergon_ogg::page::{BEGIN_OF_STREAM, CONTINUED, END_OF_STREAM, write_page};
-use triergon_ogg::{Limits, Packet, Reader, ReaderEvent};
+use triergon_ogg::{Limits, Packet, PageHeader, Reader, ReaderEvent};
 
 /// Lays out packets on pages the way an Ogg muxer does.
 struct Muxer {
@@ -320,13 +320,60 @@ fn truncation_at_every_byte_ends_cleanly_with_a_prefix_of_the_packets() {
 fn corrupt_bytes_never_panic() {
     let mut file = Vec::new();
     opus_stream(5, 5, 2, 30, &mut file);
+    let pages = page_offsets(&file);
     for at in 0..file.len() {
         for flip in [0x01, 0x80, 0xff] {
             let mut bad = file.clone();
             bad[at] ^= flip;
-            // Rewrite the CRC sometimes so the damage reaches the parsers.
             let _ = read_with(&bad, 13, 1 << 20, false, Limits::default());
+            // The same damage under a valid CRC reaches the parsers and the clocks.
+            let start = pages[pages.partition_point(|&page| page <= at) - 1];
+            if let Some(fixed) = with_crc(&bad, start) {
+                let _ = read_with(&fixed, 13, 1 << 20, false, Limits::default());
+            }
         }
+    }
+}
+
+/// `file` with the page at `start` written again under its own CRC, when it still
+/// parses as a page.
+fn with_crc(file: &[u8], start: usize) -> Option<Vec<u8>> {
+    let page = &file[start..];
+    let header = PageHeader::parse(page).ok()?;
+    let end = start + header.page_len();
+    let body = file.get(start + header.header_len()..end)?;
+    let mut fixed = file[..start].to_vec();
+    let lacing = header.lacing(page);
+    write_page(
+        header.flags,
+        header.granule,
+        header.serial,
+        header.sequence,
+        lacing,
+        body,
+        &mut fixed,
+    );
+    fixed.extend_from_slice(&file[end..]);
+    Some(fixed)
+}
+
+#[test]
+fn extreme_granule_positions_leave_times_unknown_without_panicking() {
+    for granule in [i64::MIN, i64::MIN + 1, i64::MAX - 1, i64::MAX] {
+        let mut file = Vec::new();
+        let mut muxer = Muxer::new(3);
+        muxer.packet(&opus_head(312), 0, &mut file);
+        muxer.flush(false, &mut file);
+        muxer.packet(b"OpusTags\0\0\0\0\0\0\0\0", 0, &mut file);
+        muxer.flush(false, &mut file);
+        for (n, page_granule) in [granule, granule, granule].into_iter().enumerate() {
+            muxer.packet(&opus_packet(2 * n, 20), page_granule, &mut file);
+            muxer.packet(&opus_packet(2 * n + 1, 20), page_granule, &mut file);
+            muxer.flush(n == 2, &mut file);
+        }
+        let (_, events, error) = read_with(&file, 1 << 16, 1 << 20, false, Limits::default());
+        assert_eq!(error, None, "granule {granule}");
+        assert_eq!(packets(&events).len(), 6, "granule {granule}");
     }
 }
 
@@ -416,9 +463,7 @@ fn page_offsets(file: &[u8]) -> Vec<usize> {
     let mut at = 0;
     while at < file.len() {
         offsets.push(at);
-        at += triergon_ogg::PageHeader::parse(&file[at..])
-            .unwrap()
-            .page_len();
+        at += PageHeader::parse(&file[at..]).unwrap().page_len();
     }
     offsets.push(at);
     offsets

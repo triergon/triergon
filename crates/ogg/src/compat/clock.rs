@@ -87,7 +87,7 @@ impl ReferenceClock {
 
     /// Where the last packet ended, as the next link continues.
     pub(crate) fn end(&self) -> Option<i64> {
-        self.end.map(|end| end + self.shift)
+        self.end.and_then(|end| end.checked_add(self.shift))
     }
 
     /// A page with no media packets: its granule position still times the next packet.
@@ -98,7 +98,7 @@ impl ReferenceClock {
     }
 
     /// Time one page's packets. `granule` is in ticks; `raw_zero` says the page states
-    /// granule position 0.
+    /// granule position 0. A time out of the `i64` range is unknown.
     pub(crate) fn page<S: AsMut<Slot>>(
         &mut self,
         timeline: &Timeline,
@@ -132,7 +132,7 @@ impl ReferenceClock {
                 && self.anchor.is_none_or(|anchor| anchor == 0)
             {
                 duration = slot.durations.standalone.map(i64::from);
-                pts = from_here[index].map(|rest| granule - rest);
+                pts = from_here[index].and_then(|rest| granule.checked_sub(rest));
                 if raw_zero && from_here[index].is_some_and(|rest| rest != 0) {
                     pts = None;
                 }
@@ -151,32 +151,40 @@ impl ReferenceClock {
                 if let (true, Some((first, sum)), Some(granule), Some(own)) =
                     (index == last, self.last_page, granule, duration)
                 {
-                    let excess = first + sum + own - granule;
+                    // Once per stream, so exact in i128 whatever the granule positions.
+                    let end = i128::from(first) + i128::from(sum);
+                    let excess = end + i128::from(own) - i128::from(granule);
                     padding = u32::try_from(excess.max(0)).unwrap_or(u32::MAX);
-                    duration = Some(granule - first - sum);
+                    duration = i64::try_from(i128::from(granule) - end).ok();
                     if speex {
                         padding = 0;
                         duration = duration.filter(|&d| d > 0).or(Some(own));
                     }
                 }
                 if let (Some((first, sum)), Some(own)) = (self.last_page, duration) {
-                    self.last_page = Some((first, sum + own));
+                    self.last_page = Some((first, sum.saturating_add(own)));
                 }
             }
             let pts = pts.or(self.end);
-            self.end = pts.zip(duration).map(|(pts, d)| pts + d).or(self.end);
+            self.end = pts
+                .zip(duration)
+                .and_then(|(pts, d)| pts.checked_add(d))
+                .or(self.end);
             let skip = match timeline {
                 Timeline::Opus { pre_skip } if !self.started => u32::from(*pre_skip),
                 _ => 0,
             };
             if !self.started {
                 self.started = true;
-                if let (Some(end), Some(pts)) = (self.chain_end, pts) {
-                    self.shift = end - pts;
+                // A shift out of range leaves the link where it is.
+                if let (Some(end), Some(pts)) = (self.chain_end, pts)
+                    && let Some(shift) = end.checked_sub(pts)
+                {
+                    self.shift = shift;
                 }
             }
             slot.reference = ReferenceTiming {
-                pts: pts.map(|pts| pts + self.shift),
+                pts: pts.and_then(|pts| pts.checked_add(self.shift)),
                 duration,
                 skip_samples: skip,
                 discard_padding: padding,

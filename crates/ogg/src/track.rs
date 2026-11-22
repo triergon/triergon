@@ -198,11 +198,11 @@ impl Packet {
         self.page
     }
 
-    /// Where the packet's samples end.
+    /// Where the packet's samples end; `None` when that is out of the `i64` range.
     pub fn end(&self) -> Option<i64> {
         self.pts
             .zip(self.duration)
-            .map(|(pts, duration)| pts + duration)
+            .and_then(|(pts, duration)| pts.checked_add(duration))
     }
 }
 

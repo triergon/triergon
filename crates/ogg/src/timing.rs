@@ -54,7 +54,7 @@ impl Clock {
         }
     }
 
-    /// Time the packets of one page.
+    /// Time the packets of one page. A time out of the `i64` range is unknown.
     pub(crate) fn page<S: AsMut<Slot>>(
         &mut self,
         timeline: &Timeline,
@@ -71,12 +71,16 @@ impl Clock {
             let mut end = Some(granule);
             for slot in slots.iter_mut().rev().map(AsMut::as_mut) {
                 slot.pts = end;
-                end = end.zip(duration(slot)).map(|(end, d)| end - d);
+                end = end
+                    .zip(duration(slot))
+                    .and_then(|(end, d)| end.checked_sub(d));
             }
         }
         let mut end = self.next;
         for slot in slots.iter_mut().map(AsMut::as_mut) {
-            let forward = end.zip(duration(slot)).map(|(end, d)| end + d);
+            let forward = end
+                .zip(duration(slot))
+                .and_then(|(end, d)| end.checked_add(d));
             slot.pts = if forwards {
                 forward
             } else {
@@ -87,8 +91,8 @@ impl Clock {
         if timeline.trims()
             && page.end_of_stream
             && let (Some(granule), Some(end)) = (page.granule, slots[last].as_mut().pts)
+            && let Some(mut excess) = end.checked_sub(granule)
         {
-            let mut excess = end - granule;
             for slot in slots.iter_mut().rev().map(AsMut::as_mut) {
                 let Some(d) = duration(slot).filter(|_| excess > 0) else {
                     break;
@@ -103,12 +107,15 @@ impl Clock {
             (end, granule) => end.or(granule),
         };
         for slot in slots.iter_mut().map(AsMut::as_mut) {
-            slot.pts = slot.pts.zip(duration(slot)).map(|(end, d)| end - d);
+            slot.pts = slot
+                .pts
+                .zip(duration(slot))
+                .and_then(|(end, d)| end.checked_sub(d));
             if timeline.trims()
                 && let (Some(pts), Some(d)) = (slot.pts, duration(slot))
                 && pts < 0
             {
-                slot.trim.start = Some(d.min(-pts));
+                slot.trim.start = Some(d.min(pts.saturating_neg()));
             }
         }
     }
