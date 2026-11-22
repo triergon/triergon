@@ -7,7 +7,8 @@
       "profile": "lower",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "54",
         "capital",
@@ -24,7 +25,8 @@
       "profile": "upper",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "54",
         "capital",
@@ -41,7 +43,8 @@
       "profile": "advance",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "54",
         "capital",
@@ -58,7 +61,8 @@
       "profile": "extents",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "54",
         "capital",
@@ -75,7 +79,8 @@
       "profile": "lower",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "54",
         "small",
@@ -92,7 +97,8 @@
       "profile": "upper",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "54",
         "small",
@@ -109,7 +115,8 @@
       "profile": "advance",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "54",
         "small",
@@ -126,7 +133,8 @@
       "profile": "extents",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "54",
         "small",
@@ -143,7 +151,8 @@
       "profile": "lower",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "81",
         "capital",
@@ -160,7 +169,8 @@
       "profile": "upper",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "81",
         "capital",
@@ -177,7 +187,8 @@
       "profile": "advance",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "81",
         "capital",
@@ -194,7 +205,8 @@
       "profile": "extents",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "81",
         "capital",
@@ -211,7 +223,8 @@
       "profile": "lower",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "81",
         "small",
@@ -228,7 +241,8 @@
       "profile": "upper",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "81",
         "small",
@@ -245,7 +259,8 @@
       "profile": "advance",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "81",
         "small",
@@ -262,7 +277,8 @@
       "profile": "extents",
       "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
       "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
-      "rights": "Apache-2.0",
+      "rights": "reviewed-licence",
+      "licence": "Apache-2.0",
       "arguments": [
         "81",
         "small",
