@@ -1,0 +1,211 @@
+{
+ "name": "gate-run-aarch64-fd9d1335-20261121-233812-shard-1",
+ "path": "gate-run-aarch64-fd9d1335-20261121-233812-shard-1",
+ "retention": "retained",
+ "reason": "Linked playback and ISO BMFF reader qualification for MPEG-TS LATM seeking on Linux AArch64.",
+ "key": "evidence/gate-runs/fd9d133518c21b049a3a622b8c34826308622f9b-aarch64-20261121-233812/shard-1/88ce88d4ff183924dbe020a58fcacc3e18df36db35ffe39816304d9415cd5873.tar.zst",
+ "sha256": "88ce88d4ff183924dbe020a58fcacc3e18df36db35ffe39816304d9415cd5873",
+ "bytes": 58616180,
+ "results": [
+  {
+   "path": "memory/matroska-legacy-aac/gate-result.json",
+   "command": "report --memory",
+   "key": "591df0dba00548409c4cd7679fa64110dceceed2f6eb5af1cf333d8a73b71a24",
+   "status": 0,
+   "report_sha256": "1e82b15b49b66ed7df66eda903c0d6bd7620b4ed21d142943452f9af97c5e855",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-startup-seek/gate-result.json",
+   "command": "report --memory",
+   "key": "6696080dfc43a79dcf2f044f8a447739ce77a602ef9779f3e860a396464b59bf",
+   "status": 0,
+   "report_sha256": "39b5c9cb3d9b0030cfdb27c0aa24877f0e88c20f35afc75430f44cc15e246786",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "1be4a9c2c52f1730d2515878c6275bb379018bd43231008a4c7cc9380965081e",
+   "status": 0,
+   "report_sha256": "a7b36cbbf1b61f4b6cdde139cf9de18588ddb816e2925b05489c95eed3913896",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/ts-program/gate-result.json",
+   "command": "report --memory",
+   "key": "46abf858129e4665a28e3b86ba294625c805e13ed154532cb40b78a248c47822",
+   "status": 0,
+   "report_sha256": "d0c5886a9174ebceeab1a5913d6b38d8f4b2aa56c8447ac89ee76129a4ff35ca",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "485d5f6626d69b0fe301e32f5cc4f996f7b8f32164d84b9ed272f9a8201e1c1c",
+   "status": 0,
+   "report_sha256": "981a93ec527f262832105c9f6f8811fbc59b788a6e4d4152623bec3ff3b1f533",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/raw-annex-b/gate-result.json",
+   "command": "report --memory",
+   "key": "ee37feee3333819331a62f66587b1f09b03586e4f1118a0d30c6eada4898364f",
+   "status": 0,
+   "report_sha256": "39eac57767ef41b500cc5f165b951b5996fcb9d5318aa8b548964775a4dd8334",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/hls-segments/gate-result.json",
+   "command": "report --memory",
+   "key": "30aea858e3ca7033d215ac32bb5084918b1e88aaf19dab7fa692b7e7fd6265df",
+   "status": 0,
+   "report_sha256": "446fa076b794e2c682984d091df2d3876d6f6a400b6a9408a35b3e3620b82a49",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-audio-clocks/gate-result.json",
+   "command": "report --memory",
+   "key": "962dfced4ca4b4bc0007097aa442a7acdc8025bcdd4b1e586bf0c46c14b04e2e",
+   "status": 0,
+   "report_sha256": "74ffbd6399418d4946e2e0f235f0b26b3b4f747d3a31a42578a849a7e053da8d",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "646776253f3570739155611c021368fc45634664d0114ecb0120bb91f43a4616",
+   "status": 0,
+   "report_sha256": "65313f4090045708dcd4fd625cd062e5f9257a4fecdf06039a13f8451e03ec3b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-legacy-aac/gate-result.json",
+   "command": "report --benchmark",
+   "key": "30b007a2b2a06bfabdd7244863779ce3882f9bf7f9f0bb9f3d365da2c64af19c",
+   "status": 0,
+   "report_sha256": "540e00318428274179fd6c9618c1f47d89adb21eba438ea1858cc47cab34e2c9",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-startup-seek/gate-result.json",
+   "command": "report --benchmark",
+   "key": "06152a96da42aad3488c7eac0f9c89f0c9784ec184d4cb82473aec22896efdc1",
+   "status": 0,
+   "report_sha256": "8a75c02f2bf29d60dcb4cd55cc3ac843bf38a65d90b189f08ca08a6b9e6bfb3e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "453b0bf1169eca3ed1da7b9ee90c44403f9b6a6260912f9919e9afbef3ec49a9",
+   "status": 0,
+   "report_sha256": "bc8675628616314ccf041cf6c49b8691fe863e7ebb33a5599d44cf76cda63b6b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ts-program/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c8be3e49ac80aad65c1d9cfd4e26b6d7beb51363efc7e703840f6daec3bbd827",
+   "status": 0,
+   "report_sha256": "2673dac1a04ee55cd6d015020dff5aed1657302bfc721b4a2002b4c1b8c8b4b0",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b4c0184742174b547399b9299addedf86713c405a4885dfa3ef6c6b7d0aff96b",
+   "status": 0,
+   "report_sha256": "46800bce76ba56d9dd9f02c7ff13bfc4c9b70c1eac32601ea1885a2c0681e619",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/raw-annex-b/gate-result.json",
+   "command": "report --benchmark",
+   "key": "8b48f096c8c4a3b5a32704bd9026d53e955e294f11908dd002f472d216350aa8",
+   "status": 0,
+   "report_sha256": "ceff594794d1fa0ded86d015c4be8ee49b418b1b0f6c5e501e9da6879b0d8e0b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/hls-segments/gate-result.json",
+   "command": "report --benchmark",
+   "key": "8d8a16548f2129c92abe37d877875575cc68652ae345b526943118b3d4a2e31b",
+   "status": 0,
+   "report_sha256": "c5d165293325a4e0611ff4d3dc8ed42dba84826b6b0f6ed3516ff442d31f8c24",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-audio-clocks/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c44dca53a76f4ef8574b3582d8b93cba0a92b6d1ecf508654f151f40cc75af91",
+   "status": 0,
+   "report_sha256": "c3956f616543e02eacce16f7ed73db0c8cc66c7f737648e7e8c527d705e8b7fd",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a7761cf35bae1e69eb62851e187be22069cdfdbb6360fd92ddd95daf964166f2",
+   "status": 0,
+   "report_sha256": "3f0c1102890d800da1cc869c369dd2844b5e35d756f5579603f70885d81e5269",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-legacy-aac/gate-result.json",
+   "command": "grade",
+   "key": "1a2b4629ae6c154c41f86f8dcbfeecee7b3fbf2755c6dd2e184d317fb6cdbcc4",
+   "status": 0,
+   "report_sha256": "498997d408c7544d92e4f5978bb9f99ec3396a03e8eb07b4f38cfb18e66e9387"
+  },
+  {
+   "path": "graded/matroska-startup-seek/gate-result.json",
+   "command": "grade",
+   "key": "ab546eb9c9358c1f562664dbc52187777217a90595ca95c38dc6cbedb84aee91",
+   "status": 0,
+   "report_sha256": "3581fe6b6eb538becc736c8454dbf1d6bd43e9708bbb80cd38fdc732f424a0b2"
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "c9b21277c2c53d5b945934baf0b9c87d349f30202b278b293225125098131ac3",
+   "status": 0,
+   "report_sha256": "fcc479353e840dfb8cdc4af30da85389c170fd0e1bd2b392e6e5c664a8aea068"
+  },
+  {
+   "path": "graded/ts-program/gate-result.json",
+   "command": "grade",
+   "key": "4e063ed60e8501ef08cbad736fabf391edb2fd4e05c206fd4e2843cff1a3aaee",
+   "status": 0,
+   "report_sha256": "6a32f224c4c551d3a1a5aabf670ca7ed1eb5de2328d50eef79e78956966aa468"
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "6b8931f34c9e75ffa934d2ea449d12ce06ff143611ce8b636462e87fcfbc229f",
+   "status": 0,
+   "report_sha256": "94cb8f46e268060ad9acca02bda98427d7f91b08269aa711b5bbd4d337e4e950"
+  },
+  {
+   "path": "graded/raw-annex-b/gate-result.json",
+   "command": "grade",
+   "key": "142650b82e1bd3937e54c65309d8f846cd9968e9f50a61a44c0675101ebcded1",
+   "status": 0,
+   "report_sha256": "1f9317335e5d6ff3e3ebc3fa36ed362aaf5615d7a10b5aad6e26b46a55664479"
+  },
+  {
+   "path": "graded/hls-segments/gate-result.json",
+   "command": "grade",
+   "key": "55ea692e588045fd29fc0d73fc626ce8bf7647939145fb9c5fa20997aa2c5e32",
+   "status": 0,
+   "report_sha256": "6c84e37f00c6f7edfa85f9363478b2418405068ce81918fc42f0554a8c79392e"
+  },
+  {
+   "path": "graded/matroska-audio-clocks/gate-result.json",
+   "command": "grade",
+   "key": "d4a6b3a5026b424f7376c7fff0fc03960aeca91b862ad1cc695cecc214dbad7f",
+   "status": 0,
+   "report_sha256": "941094f485e1e106a81f3a8fa602321dd3ad54dd21ded8c1bcc2da4756479743"
+  }
+ ]
+}
