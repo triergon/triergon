@@ -182,11 +182,11 @@ impl Encoder {
         let mut levels = [0i32; 64];
         let mut coefficient_bits = 0;
         for b in 0..6 {
-            let (plane, stride, x, y, comp) = block_origin(g, b, mb_x, mb_y);
-            let src = match plane {
-                0 => &input.y(),
-                1 => &input.cb(),
-                _ => &input.cr(),
+            let (component, stride, x, y) = block_origin(g, b, mb_x, mb_y);
+            let src = match component {
+                Component::Y => input.y(),
+                Component::Cb => input.cb(),
+                Component::Cr => input.cr(),
             };
             for r in 0..8 {
                 let row = &src[(y + r) * stride + x..(y + r) * stride + x + 8];
@@ -196,8 +196,12 @@ impl Encoder {
             }
             dct::fdct(&mut coeffs);
             let dc = ((coeffs[0] + 4) >> 3).clamp(0, 255);
-            write_dc(&mut self.writer, dc - s.dc_pred[comp], comp == 0);
-            s.dc_pred[comp] = dc;
+            write_dc(
+                &mut self.writer,
+                dc - s.dc_pred[component as usize],
+                component == Component::Y,
+            );
+            s.dc_pred[component as usize] = dc;
             let mask = if dc_only {
                 0
             } else if MEASURE {
@@ -212,10 +216,10 @@ impl Encoder {
             } else {
                 block::dequant_intra(&levels, mask, dc, s.q, &mut coeffs);
                 dct::idct(&mut coeffs, mask | 1);
-                let dst = match plane {
-                    0 => self.recon.y_mut(),
-                    1 => self.recon.cb_mut(),
-                    _ => self.recon.cr_mut(),
+                let dst = match component {
+                    Component::Y => self.recon.y_mut(),
+                    Component::Cb => self.recon.cb_mut(),
+                    Component::Cr => self.recon.cr_mut(),
                 };
                 for r in 0..8 {
                     let row = &mut dst[(y + r) * stride + x..(y + r) * stride + x + 8];
@@ -302,11 +306,11 @@ impl Encoder {
         if !tight {
             let mut coeffs = [0i32; 64];
             for b in 0..6 {
-                let (plane, stride, x, y, _) = block_origin(g, b, mb_x, mb_y);
-                let src = match plane {
-                    0 => &input.y(),
-                    1 => &input.cb(),
-                    _ => &input.cr(),
+                let (component, stride, x, y) = block_origin(g, b, mb_x, mb_y);
+                let src = match component {
+                    Component::Y => input.y(),
+                    Component::Cb => input.cb(),
+                    Component::Cr => input.cr(),
                 };
                 // Residuals and their per-column magnitudes in 16-bit lanes
                 // (a column sums at most 8 × 255).
@@ -409,11 +413,11 @@ impl Encoder {
     fn store_prediction(&mut self, mb_x: usize, mb_y: usize, blocks: &[[u8; 64]; 6]) {
         let g = self.cfg.geometry;
         for (b, block) in blocks.iter().enumerate() {
-            let (plane, stride, x, y, _) = block_origin(g, b, mb_x, mb_y);
-            let dst = match plane {
-                0 => self.recon.y_mut(),
-                1 => self.recon.cb_mut(),
-                _ => self.recon.cr_mut(),
+            let (component, stride, x, y) = block_origin(g, b, mb_x, mb_y);
+            let dst = match component {
+                Component::Y => self.recon.y_mut(),
+                Component::Cb => self.recon.cb_mut(),
+                Component::Cr => self.recon.cr_mut(),
             };
             for r in 0..8 {
                 dst[(y + r) * stride + x..(y + r) * stride + x + 8]
@@ -423,24 +427,32 @@ impl Encoder {
     }
 }
 
-/// Plane (0 Y, 1 Cb, 2 Cr), stride, sample origin and DC-predictor component of block `b`.
+/// The colour component of a block: its plane and its DC predictor (`dc_pred` index).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+enum Component {
+    Y = 0,
+    Cb = 1,
+    Cr = 2,
+}
+
+/// Component, stride and sample origin of block `b` of the macroblock at (mb_x, mb_y).
 #[inline]
 fn block_origin(
     g: Geometry,
     b: usize,
     mb_x: usize,
     mb_y: usize,
-) -> (usize, usize, usize, usize, usize) {
+) -> (Component, usize, usize, usize) {
     match b {
         0..=3 => (
-            0,
+            Component::Y,
             g.luma_stride(),
             mb_x * 16 + (b & 1) * 8,
             mb_y * 16 + (b >> 1) * 8,
-            0,
         ),
-        4 => (1, g.chroma_stride(), mb_x * 8, mb_y * 8, 1),
-        _ => (2, g.chroma_stride(), mb_x * 8, mb_y * 8, 2),
+        4 => (Component::Cb, g.chroma_stride(), mb_x * 8, mb_y * 8),
+        _ => (Component::Cr, g.chroma_stride(), mb_x * 8, mb_y * 8),
     }
 }
 
