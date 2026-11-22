@@ -618,9 +618,6 @@
       "reference": "walks all roots and produces 945 callback/access rows, ending at logical position 859",
       "cases": [
         "transport-footer-0-14"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
