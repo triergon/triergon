@@ -980,7 +980,19 @@
         "thumbv7neon-unknown-linux-gnueabihf"
       ],
       "unmeasured": "opus-final-range"
-    }
+    },
+    {"area": "CRC values", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "crc-values"},
+    {"area": "Exact time rescale", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "time-rescale"},
+    {"area": "Decoded picture properties", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "picture-properties"},
+    {"area": "H.264 stream inspection", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "h264-stream-inspection"},
+    {"area": "HEVC access unit splitting", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hevc-access-units"},
+    {"area": "ADTS synchronization search", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "adts-sync"},
+    {"area": "AC-3 and E-AC-3 frame headers", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ac3-frame-header"},
+    {"area": "AC-3 and E-AC-3 frame information", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ac3-frame-info"},
+    {"area": "AC-3 audio block features", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ac3-features"},
+    {"area": "Codec channel layouts and downmix", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "codec-layouts"},
+    {"area": "Video NAL input", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "video-nal-input"},
+    {"area": "Video NAL workloads", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "Runtime, peak heap and total RSS collection pending on isolated gate hosts."}
   ],
   "open_cells": [
     {
