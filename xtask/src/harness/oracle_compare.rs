@@ -183,14 +183,23 @@ impl<'a> TraceOracle<'a> {
                 })),
             ),
         };
-        let expected = pin(case, &self.target)?;
+        let expected = if !self.target.is_empty()
+            && !crate::gate::TARGETS.contains(&self.target.as_str())
+            && report::expected_for(case, &self.target).is_none()
+        {
+            None
+        } else {
+            Some(pin(case, &self.target)?)
+        };
         let reference = oracle::trace(root, self.oracle, &input, &arguments, self.timeout)?;
         let observed = sha256::hex(reference.as_bytes());
         if let Some(path) = files {
             report::create_output(path)?;
             fs::write(path.join("oracle.trace"), &reference).map_err(|e| e.to_string())?;
         }
-        if observed != expected {
+        if let Some(expected) = expected
+            && observed != expected
+        {
             return Err(format!(
                 "oracle trace changed: expected {expected}, got {observed}"
             ));
@@ -208,10 +217,10 @@ impl<'a> TraceOracle<'a> {
         let exact = actual == reference.as_bytes();
         let within_one_ulp = matches!(self.oracle, oracle::Kind::Trace("windows"))
             && crate::codecs::dsp::windows_match(actual, reference.as_bytes());
-        let status = if exact || within_one_ulp {
-            "pass"
-        } else {
-            "mismatch"
+        let status = match (exact || within_one_ulp, expected) {
+            (true, Some(_)) => "pass",
+            (true, None) => "unpinned",
+            (false, _) => "mismatch",
         };
         Ok(Value::object([
             ("status", Value::str(status)),

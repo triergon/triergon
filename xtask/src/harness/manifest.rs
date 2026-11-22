@@ -94,8 +94,16 @@ pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), Strin
                 if case.get("expected").is_some() {
                     return Err(format!("{id}: expected must use per-target oracle pins"));
                 }
+                let unpinned = crate::generators::unpinned(contract, id);
                 for target in targets {
                     let target = target.as_str().ok_or("invalid required target")?;
+                    if super::report::expected_for(case, target).is_none()
+                        && unpinned
+                            .iter()
+                            .any(|&(name, why)| name == target && !why.is_empty())
+                    {
+                        continue;
+                    }
                     super::oracle_compare::pin(case, target)?;
                 }
             } else {
