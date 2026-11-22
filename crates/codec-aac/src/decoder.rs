@@ -1106,9 +1106,8 @@ fn fixed_config_slots(cfg: u8, layout: FixedLayout) -> Vec<Slot> {
     v
 }
 
-/// Speaker assignment for a PCE, reproducing FFmpeg 9's observable mapping (probed with
-/// `harness/codecs/aac/tools/probe_layout.py`). Returns the slots and whether the output keeps
-/// PCE order (FFmpeg "unknown" layouts) instead of native order.
+/// Speaker assignment for a PCE. Returns the slots and whether an ambiguous layout
+/// keeps PCE order instead of native speaker order.
 fn pce_slots(p: &Pce, adts: bool) -> (Vec<Slot>, bool) {
     use Speaker::{
         BackCenter, BackLeft, BackRight, BottomFrontCenter, BottomFrontLeft, BottomFrontRight,
@@ -1124,22 +1123,6 @@ fn pce_slots(p: &Pce, adts: bool) -> (Vec<Slot>, bool) {
     let front = normal(&p.front);
     let side = normal(&p.side);
     let back = normal(&p.back);
-    let kinds =
-        |v: &[crate::pce::PceElement]| -> Vec<bool> { v.iter().map(|e| e.is_cpe).collect() };
-    let no_heights = p
-        .front
-        .iter()
-        .chain(&p.side)
-        .chain(&p.back)
-        .all(|e| e.height == 0);
-    // ADTS uses the conventional side pair for the 5.0/5.1 pattern. An explicit
-    // program in AudioSpecificConfig keeps its declared back pair.
-    let cfg56 = adts
-        && no_heights
-        && kinds(&front) == [false, true]
-        && side.is_empty()
-        && kinds(&back) == [true]
-        && p.lfe.len() <= 1;
     let sce = |t, s| Slot {
         kind: ElementId::Sce,
         tag: t,
@@ -1224,7 +1207,7 @@ fn pce_slots(p: &Pce, adts: bool) -> (Vec<Slot>, bool) {
             .map(|singles| singles.len() / 2)
             .sum::<usize>();
     }
-    let mut first_back_pair_to_side = side.is_empty() && (back_pairs >= 2 || cfg56);
+    let mut first_back_pair_to_side = side.is_empty() && back_pairs >= 2;
     let mut back_speakers = |can_use_side| {
         if first_back_pair_to_side && can_use_side {
             first_back_pair_to_side = false;
@@ -1386,6 +1369,36 @@ fn is_libfaac_signature(t: &[u8]) -> bool {
 pub(crate) mod tests {
     use super::*;
     use crate::cce::CceState;
+
+    #[test]
+    fn adts_program_keeps_the_back_pair_and_its_plane_order() {
+        use crate::pce::PceElement;
+        let pair = PceElement {
+            is_cpe: true,
+            ..PceElement::default()
+        };
+        let pce = Pce {
+            front: vec![PceElement::default(), pair],
+            back: vec![PceElement { tag: 1, ..pair }],
+            lfe: vec![0],
+            ..Pce::default()
+        };
+        let (slots, unordered) = pce_slots(&pce, true);
+        let core = Core::new(&Budget::new(1 << 20).unwrap());
+        let (layout, planes) = core.layout_of(&slots, unordered).unwrap();
+        assert_eq!(
+            layout.speakers(),
+            [
+                Speaker::FrontLeft,
+                Speaker::FrontRight,
+                Speaker::FrontCenter,
+                Speaker::LowFrequency,
+                Speaker::BackLeft,
+                Speaker::BackRight,
+            ]
+        );
+        assert_eq!(planes, [[2, usize::MAX], [0, 1], [4, 5], [3, usize::MAX]]);
+    }
 
     /// `value`'s `Debug` text without the counters of the pools it is charged to.
     pub(crate) fn without_pools(value: &impl core::fmt::Debug) -> String {

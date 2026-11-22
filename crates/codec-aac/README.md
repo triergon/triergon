@@ -90,6 +90,9 @@ on both targets; every other worker stays on stable.
   SBR/PS, a new PCE). A frame yields 1024 samples per raw data block, 2048 with SBR.
 - `adts::find_frame` preserves a complete frame at the requested boundary when
   junk follows it. Continue searches from the frame's declared end.
+- Fixed MPEG-4 configuration 6 uses the side surround speakers defined by
+  Table 1.19. An ADTS program configuration element with one explicitly signalled
+  back pair retains those back speakers in its output layout.
 - On error `out` is empty and the decoder stays usable. Errors are typed:
   `Unsupported(Feature)`, `Invalid(&str)` naming the syntax element,
   `Policy(&str)`, `Truncated`, `Budget(StorageError)`.
