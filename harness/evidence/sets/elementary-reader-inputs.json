@@ -1,0 +1,260 @@
+{
+ "name": "elementary-reader-inputs",
+ "path": "elementary-reader-inputs",
+ "retention": "retained",
+ "reason": "Pinned authored FLAC, MPEG audio, ADTS, AC-3 and E-AC-3 streams, including crafted damaged streams. Each matches its elementary packet comparison pin in harness/codecs/reader-manifest.json.",
+ "key": "evidence/elementary-reader-inputs/a0c4df2d21151426fa88e0798f3aff4d5518d3e80048c353af60b21746c6b3d5.tar.gz",
+ "sha256": "a0c4df2d21151426fa88e0798f3aff4d5518d3e80048c353af60b21746c6b3d5",
+ "bytes": 5843924,
+ "unpacked_at": "repository",
+ "files": [
+  {
+   "path": ".research/elementary/ac3_51.ac3",
+   "sha256": "41d6db5aab063d28f14a57b335a5dfb40deca9fb9b0dd5c6799acb9e079f7469"
+  },
+  {
+   "path": ".research/elementary/ac3_stereo.ac3",
+   "sha256": "ddf1e315305f096a5b5217ea123f69ae9106e7134e5066480090fc05c296f541"
+  },
+  {
+   "path": ".research/elementary/adts_51.aac",
+   "sha256": "0aafadbf51a54d1469565901477f707a8a1dca4653b070afab6456f098fc765e"
+  },
+  {
+   "path": ".research/elementary/adts_lc.aac",
+   "sha256": "756494f09100b66748cf57bbec30dadba0ccac66fe63832a1f5c75597a672695"
+  },
+  {
+   "path": ".research/elementary/crafted/ac3_mid_junk.ac3",
+   "sha256": "bc6593256a855cf8f38f66e5160ba7c909ea4c887d8115a60a3deed7fce3ab6b"
+  },
+  {
+   "path": ".research/elementary/crafted/ac3_tags.ac3",
+   "sha256": "7dfdd81edc33f2734acb33acd509f7826a08400ef72474946348b138c77de316"
+  },
+  {
+   "path": ".research/elementary/crafted/ac3_truncated.ac3",
+   "sha256": "94553bba7d4834697904c19456a62952ab35fcebd9b153f4e4e64c45f4023181"
+  },
+  {
+   "path": ".research/elementary/crafted/adts_mid_junk.aac",
+   "sha256": "6490572a4960ed9f90277217dc982d04c5d119e7abcc8ad6d2445c9917e051e9"
+  },
+  {
+   "path": ".research/elementary/crafted/adts_tags.aac",
+   "sha256": "5bce628f9ba02157fda5ce3a6521c7877a1e06fbf657d1622d7357d7fa883468"
+  },
+  {
+   "path": ".research/elementary/crafted/adts_truncated.aac",
+   "sha256": "6045b6db08d54a13490f18b3b5c18de851342c8e3ac1184b674b9ec87ba72040"
+  },
+  {
+   "path": ".research/elementary/crafted/flac_corrupt.flac",
+   "sha256": "a64d636b1cb23938fc5488d7b421c0d884b01c02f5fdc0ab2592a1c95d1df577"
+  },
+  {
+   "path": ".research/elementary/crafted/flac_id3.flac",
+   "sha256": "f1a8e639ad4dd5e9d00cdc723f2c139fb17b7026b04797124fdb54d46db9946f"
+  },
+  {
+   "path": ".research/elementary/crafted/flac_mid_junk.flac",
+   "sha256": "e709b8e162689cd7f8c17c7b5857cde30f85c6ec7fcc28925929bf1b6727dfb4"
+  },
+  {
+   "path": ".research/elementary/crafted/flac_truncated.flac",
+   "sha256": "091e7fe26007843c4f4b949ff3f94986b07d1bd6576d7f6d879f049e542075f7"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_ape_footer_only.mp3",
+   "sha256": "9e6be4796be8d72ad95da9a974e6079fb185219ef25d4d52f60079c6a1a1b676"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_ape_noheader_tail.mp3",
+   "sha256": "856f80784b54c1e1b16fd59929a2867293f957e67319f647de6fb42c94e54a8f"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_cut_frame.mp3",
+   "sha256": "cec60c8eeba14bdc8b955f0b66469f0671f830cd43f5c3837359c3c1934e2218"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_foreign_frame.mp3",
+   "sha256": "3ab7165c4c5ae4f7f5e4acadab49656c5341fcd2266f0c5787bb46d74f479ead"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_id3_footer.mp3",
+   "sha256": "7253a804bf4d9f99d7d09e2e3dd2be976fdb6481809de9b4d9b7a078d95808ca"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_id3_unsync.mp3",
+   "sha256": "746e8a4d3d928a23b4eb75dffebb399a556832ee0a231233e054e60f5d381cc7"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_info_as_xing.mp3",
+   "sha256": "3fbda129b5c4292fc87a5845696948bf6bcc2afd3f55021a8180597493f9154a"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_info_extended.mp3",
+   "sha256": "0df7ef0fdd36a1b1b8c201cb12292be04fbc951996e1121dcd770e2c96b1ea8b"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_info_nolame.mp3",
+   "sha256": "9c90999b8b4eca85c8ad3e08595ad802197af6ea4f5e713b80954f0c1d89320e"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_info_nolame_name.mp3",
+   "sha256": "4e7e37b4f0c63b6228f7699cea9f0c8b229e75d674cf29ea4c3c51af059a01a4"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_info_othername.mp3",
+   "sha256": "a0f5109b9f797370b11196099703e1eb1c95c7f1c5bb3d0ed83ac6b78a042784"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_info_shuffled.mp3",
+   "sha256": "f026d5d52592f5df1263b6526ff4fa22977eebbadd096788964d904c89d5e8d8"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_info_tail_junk.mp3",
+   "sha256": "54b36a649b9c5b12a88d84b720bc962abcbf2ab1d87db43d465d80416c636f15"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_info_truncated.mp3",
+   "sha256": "1108d1c87df111213c78c0b44a8295974a1ef72d540381bbf6e0ef63a5764ab7"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_lead_junk.mp3",
+   "sha256": "8d0bcbc7e5dd9ef9a058313e112541596c7bbdfed2f48ca5cb9592c38e96c86e"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_lead_zero.mp3",
+   "sha256": "34c54d31beec57acb28cb3e052c9cc841fb15484ba480354e801be2a6b27acf1"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_mid_junk.mp3",
+   "sha256": "946e5a67110e4b9a7210e1fa0dd1dccecbbaff7a33a7a808885de1b5723bbb0d"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_mid_junk_falsesync.mp3",
+   "sha256": "eca2f347d0862c1f87a4ec5531688657844efef96322fde1dc583874674d7240"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_name_abcd.mp3",
+   "sha256": "347d66580987f1f1cd3efd6b046b2d0b5727b02bc8758df7c17b8945917e25f8"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_name_gogo.mp3",
+   "sha256": "82fb77301c8ae65885b57bb8b705376bc8209257017a14340f603d02f8a53ae2"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_name_lame.mp3",
+   "sha256": "412910d309db738799e38ec4d12e7c92b1ac8b2f29328bb6774e771e317a0b3f"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_name_lav.mp3",
+   "sha256": "943625d024fcfe3dc74cb692e68fb72fbc6f248824a3c1f04397890e07610c50"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_name_lavf.mp3",
+   "sha256": "e681abd2375707412eb7f7aa61ead61e57e46935523b57e921ae7f4bf1ae0846"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_name_zero4.mp3",
+   "sha256": "ecb9bacfd3f67da6b3687b0b674fa6bf623b231a31495f7d753ec3dbf1c7a27c"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_pad_100.mp3",
+   "sha256": "db5979368869c16c9ebe38c8856a304272a8ff0a0f035100870006c16115b431"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_pad_529.mp3",
+   "sha256": "bf8ccbe51466a55da86358df6953bbc76a38d16eed90155eeab07fbd3a577839"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_pad_530.mp3",
+   "sha256": "11f72df96567f7e765272c68560d66f92400d99ec18f6cc2eace5a4bc81d88d5"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_pad_600.mp3",
+   "sha256": "271247f58ff86b13828800db7103091d2d7f1980621a5879cf93b2be33229dab"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_tags_tail.mp3",
+   "sha256": "49cf61d29f59850e0f05f33dfe5cda8e05d5fb48d86c1933cfe6e4364d7e0536"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_tail_junk.mp3",
+   "sha256": "e9496af0072a99badc1b6ac137225e72b12acb57e22574c34f71342bb28524d6"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_tail_junk_id3v1.mp3",
+   "sha256": "338f464d1143467afeaa4ebab7828b09516ac77cfe83f8436006ab75c5dfdcf7"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_truncated.mp3",
+   "sha256": "24dbec1afa4d83f3451c234ace597e1e770fc883ebbf9ee4ab6d504b44fe9cfa"
+  },
+  {
+   "path": ".research/elementary/crafted/mp3_two_id3.mp3",
+   "sha256": "269e7e6a680043d3f367a774d5e443886ff538873f81e1329de269d92fa660d0"
+  },
+  {
+   "path": ".research/elementary/eac3_51.eac3",
+   "sha256": "ec9ca4c1ddbd8d42138931936eea6397789c5950a18f7b67e66c22c75aab4344"
+  },
+  {
+   "path": ".research/elementary/eac3_stereo.eac3",
+   "sha256": "c6bf6e6e5ef80bffd809e6466a297adfdbcbf5aa99e5094eb4cb756cab21a571"
+  },
+  {
+   "path": ".research/elementary/flac_24bit.flac",
+   "sha256": "f6e8155a43ff66a5adc7db968c1aa049da62c7bbf314763e7285c4a9b3dacfd0"
+  },
+  {
+   "path": ".research/elementary/flac_default.flac",
+   "sha256": "e87f997ad8e462501f8695668ba6d95b1597499684d643abec62e258d83398c5"
+  },
+  {
+   "path": ".research/elementary/flac_mono48.flac",
+   "sha256": "b64c7c1a883b3946fb9a411b0863e2a45420a265eee5b9501cd1b610b08f091e"
+  },
+  {
+   "path": ".research/elementary/flac_small_blocks.flac",
+   "sha256": "aebccbe21e4263a94ed17a829b83497747d175d491b1c5ab1ff3ef8edb93b2db"
+  },
+  {
+   "path": ".research/elementary/mp2_192.mp2",
+   "sha256": "5c10c7dcf26c1959f2ebf565ae74df6cc235ce3159e1c592b5d47af0de89f12f"
+  },
+  {
+   "path": ".research/elementary/mp2_mono48.mp2",
+   "sha256": "7d3f04083bbaad397cf25aa042fa2a9c614a4405919fd00da463aff616793e84"
+  },
+  {
+   "path": ".research/elementary/mp3_cbr_info.mp3",
+   "sha256": "db32767a99ec36f1e06291411c162857ffe145184df9a8b5c36d46bc3af07650"
+  },
+  {
+   "path": ".research/elementary/mp3_cbr_noxing.mp3",
+   "sha256": "6c09e5b19e8d6d62d4f0228d14629c5848703fb8d6ccb1d93cd1241438d02fd3"
+  },
+  {
+   "path": ".research/elementary/mp3_id3v1.mp3",
+   "sha256": "309efcb9f4214bcfbdadeb252bc4f073b239440a862ab39a0a68d83771faacf8"
+  },
+  {
+   "path": ".research/elementary/mp3_mpeg25.mp3",
+   "sha256": "870cb9c7f7abd4050f482baf96d00094a17feebbc425de744dd51ec5718cc74f"
+  },
+  {
+   "path": ".research/elementary/mp3_mpeg2_mono.mp3",
+   "sha256": "1f08c8ea19d3fdd136eb096f147280d7b3f774d791796e417fee103aa95ab0d9"
+  },
+  {
+   "path": ".research/elementary/mp3_vbr_noxing_noid3.mp3",
+   "sha256": "587b109ee9d0ec37be89bd290678bff497b937aa1323ed4fc10430a6586db4b2"
+  },
+  {
+   "path": ".research/elementary/mp3_vbr_xing.mp3",
+   "sha256": "d91b48d9f533b994550e0e21ff78a6a4e3dc8f81417695e667804cc3c0e941a3"
+  }
+ ]
+}
