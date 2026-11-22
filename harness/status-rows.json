@@ -920,6 +920,7 @@
     {"area": "Playback input probes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-probe"},
     {"area": "Playback source packets and tracks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-source-view"},
     {"area": "MP4 source clocks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mp4-source-clock"},
+    {"area": "Facade input probes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "facade-probe"},
     {
       "area": "Bit readers",
       "targets": [
