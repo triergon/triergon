@@ -112,8 +112,8 @@ floors the target to nanoseconds and calls `seek_previous` for
 Refused with `Error::Unsupported`: encryption, bzip2/lzo compression, preset
 zlib dictionaries, ContentEncoding scope 4, `TrackTimestampScale` other than 1.0,
 multiple EBML documents or Segments, EBMLReadVersion above 1,
-DocTypeReadVersion above 4, EBMLMaxIDLength above 4, EBMLMaxSizeLength above 8,
-and seeking on a non-video track.
+DocTypeReadVersion above 4, EBMLMaxIDLength above 4 and EBMLMaxSizeLength above 8.
+The general seek methods require a video track.
 
 ## Behaviour and limits
 
@@ -155,7 +155,7 @@ laced frame is decoded separately. `zlib::decompress` reads one complete RFC 195
 (stored, fixed and dynamic blocks), checks Adler-32 before returning anything and rejects
 trailing bytes.
 
-**Seeking.** Requests name a track index (must be video) and a presentation time in
+**Seeking.** The video seek methods name a track index and a presentation time in
 nanoseconds. `seek_previous` lands on the latest video keyframe at or before the
 target. `seek_for_playback` first subtracts the largest track SeekPreRoll, then
 replays the landing Cluster, including interleaved audio before the keyframe. A cue is
@@ -166,6 +166,44 @@ keyframes. The `SeekReceipt` reports `actual_ns`, `used_index`, `scanned_bytes`,
 `replays_from_start` (so one-time start trimming is not repeated). Recovery can fail
 with `missing timed audio duration` if a timed packet has no duration. After any failure
 or cancellation the caller must seek or `reset` before reading more packets.
+
+The typed reader's `seek_cued_aac` selects the preceding validated Cue for a
+single audio track with `A_AAC` AudioSpecificConfig `12 10` (AAC-LC, 44.1 kHz,
+stereo), zero CodecDelay and zero SeekPreRoll. It requires a preceding Cue and
+does not scan for uncued packets. It validates the referenced block and returns
+its source clock and bytes; it does not validate or decode AAC payloads. The
+neutral `ContainerReader::request_seek` routes audio requests through this same
+checked operation; video requests retain their existing seek policies.
+
+The `media-worker` and public libavformat reference expose the `cued-aac-`
+worker protocol. The reference uses a backward `av_seek_frame` and public flags
+that preserve demuxed fields. `trace`, `fold` and `memory` take a file and a
+seek target in nanoseconds; `bench` additionally takes an iteration count before
+the target. Both preload the file and perform open, seek, complete packet
+traversal and teardown inside each operation. The fold includes the landing,
+track, presence and value of each timestamp and duration, payload length and
+bytes, and successful EOF. The [cued AAC contract](../../harness/features/matroska-cued-aac/contract.json)
+registers the original seek and a fractional target immediately before the second
+Cue. The latter lands at the first Cue and folds all three packets through EOF;
+the reference floors the target to its stream time base. To regenerate the authored input:
+
+```sh
+CARGO_INCREMENTAL=0 cargo run -p triergon-matroska --example cued_aac_fixture -- \
+  harness/features/matroska-cued-aac/inputs/two-cues.mkv
+```
+
+The `coded-cues` case uses eight authored silent stereo AAC-LC access units
+at 44.1 kHz. A 100 ms seek lands at 93 ms and reads four units through EOF.
+The source-view comparison matches each PTS, absent DTS and duration, and
+all payload bytes. The AAC decoder accepts all eight units and produces
+1,024 samples per channel per unit. Pass the output path followed by
+`coded` to regenerate this fixture.
+
+The playback AAC clock projects source PTS into DTS and infers a 23 ms
+duration in both fixtures. The pinned FFprobe decoder build reports those
+same projected fields for the coded fixture. With opaque payloads in the
+original fixture, FFprobe leaves durations unknown. Playback seek
+integration and native performance and memory qualification remain open.
 
 **Colour.** `Track::colour` keeps every source field: bit depth, both chroma and Cb
 subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering value as

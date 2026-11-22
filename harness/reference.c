@@ -200,7 +200,138 @@ done:
     if(io){av_freep(&io->buffer);avio_context_free(&io);}
     return result;
 }
+#ifdef TRIERGON_CUED_AAC_REFERENCE
+/* Preserve the packet clocks of the source view through a backward AAC seek. */
+static int cued_aac(const uint8_t *data, size_t len, int64_t target_ns, int trace,
+                    uint64_t *packets, uint64_t *bytes, uint64_t *digest) {
+    Source source = {data, len, 0};
+    AVFormatContext *f = avformat_alloc_context();
+    AVIOContext *io = NULL;
+    AVPacket *p = NULL;
+    int first = 1;
+    int result = AVERROR(ENOMEM);
+    uint8_t *buffer = av_malloc(32768);
+    if (!f || !buffer) {
+        av_free(buffer);
+        goto done;
+    }
+    io = avio_alloc_context(buffer, 32768, 0, &source, read_bytes, NULL, seek_bytes);
+    if (!io) {
+        av_free(buffer);
+        goto done;
+    }
+    f->pb = io;
+    f->flags |= AVFMT_FLAG_CUSTOM_IO | AVFMT_FLAG_NOPARSE | AVFMT_FLAG_NOFILLIN;
+    result = avformat_open_input(&f, NULL, av_find_input_format("matroska,webm"), NULL);
+    if (result < 0) goto done;
+    if (f->nb_streams != 1) {
+        result = AVERROR(EINVAL);
+        goto done;
+    }
+    AVRational tb = f->streams[0]->time_base;
+    int64_t target = av_rescale_q_rnd(target_ns, (AVRational){1, 1000000000}, tb,
+                                      AV_ROUND_DOWN);
+    result = av_seek_frame(f, 0, target, AVSEEK_FLAG_BACKWARD);
+    if (result < 0) goto done;
+    p = av_packet_alloc();
+    if (!p) {
+        result = AVERROR(ENOMEM);
+        goto done;
+    }
+    while ((result = av_read_frame(f, p)) >= 0) {
+        if (p->stream_index != 0 || p->size < 0 || (first && p->pts == AV_NOPTS_VALUE)) {
+            result = AVERROR(EINVAL);
+            goto done;
+        }
+        int64_t times[] = {p->pts, p->dts, p->duration ? p->duration : AV_NOPTS_VALUE};
+        if (first) {
+            int64_t landing = ns(p->pts, tb);
+            fold(digest, (uint64_t)landing);
+            if (trace) printf("{\"landing_ns\":%" PRId64 ",\"packets\":[", landing);
+            first = 0;
+        } else if (trace) {
+            putchar(',');
+        }
+        (*packets)++;
+        *bytes += (uint64_t)p->size;
+        fold(digest, (uint64_t)p->stream_index);
+        for (unsigned i = 0; i < 3; i++) {
+            int present = times[i] != AV_NOPTS_VALUE;
+            fold(digest, (uint64_t)present);
+            if (present) fold(digest, (uint64_t)ns(times[i], tb));
+        }
+        fold(digest, (uint64_t)p->size);
+        fold_bytes(digest, p->data, (size_t)p->size);
+        if (trace) {
+            printf("{\"track\":%d,\"pts_ns\":", p->stream_index);
+            time_value(times[0], tb);
+            printf(",\"dts_ns\":");
+            time_value(times[1], tb);
+            printf(",\"duration_ns\":");
+            time_value(times[2], tb);
+            printf(",\"payload\":");
+            hex(p->data, (size_t)p->size);
+            putchar('}');
+        }
+        av_packet_unref(p);
+    }
+    if (result == AVERROR_EOF && !first) {
+        fold(digest, 1);
+        if (trace) puts("],\"eof\":true}");
+        result = 0;
+    }
+done:
+    av_packet_free(&p);
+    avformat_close_input(&f);
+    if (io) {
+        av_freep(&io->buffer);
+        avio_context_free(&io);
+    }
+    return result;
+}
+#endif
 static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return(uint64_t)t.tv_sec*1000000000+(uint64_t)t.tv_nsec;}
+
+#ifdef TRIERGON_CUED_AAC_REFERENCE
+static int cued_aac_main(int argc, char **argv, const uint8_t *data, size_t size) {
+    const char *mode = argv[1];
+    int bench = !strcmp(mode, "cued-aac-bench");
+    int memory = !strcmp(mode, "cued-aac-memory");
+    int trace = !strcmp(mode, "cued-aac-trace");
+    if (!bench && !memory && !trace && strcmp(mode, "cued-aac-fold")) return 2;
+    if (argc != (bench ? 5 : 4)) return 2;
+    char *end;
+    const char *target_text = argv[bench ? 4 : 3];
+    int64_t target = strtoll(target_text, &end, 10);
+    if (end == target_text || *end) return 2;
+    unsigned long iterations = 1;
+    if (bench) {
+        iterations = strtoul(argv[3], &end, 10);
+        if (*end || !iterations || iterations > 1000000) return 2;
+    }
+    uint64_t packets = 0, bytes = 0, digest = 0;
+    const char begin[] = "TRIERGON_BEGIN_V1\n";
+    const char finish[] = "TRIERGON_END_V1\n";
+    if (memory && write(1, begin, sizeof(begin) - 1) != sizeof(begin) - 1) return 2;
+    uint64_t start = bench ? now_ns() : 0;
+    for (unsigned long i = 0; i < iterations; i++) {
+        if (cued_aac(data, size, target, trace, &packets, &bytes, &digest) < 0) return 1;
+    }
+    if (bench) {
+        uint64_t elapsed = now_ns() - start;
+        printf("{\"schema\":1,\"iterations\":%lu,\"elapsed_ns\":%" PRIu64
+               ",\"packets\":%" PRIu64 ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64
+               ",\"eof\":true}\n", iterations, elapsed, packets, bytes, digest);
+    } else {
+        if (memory && write(1, finish, sizeof(finish) - 1) != sizeof(finish) - 1) return 2;
+        if (!trace) {
+            printf("{\"packets\":%" PRIu64 ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64
+                   ",\"eof\":true}\n", packets, bytes, digest);
+        }
+    }
+    return 0;
+}
+#endif
 #ifdef TRIERGON_FEED_REFERENCE
 #include "reference_feed.h"
 #include "reference_packet_fold.h"
@@ -257,6 +388,13 @@ int main(int argc,char **argv){
     if(!strncmp(argv[1],"ts-",3)){int result=ts_main(argc,argv,data,size);free(data);return result;}
     if(!strncmp(argv[1],"pgs-",4)){int result=pgs_main(argc,argv,data,size);free(data);return result;}
     if(!strncmp(argv[1],"subtitle-text-",14)){int result=text_main(argc,argv,data,size);free(data);return result;}
+#endif
+#ifdef TRIERGON_CUED_AAC_REFERENCE
+    if (!strncmp(argv[1], "cued-aac-", 9)) {
+        int result = cued_aac_main(argc, argv, data, (size_t)size);
+        free(data);
+        return result;
+    }
 #endif
     int metadata=!strncmp(argv[1],"catalogue-",10)?2:!strncmp(argv[1],"metadata-",9);
     int seek_mode=!strncmp(argv[1],"seek-",5);

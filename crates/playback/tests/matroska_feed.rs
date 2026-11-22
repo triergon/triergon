@@ -20,6 +20,9 @@ use triergon_playback::{
     },
 };
 
+#[path = "../../media/tests/support/ebml.rs"]
+mod cued_audio_fixture;
+
 const ID: SourceId = SourceId(172);
 const INPUT: &[u8] = include_bytes!("fixtures/mkv-feed/three-tracks.mkv");
 const GOLD: &[u8] = include_bytes!("fixtures/mkv-feed/three-tracks.feed");
@@ -1603,6 +1606,231 @@ fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
             .collect();
         assert_eq!(timings, expected);
     }
+}
+
+fn check_cued_aac_clocks(fixture: &[u8], skipped: usize, expected: &[(i64, &[u8])]) {
+    let (mut player, pool) = player_with_input(fixture, 7);
+    let outputs = collect_with_work(&mut player, 1);
+    let configuration = outputs
+        .iter()
+        .find_map(|output| match output.event() {
+            RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+            _ => None,
+        })
+        .unwrap();
+    let feed = setup(&pool, configuration, 0);
+    let packets = outputs
+        .iter()
+        .filter(|output| matches!(output.event(), RawEvent::Matroska(Event::Packet(_))))
+        .collect::<Vec<_>>();
+
+    assert_eq!(packets.len(), skipped + expected.len());
+    let mut probe = feed
+        .native_aac_clock_probe(&pool, expected.len())
+        .unwrap()
+        .unwrap();
+    for (ordinal, (output, &(pts_ns, bytes))) in packets[skipped..].iter().zip(expected).enumerate()
+    {
+        let packet = frame(&feed, output);
+        assert_eq!(packet.source.packet.data.as_ref(), bytes);
+        assert_eq!(packet.source.packet.pts_ns, Some(pts_ns));
+        assert_eq!(packet.source.packet.dts_ns, None);
+        assert_eq!(packet.source.packet.duration_ns, None);
+        let demux =
+            triergon_matroska::compat::clock::packet_timing(packet.source.packet.timing).unwrap();
+        assert_eq!(demux.pts.unwrap().rounded_ns().unwrap(), pts_ns);
+        assert_eq!(demux.duration, None);
+        assert_eq!(probe.push(&packet).unwrap(), ordinal);
+    }
+    let projected = probe.finish();
+    for (ordinal, (pts_ns, _)) in expected.iter().copied().enumerate() {
+        let timing = projected.timing(ordinal).unwrap();
+        assert_eq!(timing.pts_ns, Some(pts_ns));
+        assert_eq!(timing.dts_ns, Some(pts_ns));
+        assert_eq!(timing.duration_ns, Some(23_000_000));
+    }
+}
+
+#[test]
+fn cued_aac_suffix_keeps_source_and_projected_clocks_distinct() {
+    let (fixture, _, _) = cued_audio_fixture::cued_aac();
+    check_cued_aac_clocks(
+        &fixture,
+        1,
+        &[(1_000_000_000, b"second"), (1_020_000_000, b"third")],
+    );
+}
+
+#[test]
+fn coded_cued_aac_suffix_projects_the_decodable_packet_clocks() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-aac/inputs/coded-cues.mkv");
+    // The pinned decoder reference reports PTS = DTS and a 23 ms duration
+    // for each of the four packets after this seek.
+    let payload = &[0x20, 0x64, 0, 1, 0x90, 0, 0x0e][..];
+    let expected = [93, 116, 139, 163].map(|ms| (ms * 1_000_000, payload));
+    check_cued_aac_clocks(fixture, 4, &expected);
+}
+
+#[test]
+fn coded_cued_aac_playback_seek_invalidates_queue_and_feeds_indexed_suffix() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-aac/inputs/coded-cues.mkv");
+    let (mut player, pool) = player_with_input(fixture, 7);
+    let cancel = AtomicBool::new(false);
+    let old = loop {
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
+        if let Some(output) = player.pop()
+            && matches!(output.event(), RawEvent::Matroska(Event::Packet(_)))
+        {
+            break output;
+        }
+    };
+    while player.queued() == 0 {
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
+    }
+    let target = Time::new(1, 10).unwrap();
+    assert!(
+        player
+            .seek_and_select(
+                TrackKey::Matroska(7),
+                target,
+                Selection::All,
+                &mut WorkBudget::new(1),
+                &cancel
+            )
+            .unwrap()
+    );
+    assert!(!player.current(&old));
+    assert_eq!(player.queued(), 0);
+    let outputs = collect_with_work(&mut player, 1);
+    let landing = outputs
+        .iter()
+        .find_map(|o| match o.event() {
+            RawEvent::Matroska(Event::Seek(landing)) => Some(landing),
+            _ => None,
+        })
+        .unwrap();
+    assert!(landing.used_index);
+    assert_eq!(landing.actual_ns, 93_000_000);
+    let configuration = outputs
+        .iter()
+        .find_map(|o| match o.event() {
+            RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+            _ => None,
+        })
+        .unwrap();
+    let feed = setup(&pool, configuration, 0);
+    let packets: Vec<_> = outputs
+        .iter()
+        .filter(|o| matches!(o.event(), RawEvent::Matroska(Event::Packet(_))))
+        .collect();
+    assert_eq!(packets.len(), 4);
+    let mut probe = feed
+        .native_aac_clock_probe(&pool, packets.len())
+        .unwrap()
+        .unwrap();
+    for (ordinal, (output, ms)) in packets.iter().zip([93, 116, 139, 163]).enumerate() {
+        let packet = frame(&feed, output);
+        assert_eq!(
+            packet.source.packet.data.as_ref(),
+            &[0x20, 0x64, 0, 1, 0x90, 0, 0x0e]
+        );
+        assert_eq!(packet.source.packet.pts_ns, Some(ms * 1_000_000));
+        assert_eq!(
+            output.delivery(),
+            if ms < 100 {
+                Delivery::DecodeOnly { until: target }
+            } else {
+                Delivery::Present
+            }
+        );
+        assert_eq!(probe.push(&packet).unwrap(), ordinal);
+    }
+    let clock = probe.finish();
+    for (ordinal, ms) in [93, 116, 139, 163].into_iter().enumerate() {
+        let timing = clock.timing(ordinal).unwrap();
+        assert_eq!(
+            (timing.pts_ns, timing.dts_ns, timing.duration_ns),
+            (Some(ms * 1_000_000), Some(ms * 1_000_000), Some(23_000_000))
+        );
+    }
+}
+
+#[test]
+fn unsupported_matroska_audio_seek_preserves_playback() {
+    let mut fixture =
+        include_bytes!("../../../harness/features/matroska-cued-aac/inputs/coded-cues.mkv")
+            .to_vec();
+    let at = fixture.windows(2).position(|w| w == [0x12, 0x10]).unwrap();
+    fixture[at + 1] = 0x08;
+    let (mut player, _) = player_with_input(&fixture, 7);
+    let cancel = AtomicBool::new(false);
+    let old = loop {
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
+        if let Some(output) = player.pop()
+            && matches!(output.event(), RawEvent::Matroska(Event::Packet(_)))
+        {
+            break output;
+        }
+    };
+    for track in [TrackKey::Matroska(7), TrackKey::Matroska(99)] {
+        assert!(
+            player
+                .seek_and_select(
+                    track,
+                    Time::new(1, 10).unwrap(),
+                    Selection::All,
+                    &mut WorkBudget::new(1),
+                    &cancel
+                )
+                .is_err()
+        );
+        assert!(player.current(&old));
+    }
+    let outputs = collect_with_work(&mut player, 1);
+    assert_eq!(
+        outputs
+            .iter()
+            .filter(|o| matches!(o.event(), RawEvent::Matroska(Event::Packet(_))))
+            .count(),
+        7
+    );
+}
+
+#[test]
+fn multitrack_audio_seek_refusal_preserves_playback() {
+    let (mut player, _) = player(7);
+    let cancel = AtomicBool::new(false);
+    let mut audio = None;
+    let old = loop {
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
+        if let Some(output) = player.pop() {
+            if let RawEvent::Matroska(Event::Configuration(configuration)) = output.event() {
+                audio = Some(TrackKey::Matroska(configuration.tracks()[2].number));
+            }
+            if matches!(output.event(), RawEvent::Matroska(Event::Packet(_))) {
+                break output;
+            }
+        }
+    };
+    assert!(
+        player
+            .seek_and_select(
+                audio.unwrap(),
+                Time::new(1, 10).unwrap(),
+                Selection::All,
+                &mut WorkBudget::new(1),
+                &cancel
+            )
+            .is_err()
+    );
+    assert!(player.current(&old));
+    assert!(
+        collect_with_work(&mut player, 1)
+            .iter()
+            .any(|o| matches!(o.event(), RawEvent::Matroska(Event::Packet(_))))
+    );
 }
 
 #[test]

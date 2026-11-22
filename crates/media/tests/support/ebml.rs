@@ -62,6 +62,67 @@ pub(crate) fn cluster(time: u64, blocks: impl AsRef<[u8]>) -> Vec<u8> {
     )
 }
 
+/// Single AAC-LC track 7 with two independently addressed canonical Cues.
+pub(crate) fn cued_aac() -> (Vec<u8>, u64, u64) {
+    let first = cluster(0, simple(7, 0, 0x80, b"first"));
+    let second = cluster(
+        1000,
+        [simple(7, 0, 0x80, b"second"), simple(7, 20, 0x80, b"third")].concat(),
+    );
+    aac_cues(first, second, 1000)
+}
+
+/// Eight silent stereo AAC-LC access units in two cued clusters.
+pub(crate) fn cued_aac_coded() -> Vec<u8> {
+    // Independent long windows with zero spectral bands in both channels.
+    // The AAC decoder test checks these bytes against its bit writer.
+    const SILENT_STEREO: [u8; 7] = [0x20, 0x64, 0, 0x01, 0x90, 0, 0x0e];
+    let audio_cluster = |start| {
+        let blocks: Vec<_> = [0, 23, 46, 70]
+            .into_iter()
+            .flat_map(|ticks| simple(7, ticks, 0x80, &SILENT_STEREO))
+            .collect();
+        cluster(start, blocks)
+    };
+    aac_cues(audio_cluster(0), audio_cluster(93), 93).0
+}
+
+fn aac_cues(first: Vec<u8>, second: Vec<u8>, second_time: u64) -> (Vec<u8>, u64, u64) {
+    let entry = element(
+        0xae,
+        &[
+            uint(0xd7, 7),
+            uint(0x73c5, 7),
+            uint(0x83, 2),
+            element(0x86, b"A_AAC"),
+            element(0x63a2, &[0x12, 0x10]),
+        ]
+        .concat(),
+    );
+    let tracks = element(0x1654ae6b, &entry);
+    let cue = |time, position| {
+        element(
+            0xbb,
+            &[
+                uint(0xb3, time),
+                element(0xb7, &[uint(0xf7, 7), uint(0xf1, position)].concat()),
+            ]
+            .concat(),
+        )
+    };
+    let cues_len = element(0x1c53bb6b, &[cue(0, 0), cue(second_time, 0)].concat()).len();
+    let first_position = (tracks.len() + cues_len) as u64;
+    let second_position = first_position + first.len() as u64;
+    let cues = element(
+        0x1c53bb6b,
+        &[cue(0, first_position), cue(second_time, second_position)].concat(),
+    );
+    let segment = [tracks, cues, first, second].concat();
+    let raw = mkv(&segment);
+    let segment_data = (raw.len() - segment.len()) as u64;
+    (raw, segment_data + second_position, second_position)
+}
+
 /// The file shape of the BlockAdditions tests: one authored track, one Cluster.
 pub(crate) mod side_data {
     use super::{cluster, element, mkv};

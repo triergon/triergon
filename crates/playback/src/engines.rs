@@ -7,7 +7,9 @@ use crate::{
     mp4_plan::{Mp4Configuration, PreparedMp4, SourceRow},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::container::{MediaKind, TrackInfo};
+use triergon_core::container::{
+    ContainerReader, MediaKind, SeekPolicy, SeekRequest, TrackId, TrackInfo,
+};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputRequest, SourceCapabilities, SourceId,
     SourceLocation, Step, Time, TimeBase, WorkBudget,
@@ -1039,17 +1041,11 @@ impl Engine {
                 let TrackKey::Matroska(number) = intent.track else {
                     return Err(Error::Invalid("seek track format"));
                 };
-                let at = r
-                    .tracks()
-                    .iter()
-                    .position(|t| t.number == number && t.kind == 1)
-                    .ok_or(Error::Invalid("seek needs source video track"))?;
-                r.reader.seek_for_playback(
-                    at,
-                    intent
-                        .target
-                        .to_nanoseconds(triergon_core::Rounding::Floor)?,
-                )?;
+                r.reader.request_seek(SeekRequest {
+                    track: TrackId(number),
+                    target: intent.target,
+                    policy: SeekPolicy::PlaybackPreroll,
+                })?;
             }
             Self::Mp4(r) => {
                 if r.progressive.is_some() {

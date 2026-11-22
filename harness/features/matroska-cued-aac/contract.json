@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "matroska-cued-aac",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "matroska-cued-aac-source-seek",
+  "candidate": "media-worker",
+  "worker_operation": "cued-aac-",
+  "reference": "ffmpeg-native",
+  "contract": [
+    "Seek to the preceding Cue for a single AAC-LC track with AudioSpecificConfig 12 10, zero CodecDelay and zero SeekPreRoll.",
+    "Each operation opens a seekable view of preloaded bytes, seeks backwards, reads the complete packet suffix through EOF and releases the reader.",
+    "The reference uses the public libavformat source view with NOPARSE and NOFILLIN, flooring the target to the stream time base before seeking. Every packet retains its source timestamps, durations and opaque payload.",
+    "Fold the landing time, then the track, timestamp and duration presence and values, payload length and bytes of each packet in order, and successful EOF."
+  ],
+  "required_profiles": ["two-cues", "fraction-before-second-cue", "coded-cues"],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

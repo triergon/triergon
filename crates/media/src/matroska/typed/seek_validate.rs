@@ -86,10 +86,11 @@ impl CueValidationJob {
         if !configuration.belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
-        if configuration
-            .tracks()
-            .get(track)
-            .is_none_or(|t| t.kind != 1)
+        if !super::seek::cued_aac_profile(configuration.tracks(), track)
+            && configuration
+                .tracks()
+                .get(track)
+                .is_none_or(|t| t.kind != 1)
         {
             return Err(Error::Unsupported("seek requires video track"));
         }

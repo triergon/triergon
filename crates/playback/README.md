@@ -102,6 +102,8 @@ packet clocks are explicit opt-in views (`ClockChoice::ExplicitNativeProjection`
 `*_native_*` TS engines); they never overwrite source facts. Native views can
 emit events the source view does not, such as `Mp4Event::NativeShortPacket`,
 `NativeEmptyPacket`, `NativeMissingSample` and native refusals.
+The Matroska AAC playback clock can infer a duration from the configuration;
+its projected clock may therefore differ from a demuxer that leaves duration unknown.
 
 **Generations.** A seek, track switch or configuration change starts a new
 generation. Check outputs with `Player::may_deliver`. Feeds, bridges, clocks
@@ -113,6 +115,9 @@ target.
 blocks from the source window and keep the whole backing allocation charged until
 they drop; blocks split across reads are copied. The immutable seek index needs no
 Cues. HEVC startup requires one distinct parameter set of each type. Legacy
+`Player::seek_and_select` also seeks a single-track `A_AAC` Segment with
+AudioSpecificConfig `12 10` and zero codec delay and seek preroll to its preceding
+validated Cue. Packets before the requested time are marked decode-only.
 `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC` tracks without an initialization record get
 AAC-LC configuration from `compat::matroska::legacy_aac_lc_initialization` for one
 to six channels. The Dolby clock probe retains at most 4,096 timing rows and

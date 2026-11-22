@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "two-cues",
+      "profile": "two-cues",
+      "file": "harness/features/matroska-cued-aac/inputs/two-cues.mkv",
+      "sha256": "52ab8f29366d3910f38d2a1eac9380f05e197ace1547605086ccad7a6cdd2871",
+      "rights": "authored-synthetic",
+      "arguments": ["1010000000"],
+      "expected": {
+        "packets": 2,
+        "bytes": 11,
+        "digest": 14086002072218715579,
+        "eof": true
+      }
+    },
+    {
+      "id": "fraction-before-second-cue",
+      "profile": "fraction-before-second-cue",
+      "file": "harness/features/matroska-cued-aac/inputs/two-cues.mkv",
+      "sha256": "52ab8f29366d3910f38d2a1eac9380f05e197ace1547605086ccad7a6cdd2871",
+      "rights": "authored-synthetic",
+      "arguments": ["999600000"],
+      "expected": {
+        "packets": 3,
+        "bytes": 16,
+        "digest": 10656081498208427173,
+        "eof": true
+      }
+    },
+    {
+      "id": "coded-cues",
+      "profile": "coded-cues",
+      "file": "harness/features/matroska-cued-aac/inputs/coded-cues.mkv",
+      "sha256": "7f9e4ffa67e5e6cf6e027998e130a1ee3ec419e934adbdb75697cbe2d8624ee9",
+      "rights": "authored-synthetic",
+      "arguments": ["100000000"],
+      "expected": {
+        "packets": 4,
+        "bytes": 28,
+        "digest": 16219901096867284417,
+        "eof": true
+      }
+    }
+  ]
+}

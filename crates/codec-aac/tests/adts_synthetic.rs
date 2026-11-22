@@ -103,6 +103,30 @@ fn block(cpe: bool) -> Vec<u8> {
 }
 
 #[test]
+fn coded_matroska_cue_fixture_contains_decodable_stereo_access_units() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-aac/inputs/coded-cues.mkv");
+    let au = block(true);
+    assert_eq!(
+        fixture
+            .windows(au.len())
+            .filter(|window| *window == au)
+            .count(),
+        8
+    );
+    let budget = Budget::new(4 << 20).unwrap();
+    let mut decoder = RawLcDecoder::new_in(4, 2, &budget).unwrap();
+    let mut frame = AudioFrame::default();
+    for _ in 0..8 {
+        decoder.decode(&au, &mut frame).unwrap();
+        assert_eq!(
+            (frame.sample_rate, frame.samples_per_channel),
+            (44_100, 1024)
+        );
+    }
+}
+
+#[test]
 fn an_explicit_container_edit_supersedes_the_adts_delay_signature() {
     let mut bits = Bw::new();
     bits.put(6, 3); // ID_FIL

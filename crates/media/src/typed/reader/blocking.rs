@@ -318,6 +318,23 @@ impl<R: Read> BlockingReader<R> {
             cancel,
         )
     }
+    /// Seek to a validated preceding Cue in the supported single-track AAC-LC profile.
+    pub fn seek_cued_aac(
+        &mut self,
+        track: usize,
+        requested_ns: i64,
+        cancel: &AtomicBool,
+    ) -> Result<crate::matroska::SeekReceipt> {
+        self.seek(
+            SeekRequest {
+                track,
+                requested_ns,
+                playback_preroll: false,
+            },
+            RecoveryAudio::CuedAac,
+            cancel,
+        )
+    }
     pub fn seek_for_playback(
         &mut self,
         track: usize,
