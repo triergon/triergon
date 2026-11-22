@@ -6,27 +6,21 @@
     "triergon": [
       {
         "name": "play-pipeline",
-        "entry_points": ["playback::Player::read_output", "playback::Output::packet", "playback::Engine::track", "bridge::access::AccessUnits::for_track", "session::audio_configuration", "session::video_codec", "session::AudioSession::feed_discarding", "session::VideoSession::feed", "render::ass::Renderer::render"],
+        "entry_points": ["render::ass::Renderer::render"],
         "degree": "unit-tests",
-        "needs": "a worker operation running examples/play/pipeline.rs over Matroska, MP4 and TS inputs, its packets, RGBA pictures and stereo PCM graded against the reference's demux and decode of the same file by the h264, hevc and audio lane rules; tests/play.rs checks counts only"
+        "needs": "The play corpus grades the facade demux, framing and decode path. The ASS overlay still needs a paired picture grade inside that pipeline."
       },
       {
         "name": "any-reader-mpegts",
-        "entry_points": ["AnyReader::MpegTs", "AnyPacket::MpegTs", "AnyOther::MpegTs"],
+        "entry_points": ["AnyOther::MpegTs"],
         "degree": "unit-tests",
-        "needs": "mpegts-access-units cases read through AnyReader::open and folded as that contract folds; no gated operation opens a transport stream through the facade"
+        "needs": "Facade-mpegts compares admission and packet delivery. A paired comparison of MPEG-TS control events through AnyOther remains due."
       },
       {
         "name": "any-reader-seek-and-control",
         "entry_points": ["AnyReader::request_seek", "AnyReader::reset", "AnyReader::fail", "AnyReader::capabilities", "AnyPacket::random_access", "Blocking::seek"],
         "degree": "unit-tests",
         "needs": "seek and reset cases of matroska-cues-preroll, isobmff-seek and mpegts-previous-picture run through AnyReader and Blocking and folded as those contracts fold, with each packet's random-access flag"
-      },
-      {
-        "name": "blocking-probe",
-        "entry_points": ["probe", "Probe", "open_blocking", "open_sequential", "Replayed"],
-        "degree": "step",
-        "needs": "every Probe verdict (TS188 apart from M2TS192, ID3- and junk-prefixed elementary input) and the adapters' format choice and replayed prefix compared with the reference's av_probe_input_format3 and demuxer choice; compared today only through codecs-files reading the files they open"
       }
     ],
     "triergon-ass": [],
@@ -260,12 +254,6 @@
         "needs": "a worker operation probing each corpus input at several prefix lengths and window sizes, folding the selected format and the replayed bytes against the reference's av_probe_input_format3 over the same prefix"
       },
       {
-        "name": "source-view-playback",
-        "entry_points": ["Engine::matroska", "Engine::mp4", "Engine::mp4_progressive", "Engine::ts", "Engine::ts_entities", "mp4::Mp4IndexJob::new", "mp4::Mp4Open::new_progressive", "mp4::Mp4Open::with_timing_policy", "Player::continue_entity", "Player::finish_logical_source", "ClockChoice::Source"],
-        "degree": "recorded",
-        "needs": "worker operations playing each format through Player with the source clock and folding every packet's source times, flags and bytes against the reference's packets; the gated operations reach Engine::matroska and Engine::mp4 with demux clocks only"
-      },
-      {
         "name": "demux-view-entry-points-outside-the-gated-operations",
         "entry_points": ["compat::mov::index", "compat::mov::index_encoded_range", "compat::pes::open_private_audio", "compat::pes::open_segment", "compat::pes::startup::Startup::new"],
         "degree": "recorded",
@@ -285,9 +273,9 @@
       },
       {
         "name": "neutral-views",
-        "entry_points": ["Packet", "DemuxTimes", "Track", "Track::key", "Engine::track_count", "Engine::track", "Output::packet", "Event::packet", "mp4::PreparedMp4::identify_tracks", "Engine::mp4_plan", "Engine::matroska_reader"],
-        "degree": "unit-tests",
-        "needs": "the packet folds of mp4-forward, matroska-startup-seek and ts-program read through PacketInfo and TrackInfo instead of the format types, with each track's codec, tag, configuration and language against the reference's AVStream"
+        "entry_points": ["DemuxTimes", "Track::key", "mp4::PreparedMp4::identify_tracks", "Engine::mp4_plan", "Engine::matroska_reader"],
+        "degree": "step",
+        "needs": "Playback-source-view compares neutral packet and track fields. Extend paired coverage to the underlying reader and prepared-plan accessors, track keys and DemuxTimes on the same packet."
       }
     ],
     "triergon-raster": [],
