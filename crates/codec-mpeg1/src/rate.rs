@@ -1,17 +1,19 @@
 //! Picture-level rate control with explicit whole-picture and texture budgets.
 //!
 //! Bit allocation across a GOP follows the published MPEG-2 Test Model 5
-//! complexity rule (I/P only, I quantiser ≈ 0.8× the P quantiser). Each
-//! picture then uses one quantiser, chosen from a per-type model
-//! `bits ≈ side + α · activity / q` whose α is learned from the previous picture
-//! of the same type; a uniform quantiser within a picture is what keeps the
-//! distortion low for a given size. For I pictures `side` is what no quantiser
-//! changes: every macroblock's header and every block's DC differential and
-//! end_of_block, which outweigh the AC coefficients when a large picture has few
-//! bits per macroblock. P pictures model all their bits as `α · activity / q`.
-//! Rows only deviate from the quantiser by a bounded amount when the running
-//! total drifts from the plan (side bits evenly per row, the rest by activity),
-//! or when the VBV would otherwise underflow.
+//! complexity rule (I/P only, I quantiser ≈ 0.8× the P quantiser), applied to the
+//! bits a quantiser changes: an I picture's target is its side bits (below) and
+//! its TM5 share of the rest of the GOP's budget. Each picture then uses one
+//! quantiser, chosen from a per-type model `bits ≈ side + α · activity / q` whose
+//! α is learned from the previous picture of the same type; a uniform quantiser
+//! within a picture is what keeps the distortion low for a given size. For I
+//! pictures `side` is what no quantiser changes: every macroblock's header and
+//! every block's DC differential and end_of_block, which outweigh the AC
+//! coefficients when a large picture has few bits per macroblock. P pictures
+//! model all their bits as `α · activity / q`. Rows only deviate from the
+//! quantiser by a bounded amount when the running total drifts from the plan
+//! (side bits evenly per row, the rest by activity), or when the VBV would
+//! otherwise underflow.
 //!
 //! The VBV model is the variable-rate case of ISO/IEC 11172-2 Annex C /
 //! H.262 Annex C: the buffer fills at `max_rate` until full and each picture
@@ -153,8 +155,12 @@ impl RateControl {
         let pictures = self.left_p as f64 + (kind == PictureType::Intra) as u32 as f64;
         let remaining = self.bank + pictures * self.frame_bits;
         let target = match kind {
+            // TM5 shares out what a quantiser can trade; the side bits are paid
+            // at any quantiser.
             PictureType::Intra => {
-                remaining / (1.0 + self.left_p as f64 * self.x_p / (self.x_i * KP))
+                self.side_i
+                    + (remaining - self.side_i).max(0.0)
+                        / (1.0 + self.left_p as f64 * self.x_p / (self.x_i * KP))
             }
             PictureType::Predicted => remaining / self.left_p.max(1) as f64,
         };

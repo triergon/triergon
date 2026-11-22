@@ -254,11 +254,26 @@ fn the_intra_quantiser_models_only_the_coefficient_bits() {
 }
 
 #[test]
-fn side_bits_filling_the_target_select_the_coarsest_quantiser() {
-    let mut rc = RateControl::new(30_000, 42_000, 30_000, 1, 30.0);
+fn the_i_target_pays_its_side_bits_before_the_tm5_split() {
+    let mut without = RateControl::new(30_000, 42_000, 30_000, 30, 30.0);
+    let mut with = RateControl::new(30_000, 42_000, 30_000, 30, 30.0);
+    without.seed_intra(0.0, 1600.0, 4, 1.0);
+    with.seed_intra(600.0, 1600.0, 4, 1.0);
+    let share = without.begin(PictureType::Intra, 1.0, 0).target / 30_000.0;
+    let target = with.begin(PictureType::Intra, 1.0, 0).target;
+    // The GOP's 30,000 bits less the 600 side bits are shared as before.
+    assert!(
+        (target - (600.0 + share * 29_400.0)).abs() < 1e-9,
+        "{target}"
+    );
+}
+
+#[test]
+fn side_bits_filling_the_vbv_select_the_coarsest_quantiser() {
+    let mut rc = RateControl::new(30_000, 42_000, 1000, 1, 30.0);
     rc.seed_intra(1200.0, 1600.0, 4, 1.0);
     let plan = rc.begin(PictureType::Intra, 1.0, 0);
-    assert_eq!(plan.side_bits, 1000.0);
+    assert_eq!(plan.side_bits, 960.0);
     assert_eq!(plan.q, 31);
 }
 
@@ -293,43 +308,34 @@ fn a_predicted_picture_models_all_its_texture_bits() {
     assert_eq!(rc.alpha_p, Some(4000.0));
 }
 
-/// A 480×272 picture whose 8×8 blocks alternate between two levels, each
-/// with a ramp and a little noise: its DC differentials alone cost about as much
-/// as its AC coefficients at the planned quantiser.
-fn checkered_ramps(geometry: Geometry) -> Picture {
-    let mut input = Picture::new(geometry);
-    let stride = geometry.luma_stride();
-    let mut seed = 1u32;
-    for (i, p) in input.y_mut().iter_mut().enumerate() {
-        let (x, y) = (i % stride, i / stride);
-        seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
-        let level = if (x / 8 + y / 8) % 2 == 0 { 40 } else { 180 };
-        *p = (level + (x % 8) * 4 + (seed >> 29) as usize) as u8;
-    }
-    input.cb_mut().fill(128);
-    input.cr_mut().fill(128);
-    input
-}
-
-/// The model the first I picture is planned with charges the side bits once,
-/// not once per quantiser step: the picture lands on its plan.
+/// An I picture whose 8×8 blocks are flat has no AC coefficient at any
+/// quantiser: all its bits are side bits, which the trial pass over every second
+/// row measures for the whole picture.
 #[test]
-fn an_intra_picture_with_heavy_side_bits_lands_on_its_plan() {
+fn the_trial_pass_measures_the_side_bits_of_the_whole_picture() {
     let geometry = Geometry::new(480, 272).unwrap();
     let mut e = Encoder::new(EncoderConfig {
         geometry,
-        bit_rate: 776_000,
-        max_rate: 1_086_400,
+        bit_rate: 600_000,
+        max_rate: 840_000,
         vbv_bits: 1_000_000,
         gop: 30,
     })
     .unwrap();
+    let mut input = Picture::new(geometry);
+    let stride = geometry.luma_stride();
+    for (i, p) in input.y_mut().iter_mut().enumerate() {
+        let (x, y) = (i % stride / 8, i / stride / 8);
+        *p = [40, 180, 110][(x + 2 * y) % 3];
+    }
+    input.cb_mut().fill(128);
+    input.cr_mut().fill(128);
     let mut output = Vec::new();
-    let picture = e.encode(&checkered_ramps(geometry), &mut output).unwrap();
-    let target = e.rc.plan.target;
+    let picture = e.encode(&input, &mut output).unwrap();
+    let side = e.rc.side_i;
     assert!(
-        (picture.bits as f64 - target).abs() < 0.08 * target,
-        "{} {target}",
+        (picture.bits as f64 - side).abs() < 0.02 * side,
+        "{} {side}",
         picture.bits
     );
 }
