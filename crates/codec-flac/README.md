@@ -41,13 +41,10 @@ channel counts that change between frames.
 
 ## Behaviour and limits
 
-- `decode_float` scales as FFmpeg converts its FLAC decoder output to `f32`: up to 16
+- `decode` scales as FFmpeg converts its FLAC decoder output to `f32`: up to 16
   bits per sample the samples go through 16-bit (`(x << (16 - bits)) as i16 / 2^15`),
   above that through 32-bit (`(x << (32 - bits)) as f32 / 2^31`, which rounds 25- to
   32-bit samples to `f32`). `decode_integer` returns the samples themselves.
-  The [integer PCM comparison](../../harness/features/flac-integer/contract.json)
-  checks every sample against the encoder's STREAMINFO checksum, including the
-  low bits of 32-bit samples and an unconfigured decoder's rate and layout change.
 - Rice residuals share a cache refill across several samples. The decoder checks
   the frame bit limit after each partition and rejects a partition whose final
   code crosses it.
@@ -61,11 +58,6 @@ channel counts that change between frames.
   STREAMINFO maximum block size below 16, a block above it, a predictor order above the
   first residual partition, wasted bits not below the sample size and a frame missing
   any byte of its CRC-16 are `Invalid`.
-- The `flac-crc-reject` gate compares the retained frame counts and PCM with FFmpeg
-  under `crccheck`, including cases where only FFmpeg returns samples from damaged input.
-  The integer PCM comparison checks a clean frame, the same frame with one
-  footer bit flipped, and a clean frame after it with the default, explicit
-  Ignore and Reject policies.
 - Layout: FFmpeg's FLAC defaults (mono, stereo, 3.0, quad, 5.0(side), 5.1(side), 6.1,
   7.1; the five- and six-channel surround pair is side left/right where RFC 9639 says
   back/surround). A `WAVEFORMATEXTENSIBLE_CHANNEL_MASK` Vorbis comment in the
@@ -73,9 +65,6 @@ channel counts that change between frames.
   C `strtol` with base 0, naming exactly as many of the 18 WAVEFORMATEXTENSIBLE speakers
   as STREAMINFO has channels. A frame with another channel count uses the default
   layout of its count.
-- The file comparison includes front left, top back centre and top back right.
-  Native PCM matches FFmpeg. The stereo device path also produces output for that
-  layout, which the reference's stereo path refuses.
 - An empty configuration decodes a stream picked up at a frame header (no STREAMINFO):
   each frame then supplies its own sample rate, and its sample size or the first
   frame's.
@@ -88,7 +77,23 @@ channel counts that change between frames.
   outputs with the channel buffers of 32-bit stereo and a buffer's copy while it grows;
   `with_limits` and `new_in` set another limit or a shared pool.
 
-## Known gaps
+## Conformance
+
+RFC 9639. Test vectors (outside git): the IETF CELLAR decoder testbench (`subset`,
+`uncommon`, `faulty`; CC0) and the streams `harness/codecs/flac/flac_vectors.py generate`
+makes with FFmpeg's and the reference `flac` encoder, compared with FFmpeg's decoder in
+[harness/codecs](../../harness/codecs/STATUS.md). The `flac-crc-reject` lane compares the
+retained frame counts and PCM under `crccheck`, including cases where only FFmpeg returns
+samples from damaged input. The
+[integer PCM comparison](../../harness/features/flac-integer/contract.json) checks every
+sample against the encoder's STREAMINFO checksum, including the low bits of 32-bit
+samples, an unconfigured decoder's rate and layout change, and a clean frame, the same
+frame with one footer bit flipped and a clean frame after it under each CRC policy. A
+file with front left, top back centre and top back right speakers decodes to FFmpeg's
+native PCM; its stereo mix is produced where the reference's stereo path refuses the
+layout. Results are in [docs/status.md](../../docs/status.md).
+
+Where the output differs from FFmpeg's:
 
 - FFmpeg drops the channel mask of a stream whose channel count changes within the
   frames its demuxer probes (it labels even the first frames with the default layout);
@@ -96,11 +101,3 @@ channel counts that change between frames.
 - Malformed streams whose decoded samples exceed their sample size are reproduced as
   FFmpeg wraps them in the 16- or 32-bit output, but the choice between 32- and 64-bit
   LPC accumulation is only known to match FFmpeg for valid streams.
-
-## Standards
-
-RFC 9639. Test vectors (outside git): the IETF CELLAR decoder testbench (`subset`,
-`uncommon`, `faulty`; CC0) and the streams `harness/codecs/flac/flac_vectors.py generate`
-makes with FFmpeg's and the reference `flac` encoder. Verification:
-[harness/codecs](../../harness/codecs/STATUS.md); results in
-[docs/status.md](../../docs/status.md).
