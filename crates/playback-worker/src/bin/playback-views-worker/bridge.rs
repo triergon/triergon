@@ -849,7 +849,7 @@ fn compact(pool: &Budget, data: &Bytes, rows: &mut Records) -> Result<()> {
     let mut feeds = Vec::new();
     let mut asc = vec![None; config.tracks().len()];
     for (index, track) in config.tracks().iter().enumerate() {
-        feeds.push(if track.codec() == CodecId::Aac {
+        feeds.push(if matches!(track.codec(), CodecId::Aac | CodecId::H264) {
             Some(feed(pool, &config, index)?)
         } else {
             None
@@ -885,7 +885,7 @@ fn compact(pool: &Budget, data: &Bytes, rows: &mut Records) -> Result<()> {
         }
     }
     discovered_fields(&config, &[], &asc, rows);
-    compact_replay(prefix, &feeds, rows)?;
+    compact_replay(discovered.prefix, &feeds, rows)?;
     outputs(&mut discovered.player, |output| {
         if let Some(packet) = output_packet(&output) {
             replay_row(rows, packet, &packet.packet.data);
@@ -895,27 +895,80 @@ fn compact(pool: &Budget, data: &Bytes, rows: &mut Records) -> Result<()> {
 }
 
 fn compact_replay(
-    prefix: &MatroskaReplayPrefix,
+    prefix: MatroskaReplayPrefix,
     feeds: &[Option<MatroskaTrackFeed>],
     rows: &mut Records,
 ) -> Result<()> {
+    let first_feed = feeds.iter().flatten().next().ok_or("no A/V replay feed")?;
+    let end = prefix.events().len();
+    if !matches!(
+        prefix.feed_packet(end, first_feed),
+        Err(Error::Invalid("Matroska replay ordinal"))
+    ) {
+        return Err("compact replay accepted an out-of-range ordinal".into());
+    }
+    let signature = |event: &MkvEvent| {
+        let packet = match event {
+            MkvEvent::Packet(packet) => Some((
+                packet.packet.track,
+                packet.configuration.generation(),
+                packet.configuration.revision(),
+                packet.packet.pts_ns,
+                packet.packet.dts_ns,
+                packet.packet.duration_ns,
+                packet.packet.keyframe,
+                packet.packet.data.as_ptr(),
+                packet.packet.data.len(),
+            )),
+            _ => None,
+        };
+        (std::mem::discriminant(event), packet)
+    };
+    let mut selected = Vec::new();
     for (ordinal, event) in prefix.events().enumerate() {
+        selected.push(signature(event));
         if let MkvEvent::Packet(packet) = event {
             if let Some(feed) = feeds.get(packet.packet.track).and_then(Option::as_ref) {
                 let mut job = prefix
                     .feed_packet(ordinal, feed)?
-                    .ok_or("selected AAC packet not replayed")?;
+                    .ok_or("selected packet not replayed")?;
                 let framed = ready(|w| job.step(w, CANCEL))?;
-                let mut spans = framed.payload.segments();
-                let header = spans.next().ok_or("missing ADTS header")?;
-                let payload = spans.next().ok_or("missing ADTS payload")?;
-                if header.len() != 7 || spans.next().is_some() {
-                    return Err("invalid AAC feed segments".into());
+                if !std::ptr::eq(framed.source, packet) {
+                    return Err("replay feed changed the selected event".into());
                 }
-                replay_row(rows, framed.source, payload);
+                let mut spans = framed.payload.segments();
+                if packet.configuration.tracks()[packet.packet.track].codec() == CodecId::Aac {
+                    let header = spans.next().ok_or("missing ADTS header")?;
+                    let payload = spans.next().ok_or("missing ADTS payload")?;
+                    if header.len() != 7
+                        || spans.next().is_some()
+                        || payload != &*packet.packet.data
+                    {
+                        return Err("invalid AAC feed segments".into());
+                    }
+                } else if spans.map(<[u8]>::len).sum::<usize>() == 0 {
+                    return Err("selected AVC packet yielded an empty feed".into());
+                }
+                replay_row(rows, framed.source, &packet.packet.data);
             } else {
+                if prefix.feed_packet(ordinal, first_feed)?.is_some() {
+                    return Err("replay feed admitted an unselected track".into());
+                }
                 replay_row(rows, packet, &packet.packet.data);
             }
+        } else if prefix.feed_packet(ordinal, first_feed)?.is_some() {
+            return Err("replay feed admitted a non-packet event".into());
+        }
+    }
+    let outputs = prefix.into_outputs();
+    if outputs.len() != selected.len() {
+        return Err("compact replay lost a typed output".into());
+    }
+    for (output, expected) in outputs.zip(selected) {
+        if !matches!(output.event(), Event::Matroska(event) if signature(event) == expected)
+            || output.source_id() != SOURCE
+        {
+            return Err("compact replay changed the typed envelope".into());
         }
     }
     Ok(())

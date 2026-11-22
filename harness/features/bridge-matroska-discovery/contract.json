@@ -10,7 +10,7 @@
   "contract": [
     "Compare Matroska stream discovery with avformat_find_stream_info on the formats build. Fold stream ordinal, codec, width, height and complete codec configuration. PGS canvas comes from buffered packets and the VobSub canvas from CodecPrivate.",
     "Replay the discovery prefix and then continue playback in source order. Compare every stream ordinal, optional source PTS and DTS in nanoseconds, key flag, length and packet bytes. The reference reads a fresh raw demux pass. Matroska Blocks carry PTS only, including DVB packets for which the reference additionally reports a demux DTS equal to PTS.",
-    "Compact discovery checks the buffered AAC feed segments and folds their raw AAC payload. Reconstruct legacy ASC from the first ADTS header emitted by the actual feed. The reference folds its discovered extradata.",
+    "Compact discovery checks that each buffered AVC or AAC feed selects the original event by ordinal, that a non-packet event or unselected track produces no packet, and that an invalid ordinal is refused. Consume the prefix and check the original event order, source, packet clocks, configuration and payload. Fold the original packet bytes and reconstruct legacy ASC from the first ADTS header emitted by the actual feed. The reference folds its discovered extradata and source packets.",
     "Full discovery includes the HEVC/Dolby feed duration projection for Dolby packets. The indexed seek case folds the selected HEVC packets admitted from the landing keyframe and the gate's landed verdict.",
     "Trace the candidate cutoff and buffered output count. The packet sequence is compared through the end independent of the readiness cutoff."
   ],

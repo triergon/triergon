@@ -13,14 +13,7 @@
     ],
     "triergon-ass": [],
     "triergon-bitstream": [],
-    "triergon-bridge": [
-      {
-        "name": "compact-replay-prefix",
-        "entry_points": ["matroska::MatroskaReplayPrefix", "matroska::MatroskaReplayPrefix::feed_packet"],
-        "degree": "step",
-        "needs": "a coverage run showing matroska-audio-clocks executing feed_packet on every case with a buffered prefix, and startup cases whose buffered prefix holds video"
-      }
-    ],
+    "triergon-bridge": [],
     "triergon-capture": [
       {
         "name": "session-configuration",

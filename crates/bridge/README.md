@@ -96,6 +96,8 @@ and WebM. The [Matroska discovery comparison](../../harness/features/bridge-matr
 checks discovered codec fields, PGS canvas, legacy AAC initialization, source
 replay and the HEVC seek landing. The AAC audio-clock comparison exercises
 the compact replay feed through its clock and raw packet output.
+The discovery comparison also checks typed compact replay order and packet
+identity, AVC and AAC feed selection, and refusal of an invalid ordinal.
 
 The [text subtitle comparison](../../harness/features/bridge-text-subtitles/contract.json),
 [bitmap subtitle comparison](../../harness/features/bridge-bitmap-subtitles/contract.json)
