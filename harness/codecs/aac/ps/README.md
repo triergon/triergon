@@ -200,19 +200,20 @@ a frame that overran its extension.
   last envelope is rejected at 1.2e-2 to 2.7e-2. With one array per parameter the decoder
   missed these shapes; `ps-open-dt-envelope-reference` of the open manifest is o40's
   stream of it (from a random stream).
+- **SBR after a frame without its SBR element.** Such a frame leaves the last envelope
+  border and the band limits of the frame before it in place, and the high band it carries
+  into the next frame is zero. So when the frame before it had an envelope ending after
+  the border (FIXVAR, 3 time slots), the next frame's first slots take that border and
+  zero there. `ps-open-sbr-after-missing` (HE-AAC v1, kx = 32) matches the reference
+  bit-identically with this rule; with the border reset by the missing frame, as before,
+  it missed by 81 LSB in that frame, and with the border kept and the earlier high band
+  kept as well by 59 LSB. With and without PS alike.
 
 The crafted streams of the other paths are vectors of the aac lane
 ([../correctness-manifest.json](../../correctness-manifest.json), files in `vectors/`).
 
 ## Not recovered
 
-- SBR, with and without PS: the frame after a missing SBR element, when the frame before
-  the missing one had an envelope ending after the frame border (FIXVAR, 3 time slots), in
-  `ps-open-sbr-after-missing` (HE-AAC v1). The missing frame itself matches since the
-  decoder drops the overlapping high band there too (o31). The next frame misses by 2.8e-4, and
-  about 1.6e-7 persists in later frames (o31, o40). That level is about the lowest noise
-  floor. The cause is not probed; candidates are SBR state carried over the missing frame:
-  the noise and sinusoid indices, or the high-frequency generator's history.
 - An SBR payload cut short (`ps-open-sbr-truncated`: the first 30 bits kept, neutral PS).
   The reference reports reading past the SBR data and an invalid envelope value, and still
   outputs the frame. This decoder refuses the access unit, so its output is one frame short

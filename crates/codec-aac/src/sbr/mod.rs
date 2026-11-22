@@ -657,9 +657,12 @@ impl Sbr {
                 ch.kx_prev = kx;
                 ch.m_prev = m;
             } else {
-                ch.prev_t_env_last = NUM_TIME_SLOTS;
-                ch.kx_prev = kx;
-                ch.m_prev = 0;
+                // a frame without its SBR element leaves the last envelope border and the
+                // band limits of the frame before it, and the high band it carries into the
+                // next frame, the slots before `i_temp` there, is zero (observed behaviour:
+                // `ps-open-sbr-after-missing` in harness/codecs/aac, a FIXVAR envelope 3
+                // slots past the border, kx = 32)
+                ch.y_prev[..i_temp].fill([Cpx::default(); 64]);
             }
             if let (0, true, Some(stereo)) = (c, ps, &mut self.stereo) {
                 // look-ahead slots (low band only) for the PS hybrid filters
@@ -1442,6 +1445,38 @@ mod tests {
             output
                 .iter()
                 .all(|slot| !slot[18..20].iter().any(has_noise))
+        );
+    }
+
+    #[test]
+    fn a_frame_without_sbr_data_keeps_the_border_and_drops_the_carried_high_band() {
+        // `ps-open-sbr-after-missing`: the frame before ended its last envelope 3 slots
+        // past the border with M = 12; the frame after the missing one still starts from
+        // that border and those limits, with a zero high band
+        let budget = Budget::new(1 << 30).unwrap();
+        let mut sbr = Sbr::new(24_000, false, &budget).unwrap();
+        let ch = &mut sbr.ch[0];
+        (ch.prev_t_env_last, ch.kx_prev, ch.m_prev) = (NUM_TIME_SLOTS + 3, 32, 12);
+        ch.y_prev[0][40].re = 1.0;
+        let (mut left, mut right) = ([0f32; 2048], [0f32; 2048]);
+        sbr.process(
+            &mut left,
+            &mut right,
+            1,
+            false,
+            false,
+            &mut Modulation::new(),
+        );
+        let ch = &sbr.ch[0];
+        assert_eq!(
+            (ch.prev_t_env_last, ch.kx_prev, ch.m_prev),
+            (NUM_TIME_SLOTS + 3, 32, 12)
+        );
+        assert!(
+            ch.y_prev
+                .iter()
+                .flatten()
+                .all(|v| v.re == 0.0 && v.im == 0.0)
         );
     }
 }
