@@ -474,36 +474,10 @@
     }
   ],
   "pending_module_requirements": [
-    "Owner question under ISO/IEC 14496-12 sections 8.7.3\u20134 and 8.8.8. Require an ordered merge by authored sample occurrence for a source-copy consumer, or compare complete decode order per track and retain native cross-track scheduling separately for a demux-compatible consumer.",
     "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
-    "Owner question under ISO/IEC 14496-12 sections 8.1.1, 8.8.8 and 8.8.12. Should source delivery require an entire declared sample extent at the definitive endpoint, or expose recovered demux packets separately for salvage callers? Prove membership against the table and exact input extent before changing the fold.",
-    "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.5\u20136 and 2.4.4.9. Compare the initial current PMT catalogue and its update events for a causal streaming consumer, or also require the post-probe demux catalogue for a consumer that needs read-ahead retyping.",
-    "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.8. Retain opaque private PMT declarations for a source copier, or resolve codec identity, configuration and language in the selected descriptor namespace for a consumer that auto-selects a decoder.",
-    "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.18. Compare a literal ISO 639 descriptor row as source evidence, or require that source TrackInfo interprets the descriptor on a video/private route as native demuxers do for a language-selector consumer.",
-    "Owner question under ISO/IEC 14496-12 sections 8.8.7\u20138 and 8.8.12. The two fragment ranges deliver clocks in a different order. Require physical source delivery for a forward-only consumer, or a seekable decode-order replay that can revisit the earlier range."
+    "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.18. Compare a literal ISO 639 descriptor row as source evidence, or require that source TrackInfo interprets the descriptor on a video/private route as native demuxers do for a language-selector consumer."
   ],
   "open_cases": [
-    {
-      "id": "mp4-forward-regular-r-multitrack",
-      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.7.3\u20134 and 8.8.8. Require an ordered merge by authored sample occurrence for a source-copy consumer, or compare complete decode order per track and retain native cross-track scheduling separately for a demux-compatible consumer.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-f-multitrack",
-      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.7.3\u20134 and 8.8.8. Require an ordered merge by authored sample occurrence for a source-copy consumer, or compare complete decode order per track and retain native cross-track scheduling separately for a demux-compatible consumer.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-pending-reverse-ranges",
-      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.8.7\u20138 and 8.8.12. The two fragment ranges deliver clocks in a different order. Require physical source delivery for a forward-only consumer, or a seekable decode-order replay that can revisit the earlier range.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
     {
       "id": "mp4-forward-progressive-pending-unknown-clock",
       "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
@@ -526,29 +500,8 @@
       ]
     },
     {
-      "id": "ts-program-program-pmt-retype",
-      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.5\u20136 and 2.4.4.9. Compare the initial current PMT catalogue and its update events for a causal streaming consumer, or also require the post-probe demux catalogue for a consumer that needs read-ahead retyping.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-program-private-avc-dvb",
-      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.8. Retain opaque private PMT declarations for a source copier, or resolve codec identity, configuration and language in the selected descriptor namespace for a consumer that auto-selects a decoder.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "ts-program-pmt-opaque-language-descriptors",
       "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.18. Compare a literal ISO 639 descriptor row as source evidence, or require that source TrackInfo interprets the descriptor on a video/private route as native demuxers do for a language-selector consumer.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "progressive-pending-empty-endpoint",
-      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.1.1, 8.8.8 and 8.8.12. Should source delivery require an entire declared sample extent at the definitive endpoint, or expose recovered demux packets separately for salvage callers? Prove membership against the table and exact input extent before changing the fold.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
@@ -559,23 +512,77 @@
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
-    },
-    {
-      "id": "source-program-pmt-retype",
-      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.5\u20136 and 2.4.4.9. Compare the initial current PMT catalogue and its update events for a causal streaming consumer, or also require the post-probe demux catalogue for a consumer that needs read-ahead retyping.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-program-private-avc-dvb",
-      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.8. Retain opaque private PMT declarations for a source copier, or resolve codec identity, configuration and language in the selected descriptor namespace for a consumer that auto-selects a decoder.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
     }
   ],
   "open_deviations": [
+    {
+      "reading": "The progressive MP4 source view traverses reversed fragment ranges in physical order",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.8.4.1, 8.8.7\u20138 and 8.8.12.1 define each run position and the independent decode timeline",
+      "candidate": "Emits all nine samples in physical order. Decode times 6000, 7000 and 8000 at positions 1103, 1115 and 1127 precede times 3000, 4000 and 5000 at positions 1139, 1151 and 1163.",
+      "reference": "Emits the same samples in decode order, including the second range before the first. The sample bytes, clocks, flags, catalogue and terminal status agree.",
+      "compat": "The existing compat::mov front demux view replays a bounded media extent in native order.",
+      "cases": [
+        "mp4-forward-progressive-pending-reverse-ranges"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "The MP4 source view retains explicitly declared zero-length fragment samples",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.1.1 and 8.8.8 locate and size the declared samples. Section 8.7.3.1 leaves the coding meaning of an empty sample to the sample entry.",
+      "candidate": "Emits six nonempty samples and retains three timed zero-length sample records at the definitive offset 1139. The source view exposes the raw-video table records without interpreting the zero-size payload as a decoded picture.",
+      "reference": "Emits the first three nonempty samples and then reports data refusal.",
+      "compat": "A consumer requiring native demux admission and terminal handling uses the existing compat::mov recovery mode.",
+      "cases": [
+        "progressive-pending-empty-endpoint"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "A forward MP4 source merges tracks by physical sample position",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.7.3\u20135 and 8.8.8 locate samples within each track without prescribing a demux API merge order across tracks",
+      "candidate": "Delivers samples in ascending byte position. The regular file delivers positions 1227 before 1239. The fragmented file delivers 1339 before 1351 and 1671 before 1683.",
+      "reference": "Delivers those pairs in reverse order. Track catalogue, per-track sequence, packet bytes, clocks and flags, and the terminal status agree.",
+      "compat": "A consumer replaying the native demux merge would use compat::mov::intertrack_demux_order.",
+      "cases": [
+        "mp4-forward-regular-r-multitrack",
+        "mp4-forward-regular-f-multitrack"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "A source catalogue requires a DVB namespace to resolve private PES descriptors",
+      "clause": "ITU-T H.222.0 (08/2023) section 2.4.4.10/Table 2-34 and section 2.6.1/Table 2-45 leave stream type 0x06 and descriptor tags 0x59 and 0x6a private. ETSI EN 300 468 V1.16.1 section 6.2.41 and Annex D.2\u20133 give those tags meaning within DVB.",
+      "candidate": "In an unspecified namespace, keeps private PES tracks opaque. In the default programme the subtitle PID 258 has no codec configuration or language.",
+      "reference": "Recognizes AC-3 on PID 257 when selected and DVB subtitles on PID 258 in the default programme, with language eng and configuration 0001000214. Packet and terminal folds agree.",
+      "compat": "A consumer selecting DVB decoders from an unlabelled service would use compat::pes::infer_dvb_from_private_tags.",
+      "cases": [
+        "ts-program-program-private-avc-dvb",
+        "source-program-private-avc-dvb"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "The opening transport catalogue uses the first current PMT and its declared namespace",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.4 and 2.4.4.9\u201310 apply the latest current PMT to current data. Section 2.6.1/Table 2-45 leaves DVB tags private.",
+      "candidate": "The opening catalogue uses version 0 at byte 188, with opaque PID 257 and, in the default programme, opaque PID 258. Version 1 at byte 940 signals type 0x11 on PID 257 for subsequent data.",
+      "reference": "Labels PID 257 AC-3 from the earlier DVB descriptor and, in the default programme, labels PID 258 DVB subtitles with language eng and configuration 0001000214. Packet and terminal folds agree.",
+      "compat": "A consumer using a native demux probe catalogue across PMT changes would use compat::pes::probe_catalogue.",
+      "cases": [
+        "ts-program-program-pmt-retype",
+        "source-program-pmt-retype"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
     {
       "reading": "A forward source leaves the initial decode origin absent when no predecessor or explicit origin is known",
       "clause": "ISO/IEC 14496-12:2015 sections 8.6.1.2 and 8.8.12.1 derive the media decode origin from preceding durations or tfdt",

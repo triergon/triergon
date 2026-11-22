@@ -937,7 +937,7 @@
     },
     {"area": "Capture configurations", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "11 stream cases awaiting measurement"},
     {"area": "Playback input probes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-probe"},
-    {"area": "Playback source packets and tracks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-source-view", "parity": {"aarch64-unknown-linux-gnu": "97 of 134 cases match, with 24 declared deviations and 13 open cases. [Comparison](../harness/features/playback-source-view/contract.json)"}},
+    {"area": "Playback source packets and tracks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-source-view", "parity": {"aarch64-unknown-linux-gnu": "97 of 134 cases match, with 32 declared deviations and 5 open cases. [Comparison](../harness/features/playback-source-view/contract.json)"}},
     {"area": "MP4 player seeks and duration", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-mp4-seek"},
     {"area": "MP4 catalogue replacement", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-catalogue-replacement"},
     {"area": "Player FIFO and sink delivery", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-delivery"},

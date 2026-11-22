@@ -141,8 +141,11 @@ and compares the native codec identity and configuration alongside them. The
 MP4 comparison pairs demux packets with exact sample-table or fragment byte
 ranges and reads source timing and sync flags from the tables. The MPEG-TS
 comparison checks the stream type from the selected PMT and the clocks from
-each complete PES header against the delivered bytes. The bounded timing-prefix
-controls use `TimingRunPolicy::BoundedPrefix`.
+each complete PES header against the delivered bytes. MP4 source packets use
+ascending byte position across tracks. The opening MPEG-TS catalogue uses the
+first current PMT and keeps private descriptors opaque when the caller leaves
+the namespace unspecified. The bounded timing-prefix controls use
+`TimingRunPolicy::BoundedPrefix`.
 The [MP4 clock oracle](../../harness/features/mp4-source-clock/contract.json)
 checks sample decode and composition times before the movie's edit list. For
 surplus timing runs, it checks strict indexing and the bounded compatibility
