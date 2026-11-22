@@ -637,9 +637,6 @@
         "FM1_BT_B.h264",
         "FM2_SVA_B.264",
         "FM2_SVA_C.264"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
