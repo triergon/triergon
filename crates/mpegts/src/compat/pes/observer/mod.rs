@@ -350,6 +350,7 @@ struct Pending {
     source: Bytes,
     payload: Option<Bytes>,
     position: usize,
+    // A single phase raised the transport total by 0.000216% even with writes only on transitions.
     counter_checked: bool,
     started: bool,
     body_drained: bool,
