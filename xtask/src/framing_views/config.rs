@@ -401,12 +401,26 @@ fn pce(counts: [u32; 6], tagged_mix: bool) -> Bits {
 
 fn asc(root: &Path, corpus: &mut Corpus) -> Result<()> {
     let mut sample = |name: &str, raw: &[u8], bits: usize| {
+        let operation = if matches!(
+            name,
+            "fixed-bits-12"
+                | "fixed-bits-13"
+                | "fixed-bits-14"
+                | "fixed-bits-15"
+                | "sync-extent-27"
+                | "sync-extent-31"
+                | "sync-extent-36"
+        ) {
+            "asc-truncated"
+        } else {
+            "asc"
+        };
         corpus.authored(
             View::Reference,
             &format!("asc-{name}"),
             "asc",
             raw,
-            &["asc", &bits.to_string()],
+            &[operation, &bits.to_string()],
         )
     };
     for line in text(&root.join("crates/framing/tests/aac-fixtures/original15.tsv"))?

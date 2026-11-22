@@ -47,8 +47,16 @@ pub(super) fn operation<'a>(
         ),
         ("config-", ["vpcc"]) => ("codec-config-views", vpcc(input, true, None)),
         ("config-", ["hvcc-written"]) => ("codec-config-views", hvcc(input, true)),
-        ("config-", ["asc", bits]) => ("codec-config-views", asc(input, number(bits)?, false)),
-        ("config-", ["asc-mov", bits]) => ("codec-config-views", asc(input, number(bits)?, true)),
+        ("config-", ["asc", bits]) => (
+            "codec-config-views",
+            asc(input, number(bits)?, false, false),
+        ),
+        ("config-", ["asc-truncated", bits]) => {
+            ("codec-config-views", asc(input, number(bits)?, false, true))
+        }
+        ("config-", ["asc-mov", bits]) => {
+            ("codec-config-views", asc(input, number(bits)?, true, false))
+        }
         ("config-", ["asc-frame", config]) => {
             let config = Some(*config)
                 .filter(|value| {
@@ -208,6 +216,11 @@ fn vpcc(input: &[u8], reference: bool, flags: Option<u32>) -> Action<'_> {
             fields.matrix_coefficients(),
         );
         if reference {
+            // The live projection asks whether a VP9 track can publish this
+            // record. The wire oracle also keeps the diagnostic and the bytes.
+            if fields.initialization_size() != 0 {
+                return record(work, &mut trace, 8, &[], &[]);
+            }
             // The MOV demuxer preserves reserved values 0 and 3 in range.
             // Unmapped values appear as AVCOL_*_UNSPECIFIED in codecpar.
             let primaries = if matches!(primaries, 0..=12 | 22) {
@@ -290,7 +303,7 @@ fn decoder_channels(config: &AacAudioSpecificConfig) -> Result<Option<u16>, Stri
     }
 }
 
-fn asc(input: &[u8], bits: usize, movie: bool) -> Action<'_> {
+fn asc(input: &[u8], bits: usize, movie: bool, compare_padded: bool) -> Action<'_> {
     Box::new(move |work, mut trace| {
         let pool = Budget::new(65536).map_err(error)?;
         let physical = input.len() * 8;
@@ -352,10 +365,32 @@ fn asc(input: &[u8], bits: usize, movie: bool) -> Action<'_> {
         let outcomes = views
             .as_ref()
             .map(|views| [views.declared(), views.physical()]);
+        let padded = if compare_padded {
+            // The authored cut ends inside a required syntax element. Verify
+            // the exact cutoff before comparing FFmpeg's byte-sized input.
+            if bits == 0
+                || bits.is_multiple_of(8)
+                || outcomes.and_then(|outcomes| outcomes[0].error()) != Some(Error::Truncated)
+            {
+                return Err("ASC bit cut should truncate the authored syntax".into());
+            }
+            let mut masked = input[..bits.div_ceil(8)].to_vec();
+            *masked.last_mut().ok_or("missing ASC padding byte")? &= u8::MAX << (8 - bits % 8);
+            Some(asc_scopes(&pool, &masked, masked.len() * 8).map_err(error)?)
+        } else {
+            None
+        };
         for scope in 0..2 {
-            let config = outcomes
-                .filter(|_| scope != 0 || declared.is_some())
-                .and_then(|outcomes| outcomes[scope].parsed());
+            let outcome = if scope == 0
+                && let Some(views) = &padded
+            {
+                Some(views.declared())
+            } else {
+                outcomes
+                    .filter(|_| scope != 0 || declared.is_some())
+                    .map(|outcomes| outcomes[scope])
+            };
+            let config = outcome.and_then(triergon_framing::aac::AacAscScopeOutcome::parsed);
             if let Some(config) = config
                 && let Some(channels) = decoder_channels(config)?
             {

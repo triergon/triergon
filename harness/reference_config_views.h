@@ -309,7 +309,7 @@ static int asc_main(const ViewCase *input, ViewWork *work)
             avcodec_free_context(&decoder);
             return 2;
         }
-        if (status < 0) {
+        if (status < 0 || (!bits && decoder->ch_layout.nb_channels == 0)) {
             config_words(work, 8, &i, 1);
         } else {
             const uint64_t words[] = {i, (uint64_t)decoder->ch_layout.nb_channels};
@@ -384,9 +384,27 @@ static int asc_frame_main(const ViewCase *input, ViewWork *work)
     if (status >= 0)
         status = avcodec_receive_frame(decoder, frame);
     if (status >= 0) {
+        static const unsigned aac_rates[] = {
+            96000, 88200, 64000, 48000, 44100, 32000, 24000,
+            22050, 16000, 12000, 11025, 8000, 7350,
+        };
+        unsigned rate = (unsigned)frame->sample_rate;
+        unsigned samples = (unsigned)frame->nb_samples;
+        if (work->trace)
+            fprintf(stderr, "AAC decoded frame: %u Hz, %u samples\n", rate, samples);
+        /* The LC ASC alone predicts the core clock. In-band dual-rate SBR
+         * doubles rate and samples while leaving the decoded duration intact.
+         * Keep explicitly signaled extension configurations in their own clock. */
+        if (bytes == 2 && (raw[0] >> 3) == 2) {
+            const unsigned index = ((raw[0] & 7) << 1) | (raw[1] >> 7);
+            if (index < sizeof(aac_rates) / sizeof(*aac_rates) &&
+                rate == 2 * aac_rates[index] && !(samples & 1)) {
+                rate /= 2;
+                samples /= 2;
+            }
+        }
         const uint64_t words[] = {
-            (uint64_t)frame->sample_rate, (uint64_t)frame->ch_layout.nb_channels,
-            (uint64_t)frame->nb_samples,
+            rate, (uint64_t)frame->ch_layout.nb_channels, samples,
         };
         config_words(work, 3, words, 3);
     } else if (status == AVERROR(ENOMEM) || status == AVERROR_DECODER_NOT_FOUND) {
@@ -493,12 +511,12 @@ static int config_views_prepare(ViewCase *input)
         else if (!strcmp(name, "eac3"))
             input->run = eac3_views_main;
     } else if (input->argc == 2 && input->size <= 4096 &&
-               (!strcmp(name, "asc") || !strcmp(name, "asc-mov"))) {
+               (!strcmp(name, "asc") || !strcmp(name, "asc-truncated") || !strcmp(name, "asc-mov"))) {
         const char *argument = input->argv[1];
         if (!*argument || strspn(argument, "0123456789") != strlen(argument) ||
             strtoul(argument, NULL, 10) > 32768)
             return 2;
-        if (!strcmp(name, "asc"))
+        if (!strcmp(name, "asc") || !strcmp(name, "asc-truncated"))
             input->run = asc_main;
         else if (strtoul(argument, NULL, 10) % 8 == 0)
             input->run = asc_mov_main;

@@ -8,9 +8,9 @@
   "runner": "cargo xtask report",
   "reference": "ffmpeg-framing-views-native",
   "contract": [
-    "Wrap each vpcC FullBox payload in one minimal vp09 movie and open through the MOV demuxer without stream discovery. Fold kind 3 with AVCodecParameters range, colour primaries, transfer and matrix, or kind 8 on refusal. The candidate maps full range to 2 and limited to 1. The MOV CICP projection preserves primaries 0–12 and 22, transfer 0–18 and matrix 0–17. Other values map to unspecified (2). The wire oracle retains every code.",
-    "For asc, fold kind 2 with declared bits, physical bits and whether they are equal. At each extent in order (declared 0, physical 1), fold kind 3 with scope and channel count for an eligible configuration, or kind 8 with scope on refusal. The candidate caps the decoder policy at 64 channels and disables explicitly coded core frequencies, which the reference decoder refuses at open. The reference supplies the byte extent to avcodec_open2, padding a partial final byte with zero bits. ASC rate and channel reason appear in the candidate trace. The reference has no initialized rate, profile or frame size at open on this corpus.",
-    "For asc-mov, put the declared whole-byte ASC length and the full physical buffer in the DecoderSpecificInfo descriptor of an mp4a track. Fold kind 2 with the published extradata length and exact bytes, followed by kind 3 with the signalled sample rate, core channels and core samples per frame. Fold kind 8 on refusal. For asc-frame, provide the named ASC and the first raw access unit of the pinned ADTS stream to the reference decoder. Fold kind 3 with sample rate, channels and samples per channel, or kind 8. The candidate projects those outputs from the ASC's signalled rate, decoder channels and core frame length. In-band extensions can change the decoded result.",
+    "Wrap each vpcC FullBox payload in one minimal vp09 movie and open through the MOV demuxer without stream discovery. Fold kind 3 with AVCodecParameters range, colour primaries, transfer and matrix, or kind 8 on refusal. The candidate maps full range to 2 and limited to 1. The MOV CICP projection preserves primaries 0–12 and 22, transfer 0–18 and matrix 0–17. Other values map to unspecified (2). A nonzero initialization size makes the VP9 track projection ineligible; the wire oracle retains all fields and initialization bytes.",
+    "For asc, fold kind 2 with declared bits, physical bits and whether they are equal. At each extent in order (declared 0, physical 1), fold kind 3 with scope and channel count for an eligible configuration, or kind 8 with scope on refusal. The candidate caps the decoder policy at 64 channels and disables explicitly coded core frequencies, which the reference decoder refuses at open. The reference supplies the byte extent to avcodec_open2, padding a partial final byte with zero bits. The asc-truncated operation first requires a truncation in the authored exact bit scope and then compares that same padded byte representation. Zero bytes supply no ASC. ASC rate and channel reason appear in the candidate trace. The reference has no initialized rate, profile or frame size at open on this corpus.",
+    "For asc-mov, put the declared whole-byte ASC length and the full physical buffer in the DecoderSpecificInfo descriptor of an mp4a track. Fold kind 2 with the published extradata length and exact bytes, followed by kind 3 with the signalled sample rate, core channels and core samples per frame. Fold kind 8 on refusal. For asc-frame, provide the named ASC and the first raw access unit of the pinned ADTS stream to the reference decoder. Fold kind 3 with sample rate, channels and samples per channel, or kind 8. The candidate projects those outputs from the ASC's signalled rate, decoder channels and core frame length. For a two-byte AAC-LC ASC, express a dual-rate decoded frame in core samples at the signalled core rate; record the actual decoded rate and sample count in the trace.",
     "For hvcc-written, compare the hvcC prefix from the authored MP4 with the pinned reference's HEVC parser over the first packet. Fold kind 3 with profile, level, and chroma format and two bit depths minus eight from the parser's public pixel format descriptor. The reference inputs are complete movies written by the pinned release muxer.",
     "For eac3, group each independent syncframe and its following dependent syncframes for comparison with the reference demuxer's decoded packet. Fold kind 1 with group offset and byte size, rate, samples, channels, native AVChannel mask, audio service type and matrix encoding. Fold kind 3 for published downmix side data with preferred mode and five linear gains rounded to 10^-5 in this order: center Lo/Ro, center Lt/Rt, surround Lo/Ro, surround Lt/Rt, LFE. Use the ATSC A/52 Annex E locations and level tables. The public downmix mode values for coded 0, 1, 2 and 3 are 0, 2, 1 and 3. Stereo frames in this corpus can publish matrix encoding. The reference publishes downmix side data on the multichannel inputs. Fold kind 7 with packet count on complete input, or kind 8 with the refusal offset."
   ],
@@ -27,6 +27,94 @@
     "thumbv7neon-unknown-linux-gnueabihf"
   ],
   "iterations": 1,
+  "open_deviations": [
+    {
+      "reading": "Interpret only the supported vpcC version",
+      "clause": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (version 1, version 0 deprecated)",
+      "candidate": "refuses version 0 and version 2 without deriving colour fields",
+      "reference": "skips the box and opens the track with unknown range and unspecified CICP",
+      "compat": "compat::vp9::skip_unsupported_configuration",
+      "cases": [
+        "vpcc-version-zero-unsupported",
+        "vpcc-future-version-unsupported"
+      ]
+    },
+    {
+      "reading": "The initialization extent exhausts the vpcC record",
+      "clause": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (codecInitializationDataSize is zero for VP9)",
+      "candidate": "refuses bytes after the zero-length initialization field",
+      "reference": "opens the track using the fixed colour fields despite trailing bytes",
+      "cases": [
+        "vpcc-extra-record-tail"
+      ]
+    },
+    {
+      "reading": "All fixed vpcC fields stay within their box",
+      "clause": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (4 FullBox bytes and 8 fixed record bytes)",
+      "candidate": "refuses the incomplete box or record",
+      "reference": "publishes default colour fields if the box is empty or publishes fields read beyond its recorded extent",
+      "compat": "compat::vp9::skip_incomplete_configuration for a consumer needing default fields",
+      "cases": [
+        "vpcc-short-record-5",
+        "vpcc-short-record-6",
+        "vpcc-short-record-7",
+        "vpcc-short-fullbox-0"
+      ]
+    },
+    {
+      "reading": "Channel configurations supported by the AAC-LC reader",
+      "clause": "ISO/IEC 14496-3 clause 1.6.2.1 (AudioSpecificConfig) and 4.4.1 (GASpecificConfig), as documented by AacAscParser (channelConfiguration)",
+      "candidate": "refuses configuration 13 in both scopes",
+      "reference": "opens configuration 13 and publishes 24 channels",
+      "cases": [
+        "asc-channel-13"
+      ]
+    },
+    {
+      "reading": "AAC-LC source configuration subset",
+      "clause": "ISO/IEC 14496-3 clause 1.6.2.1 (AudioSpecificConfig) and 4.4.1 (GASpecificConfig), as documented by AacAscParser (audioObjectType and the object-specific grammar)",
+      "candidate": "refuses the non-LC object type in both scopes",
+      "reference": "opens AAC Main, SSR, LTP, ER LC and ER LD and publishes two channels each",
+      "cases": [
+        "asc-object-1",
+        "asc-object-3",
+        "asc-object-4",
+        "asc-object-17",
+        "asc-object-23"
+      ]
+    },
+    {
+      "reading": "DecoderSpecificInfo cannot extend beyond its containing descriptor",
+      "clause": "ISO/IEC 14496-1 DecoderSpecificInfo expandable descriptor extent, as exercised by AacAscScopeParser",
+      "candidate": "refuses a declared extent of eight bytes backed by seven",
+      "reference": "publishes eight bytes of extradata and reads a byte beyond the esds box",
+      "cases": [
+        "asc-mov-longer"
+      ]
+    },
+    {
+      "reading": "Aligned E-AC-3 cannot begin with reserved strmtyp 3",
+      "clause": "ATSC A/52:2018 Annex E, 2.3.1.1 and Table E2.1",
+      "candidate": "refuses at offset zero on the reserved stream type",
+      "reference": "recovers 157 decoded eight-channel packets from the unaligned stream",
+      "compat": "compat::ac3::recover_aligned_syncframes",
+      "cases": [
+        "the-great-wall-7-1"
+      ]
+    },
+    {
+      "reading": "A selected ASC sync extension requires its advertised fields",
+      "clause": "ISO/IEC 14496-3 clause 1.6.2.1 (AudioSpecificConfig syncExtensionType, extensionAudioObjectType and SBR/PS presence flags), as documented by AacAscParser",
+      "candidate": "refuses the incomplete extension within the supplied bytes; the fractional-cut controls also verify truncation at the exact bit cutoff",
+      "reference": "opens the incomplete configuration and publishes the mono or stereo channel count",
+      "cases": [
+        "asc-sync-extent-27",
+        "asc-sync-extent-31",
+        "asc-sync-extent-32",
+        "asc-sync-extent-48"
+      ]
+    }
+  ],
   "open_unmeasured": [
     {
       "bound": "runtime",
@@ -642,133 +730,6 @@
         "the-great-wall-7-1"
       ],
       "cause": "The reference publishes E-AC-3 side data only while decoding audio"
-    }
-  ],
-  "pending_module_requirements": [
-    "The binding requires zero VP9 initialization bytes. The framing view preserves those bytes with a syntax issue and the MOV demuxer rejects the track.",
-    "The version 1 record parser refuses other versions. The MOV demuxer skips the box and opens the track with unspecified colour fields.",
-    "A vpcC record must end at the initialization extent. The MOV demuxer reads the fixed fields and accepts extra box bytes.",
-    "The complete FullBox payload is required by the record view. The MOV demuxer publishes default colour fields for the empty box or reads fields beyond the truncated payload.",
-    "The ASC framing view supports its selected ISO channel configurations only. The reference decoder accepts configuration 13, with 24 channels.",
-    "The ASC framing grammar selects an AAC-LC core. The reference decoder also opens the selected Main, SSR, LTP, ER LC and ER LD object types.",
-    "A zero-length ASC has no syntax to parse. The decoder accepts an open without configuration and reports zero channels.",
-    "The ASC extent ends within a required field. Decoder extradata has byte granularity and its open accepts padding or an incomplete extension.",
-    "The declared descriptor is longer than its physical payload. The MOV demuxer reads the extra byte beyond esds and the scope view refuses the declaration.",
-    "The LC ASC carries no SBR signal. The reference resolves SBR from the coded access unit, doubles the rate and produces twice the core sample count.",
-    "The aligned BSI view refuses the leading reserved stream type. The reference decoder recovers an eight-channel group from the same input."
-  ],
-  "open_cases": [
-    {
-      "id": "vpcc-nonempty-initialization",
-      "requirement": "The binding requires zero VP9 initialization bytes. The framing view preserves those bytes with a syntax issue and the MOV demuxer rejects the track."
-    },
-    {
-      "id": "vpcc-version-zero-unsupported",
-      "requirement": "The version 1 record parser refuses other versions. The MOV demuxer skips the box and opens the track with unspecified colour fields."
-    },
-    {
-      "id": "vpcc-future-version-unsupported",
-      "requirement": "The version 1 record parser refuses other versions. The MOV demuxer skips the box and opens the track with unspecified colour fields."
-    },
-    {
-      "id": "vpcc-extra-record-tail",
-      "requirement": "A vpcC record must end at the initialization extent. The MOV demuxer reads the fixed fields and accepts extra box bytes."
-    },
-    {
-      "id": "vpcc-short-record-5",
-      "requirement": "The complete FullBox payload is required by the record view. The MOV demuxer publishes default colour fields for the empty box or reads fields beyond the truncated payload."
-    },
-    {
-      "id": "vpcc-short-record-6",
-      "requirement": "The complete FullBox payload is required by the record view. The MOV demuxer publishes default colour fields for the empty box or reads fields beyond the truncated payload."
-    },
-    {
-      "id": "vpcc-short-record-7",
-      "requirement": "The complete FullBox payload is required by the record view. The MOV demuxer publishes default colour fields for the empty box or reads fields beyond the truncated payload."
-    },
-    {
-      "id": "vpcc-short-fullbox-0",
-      "requirement": "The complete FullBox payload is required by the record view. The MOV demuxer publishes default colour fields for the empty box or reads fields beyond the truncated payload."
-    },
-    {
-      "id": "asc-channel-13",
-      "requirement": "The ASC framing view supports its selected ISO channel configurations only. The reference decoder accepts configuration 13, with 24 channels."
-    },
-    {
-      "id": "asc-object-1",
-      "requirement": "The ASC framing grammar selects an AAC-LC core. The reference decoder also opens the selected Main, SSR, LTP, ER LC and ER LD object types."
-    },
-    {
-      "id": "asc-object-3",
-      "requirement": "The ASC framing grammar selects an AAC-LC core. The reference decoder also opens the selected Main, SSR, LTP, ER LC and ER LD object types."
-    },
-    {
-      "id": "asc-object-4",
-      "requirement": "The ASC framing grammar selects an AAC-LC core. The reference decoder also opens the selected Main, SSR, LTP, ER LC and ER LD object types."
-    },
-    {
-      "id": "asc-object-17",
-      "requirement": "The ASC framing grammar selects an AAC-LC core. The reference decoder also opens the selected Main, SSR, LTP, ER LC and ER LD object types."
-    },
-    {
-      "id": "asc-object-23",
-      "requirement": "The ASC framing grammar selects an AAC-LC core. The reference decoder also opens the selected Main, SSR, LTP, ER LC and ER LD object types."
-    },
-    {
-      "id": "asc-fixed-bits-0",
-      "requirement": "A zero-length ASC has no syntax to parse. The decoder accepts an open without configuration and reports zero channels."
-    },
-    {
-      "id": "asc-fixed-bits-12",
-      "requirement": "The ASC extent ends within a required field. Decoder extradata has byte granularity and its open accepts padding or an incomplete extension."
-    },
-    {
-      "id": "asc-fixed-bits-13",
-      "requirement": "The ASC extent ends within a required field. Decoder extradata has byte granularity and its open accepts padding or an incomplete extension."
-    },
-    {
-      "id": "asc-fixed-bits-14",
-      "requirement": "The ASC extent ends within a required field. Decoder extradata has byte granularity and its open accepts padding or an incomplete extension."
-    },
-    {
-      "id": "asc-fixed-bits-15",
-      "requirement": "The ASC extent ends within a required field. Decoder extradata has byte granularity and its open accepts padding or an incomplete extension."
-    },
-    {
-      "id": "asc-physical-bytes-0",
-      "requirement": "A zero-length ASC has no syntax to parse. The decoder accepts an open without configuration and reports zero channels."
-    },
-    {
-      "id": "asc-sync-extent-27",
-      "requirement": "The ASC extent ends within a required field. Decoder extradata has byte granularity and its open accepts padding or an incomplete extension."
-    },
-    {
-      "id": "asc-sync-extent-31",
-      "requirement": "The ASC extent ends within a required field. Decoder extradata has byte granularity and its open accepts padding or an incomplete extension."
-    },
-    {
-      "id": "asc-sync-extent-32",
-      "requirement": "The ASC extent ends within a required field. Decoder extradata has byte granularity and its open accepts padding or an incomplete extension."
-    },
-    {
-      "id": "asc-sync-extent-36",
-      "requirement": "The ASC extent ends within a required field. Decoder extradata has byte granularity and its open accepts padding or an incomplete extension."
-    },
-    {
-      "id": "asc-sync-extent-48",
-      "requirement": "The ASC extent ends within a required field. Decoder extradata has byte granularity and its open accepts padding or an incomplete extension."
-    },
-    {
-      "id": "asc-mov-longer",
-      "requirement": "The declared descriptor is longer than its physical payload. The MOV demuxer reads the extra byte beyond esds and the scope view refuses the declaration."
-    },
-    {
-      "id": "asc-frame-implicit-sbr",
-      "requirement": "The LC ASC carries no SBR signal. The reference resolves SBR from the coded access unit, doubles the rate and produces twice the core sample count."
-    },
-    {
-      "id": "the-great-wall-7-1",
-      "requirement": "The aligned BSI view refuses the leading reserved stream type. The reference decoder recovers an eight-channel group from the same input."
     }
   ]
 }

@@ -1959,7 +1959,7 @@
       "expected": {
         "packets": 3,
         "bytes": 0,
-        "digest": 53319532037487
+        "digest": 1719989524862
       }
     },
     {
@@ -2145,7 +2145,7 @@
       "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
       "rights": "authored-synthetic",
       "arguments": [
-        "asc",
+        "asc-truncated",
         "12"
       ],
       "expected": {
@@ -2161,7 +2161,7 @@
       "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
       "rights": "authored-synthetic",
       "arguments": [
-        "asc",
+        "asc-truncated",
         "13"
       ],
       "expected": {
@@ -2177,7 +2177,7 @@
       "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
       "rights": "authored-synthetic",
       "arguments": [
-        "asc",
+        "asc-truncated",
         "14"
       ],
       "expected": {
@@ -2193,7 +2193,7 @@
       "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
       "rights": "authored-synthetic",
       "arguments": [
-        "asc",
+        "asc-truncated",
         "15"
       ],
       "expected": {
@@ -2231,7 +2231,7 @@
       "expected": {
         "packets": 3,
         "bytes": 0,
-        "digest": 52880217715390
+        "digest": 55026390320
       }
     },
     {
@@ -2289,7 +2289,7 @@
       "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
       "rights": "authored-synthetic",
       "arguments": [
-        "asc",
+        "asc-truncated",
         "27"
       ],
       "expected": {
@@ -2305,7 +2305,7 @@
       "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
       "rights": "authored-synthetic",
       "arguments": [
-        "asc",
+        "asc-truncated",
         "31"
       ],
       "expected": {
@@ -2337,7 +2337,7 @@
       "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
       "rights": "authored-synthetic",
       "arguments": [
-        "asc",
+        "asc-truncated",
         "36"
       ],
       "expected": {
@@ -2551,7 +2551,7 @@
       "expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 46219483
+        "digest": 23154459
       }
     },
     {
