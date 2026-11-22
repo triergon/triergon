@@ -48,13 +48,13 @@ impl std::iter::FusedIterator for LanguageEntries<'_> {}
 /// An AVC video descriptor (tag 0x28).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcVideo {
-    /// The 8-bit `profile_idc`.
+    /// Coded AVC profile identifier from the stream descriptor, 0–255.
     pub profile_idc: u8,
     /// Constraint set flags 0 through 5, in source order.
     pub constraint_set_flags: [bool; 6],
     /// The 2-bit `AVC_compatible_flags`.
     pub compatible_flags: u8,
-    /// The 8-bit `level_idc`.
+    /// Coded AVC level identifier from the stream descriptor, 0–255.
     pub level_idc: u8,
     /// `AVC_still_present`: the stream may contain AVC still pictures.
     pub still_present: bool,
@@ -68,11 +68,11 @@ pub struct AvcVideo {
 /// An HEVC video descriptor (tag 0x38).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HevcVideo {
-    /// The 2-bit `profile_space`.
+    /// Selects the namespace, 0–3, for the HEVC profile identifier.
     pub profile_space: u8,
-    /// The tier flag: `true` for the High tier.
+    /// Selects the HEVC tier. `true` is High, `false` is Main.
     pub high_tier: bool,
-    /// The 5-bit `profile_idc`.
+    /// Coded HEVC profile identifier, 0–31, within the signalled profile space.
     pub profile_idc: u8,
     /// The 32 profile compatibility flags, first flag in the most significant bit.
     pub profile_compatibility_indication: u32,
@@ -86,7 +86,7 @@ pub struct HevcVideo {
     pub frame_only_constraint: bool,
     /// Forty-four unmodified profile-tier-level constraint bits, right-aligned.
     pub copied_44bits: u64,
-    /// The 8-bit `level_idc`.
+    /// Coded HEVC level identifier from the stream descriptor, 0–255.
     pub level_idc: u8,
     /// Whether this stream may carry HEVC still pictures.
     pub still_present: bool,

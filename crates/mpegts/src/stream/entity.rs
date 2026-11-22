@@ -9,7 +9,7 @@ pub struct ObservedTrace<T> {
     pub(crate) origin: TraceOrigin,
 }
 impl<T> ObservedTrace<T> {
-    /// The source event.
+    /// Borrow the event while retaining the original parser and input witness.
     pub fn event(&self) -> &T {
         &self.event
     }

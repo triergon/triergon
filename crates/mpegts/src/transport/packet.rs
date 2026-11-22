@@ -72,11 +72,11 @@ impl Pcr {
 pub struct Adaptation {
     /// Adaptation field bytes, from the adaptation field length byte to the end of the field.
     pub source: Bytes,
-    /// The discontinuity indicator.
+    /// Set when this carrier signals a continuity or time-base discontinuity.
     pub discontinuity: bool,
-    /// The random access indicator.
+    /// Set when the carrier signals that its PID's data can support a random-access entry.
     pub random_access_indicator: bool,
-    /// The elementary stream priority indicator.
+    /// Set when the adaptation field signals elevated priority for the elementary payload.
     pub elementary_priority: bool,
     /// The program clock reference, when the PCR flag is set.
     pub pcr: Option<Pcr>,

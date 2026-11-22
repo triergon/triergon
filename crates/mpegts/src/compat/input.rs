@@ -69,7 +69,7 @@ impl InputContext {
     pub fn inspected_bytes(&self) -> usize {
         self.inspected_bytes
     }
-    /// The charged input window used to identify the carrier grid.
+    /// The original charged prefix or whole-entity window supplied for grid detection.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.backing
     }

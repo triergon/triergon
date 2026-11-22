@@ -84,7 +84,7 @@ pub struct RecoveredPacket {
     pub rejection: RejectedTransport,
     /// The source context the rejection was pushed with.
     pub context: SourceContext,
-    /// The PES header as encoded in the carrier.
+    /// Original PES header bytes retained from the rejected carrier.
     pub encoded_header: EncodedHeader,
     /// Where the header bytes lie in the source.
     pub header_source_ranges: BudgetVec<SourceRange>,
@@ -270,7 +270,7 @@ impl RecoveryObserver {
     pub fn scope(&self) -> DemuxScope {
         self.inner.scope()
     }
-    /// The rejected-carrier policy.
+    /// The configured rule for whether to admit payload from a rejected transport carrier.
     pub fn policy(&self) -> RejectedPolicy {
         self.policy
     }

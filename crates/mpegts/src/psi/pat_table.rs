@@ -7,9 +7,9 @@ use triergon_core::{Budget, BudgetVec, Bytes, Error, Refused, Result, WorkBudget
 /// Where part of one PAT section lies in the source.
 #[derive(Clone, Copy, Debug)]
 pub struct PatSourceRange {
-    /// The section number the range belongs to.
+    /// The 8-bit PAT section number within the collected table version.
     pub section_number: u8,
-    /// The source range.
+    /// Entity, byte offset and length of this contiguous run of section bytes.
     pub range: SourceRange,
 }
 /// A complete current PAT assembled from all its sections.

@@ -23,11 +23,11 @@ pub struct DvbDtsHd<'a> {
 pub struct DvbDtsHdSubstream<'a> {
     /// The 5-bit channel count field.
     pub channels: u8,
-    /// Whether an LFE channel is present.
+    /// Set when the substream signals a low-frequency effects channel.
     pub lfe: bool,
-    /// The 4-bit sample rate code.
+    /// Coded sample-rate index, 0–15, in the DVB DTS-HD sample-rate table.
     pub sample_rate_code: u8,
-    /// Whether samples have more than 16 bits.
+    /// Signalled sample depth exceeds 16 bits per sample.
     pub more_than_16_bits: bool,
     assets: &'a [u8],
 }
@@ -37,11 +37,11 @@ pub struct DvbDtsHdSubstream<'a> {
 pub struct DvbDtsHdAsset {
     /// The 5-bit asset construction field.
     pub construction: u8,
-    /// Whether the asset uses a variable bit rate.
+    /// Set when the encoded rate describes a variable-rate asset.
     pub variable_bit_rate: bool,
-    /// Whether the bit rate code is scaled.
+    /// Selects the scaled interpretation of the coded rate.
     pub scaled_bit_rate: bool,
-    /// The 13-bit bit rate code.
+    /// Raw 13-bit rate value, interpreted with the scaling and variable-rate flags.
     pub bit_rate_code: u16,
     /// The component type byte, when its flag is set.
     pub component_type: Option<u8>,

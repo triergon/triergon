@@ -133,7 +133,8 @@ impl CompactPayload {
     pub fn budget(&self) -> &Budget {
         self.records.budget()
     }
-    /// Visit every logical span in source order without adding shared handles.
+    /// Borrow logical spans in source order without adding shared handles. The iterator's
+    /// exact length includes spans stored in compact runs.
     pub fn spans(&self) -> DemuxSpanViews<'_> {
         DemuxSpanViews {
             records: self.records.as_slice().iter(),
@@ -241,7 +242,8 @@ impl PayloadCursor {
     pub fn has_current(&self) -> bool {
         self.active
     }
-    /// Borrow the active range until it is explicitly retired.
+    /// Borrow the active range and its source coordinates. Returns `None` before
+    /// admission or after retirement.
     // Matching the active flag with the retained span measured +0.000000267% across the playback workloads.
     #[expect(
         clippy::expect_used,
@@ -256,8 +258,7 @@ impl PayloadCursor {
             )
         })
     }
-    /// Borrow the active byte range without constructing its source facts.
-    /// The range and backing are identical to `current().map(|span| span.bytes)`.
+    /// Borrow the active payload bytes. Returns `None` when no range is active.
     #[inline]
     pub fn current_bytes(&self) -> Option<BytesView<'_>> {
         let (Some(span), true) = (&self.current, self.active) else {
@@ -265,15 +266,15 @@ impl PayloadCursor {
         };
         Some(byte_view(span, self.index, self.current_count != 1))
     }
-    /// Admit the next logical range. The caller validates its pool and full
-    /// extent before consuming bytes, as with an ordinary span iterator.
+    /// Borrow the active span, admitting the next unretired span if needed. Returns
+    /// `None` at exhaustion. Validate the span's pool and extent before consuming it.
     pub fn next_span(&mut self) -> Option<DemuxSpanView<'_>> {
         self.admit_next()?;
         self.current()
     }
-    /// Admit the next logical range with the same state transitions as
-    /// `next_span`, returning only its borrowed bytes. Its full facts remain
-    /// available through `current` until `retire_current`.
+    /// Borrow the bytes of the active span, admitting the next span if needed. Returns
+    /// `None` at exhaustion. The source coordinates remain available through
+    /// [`Self::current`] until [`Self::retire_current`].
     #[inline]
     pub fn next_bytes(&mut self) -> Option<BytesView<'_>> {
         self.admit_next()?;

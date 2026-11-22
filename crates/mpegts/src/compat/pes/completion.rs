@@ -128,7 +128,7 @@ impl NoMediaConfirmation {
     pub fn pmt_sections(self) -> usize {
         self.pmt_sections
     }
-    /// The source context of the source `Finished` event.
+    /// Event ordinal and epochs at the parser's confirmed logical EOF.
     pub fn source_finished(self) -> SourceContext {
         self.source_finished
     }

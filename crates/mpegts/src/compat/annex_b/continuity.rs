@@ -20,11 +20,11 @@ const UNOBSERVED: Error = Error::Unsupported("unobserved video continuity contex
 pub struct ContinuityEvidence {
     /// The last selected carrier before the change, with its complete original bytes.
     pub carrier: TransportPacket,
-    /// The source context of that carrier.
+    /// Event ordinal and epochs of the last selected carrier before the change.
     pub carrier_context: SourceContext,
     /// The source event that admitted the change.
     pub event: SourceEvent,
-    /// The source context of that event.
+    /// Event ordinal and epochs when the source reported the change.
     pub context: SourceContext,
 }
 

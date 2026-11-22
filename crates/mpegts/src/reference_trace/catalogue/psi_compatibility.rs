@@ -45,7 +45,7 @@ impl PsiCompatibility {
 pub struct PsiCompatibilityPolicies(u8);
 impl PsiCompatibilityPolicies {
     const NONE: Self = Self(0);
-    /// Every policy.
+    /// Admits all supported PAT and PMT compatibility cases.
     pub const ALL: Self = Self(7);
     /// The set holding only `policy`.
     pub fn one(policy: PsiCompatibility) -> Self {
@@ -116,11 +116,11 @@ impl PsiCompatibilityEvidence {
     pub fn source_status(&self) -> PsiCompatibilitySourceStatus {
         self.source_status
     }
-    /// The section header as on the wire.
+    /// Original table ID, version and section-number fields, including values refused by strict PSI.
     pub fn wire_header(&self) -> SectionHeader {
         self.header
     }
-    /// The whole section bytes.
+    /// Original charged section from table ID through its CRC.
     pub fn section_bytes(&self) -> &Bytes {
         self.input.section.bytes()
     }
@@ -133,7 +133,7 @@ impl PsiCompatibilityEvidence {
     pub fn descriptor_stop_offset(&self) -> Option<usize> {
         self.descriptor_stop
     }
-    /// Number of transport carriers retained for the section.
+    /// Count of retained carriers that supplied bytes or evidence for this section.
     pub fn carrier_count(&self) -> usize {
         self.input.carriers.len()
     }

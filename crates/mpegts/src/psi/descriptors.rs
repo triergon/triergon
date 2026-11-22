@@ -26,8 +26,8 @@ impl Descriptor<'_> {
             _ => Ok(()),
         }
     }
-    /// In a DVB namespace, validate the body of an AC-3 or E-AC-3 descriptor.
-    /// Missing flagged bytes return `Invalid`. Other tags remain opaque.
+    /// Check DVB tags 0x6A and 0x7A for the fields their flags require. Missing fields
+    /// return `Invalid`. This check is for DVB loops. All other tags succeed.
     pub fn validate_dvb_audio_syntax(self) -> Result<()> {
         match self.tag {
             0x6a => self.dvb_ac3().map(|_| ()),

@@ -27,7 +27,7 @@ use triergon_framing::{
 pub struct SeekEntity {
     /// The source entity this part is read from.
     pub source: SourceId,
-    /// The entity's length in bytes.
+    /// Known byte length of this entity, used to bound reads and the combined scan.
     pub length: u64,
 }
 

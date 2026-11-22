@@ -43,7 +43,7 @@ pub struct DemuxScope {
     pub program: u16,
     /// The 13-bit PID to observe.
     pub pid: u16,
-    /// The PMT stream type of the PID.
+    /// The 8-bit PMT carriage tag, which must match the selected observer's policy.
     pub stream_type: u8,
     /// The PES stream ID the carriage expects.
     pub stream_id: u8,
@@ -176,7 +176,8 @@ impl AsRef<[u8]> for DemuxSpan {
     }
 }
 impl DemuxSpan {
-    /// Shared immutable storage for retained-capacity accounting/deduplication.
+    /// The charged allocation behind the span. Deduplicate by backing address when
+    /// several spans retain the same allocation.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.bytes
     }

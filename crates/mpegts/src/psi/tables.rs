@@ -184,7 +184,7 @@ impl PatReader {
 /// One elementary stream entry of a PMT.
 #[derive(Clone, Debug)]
 pub struct ElementaryStream {
-    /// The 8-bit stream type.
+    /// The original 8-bit PMT carriage tag used for codec classification.
     pub stream_type: u8,
     /// The 13-bit elementary PID.
     pub pid: u16,
@@ -194,7 +194,7 @@ pub struct ElementaryStream {
     pub(super) dvb: super::dvb::DvbSummary,
 }
 impl ElementaryStream {
-    /// Iterates the entry's descriptors.
+    /// Borrow the PMT descriptor loop in wire order. An empty loop yields no entries.
     pub fn descriptors(&self) -> Descriptors<'_> {
         Descriptors::new(self.descriptor_bytes.as_ref())
     }

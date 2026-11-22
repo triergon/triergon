@@ -187,11 +187,11 @@ impl NoPacketsConfirmation {
     pub fn source_finished(&self) -> SourceContext {
         self.finished
     }
-    /// Number of physical carriers accounted for.
+    /// Count of complete carriers in the covered entity, including reported discards.
     pub fn physical_carriers(&self) -> u64 {
         self.carriers
     }
-    /// Number of carriers discarded as malformed.
+    /// Subset of the physical carrier count classified as malformed.
     pub fn discarded_carriers(&self) -> u64 {
         self.discarded
     }

@@ -29,7 +29,7 @@ impl NullCarrierRun {
         &self.bytes
     }
 
-    /// The packet format of the run.
+    /// Common carrier format of the run, including whether each carrier has an M2TS prefix.
     pub fn format(&self) -> PacketFormat {
         self.format
     }
@@ -44,7 +44,7 @@ impl NullCarrierRun {
         self.bytes.len() / self.format.bytes()
     }
 
-    /// Whether the run holds no packets.
+    /// Whether the run covers zero carriers. Source polls emit only nonempty runs.
     pub fn is_empty(&self) -> bool {
         self.bytes.is_empty()
     }

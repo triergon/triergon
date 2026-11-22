@@ -20,7 +20,7 @@ impl PatRoute {
     pub fn entity(self) -> SourceId {
         self.entity
     }
-    /// The selected program number.
+    /// The nonzero 16-bit PAT program number whose PMT this route selects.
     pub fn program(self) -> u16 {
         self.program
     }

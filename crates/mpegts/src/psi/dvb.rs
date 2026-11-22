@@ -56,9 +56,9 @@ pub struct DvbSubtitlingService<'a> {
     pub language_code: [u8; 3],
     /// Original byte, including reserved/unrecognised values.
     pub subtitling_type: u8,
-    /// The 16-bit composition page ID.
+    /// The 16-bit page identifier for this service's display composition.
     pub composition_page_id: u16,
-    /// The 16-bit ancillary page ID.
+    /// The 16-bit page identifier for additional subtitle data used by this service.
     pub ancillary_page_id: u16,
 }
 impl<'a> DvbSubtitlingService<'a> {
@@ -218,10 +218,9 @@ impl ElementaryStream {
             CodecIdentification::DvbSubtitles
         }
     }
-    /// Explicit single-descriptor/single-service codec parameters view. Additional
-    /// ES context TLVs are unprobed and unsupported by this view. No first-service
-    /// fallback, language conversion, PES envelope stripping or DTS inference.
-    /// Wider field values are unverified; only six inputs were probed.
+    /// Project the five codec parameter bytes for a DVB private stream whose descriptor
+    /// loop consists of one subtitling descriptor with one service. Other signalling
+    /// returns `Unsupported`.
     #[cfg(feature = "reference-trace")]
     pub fn dvb_single_service_view(
         &self,

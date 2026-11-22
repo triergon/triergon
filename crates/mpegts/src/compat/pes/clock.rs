@@ -74,7 +74,7 @@ pub struct ClockOrigin {
 pub struct DemuxTimeView {
     /// The demux profile the time was placed under.
     pub profile: DemuxProfile,
-    /// The program number of the clock.
+    /// The nonzero 16-bit program number whose interval places these timestamps.
     pub program: u16,
     /// The 13-bit PID of the PES.
     pub pid: u16,

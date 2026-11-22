@@ -119,19 +119,19 @@ pub struct DiagnosticPacket {
     pub selected_fault: SelectedFault,
     /// The source's own diagnostic for the fault.
     pub source_fault: TraceFault,
-    /// The unchanged carrier.
+    /// Original accepted or rejected carrier including its complete source bytes.
     pub carrier: DiagnosticCarrier,
     /// The source context the carrier was pushed with.
     pub input_context: SourceContext,
-    /// The source context of the matching diagnostic.
+    /// Event ordinal and epochs at the diagnostic that confirmed the fault.
     pub diagnostic_context: SourceContext,
-    /// The PES header as encoded in the carrier.
+    /// Original header bytes and timestamp fields observed in the faulted carrier.
     pub encoded_header: DiagnosticHeader,
     /// Where the header bytes lie in the source.
     pub header_source_ranges: BudgetVec<SourceRange>,
     /// Payload bytes after the header.
     pub payload_len: usize,
-    /// The payload spans.
+    /// Ordered spans aliasing the original carrier payload after the PES header.
     pub spans: BudgetVec<DemuxSpan>,
 }
 impl DiagnosticPacket {

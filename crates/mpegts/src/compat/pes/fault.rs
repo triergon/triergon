@@ -192,19 +192,19 @@ pub struct PesFaultPacket {
     pub kind: PesFaultKind,
     /// The source's own diagnostic for the fault.
     pub source_fault: TraceFault,
-    /// The unchanged carrier.
+    /// Original carrier bytes and fields, including the rejection when transport refused it.
     pub carrier: PesFaultCarrier,
     /// The source context the carrier was pushed with.
     pub input_context: SourceContext,
-    /// The source context of the matching diagnostic.
+    /// Event ordinal and epochs at the diagnostic that confirmed the fault.
     pub diagnostic_context: SourceContext,
-    /// The PES header as encoded in the carrier.
+    /// Original bytes from the PES start code through the declared optional-header extent.
     pub encoded_header: PesFaultHeader,
     /// Where the header bytes lie in the source.
     pub header_source_ranges: BudgetVec<SourceRange>,
     /// Payload bytes after the header.
     pub payload_len: usize,
-    /// The payload spans.
+    /// Ordered spans aliasing the original carrier payload after the PES header.
     pub spans: BudgetVec<DemuxSpan>,
 }
 impl PesFaultPacket {
@@ -266,15 +266,15 @@ pub struct TransportFaultPacket {
     pub carrier: TransportPacket,
     /// The source context the carrier was pushed with.
     pub input_context: SourceContext,
-    /// The source context of the matching diagnostic.
+    /// Event ordinal and epochs at the diagnostic that confirmed the fault.
     pub diagnostic_context: SourceContext,
-    /// The PES header as encoded in the carrier.
+    /// Original bytes from the PES start code through the declared optional-header extent.
     pub encoded_header: TransportFaultHeader,
     /// Where the header bytes lie in the source.
     pub header_source_ranges: BudgetVec<SourceRange>,
     /// Payload bytes after the header.
     pub payload_len: usize,
-    /// The payload spans.
+    /// Ordered spans aliasing the original carrier payload after the PES header.
     pub spans: BudgetVec<DemuxSpan>,
 }
 impl TransportFaultPacket {

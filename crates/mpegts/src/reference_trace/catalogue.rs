@@ -114,7 +114,7 @@ impl CatalogueCodec {
 /// The source sections one catalogue entry was read from.
 #[derive(Debug)]
 pub struct CatalogueEvidence {
-    /// The section bytes.
+    /// Complete original PSI sections in table order, including their CRCs.
     pub bytes: BudgetVec<Bytes>,
     /// Where those bytes lie in the source.
     pub ranges: BudgetVec<SourceRange>,
@@ -243,7 +243,7 @@ impl Catalogue {
             )),
         }
     }
-    /// The programs, in the demuxer's order.
+    /// PAT programs in demux order. The slice is empty before any PAT is admitted.
     pub fn programs(&self) -> &[Program] {
         self.programs.as_slice()
     }
