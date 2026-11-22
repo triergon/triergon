@@ -183,8 +183,8 @@ impl MatroskaBitmapLiveClock<'_> {
         Ok(Some(packet))
     }
 
-    /// As [`Self::packet`], bound to the track's DVB decoder. Fails with `Invalid` for
-    /// a track that is not DVB.
+    /// Advances the live clock for a packet of the bound DVB track. Returns
+    /// `None` for another track and `Invalid` when bound to a different subtitle codec.
     pub fn dvb_packet(
         &mut self,
         output: &Output,

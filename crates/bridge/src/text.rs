@@ -46,7 +46,7 @@ pub(crate) fn receiver_timing(start_us: Option<i64>, display_ms: Option<u32>) ->
 /// An output without a text packet, returned with the reason.
 #[derive(Debug)]
 pub struct RejectedOutput {
-    /// The player output as it was handed in.
+    /// The untouched output, with its storage and delivery scope still attached.
     pub output: Output,
     /// Why it was refused.
     pub error: Error,
@@ -161,7 +161,7 @@ pub enum TextStep {
 /// A refused source, returned with the reason.
 #[derive(Debug)]
 pub struct TextRejection {
-    /// The packet or document as it was handed in.
+    /// Returns ownership of the original packet or document for caller handling.
     pub source: TextSource,
     /// Why it was refused.
     pub error: Error,

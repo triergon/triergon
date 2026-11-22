@@ -16,6 +16,7 @@ pub struct AacBridge {
     source: triergon_core::SourceId,
     track: u32,
     revision: u64,
+    #[expect(dead_code, reason = "retains the charged source configuration")]
     configuration: AacAudioSpecificConfig,
     parameters: AacAdtsParameters,
     maximum: usize,
@@ -63,10 +64,6 @@ impl AacBridge {
             parameters,
             maximum,
         })
-    }
-    /// The AudioSpecificConfig the headers are written from.
-    pub fn configuration(&self) -> &AacAudioSpecificConfig {
-        &self.configuration
     }
     /// Starts framing `packet`. Fails with `SourceMismatch` for another source and with
     /// `Invalid` when its track, revision or `mp4a` sample entry differs from the

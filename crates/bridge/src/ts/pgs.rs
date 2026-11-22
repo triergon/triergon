@@ -14,17 +14,13 @@ use triergon_subtitles::pgs::PacketClock;
 /// The BD-ROM stream type of presentation graphics.
 const STREAM_TYPE_PGS: u8 = 0x90;
 
-/// The source facts of a TS bitmap packet.
+/// Source provenance carried with an assembled PGS packet through the bitmap bridge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TsPesFacts {
-    /// The PID the PES was carried on.
-    pub pid: u16,
-    /// Where the PES payload starts in the elementary stream.
-    pub elementary_offset: u64,
-    /// The PES presentation time.
-    pub pts: Option<SourceTimestamp>,
-    /// The PES decode time.
-    pub dts: Option<SourceTimestamp>,
+    pid: u16,
+    elementary_offset: u64,
+    pts: Option<SourceTimestamp>,
+    dts: Option<SourceTimestamp>,
 }
 
 /// What a poll did.

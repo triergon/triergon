@@ -34,7 +34,7 @@ pub struct CaptionVideo {
 pub struct CaptionUnit {
     /// The packet bytes, charged to the bridge's pool.
     pub data: Bytes,
-    /// The presentation time.
+    /// Presentation time in ticks of the bridge's video time base, if known.
     pub pts: Option<i64>,
     /// The decode time, where the container states one. A TS PES without a
     /// DTS decodes at its PTS (H.222.0 §2.4.3.7); Matroska states none.
@@ -46,7 +46,7 @@ pub struct CaptionUnit {
 /// A refused unit, returned with the reason.
 #[derive(Debug)]
 pub struct CaptionRejection {
-    /// The unit as it was handed in.
+    /// The untouched input, including its charged bytes, returned to the caller.
     pub unit: CaptionUnit,
     /// Why it was refused.
     pub error: Error,

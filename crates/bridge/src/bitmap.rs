@@ -414,17 +414,16 @@ pub struct DvdPicture {
     /// The height in pixels.
     pub height: u16,
     palette: BudgetVec<u32>,
-    /// `width * height` colour indices, row by row.
-    pub pixels: Bytes,
+    pixels: Bytes,
 }
 
 impl DvdPicture {
-    /// The colours the indices select.
+    /// Palette indexed by each pixel, with 4 or 256 packed ARGB entries.
     pub fn palette(&self) -> &[u32] {
         self.palette.as_slice()
     }
 
-    /// One row of colour indices.
+    /// Borrows `width` palette indices at row `y`, or returns `None` at or beyond `height`.
     pub fn row(&self, y: u16) -> Option<&[u8]> {
         let width = usize::from(self.width);
         (y < self.height).then(|| &self.pixels[usize::from(y) * width..][..width])
