@@ -9,7 +9,8 @@
   "contract": [
     "Compare the complete native integer PCM against the encoder checksum from RFC 9639 section 8.2 STREAMINFO. Independently read the sample rate, channel count, bits per sample and total samples from the same metadata.",
     "Decode every access unit with Decoder::decode_integer into its IntegerFrame. Require the return value and the frame to agree. Keep the low bits of 32-bit samples. Pack signed samples little-endian at the coded byte width in channel order, then fold the native rate, channels, depth, sample count and MD5.",
-    "One case decodes with an empty configuration, then appends an authored 32 kHz mono frame to the same decoder after the 44.1 kHz stereo frames. Check that a plane beyond the layout is empty and a failed frame clears the output."
+    "One case decodes with an empty configuration, then appends an authored 32 kHz mono frame to the same decoder after the 44.1 kHz stereo frames. Check that a plane beyond the layout is empty and a failed frame clears the output.",
+    "Change only the last CRC-16 bit of the authored frame under RFC 9639 section 9.3. Compare a clean, damaged and clean frame in sequence with the default, explicit Ignore and Reject policies. Compare each retained PCM checksum and require the Reject operation to return CrcMismatch and clear the frame."
   ],
   "required_profiles": [
     "channels",
@@ -17,7 +18,8 @@
     "stereo-assignment",
     "channel-mask",
     "block-and-clock",
-    "bare-frames"
+    "bare-frames",
+    "crc-policy"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
@@ -58,7 +60,8 @@
         "flac_s16_partition15",
         "flac_s16_rate1",
         "flac_s20_rate768k",
-        "ff_s16_ch2-bare"
+        "ff_s16_ch2-bare",
+        "ff_s16_ch2-crc-policy"
       ],
       "cause": "The independent STREAMINFO oracle reads the encoder checksum."
     },
@@ -93,7 +96,8 @@
         "flac_s16_partition15",
         "flac_s16_rate1",
         "flac_s20_rate768k",
-        "ff_s16_ch2-bare"
+        "ff_s16_ch2-bare",
+        "ff_s16_ch2-crc-policy"
       ],
       "cause": "The independent STREAMINFO oracle reads the encoder checksum."
     },
@@ -128,7 +132,8 @@
         "flac_s16_partition15",
         "flac_s16_rate1",
         "flac_s20_rate768k",
-        "ff_s16_ch2-bare"
+        "ff_s16_ch2-bare",
+        "ff_s16_ch2-crc-policy"
       ],
       "cause": "The independent STREAMINFO oracle reads the encoder checksum."
     }

@@ -82,14 +82,7 @@
       }
     ],
     "triergon-codec-dca": [],
-    "triergon-codec-flac": [
-      {
-        "name": "crc-policy",
-        "entry_points": ["CrcPolicy", "Decoder::with_crc_policy"],
-        "degree": "step",
-        "needs": "The flac-crc-reject lane compares Reject with FFmpeg crccheck. Frame counts differ where the reference logs a damaged frame and still emits PCM."
-      }
-    ],
+    "triergon-codec-flac": [],
     "triergon-codec-h264": [],
     "triergon-codec-hevc": [
       {

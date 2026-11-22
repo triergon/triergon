@@ -92,11 +92,16 @@ pub(super) fn operation<'a>(
             name: "ogg-pages",
             run: Box::new(move |work, trace| pages(input, work, trace)),
         }),
-        "flac-integer-" if arguments.is_empty() || arguments == ["bare"] => {
-            let bare = !arguments.is_empty();
+        "flac-integer-" => {
+            let mode = match arguments {
+                [] => flac_integer::Mode::Configured,
+                [mode] if mode == "bare" => flac_integer::Mode::Bare,
+                [mode] if mode == "crc" => flac_integer::Mode::Crc,
+                _ => return Err("expected configured, bare or CRC FLAC comparison".into()),
+            };
             Ok(Operation {
                 name: "flac-integer",
-                run: Box::new(move |work, trace| flac_integer::run(input, bare, work, trace)),
+                run: Box::new(move |work, trace| flac_integer::run(input, mode, work, trace)),
             })
         }
         _ => Err(format!("usage: {prefix} operation is unavailable")),

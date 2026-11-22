@@ -2,7 +2,7 @@ use std::{io::Write, sync::atomic::AtomicBool};
 
 use triergon::{
     Budget, PacketInfo, TrackInfo,
-    codec::flac::{Decoder, IntegerFrame},
+    codec::flac::{CrcPolicy, DecodeError, Decoder, IntegerFrame},
     elementary::Flac,
 };
 use triergon_harness_protocol::md5;
@@ -12,6 +12,13 @@ use super::{Work, record};
 
 // Fixed-block frame, 16 mono samples at 32 kHz, constant signed value -32767.
 const MONO_FRAME: &[u8] = b"\xff\xf8\x68\x08\x00\x0f\x26\x00\x80\x01\x6e\x8c";
+
+#[derive(Clone, Copy)]
+pub(super) enum Mode {
+    Configured,
+    Bare,
+    Crc,
+}
 
 fn pack(frame: &IntegerFrame, pcm: &mut Vec<u8>) -> Result<(), String> {
     let block = frame.samples_per_channel;
@@ -51,11 +58,12 @@ fn decode(decoder: &mut Decoder, packet: &[u8], frame: &mut IntegerFrame) -> Res
 
 pub(super) fn run(
     input: &[u8],
-    bare: bool,
+    mode: Mode,
     work: &mut Work,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let error = |value: &dyn std::fmt::Debug| format!("{value:?}");
+    let bare = matches!(mode, Mode::Bare);
     let budget = Budget::new(64 << 20).map_err(|e| error(&e))?;
     let (mut source, mut next) = opened::<Flac>(input).map_err(|e| error(&e))?;
     let track = source.reader().stream().ok_or("missing FLAC track")?;
@@ -91,6 +99,9 @@ pub(super) fn run(
         &[u64::from(rate), channels as u64, u64::from(bits), samples],
         &md5::digest(&pcm),
     )?;
+    if matches!(mode, Mode::Crc) {
+        return check_crc(&budget, work, trace);
+    }
     if bare {
         decode(&mut decoder, MONO_FRAME, &mut integer)?;
         pcm.clear();
@@ -113,6 +124,58 @@ pub(super) fn run(
         || integer.planes().any(|plane| !plane.is_empty())
     {
         return Err("failed FLAC frame retained integer samples".into());
+    }
+    Ok(())
+}
+
+fn check_crc(
+    budget: &Budget,
+    work: &mut Work,
+    mut trace: Option<&mut dyn Write>,
+) -> Result<(), String> {
+    let mut bad_footer = MONO_FRAME.to_vec();
+    let last = bad_footer.last_mut().ok_or("missing FLAC CRC footer")?;
+    *last ^= 1;
+    for (mode, policy) in [None, Some(CrcPolicy::Ignore), Some(CrcPolicy::Reject)]
+        .into_iter()
+        .enumerate()
+    {
+        let mut decoder = Decoder::new_in(&[], budget).map_err(|error| format!("{error:?}"))?;
+        if let Some(policy) = policy {
+            decoder = decoder.with_crc_policy(policy);
+        }
+        let mut integer = decoder.integer_frame();
+        for (index, packet) in [MONO_FRAME, bad_footer.as_slice(), MONO_FRAME]
+            .into_iter()
+            .enumerate()
+        {
+            let result = decoder.decode_integer(packet, &mut integer);
+            let rejected = policy == Some(CrcPolicy::Reject) && index == 1;
+            let mut pcm = Vec::new();
+            if rejected {
+                if !matches!(result, Err(DecodeError::CrcMismatch))
+                    || integer.samples_per_channel != 0
+                    || integer.planes().any(|plane| !plane.is_empty())
+                {
+                    return Err("FLAC CRC rejection did not clear the decoded frame".into());
+                }
+            } else {
+                result.map_err(|error| format!("{error:?}"))?;
+                pack(&integer, &mut pcm)?;
+            }
+            record(
+                work,
+                trace.as_mut().map(|writer| &mut **writer as &mut dyn Write),
+                4,
+                &[
+                    mode as u64,
+                    index as u64,
+                    u64::from(rejected),
+                    integer.samples_per_channel as u64,
+                ],
+                &md5::digest(&pcm),
+            )?;
+        }
     }
     Ok(())
 }

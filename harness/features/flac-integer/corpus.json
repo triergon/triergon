@@ -322,6 +322,19 @@
       "expected": {
         "trace_sha256": "024af9d250e3b7e234d5185fc6dc262ee6d4560397dc9bf166708ecd2ad90daa"
       }
+    },
+    {
+      "id": "ff_s16_ch2-crc-policy",
+      "profile": "crc-policy",
+      "file": ".research/flac-generated/ff_s16_ch2.flac",
+      "sha256": "822a5b4df6458efa3b3ca9160bdc6a398d5d859cc6c73c2f4553cdf6abcfb67d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "crc"
+      ],
+      "expected": {
+        "trace_sha256": "d978e1a0ea973b9b23494de7c40c2ba0b7897b582b8f13131ebf0748e57b634f"
+      }
     }
   ]
 }

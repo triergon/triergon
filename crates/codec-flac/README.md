@@ -63,6 +63,9 @@ channel counts that change between frames.
   any byte of its CRC-16 are `Invalid`.
 - The `flac-crc-reject` gate compares the retained frame counts and PCM with FFmpeg
   under `crccheck`, including cases where only FFmpeg returns samples from damaged input.
+  The integer PCM comparison checks a clean frame, the same frame with one
+  footer bit flipped, and a clean frame after it with the default, explicit
+  Ignore and Reject policies.
 - Layout: FFmpeg's FLAC defaults (mono, stereo, 3.0, quad, 5.0(side), 5.1(side), 6.1,
   7.1; the five- and six-channel surround pair is side left/right where RFC 9639 says
   back/surround). A `WAVEFORMATEXTENSIBLE_CHANNEL_MASK` Vorbis comment in the
