@@ -15,12 +15,6 @@
     "triergon-bitstream": [],
     "triergon-bridge": [
       {
-        "name": "text-subtitle-bridge",
-        "entry_points": ["text::TextBridge", "text::TextSource"],
-        "degree": "unit-tests",
-        "needs": "bridge-text-subtitles compares container-to-cue playback. A comparison still needs to exercise TextBridge reset and the TextSource packet accessors."
-      },
-      {
         "name": "bitmap-subtitle-bridges",
         "entry_points": ["bitmap::PgsBridge", "bitmap::DvdReceiver", "matroska::MatroskaBitmapTrack", "matroska::MatroskaBitmapClockProbe", "mp4_dvd::Mp4DvdSetup", "mp4_dvd::Mp4DvdTrack", "ts::dvb::DvbTsBridge", "ts::pgs::PgsTsTrack"],
         "degree": "unit-tests",

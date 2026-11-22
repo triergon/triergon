@@ -47,6 +47,7 @@ TRACE_ORACLES = {
     "facade-source-control": ("harness.oracles", "facade_source_control"),
     "facade-mpegts-controls": ("harness.ts_facade_oracle", "trace"),
     "playback-probe-lifecycle": ("harness.oracles", "playback_probe_lifecycle"),
+    "bridge-text-control": ("harness.oracles", "bridge_text_control"),
     "ac3-features": ("harness.ac3_audblk_oracle", "trace"),
     "divide": ("harness.codec_dsp_oracle", "divide"),
     "windows": ("harness.codec_dsp_oracle", "windows"),
@@ -101,6 +102,14 @@ def playback_probe_lifecycle(path):
         "3 abort close",
         "4 abort close",
     ]
+
+
+def bridge_text_control(_path, kind, container, codec, ordinal, program):
+    """Container packet ownership and restarts from the TextBridge contract."""
+    if (kind, ordinal, program) != ("text", "0", "0"):
+        raise ValueError("expected the first text track")
+    source = {("mov", "tx3g"): 1, ("mkv", "utf8"): 2}[container, codec]
+    return [f"1 {source} 1", "2 1", "3 1", "4 22"]
 
 
 # Oracles that read no input file.

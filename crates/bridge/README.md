@@ -110,6 +110,9 @@ With the subtitle decoder corpora and pinned subtitles `ffprobe` prepared,
 It retains the first authored input with each SHA-256 and complete selector.
 The text comparison preserves the source cue extent and text even when the
 reference decoder normalizes or suppresses it.
+The [text bridge control comparison](../../harness/features/bridge-text-control/contract.json)
+checks reset with a pending packet, stale generation refusal, and the
+container packet and document accessors against their original inputs.
 
 The integration tests (`tests/it`) read the fixtures of `crates/playback/tests/fixtures`.
 Fixture provenance: [AV1](../playback/tests/fixtures/av1/README.md),

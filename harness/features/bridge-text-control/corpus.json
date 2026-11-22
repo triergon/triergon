@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "mkv",
+      "profile": "mkv",
+      "file": "harness/features/text-extraction/inputs/utf8-packet-markup.mkv",
+      "sha256": "8469bbcb10fe6dbfa60aac5e601342e65505b04f512d161100ce4124030eed5a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "text",
+        "mkv",
+        "utf8",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "trace_sha256": "88567ac8d27c68e5a07ba4c90fee832881bdb26ee57c4d9a577939dfd7f2bdc4"
+      }
+    },
+    {
+      "id": "mov",
+      "profile": "mov",
+      "file": "harness/features/text-extraction/inputs/tx3g-basic.mp4",
+      "sha256": "f34cd78cae8ec168a5b5c6573a40c32f462c11616c6d615600950c0bea167ecc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "trace_sha256": "5d696b7272d2e88370a94522a22762411adf95819a19ae0e600cfaa8451e92c8"
+      }
+    }
+  ]
+}

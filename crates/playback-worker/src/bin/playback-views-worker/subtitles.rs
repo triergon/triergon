@@ -1,6 +1,7 @@
 //! Containers played through the public subtitle bridges.
 mod bitmap;
 mod captions;
+mod text_control;
 
 use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
@@ -363,6 +364,10 @@ fn text_track(
         return Err("text track absent".into());
     }
     Ok(())
+}
+
+pub(super) fn run_text_control(args: &[String]) -> Result<()> {
+    text_control::run(args)
 }
 
 pub(super) fn run(args: &[String]) -> Result<()> {

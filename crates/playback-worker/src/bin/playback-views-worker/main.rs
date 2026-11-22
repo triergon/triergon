@@ -36,6 +36,7 @@ const RUNNERS: &[(&str, runner::Run)] = &[
     ("mp4-bridges-", bridge::run),
     ("mkv-discovery-", bridge::run),
     ("text-bridge-", subtitles::run),
+    ("text-control-", subtitles::run_text_control),
     ("subtitle-bridge-", subtitles::run),
 ];
 

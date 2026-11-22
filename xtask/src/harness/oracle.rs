@@ -36,6 +36,7 @@ impl Kind {
             "facade-source-control",
             "facade-mpegts-controls",
             "playback-probe-lifecycle",
+            "bridge-text-control",
             "ac3-features",
             "elementary-metadata",
             "opus-final-range",
