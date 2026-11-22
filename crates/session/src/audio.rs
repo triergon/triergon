@@ -18,8 +18,8 @@ use triergon_codec::{AudioFrame, ChannelLayout, DownmixLevels, DynAudioDecoder, 
 pub struct PcmBlock<S = Vec<i16>> {
     /// Samples per second per channel; meaningful while `samples` is not empty.
     pub sample_rate: u32,
-    /// The caller PTS of the first access unit in the block; `None` when that unit had
-    /// none, or when the block holds only samples the decoder released at end of stream.
+    /// The first retained sample's PTS in nanoseconds, from its caller PTS and leading
+    /// trim. `None` when the caller PTS is unknown or the block holds only drain samples.
     pub pts: Option<i64>,
     /// The samples; for the default form left and right samples in turn.
     pub samples: S,
@@ -260,8 +260,9 @@ impl<F: PcmForm> AudioSession<F> {
             consumed += 1;
             match decoder.decode(&unit.data, &mut self.frame) {
                 Ok(levels) => {
-                    unit.discard.apply(&mut self.frame, &mut self.delay);
-                    self.output.append(&self.frame, levels, unit.pts, out);
+                    let skipped = unit.discard.apply(&mut self.frame, &mut self.delay);
+                    self.output
+                        .append(&self.frame, levels, unit.pts, skipped, out);
                 }
                 Err(error) => {
                     if self.refusals.refuse(error) == OnRefusal::Fail {
@@ -284,7 +285,7 @@ impl<F: PcmForm> AudioSession<F> {
         };
         self.phase = match decoder.flush(&mut self.frame) {
             Ok(()) => {
-                self.output.append(&self.frame, None, None, out);
+                self.output.append(&self.frame, None, None, 0, out);
                 Phase::Drained
             }
             Err(error) => match self.refusals.refuse(error) {
@@ -325,6 +326,7 @@ impl<F: PcmForm> Output<F> {
         frame: &AudioFrame,
         levels: Option<DownmixLevels>,
         pts: Option<i64>,
+        skipped: usize,
         out: &mut PcmBlock<F::Samples>,
     ) {
         if frame.samples_per_channel == 0 {
@@ -339,9 +341,21 @@ impl<F: PcmForm> Output<F> {
         };
         if F::is_empty(&target.samples) {
             target.sample_rate = frame.sample_rate;
-            target.pts = pts;
+            target.pts = if skipped == 0 {
+                pts
+            } else {
+                pts.map(|pts| retained_pts(pts, skipped, frame.sample_rate))
+            };
         }
         self.form
             .append(frame, levels.unwrap_or_default(), &mut target.samples);
     }
+}
+
+/// Advance the integral caller clock by the leading trim, rounded to the nearest ns.
+#[cold]
+fn retained_pts(pts: i64, skipped: usize, sample_rate: u32) -> i64 {
+    let rate = i128::from(sample_rate.max(1));
+    let ns = (skipped as i128 * 1_000_000_000 + rate / 2) / rate;
+    i64::try_from(i128::from(pts) + ns).unwrap_or(i64::MAX)
 }

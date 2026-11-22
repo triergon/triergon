@@ -24,13 +24,14 @@ impl Discard {
     }
 
     /// Drop the marked samples from `frame`, and at least `delay` samples from its start.
+    /// Returns the number of samples dropped from the start, per channel.
     /// What does not fit in this frame stays in `delay` for the next one: a start delay
     /// or start trim may span packets (a LAME skip of 1105 samples over 576-sample
     /// frames, a long Opus pre-skip).
-    pub fn apply(self, frame: &mut AudioFrame, delay: &mut usize) {
+    pub fn apply(self, frame: &mut AudioFrame, delay: &mut usize) -> usize {
         let len = frame.samples_per_channel;
         if len == 0 {
-            return;
+            return 0;
         }
         let samples = |ticks: i64| {
             self.time_base
@@ -51,7 +52,7 @@ impl Discard {
         *delay = pending - start;
         let end = self.trim.end.map_or(0, samples).min(len - start);
         if start == 0 && end == 0 {
-            return;
+            return 0;
         }
         let kept = len - start - end;
         for plane in &mut frame.planes {
@@ -59,6 +60,7 @@ impl Discard {
             plane.truncate(kept);
         }
         frame.samples_per_channel = kept;
+        start
     }
 }
 

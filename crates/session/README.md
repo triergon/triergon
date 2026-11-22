@@ -109,7 +109,9 @@ The `mix` module holds the stereo downmix (`mix::Downmix`) and the s16 conversio
   texture cache never confuses streams.
 - **Audio timing.** `pull` decodes queued units whose PTS minus `lead_ns` has
   been reached. The caller passes the lead; `audio::DEFAULT_LEAD_NS` is 120 ms.
-  A sample-rate change ends the current block.
+  A block's PTS is the caller PTS advanced by the samples trimmed from the
+  start of its first retained frame, rounded to nanoseconds at that frame's
+  sample rate. A sample-rate change ends the current block.
 - **Lifecycle.** `load` starts a new stream; video `flush` restarts the timeline
   but keeps the last picture; video `stop` unloads the decoder and clears the picture;
   audio `stop` discards queued input and keeps the decoder. Each of these advances

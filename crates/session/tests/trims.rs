@@ -3,12 +3,14 @@
 use triergon::ogg::page::{BEGIN_OF_STREAM, END_OF_STREAM, write_page};
 use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_blocking};
 use triergon_codec::{AudioFrame, Speaker};
+use triergon_core::{Rounding, TimeBase};
 use triergon_session::{AudioSession, Discard, Error, PcmBlock, QueueLimits, TrackDecoder};
 
-/// Ogg Opus: five 20 ms CELT packets, a 312-sample pre-skip, and a final granule (which
+/// Ogg Opus: five 20 ms CELT packets, the supplied pre-skip, and a final granule (which
 /// counts the pre-skip) 100 samples before the end of the last packet.
-fn opus_file() -> Vec<u8> {
-    let head = b"OpusHead\x01\x02\x38\x01\x80\xbb\x00\x00\x00\x00\x00";
+fn opus_file(pre_skip: u16) -> Vec<u8> {
+    let mut head = *b"OpusHead\x01\x02\x00\x00\x80\xbb\x00\x00\x00\x00\x00";
+    head[10..12].copy_from_slice(&pre_skip.to_le_bytes());
     let tags = b"OpusTags\x04\x00\x00\x00test\x00\x00\x00\x00";
     let mut file = Vec::new();
     write_page(
@@ -17,7 +19,7 @@ fn opus_file() -> Vec<u8> {
         9,
         0,
         &[head.len() as u8],
-        head,
+        &head,
         &mut file,
     );
     write_page(0, 0, 9, 1, &[tags.len() as u8], tags, &mut file);
@@ -36,8 +38,23 @@ fn opus_file() -> Vec<u8> {
 
 #[test]
 fn an_audio_session_applies_pre_skip_and_end_trim() {
+    let (block, expected) = opus_session(312, false);
+    assert_eq!(block.pts, None);
+    assert_eq!(block.samples.len(), expected);
+}
+
+#[test]
+fn opus_block_starts_at_the_first_sample_after_pre_skip() {
+    for pre_skip in [312, 1272, 2232] {
+        let (block, expected) = opus_session(pre_skip, true);
+        assert_eq!(block.pts, Some(0), "pre-skip {pre_skip}");
+        assert_eq!(block.samples.len(), expected);
+    }
+}
+
+fn opus_session(pre_skip: u16, clocked: bool) -> (PcmBlock, usize) {
     let pool = Budget::new(16 << 20).unwrap();
-    let mut source = open_blocking(std::io::Cursor::new(opus_file()), &pool).unwrap();
+    let mut source = open_blocking(std::io::Cursor::new(opus_file(pre_skip)), &pool).unwrap();
     let mut session = AudioSession::new(QueueLimits::AUDIO);
     let mut loaded = false;
     while let Some(packet) = source.next_packet().unwrap() {
@@ -47,21 +64,27 @@ fn an_audio_session_applies_pre_skip_and_end_trim() {
             loaded = true;
         }
         let payload = packet.payload().to_vec();
+        let pts = packet.pts().filter(|_| clocked).map(|pts| {
+            packet
+                .time_base()
+                .rescale(pts, TimeBase::NANOSECONDS, Rounding::NearestAway)
+                .unwrap()
+        });
         session
-            .feed_discarding(&payload, None, Discard::of(&packet))
+            .feed_discarding(&payload, pts, Discard::of(&packet))
             .unwrap();
     }
     session.end_of_stream();
     let mut block = PcmBlock::default();
     session.pull(None, 0, &mut block);
     assert_eq!(block.sample_rate, 48_000);
-    assert_eq!(block.samples.len(), 2 * (5 * 960 - 312 - 100));
+    (block, 2 * (5 * 960 - usize::from(pre_skip) - 100))
 }
 
 #[test]
 fn a_track_decoder_charges_its_configuration_to_the_callers_pool() {
     let pool = Budget::new(16 << 20).unwrap();
-    let mut source = open_blocking(std::io::Cursor::new(opus_file()), &pool).unwrap();
+    let mut source = open_blocking(std::io::Cursor::new(opus_file(312)), &pool).unwrap();
     source.next_packet().unwrap();
     let track = source.reader().track(0).unwrap();
     let tiny = Budget::new(Budget::control_storage_bytes() + 8).unwrap();
