@@ -12,6 +12,7 @@ use crate::{
     fields, policy,
     sample::SampleSpan,
 };
+use std::borrow::Borrow;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 mod decode_time;
@@ -216,7 +217,7 @@ impl Run {
             stride,
         })
     }
-    fn values(&self, index: u32, defaults: Trex) -> Result<Values> {
+    fn values(&self, index: u32, defaults: &Trex) -> Result<Values> {
         if index >= self.count {
             return Err(Error::Invalid("fragment sample index"));
         }
@@ -340,13 +341,7 @@ impl FragmentIndex {
     }
     /// A cursor over the samples in run order.
     pub fn cursor(&self) -> FragmentCursor<'_> {
-        FragmentCursor {
-            index: self,
-            run: 0,
-            sample: 0,
-            byte: 0,
-            decode: None,
-        }
+        self.resume(FragmentCursorPosition::default())
     }
     /// A locator for the sample with 1-based track `ordinal`; `Error::Invalid` outside
     /// this fragment.
@@ -642,7 +637,7 @@ impl FragmentBuilder {
                         .as_slice()
                         .get(self.run)
                         .ok_or(Error::Invalid("run index"))?;
-                    let defaults = self.defaults;
+                    let defaults = &self.defaults;
                     if run.wire.constant_extents() {
                         if self.reject_zero_size && run.wire.count != 0 && defaults.size == 0 {
                             return Err(Error::Invalid("zero-size fragment sample while opening"));
@@ -790,7 +785,7 @@ impl FragmentIndex {
                 .min(maximum.saturating_sub(1).min(work.remaining()) + 1);
             let (mut end, mut count, mut offset_minimum) = (start, 0u32, None::<i32>);
             while u64::from(count) < wanted {
-                let values = run.wire.values(position.sample + count, self.defaults)?;
+                let values = run.wire.values(position.sample + count, &self.defaults)?;
                 match end.checked_add(u64::from(values.size)) {
                     Some(next) => end = next,
                     None if count == 0 => return Err(Error::Overflow),
@@ -822,20 +817,43 @@ impl FragmentIndex {
 
 /// Reads the samples of a [`FragmentIndex`] in run order; from [`FragmentIndex::cursor`].
 #[derive(Clone, Copy, Debug)]
+#[repr(transparent)]
 pub struct FragmentCursor<'a> {
-    index: &'a FragmentIndex,
-    run: usize,
-    sample: u32,
-    byte: u64,
-    decode: Option<i128>,
+    at: FragmentPosition<&'a FragmentIndex>,
 }
 impl FragmentCursor<'_> {
     /// 0-based run of the sample the last poll returned, until the next poll.
     pub(crate) fn run_index(&self) -> usize {
-        self.run
+        self.at.run
     }
     /// The next sample, for one work unit per sample and per run passed.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
+        self.at.poll(work)
+    }
+    /// Steps past the next sample without building it, as [`poll`](Self::poll)
+    /// does.
+    pub(crate) fn skip(&mut self, work: &mut WorkBudget) -> Result<RunSkip> {
+        let Advance::Sample(next) = self.at.advance(work)? else {
+            return Ok(RunSkip::Yield);
+        };
+        let Some(next) = next else {
+            return Ok(RunSkip::End);
+        };
+        self.at.commit(&next);
+        Ok(RunSkip::Sample(SkippedRunSample {
+            ordinal: next.ordinal,
+            dts: next.decode,
+            duration: next.values.duration,
+            start: next.start,
+            size: next.values.size,
+            sync: next.values.flags & 0x10000 == 0,
+        }))
+    }
+}
+
+impl<I: Borrow<FragmentIndex>> FragmentPosition<I> {
+    /// The next sample, for one work unit per sample and per run passed.
+    fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         let Advance::Sample(next) = self.advance(work)? else {
             return Ok(Next::Yield);
         };
@@ -850,7 +868,7 @@ impl FragmentCursor<'_> {
             .transpose()?;
         let sample = Sample {
             ordinal: next.ordinal,
-            description_index: self.index.defaults.description_index,
+            description_index: self.index.borrow().defaults.description_index,
             range: next.start..next.end,
             dts_ticks: next.decode,
             cts_ticks: cts,
@@ -868,29 +886,11 @@ impl FragmentCursor<'_> {
         self.commit(&next);
         Ok(Next::Item(sample))
     }
-    /// Steps past the next sample without building it, as [`poll`](Self::poll)
-    /// does.
-    pub(crate) fn skip(&mut self, work: &mut WorkBudget) -> Result<RunSkip> {
-        let Advance::Sample(next) = self.advance(work)? else {
-            return Ok(RunSkip::Yield);
-        };
-        let Some(next) = next else {
-            return Ok(RunSkip::End);
-        };
-        self.commit(&next);
-        Ok(RunSkip::Sample(SkippedRunSample {
-            ordinal: next.ordinal,
-            dts: next.decode,
-            duration: next.values.duration,
-            start: next.start,
-            size: next.values.size,
-            sync: next.values.flags & 0x10000 == 0,
-        }))
-    }
     /// Finds the next sample, passing exhausted runs, without moving past it.
     fn advance(&mut self, work: &mut WorkBudget) -> Result<Advance> {
+        let index = self.index.borrow();
         loop {
-            let Some(run) = self.index.runs.as_slice().get(self.run) else {
+            let Some(run) = index.runs.as_slice().get(self.run) else {
                 return Ok(Advance::Sample(None));
             };
             if !work.try_charge(1) {
@@ -911,7 +911,7 @@ impl FragmentCursor<'_> {
             } else {
                 self.decode
             };
-            let values = run.wire.values(self.sample, self.index.defaults)?;
+            let values = run.wire.values(self.sample, &index.defaults)?;
             let end = start
                 .checked_add(u64::from(values.size))
                 .ok_or(Error::Overflow)?;
@@ -1086,11 +1086,13 @@ impl FragmentLocator<'_> {
                     (0, run.byte, run.decode)
                 };
                 self.cursor = Some(FragmentCursor {
-                    index: self.index,
-                    run: self.low,
-                    sample,
-                    byte,
-                    decode,
+                    at: FragmentPosition {
+                        index: self.index,
+                        run: self.low,
+                        sample,
+                        byte,
+                        decode,
+                    },
                 });
             }
             let cursor = self
@@ -1102,12 +1104,12 @@ impl FragmentLocator<'_> {
                 .index
                 .runs
                 .as_slice()
-                .get(cursor.run)
+                .get(cursor.at.run)
                 .is_some_and(|run| {
-                    cursor.sample < run.wire.count
+                    cursor.at.sample < run.wire.count
                         && run
                             .ordinal
-                            .checked_add(u64::from(cursor.sample))
+                            .checked_add(u64::from(cursor.at.sample))
                             .is_some_and(|next| next < self.target)
                 })
             {
@@ -1139,95 +1141,81 @@ impl FragmentLocator<'_> {
     }
 }
 
-/// A [`FragmentCursor`] that owns its index, so it can be kept without a borrow; from
-/// [`FragmentIndex::into_cursor`].
+/// A [`FragmentCursor`] that owns its index, from [`FragmentIndex::into_cursor`].
 #[derive(Debug)]
 pub struct OwnedFragmentCursor {
-    index: FragmentIndex,
-    run: usize,
-    sample: u32,
-    byte: u64,
-    decode: Option<i128>,
+    at: FragmentPosition<FragmentIndex>,
 }
 impl FragmentIndex {
     /// A cursor over the samples that takes the index with it.
     pub fn into_cursor(self) -> OwnedFragmentCursor {
         OwnedFragmentCursor {
-            index: self,
-            run: 0,
-            sample: 0,
-            byte: 0,
-            decode: None,
+            at: FragmentCursorPosition::default().with_index(self),
         }
     }
 }
 impl OwnedFragmentCursor {
     pub(crate) fn restart(&mut self) {
-        self.run = 0;
-        self.sample = 0;
-        self.byte = 0;
-        self.decode = None;
+        self.at.run = 0;
+        self.at.sample = 0;
+        self.at.byte = 0;
+        self.at.decode = None;
     }
     pub(crate) fn run_index(&self) -> usize {
-        self.run
+        self.at.run
     }
     pub(crate) fn delivered_run_start(&self) -> bool {
-        self.sample == 1
+        self.at.sample == 1
     }
     pub(crate) fn remaining_in_delivered_run(&self) -> u32 {
-        self.index.runs.as_slice()[self.run].wire.count - self.sample
+        self.at.index.runs.as_slice()[self.at.run].wire.count - self.at.sample
     }
     /// The index being read.
     pub fn index(&self) -> &FragmentIndex {
-        &self.index
+        &self.at.index
     }
     /// The next sample, as [`FragmentCursor::poll`] reports it.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
-        let mut cursor = FragmentCursor {
-            index: &self.index,
-            run: self.run,
-            sample: self.sample,
-            byte: self.byte,
-            decode: self.decode,
-        };
-        let result = cursor.poll(work);
-        self.run = cursor.run;
-        self.sample = cursor.sample;
-        self.byte = cursor.byte;
-        self.decode = cursor.decode;
-        result
+        self.at.poll(work)
     }
 }
 
-/// A [`FragmentCursor`]'s place in its index, kept without borrowing the index so
-/// an owner can hold both.
+/// A place in a fragment's runs, with an owned, borrowed or detached index.
+// The borrowed index fits beside the position's other fields without extra padding.
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct FragmentCursorPosition {
+pub(crate) struct FragmentPosition<I> {
+    index: I,
     run: usize,
     sample: u32,
     byte: u64,
     decode: Option<i128>,
 }
-impl FragmentIndex {
-    /// The cursor continuing from `position`, which must come from this index.
-    pub(crate) fn resume(&self, position: FragmentCursorPosition) -> FragmentCursor<'_> {
-        FragmentCursor {
-            index: self,
-            run: position.run,
-            sample: position.sample,
-            byte: position.byte,
-            decode: position.decode,
-        }
-    }
-}
-impl FragmentCursor<'_> {
-    pub(crate) fn position(&self) -> FragmentCursorPosition {
-        FragmentCursorPosition {
+impl<I> FragmentPosition<I> {
+    fn with_index<J>(&self, index: J) -> FragmentPosition<J> {
+        FragmentPosition {
+            index,
             run: self.run,
             sample: self.sample,
             byte: self.byte,
             decode: self.decode,
         }
+    }
+}
+
+/// The position passed between cursor polls without borrowing the index.
+pub(crate) type FragmentCursorPosition = FragmentPosition<()>;
+
+impl FragmentIndex {
+    /// Continues from a position in this index.
+    pub(crate) fn resume(&self, position: FragmentCursorPosition) -> FragmentCursor<'_> {
+        FragmentCursor {
+            at: position.with_index(self),
+        }
+    }
+}
+impl FragmentCursor<'_> {
+    pub(crate) fn position(&self) -> FragmentCursorPosition {
+        self.at.with_index(())
     }
 }
 
