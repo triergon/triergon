@@ -76,8 +76,8 @@ layout holds) at any sample rate.
   codeword tables before it assigns a codeword, so an oversized one is refused
   (`Budget`) or rejected as an overspecified tree (`Invalid`) without per-entry work.
 
-## Standards
+## Conformance
 
-Vorbis I (Xiph.Org, 2020-07-04 revision with the 2015 errata). Verification:
-[harness/codecs](../../harness/codecs/STATUS.md); results in
+Vorbis I (Xiph.Org, 2020-07-04 revision with the 2015 errata). The decoder is compared
+with FFmpeg's in [harness/codecs](../../harness/codecs/STATUS.md); results are in
 [docs/status.md](../../docs/status.md).

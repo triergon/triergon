@@ -97,8 +97,12 @@ the pre-skip or other container trims.
 
 Constant tables are taken from RFC 6716; see [THIRD-PARTY.md](THIRD-PARTY.md).
 
-## Standards
+## Conformance
 
 RFC 6716 with the RFC 8251 updates, and RFC 7845 for the identification header and the
-channel mappings. Verification: [harness/codecs](../../harness/codecs/STATUS.md); results
-in [docs/status.md](../../docs/status.md).
+channel mappings. The decoder is compared with FFmpeg's in
+[harness/codecs](../../harness/codecs/STATUS.md), and the
+[final range comparison](../../harness/features/opus-final-range/contract.json) checks
+`Decoder::final_range` of every packet of the RFC 8251 test vectors against the encoder's
+recorded final range, as RFC 6716 section 6.1 requires. Results are in
+[docs/status.md](../../docs/status.md).
