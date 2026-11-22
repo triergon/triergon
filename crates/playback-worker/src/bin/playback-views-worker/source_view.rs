@@ -13,19 +13,26 @@ mod worker {
     use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
     use std::{collections::BTreeMap, path::Path, sync::atomic::AtomicBool};
     use triergon_core::{
-        Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget,
+        Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, Step, TimeBase,
+        WorkBudget,
         container::{CodecId, MediaKind, PacketInfo, RandomAccess, TrackInfo},
     };
-    use triergon_harness_protocol::digest::{fold, fold_bytes};
-    use triergon_isobmff::table::TimingRunPolicy;
+    use triergon_framing::nal::{Codec, RawAnnexBLimits};
+    use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
+    use triergon_isobmff::{config::ConfigurationLimits, table::TimingRunPolicy};
     use triergon_mpegts::{
-        PacketFormat, clock::SourceTimePolicy, psi::DescriptorNamespace, stream::TraceEvent,
+        PacketFormat, ParseLimits, clock::SourceTimePolicy, psi::DescriptorNamespace,
+        stream::TraceEvent,
     };
     use triergon_playback::{
-        ByteSource, Engine, Event, Format, Player, PlayerPolicy, Progress, Selection, SourceOwner,
-        TrackKey,
-        mp4::{Mp4IndexJob, Mp4Open, OpenProgress},
+        ByteSource, ClockChoice, Engine, Event, Format, Player, PlayerPolicy, Progress, Selection,
+        SourceOwner, TrackKey,
+        mp4::{Mp4IndexJob, Mp4Open, OpenLimits, OpenProgress, PlanLimits, ProgressiveLimits},
         probe::SelectedInput,
+    };
+
+    use triergon_raw_video::{
+        RawFeedClock, RawVideoConfiguration, RawVideoProbe, RawVideoProbeLimits, RawVideoProbeStep,
     };
 
     use super::super::packet_fold::{Packet as PacketRow, Work};
@@ -42,6 +49,7 @@ mod worker {
         TimingPolicy,
         Ts(PacketFormat),
         Entities,
+        Raw(Codec),
     }
 
     impl Layout {
@@ -52,8 +60,10 @@ mod worker {
                 "mp4-progressive" => Self::Progressive,
                 "mp4-timing-policy" => Self::TimingPolicy,
                 "ts188" => Self::Ts(PacketFormat::Ts188),
-                "ts192" => Self::Ts(PacketFormat::M2ts192),
+                "m2ts192" => Self::Ts(PacketFormat::M2ts192),
                 "ts-entities" => Self::Entities,
+                "raw-avc" => Self::Raw(Codec::Avc),
+                "raw-hevc" => Self::Raw(Codec::Hevc),
                 _ => return Err("unknown source-view opener".into()),
             })
         }
@@ -111,7 +121,11 @@ mod worker {
         };
         measure(&invocation, name, Some(&pool), || {
             let mut views = Views::new(trace, clock_only, &pids);
-            match play(&pool, &data, next.as_ref(), layout, &mut views) {
+            let result = match layout {
+                Layout::Raw(codec) => raw_views(&pool, &data, codec, &mut views),
+                _ => play(&pool, &data, next.as_ref(), layout, &mut views),
+            };
+            match result {
                 Ok(()) => views.terminal(7),
                 Err(
                     error @ (Error::Invalid(_)
@@ -150,7 +164,7 @@ mod worker {
         data: &Bytes,
         next: Option<&Bytes>,
         layout: Layout,
-        views: &mut Views,
+        views: &mut Views<'_>,
     ) -> triergon_core::Result<()> {
         let cancel = AtomicBool::new(false);
         let work = || WorkBudget::new(1 << 16);
@@ -162,7 +176,7 @@ mod worker {
                     pool,
                     SOURCE,
                     capabilities,
-                    Default::default(),
+                    triergon_matroska::Limits::default(),
                     WINDOW,
                 )?),
                 source,
@@ -172,7 +186,7 @@ mod worker {
                     InputCursor::new(pool, SOURCE, capabilities, WINDOW)?,
                     format,
                     1,
-                    Default::default(),
+                    ParseLimits::default(),
                     SourceTimePolicy::RelativeEpochZero,
                     DescriptorNamespace::default(),
                 )?,
@@ -183,19 +197,20 @@ mod worker {
                     InputCursor::new(pool, SOURCE, capabilities, WINDOW)?,
                     PacketFormat::Ts188,
                     1,
-                    Default::default(),
+                    ParseLimits::default(),
                     SourceTimePolicy::RelativeEpochZero,
                     DescriptorNamespace::default(),
                 )?,
                 source,
             ),
-            _ => {
+            Layout::Raw(_) => return Err(Error::Invalid("raw input has no container engine")),
+            Layout::Mp4 | Layout::Progressive | Layout::TimingPolicy => {
                 let selected = SelectedInput {
                     input: InputCursor::new(pool, SOURCE, capabilities, WINDOW)?,
                     source,
                     format: Format::Mp4,
                 };
-                let limits = Default::default();
+                let limits = OpenLimits::default();
                 let mut opener = match layout {
                     Layout::Progressive => Mp4Open::new_progressive(selected, limits)?,
                     Layout::TimingPolicy => Mp4Open::with_timing_policy(
@@ -207,12 +222,17 @@ mod worker {
                 };
                 while !matches!(opener.advance(&mut work(), &cancel)?, OpenProgress::Ready) {}
                 let opened = opener.finish()?;
-                let mut index = Mp4IndexJob::new(&opened.movie, Default::default())?;
+                let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default())?;
                 while !index.poll(&mut work(), &cancel)? {}
                 let mut plan = index.finish()?;
-                while !plan.identify_tracks(Default::default(), &mut work())? {}
+                while !plan.identify_tracks(ConfigurationLimits::default(), &mut work())? {}
                 let engine = if layout == Layout::Progressive {
-                    Engine::mp4_progressive(opened.input, plan, 1 << 20, Default::default())?
+                    Engine::mp4_progressive(
+                        opened.input,
+                        plan,
+                        1 << 20,
+                        ProgressiveLimits::default(),
+                    )?
                 } else {
                     Engine::mp4(opened.input, plan, 1 << 20)?
                 };
@@ -221,6 +241,16 @@ mod worker {
         };
         let mut player =
             Player::new_direct(engine, source, Selection::All, PlayerPolicy::default())?;
+        player.set_clock_view(ClockChoice::Source)?;
+        if views.trace
+            && let Some(engine) = player.engine()
+        {
+            eprintln!(
+                "source views: MP4 plan={}, Matroska reader={}",
+                engine.mp4_plan().is_some(),
+                engine.matroska_reader().is_some(),
+            );
+        }
         let mut slot = None;
         let mut next = next;
         let mut catalogue = false;
@@ -293,6 +323,88 @@ mod worker {
         }
     }
 
+    fn raw_views(
+        pool: &Budget,
+        data: &Bytes,
+        codec: Codec,
+        views: &mut Views<'_>,
+    ) -> triergon_core::Result<()> {
+        let cancel = AtomicBool::new(false);
+        let work = || WorkBudget::new(1 << 16);
+        let mut probe = RawVideoProbe::new(
+            pool,
+            SOURCE,
+            caps(data, false),
+            ByteSource::new(SOURCE, data.clone(), WINDOW)?,
+            RawVideoProbeLimits::default(),
+            RawAnnexBLimits::default(),
+        )?;
+        loop {
+            if let RawVideoProbeStep::Detected(detected) = probe.advance(&mut work(), &cancel)? {
+                if detected != codec {
+                    return Err(Error::Invalid("unexpected Annex B codec"));
+                }
+                break;
+            }
+        }
+        let mut feed = probe.finish()?.into_feed(4096, RawFeedClock::Unspecified)?;
+        let mut first = true;
+        loop {
+            match feed.poll(&mut work(), &cancel)? {
+                Step::Ready(packet) => {
+                    if first {
+                        let rate = match &packet.configuration {
+                            Some(config) => frame_rate(config, views.trace)?,
+                            None => None,
+                        };
+                        let (num, den) =
+                            rate.map_or((0, 1), |rate| (rate.numerator(), rate.denominator()));
+                        views.field(&[4, num, den]);
+                        first = false;
+                    }
+                    views.field(&[3, signed(packet.queue_timestamp_ns())]);
+                }
+                Step::End(_) => return Ok(()),
+                Step::NeedInput(_) | Step::Yield => {}
+            }
+        }
+    }
+
+    fn frame_rate(
+        config: &RawVideoConfiguration,
+        trace: bool,
+    ) -> triergon_core::Result<Option<TimeBase>> {
+        let ratio = match config.codec {
+            Codec::Avc => {
+                if trace {
+                    eprintln!("AVC source VUI: {:?}", config.avc_timing);
+                }
+                config.avc_timing.map(|timing| {
+                    (
+                        u64::from(timing.time_scale),
+                        2 * u64::from(timing.num_units_in_tick),
+                    )
+                })
+            }
+            Codec::Hevc => {
+                let timing = config.hevc_timing()?;
+                if trace {
+                    eprintln!("HEVC source VUI: {timing:?}");
+                }
+                timing.map(|value| {
+                    let ticks = value
+                        .num_ticks_poc_diff_one_minus1
+                        .map_or(1, |n| u64::from(n) + 1);
+                    (
+                        u64::from(value.time_scale),
+                        ticks * u64::from(value.num_units_in_tick),
+                    )
+                })
+            }
+        };
+        ratio.map(|(num, den)| TimeBase::new(num, den)).transpose()
+    }
+
     type ClockRow = (u64, u64, Option<i64>, Option<i64>, Option<i64>);
 
     struct Views<'a> {
@@ -318,6 +430,23 @@ mod worker {
 
         fn selected(&self, track: u64) -> bool {
             self.pids.is_empty() || u16::try_from(track).is_ok_and(|pid| self.pids.contains(&pid))
+        }
+
+        fn field(&mut self, words: &[u64]) {
+            for &word in words {
+                self.word(word);
+            }
+            self.work.packets += 1;
+            if self.trace {
+                println!(
+                    "{}",
+                    words
+                        .iter()
+                        .map(u64::to_string)
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                );
+            }
         }
 
         fn word(&mut self, word: u64) {
@@ -410,9 +539,9 @@ mod worker {
             })
         }
 
-        fn record_packet<'a>(
+        fn record_packet<'payload>(
             &mut self,
-            packet: PacketRow<impl IntoIterator<Item = &'a [u8]>>,
+            packet: PacketRow<impl IntoIterator<Item = &'payload [u8]>>,
         ) -> triergon_core::Result<()> {
             if self.trace {
                 println!(

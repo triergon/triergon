@@ -3,7 +3,7 @@
 use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, Step, WorkBudget};
-use triergon_framing::nal::Codec;
+use triergon_framing::nal::{Codec, RawAnnexBLimits};
 use triergon_harness_protocol::{
     digest::{fold, fold_bytes},
     md5,
@@ -13,7 +13,7 @@ use triergon_playback::{
     ByteSource, Format, Source, SourceOwner,
     probe::{Probe, ProbeProgress, SelectedInput},
 };
-use triergon_raw_video::{PlaybackInput, PlaybackProbe, PlaybackProbeStep};
+use triergon_raw_video::{PlaybackInput, PlaybackProbe, PlaybackProbeStep, RawVideoProbeLimits};
 
 const ID: SourceId = SourceId(1);
 const WORK: u64 = 1 << 16;
@@ -52,7 +52,14 @@ fn compare(pool: &Budget, data: &Bytes, window: usize, raw: bool, trace: bool) -
     };
     let source = ByteSource::new(ID, data.clone(), window)?;
     let (verdict, width, replay) = if raw {
-        let mut probe = PlaybackProbe::new(pool, ID, caps, window, source, Default::default())?;
+        let mut probe = PlaybackProbe::new(
+            pool,
+            ID,
+            caps,
+            window,
+            source,
+            RawVideoProbeLimits::default(),
+        )?;
         let detection = loop {
             match probe.advance(&mut WorkBudget::new(WORK), &cancel) {
                 Ok(PlaybackProbeStep::Detected(kind)) => break kind,
@@ -63,7 +70,7 @@ fn compare(pool: &Budget, data: &Bytes, window: usize, raw: bool, trace: bool) -
         if trace {
             eprintln!("probe detection: {detection:?}");
         }
-        match probe.finish(Default::default())? {
+        match probe.finish(RawAnnexBLimits::default())? {
             PlaybackInput::Container(selected) => handoff(selected, &cancel)?,
             PlaybackInput::RawVideo { codec, .. } => (
                 match codec {

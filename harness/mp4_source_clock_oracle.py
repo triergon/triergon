@@ -206,7 +206,7 @@ def add_fragment(moof: Box, tracks: dict[int, TrackClock], defaults: dict[int, i
             start = track.end
 
 
-def trace(path: Path, arguments: list[str]) -> list[str]:
+def trace(path: Path, *arguments: str) -> list[str]:
     """Canonical source-clock rows by track ID, preserving per-track decode order."""
     if len(arguments) != 2 or arguments[1] != "clock" or arguments[0] not in (
         "mp4", "mp4-progressive", "mp4-timing-policy",

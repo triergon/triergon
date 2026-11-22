@@ -5,7 +5,7 @@
 
 typedef struct {
     const char *demuxer;
-    int seekable, ignore_edits, transport;
+    int seekable, ignore_edits, transport, raw;
     uint8_t *entities;
     size_t size, pid_count;
     unsigned pids[64];
@@ -156,6 +156,41 @@ static int source_view_selected(const AVFormatContext *format, const AVStream *s
     return 0;
 }
 
+static int source_view_raw(AVFormatContext *format, ViewWork *work)
+{
+    int rc = avformat_find_stream_info(format, NULL);
+    if (rc < 0)
+        return rc;
+    if (format->nb_streams != 1)
+        return AVERROR_INVALIDDATA;
+    const AVStream *stream = format->streams[0];
+    const AVCodecParameters *parameters = stream->codecpar;
+    AVRational rate = parameters->framerate;
+    if (rate.num <= 0 || rate.den <= 0)
+        rate = (AVRational){0, 1};
+    const uint64_t words[] = {(uint64_t)rate.num, (uint64_t)rate.den};
+    view_record(work, 4, words, 2, NULL, 0);
+    if (work->trace) {
+        printf("4 %d %d\n", rate.num, rate.den);
+        fprintf(stderr, "reference SAR: %d/%d\n",
+                parameters->sample_aspect_ratio.num, parameters->sample_aspect_ratio.den);
+    }
+    AVPacket *packet = av_packet_alloc();
+    if (!packet)
+        return AVERROR(ENOMEM);
+    while ((rc = av_read_frame(format, packet)) >= 0) {
+        const int64_t ns = packet->pts == AV_NOPTS_VALUE ? 0 :
+            av_rescale_q(packet->pts, stream->time_base, (AVRational){1, 1000000000});
+        const uint64_t word = (uint64_t)ns;
+        view_record(work, 3, &word, 1, NULL, 0);
+        if (work->trace)
+            printf("3 %" PRIu64 "\n", word);
+        av_packet_unref(packet);
+    }
+    av_packet_free(&packet);
+    return rc;
+}
+
 static int source_view_run(const ViewCase *input, ViewWork *work)
 {
     const PlaybackSourceCase *source = input->prepared;
@@ -177,6 +212,17 @@ static int source_view_run(const ViewCase *input, ViewWork *work)
         view_record(work, 8, NULL, 0, NULL, 0);
         if (work->trace)
             puts("8");
+        return 0;
+    }
+    if (source->raw) {
+        rc = source_view_raw(format, work);
+        packet_close(&format);
+        if (rc == AVERROR(ENOMEM))
+            return 2;
+        const uint64_t terminal = rc == AVERROR_EOF ? 7 : 8;
+        view_record(work, terminal, NULL, 0, NULL, 0);
+        if (work->trace)
+            printf("%" PRIu64 "\n", terminal);
         return 0;
     }
     for (unsigned i = 0; i < format->nb_streams; ++i) {
@@ -287,7 +333,10 @@ static int playback_source_view_prepare(ViewCase *input)
         source.demuxer = "mov";
         source.seekable = strcmp(layout, "mp4-progressive") != 0;
         source.ignore_edits = 1;
-    } else if (!strcmp(layout, "ts188") || !strcmp(layout, "ts192") ||
+    } else if (!strcmp(layout, "raw-avc") || !strcmp(layout, "raw-hevc")) {
+        source.demuxer = !strcmp(layout, "raw-avc") ? "h264" : "hevc";
+        source.raw = 1;
+    } else if (!strcmp(layout, "ts188") || !strcmp(layout, "m2ts192") ||
                !strcmp(layout, "ts-entities")) {
         source.demuxer = "mpegts";
         source.transport = 1;
