@@ -303,6 +303,10 @@ The [continuity reader comparison](../../harness/features/ts-reader-container/co
 checks the pending request and closure, then grades the residue's physical
 source end and typed confirming events alongside its paired packet result.
 
+The [source polling comparison](../../harness/features/ts-source-poll/contract.json)
+checks the five poll forms against original PSI, continuity counters, null
+carriers, selected PCR clock boundaries and physical entity ends.
+
 The [reader view comparison](../../harness/features/ts-reader-views/contract.json)
 checks track signalling against PMT carrier bytes and reconstructs the reported
 opaque or incomplete elementary ranges from the retained PES payload.

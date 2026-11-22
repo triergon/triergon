@@ -103,12 +103,6 @@
     "triergon-matroska": [],
     "triergon-mpegts": [
       {
-        "name": "source-stream-polling",
-        "entry_points": ["stream::TransportStream::new", "stream::TransportStream::poll_feed", "stream::TransportStream::poll_feed_carriers", "stream::TransportStream::poll_compact", "stream::TransportStream::poll_compact_observed", "stream::TransportStream::active_program", "stream::ActiveProgram", "stream::ProgramStream", "stream::ObservedTrace::into_event"],
-        "degree": "unit-tests",
-        "needs": "ts-source-poll compares the PES output of all five poll forms and checks their source spans. Table, continuity, timeline and diagnostic events have no equivalent full reference trace."
-      },
-      {
         "name": "reference-trace-recovery",
         "entry_points": ["reference_trace::recovery::RecoveryObserver", "reference_trace::recovery::RecoveredPacket", "reference_trace::recovery::EncodedHeader", "reference_trace::recovery::PatSelection", "reference_trace::recovery::PmtBindingJob", "reference_trace::recovery::DiagnosticPacket"],
         "degree": "unit-tests",

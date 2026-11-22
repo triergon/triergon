@@ -22,6 +22,8 @@ use triergon_mpegts::stream::{CompactTraceEvent, FeedContinuation, TraceEvent, T
 use triergon_mpegts::transport::{Continuity, ContinuityOutcome, PacketFormat, TransportPacket};
 use triergon_mpegts::{AssemblyStep, ParseLimits, SourceEpochs, SourceRange};
 
+mod controls;
+
 const MAX_INPUT: usize = 64 * 1024 * 1024;
 const WINDOW: usize = 64 * 1024;
 const GRANT: u64 = 4096;
@@ -309,6 +311,7 @@ fn view_poll(
     form: PollForm,
     stream: &mut TransportStream,
     input: &mut InputCursor,
+    request: &Request,
     output: &mut Output<'_, '_>,
 ) -> Result<Step<Option<TraceEvent>>, String> {
     let work = &mut WorkBudget::new(GRANT);
@@ -335,6 +338,7 @@ fn view_poll(
     };
     let step = compact.map_err(err)?;
     if let Step::Ready(CompactTraceEvent::NullRun(run)) = &step {
+        controls::null_run(request, run)?;
         output.note(format_args!("null-run {run:?}"))?;
     }
     Ok(map_step(step, |event| match event {
@@ -908,10 +912,14 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
     let mut observer: Option<Observer> = None;
     let mut clock = DemuxClock::new(request.program).map_err(err)?;
     let mut ordinal = 0;
+    let mut controls = controls::SourceControls::default();
     loop {
-        match view_poll(form, &mut stream, &mut input, output)? {
+        match view_poll(form, &mut stream, &mut input, request, output)? {
             Step::Ready(Some(event)) => {
                 let epochs = stream.source_epochs();
+                if matches!(request.mode, Mode::Source(_)) {
+                    controls.check(request, &stream, &event)?;
+                }
                 match event {
                     TraceEvent::ProgramMap {
                         map, active: true, ..
@@ -1049,7 +1057,12 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
             }
             Step::Ready(None) | Step::Yield => {}
             Step::NeedInput(request) => supply(&mut input, bytes, request).map_err(err)?,
-            Step::End(_) => {
+            Step::End(location) => {
+                if matches!(request.mode, Mode::Source(_))
+                    && (location.source != input.source() || location.offset != bytes.len() as u64)
+                {
+                    return Err("source poll ended at a different entity boundary".into());
+                }
                 let end = stream
                     .media_entity_end(&mut input, &mut WorkBudget::new(GRANT), &CANCEL)
                     .map_err(err)?
