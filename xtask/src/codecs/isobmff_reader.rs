@@ -548,7 +548,7 @@ fn reference(
         if colour {
             let code = |field: &str| match stream.get(field).and_then(Value::as_str) {
                 Some("bt709") => Value::int(1),
-                Some("bt2020") | Some("bt2020nc") => Value::int(9),
+                Some("bt2020" | "bt2020nc") => Value::int(9),
                 Some("smpte2084") => Value::int(16),
                 Some(other) => Value::str(other),
                 None => Value::Null,
