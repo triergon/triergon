@@ -66,7 +66,9 @@ from the Xing table of contents or the bit rate (`SeekBasis::Toc`, `SeekBasis::B
 and counts from the start when the estimate falls past the end. Where the frame found
 after the jump estimates past the target, the bytes skipped to reach it are no frame
 and join its packet, as when reading; the seek lands on that packet, at the jump, with
-the estimate there, which is at or before the target. ADTS and AC-3 count
+the estimate there, which is at or before the target. The [seek
+comparison](../../harness/codecs/reader-seeks.json) checks each format's receipt,
+landing basis, preroll and packets after the landing against FFmpeg's. ADTS and AC-3 count
 frames from the start (`SeekMethod::Restart`). A playback seek lands
 `Format::PREROLL` frames early (two for MPEG audio, one for ADTS and AC-3, none for
 FLAC).

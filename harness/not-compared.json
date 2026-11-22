@@ -59,14 +59,7 @@
     "triergon-codec-opus": [],
     "triergon-codec-vorbis": [],
     "triergon-core": [],
-    "triergon-elementary": [
-      {
-        "name": "seeking",
-        "entry_points": ["BlockingReader::seek", "Reader::last_seek", "SeekDetail", "SeekBasis", "Format::PREROLL"],
-        "degree": "unit-tests",
-        "needs": "The elementary seek lane compares the landing and packet suffix. It retains thirty declared frame-position and clock differences and one open MPEG audio recovery landing."
-      }
-    ],
+    "triergon-elementary": [],
     "triergon-font": [],
     "triergon-framing": [],
     "triergon-harness-protocol": [],
