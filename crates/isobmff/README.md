@@ -307,8 +307,10 @@ codes, log lines and models of its input layer, are compiled only with the non-d
 FFmpeg-compatible open, index, seek and range-plan operations, and its
 `--recover-regular-tables` profile reads a single local, unedited track through the
 regular table recovery cursors. `cargo xtask codecs isobmff-reader` compares every
-packet `Reader` delivers with the formats reference's `ffprobe`; its contract, rules and
-reviewed differences are in [harness/features/isobmff-reader](../../harness/features/isobmff-reader).
+packet `Reader` delivers with the formats reference's `ffprobe`. Its
+[contract and reviewed differences](../../harness/features/isobmff-reader)
+cover 648 cases, including fragments whose decode clocks continue from a
+known predecessor.
 The [PCM packet](../../harness/features/mov-pcm-packets/contract.json),
 [table recovery](../../harness/features/mov-run-recovery/contract.json) and
 [encoded view](../../harness/features/mov-encoded-views/contract.json) comparisons

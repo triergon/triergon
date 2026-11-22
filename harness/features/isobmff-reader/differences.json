@@ -151,20 +151,6 @@
    ]
   },
   {
-   "name": "open-index/origin18-variable-deltas-second-absent",
-   "sha256": "1906452e6d31eb1f7ecdc8ed2276ea5d0a5374f8b76c958b0b9657dbeadda69e",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "739707e2505f8699c6998189eed275011d3aa4039e91732400b91cdda6dfd96e",
-   "differences": [
-    [1, 3, 3, "pts", null, 35, "fragment-without-tfdt"],
-    [1, 3, 3, "dts", null, 35, "fragment-without-tfdt"],
-    [1, 4, 4, "pts", null, 58, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 58, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 89, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 89, "fragment-without-tfdt"]
-   ]
-  },
-  {
    "name": "open-index/interleave-prime-delta-1000004",
    "sha256": "19a222cb35a4595a6d6e4a8523f3a6f18e75a42380a08f6cd81de291578152b2",
    "dispositions": ["cross-track-order"],
@@ -271,21 +257,9 @@
   {
    "name": "open-index/origin18-track-isolation-12",
    "sha256": "34bb9c4f874cf0d74c69f21a7b92b2fb450f99ed203069905bd26e84ed9b13fd",
-   "dispositions": ["cross-track-order", "fragment-without-tfdt"],
-   "difference_sha256": "1e1f9b74346906a0ea35669397df5ba6a583da5b0be6651a82ddd0acd5c040e6",
+   "dispositions": ["cross-track-order"],
+   "difference_sha256": "105ef01945d08d535b5e36272b7e0d714f82d73085fbd521261be9ceff5317b2",
    "differences": [
-    [1, 3, 3, "pts", null, 10000, "fragment-without-tfdt"],
-    [1, 3, 3, "dts", null, 10000, "fragment-without-tfdt"],
-    [1, 4, 4, "pts", null, 11000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 11000, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 12000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 12000, "fragment-without-tfdt"],
-    [2, 3, 3, "pts", null, 43000, "fragment-without-tfdt"],
-    [2, 3, 3, "dts", null, 43000, "fragment-without-tfdt"],
-    [2, 4, 4, "pts", null, 44000, "fragment-without-tfdt"],
-    [2, 4, 4, "dts", null, 44000, "fragment-without-tfdt"],
-    [2, 5, 5, "pts", null, 45000, "fragment-without-tfdt"],
-    [2, 5, 5, "dts", null, 45000, "fragment-without-tfdt"],
     [null, 3, 3, "order", 2, 1, "cross-track-order"]
    ]
   },
@@ -401,20 +375,6 @@
    "differences": [
     [1, null, null, "packets", 0, 6, "times-beyond-i64"],
     [null, null, null, "end", "error: arithmetic overflow", "eof", "times-beyond-i64"]
-   ]
-  },
-  {
-   "name": "open-index/origin18-zero-anchor-second-absent",
-   "sha256": "4ce00f18a1e1294db2bcbf70e40178bf27f258b1af53f796f78354730a553321",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "97d52e1d1a67294346ad444082be8ebf85f010b8a74de51df5902e6f125820e0",
-   "differences": [
-    [1, 3, 3, "pts", null, 3000, "fragment-without-tfdt"],
-    [1, 3, 3, "dts", null, 3000, "fragment-without-tfdt"],
-    [1, 4, 4, "pts", null, 4000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 4000, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 5000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 5000, "fragment-without-tfdt"]
    ]
   },
   {
@@ -550,18 +510,6 @@
    ]
   },
   {
-   "name": "open-index/origin18-three-gap-then-absent",
-   "sha256": "635e9a9069ad61f4753f7b733828e31ff7eb4ef12185f5140941d0384760182e",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "b507bdd8feaedbbb7a3c6b2e9a4447e921396a26e2ec52bd9295d91f8145fa12",
-   "differences": [
-    [1, 4, 4, "pts", null, 9000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 9000, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 10000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 10000, "fragment-without-tfdt"]
-   ]
-  },
-  {
    "name": "open-index/interleave-end-moov",
    "sha256": "6501c9bbc190f58794d8b536345f11c1522cf7d75e269da58348c7fe56da75a7",
    "dispositions": ["cross-track-order"],
@@ -601,18 +549,15 @@
   {
    "name": "open-index/origin18-signed-second-absent",
    "sha256": "68d7c5ac8fa9b945374bf1e0392fe6396cbd38ea6fd83a1557483cf11c047811",
-   "dispositions": ["fragment-negative-offset-pts-shift", "fragment-without-tfdt"],
-   "difference_sha256": "b26462fb4e6c376fd139ca17c935d7fecf4a655c67ab5b000ad0567175497e3a",
+   "dispositions": ["fragment-negative-offset-pts-shift"],
+   "difference_sha256": "e43db56e749139030cfb4be161651d6a9a6df075c1bdde722fa62891fca0119b",
    "differences": [
     [1, 0, 0, "pts", 0, 1000, "fragment-negative-offset-pts-shift"],
     [1, 1, 1, "pts", 3000, 4000, "fragment-negative-offset-pts-shift"],
     [1, 2, 2, "pts", 1000, 2000, "fragment-negative-offset-pts-shift"],
-    [1, 3, 3, "pts", null, 3000, "fragment-without-tfdt"],
-    [1, 3, 3, "dts", null, 3000, "fragment-without-tfdt"],
-    [1, 4, 4, "pts", null, 6000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 4000, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 5000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 5000, "fragment-without-tfdt"]
+    [1, 3, 3, "pts", 2000, 3000, "fragment-negative-offset-pts-shift"],
+    [1, 4, 4, "pts", 5000, 6000, "fragment-negative-offset-pts-shift"],
+    [1, 5, 5, "pts", 4000, 5000, "fragment-negative-offset-pts-shift"]
    ]
   },
   {
@@ -877,21 +822,9 @@
   {
    "name": "open-index/origin18-track-isolation-21",
    "sha256": "9c1badd3293a354cc292cd8d9da9bff0a25bf2623f90ca314d9eb682145f5dfb",
-   "dispositions": ["cross-track-order", "fragment-without-tfdt"],
-   "difference_sha256": "1e1f9b74346906a0ea35669397df5ba6a583da5b0be6651a82ddd0acd5c040e6",
+   "dispositions": ["cross-track-order"],
+   "difference_sha256": "105ef01945d08d535b5e36272b7e0d714f82d73085fbd521261be9ceff5317b2",
    "differences": [
-    [1, 3, 3, "pts", null, 10000, "fragment-without-tfdt"],
-    [1, 3, 3, "dts", null, 10000, "fragment-without-tfdt"],
-    [1, 4, 4, "pts", null, 11000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 11000, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 12000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 12000, "fragment-without-tfdt"],
-    [2, 3, 3, "pts", null, 43000, "fragment-without-tfdt"],
-    [2, 3, 3, "dts", null, 43000, "fragment-without-tfdt"],
-    [2, 4, 4, "pts", null, 44000, "fragment-without-tfdt"],
-    [2, 4, 4, "dts", null, 44000, "fragment-without-tfdt"],
-    [2, 5, 5, "pts", null, 45000, "fragment-without-tfdt"],
-    [2, 5, 5, "dts", null, 45000, "fragment-without-tfdt"],
     [null, 3, 3, "order", 2, 1, "cross-track-order"]
    ]
   },
@@ -971,18 +904,6 @@
     [null, 1, 1, "order", 1, 2, "cross-track-order"],
     [null, 6, 6, "order", 1, 2, "cross-track-order"],
     [null, 9, 9, "order", 1, 2, "cross-track-order"]
-   ]
-  },
-  {
-   "name": "open-index/discard22-later-anchor-5000",
-   "sha256": "ab2a23fe92e2914bec808386a5ea29e0131fa7d3da4e5e11b952148793be5e0e",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "e39116f080ee6093d001f1e921ff21d8a5adf2a6cc41de2c92fa92d8a666873b",
-   "differences": [
-    [1, 4, 4, "pts", null, 3000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 3000, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 4000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 4000, "fragment-without-tfdt"]
    ]
   },
   {
@@ -1125,20 +1046,6 @@
    ]
   },
   {
-   "name": "open-index/f-no-second-tfdt",
-   "sha256": "c813dcb356c91c96f57d748894724c09edc39e2784804b51b7fe198a8ea85bb6",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "97d52e1d1a67294346ad444082be8ebf85f010b8a74de51df5902e6f125820e0",
-   "differences": [
-    [1, 3, 3, "pts", null, 3000, "fragment-without-tfdt"],
-    [1, 3, 3, "dts", null, 3000, "fragment-without-tfdt"],
-    [1, 4, 4, "pts", null, 4000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 4000, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 5000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 5000, "fragment-without-tfdt"]
-   ]
-  },
-  {
    "name": "open-index/follow-clock-v0-high-uniform-three",
    "sha256": "c9119e5bc8b5aef6c2bc57ec8b192b981e63a833575565921475684885dca7eb",
    "dispositions": ["version-0-offset-high-bit"],
@@ -1193,14 +1100,10 @@
   {
    "name": "open-index/discard22-zero-delta-derived-equality",
    "sha256": "d6cecee5ae763f52033434bc0f8802460c9d11d04ef108918585514a5fdb92ca",
-   "dispositions": ["fragment-without-tfdt", "zero-decode-delta"],
-   "difference_sha256": "e6d339d6b42cdf21fd77edf1c6677a94662e3a3b4786d0f1e2800cc44a4974eb",
+   "dispositions": ["zero-decode-delta"],
+   "difference_sha256": "abbe134e15b5721c7cd65c2d43511753c4e47640cf86457d46346e2b8eb0f249",
    "differences": [
-    [1, 4, 4, "pts", null, 3000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 3000, "fragment-without-tfdt"],
-    [1, 4, 4, "duration", 0, null, "zero-decode-delta"],
-    [1, 5, 5, "pts", null, 3000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 3000, "fragment-without-tfdt"]
+    [1, 4, 4, "duration", 0, null, "zero-decode-delta"]
    ]
   },
   {
@@ -1352,44 +1255,6 @@
     [1, 3, 3, "pts", 2147486680, -2147480616, "version-0-offset-high-bit"],
     [1, 4, 4, "pts", 2147487680, -2147479616, "version-0-offset-high-bit"],
     [1, 5, 5, "pts", 2147488680, -2147478616, "version-0-offset-high-bit"]
-   ]
-  },
-  {
-   "name": "open-index/origin18-nonzero-anchor-second-absent",
-   "sha256": "ecd6505633ebced7bdec49d8744c9f7f5f95174c5a4d5079148e673331c77363",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "5b6683ec3150e868714d76d270c61628aaa54e28a93acd68af4370f09786148f",
-   "differences": [
-    [1, 3, 3, "pts", null, 10000, "fragment-without-tfdt"],
-    [1, 3, 3, "dts", null, 10000, "fragment-without-tfdt"],
-    [1, 4, 4, "pts", null, 11000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 11000, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 12000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 12000, "fragment-without-tfdt"]
-   ]
-  },
-  {
-   "name": "open-index/discard22-long-derived-then-intermediate-anchor",
-   "sha256": "edb7cbd5224e2a6a9bce6c3b3c9c53c48d170f25bfb7ea651547a8c8c0bb7cf1",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "4758bac6e0bf5506ace54bd86d0c4bc38d05c975373a2155769ddd456077c36f",
-   "differences": [
-    [1, 4, 4, "pts", null, 25000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 25000, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 26000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 26000, "fragment-without-tfdt"]
-   ]
-  },
-  {
-   "name": "open-index/origin18-three-backward-then-absent",
-   "sha256": "edd5dfc92eb1bfef5bc722eabbff24710fef782f93eee46313d0ffbffdd3d2ed",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "e39116f080ee6093d001f1e921ff21d8a5adf2a6cc41de2c92fa92d8a666873b",
-   "differences": [
-    [1, 4, 4, "pts", null, 3000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 3000, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 4000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 4000, "fragment-without-tfdt"]
    ]
   },
   {
@@ -4747,20 +4612,6 @@
    ]
   },
   {
-   "name": "playback/open-ended/unknown-clock-terminal.mp4",
-   "sha256": "d5a039c57c8ff4a1daa22756ea5a3d404072d2bf7e0cb37893721e9ff2c5d156",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "1acf45cdf0878b51519b1bbd7aa64c79e07e2a153d2a3e80bfaa035b0750d094",
-   "differences": [
-    [1, 6, 6, "pts", null, 6000, "fragment-without-tfdt"],
-    [1, 6, 6, "dts", null, 6000, "fragment-without-tfdt"],
-    [1, 7, 7, "pts", null, 7000, "fragment-without-tfdt"],
-    [1, 7, 7, "dts", null, 7000, "fragment-without-tfdt"],
-    [1, 8, 8, "pts", null, 8000, "fragment-without-tfdt"],
-    [1, 8, 8, "dts", null, 8000, "fragment-without-tfdt"]
-   ]
-  },
-  {
    "name": "playback/progressive/pending-empty-endpoint.mp4",
    "sha256": "45d0016cc4c0443daf2a306044b112d39feed5fb55f71785aed5943d46b1089d",
    "dispositions": ["ffmpeg-refuses-header"],
@@ -4769,20 +4620,6 @@
     [1, null, null, "packets", 9, 0, "ffmpeg-refuses-header"],
     [null, null, null, "streams", [1], [], "ffmpeg-refuses-header"],
     [null, null, null, "end", "eof", "error", "ffmpeg-refuses-header"]
-   ]
-  },
-  {
-   "name": "playback/progressive/pending-unknown-clock.mp4",
-   "sha256": "156e7b51aa426e891fa12e2fdaa91d6d38072b24238fd225f60d5a61a1b004c4",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "1acf45cdf0878b51519b1bbd7aa64c79e07e2a153d2a3e80bfaa035b0750d094",
-   "differences": [
-    [1, 6, 6, "pts", null, 6000, "fragment-without-tfdt"],
-    [1, 6, 6, "dts", null, 6000, "fragment-without-tfdt"],
-    [1, 7, 7, "pts", null, 7000, "fragment-without-tfdt"],
-    [1, 7, 7, "dts", null, 7000, "fragment-without-tfdt"],
-    [1, 8, 8, "pts", null, 8000, "fragment-without-tfdt"],
-    [1, 8, 8, "dts", null, 8000, "fragment-without-tfdt"]
    ]
   },
   {
