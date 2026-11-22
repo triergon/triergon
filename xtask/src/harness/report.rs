@@ -287,12 +287,14 @@ const QUALIFIED_TARGETS: [&str; 4] = [
 /// reports `aarch64` or `armv8l` from `uname -m`, so the machine name cannot tell
 /// it apart from a 64-bit one. Any other target, such as ARMv6 or A32, is reported
 /// as unqualified.
+/// Set `TRIERGON_TEST_UNQUALIFIED_TARGET=1` to exercise unqualified parity on this host.
 pub fn gate_target() -> Result<String, String> {
-    gate_build::worker_target().map(qualified)
+    let force_unqualified = std::env::var("TRIERGON_TEST_UNQUALIFIED_TARGET").as_deref() == Ok("1");
+    gate_build::worker_target().map(|target| qualified(target, force_unqualified))
 }
 
-fn qualified(target: &str) -> String {
-    if QUALIFIED_TARGETS.contains(&target) {
+fn qualified(target: &str, force_unqualified: bool) -> String {
+    if !force_unqualified && QUALIFIED_TARGETS.contains(&target) {
         target.to_owned()
     } else {
         format!("unqualified-{target}")

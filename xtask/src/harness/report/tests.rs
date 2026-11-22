@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 #[test]
 fn only_the_listed_targets_qualify() {
     assert_eq!(
-        qualified("thumbv7neon-unknown-linux-gnueabihf"),
+        qualified("thumbv7neon-unknown-linux-gnueabihf", false),
         "thumbv7neon-unknown-linux-gnueabihf"
     );
     for other in [
@@ -13,13 +13,21 @@ fn only_the_listed_targets_qualify() {
         "armv7-unknown-linux-gnueabihf",
         "aarch64-unknown-linux-musl",
     ] {
-        assert_eq!(qualified(other), format!("unqualified-{other}"));
+        assert_eq!(qualified(other, false), format!("unqualified-{other}"));
+        assert_eq!(qualified(other, true), format!("unqualified-{other}"));
     }
     let host = gate_target().unwrap();
     assert!(
         QUALIFIED_TARGETS.contains(&host.as_str()) || host.starts_with("unqualified-"),
         "{host}"
     );
+}
+
+#[test]
+fn parity_simulation_marks_named_targets_unqualified() {
+    for target in QUALIFIED_TARGETS {
+        assert_eq!(qualified(target, true), format!("unqualified-{target}"));
+    }
 }
 
 struct Output(PathBuf);
