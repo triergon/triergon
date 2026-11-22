@@ -116,6 +116,9 @@
     {"area": "MP4 AAC packet bridge", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-mp4-packets"},
     {"area": "AV1 temporal-unit bridge", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-av1-low-overhead"},
     {"area": "Matroska bridge discovery", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-matroska-discovery"},
+    {"area": "Text subtitle bridges", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-text-subtitles"},
+    {"area": "Bitmap subtitle bridges", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-bitmap-subtitles"},
+    {"area": "Caption and teletext bridges", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "bridge-captions-teletext"},
     {
       "area": "Matroska audio clocks",
       "targets": [
