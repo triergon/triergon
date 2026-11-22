@@ -258,15 +258,11 @@ impl PayloadCursor {
     /// Borrow the active byte range without constructing its source facts.
     /// The range and backing are identical to `current().map(|span| span.bytes)`.
     #[inline]
-    #[expect(
-        clippy::expect_used,
-        reason = "returning these views as options measured +1.2% on progressive TS188 and +0.9% on HLS playback"
-    )]
     pub fn current_bytes(&self) -> Option<BytesView<'_>> {
-        self.active.then(|| {
-            let span = self.current.as_ref().expect("active payload range");
-            byte_view(span, self.index, self.current_count != 1)
-        })
+        let (Some(span), true) = (&self.current, self.active) else {
+            return None;
+        };
+        Some(byte_view(span, self.index, self.current_count != 1))
     }
     /// Admit the next logical range. The caller validates its pool and full
     /// extent before consuming bytes, as with an ordinary span iterator.
