@@ -39,8 +39,8 @@ while let Some(p) = reader.next_typed_packet(&cancel)? {
 `open`/`open_in` accept any `Read` (sequential, no seeking); `open_seekable*`
 need `Read + Seek`; `open_owned_seekable_in` reads an `OwnedInputBytes` and lets
 packets alias the input allocation. The `*_in` variants share a caller `Budget`.
-`next_packet` returns the plain `matroska::Packet` and refuses packets that carry
-block additions or CodecState; use `next_typed_packet` for those. Typed configurations
+`next_packet` returns the plain `Packet` and refuses packets that carry block
+additions or CodecState; use `next_typed_packet` for those. Typed configurations
 expose their allocation accounting through `Configuration::budget()`.
 
 `examples/matroska_packets.rs FILE` prints the tracks and packets of a file.
@@ -49,7 +49,7 @@ expose their allocation accounting through `Configuration::budget()`.
 
 | Feature | Default | Effect |
 |---|---|---|
-| `reference-trace` | off | `reference_trace`: the initial trim after a seek, the zlib inflater on its own (`reference_trace::zlib::decompress`) and `Colour::trace_fields`, the colour values FFmpeg reports |
+| `reference-trace` | off | `reference_trace`: the initial trim after a seek, the decoding of one whole zlib stream (`reference_trace::zlib::decompress`) and `Colour::trace_fields`, the colour values FFmpeg reports |
 
 Push / poll reader (no I/O; the caller supplies bytes):
 
@@ -93,8 +93,8 @@ generic code and inside `triergon::AnyReader`:
 | Neutral view | Matroska source |
 |---|---|
 | `PacketInfo` | `TypedPacket`: time base nanoseconds (TimestampScale applied), `pts`/`duration` from the packet, `dts` `None`, `RandomAccess` from the Block keyframe flag, `Trim::end` from DiscardPadding |
-| `TrackInfo` | `matroska::Track`: `TrackId` = TrackNumber, `codec_tag` = CodecID, `codec` from an exact CodecID match with any other CodecID as `CodecId::Other`, `configuration` = CodecPrivate, effective language, default and forced flags, `colour` as a `ColourDescription` with `Origin::SpecificationDefault` for omitted Colour children |
-| `Event::Seek` | `matroska::SeekReceipt::neutral()`: method `Index` or `BoundedScan`; Cue and preroll detail stay on the Matroska receipt |
+| `TrackInfo` | `Track`: `TrackId` = TrackNumber, `codec_tag` = CodecID, `codec` from an exact CodecID match with any other CodecID as `CodecId::Other`, `configuration` = CodecPrivate, effective language, default and forced flags, `colour` as a `ColourDescription` with `Origin::SpecificationDefault` for omitted Colour children |
+| `Event::Seek` | `SeekReceipt::neutral()`: method `Index` or `BoundedScan`; Cue and preroll detail stay on the Matroska receipt |
 | `Event::Other` | the other `Event`s (Envelope, Configuration, Document) |
 
 `request_seek` maps the `TrackId` to a track index (`Error::Invalid` when absent),
@@ -139,11 +139,13 @@ and seeking on a non-video track.
 | `index_entries` | 16,384 | Cues entries |
 | `decompression_ratio` / `decompression_work` | 1024 / 128 Mi | expansion vs. input; work units per encoding |
 
-Exceeding a policy is `Error::Limit`; output that fits once the caller drops retained
-packets is `Step::Backpressure` from `Reader::step` (`Error::Backpressure` from
-`BlockingReader`) and is retryable. `PayloadOwnership::OwnedExact` (default) gives each
-block payload storage of exactly its size; `SharedBounded` lets payloads alias their
-parent input allocation and reports that parent's full capacity as retained.
+Exceeding a `Limits` field is `Error::Policy` naming what was exceeded, and storage the
+pool can never grant is `Error::Limit`; both are permanent for the input. Output that
+fits once the caller drops retained packets is `Step::Backpressure` from `Reader::step`
+(`Error::Backpressure` from `BlockingReader`) and is retryable.
+`PayloadOwnership::OwnedExact` (default) gives each block payload storage of exactly its
+size; `SharedBounded` lets payloads alias their parent input allocation and reports that
+parent's full capacity as retained.
 
 **Opening.** Sequential input requires metadata before the first Cluster. Seekable
 input follows bounded SeekHead chains to load late Tracks, Cues, chapters, tags
@@ -157,9 +159,9 @@ duration is known, and fractional lace durations and negative PTS are kept.
 Segment ticks that reproduces FFmpeg's packet clock, including its omissions.
 
 **Content encoding.** Encodings apply in descending `ContentEncodingOrder`, and each
-laced frame is decoded separately. The zlib inflater reads one complete RFC 1950 stream
-(stored, fixed and dynamic blocks), checks Adler-32 before returning anything and rejects
-trailing bytes.
+laced frame is decoded separately. A zlib value is one complete RFC 1950 stream (stored,
+fixed and dynamic blocks); its Adler-32 is checked before any byte is returned and
+trailing bytes are refused.
 
 **Seeking.** Requests name a track index (must be video) and a presentation time in
 nanoseconds. `seek_previous` lands on the latest video keyframe at or before the
