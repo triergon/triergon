@@ -92,6 +92,10 @@ identical output.
 
 ## Conformance
 
+The [conformance gate](../../harness/codecs/correctness-manifest.json) checks
+the exact reported refusal and picture counts for the registered chroma,
+bit-depth, transform-skip rotation and malformed extension cases.
+
 Rec. ITU-T H.265 (V11, 01/2026). Tables are transcribed or regenerated from the text with
 the table or equation number in a comment. The comparison commands are in
 [harness/codecs/hevc](../../harness/codecs/hevc/STATUS.md); results in

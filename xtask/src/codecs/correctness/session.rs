@@ -27,6 +27,11 @@ pub(in crate::codecs) fn registered_refusals(
         return Ok(refusals);
     };
     for group in groups.as_array().ok_or("open_refusals must be an array")? {
+        if group.get("kind").and_then(Value::as_str)
+            == Some(crate::codecs::summary::VIDEO_REFUSAL_KIND)
+        {
+            continue;
+        }
         let line = |key| {
             group
                 .get(key)

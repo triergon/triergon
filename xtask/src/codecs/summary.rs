@@ -10,9 +10,9 @@
 //! A row of a vector its manifest lists in `open_cases` or `open_deviations` (`"open_case": true`)
 //! must fail, and is counted as `open`; it needs a disposition saying what is
 //! not recovered. A listed vector that no longer fails fails the summary, so
-//! the list only shrinks. The video lanes also pin the exact disposition and
-//! picture counts of each listed vector. Strict video summaries require a
-//! registration for every non-pass from a pinned manifest.
+//! the list only shrinks. Registered video refusals pin the input, the exact
+//! disposition and picture counts. Strict video summaries require a registration
+//! for every non-pass from a pinned manifest.
 
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::fs;
@@ -99,131 +99,88 @@ fn disposition(key: &str) -> Option<&'static str> {
     })
 }
 
-struct VideoException {
-    decoder: &'static str,
-    output: &'static str,
+pub(super) const VIDEO_REFUSAL_KIND: &str = "video-grade";
+
+struct VideoException<'a> {
+    sha256: &'a str,
+    decoder: &'a str,
+    output: &'a str,
     // Candidate, reference, and equal pictures, on both comparison paths.
-    pictures: [i64; 3],
-    error: &'static str,
-    reason: &'static str,
+    pictures: [i128; 3],
+    error: &'a str,
+    reason: &'a str,
 }
 
-fn video_exception(lane: &str, name: &str) -> Option<VideoException> {
-    let unsupported = |reference, error, reason| VideoException {
-        decoder: "refused-unsupported",
-        output: "fail",
-        pictures: [0, reference, 0],
-        error,
-        reason,
+type VideoRefusals<'a> = BTreeMap<(&'a str, &'a str), VideoException<'a>>;
+
+fn video_refusals(manifest: &Value) -> Result<VideoRefusals<'_>, String> {
+    let mut refusals = BTreeMap::new();
+    let Some(groups) = manifest.get("open_refusals") else {
+        return Ok(refusals);
     };
-    let refused = |error, reason| VideoException {
-        decoder: "ffmpeg-refused",
-        output: "reference-produced-nothing",
-        pictures: [0; 3],
-        error,
-        reason,
-    };
-    let partial = |decoder, pictures, error, reason| VideoException {
-        decoder,
-        output: "fail",
-        pictures,
-        error,
-        reason,
-    };
-    let fmo = "flexible macroblock ordering";
-    let sp_si = "SP/SI slices";
-    let chroma = "The stream uses High 4:2:2 chroma, which the H.264 decoder refuses by design.";
-    let high_depth =
-        "The stream uses bit depth above 8, which the H.264 decoder refuses by design.";
-    let rext_422 = |reference| {
-        unsupported(
-            reference,
-            "chroma_format_idc 2 (4:2:2, RExt)",
-            "The stream uses HEVC Range Extensions 4:2:2 chroma, which the decoder refuses by design.",
-        )
-    };
-    let rext_444 = |reference| {
-        unsupported(
-            reference,
-            "chroma_format_idc 3 (4:4:4, RExt)",
-            "The stream uses HEVC Range Extensions 4:4:4 chroma, which the decoder refuses by design.",
-        )
-    };
-    Some(match (lane, name) {
-        ("h264", "FM1_BT_B.h264") => partial(
-            "failed-exit",
-            [50, 0, 0],
-            fmo,
-            "The H.264 decoder refuses flexible macroblock ordering by design after decoding a prefix. FFmpeg produces no pictures.",
-        ),
-        ("h264", "FM1_FT_E.264") => partial(
-            "decoder-error",
-            [119, 305, 119],
-            fmo,
-            "The H.264 decoder refuses flexible macroblock ordering by design after decoding a prefix.",
-        ),
-        ("h264", "FM2_SVA_B.264" | "FM2_SVA_C.264") => refused(
-            fmo,
-            "The stream uses flexible macroblock ordering, which the H.264 decoder refuses by design. FFmpeg also produces no pictures.",
-        ),
-        ("h264", "sp1_bt_a.h264" | "sp2_bt_b.h264") => partial(
-            "decoder-error",
-            [361, 400, 10],
-            sp_si,
-            "The H.264 decoder refuses Extended-profile SP/SI slices by design after decoding a prefix.",
-        ),
-        ("h264", "Hi422FR10_SONY_B.264" | "Hi422FR1_SONY_A.jsv") => {
-            unsupported(5, "chroma format 4:2:2 / 4:4:4", chroma)
+    let vectors = manifest
+        .get("vectors")
+        .and_then(Value::as_array)
+        .ok_or("registered video refusals need pinned vectors")?;
+    for group in groups.as_array().ok_or("open_refusals must be an array")? {
+        if text(group.get("kind")) != Some(VIDEO_REFUSAL_KIND) {
+            continue;
         }
-        ("h264", "Hi422FR13_SONY_B.264" | "Hi422FR6_SONY_A.jsv") => {
-            unsupported(5, "bit depth > 8", high_depth)
+        let reading = |key| refusal_line(group, key);
+        let (reason, error) = (reading("reason")?, reading("detail")?);
+        reading("clause")?;
+        let cases = group
+            .get("cases")
+            .and_then(Value::as_array)
+            .filter(|cases| !cases.is_empty())
+            .ok_or("registered video refusal needs cases")?;
+        for case in cases {
+            let id = refusal_line(case, "id")?;
+            let (lane, sha256) = vectors
+                .iter()
+                .find_map(|vector| {
+                    let lane = text(vector.get("lane"))?;
+                    (text(vector.get("name")) == Some(id) && matches!(lane, "h264" | "hevc"))
+                        .then_some((lane, text(vector.get("sha256"))?))
+                })
+                .ok_or_else(|| format!("{id}: no pinned video vector"))?;
+            let pictures = case
+                .get("pictures")
+                .and_then(Value::as_array)
+                .and_then(|array| <&[_; 3]>::try_from(array).ok())
+                .and_then(|[candidate, reference, equal]| {
+                    Some([
+                        python::int(candidate)?,
+                        python::int(reference)?,
+                        python::int(equal)?,
+                    ])
+                })
+                .filter(|[a, b, equal]| *equal >= 0 && *equal <= (*a).min(*b))
+                .ok_or_else(|| format!("{id}: invalid picture counts"))?;
+            let expected = VideoException {
+                sha256,
+                decoder: refusal_line(case, "decoder")?,
+                output: refusal_line(case, "output")?,
+                pictures,
+                error,
+                reason,
+            };
+            if refusals.insert((lane, id), expected).is_some() {
+                return Err(format!("{id}: duplicate registered video refusal"));
+            }
         }
-        (
-            "h264",
-            "PPH10I1_Panasonic_A.264"
-            | "PPH10I2_Panasonic_A.264"
-            | "PPH10I3_Panasonic_A.264"
-            | "PPH10I4_Panasonic_A.264"
-            | "PPH10I5_Panasonic_A.264"
-            | "PPH10I6_Panasonic_A.264"
-            | "PPH10I7_Panasonic_A.264"
-            | "PPH422I1_Panasonic_A.264"
-            | "PPH422I2_Panasonic_A.264"
-            | "PPH422I3_Panasonic_A.264"
-            | "PPH422I4_Panasonic_A.264"
-            | "PPH422I5_Panasonic_A.264"
-            | "PPH422I6_Panasonic_A.264"
-            | "PPH422I7_Panasonic_A.264",
-        ) => unsupported(10, "bit depth > 8", high_depth),
-        ("hevc", "ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit") => rext_422(3),
-        ("hevc", "IPCM_A_RExt_NEC.bit") => rext_422(1),
-        ("hevc", "IPCM_B_RExt_NEC.bit") => rext_444(1),
-        ("hevc", "Main_422_10_A_RExt_Sony_1.bin") => rext_422(24),
-        ("hevc", "Main_422_10_B_RExt_Sony_1.bin") => rext_422(17),
-        ("hevc", "PERSIST_RPARAM_A_RExt_Sony_1.bit" | "PERSIST_RPARAM_A_RExt_Sony_3.bit") => {
-            rext_444(2)
-        }
-        ("hevc", "QMATRIX_A_RExt_Sony_1.bit") => rext_444(20),
-        ("hevc", "SAO_A_RExt_MediaTek_1.bit") => rext_444(8),
-        ("hevc", "WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit") => unsupported(
-            3,
-            "transform_skip_rotation_enabled_flag (RExt)",
-            "The stream enables transform skip rotation, which the HEVC decoder refuses by design.",
-        ),
-        ("hevc", "EXT_A_ericsson_3.bit") => refused(
-            "bitstream overrun",
-            "The decoder rejects the extension stream at a bitstream overrun. FFmpeg also produces no pictures.",
-        ),
-        ("hevc", "TSUNEQBD_A_MAIN10_Technicolor_2.bit") => refused(
-            "unequal luma/chroma bit depth",
-            "The stream uses unequal luma and chroma bit depths, which the HEVC decoder refuses by design. FFmpeg also produces no pictures.",
-        ),
-        _ => return None,
-    })
+    }
+    Ok(refusals)
 }
 
-impl VideoException {
-    fn matches(&self, decoder: &Value, output: &Value) -> bool {
+fn refusal_line<'a>(row: &'a Value, key: &str) -> Result<&'a str, String> {
+    text(row.get(key))
+        .filter(|line| !line.trim().is_empty() && !line.contains('\n'))
+        .ok_or_else(|| format!("registered video refusal needs {key}"))
+}
+
+impl VideoException<'_> {
+    fn matches(&self, row: &Value, decoder: &Value, output: &Value) -> bool {
         let counts = |section: &Value, keys: [&str; 3]| {
             keys.into_iter()
                 .zip(self.pictures)
@@ -237,7 +194,9 @@ impl VideoException {
         } else {
             counts(decoder, ["frames_ours", "frames_ref", "frames_equal"])
         };
-        text(decoder.get("status")) == Some(self.decoder)
+        text(row.get("sha256")) == Some(self.sha256)
+            && !row.get("open_case").is_some_and(Value::truthy)
+            && text(decoder.get("status")) == Some(self.decoder)
             && text(output.get("status")) == Some(self.output)
             && planar
             && counts(output, ["pictures_ours", "pictures_ref", "pictures_equal"])
@@ -457,6 +416,15 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
         Value::Null
     };
     let session_refusals = session::registered_refusals(&session_manifest)?;
+    let video_manifest = if rows
+        .iter()
+        .any(|row| matches!(text(get(row, "lane")), Some("h264" | "hevc")))
+    {
+        json::read(&crate::root().join(super::derived::MANIFEST))?
+    } else {
+        Value::Null
+    };
+    let video_refusals = video_refusals(&video_manifest)?;
     for row in &rows {
         let lane = text(get(row, "lane")).ok_or("row without lane")?.to_owned();
         let name = get(row, "name").cloned().unwrap_or(Value::Null);
@@ -464,8 +432,7 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
         let decoder = get(row, "decoder").unwrap_or(&empty);
         let output = get(row, "output").unwrap_or(&empty);
         let video = matches!(lane.as_str(), "h264" | "hevc");
-        let open = get(row, "open_case").is_some_and(Value::truthy);
-        let expected = video_exception(&lane, name.as_str().unwrap_or_default()).filter(|_| open);
+        let expected = video_refusals.get(&(lane.as_str(), name.as_str().unwrap_or_default()));
         let session_refusal = session_refusals
             .get(name.as_str().unwrap_or_default())
             .filter(|_| matches!(lane.as_str(), "session-h264" | "session-hevc"));
@@ -480,24 +447,17 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
                 ));
                 "FAIL".into()
             }
-        } else if video && open {
-            if let Some(expected) = &expected {
-                if expected.matches(decoder, output) {
-                    "open".into()
-                } else {
-                    changed.push(format!(
-                        "{} (expected {} / {} and {:?} candidate / reference / equal pictures)",
-                        python::str(&name),
-                        expected.decoder,
-                        expected.output,
-                        expected.pictures,
-                    ));
-                    "FAIL".into()
-                }
+        } else if let Some(expected) = expected {
+            if expected.matches(row, decoder, output) {
+                "registered refusal".into()
             } else {
                 changed.push(format!(
-                    "{} (missing video disposition)",
-                    python::str(&name)
+                    "{} (expected input {}, {} / {} and {:?} candidate / reference / equal pictures)",
+                    python::str(&name),
+                    expected.sha256,
+                    expected.decoder,
+                    expected.output,
+                    expected.pictures,
                 ));
                 "FAIL".into()
             }
@@ -590,6 +550,9 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
                 ("open_case", Value::Bool(c == "open")),
             ]));
         }
+        let refusal_reason = session_refusal
+            .map(|refusal| refusal.reason)
+            .or_else(|| expected.map(|refusal| refusal.reason));
         let mut listed_row = vec![
             ("lane", Value::str(lane.as_str())),
             ("name", name),
@@ -598,8 +561,8 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
             ("decoder", status(decoder)),
             ("output", status(output)),
         ];
-        if let Some(refusal) = session_refusal {
-            listed_row.push(("refusal_reason", Value::str(refusal.reason)));
+        if let Some(reason) = refusal_reason {
+            listed_row.push(("refusal_reason", Value::str(reason)));
         }
         listed.push(Value::object(listed_row));
     }
@@ -772,18 +735,22 @@ mod tests {
         let manifest = row(include_str!(
             "../../../harness/codecs/correctness-manifest.json"
         ));
-        let open = manifest.get("open_cases").unwrap().as_array().unwrap();
-        for vector in manifest.get("vectors").unwrap().as_array().unwrap() {
-            let lane = vector.get("lane").unwrap().as_str().unwrap();
-            if matches!(lane, "h264" | "hevc") {
-                let name = vector.get("name").unwrap();
-                assert_eq!(
-                    open.contains(name),
-                    video_exception(lane, name.as_str().unwrap()).is_some(),
-                    "{lane} {name:?}"
-                );
-            }
-        }
+        let registered = video_refusals(&manifest).unwrap();
+        assert_eq!(registered.len(), 36);
+        assert_eq!(
+            registered
+                .keys()
+                .filter(|(lane, _)| *lane == "h264")
+                .count(),
+            24
+        );
+        assert_eq!(
+            registered
+                .keys()
+                .filter(|(lane, _)| *lane == "hevc")
+                .count(),
+            12
+        );
     }
 
     #[test]
@@ -792,14 +759,19 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let run = dir.join("run.jsonl");
         let out = dir.join("summary.json");
-        let registered = r#"{"lane":"h264","name":"FM1_FT_E.264","open_case":true,
+        let manifest = json::read(&crate::root().join(super::super::derived::MANIFEST)).unwrap();
+        let registered_cases = video_refusals(&manifest).unwrap();
+        let pin = registered_cases[&("h264", "FM1_FT_E.264")].sha256;
+        let registered = r#"{"lane":"h264","name":"FM1_FT_E.264","sha256":"PIN",
             "decoder":{"status":"decoder-error","frames_ours":119,"frames_ref":305,
             "frames_equal":119,"ours_errors":[{"error":"unsupported: flexible macroblock ordering"}]},
             "output":{"status":"fail","pictures_ours":119,"pictures_ref":305,"pictures_equal":119}}"#
-            .replace('\n', "");
+            .replace('\n', "")
+            .replace("PIN", pin);
         fs::write(&run, &registered).unwrap();
         summarize(run.to_str().unwrap(), &out, true).unwrap();
         for changed in [
+            registered.replace(pin, "wrong-input"),
             registered.replace("decoder-error", "failed-exit"),
             registered.replace("\"frames_ours\":119", "\"frames_ours\":118"),
             registered.replace("\"pictures_equal\":119", "\"pictures_equal\":118"),

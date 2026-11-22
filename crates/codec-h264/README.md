@@ -49,6 +49,10 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
 
 ## Behaviour and limits
 
+The [conformance gate](../../harness/codecs/correctness-manifest.json) checks
+the exact typed refusal and retained planar and RGBA picture counts for the
+registered slice-group, SP/SI, chroma and bit-depth cases.
+
 - `Picture` carries cropped `width`/`height`, three `Plane`s that share the decoder's
   frame buffer (no copy; `row(y)`, `data()`, `raw()`), `bit_depth`, `pts`, `poc`, `sar`,
   `colour` and `interlaced`. Each picture keeps the timestamp of the access unit that
