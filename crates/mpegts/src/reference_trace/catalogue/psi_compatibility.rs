@@ -545,6 +545,7 @@ fn decode_rejected_pmt(
                 language,
                 hearing_impaired,
                 visual_impaired,
+                dvb_initialization: None,
                 evidence: 0,
             })
             .map_err(|e| e.error)?;
@@ -867,6 +868,7 @@ impl Catalogue {
                 old.language = language;
                 old.hearing_impaired = decoded.hearing_impaired;
                 old.visual_impaired = decoded.visual_impaired;
+                old.dvb_initialization = None;
                 old.evidence = index;
             } else {
                 if self.streams.len() >= self.limits.streams {
@@ -881,6 +883,7 @@ impl Catalogue {
                         language,
                         hearing_impaired: decoded.hearing_impaired,
                         visual_impaired: decoded.visual_impaired,
+                        dvb_initialization: None,
                         evidence: index,
                     })
                     .map_err(|e| e.error)?;

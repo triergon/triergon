@@ -43,21 +43,29 @@ pub struct Stream {
     /// The demux codec tag: a matching registration FourCC in little-endian order, or the PMT
     /// stream type when there is no such registration.
     pub codec_tag: u32,
-    /// The ISO 639 language codes of the first language descriptor, comma separated; empty without
-    /// one.
+    /// Comma-separated ISO 639 languages from the first language list or from the ordered DVB
+    /// subtitling services. Empty if no language is available.
     pub language: BudgetVec<u8>,
-    /// Whether the selected language descriptor includes audio type 2.
+    /// Whether the selected language list includes audio type 2 or a DVB service for the hard of
+    /// hearing.
     pub hearing_impaired: bool,
     /// Whether the selected language descriptor includes audio type 3.
     pub visual_impaired: bool,
     /// Index into [`Catalogue::evidence`] of the section the entry was read from.
     pub evidence: usize,
     codec: CatalogueCodec,
+    dvb_initialization: Option<BudgetVec<u8>>,
 }
 impl Stream {
     /// The codec the demuxer opens for the stream.
     pub fn codec(&self) -> CatalogueCodec {
         self.codec
+    }
+
+    /// The DVB subtitle decoder initialization, with five bytes per service in PMT order:
+    /// big-endian composition and ancillary page IDs followed by the subtitling type.
+    pub fn dvb_initialization(&self) -> Option<&[u8]> {
+        self.dvb_initialization.as_ref().map(BudgetVec::as_slice)
     }
 }
 /// Demux catalogue identity, never a source namespace or codec configuration.
@@ -77,6 +85,8 @@ pub enum CatalogueCodec {
     Ac3,
     /// E-AC-3 audio.
     Eac3,
+    /// DVB subtitles carried in private PES packets.
+    DvbSubtitle,
 }
 impl CatalogueCodec {
     /// The codec name the demuxer reports.
@@ -89,12 +99,14 @@ impl CatalogueCodec {
             Self::MpegAudio => "mpeg-audio",
             Self::Ac3 => "ac3",
             Self::Eac3 => "eac3",
+            Self::DvbSubtitle => "dvb_subtitle",
         }
     }
-    /// The demuxer's media type code: 0 for video, 1 for audio.
+    /// The demuxer's media type code: 0 for video, 1 for audio, 3 for subtitles.
     pub fn media_type(self) -> i32 {
         match self {
             Self::Avc | Self::Hevc => 0,
+            Self::DvbSubtitle => 3,
             _ => 1,
         }
     }
@@ -167,8 +179,7 @@ impl Catalogue {
             selected_carriage: false,
         })
     }
-    /// Explicit TS188/M2TS192 audio/video demux view. The default
-    /// constructor remains the TS188/video profile; source semantics are untouched.
+    /// TS188/M2TS192 demux view for video, audio and DVB subtitles.
     pub fn new_selected_carriage(
         budget: Budget,
         limits: ParseLimits,
@@ -191,6 +202,13 @@ impl Catalogue {
             0x03 | 0x04 => Ok(CatalogueCodec::MpegAudio),
             0x0f => Ok(CatalogueCodec::AacAdts),
             0x11 => Ok(CatalogueCodec::AacLatm),
+            6 if stream.descriptor_namespace() != DescriptorNamespace::Atsc
+                && stream
+                    .descriptors()
+                    .any(|item| item.is_ok_and(|descriptor| descriptor.tag == 0x59)) =>
+            {
+                Ok(CatalogueCodec::DvbSubtitle)
+            }
             6 | 0x81 | 0x87 => {
                 use crate::compat::pes::observer::{
                     PrivateAudioCarriage as C, PrivateAudioDescriptors,
@@ -662,11 +680,28 @@ impl Catalogue {
             let mut language = BudgetVec::new(&self.budget);
             let mut hearing_impaired = false;
             let mut visual_impaired = false;
+            let mut dvb_initialization =
+                (codec == CatalogueCodec::DvbSubtitle).then(|| BudgetVec::new(&self.budget));
             for descriptor in stream.descriptors() {
                 if cancel.load(Ordering::Relaxed) {
                     return Err(Error::Cancelled);
                 }
                 let descriptor = descriptor?;
+                if descriptor.tag == 0x59
+                    && let Some(pages) = &mut dvb_initialization
+                {
+                    let subtitles = descriptor.dvb_subtitling()?;
+                    for service in subtitles.services() {
+                        Self::append_language(&mut language, &service.language_code)?;
+                        pages.try_extend_from_slice(&service.composition_page_id.to_be_bytes())?;
+                        pages.try_extend_from_slice(&service.ancillary_page_id.to_be_bytes())?;
+                        pages
+                            .try_push(service.subtitling_type)
+                            .map_err(|e| e.error)?;
+                        hearing_impaired |= (0x20..=0x26).contains(&service.subtitling_type);
+                    }
+                    continue;
+                }
                 if descriptor.tag == 0x05 {
                     let registration = descriptor.registration()?.format_identifier;
                     if matches!(
@@ -694,21 +729,16 @@ impl Catalogue {
                         "descriptor is unsupported for video in the demux catalogue",
                     ));
                 }
-                if descriptor.tag == 0x0a && language.is_empty() {
+                if descriptor.tag == 0x0a && language.is_empty() && dvb_initialization.is_none() {
                     for e in descriptor.languages()? {
-                        if e.language_code.contains(&0) {
-                            return Err(Error::Unsupported(
-                                "demux catalogue language code contains NUL",
-                            ));
-                        }
-                        if !language.is_empty() {
-                            language.try_push(b',').map_err(|e| e.error)?;
-                        }
-                        language.try_extend_from_slice(&e.language_code)?;
+                        Self::append_language(&mut language, &e.language_code)?;
                         hearing_impaired |= e.audio_type == 2;
                         visual_impaired |= e.audio_type == 3;
                     }
                 }
+            }
+            if dvb_initialization.as_ref().is_some_and(BudgetVec::is_empty) {
+                return Err(Error::Invalid("DVB subtitle descriptor has no services"));
             }
             if let Some(old) = self
                 .streams
@@ -722,6 +752,7 @@ impl Catalogue {
                 old.language = language;
                 old.hearing_impaired = hearing_impaired;
                 old.visual_impaired = visual_impaired;
+                old.dvb_initialization = dvb_initialization;
                 old.evidence = evidence;
             } else {
                 if self.streams.len() >= self.limits.streams {
@@ -736,6 +767,7 @@ impl Catalogue {
                         language,
                         hearing_impaired,
                         visual_impaired,
+                        dvb_initialization,
                         evidence,
                     })
                     .map_err(|e| e.error)?;
@@ -755,6 +787,17 @@ impl Catalogue {
             self.pending_pmt = None;
         }
         Ok(())
+    }
+    fn append_language(language: &mut BudgetVec<u8>, code: &[u8; 3]) -> Result<()> {
+        if code.contains(&0) {
+            return Err(Error::Unsupported(
+                "demux catalogue language code contains NUL",
+            ));
+        }
+        if !language.is_empty() {
+            language.try_push(b',').map_err(|e| e.error)?;
+        }
+        language.try_extend_from_slice(code)
     }
     fn validate_terminal_witness(&self, end: &MediaEntityEnd, input: &InputCursor) -> Result<()> {
         if let Some(e) = self.fault {

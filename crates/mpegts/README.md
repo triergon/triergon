@@ -63,6 +63,8 @@ Everything else lives in its module:
   ATSC namespace. PMT types 0x03 and 0x04 identify MPEG audio without
   specifying a layer. The first ISO 639 language list supplies the ordered
   languages and hearing-impaired and visual-impaired audio dispositions.
+  DVB subtitle entries expose the ordered service languages, subtitle types
+  and page IDs. The source parser keeps the caller's descriptor namespace.
 
 `compat::pes::PacketCompletion` confirms that one physical input contained only
 control traffic. Poll the source with `TransportStream::poll_observed` and

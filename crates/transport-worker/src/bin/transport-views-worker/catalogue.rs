@@ -272,7 +272,7 @@ fn projected(
                     language: stream.language.as_slice(),
                     hearing_impaired: stream.hearing_impaired,
                     visual_impaired: stream.visual_impaired,
-                    dvb: None,
+                    dvb: stream.dvb_initialization(),
                 }
                 .write(program.program, work, out)?;
             }

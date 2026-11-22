@@ -296,6 +296,64 @@ fn iso_639_dispositions_preserve_all_roles_in_the_first_language_list() {
 }
 
 #[test]
+fn dvb_subtitle_services_keep_order_and_follow_a_pmt_retype() {
+    let services = b"\x59\x10eng\x14\x00\x01\x00\x02deu\x24\x00\x03\x00\x04";
+    let initial = pmt_carrier(0, &[(6, 256, services), (0x0f, 257, b"")]);
+    let replaced = pmt_carrier(1, &[(0x11, 256, b""), (6, 257, services)]);
+    let initial_data = [&BASIC[..188], &initial].concat();
+    let replaced_data = [initial_data.as_slice(), &replaced].concat();
+    for namespace in [DescriptorNamespace::Unspecified, DVB] {
+        let budget = Budget::new(8 * 1024 * 1024).unwrap();
+        for (data, subtitle_index) in [(initial_data.as_slice(), 0), (&replaced_data, 1)] {
+            let run = parsed_with_namespace(data, &budget, PacketFormat::Ts188, 1, namespace);
+            let projection = project(&run, &budget, PacketFormat::Ts188).unwrap();
+            let streams = projection.streams();
+            assert_eq!((streams[0].pid, streams[1].pid), (256, 257));
+            let subtitles = &streams[subtitle_index];
+            assert_eq!(subtitles.codec(), CatalogueCodec::DvbSubtitle);
+            assert_eq!(subtitles.codec().media_type(), 3);
+            assert_eq!(subtitles.stream_type, 6);
+            assert_eq!(subtitles.codec_tag, 6);
+            assert_eq!(subtitles.language.as_slice(), b"eng,deu");
+            assert!(subtitles.hearing_impaired);
+            assert!(!subtitles.visual_impaired);
+            assert_eq!(
+                subtitles.dvb_initialization(),
+                Some(b"\x00\x01\x00\x02\x14\x00\x03\x00\x04\x24".as_slice())
+            );
+            assert_eq!(streams[1 - subtitle_index].dvb_initialization(), None);
+            assert!(!streams[1 - subtitle_index].hearing_impaired);
+            assert!(run.events().any(|(event, _)| {
+                matches!(event, TraceEvent::ProgramMap { map, .. } if map.descriptor_namespace == namespace)
+            }));
+        }
+    }
+}
+
+#[test]
+fn incomplete_or_conflicting_private_subtitle_signalling_is_refused() {
+    let valid = b"\x59\x08eng\x14\x00\x01\x00\x02";
+    let conflicting_audio = [valid.as_slice(), b"\x6a\x01\x00"].concat();
+    let private_specifier = [b"\x5f\x04\x00\x00\x00\x01".as_slice(), valid].concat();
+    for (namespace, descriptors) in [
+        (
+            DescriptorNamespace::Unspecified,
+            b"\x59\x07eng\x14\x00\x01\x00".as_slice(),
+        ),
+        (DescriptorNamespace::Unspecified, b"\x59\x00".as_slice()),
+        (DVB, conflicting_audio.as_slice()),
+        (DVB, private_specifier.as_slice()),
+        (DescriptorNamespace::Atsc, valid.as_slice()),
+    ] {
+        let pmt = pmt_carrier(0, &[(6, 256, descriptors)]);
+        let data = [&BASIC[..188], &pmt].concat();
+        let budget = Budget::new(8 * 1024 * 1024).unwrap();
+        let run = parsed_with_namespace(&data, &budget, PacketFormat::Ts188, 7, namespace);
+        assert!(project(&run, &budget, PacketFormat::Ts188).is_err());
+    }
+}
+
+#[test]
 fn mpeg_audio_catalogue_uses_the_pmt_even_when_the_pes_header_is_split() {
     let pes = [
         0x00, 0x00, 0x01, 0xc0, 0x00, 0x07, 0x80, 0x00, 0x00, 0xff, 0xfd, 0x84, 0x00,
