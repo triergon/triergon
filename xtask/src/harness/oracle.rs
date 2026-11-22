@@ -47,6 +47,7 @@ impl Kind {
             "vpcc",
             "eac3-bsi",
             "av1-obu",
+            "av1-low-overhead",
             "adts",
             "dts-header",
             "dts-unpack",
