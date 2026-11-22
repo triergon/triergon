@@ -289,12 +289,16 @@ Verification: the FFmpeg comparisons are defined in
 [harness/features/isobmff-reader](../../harness/features/isobmff-reader),
 [isobmff-open-index](../../harness/features/isobmff-open-index) and
 [isobmff-seek](../../harness/features/isobmff-seek); results are in
-[docs/status.md](../../docs/status.md). The reader comparison includes first-entry
-source colour on the `nclc` and `nclx` fixtures. It excludes colour on the
+[docs/status.md](../../docs/status.md). The selected video configuration tests
+check the first video sample's AVC, HEVC or AV1 description against known header
+fields and complete ffprobe extradata in four files. One AVC file starts on its
+second description. The reference comparison covers initial selection only.
+The reader comparison includes first-entry source colour on the `nclc` and
+`nclx` fixtures. It excludes colour on the
 configuration-change fixture because ffprobe aggregates a later entry. The
 [static HDR test](tests/container_reader.rs) compares both boxes in either
 description with the pinned formats ffprobe's stream metadata. The sample-level
 test checks that callers can read HDR from the description selected by a sample.
-To run the reference comparison, prepare the formats build with
+To run the reference comparisons, prepare the formats build with
 `cargo xtask prepare-ffmpeg --profile formats`, then run
-`cargo test -p triergon-isobmff static_hdr -- --include-ignored`.
+`cargo test -p triergon-isobmff --test container_reader -- --include-ignored`.
