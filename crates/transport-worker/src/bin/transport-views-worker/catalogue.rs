@@ -246,10 +246,12 @@ fn projected(
             );
         }
     }
-    let version = view.streams().last().and_then(|stream| {
-        let evidence = view.evidence().get(stream.evidence)?;
-        let section = evidence.bytes.as_slice().first()?.as_ref();
-        (section.first() == Some(&2)).then(|| (section[5] >> 1) & 31)
+    // An admitted PMT can be empty or can update a PID earlier in stream order.
+    let version = view.evidence().iter().rev().find_map(|evidence| {
+        let bytes = evidence.bytes.as_slice().first()?.as_ref();
+        let header = bytes.get(..6)?;
+        (header[0] == 2 && u16::from_be_bytes([header[3], header[4]]) == case.program)
+            .then(|| (header[5] >> 1) & 31)
     });
     for program in view.programs() {
         let selected = program.program == case.program;
@@ -315,19 +317,19 @@ impl PsiPid {
         ) {
             return Ok(Vec::new());
         }
-        if let Some(payload) = packet.payload {
-            if let Err(error) = self.assembler.push(
+        if let Some(payload) = packet.payload
+            && let Err(error) = self.assembler.push(
                 payload,
                 packet.payload_unit_start,
                 SOURCE,
                 packet.payload_source_offset,
-            ) {
-                self.assembler.discard();
-                if !syntax(error.error) {
-                    return Err(error.error);
-                }
-                return Ok(Vec::new());
+            )
+        {
+            self.assembler.discard();
+            if !syntax(error.error) {
+                return Err(error.error);
             }
+            return Ok(Vec::new());
         }
         let mut sections = Vec::new();
         loop {
@@ -553,8 +555,8 @@ fn source_stream(
                 pages.extend(service.composition_page_id.to_be_bytes());
                 pages.extend(service.ancillary_page_id.to_be_bytes());
                 pages.push(service.subtitling_type);
-                hearing_impaired |=
-                    service.has_dvb_subtitling_type() && service.subtitling_type >= 0x20;
+                hearing_impaired |= service.has_dvb_subtitling_type()
+                    && (0x20..=0x26).contains(&service.subtitling_type);
             }
         }
     }

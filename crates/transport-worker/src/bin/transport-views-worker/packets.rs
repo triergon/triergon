@@ -252,7 +252,7 @@ fn compact_fields(
                 }
             }
             Step::Ready(CompactTraceEvent::Event(TraceEvent::Transport(packet))) => {
-                fields(work, out, &packet)?
+                fields(work, out, &packet)?;
             }
             Step::Ready(_) | Step::Yield => {}
             Step::NeedInput(request) => supply(&mut input, data, request)?,

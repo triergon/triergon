@@ -83,7 +83,9 @@ pub(super) fn fixtures(dir: &Path) -> Result<(), String> {
 fn hevc(flags: u16) -> Vec<u8> {
     let subset = flags & 8 != 0;
     let mut descriptor = vec![0x38, if subset { 15 } else { 13 }];
-    descriptor.push(((flags >> 3) % 4) as u8 * 64 | ((flags >> 8) as u8 * 32) | (flags % 32) as u8);
+    let profile_space = ((flags >> 3) % 4) as u8;
+    let tier = (flags >> 8) as u8;
+    descriptor.push(profile_space << 6 | tier << 5 | (flags % 32) as u8);
     descriptor.extend((u32::from(flags).wrapping_mul(0x10204081)).to_be_bytes());
     let copied = u64::from(flags).wrapping_mul(0x13579bdf) & ((1 << 44) - 1);
     let constraints = u64::from((flags >> 4) & 15) << 44 | copied;
