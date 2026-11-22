@@ -12,7 +12,7 @@
 //! not recovered. A listed vector that no longer fails fails the summary, so
 //! the list only shrinks. The video lanes also pin the exact disposition and
 //! picture counts of each listed vector. Strict video summaries require a
-//! registration for every non-pass.
+//! registration for every non-pass from a pinned manifest.
 
 use std::fs;
 use std::path::Path;
@@ -430,7 +430,7 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
                 closed.push(format!("{} ({c})", python::str(&name)));
                 c
             });
-            if require_pass && video && class != "pass" {
+            if require_pass && video && text(get(row, "sha256")).is_some() && class != "pass" {
                 "FAIL".into()
             } else {
                 class
@@ -721,7 +721,7 @@ mod tests {
                 "{error}"
             );
         }
-        let unregistered = r#"{"lane":"h264","name":"new.264",
+        let unregistered = r#"{"lane":"h264","name":"new.264","sha256":"pin",
             "decoder":{"status":"ffmpeg-refused","ours_frames":1},
             "output":{"status":"reference-produced-nothing"}}"#
             .replace('\n', "");
