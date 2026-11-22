@@ -195,7 +195,11 @@ Matroska, MP4 and MPEG-TS, checking packet fields and payloads, ordered RGBA
 pictures with presentation times, and stereo PCM. Matroska and MP4 use
 `Player`. The Matroska grade checks the exact Block clocks independently
 and compares the selected AAC output from presentation time zero. MPEG-TS uses
-its source access-unit reader. The facade also has
+its source access-unit reader. After the three-track Matroska decode, the
+same example renders an external ASS script with its embedded font at 640×360.
+The grade checks image order, geometry, colour and every alpha byte against
+libass, with a frame while the subtitle is visible and one at expiry.
+The facade also has
 separate comparisons for strict MPEG-TS access units and seek delivery.
 The MPEG-TS comparison records source admission differences for private
 audio carriage and for video delimiters without a coded picture. It checks

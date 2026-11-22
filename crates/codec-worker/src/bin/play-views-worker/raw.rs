@@ -1,12 +1,14 @@
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::{self, BufWriter, Read, Write};
+use std::path::Path;
 
 use triergon::mpegts::{
     Reader, ReaderLimits,
     psi::{DescriptorNamespace, DvbNamespaceEvidence},
 };
 use triergon::playback::Format;
+use triergon::render::ass::{Change, Frame, ImageKind};
 use triergon::session::{Canvas, PcmBlock, Published};
 use triergon::{
     AnyReader, Budget, Bytes, Error, PacketInfo, RandomAccess, Result, SourceCapabilities, SourceId,
@@ -113,6 +115,7 @@ struct Raw {
     video: BufWriter<File>,
     audio: BufWriter<File>,
     packets: BufWriter<File>,
+    subtitles: Option<BufWriter<File>>,
 }
 
 struct Output<'w, 't> {
@@ -188,6 +191,45 @@ impl Observer for Output<'_, '_> {
         }
         Ok(())
     }
+
+    fn subtitle(&mut self, now_ms: i64, frame: Frame<'_>) -> Result<()> {
+        let out = self
+            .raw
+            .as_mut()
+            .and_then(|raw| raw.subtitles.as_mut())
+            .ok_or(Error::Invalid("missing subtitle output"))?;
+        let change = match frame.change {
+            Change::None => 0,
+            Change::Positions => 1,
+            Change::Content => 2,
+        };
+        writeln!(out, "frame {now_ms} {change} {}", frame.images.len())?;
+        for image in frame.images {
+            let kind = match image.kind {
+                ImageKind::Fill => 0,
+                ImageKind::Border => 1,
+                ImageKind::Shadow => 2,
+                ImageKind::Background => 3,
+            };
+            write!(
+                out,
+                "image {kind} {} {} {} {} {:08x}",
+                image.x,
+                image.y,
+                image.width(),
+                image.height(),
+                image.colour.0
+            )?;
+            for row in image.rows() {
+                out.write_all(b" ")?;
+                for byte in row {
+                    write!(out, "{byte:02x}")?;
+                }
+            }
+            writeln!(out)?;
+        }
+        Ok(())
+    }
 }
 
 fn tick(value: Option<i64>) -> String {
@@ -231,12 +273,25 @@ pub(super) fn operation<'a>(
 
 pub(super) fn command(arguments: &[OsString]) -> std::result::Result<(), String> {
     let [file, video, audio, packets, arguments @ ..] = arguments else {
-        return Err(
-            "usage: play-raw FILE VIDEO AUDIO PACKETS [WxH [VIDEO_TRACK AUDIO_TRACK [atsc]]]"
-                .into(),
-        );
+        return Err("usage: play-raw FILE VIDEO AUDIO PACKETS [WxH [VIDEO_TRACK AUDIO_TRACK [atsc]]] [--ass SCRIPT OUTPUT TIME...]".into());
     };
     let run = || -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let (arguments, subtitles) = match arguments.iter().position(|arg| arg == "--ass") {
+            Some(index) => {
+                let (_, subtitle_args) = arguments.split_at(index);
+                let [_, script, output, times @ ..] = subtitle_args else {
+                    return Err("expected --ass SCRIPT OUTPUT TIME...".into());
+                };
+                let times = times
+                    .iter()
+                    .map(|time| time.to_str().and_then(|text| text.parse::<i64>().ok()))
+                    .collect::<Option<Vec<_>>>()
+                    .filter(|times| !times.is_empty())
+                    .ok_or("expected signed subtitle times in milliseconds")?;
+                (&arguments[..index], Some((script, output, times)))
+            }
+            None => (arguments, None),
+        };
         let opts = options(arguments)?;
         let mut input = Vec::new();
         File::open(file)?
@@ -252,16 +307,34 @@ pub(super) fn command(arguments: &[OsString]) -> std::result::Result<(), String>
                 video: BufWriter::new(File::create(video)?),
                 audio: BufWriter::new(File::create(audio)?),
                 packets: BufWriter::new(File::create(packets)?),
+                subtitles: subtitles
+                    .as_ref()
+                    .map(|(_, path, _)| File::create(path).map(BufWriter::new))
+                    .transpose()?,
             }),
             trace: Some(&mut stdout),
             work: &mut work,
         };
         let (pool, bytes) = preload(&input)?;
-        let result = pipeline::play_with(&pool, bytes, opts, &mut output);
+        let result = if let Some((script, _, times)) = subtitles {
+            pipeline::play_with_subtitles(
+                &pool,
+                bytes,
+                opts,
+                Path::new(script),
+                &times,
+                &mut output,
+            )
+        } else {
+            pipeline::play_with(&pool, bytes, opts, &mut output)
+        };
         if let Some(raw) = &mut output.raw {
             raw.video.flush()?;
             raw.audio.flush()?;
             raw.packets.flush()?;
+            if let Some(subtitles) = &mut raw.subtitles {
+                subtitles.flush()?;
+            }
         }
         result?;
         Ok(())

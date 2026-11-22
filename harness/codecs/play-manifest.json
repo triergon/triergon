@@ -6,7 +6,8 @@
     "Matroska and MP4 use the playback engine packet view. MPEG-TS uses the facade source access-unit reader, because the transport playback engine does not supply that view.",
     "Compare every RGBA canvas byte and each picture presentation timestamp in output order. Require identical stereo s16 sample counts and rates and apply the existing audio_device_path LSB bound.",
     "Compare every packet in demux order by stream ordinal, time base, signed PTS, DTS, duration, key flag, byte length and payload MD5. For MP4, both operations use the unedited media timeline and present AAC through each sample’s declared duration. Matroska packet ticks are expressed in nanoseconds and checked against the independent Block timing oracle. Compare selected Matroska AAC from time zero by applying the source-derived leading discard to reference PCM before comparing all presented samples.",
-    "Use a 1920 by 1080 canvas. The 640 by 360 example canvas is outside this grade until there is pixel parity across the corpus.",
+    "Use a 1920 by 1080 decoded video canvas. The 640 by 360 decoded video canvas is outside this grade until there is pixel parity across the corpus.",
+    "After decoding three-tracks.mkv, render the authored ASS script at the example's 640 by 360 subtitle size using only its embedded fonts. Compare every image's kind, position, extent, colour and alpha rows, and the frame change and image order, against the pinned libass renderer. An overlay mismatch fails independently of packet and decoder deviations.",
     "Both workers use explicit stream ordinals for three-tracks.mkv. The fixture rights and inputs are inherited from the existing authored corpora.",
     "The two private ATSC audio stream types use the declared ATSC namespace. The DVB E-AC-3 input uses its service profile."
   ],
@@ -20,7 +21,12 @@
       "tracks": [
         0,
         1
-      ]
+      ],
+      "ass": {
+        "path": "harness/fixtures/ass-render/decorations-orientation-example.ass",
+        "sha256": "565c74c9bc35ae99c4c929d89e2a43cee57d629e76b4affc297b1f182eb53fa0",
+        "times_ms": [500, 1000]
+      }
     },
     {
       "lane": "play-mkv",

@@ -5,12 +5,6 @@
     "playback-worker": [],
     "triergon": [
       {
-        "name": "play-pipeline",
-        "entry_points": ["render::ass::Renderer::render"],
-        "degree": "unit-tests",
-        "needs": "The play corpus grades the facade demux, framing and decode path. The ASS overlay still needs a paired picture grade inside that pipeline."
-      },
-      {
         "name": "any-reader-mpegts",
         "entry_points": ["AnyOther::MpegTs"],
         "degree": "unit-tests",

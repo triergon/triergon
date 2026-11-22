@@ -16,7 +16,7 @@ use triergon::{
         mp4::{Mp4IndexJob, Mp4Open, OpenLimits, OpenProgress, PlanLimits},
         probe::{Probe, ProbeProgress, SelectedInput},
     },
-    render::ass::{Fonts, Options as ScriptOptions, Renderer, Script, Settings, Size},
+    render::ass::{Fonts, Frame, Options as ScriptOptions, Renderer, Script, Settings, Size},
     session::{
         AudioSession, Canvas, Discard, PcmBlock, Published, QueueLimits, SessionState,
         VideoSession, audio_codec, audio_configuration, audio_decoder_in, video_codec,
@@ -71,6 +71,10 @@ pub(super) trait Observer {
     fn pcm(&mut self, _block: &PcmBlock) -> Result<()> {
         Ok(())
     }
+
+    fn subtitle(&mut self, _now_ms: i64, _frame: Frame<'_>) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Default)]
@@ -86,6 +90,15 @@ impl Observer for Count {
     fn pcm(&mut self, block: &PcmBlock) -> Result<()> {
         self.0.audio_samples += block.samples.len() / 2;
         self.0.sample_rate = block.sample_rate;
+        Ok(())
+    }
+
+    fn subtitle(&mut self, _: i64, frame: Frame<'_>) -> Result<()> {
+        self.0.subtitle_images = frame
+            .images
+            .iter()
+            .filter(|image| image.rows().flatten().any(|&alpha| alpha != 0))
+            .count();
         Ok(())
     }
 }
@@ -377,7 +390,7 @@ pub(super) fn play(media: &Path, subtitles: &Path, now_ms: i64) -> ExampleResult
     let pool = Budget::new(128 << 20)?;
     let canvas = Canvas::new(WIDTH, HEIGHT).ok_or(Error::Invalid("example canvas"))?;
     let mut observer = Count::default();
-    play_with(
+    play_with_subtitles(
         &pool,
         read_file(&pool, media)?,
         Options {
@@ -387,22 +400,31 @@ pub(super) fn play(media: &Path, subtitles: &Path, now_ms: i64) -> ExampleResult
             audio: None,
             transport: None,
         },
+        subtitles,
+        &[now_ms],
         &mut observer,
     )?;
-    let mut played = observer.0;
+    Ok(observer.0)
+}
 
+pub(super) fn play_with_subtitles(
+    pool: &Budget,
+    media: Bytes,
+    opts: Options,
+    subtitles: &Path,
+    times_ms: &[i64],
+    observer: &mut impl Observer,
+) -> ExampleResult<()> {
+    play_with(pool, media, opts, observer)?;
     let options = ScriptOptions {
         extract_fonts: true,
         ..ScriptOptions::default()
     };
-    let mut script = Script::parse(&pool, &read_file(&pool, subtitles)?, &options)?;
+    let mut script = Script::parse(pool, &read_file(pool, subtitles)?, &options)?;
     let settings = Settings::new(Size::new(WIDTH as u32, HEIGHT as u32));
-    let mut renderer = Renderer::new(&pool, &settings, &Fonts::default())?;
-    played.subtitle_images = renderer
-        .render(&mut script, now_ms)?
-        .images
-        .iter()
-        .filter(|image| image.rows().flatten().any(|&alpha| alpha != 0))
-        .count();
-    Ok(played)
+    let mut renderer = Renderer::new(pool, &settings, &Fonts::default())?;
+    for &now_ms in times_ms {
+        observer.subtitle(now_ms, renderer.render(&mut script, now_ms)?)?;
+    }
+    Ok(())
 }

@@ -277,7 +277,7 @@
     "not_compared": {
       "codec-worker": 0,
       "playback-worker": 0,
-      "triergon": 3,
+      "triergon": 2,
       "triergon-ass": 0,
       "triergon-bitstream": 0,
       "triergon-bridge": 3,

@@ -797,7 +797,7 @@
         }
       ]
     },
-    {"area": "Facade playback pipeline", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "comparison only (runtime, peak live heap and total RSS pending)"},
+    {"area": "Facade playback pipeline", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "comparison only (runtime, peak live heap and total RSS pending)", "parity": {"aarch64-unknown-linux-gnu": "All twelve cases match picture bytes, picture times and presented PCM counts, with PCM within 1 LSB. Three also match every packet field. The ASS overlay matches all 17 images and both frame records, including expiry."}},
     {"area": "Facade MPEG-TS access units", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "facade-mpegts"},
     {"area": "Facade seeks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "facade-seek"},
     {

@@ -23,7 +23,13 @@ struct Run {
 }
 
 impl Run {
-    fn execute(worker: &str, path: &str, directory: &Path, vector: &Value) -> Result<Self, Stop> {
+    fn execute(
+        worker: &str,
+        path: &str,
+        directory: &Path,
+        vector: &Value,
+        subtitles: Option<&Subtitles>,
+    ) -> Result<Self, Stop> {
         std::fs::create_dir(directory).map_err(|error| error.to_string())?;
         let paths = ["video.rgba", "audio.s16", "packets.txt"].map(|name| directory.join(name));
         let mut argv = vec![worker.to_owned(), "play-raw".into(), path.to_owned()];
@@ -53,10 +59,137 @@ impl Run {
             }
             argv.push(namespace.to_owned());
         }
+        if let Some(subtitles) = subtitles {
+            argv.extend([
+                "--ass".into(),
+                python::path(&subtitles.script),
+                python::path(&directory.join("subtitles.txt")),
+            ]);
+            argv.extend(subtitles.times.iter().map(ToString::to_string));
+        }
         Ok(Self {
             output: run_text(&argv, RUN_TIMEOUT)?,
             paths,
         })
+    }
+}
+
+struct Subtitles {
+    script: PathBuf,
+    times: Vec<i64>,
+}
+
+impl Subtitles {
+    fn prepare(root: &Path, tmp: &Path, vector: &Value) -> Result<Option<Self>, String> {
+        let Some(spec) = vector.get("ass") else {
+            return Ok(None);
+        };
+        let fixture = root.join(
+            spec.get("path")
+                .and_then(Value::as_str)
+                .ok_or("missing play ASS script path")?,
+        );
+        let source =
+            std::fs::read(&fixture).map_err(|error| format!("{}: {error}", fixture.display()))?;
+        let hash = sha256::hex(&source);
+        if spec.get("sha256").and_then(Value::as_str) != Some(hash.as_str()) {
+            return Err(format!(
+                "play ASS script hash differs for {}",
+                fixture.display()
+            ));
+        }
+        let times = spec
+            .get("times_ms")
+            .and_then(Value::as_array)
+            .filter(|times| !times.is_empty())
+            .ok_or("missing play ASS times")?
+            .iter()
+            .map(|time| {
+                python::int(time)
+                    .and_then(|time| i64::try_from(time).ok())
+                    .ok_or("invalid play ASS time")
+            })
+            .collect::<Result<_, _>>()?;
+        // The facade example uses only fonts embedded in the script. The
+        // ASS harness directives can otherwise supply fonts to libass.
+        let script = tmp.join("overlay.ass");
+        let data: Vec<_> = source
+            .split_inclusive(|&byte| byte == b'\n')
+            .filter(|line| {
+                ![
+                    b";@default-family ".as_slice(),
+                    b";@default-font ",
+                    b";@attach ",
+                ]
+                .iter()
+                .any(|directive| line.starts_with(directive))
+            })
+            .flatten()
+            .copied()
+            .collect();
+        std::fs::write(&script, data).map_err(|error| format!("{}: {error}", script.display()))?;
+        Ok(Some(Self { script, times }))
+    }
+
+    fn compare(&self, root: &Path, candidate: &Path) -> Result<Value, Stop> {
+        let reference = run_text(
+            &[
+                python::path(&root.join("target/harness/libass-ass-worker")),
+                "ass-render-dump".into(),
+                python::path(&self.script),
+                "script".into(),
+                python::path(&root.join(".research/fonts/files")),
+                "640".into(),
+                "360".into(),
+                "640".into(),
+                "360".into(),
+            ],
+            RUN_TIMEOUT,
+        )?;
+        if reference.code != 0
+            || reference
+                .stderr
+                .lines()
+                .any(|row| row.ends_with(": host-dependent"))
+        {
+            return Err(format!(
+                "play ASS reference failed: {}",
+                python::tail(&reference.stderr, 300)
+            )
+            .into());
+        }
+        let candidate = std::fs::read(candidate).map_err(|error| error.to_string())?;
+        let rows = reference.stdout.lines();
+        let times = rows
+            .clone()
+            .filter_map(|row| row.strip_prefix("frame "))
+            .map(|row| {
+                row.split_ascii_whitespace()
+                    .next()
+                    .and_then(|time| time.parse::<i64>().ok())
+            });
+        if times.ne(self.times.iter().copied().map(Some)) {
+            return Err("play ASS reference rendered a different frame schedule"
+                .to_owned()
+                .into());
+        }
+        let images = rows.filter(|row| row.starts_with("image ")).count();
+        if images == 0 {
+            return Err("play ASS reference rendered no images".to_owned().into());
+        }
+        if candidate != reference.stdout.as_bytes() {
+            return Err(format!(
+                "play ASS image dump differs: candidate SHA-256 {}, reference SHA-256 {}",
+                sha256::hex(&candidate),
+                sha256::hex(reference.stdout.as_bytes()),
+            )
+            .into());
+        }
+        Ok(Value::object([
+            ("frames", Value::int(self.times.len() as i64)),
+            ("images", Value::int(images as i64)),
+            ("sha256", Value::str(sha256::hex(&candidate))),
+        ]))
     }
 }
 
@@ -293,12 +426,21 @@ fn packets(ours: &Path, reference: &Path) -> Result<(Value, bool), String> {
 
 pub(super) fn grade(grade: &Grade, path: &Path, tmp: &Path, vector: &Value) -> Result<Value, Stop> {
     let worker = python::path(grade.codec_workers.of("play"));
-    let ours = Run::execute(&worker, &python::path(path), &tmp.join("ours"), vector)?;
+    let subtitles = Subtitles::prepare(&grade.root, tmp, vector)?;
+    let ours_dir = tmp.join("ours");
+    let ours = Run::execute(
+        &worker,
+        &python::path(path),
+        &ours_dir,
+        vector,
+        subtitles.as_ref(),
+    )?;
     let reference = Run::execute(
         &grade.reference,
         &python::path(path),
         &tmp.join("reference"),
         vector,
+        None,
     )?;
     let expected_exit = vector
         .get("candidate_exit")
@@ -313,6 +455,9 @@ pub(super) fn grade(grade: &Grade, path: &Path, tmp: &Path, vector: &Value) -> R
             python::tail(&reference.output.stderr, 300),
         )));
     }
+    let subtitles = subtitles
+        .map(|subtitles| subtitles.compare(&grade.root, &ours_dir.join("subtitles.txt")))
+        .transpose()?;
     let [ov, oa, op] = &ours.paths;
     let [rv, ra, rp] = &reference.paths;
     let prefix = if vector.get("lane").and_then(Value::as_str) == Some("play-mkv") {
@@ -352,7 +497,7 @@ pub(super) fn grade(grade: &Grade, path: &Path, tmp: &Path, vector: &Value) -> R
         && exact_audio
         && exact_packets
         && exact_timeline;
-    Ok(Value::object([
+    let mut result = Value::object([
         ("status", Value::str(if pass { "pass" } else { "fail" })),
         ("video", video),
         ("audio", audio),
@@ -370,5 +515,11 @@ pub(super) fn grade(grade: &Grade, path: &Path, tmp: &Path, vector: &Value) -> R
             "reference_stderr_tail",
             Value::str(python::tail(&reference.output.stderr, 300)),
         ),
-    ]))
+    ]);
+    if let Some(subtitles) = subtitles
+        && let Value::Object(fields) = &mut result
+    {
+        fields.push(("ass".to_owned(), subtitles));
+    }
+    Ok(result)
 }
