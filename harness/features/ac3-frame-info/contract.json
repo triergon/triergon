@@ -100,52 +100,5 @@
       ],
       "cause": "Codec workloads measure AC-3 and E-AC-3 decode. This operation adds the published per-frame facts."
     }
-  ],
-  "open_cases": [
-    {
-      "id": "ac3-monsters_inc_2.0_192_small.ac3",
-      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ac3-monsters_inc_5.1_448_small.ac3",
-      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ac3-mp3ac325_a0.ac3",
-      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ac3-mp3ac325_a1.ac3",
-      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ac3-monsters_inc_5.1_448_small.ac3-fate-samples",
-      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ac3-monsters_inc_2.0_192_small.ac3-fate-samples",
-      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    }
-  ],
-  "pending_module_requirements": [
-    "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value"
   ]
 }
