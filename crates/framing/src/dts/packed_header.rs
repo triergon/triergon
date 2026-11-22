@@ -100,7 +100,8 @@ impl DtsPackedHeader {
 /// holds a frame unpacked from any packing. Bits after `valid_bits` are ignored.
 /// At most 120 bits are read, and only the header prefix and the values derived
 /// from it are kept. A header that breaks the specification, or that the bits
-/// end inside, is reported in the result.
+/// end inside, is reported in the result. A complete non-core sync word ends
+/// the inspection before any core field that follows it.
 ///
 /// Fails with `Invalid` when `valid_bits` exceeds the bits `storage` holds.
 pub fn inspect_header_bits(storage: &[u8], valid_bits: usize) -> Result<DtsPackedHeader> {
@@ -108,7 +109,11 @@ pub fn inspect_header_bits(storage: &[u8], valid_bits: usize) -> Result<DtsPacke
         return Err(Error::Invalid("DTS valid bit extent"));
     }
     let has_crc = valid_bits >= 39 && storage[4] & 2 != 0;
-    let observed = valid_bits.min(if has_crc { 120 } else { 104 });
+    let observed = if valid_bits >= 32 && !storage.starts_with(&CORE_SYNC.to_be_bytes()) {
+        32
+    } else {
+        valid_bits.min(if has_crc { 120 } else { 104 })
+    };
     let mut bytes = [0; 15];
     let len = observed.div_ceil(8);
     bytes[..len].copy_from_slice(&storage[..len]);

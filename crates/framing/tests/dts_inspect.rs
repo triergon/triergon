@@ -105,6 +105,23 @@ fn canonical_cpf_absence_and_coded_zero_are_distinct() {
 }
 
 #[test]
+fn packed_inspection_stops_at_a_non_core_sync_word() {
+    for sync in [0x7ffe8000_u32, 0x64582025] {
+        let mut raw = authored(true, &[]);
+        raw[..4].copy_from_slice(&sync.to_be_bytes());
+        let owned = inspect(&raw, 1);
+        let packed = dts::inspect_header_bits(&raw, raw.len() * 8).unwrap();
+        assert_eq!(packed.value(F::Sync), Some(sync));
+        for field in F::ALL.into_iter().skip(1) {
+            assert_eq!(packed.field(field), FieldObservation::NotReached);
+        }
+        assert_eq!(packed.issues(), owned.issues().bits());
+        assert_eq!(packed.views(), owned.views());
+        assert_eq!(packed.required_header_bits(), None);
+    }
+}
+
+#[test]
 fn all_prefix_lengths_preserve_missing_bits_without_zero_padding() {
     for cpf in [false, true] {
         let raw = authored(
