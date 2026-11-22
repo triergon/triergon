@@ -85,6 +85,11 @@ machine word: on 64-bit targets 64 bits refilled 32 at a time, on 32-bit targets
 refilled to capacity from the stream's bit position, where 64-bit shifts and comparisons
 take several instructions.
 
+The [CABAC engine comparison](../../harness/features/cabac-engine/contract.json) checks
+both layouts against serial arithmetic decoding, including context updates, bypass
+reads through 32 bins, offset refusals and cursor values. The capped unary cases
+record where a call advances past its requested limit.
+
 ```rust
 use triergon_bitstream::cabac::{Engine, InvalidOffset, init_state};
 

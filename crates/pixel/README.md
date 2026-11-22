@@ -156,6 +156,11 @@ impulses, ramps and constant fields through its public filter API).
   compares the nearest-rounded BT.601 and BT.709 colours against FFmpeg at four
   canvas heights. The [DVB palette sweep](../../harness/features/dvb-palette-sweep/contract.json)
   compares full-width and reduced-width CLUT entries at 2, 4 and 8 bits.
+  [DVD subtitle comparison](../../harness/features/subtitle-dvd/contract.json) covers
+  BT.601/HalfDown through MOV palette configuration. The
+  [direct palette comparison](../../harness/features/ycbcr-palette/contract.json)
+  checks both matrices and both rounding choices across the channel rails and the
+  17-code cube, including BT.709/HalfDown.
 - Unit tests pin the fit rule, that another canvas size holds the same fitted picture
   (direct and separable paths), taps against reference measurements (including
   near ties), the left-crop alignment rule, filter normalisation, the BT.601

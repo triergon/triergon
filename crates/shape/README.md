@@ -319,6 +319,12 @@ covers `@` font metrics through rendered image placement. Its vertical fixtures
 include code points on either side of U+02F1 that share a glyph, with each side
 loading its glyph first.
 
+The [direct rotation comparison](../../harness/features/libass-rotations/contract.json)
+checks both alias pairs at two sizes. It compares glyph IDs, advances and extents
+with FreeType metrics, using libass image placement to identify the selected
+advance. It also checks the documented first-lookup rule when a caller requests
+an advance or extents by glyph ID before looking up a character.
+
 ## Licence
 
 MIT or Apache-2.0, at your option, with HarfBuzz 14.6.0's "Old MIT" licence and libass
