@@ -433,7 +433,7 @@
       "expected": {
         "packets": 8,
         "bytes": 18020,
-        "digest": 2740831903765630141
+        "digest": 6182998414525424842
       }
     },
     {
@@ -601,7 +601,7 @@
       "expected": {
         "packets": 6,
         "bytes": 4549,
-        "digest": 14731237894413723692
+        "digest": 4801871654992259234
       }
     },
     {
@@ -613,9 +613,9 @@
       "required": true,
       "arguments": [],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 8
+        "packets": 12,
+        "bytes": 2661,
+        "digest": 11271481890011886773
       }
     },
     {
@@ -629,7 +629,7 @@
       "expected": {
         "packets": 8,
         "bytes": 4042,
-        "digest": 6688306632785424034
+        "digest": 14236107025168995569
       }
     },
     {

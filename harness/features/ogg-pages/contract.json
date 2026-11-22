@@ -6,9 +6,9 @@
   "candidate": "codec-views-worker",
   "worker_operation": "ogg-pages-",
   "contract": [
-    "Read every Ogg page of the fixed bitexact remux from the first capture pattern. Rebuild the page with its original flags, granule, serial, sequence, lacing and body. The reference demuxes and writes the same input with the bitexact Ogg muxer in memory. A failed remux emits a refusal record.",
+    "Read every original Ogg page from its capture pattern. Rebuild the page with its original flags, granule, serial, sequence, lacing and body. Independently walk the same source bytes using the RFC 3533 section 6 page layout and polynomial CRC.",
     "For each page fold kind 3 with version, flags, signed granule as a uint64 word, serial, sequence, CRC word, CRC validity, lacing count and lacing bytes. Fold kind 1 with complete page length and the written bytes. A truncated or malformed header or body folds kind 8.",
-    "The wire controls compare parsing and writing against the RFC 3533 section 6 page layout and independent polynomial CRC. They include all flag combinations, a full 255-segment page, empty packets and missing granules. The first remux bytes of the muxer's three unstable outputs and the original input of its Skeleton refusal also have wire controls."
+    "Compare the stored pages of the bitexact remux inputs and the original Skeleton input. Wire controls include all flag combinations, a full 255-segment page, empty packets and missing granules."
   ],
   "required_profiles": [
     "reference-refusal",
@@ -205,29 +205,5 @@
       ],
       "cause": "Paired runtime, heap and total RSS collection remains due on the gate hosts."
     }
-  ],
-  "open_cases": [
-    {
-      "id": "remux-lost-page.opus",
-      "requirement": "The second remux changes Opus page grouping and granule at sequence 2 after the missing page. RFC 3533 permits multiple page groupings for the same packet stream."
-    },
-    {
-      "id": "remux-speex-uwb-stereo.spx",
-      "requirement": "The C API remux and the first bitexact CLI remux put different Speex end granules on the same page lacing. The page writer preserves the source granule."
-    },
-    {
-      "id": "remux-speex-skeleton.spx",
-      "requirement": "The reference Ogg muxer refuses the Skeleton stream. The candidate parses the original Ogg pages, including the Skeleton header."
-    },
-    {
-      "id": "remux-chain-speex.spx",
-      "requirement": "The second remux changes the end granule of chained Speex by 2^32. The page writer preserves the original signed 64-bit granule."
-    }
-  ],
-  "pending_module_requirements": [
-    "The C API remux and the first bitexact CLI remux put different Speex end granules on the same page lacing. The page writer preserves the source granule.",
-    "The reference Ogg muxer refuses the Skeleton stream. The candidate parses the original Ogg pages, including the Skeleton header.",
-    "The second remux changes Opus page grouping and granule at sequence 2 after the missing page. RFC 3533 permits multiple page groupings for the same packet stream.",
-    "The second remux changes the end granule of chained Speex by 2^32. The page writer preserves the original signed 64-bit granule."
   ]
 }

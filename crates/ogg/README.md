@@ -107,6 +107,11 @@ once output is released.
 
 ## Comparison with FFmpeg
 
+The [page comparison](../../harness/features/ogg-pages/contract.json) checks
+page headers, lacing, CRC and exact rewritten bytes against an independent
+walk of the same stored pages using RFC 3533 section 6. Its inputs include
+remuxed streams and an original stream carrying a Skeleton track.
+
 `cargo xtask codecs readers` compares every packet `BlockingReader` delivers with the
 pinned `ffprobe -show_packets` of FFmpeg 9.0.2 in two views: the reader's own timing
 (track, pts, dts, duration, trims, size) and `compat::clock`, the FFmpeg-compatible view

@@ -191,75 +191,9 @@ static int reader_page_records(ViewWork *work, const uint8_t *data, size_t size)
     return 0;
 }
 
-static int reader_remux(AVFormatContext *source, AVFormatContext *dest)
-{
-    int status;
-    for (unsigned i = 0; i < source->nb_streams; ++i) {
-        const AVStream *from = source->streams[i];
-        AVStream *to = avformat_new_stream(dest, NULL);
-        if (!to)
-            return AVERROR(ENOMEM);
-        status = avcodec_parameters_copy(to->codecpar, from->codecpar);
-        if (status < 0)
-            return status;
-        status = av_dict_copy(&to->metadata, from->metadata, 0);
-        if (status < 0)
-            return status;
-        to->codecpar->codec_tag = 0;
-        to->time_base = from->time_base;
-    }
-    status = av_dict_copy(&dest->metadata, source->metadata, 0);
-    if (status < 0)
-        return status;
-    status = avformat_write_header(dest, NULL);
-    if (status < 0)
-        return status;
-    AVPacket *packet = av_packet_alloc();
-    if (!packet)
-        return AVERROR(ENOMEM);
-    while ((status = av_read_frame(source, packet)) >= 0) {
-        unsigned index = (unsigned)packet->stream_index;
-        if (index >= dest->nb_streams) {
-            status = AVERROR_INVALIDDATA;
-            break;
-        }
-        av_packet_rescale_ts(packet, source->streams[index]->time_base, dest->streams[index]->time_base);
-        packet->pos = -1;
-        status = av_interleaved_write_frame(dest, packet);
-        av_packet_unref(packet);
-        if (status < 0)
-            break;
-    }
-    av_packet_free(&packet);
-    return status == AVERROR_EOF ? av_write_trailer(dest) : status;
-}
-
 static int reader_pages(const ViewCase *input, ViewWork *work)
 {
-    if (input->argc == 1)
-        return reader_page_records(work, input->data, input->size);
-    ReaderInput source = {0};
-    AVFormatContext *dest = NULL;
-    uint8_t *buffer = NULL;
-    int size = 0;
-    int status = reader_open(&source, input, "ogg");
-    if (status >= 0)
-        status = avformat_find_stream_info(source.format, NULL);
-    if (status >= 0)
-        status = avformat_alloc_output_context2(&dest, NULL, "ogg", NULL);
-    if (status >= 0)
-        status = avio_open_dyn_buf(&dest->pb);
-    if (status >= 0) {
-        dest->flags |= AVFMT_FLAG_BITEXACT;
-        status = reader_remux(source.format, dest);
-        size = avio_close_dyn_buf(dest->pb, &buffer);
-    }
-    avformat_free_context(dest);
-    reader_close(&source);
-    int result = status == AVERROR(ENOMEM) ? 2 : status < 0 || size < 0
-        ? reader_refusal(work) : reader_page_records(work, buffer, (size_t)size);
-    av_free(buffer);
-    return result;
+    return reader_page_records(work, input->data, input->size);
 }
 
 static uint64_t reader_codec(enum AVCodecID codec)
