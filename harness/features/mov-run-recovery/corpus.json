@@ -1,0 +1,2624 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "run57-00-r-front-stco-unchanged-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-00-r-front-stco-unchanged.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "run57-00-r-front-stco-unchanged-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-00-r-front-stco-unchanged.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "run57-01-r-front-stco-lastcount7-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-01-r-front-stco-lastcount7.mov",
+      "sha256": "a73197cdcf9dc89806f8d01899d5c28225a3e981bc139a1d23356491caef057a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "run57-01-r-front-stco-lastcount7-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-01-r-front-stco-lastcount7.mov",
+      "sha256": "a73197cdcf9dc89806f8d01899d5c28225a3e981bc139a1d23356491caef057a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "run57-02-r-front-stco-lastcount8-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-02-r-front-stco-lastcount8.mov",
+      "sha256": "3ad74ba110e7cf15f3356e5d506ef9103318fa48a7e5b6062bfde75d1abfb0a8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "run57-02-r-front-stco-lastcount8-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-02-r-front-stco-lastcount8.mov",
+      "sha256": "3ad74ba110e7cf15f3356e5d506ef9103318fa48a7e5b6062bfde75d1abfb0a8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "run57-03-r-front-stco-lastcount12-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-03-r-front-stco-lastcount12.mov",
+      "sha256": "569ac9ad599da464c75a684137db3cc6bbd183604a0c70e26f840116294e0bb2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "run57-03-r-front-stco-lastcount12-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-03-r-front-stco-lastcount12.mov",
+      "sha256": "569ac9ad599da464c75a684137db3cc6bbd183604a0c70e26f840116294e0bb2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "run57-04-r-front-stco-lastcount5-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-04-r-front-stco-lastcount5.mov",
+      "sha256": "1a8e715760ca5599d32af710f7b769fa5982e6495fd656b56ca3702cc03f4413",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 10280585131556973722
+      }
+    },
+    {
+      "id": "run57-04-r-front-stco-lastcount5-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-04-r-front-stco-lastcount5.mov",
+      "sha256": "1a8e715760ca5599d32af710f7b769fa5982e6495fd656b56ca3702cc03f4413",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 10280585131556973722
+      }
+    },
+    {
+      "id": "run57-05-r-front-stco-lastcount0-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-05-r-front-stco-lastcount0.mov",
+      "sha256": "f493bf848b355747b790c12468c16981f65a7e835b521c3b3acafa186f51c221",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 18217201292976300162
+      }
+    },
+    {
+      "id": "run57-05-r-front-stco-lastcount0-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-05-r-front-stco-lastcount0.mov",
+      "sha256": "f493bf848b355747b790c12468c16981f65a7e835b521c3b3acafa186f51c221",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 18217201292976300162
+      }
+    },
+    {
+      "id": "run57-06-r-vfr-unchanged-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-06-r-vfr-unchanged.mov",
+      "sha256": "4ee159368878ba6df3a232603bef77b88d7360c74aebd15a204800387184a016",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 13792319961331653251
+      }
+    },
+    {
+      "id": "run57-06-r-vfr-unchanged-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-06-r-vfr-unchanged.mov",
+      "sha256": "4ee159368878ba6df3a232603bef77b88d7360c74aebd15a204800387184a016",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 13792319961331653251
+      }
+    },
+    {
+      "id": "run57-07-r-vfr-lastcount2-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-07-r-vfr-lastcount2.mov",
+      "sha256": "a8e289afbb095b111a96414be29cd252ac3c6649a7aaea98152f474acda2188e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 13792319961331653251
+      }
+    },
+    {
+      "id": "run57-07-r-vfr-lastcount2-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-07-r-vfr-lastcount2.mov",
+      "sha256": "a8e289afbb095b111a96414be29cd252ac3c6649a7aaea98152f474acda2188e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 13792319961331653251
+      }
+    },
+    {
+      "id": "run57-08-r-vfr-lastcount8-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-08-r-vfr-lastcount8.mov",
+      "sha256": "48aa033844be47ac01ff75519bdcf4dcaba3737de06f74cab9b4a02b20e55d13",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 13792319961331653251
+      }
+    },
+    {
+      "id": "run57-08-r-vfr-lastcount8-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/run-recovery/run57-08-r-vfr-lastcount8.mov",
+      "sha256": "48aa033844be47ac01ff75519bdcf4dcaba3737de06f74cab9b4a02b20e55d13",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 13792319961331653251
+      }
+    },
+    {
+      "id": "mdhd-one-baseline-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/mdhd-one-baseline.mov",
+      "sha256": "5d563aa658a9b28e03da1cc0952260a9f7969a4a81a3a7906bd2650d7d0512ab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "mdhd-one-baseline-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/mdhd-one-baseline.mov",
+      "sha256": "5d563aa658a9b28e03da1cc0952260a9f7969a4a81a3a7906bd2650d7d0512ab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "mdhd-zero-baseline-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/mdhd-zero-baseline.mov",
+      "sha256": "fbea204fdf5111a97d6d947522906cc8ed65b1ddca16d518e9ecb13afabf64ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "mdhd-zero-baseline-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/mdhd-zero-baseline.mov",
+      "sha256": "fbea204fdf5111a97d6d947522906cc8ed65b1ddca16d518e9ecb13afabf64ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "mdhd-zero-ctts-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/mdhd-zero-ctts.mov",
+      "sha256": "d6d48389d5dd7179fa34fd58455577ab128534bb22a24444bad88be751c19ee0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 13286600008452729400
+      }
+    },
+    {
+      "id": "mdhd-zero-ctts-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/mdhd-zero-ctts.mov",
+      "sha256": "d6d48389d5dd7179fa34fd58455577ab128534bb22a24444bad88be751c19ee0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 13286600008452729400
+      }
+    },
+    {
+      "id": "mdhd-zero-vfr-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/mdhd-zero-vfr.mov",
+      "sha256": "e41f1ce8801270f47a7dc061f20755ace6c806a8895693d876c5340b9acac81f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 13792319961331653251
+      }
+    },
+    {
+      "id": "mdhd-zero-vfr-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/mdhd-zero-vfr.mov",
+      "sha256": "e41f1ce8801270f47a7dc061f20755ace6c806a8895693d876c5340b9acac81f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 13792319961331653251
+      }
+    },
+    {
+      "id": "mvhd-zero-not-selected-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/mvhd-zero-not-selected.mov",
+      "sha256": "1f8e4f8837bb2089c72cec29c03259985eab3ebeefe240f1ed884d6def16ffa1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "mvhd-zero-not-selected-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/mvhd-zero-not-selected.mov",
+      "sha256": "1f8e4f8837bb2089c72cec29c03259985eab3ebeefe240f1ed884d6def16ffa1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "stss-0-4-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-0-4.mov",
+      "sha256": "a505e223eaffec115981b40bfc69889694716adc425feab106a381facfb352bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 3408535204267542258
+      }
+    },
+    {
+      "id": "stss-0-4-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-0-4.mov",
+      "sha256": "a505e223eaffec115981b40bfc69889694716adc425feab106a381facfb352bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 3408535204267542258
+      }
+    },
+    {
+      "id": "stss-1-100-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-1-100.mov",
+      "sha256": "c658b4ac3c8f4048431df8144a2cf15e388a08167bb8f418c664e4385b092243",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 5041124766597327443
+      }
+    },
+    {
+      "id": "stss-1-100-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-1-100.mov",
+      "sha256": "c658b4ac3c8f4048431df8144a2cf15e388a08167bb8f418c664e4385b092243",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 5041124766597327443
+      }
+    },
+    {
+      "id": "stss-1-4-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-1-4.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "stss-1-4-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-1-4.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "stss-100-4-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-100-4.mov",
+      "sha256": "168ed6abfde272164f75e10d908ff17fa826a2c29123b523aa81495e6fe973d4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 981680553768202932
+      }
+    },
+    {
+      "id": "stss-100-4-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-100-4.mov",
+      "sha256": "168ed6abfde272164f75e10d908ff17fa826a2c29123b523aa81495e6fe973d4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 981680553768202932
+      }
+    },
+    {
+      "id": "stss-2-4-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-2-4.mov",
+      "sha256": "6367f48c791fa4602f5e27a8894fd6f7907d06c063c1e474450b20d3db8a2567",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 12647580027134572274
+      }
+    },
+    {
+      "id": "stss-2-4-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-2-4.mov",
+      "sha256": "6367f48c791fa4602f5e27a8894fd6f7907d06c063c1e474450b20d3db8a2567",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 12647580027134572274
+      }
+    },
+    {
+      "id": "stss-4-1-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-4-1.mov",
+      "sha256": "51e81f625a99de1022f016d98b9fb10788d40247eec0c8f1c11e68b1d831a721",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 2853744343066803731
+      }
+    },
+    {
+      "id": "stss-4-1-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-4-1.mov",
+      "sha256": "51e81f625a99de1022f016d98b9fb10788d40247eec0c8f1c11e68b1d831a721",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 2853744343066803731
+      }
+    },
+    {
+      "id": "stss-4-4-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-4-4.mov",
+      "sha256": "56395303c0633b885159c22955b1b88e34ffb9118a946f1a554e7420c0270d37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 2853744343066803731
+      }
+    },
+    {
+      "id": "stss-4-4-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-4-4.mov",
+      "sha256": "56395303c0633b885159c22955b1b88e34ffb9118a946f1a554e7420c0270d37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 2853744343066803731
+      }
+    },
+    {
+      "id": "stss-7-4-ordinary",
+      "profile": "run-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-7-4.mov",
+      "sha256": "d9062acc47aed70c574f305b7d5a4193bd1ad1d1dd39310ae6384828305202b9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 981680553768202932
+      }
+    },
+    {
+      "id": "stss-7-4-tiny",
+      "profile": "run-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-7-4.mov",
+      "sha256": "d9062acc47aed70c574f305b7d5a4193bd1ad1d1dd39310ae6384828305202b9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "run"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 981680553768202932
+      }
+    },
+    {
+      "id": "counts-1,3,2-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-1,3,2.mov",
+      "sha256": "555773842bfa56ff91e2cebe9f67826f02bb447a1922adf76682541bd6eadd42",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17581319716581273322
+      }
+    },
+    {
+      "id": "counts-1,3,2-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-1,3,2.mov",
+      "sha256": "555773842bfa56ff91e2cebe9f67826f02bb447a1922adf76682541bd6eadd42",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17581319716581273322
+      }
+    },
+    {
+      "id": "counts-2,2,2-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-2,2,2.mov",
+      "sha256": "7df7c9e01d43ca2ded6e09732e908d35bee955f5480b5d07f23ba37c07a0ef26",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "counts-2,2,2-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-2,2,2.mov",
+      "sha256": "7df7c9e01d43ca2ded6e09732e908d35bee955f5480b5d07f23ba37c07a0ef26",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "counts-2,3,1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-2,3,1.mov",
+      "sha256": "446482b63fe1112995481e2696f9bd7c71c2d16fd0768e45fcbb1984970875a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 3023882099383824974
+      }
+    },
+    {
+      "id": "counts-2,3,1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-2,3,1.mov",
+      "sha256": "446482b63fe1112995481e2696f9bd7c71c2d16fd0768e45fcbb1984970875a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 3023882099383824974
+      }
+    },
+    {
+      "id": "counts-3,1,2-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-3,1,2.mov",
+      "sha256": "b6d6f963df8d1cf1710d65140d0e25cae29b2bad109c92538282a98fe8af6f46",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 48,
+        "digest": 2981514340473157802
+      }
+    },
+    {
+      "id": "counts-3,1,2-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-3,1,2.mov",
+      "sha256": "b6d6f963df8d1cf1710d65140d0e25cae29b2bad109c92538282a98fe8af6f46",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 48,
+        "digest": 2981514340473157802
+      }
+    },
+    {
+      "id": "counts-3,2,1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-3,2,1.mov",
+      "sha256": "ce4e947b3f5355d58b42a2cf6e530dc84d6a3565c0c951510f4405dbcc36f5eb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 14339761293574198176
+      }
+    },
+    {
+      "id": "counts-3,2,1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-3,2,1.mov",
+      "sha256": "ce4e947b3f5355d58b42a2cf6e530dc84d6a3565c0c951510f4405dbcc36f5eb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 14339761293574198176
+      }
+    },
+    {
+      "id": "counts-4,1,1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-4,1,1.mov",
+      "sha256": "a93499ca81f6e8fcf69cf901868d72542fae7c3c9e0455152d933c97152aa6ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 36,
+        "digest": 11272883053368373837
+      }
+    },
+    {
+      "id": "counts-4,1,1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/counts-4,1,1.mov",
+      "sha256": "a93499ca81f6e8fcf69cf901868d72542fae7c3c9e0455152d933c97152aa6ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 36,
+        "digest": 11272883053368373837
+      }
+    },
+    {
+      "id": "desc-0,0,0-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-0,0,0.mov",
+      "sha256": "aeabd30b5618ea2bc96b3af00596236066fa8f8a0ad0da20346f0942f7ca42c7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 3023882099383824974
+      }
+    },
+    {
+      "id": "desc-0,0,0-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-0,0,0.mov",
+      "sha256": "aeabd30b5618ea2bc96b3af00596236066fa8f8a0ad0da20346f0942f7ca42c7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 3023882099383824974
+      }
+    },
+    {
+      "id": "desc-0,0,1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-0,0,1.mov",
+      "sha256": "210e325ee09773bd1a12d1405be3614bb05ecd57905c95edd4dc01d01675cbd4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 3023882099383824974
+      }
+    },
+    {
+      "id": "desc-0,0,1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-0,0,1.mov",
+      "sha256": "210e325ee09773bd1a12d1405be3614bb05ecd57905c95edd4dc01d01675cbd4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 3023882099383824974
+      }
+    },
+    {
+      "id": "desc-0,1,0-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-0,1,0.mov",
+      "sha256": "f43d992fc313d675f1dae5f84f25336ce63d61d3d3c9005205281cf57cc0e315",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 16034100401702845804
+      }
+    },
+    {
+      "id": "desc-0,1,0-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-0,1,0.mov",
+      "sha256": "f43d992fc313d675f1dae5f84f25336ce63d61d3d3c9005205281cf57cc0e315",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 16034100401702845804
+      }
+    },
+    {
+      "id": "desc-0,1,1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-0,1,1.mov",
+      "sha256": "e2bce77727305c31639c3c5d419709046158df4b7e0a291be8a4625678ded146",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 16034100401702845804
+      }
+    },
+    {
+      "id": "desc-0,1,1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-0,1,1.mov",
+      "sha256": "e2bce77727305c31639c3c5d419709046158df4b7e0a291be8a4625678ded146",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 16034100401702845804
+      }
+    },
+    {
+      "id": "desc-1,0,0-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-1,0,0.mov",
+      "sha256": "702acd181c8c80b310e94aef0d5f881cbd80b95cc603dc755eff1c6fc3a1d101",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 7283745633002937370
+      }
+    },
+    {
+      "id": "desc-1,0,0-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-1,0,0.mov",
+      "sha256": "702acd181c8c80b310e94aef0d5f881cbd80b95cc603dc755eff1c6fc3a1d101",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 7283745633002937370
+      }
+    },
+    {
+      "id": "desc-1,0,1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-1,0,1.mov",
+      "sha256": "a54dcf7cb8a86ca389f1c59d1ff8a452e48798e50cc430088d1705ca98f80ac6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 7283745633002937370
+      }
+    },
+    {
+      "id": "desc-1,0,1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-1,0,1.mov",
+      "sha256": "a54dcf7cb8a86ca389f1c59d1ff8a452e48798e50cc430088d1705ca98f80ac6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 7283745633002937370
+      }
+    },
+    {
+      "id": "desc-1,1,0-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-1,1,0.mov",
+      "sha256": "e95df1dc30021beefd74d095e605cc272d779e4b75f2d799b037dbac6083ec7e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "desc-1,1,0-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-1,1,0.mov",
+      "sha256": "e95df1dc30021beefd74d095e605cc272d779e4b75f2d799b037dbac6083ec7e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "desc-2,1,1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-2,1,1.mov",
+      "sha256": "ebdac9fce9b49dac7755388da5c38393cd83fb3d831687f472799035efb91cf9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 48,
+        "digest": 5810299200365006371
+      }
+    },
+    {
+      "id": "desc-2,1,1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-2,1,1.mov",
+      "sha256": "ebdac9fce9b49dac7755388da5c38393cd83fb3d831687f472799035efb91cf9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 48,
+        "digest": 5810299200365006371
+      }
+    },
+    {
+      "id": "desc-4294967295,1,1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-4294967295,1,1.mov",
+      "sha256": "2dc2ea061e3bfe90e25708e5000f411bc01fed05924d01f7127e2b1201b563e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 16034100401702845804
+      }
+    },
+    {
+      "id": "desc-4294967295,1,1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-4294967295,1,1.mov",
+      "sha256": "2dc2ea061e3bfe90e25708e5000f411bc01fed05924d01f7127e2b1201b563e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 16034100401702845804
+      }
+    },
+    {
+      "id": "desc-zero-ctts-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-zero-ctts.mov",
+      "sha256": "0f07b76aaac2134f031393a572ef29853845b05a4c70ee85a13ca7bd43a130f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 10751501602652010001
+      }
+    },
+    {
+      "id": "desc-zero-ctts-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-zero-ctts.mov",
+      "sha256": "0f07b76aaac2134f031393a572ef29853845b05a4c70ee85a13ca7bd43a130f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 10751501602652010001
+      }
+    },
+    {
+      "id": "desc-zero-variable-sizes-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-zero-variable-sizes.mov",
+      "sha256": "4d763ac1dbf0246828b13bb8d2119348af727a058bb4138bce0ecca7cb9bae9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 55,
+        "digest": 3572909392440421624
+      }
+    },
+    {
+      "id": "desc-zero-variable-sizes-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-zero-variable-sizes.mov",
+      "sha256": "4d763ac1dbf0246828b13bb8d2119348af727a058bb4138bce0ecca7cb9bae9d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 55,
+        "digest": 3572909392440421624
+      }
+    },
+    {
+      "id": "desc-zero-vfr-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-zero-vfr.mov",
+      "sha256": "9700ce038bfc9fcdb839cf7a3d2180b7242b3327d8c72554b4abcb29e7ee2692",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 6745376689677513962
+      }
+    },
+    {
+      "id": "desc-zero-vfr-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/desc-zero-vfr.mov",
+      "sha256": "9700ce038bfc9fcdb839cf7a3d2180b7242b3327d8c72554b4abcb29e7ee2692",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 6745376689677513962
+      }
+    },
+    {
+      "id": "edge-33442-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33442.mov",
+      "sha256": "1b566fda352d7f2b4f4c7a4d5aca7a1f6c0b0f67604f51c003a80f469a6a990f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "edge-33442-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33442.mov",
+      "sha256": "1b566fda352d7f2b4f4c7a4d5aca7a1f6c0b0f67604f51c003a80f469a6a990f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "edge-33443-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33443.mov",
+      "sha256": "785b94b917eea73f3d3aa7e75d82eb3a60e004f42db0b9d7bc0e745d0aaab745",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "edge-33443-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33443.mov",
+      "sha256": "785b94b917eea73f3d3aa7e75d82eb3a60e004f42db0b9d7bc0e745d0aaab745",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "edge-33444-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33444.mov",
+      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "edge-33444-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33444.mov",
+      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "edge-33445-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33445.mov",
+      "sha256": "079ffa2e7aa8f601b942d8b491dc61780a97c443da8407551b2f502d7a903c88",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "edge-33445-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33445.mov",
+      "sha256": "079ffa2e7aa8f601b942d8b491dc61780a97c443da8407551b2f502d7a903c88",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "edge-33514-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33514.mov",
+      "sha256": "2ca485ea243226c647043501f19bf505cb4eb61727b78f7988f752457a565909",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "edge-33514-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33514.mov",
+      "sha256": "2ca485ea243226c647043501f19bf505cb4eb61727b78f7988f752457a565909",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "edge-33515-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33515.mov",
+      "sha256": "442b505fbed38b83fd480525b13a84fbddac5eb106e1a8cd754876d94f939e3a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "edge-33515-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33515.mov",
+      "sha256": "442b505fbed38b83fd480525b13a84fbddac5eb106e1a8cd754876d94f939e3a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "edge-33516-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33516.mov",
+      "sha256": "2c313a54cfae8bce5a6e01b15e8a6d9046e478952a10ce7e2bea61b6ec03d4ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "edge-33516-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/edge-33516.mov",
+      "sha256": "2c313a54cfae8bce5a6e01b15e8a6d9046e478952a10ce7e2bea61b6ec03d4ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "offset-16384-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-16384.mov",
+      "sha256": "f969bd94e6a17b08b07870ce3dcd0937174c3a0b7e9ba7e4761a19f5f1e54d7f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-16384-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-16384.mov",
+      "sha256": "f969bd94e6a17b08b07870ce3dcd0937174c3a0b7e9ba7e4761a19f5f1e54d7f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-2147483647-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-2147483647.mov",
+      "sha256": "5de35825d00b78427cdc5d09aab9092c417f4ad911b54aaf2132cfa9461014e1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "offset-2147483647-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-2147483647.mov",
+      "sha256": "5de35825d00b78427cdc5d09aab9092c417f4ad911b54aaf2132cfa9461014e1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "offset-32767-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-32767.mov",
+      "sha256": "5fa065bd025a3bf9e854fd99bf3957ec4444d68f596c5a103f98f0efd771d3bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-32767-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-32767.mov",
+      "sha256": "5fa065bd025a3bf9e854fd99bf3957ec4444d68f596c5a103f98f0efd771d3bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-32768-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-32768.mov",
+      "sha256": "ac93852272cadc4d2798b46554c8ca39900ffdb21df3fa57923c4bbea98ab384",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-32768-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-32768.mov",
+      "sha256": "ac93852272cadc4d2798b46554c8ca39900ffdb21df3fa57923c4bbea98ab384",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-32769-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-32769.mov",
+      "sha256": "e2e97437690c0c898d32f401e3534d764751f9d5994b791165326d1d68f6f857",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-32769-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-32769.mov",
+      "sha256": "e2e97437690c0c898d32f401e3534d764751f9d5994b791165326d1d68f6f857",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-33442-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33442.mov",
+      "sha256": "1b566fda352d7f2b4f4c7a4d5aca7a1f6c0b0f67604f51c003a80f469a6a990f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-33442-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33442.mov",
+      "sha256": "1b566fda352d7f2b4f4c7a4d5aca7a1f6c0b0f67604f51c003a80f469a6a990f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-33443-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33443.mov",
+      "sha256": "785b94b917eea73f3d3aa7e75d82eb3a60e004f42db0b9d7bc0e745d0aaab745",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-33443-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33443.mov",
+      "sha256": "785b94b917eea73f3d3aa7e75d82eb3a60e004f42db0b9d7bc0e745d0aaab745",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-33444-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33444.mov",
+      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-33444-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33444.mov",
+      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "offset-4294967295-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-4294967295.mov",
+      "sha256": "cf43d1bf564a72c256362f92d0e9af0fa7299ae70a53a8602c1a769be793d64f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "offset-4294967295-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-4294967295.mov",
+      "sha256": "cf43d1bf564a72c256362f92d0e9af0fa7299ae70a53a8602c1a769be793d64f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "offset-4843-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-4843.mov",
+      "sha256": "912b7f1bd08794092be0ecf373535df8b80e156b87ad2fec428c07cc464ce11d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-4843-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-4843.mov",
+      "sha256": "912b7f1bd08794092be0ecf373535df8b80e156b87ad2fec428c07cc464ce11d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-65536-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-65536.mov",
+      "sha256": "0d5ecd0f28b3ff400c8dcfbb156c99e71a966048b6fd23dda652036c39dddd91",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "offset-65536-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-65536.mov",
+      "sha256": "0d5ecd0f28b3ff400c8dcfbb156c99e71a966048b6fd23dda652036c39dddd91",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "offset-747-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-747.mov",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-747-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-747.mov",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-748-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-748.mov",
+      "sha256": "fe4df4a6148397f66b23a2672b6d157f36f93a0b47b54f02f37071fbab87369c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-748-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-748.mov",
+      "sha256": "fe4df4a6148397f66b23a2672b6d157f36f93a0b47b54f02f37071fbab87369c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-8192-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-8192.mov",
+      "sha256": "b0cbca62274d44436377c96a7548370e472356477e96225912d4adf84d73bed7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "offset-8192-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-8192.mov",
+      "sha256": "b0cbca62274d44436377c96a7548370e472356477e96225912d4adf84d73bed7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "prefix-100-edge--1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-100-edge--1.mov",
+      "sha256": "55ae579b98f8fdede6c37c81e01ffebb83596debc50bd8374752587676066093",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "prefix-100-edge--1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-100-edge--1.mov",
+      "sha256": "55ae579b98f8fdede6c37c81e01ffebb83596debc50bd8374752587676066093",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "prefix-100-edge-0-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-100-edge-0.mov",
+      "sha256": "9db82f8ff71068804a64086a3f9a311d5423056726e25dccfe2c0037897a61f5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "prefix-100-edge-0-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-100-edge-0.mov",
+      "sha256": "9db82f8ff71068804a64086a3f9a311d5423056726e25dccfe2c0037897a61f5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "prefix-100-edge-1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-100-edge-1.mov",
+      "sha256": "b46d2d24bc1496abb4eefe3572e7c01448f8006792f88f75dc2816fc24a035ff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "prefix-100-edge-1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-100-edge-1.mov",
+      "sha256": "b46d2d24bc1496abb4eefe3572e7c01448f8006792f88f75dc2816fc24a035ff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "prefix-4096-edge--1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-4096-edge--1.mov",
+      "sha256": "0509a2870429c6cb082a8be68d9dbc7ab333ad65a68d00fc76e86cfb31d12d41",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "prefix-4096-edge--1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-4096-edge--1.mov",
+      "sha256": "0509a2870429c6cb082a8be68d9dbc7ab333ad65a68d00fc76e86cfb31d12d41",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "prefix-4096-edge-0-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-4096-edge-0.mov",
+      "sha256": "3d60819ff2bb23871cc11327720231d3390acaa1cce99bbe3688c81efdb22af3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "prefix-4096-edge-0-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-4096-edge-0.mov",
+      "sha256": "3d60819ff2bb23871cc11327720231d3390acaa1cce99bbe3688c81efdb22af3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "prefix-4096-edge-1-ordinary",
+      "profile": "direct-ordinary",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-4096-edge-1.mov",
+      "sha256": "a5ea9d58e411d0b5da8cf5ed91a5cdd1b795061b55716089a59ab46bc39990cd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "prefix-4096-edge-1-tiny",
+      "profile": "direct-tiny",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/prefix-4096-edge-1.mov",
+      "sha256": "a5ea9d58e411d0b5da8cf5ed91a5cdd1b795061b55716089a59ab46bc39990cd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "physical-missing-ordinary",
+      "profile": "direct-ordinary",
+      "file": "harness/features/mov-run-recovery/variants/physical-missing.mov",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "physical-missing-tiny",
+      "profile": "direct-tiny",
+      "file": "harness/features/mov-run-recovery/variants/physical-missing.mov",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "direct"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "tail-minus-1-ordinary",
+      "profile": "physical-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/tail-minus-1.mov",
+      "sha256": "3a824380e1e1317c20ad7208056cad37899fe42a451ed7f83db7676bb44cd5a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "physical"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 71,
+        "digest": 18119198152403414328
+      }
+    },
+    {
+      "id": "tail-minus-1-tiny",
+      "profile": "physical-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/tail-minus-1.mov",
+      "sha256": "3a824380e1e1317c20ad7208056cad37899fe42a451ed7f83db7676bb44cd5a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "physical"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 71,
+        "digest": 18119198152403414328
+      }
+    },
+    {
+      "id": "tail-minus-11-ordinary",
+      "profile": "physical-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/tail-minus-11.mov",
+      "sha256": "31e4fb5c7e95cb920cd1beb146b07be8336330547fadaea80b229f946a829f0d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "physical"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 61,
+        "digest": 7779534597739087965
+      }
+    },
+    {
+      "id": "tail-minus-11-tiny",
+      "profile": "physical-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/tail-minus-11.mov",
+      "sha256": "31e4fb5c7e95cb920cd1beb146b07be8336330547fadaea80b229f946a829f0d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "physical"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 61,
+        "digest": 7779534597739087965
+      }
+    },
+    {
+      "id": "tail-minus-12-ordinary",
+      "profile": "physical-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/tail-minus-12.mov",
+      "sha256": "7718b45bee674d15bb5a7c0bc9225e6aa5c59e66de1a73485410cb59bfad7b3b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "physical"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 10450454837062094908
+      }
+    },
+    {
+      "id": "tail-minus-12-tiny",
+      "profile": "physical-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/tail-minus-12.mov",
+      "sha256": "7718b45bee674d15bb5a7c0bc9225e6aa5c59e66de1a73485410cb59bfad7b3b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "physical"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 60,
+        "digest": 10450454837062094908
+      }
+    },
+    {
+      "id": "tail-minus-13-ordinary",
+      "profile": "physical-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/tail-minus-13.mov",
+      "sha256": "2f93a67cf558617b11ffaa3e540e2ff5b89b208017608b1f7cb17896c6e78369",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "physical"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 59,
+        "digest": 381615703044692861
+      }
+    },
+    {
+      "id": "tail-minus-13-tiny",
+      "profile": "physical-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/tail-minus-13.mov",
+      "sha256": "2f93a67cf558617b11ffaa3e540e2ff5b89b208017608b1f7cb17896c6e78369",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "physical"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 59,
+        "digest": 381615703044692861
+      }
+    },
+    {
+      "id": "tail-minus-6-ordinary",
+      "profile": "physical-ordinary",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/tail-minus-6.mov",
+      "sha256": "ff1fa4ffcb314ce24aa29edf747f201a9b6038977343934b3c07e7aeffe0e0ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "physical"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 66,
+        "digest": 2230231981793085735
+      }
+    },
+    {
+      "id": "tail-minus-6-tiny",
+      "profile": "physical-tiny",
+      "file": "crates/isobmff/tests/fixtures/field-recovery/tail-minus-6.mov",
+      "sha256": "ff1fa4ffcb314ce24aa29edf747f201a9b6038977343934b3c07e7aeffe0e0ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "physical"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 66,
+        "digest": 2230231981793085735
+      }
+    },
+    {
+      "id": "physical-after-mdat-ordinary",
+      "profile": "physical-ordinary",
+      "file": "harness/features/mov-run-recovery/variants/physical-after-mdat.mov",
+      "sha256": "9afd3375401204309c68888a6056da28edb1c6252f1dda4c84709b8d8c21a94b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "physical"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 788484173518047764
+      }
+    },
+    {
+      "id": "physical-after-mdat-tiny",
+      "profile": "physical-tiny",
+      "file": "harness/features/mov-run-recovery/variants/physical-after-mdat.mov",
+      "sha256": "9afd3375401204309c68888a6056da28edb1c6252f1dda4c84709b8d8c21a94b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "physical"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 788484173518047764
+      }
+    },
+    {
+      "id": "physical-base-ordinary",
+      "profile": "physical-ordinary",
+      "file": "harness/features/mov-run-recovery/variants/physical-base.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "physical"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "physical-base-tiny",
+      "profile": "physical-tiny",
+      "file": "harness/features/mov-run-recovery/variants/physical-base.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "physical"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 6913188555895928242
+      }
+    },
+    {
+      "id": "physical-large-short-ordinary",
+      "profile": "physical-ordinary",
+      "file": "harness/features/mov-run-recovery/variants/physical-large-short.mov",
+      "sha256": "b8b4fd4562fe31a11b9f506bb45dd414ac41a0b28f1ab065df80da0a75245306",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "physical"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 788486049529079478
+      }
+    },
+    {
+      "id": "physical-large-short-tiny",
+      "profile": "physical-tiny",
+      "file": "harness/features/mov-run-recovery/variants/physical-large-short.mov",
+      "sha256": "b8b4fd4562fe31a11b9f506bb45dd414ac41a0b28f1ab065df80da0a75245306",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "physical"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 788486049529079478
+      }
+    },
+    {
+      "id": "physical-short-ordinary",
+      "profile": "physical-ordinary",
+      "file": "harness/features/mov-run-recovery/variants/physical-short.mov",
+      "sha256": "3e381b20f233f3282de30556540e64b674c64ce99db3ff60c6a2848be3c921bb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "physical"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 788484173289039542
+      }
+    },
+    {
+      "id": "physical-short-tiny",
+      "profile": "physical-tiny",
+      "file": "harness/features/mov-run-recovery/variants/physical-short.mov",
+      "sha256": "3e381b20f233f3282de30556540e64b674c64ce99db3ff60c6a2848be3c921bb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "3",
+        "physical"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 788484173289039542
+      }
+    }
+  ]
+}

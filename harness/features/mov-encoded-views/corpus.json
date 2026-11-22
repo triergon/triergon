@@ -1,0 +1,907 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "creation-v0-0",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v0-0.mov",
+      "sha256": "dc5a7500e233066248842b1cb92fc82552ff0443f083680154f4201f6ee3f3d4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 434,
+        "digest": 12236833950938335566
+      }
+    },
+    {
+      "id": "creation-v0-1",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v0-1.mov",
+      "sha256": "58132e260c93487ae01ab58522cb73a8d0cfead18c1962f6ff077bfe639ca669",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 12979441480621851459
+      }
+    },
+    {
+      "id": "creation-v0-1578905043",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v0-1578905043.mov",
+      "sha256": "302da92262531021a5f2549916791b83da833b65ba971f0672a0b8a0648dfb62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 16413809013804267221
+      }
+    },
+    {
+      "id": "creation-v0-2082844799",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v0-2082844799.mov",
+      "sha256": "dd3b687a55184ca55a57e45a2f118ff7ef2f7580de2224b15b16aa090e6dbeb1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 12302576087250988131
+      }
+    },
+    {
+      "id": "creation-v0-2082844800",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v0-2082844800.mov",
+      "sha256": "b3b5d654cecd6dd9b32e9ba729c994649b0898c905967ddd5588613a46ca035f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 6111690591389155748
+      }
+    },
+    {
+      "id": "creation-v0-2082844801",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v0-2082844801.mov",
+      "sha256": "f94cdf443e7c0875cfcb663f023688cb57cca6cb91ff08bdddf3fddb1677a4db",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 12979441480621851459
+      }
+    },
+    {
+      "id": "creation-v0-4294967295",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v0-4294967295.mov",
+      "sha256": "82d52f285194e23bfee66a68961a006aced238ce1181de363d32b33061d7968b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 13808080682455769757
+      }
+    },
+    {
+      "id": "creation-v1-0",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v1-0.mov",
+      "sha256": "2f06a08b0bab4680b0d6a74e2714e86c57e64486eb36f2333aa6ac482396bca4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 434,
+        "digest": 3857614683119864782
+      }
+    },
+    {
+      "id": "creation-v1-1",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v1-1.mov",
+      "sha256": "38ba76dcd2b5603f02804e96f858d6f9e74e9baa504560efbb8d11e083f2104c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 611274777206505070
+      }
+    },
+    {
+      "id": "creation-v1-2082844799",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v1-2082844799.mov",
+      "sha256": "75d53ff3bd9c90205a7c524d6a7737dfa31b4b1c17f14b0261568b5128b9b754",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 12375870848770585130
+      }
+    },
+    {
+      "id": "creation-v1-2082844800",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v1-2082844800.mov",
+      "sha256": "8e9079b41d5106590715e502d8d0f917d3928d395459854dc627bc3755bafe55",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 16179215397280236580
+      }
+    },
+    {
+      "id": "creation-v1-2082844801",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v1-2082844801.mov",
+      "sha256": "2b85e60e39c62602e121582245a667b9b58880c3eb5af1ad0f82287835c44e70",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 4600222212803380675
+      }
+    },
+    {
+      "id": "creation-v1-9223372036854775807",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v1-9223372036854775807.mov",
+      "sha256": "96d4da546010abb440d745a28e4404628ace725689a9fefa1ce285de82d1a942",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 434,
+        "digest": 3857614683119864782
+      }
+    },
+    {
+      "id": "creation-v1-9223372036854775808",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/creation-v1-9223372036854775808.mov",
+      "sha256": "cd539b1f0d49d80a47d64bdfcbc2284f58b2132b7061c090bafb53688343e5d7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 434,
+        "digest": 3857614683119864782
+      }
+    },
+    {
+      "id": "qt-v1-after-terminator",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/qt-v1-after-terminator.mov",
+      "sha256": "ce50c8ca6dbca506de2fb37372bd88e3cb83c825c3f32097eea01d75ad2e98cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 458,
+        "digest": 9126030137039539987
+      }
+    },
+    {
+      "id": "qt-v1-duplicate-esds",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/qt-v1-duplicate-esds.mov",
+      "sha256": "54a36af8ce476b1f6eb149e8305544606ae35f0ad05b01081179e6c2d9135641",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 458,
+        "digest": 18099172128821170515
+      }
+    },
+    {
+      "id": "qt-v1-duplicate-frma",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/qt-v1-duplicate-frma.mov",
+      "sha256": "68b7b53d302b2cde72906b15fecc7cc7370c5a2f724ef264c9a574dfce99664b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 458,
+        "digest": 9126030137039539987
+      }
+    },
+    {
+      "id": "qt-v1-missing-frma",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/qt-v1-missing-frma.mov",
+      "sha256": "f11cb5148930d5e74e943d9c9681c1326d509e673c7a3207fa0440612d6611ee",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 458,
+        "digest": 7437724598966929939
+      }
+    },
+    {
+      "id": "qt-v1-missing-terminator",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/qt-v1-missing-terminator.mov",
+      "sha256": "1234b393a1613fb18a3ea27a715e17c493fa7cc384080513777fe701d01f9139",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 458,
+        "digest": 16942480892167140755
+      }
+    },
+    {
+      "id": "qt-v1-terminator-body",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/qt-v1-terminator-body.mov",
+      "sha256": "424d21d89e3d5c255fd90748777dc9036b320527527dafcf13e030f83845b0de",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 458,
+        "digest": 6046380422875899763
+      }
+    },
+    {
+      "id": "qt-v1-unframed-compression",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/qt-v1-unframed-compression.mov",
+      "sha256": "1440fd3f5847ad13594157c4b93dd5bacd68a2ae3107178d98aaa3579dcfb8eb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 458,
+        "digest": 17505249404858010771
+      }
+    },
+    {
+      "id": "qt-v1-unknown",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/qt-v1-unknown.mov",
+      "sha256": "e0ddfc745ca4230beab4730e6dd88bf843404aae35b3faec97967aedb77da365",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 458,
+        "digest": 184042356530199187
+      }
+    },
+    {
+      "id": "qt-v1-wave",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/qt-v1-wave.mov",
+      "sha256": "dfb16f8ae7587e64cf3f29bd2ee44bd43c5785d74735d05f973fac19dbec745a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 458,
+        "digest": 17505249404858010771
+      }
+    },
+    {
+      "id": "qt-v1-wrong-frma",
+      "profile": "metadata",
+      "file": "crates/isobmff/tests/fixtures/encoded-metadata/qt-v1-wrong-frma.mov",
+      "sha256": "e603268a2a2f8b251f4583f22fe98588559b5c445d37953f2631b585963a6194",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 458,
+        "digest": 17505249404858010771
+      }
+    },
+    {
+      "id": "creation-v0-2147483647",
+      "profile": "metadata",
+      "file": "harness/features/mov-encoded-views/variants/creation-v0-2147483647.mov",
+      "sha256": "20810f3e13f56aec7884439646426c78582fe46dbfe769f9c098f4d5ad3a8531",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 9938378456345809958
+      }
+    },
+    {
+      "id": "creation-v0-2147483648",
+      "profile": "metadata",
+      "file": "harness/features/mov-encoded-views/variants/creation-v0-2147483648.mov",
+      "sha256": "54aa1e4cdeeec2bd6dfe831d25c78ddf9fd6730b1f85ceb0748a06995b27e644",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 16806129345578505669
+      }
+    },
+    {
+      "id": "creation-v1-4294967296",
+      "profile": "metadata",
+      "file": "harness/features/mov-encoded-views/variants/creation-v1-4294967296.mov",
+      "sha256": "2950c6f64a4e7951d1654ab5b759cee0dfb32ec48a0df3b4c18063df594c0118",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "metadata"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 461,
+        "digest": 12296612303869994684
+      }
+    },
+    {
+      "id": "coverage-over",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/coverage-over.mp4",
+      "sha256": "138a0938c3acfde447da130718e8b322c668a116ea9bbfef8c169c79bb7b3f01",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 15050837272098766013
+      }
+    },
+    {
+      "id": "coverage-under",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/coverage-under.mp4",
+      "sha256": "118a4feb759c78fd9fdce82491fbbf447c28471b7c42d0b4b8d9891c4aa83b5c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 15050837272098766013
+      }
+    },
+    {
+      "id": "dangling-description",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/dangling-description.mp4",
+      "sha256": "80466968f41f5a1286db28de761a580b828168c0cfe9242857c176b1aecd5e02",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 15050837272098766013
+      }
+    },
+    {
+      "id": "description-without-map",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/description-without-map.mp4",
+      "sha256": "a845db178a88e30100b8a76fc9607114a3cdd5fee5b1578901d1098c535c825a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 8570511616610448957
+      }
+    },
+    {
+      "id": "duplicate-description",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/duplicate-description.mp4",
+      "sha256": "1cf16f3b4edc1789c1cd313d1a00e9510e3e874dd976802df36be1e7959a0bba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 9601525102148414205
+      }
+    },
+    {
+      "id": "empty-run",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/empty-run.mp4",
+      "sha256": "1656e00f7c53763505c8fa7edcdab21363042b0106fb42a5d5a1eb38661663cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 6361362274404255677
+      }
+    },
+    {
+      "id": "fragment-namespace",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/fragment-namespace.mp4",
+      "sha256": "f172c3ee23f6fd91b66a4749f34fc93ad968f5228ad93412d082d9813d1581eb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 15050837272098766013
+      }
+    },
+    {
+      "id": "grouping-parameter",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/grouping-parameter.mp4",
+      "sha256": "9a04ecd22bf3aac964b472739f4dd66fd44c7b493609ede2317c6a5d81fe78b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 10706099773251510845
+      }
+    },
+    {
+      "id": "mapping-before-description",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/mapping-before-description.mp4",
+      "sha256": "e8bb8603a4780142bbcd0963ce9dc52e703677eae2d870008ab6c62ff7405184",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 15050837272098766013
+      }
+    },
+    {
+      "id": "prol-negative-v1",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/prol-negative-v1.mp4",
+      "sha256": "72a2871f9abbf4540023b448b866b0eda2527bc021f29114f7b79786f5f4a749",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 10706099773251510845
+      }
+    },
+    {
+      "id": "reserved-source-retained",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/reserved-source-retained.mp4",
+      "sha256": "178f39e9b49248584f51f41a7a93ac5d0bea558fc2c4c35b59e72413c282db2a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 7846011629342510285
+      }
+    },
+    {
+      "id": "roll-multiple-descriptions",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/roll-multiple-descriptions.mp4",
+      "sha256": "0544fdc0e6155733915129bef163ea284627d7e2c0cca6729374f5ba8f36f29a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 4188993524980628093
+      }
+    },
+    {
+      "id": "roll-negative-v0",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/roll-negative-v0.mp4",
+      "sha256": "15522867fbeb97c3087857cfc068ab9b6ef99493fa7884370b8efe7ea118151d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 15050837272098766013
+      }
+    },
+    {
+      "id": "roll-positive-v1",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/roll-positive-v1.mp4",
+      "sha256": "fed68300271a70130d026d1b2dfa59de0b2722b8161ccc66c4f021ea1b18b679",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 10706099773251510845
+      }
+    },
+    {
+      "id": "roll-prol-independent",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/roll-prol-independent.mp4",
+      "sha256": "0fc78bb6ddd1922fea0b6fdb9dc5bbeb423ce379ce79cd00f2ca17386c87f256",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 11737113258789476093
+      }
+    },
+    {
+      "id": "roll-zero-association",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/roll-zero-association.mp4",
+      "sha256": "cfbc7a18f09954327c1b7e1a1c7ef90333bc87297a764662346be11850f96f43",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 6361362274404255677
+      }
+    },
+    {
+      "id": "unknown-group-unadmitted",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/unknown-group-unadmitted.mp4",
+      "sha256": "995f22452904d4749d56f75f5876fc9c0bc8f70791b93a1c3bff82bcae64a638",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 15050837272098766013
+      }
+    },
+    {
+      "id": "variable-length-unadmitted",
+      "profile": "recovery",
+      "file": "crates/isobmff/tests/fixtures/encoded-recovery/variable-length-unadmitted.mp4",
+      "sha256": "192bac93d93fe49cf921ef1340906ea0ef98400d008b2d8df55ebf3f961f5e96",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "recovery"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 6361362274404255677
+      }
+    },
+    {
+      "id": "dep-STSS-conflict-preserved",
+      "profile": "dependency",
+      "file": "crates/isobmff/tests/fixtures/encoded-dependency/dep-STSS-conflict-preserved.mp4",
+      "sha256": "9529eca9596d187b7767759ab4bfbe051ba575b8477028c5dc4a83f0b5349135",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "dependency"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 17223206021522393597
+      }
+    },
+    {
+      "id": "dep-leading-raw-preserved",
+      "profile": "dependency",
+      "file": "crates/isobmff/tests/fixtures/encoded-dependency/dep-leading-raw-preserved.mp4",
+      "sha256": "a156d20cbce05db59e33a35e0508b7689f4d9e36e16e7a94631983d97b18b2ab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "dependency"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 17223206021522393597
+      }
+    },
+    {
+      "id": "dep-no-groups",
+      "profile": "dependency",
+      "file": "crates/isobmff/tests/fixtures/encoded-dependency/dep-no-groups.mp4",
+      "sha256": "cc066958dd392b169ba24cf2df2f6385fbad6e27e9c9fceaf2b2a043855ec12c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "dependency"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 14019823786560800765
+      }
+    },
+    {
+      "id": "dep-no-hint",
+      "profile": "dependency",
+      "file": "crates/isobmff/tests/fixtures/encoded-dependency/dep-no-hint.mp4",
+      "sha256": "1a047487db17bcdcfd8d3a4521a6a729a211ba1e91c3999c6ff64d121db73e15",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "dependency"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 17223206021522393597
+      }
+    },
+    {
+      "id": "dep-real-roll-unadmitted",
+      "profile": "dependency",
+      "file": "crates/isobmff/tests/fixtures/encoded-dependency/dep-real-roll-unadmitted.mp4",
+      "sha256": "15522867fbeb97c3087857cfc068ab9b6ef99493fa7884370b8efe7ea118151d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "dependency"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 15050837272098766013
+      }
+    },
+    {
+      "id": "dep-referenced",
+      "profile": "dependency",
+      "file": "crates/isobmff/tests/fixtures/encoded-dependency/dep-referenced.mp4",
+      "sha256": "d58a5023ad10ac24b36746a9a8158b955df13c5520164872ae3493f6ad352126",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "dependency"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 17223206021522393597
+      }
+    },
+    {
+      "id": "dep-reserved-referenced-field",
+      "profile": "dependency",
+      "file": "crates/isobmff/tests/fixtures/encoded-dependency/dep-reserved-referenced-field.mp4",
+      "sha256": "a6dac59072eb3843cac15a3faa996cf87e598f0ba3c80f2a39627507a074549a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "dependency"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 17223206021522393597
+      }
+    },
+    {
+      "id": "dep-unreferenced",
+      "profile": "dependency",
+      "file": "crates/isobmff/tests/fixtures/encoded-dependency/dep-unreferenced.mp4",
+      "sha256": "bc4d18dac9c52ae20138f63a0a7258c2b83e18c8457c6760d94e4babbcd31786",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "dependency"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 4379,
+        "digest": 17257650991790797821
+      }
+    }
+  ]
+}

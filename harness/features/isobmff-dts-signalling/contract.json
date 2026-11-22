@@ -1,0 +1,328 @@
+{
+  "schema": 1,
+  "id": "isobmff-dts-signalling",
+  "gate": "required",
+  "operation": "dts-entry",
+  "candidate": "isobmff-views-worker",
+  "worker_operation": "dts-entry-",
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-isobmff-views-native",
+  "contract": [
+    "Compare stream count and the audio entry's DTS classification, integral rate and samples per access unit from codec parameters after a MOV open, without stream discovery or packet decoding.",
+    "The candidate reports its core-signalling verdict and the sample entry's base rate. FFmpeg reports the DTS codec identifier and can use the maximum coded rate from ddts. A candidate entry refusal is distinct from a non-DTS entry.",
+    "The mismatched-format case passes an inconsistent typed format to the candidate's public checker and opens the original wire entry with FFmpeg.",
+    "Input loading and schedule parsing precede the operation. Both sides open, consume and release their readers inside it."
+  ],
+  "required_profiles": [
+    "dts-entry",
+    "controls",
+    "mismatched"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "ddts-largest-duration",
+        "ddts-truncated-00",
+        "ddts-truncated-01",
+        "ddts-truncated-02",
+        "ddts-truncated-03",
+        "ddts-truncated-04",
+        "ddts-truncated-05",
+        "ddts-truncated-06",
+        "ddts-truncated-07",
+        "ddts-truncated-08",
+        "ddts-truncated-09",
+        "ddts-truncated-10",
+        "ddts-truncated-11",
+        "ddts-truncated-12",
+        "ddts-truncated-13",
+        "ddts-truncated-14",
+        "ddts-truncated-15",
+        "ddts-truncated-16",
+        "ddts-truncated-17",
+        "ddts-truncated-18",
+        "ddts-truncated-19",
+        "ddts-zero-frequency",
+        "dtsc-quicktime-v1",
+        "dtsc",
+        "dtse",
+        "dtsh",
+        "dtsl",
+        "dtsx",
+        "mp4a-object-40",
+        "mp4a-object-a9",
+        "mp4a-object-aa",
+        "mp4a-object-ab",
+        "mp4a-object-ac",
+        "ddts-layout-ff00",
+        "ddts-only-size-19",
+        "ddts-only-size-20",
+        "ddts-only-size-7",
+        "dOps-valid-after-ddts",
+        "original",
+        "audio0",
+        "audio1024",
+        "audio2048",
+        "video0",
+        "video2673",
+        "leading-ac3",
+        "leading-eac3",
+        "quicktime-avc",
+        "aac-program-edit",
+        "avc-opus-edit",
+        "dtsc-mismatched-format"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "ddts-largest-duration",
+        "ddts-truncated-00",
+        "ddts-truncated-01",
+        "ddts-truncated-02",
+        "ddts-truncated-03",
+        "ddts-truncated-04",
+        "ddts-truncated-05",
+        "ddts-truncated-06",
+        "ddts-truncated-07",
+        "ddts-truncated-08",
+        "ddts-truncated-09",
+        "ddts-truncated-10",
+        "ddts-truncated-11",
+        "ddts-truncated-12",
+        "ddts-truncated-13",
+        "ddts-truncated-14",
+        "ddts-truncated-15",
+        "ddts-truncated-16",
+        "ddts-truncated-17",
+        "ddts-truncated-18",
+        "ddts-truncated-19",
+        "ddts-zero-frequency",
+        "dtsc-quicktime-v1",
+        "dtsc",
+        "dtse",
+        "dtsh",
+        "dtsl",
+        "dtsx",
+        "mp4a-object-40",
+        "mp4a-object-a9",
+        "mp4a-object-aa",
+        "mp4a-object-ab",
+        "mp4a-object-ac",
+        "ddts-layout-ff00",
+        "ddts-only-size-19",
+        "ddts-only-size-20",
+        "ddts-only-size-7",
+        "dOps-valid-after-ddts",
+        "original",
+        "audio0",
+        "audio1024",
+        "audio2048",
+        "video0",
+        "video2673",
+        "leading-ac3",
+        "leading-eac3",
+        "quicktime-avc",
+        "aac-program-edit",
+        "avc-opus-edit",
+        "dtsc-mismatched-format"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "ddts-largest-duration",
+        "ddts-truncated-00",
+        "ddts-truncated-01",
+        "ddts-truncated-02",
+        "ddts-truncated-03",
+        "ddts-truncated-04",
+        "ddts-truncated-05",
+        "ddts-truncated-06",
+        "ddts-truncated-07",
+        "ddts-truncated-08",
+        "ddts-truncated-09",
+        "ddts-truncated-10",
+        "ddts-truncated-11",
+        "ddts-truncated-12",
+        "ddts-truncated-13",
+        "ddts-truncated-14",
+        "ddts-truncated-15",
+        "ddts-truncated-16",
+        "ddts-truncated-17",
+        "ddts-truncated-18",
+        "ddts-truncated-19",
+        "ddts-zero-frequency",
+        "dtsc-quicktime-v1",
+        "dtsc",
+        "dtse",
+        "dtsh",
+        "dtsl",
+        "dtsx",
+        "mp4a-object-40",
+        "mp4a-object-a9",
+        "mp4a-object-aa",
+        "mp4a-object-ab",
+        "mp4a-object-ac",
+        "ddts-layout-ff00",
+        "ddts-only-size-19",
+        "ddts-only-size-20",
+        "ddts-only-size-7",
+        "dOps-valid-after-ddts",
+        "original",
+        "audio0",
+        "audio1024",
+        "audio2048",
+        "video0",
+        "video2673",
+        "leading-ac3",
+        "leading-eac3",
+        "quicktime-avc",
+        "aac-program-edit",
+        "avc-opus-edit",
+        "dtsc-mismatched-format"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    }
+  ],
+  "pending_module_requirements": [
+    "The AudioSampleEntry base sample rate and the reference's coded DTS sampling frequency differ.",
+    "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level.",
+    "The source checker rejects the invalid coded frequency per description and the demuxer rejects the stream at open.",
+    "The selected core profile refuses the entry tag while demuxing reports a codec identifier.",
+    "MPEG-4 object-type core admission differs from the pinned demuxer's codec identifier mapping.",
+    "The typed format conflicts with the encoded entry type and is refused before reading its configuration."
+  ],
+  "open_cases": [
+    {
+      "id": "ddts-largest-duration",
+      "requirement": "The AudioSampleEntry base sample rate and the reference's coded DTS sampling frequency differ."
+    },
+    {
+      "id": "ddts-truncated-00",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-01",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-02",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-03",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-04",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-05",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-06",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-07",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-08",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-09",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-10",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-11",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-12",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-13",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-14",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-15",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-16",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-17",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-18",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-truncated-19",
+      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+    },
+    {
+      "id": "ddts-zero-frequency",
+      "requirement": "The source checker rejects the invalid coded frequency per description and the demuxer rejects the stream at open."
+    },
+    {
+      "id": "dtse",
+      "requirement": "The selected core profile refuses the entry tag while demuxing reports a codec identifier."
+    },
+    {
+      "id": "dtsh",
+      "requirement": "The AudioSampleEntry base sample rate and the reference's coded DTS sampling frequency differ."
+    },
+    {
+      "id": "dtsl",
+      "requirement": "The AudioSampleEntry base sample rate and the reference's coded DTS sampling frequency differ."
+    },
+    {
+      "id": "dtsx",
+      "requirement": "The selected core profile refuses the entry tag while demuxing reports a codec identifier."
+    },
+    {
+      "id": "mp4a-object-aa",
+      "requirement": "MPEG-4 object-type core admission differs from the pinned demuxer's codec identifier mapping."
+    },
+    {
+      "id": "mp4a-object-ab",
+      "requirement": "MPEG-4 object-type core admission differs from the pinned demuxer's codec identifier mapping."
+    },
+    {
+      "id": "mp4a-object-ac",
+      "requirement": "MPEG-4 object-type core admission differs from the pinned demuxer's codec identifier mapping."
+    },
+    {
+      "id": "dtsc-mismatched-format",
+      "requirement": "The typed format conflicts with the encoded entry type and is refused before reading its configuration."
+    }
+  ]
+}

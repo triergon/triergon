@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "tfra-landings",
+      "profile": "tfra",
+      "file": "crates/isobmff/tests/fixtures/f-tfra-mfra.mp4",
+      "sha256": "5c983040738d86590fd56f7168474c6e518988cb6214374ff1de2e300e696e9c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "999",
+        "62",
+        "1",
+        "1",
+        "607",
+        "799",
+        "0",
+        "799",
+        "991",
+        "3000"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 3124904122001
+      }
+    },
+    {
+      "id": "tfra-shifted-landings",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-shifted.bin",
+      "sha256": "e3f854e92593719d15a0850f0b61fa536c411942f613b25e3e783307db293ac7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "999",
+        "62",
+        "1",
+        "1",
+        "607",
+        "799",
+        "0",
+        "799",
+        "991",
+        "9000"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 3124904308001
+      }
+    },
+    {
+      "id": "sidx-v0-landings",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-v0-landings.bin",
+      "sha256": "b13a8a906bfa57aac70f31ead0e37a57387d6d9d8758fc2f779b9feb4c183143",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "607",
+        "56",
+        "1",
+        "1",
+        "663",
+        "855",
+        "0",
+        "855",
+        "1047",
+        "3000"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 2954416290505137857
+      }
+    },
+    {
+      "id": "sidx-v1-landings",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-v1-landings.bin",
+      "sha256": "b123499aa03fe2bf61d00f2695eeb6b0bdf0d25a0913378dc20c056f2db5663e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "607",
+        "64",
+        "1",
+        "1",
+        "687",
+        "879",
+        "0",
+        "879",
+        "1071",
+        "3000"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 2974721920347412673
+      }
+    }
+  ]
+}

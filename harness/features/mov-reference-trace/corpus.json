@@ -1,0 +1,3282 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "receiver-boundary-expanded-fractional",
+      "profile": "receiver",
+      "file": "crates/isobmff/tests/fixtures/clock-boundary/boundary-expanded-fractional.mov",
+      "sha256": "09205eda194c8098de11e46686a6e54e6f9541e65622b2ff306f23a3948d6418",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 0,
+        "digest": 10375521481930957972
+      }
+    },
+    {
+      "id": "receiver-f-tfdt-above-i64",
+      "profile": "receiver",
+      "file": "crates/isobmff/tests/fixtures/clock-boundary/f-tfdt-above-i64.mp4",
+      "sha256": "cb4d316199d2b7eb08ef8930690009f8a17f58831e942134cf80f310f2045dbd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 0,
+        "digest": 15367535120974869844
+      }
+    },
+    {
+      "id": "receiver-modern-iso6-tfdt-above-i64",
+      "profile": "receiver",
+      "file": "crates/isobmff/tests/fixtures/clock-boundary/modern-iso6-tfdt-above-i64.mp4",
+      "sha256": "8d387e6cbf686c1fa915b66f6aa56b531d91a1e5889c409d3bb989ab986bec30",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 0,
+        "digest": 15367535120974869844
+      }
+    },
+    {
+      "id": "configuration-dOps-only-size-0",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/dOps-only-size-0.mov",
+      "sha256": "2bcc07ba0cf16bf00a837c1c1df044f6132795ea0d552b6fa43227d3b7787eb4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "configuration-dOps-only-size-11",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/dOps-only-size-11.mov",
+      "sha256": "0fc337efe5f58693a9e8b1519508c0f5de6ca8db2978d029e9404518cf6bd15a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 2588933776574512292
+      }
+    },
+    {
+      "id": "configuration-dOps-valid-after-ddts",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/dOps-valid-after-ddts.mov",
+      "sha256": "2b4801dd8c76570519962078a7772fa1e85b584e663eb0b89e3c87d04d7ea9c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 2588933776574512292
+      }
+    },
+    {
+      "id": "configuration-ddts-layout-ff00",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-layout-ff00.mov",
+      "sha256": "812f12fdcaf4fe0e68394c7d225468d0ccf0723cd903d054196496b85f659602",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "configuration-ddts-only-size-19",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-19.mov",
+      "sha256": "04bda09604f418da2948e193ec8ffc471ec8ce4d0a7eeab2590c33972396bf39",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "configuration-ddts-only-size-20",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-20.mov",
+      "sha256": "2137a1f75500a7f0e5d589abb2e9719f751d9dc3c026cc47836d76599cbc2980",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "configuration-ddts-only-size-7",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-7.mov",
+      "sha256": "8eebebf4eb383162e0b9fd78843bad565406f0589857058d12b3f68cbd6e384a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "configuration-drop-dOps",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/drop-dOps.mov",
+      "sha256": "8a3bd654dfc2a1f9ade0f481af5debaaea8d8b870c5d281863a57b3df2a78484",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 1831350593217367
+      }
+    },
+    {
+      "id": "configuration-fiel-av1C",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/fiel-av1C.mov",
+      "sha256": "66b0082aa5fd1af043ad180c05923642f00c08c6494dc2c00a1c7d3d863809c2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 2588933776574512292
+      }
+    },
+    {
+      "id": "configuration-fiel-avcC",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/fiel-avcC.mov",
+      "sha256": "babb669f7afab47ad604cfdc757d442abf152ebcf213d651a264b71e79da5303",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 2588933776574512292
+      }
+    },
+    {
+      "id": "configuration-fiel-hvcC",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/fiel-hvcC.mov",
+      "sha256": "57d1312fcea436df5c56537a2330d48f7d01de20be32f75823bdbdddcfdf6aa2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 2588933776574512292
+      }
+    },
+    {
+      "id": "configuration-no-private-boxes",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/no-private-boxes.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "configuration-one-byte-prefix-then-real",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/one-byte-prefix-then-real.mov",
+      "sha256": "d52ea85343c534dab720b554407836741940ade49b71960f0447c41b397d3eed",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 1831350593218328
+      }
+    },
+    {
+      "id": "configuration-reversed-opaque-order",
+      "profile": "configuration",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/reversed-opaque-order.mov",
+      "sha256": "d53c9e282f0817fdf34af42cbdb2b876beaf3cc4569584d2debf780d4938a195",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 1831350593219289
+      }
+    },
+    {
+      "id": "header-dOps-only-size-0",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/dOps-only-size-0.mov",
+      "sha256": "2bcc07ba0cf16bf00a837c1c1df044f6132795ea0d552b6fa43227d3b7787eb4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "header-dOps-only-size-11",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/dOps-only-size-11.mov",
+      "sha256": "0fc337efe5f58693a9e8b1519508c0f5de6ca8db2978d029e9404518cf6bd15a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 2588933776574512292
+      }
+    },
+    {
+      "id": "header-dOps-valid-after-ddts",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/dOps-valid-after-ddts.mov",
+      "sha256": "2b4801dd8c76570519962078a7772fa1e85b584e663eb0b89e3c87d04d7ea9c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 2588933776574512292
+      }
+    },
+    {
+      "id": "header-ddts-layout-ff00",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-layout-ff00.mov",
+      "sha256": "812f12fdcaf4fe0e68394c7d225468d0ccf0723cd903d054196496b85f659602",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "header-ddts-only-size-19",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-19.mov",
+      "sha256": "04bda09604f418da2948e193ec8ffc471ec8ce4d0a7eeab2590c33972396bf39",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "header-ddts-only-size-20",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-20.mov",
+      "sha256": "2137a1f75500a7f0e5d589abb2e9719f751d9dc3c026cc47836d76599cbc2980",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "header-ddts-only-size-7",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-7.mov",
+      "sha256": "8eebebf4eb383162e0b9fd78843bad565406f0589857058d12b3f68cbd6e384a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "header-drop-dOps",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/drop-dOps.mov",
+      "sha256": "8a3bd654dfc2a1f9ade0f481af5debaaea8d8b870c5d281863a57b3df2a78484",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 1831350593217367
+      }
+    },
+    {
+      "id": "header-fiel-av1C",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/fiel-av1C.mov",
+      "sha256": "66b0082aa5fd1af043ad180c05923642f00c08c6494dc2c00a1c7d3d863809c2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 2588933776574512292
+      }
+    },
+    {
+      "id": "header-fiel-avcC",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/fiel-avcC.mov",
+      "sha256": "babb669f7afab47ad604cfdc757d442abf152ebcf213d651a264b71e79da5303",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 2588933776574512292
+      }
+    },
+    {
+      "id": "header-fiel-hvcC",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/fiel-hvcC.mov",
+      "sha256": "57d1312fcea436df5c56537a2330d48f7d01de20be32f75823bdbdddcfdf6aa2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 2588933776574512292
+      }
+    },
+    {
+      "id": "header-no-private-boxes",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/no-private-boxes.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 59799
+      }
+    },
+    {
+      "id": "header-one-byte-prefix-then-real",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/one-byte-prefix-then-real.mov",
+      "sha256": "d52ea85343c534dab720b554407836741940ade49b71960f0447c41b397d3eed",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 1831350593218328
+      }
+    },
+    {
+      "id": "header-reversed-opaque-order",
+      "profile": "header",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/reversed-opaque-order.mov",
+      "sha256": "d53c9e282f0817fdf34af42cbdb2b876beaf3cc4569584d2debf780d4938a195",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 1831350593219289
+      }
+    },
+    {
+      "id": "diagnostics-dOps-only-size-0",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/dOps-only-size-0.mov",
+      "sha256": "2bcc07ba0cf16bf00a837c1c1df044f6132795ea0d552b6fa43227d3b7787eb4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "diagnostics-dOps-only-size-11",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/dOps-only-size-11.mov",
+      "sha256": "0fc337efe5f58693a9e8b1519508c0f5de6ca8db2978d029e9404518cf6bd15a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "diagnostics-dOps-valid-after-ddts",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/dOps-valid-after-ddts.mov",
+      "sha256": "2b4801dd8c76570519962078a7772fa1e85b584e663eb0b89e3c87d04d7ea9c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "diagnostics-ddts-layout-ff00",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-layout-ff00.mov",
+      "sha256": "812f12fdcaf4fe0e68394c7d225468d0ccf0723cd903d054196496b85f659602",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 36,
+        "digest": 7634222566402560513
+      }
+    },
+    {
+      "id": "diagnostics-ddts-only-size-19",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-19.mov",
+      "sha256": "04bda09604f418da2948e193ec8ffc471ec8ce4d0a7eeab2590c33972396bf39",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 38,
+        "digest": 521631495655138875
+      }
+    },
+    {
+      "id": "diagnostics-ddts-only-size-20",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-20.mov",
+      "sha256": "2137a1f75500a7f0e5d589abb2e9719f751d9dc3c026cc47836d76599cbc2980",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "diagnostics-ddts-only-size-7",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-7.mov",
+      "sha256": "8eebebf4eb383162e0b9fd78843bad565406f0589857058d12b3f68cbd6e384a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 39,
+        "digest": 11605518945098531775
+      }
+    },
+    {
+      "id": "diagnostics-drop-dOps",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/drop-dOps.mov",
+      "sha256": "8a3bd654dfc2a1f9ade0f481af5debaaea8d8b870c5d281863a57b3df2a78484",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 205,
+        "digest": 13948218724668196035
+      }
+    },
+    {
+      "id": "diagnostics-fiel-av1C",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/fiel-av1C.mov",
+      "sha256": "66b0082aa5fd1af043ad180c05923642f00c08c6494dc2c00a1c7d3d863809c2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "diagnostics-fiel-avcC",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/fiel-avcC.mov",
+      "sha256": "babb669f7afab47ad604cfdc757d442abf152ebcf213d651a264b71e79da5303",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "diagnostics-fiel-hvcC",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/fiel-hvcC.mov",
+      "sha256": "57d1312fcea436df5c56537a2330d48f7d01de20be32f75823bdbdddcfdf6aa2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "diagnostics-no-private-boxes",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/no-private-boxes.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "diagnostics-one-byte-prefix-then-real",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/one-byte-prefix-then-real.mov",
+      "sha256": "d52ea85343c534dab720b554407836741940ade49b71960f0447c41b397d3eed",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 183,
+        "digest": 2655251577938964628
+      }
+    },
+    {
+      "id": "diagnostics-reversed-opaque-order",
+      "profile": "diagnostics",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/reversed-opaque-order.mov",
+      "sha256": "d53c9e282f0817fdf34af42cbdb2b876beaf3cc4569584d2debf780d4938a195",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 205,
+        "digest": 13948218724668196035
+      }
+    },
+    {
+      "id": "receiver-below-threshold",
+      "profile": "receiver",
+      "file": ".research/isobmff-index-fixtures/receiver-below-threshold.bin",
+      "sha256": "36b92f19cadc3fe99779f2cb851d5e60c4b3d4120c46a29ff1b7737662f608e6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 7237460816788173236
+      }
+    },
+    {
+      "id": "receiver-threshold",
+      "profile": "receiver",
+      "file": ".research/isobmff-index-fixtures/receiver-threshold.bin",
+      "sha256": "362527e94b939f8915fe673f176cf34ca299c1aca5187640ea875cd32f2e8861",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 14766685957971071540
+      }
+    },
+    {
+      "id": "receiver-above-threshold",
+      "profile": "receiver",
+      "file": ".research/isobmff-index-fixtures/receiver-above-threshold.bin",
+      "sha256": "5a548a51a71e6af9361b9c14839fd7c17bcca37637c2c62afadb898d6137a4fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 2722473597620839092
+      }
+    },
+    {
+      "id": "receiver-before-origin",
+      "profile": "receiver",
+      "file": ".research/isobmff-index-fixtures/receiver-before-origin.bin",
+      "sha256": "2c49155977d54fd94ab1134de18d41c8901e04791cbdbd69e2f671c454283f98",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 6732264194341958132
+      }
+    },
+    {
+      "id": "receiver-origin",
+      "profile": "receiver",
+      "file": ".research/isobmff-index-fixtures/receiver-origin.bin",
+      "sha256": "9f44abe292a200e9f906bf5740c1996c8d6194368665225df2b9a750a2c7d198",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 6758492327925492308
+      }
+    },
+    {
+      "id": "receiver-after-origin",
+      "profile": "receiver",
+      "file": ".research/isobmff-index-fixtures/receiver-after-origin.bin",
+      "sha256": "07e6a3f11c961e71723bdd0801d2f3e873b80faa6da98ac21a8bb3bcc27d73a1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 6784720461509026484
+      }
+    },
+    {
+      "id": "receiver-near-max-19",
+      "profile": "receiver",
+      "file": ".research/isobmff-index-fixtures/receiver-near-max-19.bin",
+      "sha256": "be1c974f77294c205c2f69529448afa3d5bc542516af3fec6f13ec2cc6d96b39",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 10322404653726530356
+      }
+    },
+    {
+      "id": "receiver-near-max-9",
+      "profile": "receiver",
+      "file": ".research/isobmff-index-fixtures/receiver-near-max-9.bin",
+      "sha256": "3423eac9a6b3c2c7a877e057c518ffe7399205451be1147257073a5809231df2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 10584685989561872116
+      }
+    },
+    {
+      "id": "receiver-decoded-to-max",
+      "profile": "receiver",
+      "file": ".research/isobmff-index-fixtures/receiver-decoded-to-max.bin",
+      "sha256": "3e5077c5a00122f6380be8d09f331b7efe8780671c79a3c0ad2694b044ad31fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "receiver-at-max",
+      "profile": "receiver",
+      "file": ".research/isobmff-index-fixtures/receiver-at-max.bin",
+      "sha256": "bb368d11dd9806604061a3ebe7a308839c62c858ba01740e1a93f460f9d6c8b3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "receiver",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "configuration-opus-version",
+      "profile": "configuration",
+      "file": ".research/isobmff-index-fixtures/opus-version.bin",
+      "sha256": "3bf23b72f794be6c474a3a218938a1670c541032d954e5efe569607cda9de40c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "header-opus-version",
+      "profile": "header",
+      "file": ".research/isobmff-index-fixtures/opus-version.bin",
+      "sha256": "3bf23b72f794be6c474a3a218938a1670c541032d954e5efe569607cda9de40c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "diagnostics-opus-version",
+      "profile": "diagnostics",
+      "file": ".research/isobmff-index-fixtures/opus-version.bin",
+      "sha256": "3bf23b72f794be6c474a3a218938a1670c541032d954e5efe569607cda9de40c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 55,
+        "digest": 6808999564576625982
+      }
+    },
+    {
+      "id": "configuration-dts-zero-rate",
+      "profile": "configuration",
+      "file": ".research/isobmff-index-fixtures/dts-zero-rate.bin",
+      "sha256": "edee0afea7b48bb5c09f64e7a5211a16aa1ba8d00d8fd228f6b0c56381a931b2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "configuration",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "header-dts-zero-rate",
+      "profile": "header",
+      "file": ".research/isobmff-index-fixtures/dts-zero-rate.bin",
+      "sha256": "edee0afea7b48bb5c09f64e7a5211a16aa1ba8d00d8fd228f6b0c56381a931b2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "header",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "diagnostics-dts-zero-rate",
+      "profile": "diagnostics",
+      "file": ".research/isobmff-index-fixtures/dts-zero-rate.bin",
+      "sha256": "edee0afea7b48bb5c09f64e7a5211a16aa1ba8d00d8fd228f6b0c56381a931b2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "diagnostics",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 11342920775076878970
+      }
+    },
+    {
+      "id": "transport-geometry-00-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-00.mov",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 761,
+        "bytes": 0,
+        "digest": 17691796378093311870
+      }
+    },
+    {
+      "id": "transport-geometry-00-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-00.mov",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 0,
+        "digest": 17817155619354111064
+      }
+    },
+    {
+      "id": "transport-geometry-00-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-00.mov",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 0,
+        "digest": 17036484607381865545
+      }
+    },
+    {
+      "id": "transport-geometry-00-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-00.mov",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005539398
+      }
+    },
+    {
+      "id": "transport-geometry-01-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-01.mov",
+      "sha256": "faea189a76ab816b020bd0d0a7824f6e01fc33705868ba46a872ee238b480542",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 769,
+        "bytes": 0,
+        "digest": 17333017070134162778
+      }
+    },
+    {
+      "id": "transport-geometry-01-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-01.mov",
+      "sha256": "faea189a76ab816b020bd0d0a7824f6e01fc33705868ba46a872ee238b480542",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 258,
+        "bytes": 0,
+        "digest": 3782055770379154893
+      }
+    },
+    {
+      "id": "transport-geometry-01-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-01.mov",
+      "sha256": "faea189a76ab816b020bd0d0a7824f6e01fc33705868ba46a872ee238b480542",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "416"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 0,
+        "digest": 6668501132055724244
+      }
+    },
+    {
+      "id": "transport-geometry-01-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-01.mov",
+      "sha256": "faea189a76ab816b020bd0d0a7824f6e01fc33705868ba46a872ee238b480542",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005547094
+      }
+    },
+    {
+      "id": "transport-geometry-02-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-02.mov",
+      "sha256": "7af512f5e62fb343434d3ced10e160f6002ce2c6fb98c7c55f6aa89af751eb90",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 769,
+        "bytes": 0,
+        "digest": 1520606833046808506
+      }
+    },
+    {
+      "id": "transport-geometry-02-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-02.mov",
+      "sha256": "7af512f5e62fb343434d3ced10e160f6002ce2c6fb98c7c55f6aa89af751eb90",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 259,
+        "bytes": 0,
+        "digest": 14656744376978907387
+      }
+    },
+    {
+      "id": "transport-geometry-02-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-02.mov",
+      "sha256": "7af512f5e62fb343434d3ced10e160f6002ce2c6fb98c7c55f6aa89af751eb90",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 0,
+        "digest": 17036484607381865553
+      }
+    },
+    {
+      "id": "transport-geometry-02-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-02.mov",
+      "sha256": "7af512f5e62fb343434d3ced10e160f6002ce2c6fb98c7c55f6aa89af751eb90",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005547094
+      }
+    },
+    {
+      "id": "transport-geometry-03-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-03.mov",
+      "sha256": "63fbf4ade8d90f0e6384a8a01c1542285712020bccbb40422bf0f11ef78119c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 769,
+        "bytes": 0,
+        "digest": 1520606833046808506
+      }
+    },
+    {
+      "id": "transport-geometry-03-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-03.mov",
+      "sha256": "63fbf4ade8d90f0e6384a8a01c1542285712020bccbb40422bf0f11ef78119c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 259,
+        "bytes": 0,
+        "digest": 14656744376978907387
+      }
+    },
+    {
+      "id": "transport-geometry-03-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-03.mov",
+      "sha256": "63fbf4ade8d90f0e6384a8a01c1542285712020bccbb40422bf0f11ef78119c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 0,
+        "digest": 17036484607381865553
+      }
+    },
+    {
+      "id": "transport-geometry-03-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-03.mov",
+      "sha256": "63fbf4ade8d90f0e6384a8a01c1542285712020bccbb40422bf0f11ef78119c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005547094
+      }
+    },
+    {
+      "id": "transport-geometry-04-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-04.mov",
+      "sha256": "8ae2d1d2f641902ac7acf41e5b65a405d5a834108d0dcdaea8c9706c68d3a008",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 770,
+        "bytes": 0,
+        "digest": 4182729606148532826
+      }
+    },
+    {
+      "id": "transport-geometry-04-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-04.mov",
+      "sha256": "8ae2d1d2f641902ac7acf41e5b65a405d5a834108d0dcdaea8c9706c68d3a008",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 259,
+        "bytes": 0,
+        "digest": 4866940542109562270
+      }
+    },
+    {
+      "id": "transport-geometry-04-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-04.mov",
+      "sha256": "8ae2d1d2f641902ac7acf41e5b65a405d5a834108d0dcdaea8c9706c68d3a008",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "416"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 0,
+        "digest": 6668501132055724245
+      }
+    },
+    {
+      "id": "transport-geometry-04-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-04.mov",
+      "sha256": "8ae2d1d2f641902ac7acf41e5b65a405d5a834108d0dcdaea8c9706c68d3a008",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005548056
+      }
+    },
+    {
+      "id": "transport-geometry-05-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-05.mov",
+      "sha256": "6c3a336ee2c4aff49ad69c4ab27b37134f17e55135226974f18efaf2ce13665f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 770,
+        "bytes": 0,
+        "digest": 17056962935406816838
+      }
+    },
+    {
+      "id": "transport-geometry-05-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-05.mov",
+      "sha256": "6c3a336ee2c4aff49ad69c4ab27b37134f17e55135226974f18efaf2ce13665f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 259,
+        "bytes": 0,
+        "digest": 14656744376978907388
+      }
+    },
+    {
+      "id": "transport-geometry-05-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-05.mov",
+      "sha256": "6c3a336ee2c4aff49ad69c4ab27b37134f17e55135226974f18efaf2ce13665f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 0,
+        "digest": 17036484607381865554
+      }
+    },
+    {
+      "id": "transport-geometry-05-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-05.mov",
+      "sha256": "6c3a336ee2c4aff49ad69c4ab27b37134f17e55135226974f18efaf2ce13665f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005548056
+      }
+    },
+    {
+      "id": "transport-geometry-06-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-06.mov",
+      "sha256": "cc66fefe42d4cca2b75d4098242f64718103cc921c37afd5c76951618d7c7e4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 770,
+        "bytes": 0,
+        "digest": 17056962935406816838
+      }
+    },
+    {
+      "id": "transport-geometry-06-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-06.mov",
+      "sha256": "cc66fefe42d4cca2b75d4098242f64718103cc921c37afd5c76951618d7c7e4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 259,
+        "bytes": 0,
+        "digest": 14656744376978907388
+      }
+    },
+    {
+      "id": "transport-geometry-06-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-06.mov",
+      "sha256": "cc66fefe42d4cca2b75d4098242f64718103cc921c37afd5c76951618d7c7e4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 0,
+        "digest": 17036484607381865554
+      }
+    },
+    {
+      "id": "transport-geometry-06-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-06.mov",
+      "sha256": "cc66fefe42d4cca2b75d4098242f64718103cc921c37afd5c76951618d7c7e4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005548056
+      }
+    },
+    {
+      "id": "transport-geometry-07-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-07.mov",
+      "sha256": "6ef0399750767f5649f82c2252cee9066a32b818acab29af6d4aee46671f6d55",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 825,
+        "bytes": 0,
+        "digest": 8731752724227444062
+      }
+    },
+    {
+      "id": "transport-geometry-07-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-07.mov",
+      "sha256": "6ef0399750767f5649f82c2252cee9066a32b818acab29af6d4aee46671f6d55",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 277,
+        "bytes": 0,
+        "digest": 10093168779144632307
+      }
+    },
+    {
+      "id": "transport-geometry-07-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-07.mov",
+      "sha256": "6ef0399750767f5649f82c2252cee9066a32b818acab29af6d4aee46671f6d55",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 0,
+        "digest": 5989659003558875048
+      }
+    },
+    {
+      "id": "transport-geometry-07-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-07.mov",
+      "sha256": "6ef0399750767f5649f82c2252cee9066a32b818acab29af6d4aee46671f6d55",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005600966
+      }
+    },
+    {
+      "id": "transport-geometry-08-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-08.mov",
+      "sha256": "055444133b3a58b989266d8bd3793f5cacd630526018989e46c863247711e847",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 825,
+        "bytes": 0,
+        "digest": 11637089076649484382
+      }
+    },
+    {
+      "id": "transport-geometry-08-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-08.mov",
+      "sha256": "055444133b3a58b989266d8bd3793f5cacd630526018989e46c863247711e847",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 277,
+        "bytes": 0,
+        "digest": 1842224876057205772
+      }
+    },
+    {
+      "id": "transport-geometry-08-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-08.mov",
+      "sha256": "055444133b3a58b989266d8bd3793f5cacd630526018989e46c863247711e847",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 0,
+        "digest": 9685977779068669249
+      }
+    },
+    {
+      "id": "transport-geometry-08-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-08.mov",
+      "sha256": "055444133b3a58b989266d8bd3793f5cacd630526018989e46c863247711e847",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005600966
+      }
+    },
+    {
+      "id": "transport-geometry-09-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-09.mov",
+      "sha256": "ac641d740332df7f6d30668605d70514c95b913d48b1dae9d2a424a3ac9708c1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 825,
+        "bytes": 0,
+        "digest": 11637089076649484382
+      }
+    },
+    {
+      "id": "transport-geometry-09-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-09.mov",
+      "sha256": "ac641d740332df7f6d30668605d70514c95b913d48b1dae9d2a424a3ac9708c1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 277,
+        "bytes": 0,
+        "digest": 1842224876057205772
+      }
+    },
+    {
+      "id": "transport-geometry-09-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-09.mov",
+      "sha256": "ac641d740332df7f6d30668605d70514c95b913d48b1dae9d2a424a3ac9708c1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 0,
+        "digest": 9685977779068669249
+      }
+    },
+    {
+      "id": "transport-geometry-09-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-09.mov",
+      "sha256": "ac641d740332df7f6d30668605d70514c95b913d48b1dae9d2a424a3ac9708c1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005600966
+      }
+    },
+    {
+      "id": "transport-geometry-10-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-10.mov",
+      "sha256": "8a92bbb5890f534af8d991bc4315887eb29f71600c8122d0d422d4b178f59a87",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 826,
+        "bytes": 0,
+        "digest": 15276445935328330902
+      }
+    },
+    {
+      "id": "transport-geometry-10-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-10.mov",
+      "sha256": "8a92bbb5890f534af8d991bc4315887eb29f71600c8122d0d422d4b178f59a87",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 277,
+        "bytes": 0,
+        "digest": 16471947190407013869
+      }
+    },
+    {
+      "id": "transport-geometry-10-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-10.mov",
+      "sha256": "8a92bbb5890f534af8d991bc4315887eb29f71600c8122d0d422d4b178f59a87",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 0,
+        "digest": 15049515120632027214
+      }
+    },
+    {
+      "id": "transport-geometry-10-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-10.mov",
+      "sha256": "8a92bbb5890f534af8d991bc4315887eb29f71600c8122d0d422d4b178f59a87",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005601928
+      }
+    },
+    {
+      "id": "transport-geometry-11-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-11.mov",
+      "sha256": "62cb2c267301463db3e80e63f257ef15e3b62db18a77a312b8b045b72e414868",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 826,
+        "bytes": 0,
+        "digest": 4597069150789334306
+      }
+    },
+    {
+      "id": "transport-geometry-11-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-11.mov",
+      "sha256": "62cb2c267301463db3e80e63f257ef15e3b62db18a77a312b8b045b72e414868",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 278,
+        "bytes": 0,
+        "digest": 8600587069300191570
+      }
+    },
+    {
+      "id": "transport-geometry-11-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-11.mov",
+      "sha256": "62cb2c267301463db3e80e63f257ef15e3b62db18a77a312b8b045b72e414868",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 0,
+        "digest": 9685977779068669250
+      }
+    },
+    {
+      "id": "transport-geometry-11-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-11.mov",
+      "sha256": "62cb2c267301463db3e80e63f257ef15e3b62db18a77a312b8b045b72e414868",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005601928
+      }
+    },
+    {
+      "id": "transport-geometry-12-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-12.mov",
+      "sha256": "a3a284bba6ed70fe7c38440b56535f1cb2848d0afbc2bd32e054999942e63d58",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 826,
+        "bytes": 0,
+        "digest": 4597069150789334306
+      }
+    },
+    {
+      "id": "transport-geometry-12-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-12.mov",
+      "sha256": "a3a284bba6ed70fe7c38440b56535f1cb2848d0afbc2bd32e054999942e63d58",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 278,
+        "bytes": 0,
+        "digest": 8600587069300191570
+      }
+    },
+    {
+      "id": "transport-geometry-12-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-12.mov",
+      "sha256": "a3a284bba6ed70fe7c38440b56535f1cb2848d0afbc2bd32e054999942e63d58",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 0,
+        "digest": 9685977779068669250
+      }
+    },
+    {
+      "id": "transport-geometry-12-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-12.mov",
+      "sha256": "a3a284bba6ed70fe7c38440b56535f1cb2848d0afbc2bd32e054999942e63d58",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005601928
+      }
+    },
+    {
+      "id": "transport-geometry-13-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-13.mov",
+      "sha256": "65e2c861eb4911acda7a2a2e1534e5b01875ee83c846dfb4b34639685c2dffb2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 4857,
+        "bytes": 0,
+        "digest": 14134650728366919550
+      }
+    },
+    {
+      "id": "transport-geometry-13-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-13.mov",
+      "sha256": "65e2c861eb4911acda7a2a2e1534e5b01875ee83c846dfb4b34639685c2dffb2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 1621,
+        "bytes": 0,
+        "digest": 279872075905297811
+      }
+    },
+    {
+      "id": "transport-geometry-13-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-13.mov",
+      "sha256": "65e2c861eb4911acda7a2a2e1534e5b01875ee83c846dfb4b34639685c2dffb2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 79,
+        "bytes": 0,
+        "digest": 18167804954959791113
+      }
+    },
+    {
+      "id": "transport-geometry-13-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-13.mov",
+      "sha256": "65e2c861eb4911acda7a2a2e1534e5b01875ee83c846dfb4b34639685c2dffb2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1009479750
+      }
+    },
+    {
+      "id": "transport-geometry-14-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-14.mov",
+      "sha256": "e4fa52ade2415052c3dbc3365a69395d76b8e39c3709edad3f83cd924319ecb4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 4857,
+        "bytes": 0,
+        "digest": 12912026455672328062
+      }
+    },
+    {
+      "id": "transport-geometry-14-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-14.mov",
+      "sha256": "e4fa52ade2415052c3dbc3365a69395d76b8e39c3709edad3f83cd924319ecb4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 1621,
+        "bytes": 0,
+        "digest": 1435239875392701996
+      }
+    },
+    {
+      "id": "transport-geometry-14-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-14.mov",
+      "sha256": "e4fa52ade2415052c3dbc3365a69395d76b8e39c3709edad3f83cd924319ecb4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 79,
+        "bytes": 0,
+        "digest": 17402026749899553353
+      }
+    },
+    {
+      "id": "transport-geometry-14-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-14.mov",
+      "sha256": "e4fa52ade2415052c3dbc3365a69395d76b8e39c3709edad3f83cd924319ecb4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1009479750
+      }
+    },
+    {
+      "id": "transport-geometry-15-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-15.mov",
+      "sha256": "ad58a4766e3f94c18b14642a9eeb90bce2a4879c1b47f78efa5375d22e8129ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 4857,
+        "bytes": 0,
+        "digest": 12912026455672328062
+      }
+    },
+    {
+      "id": "transport-geometry-15-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-15.mov",
+      "sha256": "ad58a4766e3f94c18b14642a9eeb90bce2a4879c1b47f78efa5375d22e8129ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 1621,
+        "bytes": 0,
+        "digest": 1435239875392701996
+      }
+    },
+    {
+      "id": "transport-geometry-15-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-15.mov",
+      "sha256": "ad58a4766e3f94c18b14642a9eeb90bce2a4879c1b47f78efa5375d22e8129ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 79,
+        "bytes": 0,
+        "digest": 17402026749899553353
+      }
+    },
+    {
+      "id": "transport-geometry-15-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-15.mov",
+      "sha256": "ad58a4766e3f94c18b14642a9eeb90bce2a4879c1b47f78efa5375d22e8129ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1009479750
+      }
+    },
+    {
+      "id": "transport-geometry-16-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-16.mov",
+      "sha256": "587f502b9c59438da708706acd29a37e0b9daef31cfa8b471c07fb8270127b23",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 761,
+        "bytes": 0,
+        "digest": 17691796378093311870
+      }
+    },
+    {
+      "id": "transport-geometry-16-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-16.mov",
+      "sha256": "587f502b9c59438da708706acd29a37e0b9daef31cfa8b471c07fb8270127b23",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 0,
+        "digest": 17817155619354111064
+      }
+    },
+    {
+      "id": "transport-geometry-16-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-16.mov",
+      "sha256": "587f502b9c59438da708706acd29a37e0b9daef31cfa8b471c07fb8270127b23",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 0,
+        "digest": 17036484607381865545
+      }
+    },
+    {
+      "id": "transport-geometry-16-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-16.mov",
+      "sha256": "587f502b9c59438da708706acd29a37e0b9daef31cfa8b471c07fb8270127b23",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005540359
+      }
+    },
+    {
+      "id": "transport-geometry-17-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-17.mov",
+      "sha256": "11d8e38f3a1f25f5b12607221e9466f60902a05b50abedab02cc0bebc6071f4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 761,
+        "bytes": 0,
+        "digest": 17691796378093311870
+      }
+    },
+    {
+      "id": "transport-geometry-17-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-17.mov",
+      "sha256": "11d8e38f3a1f25f5b12607221e9466f60902a05b50abedab02cc0bebc6071f4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 0,
+        "digest": 17817155619354111064
+      }
+    },
+    {
+      "id": "transport-geometry-17-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-17.mov",
+      "sha256": "11d8e38f3a1f25f5b12607221e9466f60902a05b50abedab02cc0bebc6071f4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 0,
+        "digest": 17036484607381865545
+      }
+    },
+    {
+      "id": "transport-geometry-17-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-17.mov",
+      "sha256": "11d8e38f3a1f25f5b12607221e9466f60902a05b50abedab02cc0bebc6071f4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005562462
+      }
+    },
+    {
+      "id": "transport-geometry-18-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-18.mov",
+      "sha256": "45f6dde3773acd7f4e0d48389dd23b98ea3d2b0a50e554a12e0c2e3e8f7865d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 761,
+        "bytes": 0,
+        "digest": 17691796378093311870
+      }
+    },
+    {
+      "id": "transport-geometry-18-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-18.mov",
+      "sha256": "45f6dde3773acd7f4e0d48389dd23b98ea3d2b0a50e554a12e0c2e3e8f7865d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 0,
+        "digest": 17817155619354111064
+      }
+    },
+    {
+      "id": "transport-geometry-18-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-18.mov",
+      "sha256": "45f6dde3773acd7f4e0d48389dd23b98ea3d2b0a50e554a12e0c2e3e8f7865d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 0,
+        "digest": 17036484607381865545
+      }
+    },
+    {
+      "id": "transport-geometry-18-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-18.mov",
+      "sha256": "45f6dde3773acd7f4e0d48389dd23b98ea3d2b0a50e554a12e0c2e3e8f7865d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005593214
+      }
+    },
+    {
+      "id": "transport-geometry-19-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-19.mov",
+      "sha256": "b7625bbb9fa53cd8acb3e8198586677840ef55b7cd819c04cf4dfbe70c95c7f2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 841,
+        "bytes": 0,
+        "digest": 13067489782725092630
+      }
+    },
+    {
+      "id": "transport-geometry-19-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-19.mov",
+      "sha256": "b7625bbb9fa53cd8acb3e8198586677840ef55b7cd819c04cf4dfbe70c95c7f2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 283,
+        "bytes": 0,
+        "digest": 11600854036781136485
+      }
+    },
+    {
+      "id": "transport-geometry-19-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-19.mov",
+      "sha256": "b7625bbb9fa53cd8acb3e8198586677840ef55b7cd819c04cf4dfbe70c95c7f2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 0,
+        "digest": 9685977779068632747
+      }
+    },
+    {
+      "id": "transport-geometry-19-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-19.mov",
+      "sha256": "b7625bbb9fa53cd8acb3e8198586677840ef55b7cd819c04cf4dfbe70c95c7f2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1005547166
+      }
+    },
+    {
+      "id": "transport-geometry-20-1",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-20.mov",
+      "sha256": "511132e30e209f26742a7c88b31971ed01546ea35da1ccdc47574c7ce96c50aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 786,
+        "bytes": 0,
+        "digest": 5175416896736265303
+      }
+    },
+    {
+      "id": "transport-geometry-20-3",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-20.mov",
+      "sha256": "511132e30e209f26742a7c88b31971ed01546ea35da1ccdc47574c7ce96c50aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "3",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 265,
+        "bytes": 0,
+        "digest": 17319721421617822801
+      }
+    },
+    {
+      "id": "transport-geometry-20-64",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-20.mov",
+      "sha256": "511132e30e209f26742a7c88b31971ed01546ea35da1ccdc47574c7ce96c50aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 0,
+        "digest": 8748689806522584064
+      }
+    },
+    {
+      "id": "transport-geometry-20-65536",
+      "profile": "transport",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-20.mov",
+      "sha256": "511132e30e209f26742a7c88b31971ed01546ea35da1ccdc47574c7ce96c50aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "65536",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 16865085036285996514
+      }
+    },
+    {
+      "id": "initial-available",
+      "profile": "initial",
+      "file": "crates/isobmff/tests/fixtures/transport/geometry-00.mov",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "1",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-1-747",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-1-747.bin",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "1",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-1-33443",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-1-33443.bin",
+      "sha256": "785b94b917eea73f3d3aa7e75d82eb3a60e004f42db0b9d7bc0e745d0aaab745",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "1",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-1-33444",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-1-33444.bin",
+      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "1",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-1-4294967295",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-1-4294967295.bin",
+      "sha256": "cf43d1bf564a72c256362f92d0e9af0fa7299ae70a53a8602c1a769be793d64f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "1",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-2-747",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-2-747.bin",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "2",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-2-33443",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-2-33443.bin",
+      "sha256": "785b94b917eea73f3d3aa7e75d82eb3a60e004f42db0b9d7bc0e745d0aaab745",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "2",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-2-33444",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-2-33444.bin",
+      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "2",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-2-4294967295",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-2-4294967295.bin",
+      "sha256": "cf43d1bf564a72c256362f92d0e9af0fa7299ae70a53a8602c1a769be793d64f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "2",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-3-747",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-3-747.bin",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "3",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-3-33444",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-3-33444.bin",
+      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "3",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-3-33445",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-3-33445.bin",
+      "sha256": "079ffa2e7aa8f601b942d8b491dc61780a97c443da8407551b2f502d7a903c88",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "3",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-3-4294967295",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-3-4294967295.bin",
+      "sha256": "cf43d1bf564a72c256362f92d0e9af0fa7299ae70a53a8602c1a769be793d64f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "3",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-4-747",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-4-747.bin",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "4",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-4-33443",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-4-33443.bin",
+      "sha256": "785b94b917eea73f3d3aa7e75d82eb3a60e004f42db0b9d7bc0e745d0aaab745",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "4",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-4-33444",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-4-33444.bin",
+      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "4",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-4-4294967295",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-4-4294967295.bin",
+      "sha256": "cf43d1bf564a72c256362f92d0e9af0fa7299ae70a53a8602c1a769be793d64f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "4",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-7-747",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-7-747.bin",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "7",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-7-33443",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-7-33443.bin",
+      "sha256": "785b94b917eea73f3d3aa7e75d82eb3a60e004f42db0b9d7bc0e745d0aaab745",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "7",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-7-33444",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-7-33444.bin",
+      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "7",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-7-4294967295",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-7-4294967295.bin",
+      "sha256": "cf43d1bf564a72c256362f92d0e9af0fa7299ae70a53a8602c1a769be793d64f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "7",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-64-747",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-64-747.bin",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "64",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-64-33497",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-64-33497.bin",
+      "sha256": "d3ae734d3cfd07a5c4e96dcce2b6624648d349c447a4d3d6fbcf2f3bb4bcab4d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "64",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-64-33498",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-64-33498.bin",
+      "sha256": "776e2a095b35dbbadb5dc0c086d5329dd11061c1793c7a6d49bfc0540c8ccc53",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "64",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-64-4294967295",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-64-4294967295.bin",
+      "sha256": "cf43d1bf564a72c256362f92d0e9af0fa7299ae70a53a8602c1a769be793d64f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "64",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-65536-747",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-65536-747.bin",
+      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-65536-33515",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-65536-33515.bin",
+      "sha256": "442b505fbed38b83fd480525b13a84fbddac5eb106e1a8cd754876d94f939e3a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744073168073108
+      }
+    },
+    {
+      "id": "initial-65536-33516",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-65536-33516.bin",
+      "sha256": "2c313a54cfae8bce5a6e01b15e8a6d9046e478952a10ce7e2bea61b6ec03d4ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "initial-65536-4294967295",
+      "profile": "initial",
+      "file": ".research/isobmff-index-fixtures/initial-65536-4294967295.bin",
+      "sha256": "cf43d1bf564a72c256362f92d0e9af0fa7299ae70a53a8602c1a769be793d64f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "initial",
+        "65536",
+        "1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 18446744072614556335
+      }
+    },
+    {
+      "id": "transport-footer-0-1",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-0-1.bin",
+      "sha256": "b7625bbb9fa53cd8acb3e8198586677840ef55b7cd819c04cf4dfbe70c95c7f2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 841,
+        "bytes": 0,
+        "digest": 13067489782725092630
+      }
+    },
+    {
+      "id": "transport-footer-0-2",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-0-2.bin",
+      "sha256": "00ce807e102e20c58de73f0945f3f1bc9c4a0d4894687719e76a1b7f670397a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 0,
+        "digest": 9685977779068640443
+      }
+    },
+    {
+      "id": "transport-footer-0-3",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-0-3.bin",
+      "sha256": "81a5e9e4db719f830dfffa5b745f4f3c20d858e52909a5f8e74cc5638c194a06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "64",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 0,
+        "digest": 9685977779068648139
+      }
+    },
+    {
+      "id": "transport-footer-1-1",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-1-1.bin",
+      "sha256": "24ae3a1b48efb837b3cde6103f5553dc58d45b93ad63f4208cc9e46f73b1786c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 841,
+        "bytes": 0,
+        "digest": 13067489782725092630
+      }
+    },
+    {
+      "id": "transport-footer-8-1",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-8-1.bin",
+      "sha256": "14456cc9142518c898107d48920198b604cbcbac2a98641006985fab2f4b725a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 849,
+        "bytes": 0,
+        "digest": 13475709652317468626
+      }
+    },
+    {
+      "id": "transport-footer-9-1",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-9-1.bin",
+      "sha256": "7802f73ff77589842ab987e13e967a51d1f7c709e9be2f3268b03cd24fb02708",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 850,
+        "bytes": 0,
+        "digest": 4964489732749636270
+      }
+    },
+    {
+      "id": "transport-footer-16-1",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-16-1.bin",
+      "sha256": "0180253ff01423ce6110795b2856f8f845d4fc45944d14125fbb52ba3868e021",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 857,
+        "bytes": 0,
+        "digest": 1453294620844321486
+      }
+    },
+    {
+      "id": "transport-footer-64-1",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-64-1.bin",
+      "sha256": "82b538c22951d2c84f24c9ba77e8b25fae43c8014e29e8ad133b9bb33873c5d7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 857,
+        "bytes": 0,
+        "digest": 1453294620844321486
+      }
+    },
+    {
+      "id": "transport-footer-32768-1",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-32768-1.bin",
+      "sha256": "4bdded9a84f71cf90ed48e3f10b159df2971682b3a5fd4d21f83ab201af6b29a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 857,
+        "bytes": 0,
+        "digest": 1453294620844321486
+      }
+    },
+    {
+      "id": "transport-footer-32783-2",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-32783-2.bin",
+      "sha256": "78991dd20c87ccad1ed0cb8bc579622d6bf06a1773dda51d6d802aad88667b11",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 33648,
+        "bytes": 0,
+        "digest": 10291359544796351687
+      }
+    },
+    {
+      "id": "transport-footer-32784-2",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-32784-2.bin",
+      "sha256": "77168172aad36f2e5fc19bcac3fc30a038e322bc658b0a2216fbabca315a5e55",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 33649,
+        "bytes": 0,
+        "digest": 7602560647450772802
+      }
+    },
+    {
+      "id": "transport-footer-32785-2",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-32785-2.bin",
+      "sha256": "5c3272b45dbf657914a97cde8b9b9f8ded08a371a5057c569139f18942f21892",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 882,
+        "bytes": 0,
+        "digest": 3984675708124656824
+      }
+    },
+    {
+      "id": "transport-footer-0-14",
+      "profile": "transport",
+      "file": ".research/isobmff-index-fixtures/transport-footer-0-14.bin",
+      "sha256": "0a2d177b39163c6b312bd6ea2ff98e2cd96cfb6f909c5e1fdb4b26f151d9eb5e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "transport",
+        "1",
+        "1",
+        "entry"
+      ],
+      "expected": {
+        "packets": 945,
+        "bytes": 0,
+        "digest": 10499709705665260578
+      }
+    }
+  ]
+}

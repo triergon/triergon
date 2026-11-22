@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "id": "quicktime-pcm-samples",
+  "gate": "required",
+  "operation": "qt-pcm",
+  "candidate": "isobmff-views-worker",
+  "worker_operation": "qt-pcm-",
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-isobmff-views-native",
+  "contract": [
+    "Read all QuickTime PCM samples in each audio stream and compare the source byte stream with the concatenated demuxed packet bytes for that stream.",
+    "Fold each audio stream index, PCM encoding, channel count, integral rate, coded depth and bytes per PCM frame. When block alignment is unset, derive alignment from coded depth and channel count.",
+    "PCM encoding codes are 1 unsigned 8-bit, 2 signed 16-bit BE, 3 signed 16-bit LE, 4 signed 24-bit BE, 5 signed 24-bit LE, 6 signed 32-bit BE, 7 signed 32-bit LE and 8 signed 8-bit. Code 0 denotes any other reference encoding.",
+    "Compare the total count of whole frames, byte count and ordered byte fold for each audio stream, irrespective of packet boundaries. A partial source frame is a refusal.",
+    "Input loading and schedule parsing precede the operation. Both sides open, consume and release their readers inside it."
+  ],
+  "required_profiles": [
+    "pcm"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "pcm-description-1-2-1-unused3",
+        "pcm-long-chunk-2049",
+        "pcm-multi-8k-u8-and-48k-twos",
+        "pcm-s16be-mono-end",
+        "pcm-s16be-stereo-front",
+        "pcm-u8-mono-front",
+        "pcm-u8-stereo-end",
+        "compression-and-packet-size",
+        "fractional-rate",
+        "partial-frame",
+        "raw-16bit-4ch",
+        "raw-8bit-0ch",
+        "raw-8bit-3ch",
+        "sound-v1",
+        "sound-v2",
+        "sowt-16bit-2ch",
+        "sowt-24bit-7ch",
+        "sowt-32bit-8ch",
+        "twos-24bit-5ch",
+        "twos-32bit-6ch",
+        "twos-8bit-1ch"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "pcm-description-1-2-1-unused3",
+        "pcm-long-chunk-2049",
+        "pcm-multi-8k-u8-and-48k-twos",
+        "pcm-s16be-mono-end",
+        "pcm-s16be-stereo-front",
+        "pcm-u8-mono-front",
+        "pcm-u8-stereo-end",
+        "compression-and-packet-size",
+        "fractional-rate",
+        "partial-frame",
+        "raw-16bit-4ch",
+        "raw-8bit-0ch",
+        "raw-8bit-3ch",
+        "sound-v1",
+        "sound-v2",
+        "sowt-16bit-2ch",
+        "sowt-24bit-7ch",
+        "sowt-32bit-8ch",
+        "twos-24bit-5ch",
+        "twos-32bit-6ch",
+        "twos-8bit-1ch"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "pcm-description-1-2-1-unused3",
+        "pcm-long-chunk-2049",
+        "pcm-multi-8k-u8-and-48k-twos",
+        "pcm-s16be-mono-end",
+        "pcm-s16be-stereo-front",
+        "pcm-u8-mono-front",
+        "pcm-u8-stereo-end",
+        "compression-and-packet-size",
+        "fractional-rate",
+        "partial-frame",
+        "raw-16bit-4ch",
+        "raw-8bit-0ch",
+        "raw-8bit-3ch",
+        "sound-v1",
+        "sound-v2",
+        "sowt-16bit-2ch",
+        "sowt-24bit-7ch",
+        "sowt-32bit-8ch",
+        "twos-24bit-5ch",
+        "twos-32bit-6ch",
+        "twos-8bit-1ch"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    }
+  ],
+  "pending_module_requirements": [
+    "Source samples follow each referenced description. MOV demuxing retains the initial frame width and publishes the rate from the final description.",
+    "The candidate rejects the version 0 compression and packet-size fields while the reference reads PCM.",
+    "The candidate refuses a partial source frame and the demuxer emits the configured frame width.",
+    "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo.",
+    "The candidate refuses a zero source channel count. The demuxer exposes the zero count and emits the payload.",
+    "Sound description versions 1 and 2 remain outside the version 0 reader."
+  ],
+  "open_cases": [
+    {
+      "id": "pcm-description-1-2-1-unused3",
+      "requirement": "Source samples follow each referenced description. MOV demuxing retains the initial frame width and publishes the rate from the final description."
+    },
+    {
+      "id": "compression-and-packet-size",
+      "requirement": "The candidate rejects the version 0 compression and packet-size fields while the reference reads PCM."
+    },
+    {
+      "id": "partial-frame",
+      "requirement": "The candidate refuses a partial source frame and the demuxer emits the configured frame width."
+    },
+    {
+      "id": "raw-16bit-4ch",
+      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
+    },
+    {
+      "id": "raw-8bit-0ch",
+      "requirement": "The candidate refuses a zero source channel count. The demuxer exposes the zero count and emits the payload."
+    },
+    {
+      "id": "raw-8bit-3ch",
+      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
+    },
+    {
+      "id": "sound-v1",
+      "requirement": "Sound description versions 1 and 2 remain outside the version 0 reader."
+    },
+    {
+      "id": "sound-v2",
+      "requirement": "Sound description versions 1 and 2 remain outside the version 0 reader."
+    },
+    {
+      "id": "sowt-16bit-2ch",
+      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
+    },
+    {
+      "id": "sowt-24bit-7ch",
+      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
+    },
+    {
+      "id": "sowt-32bit-8ch",
+      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
+    },
+    {
+      "id": "twos-24bit-5ch",
+      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
+    },
+    {
+      "id": "twos-32bit-6ch",
+      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
+    },
+    {
+      "id": "twos-8bit-1ch",
+      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
+    }
+  ]
+}

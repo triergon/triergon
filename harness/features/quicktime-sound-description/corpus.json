@@ -1,0 +1,300 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "pcm-description-1-2-1-unused3",
+      "profile": "pcm",
+      "file": "crates/isobmff/tests/fixtures/qt-pcm/pcm-description-1-2-1-unused3.mov",
+      "sha256": "81b20ff2cab55d0f222d50783a61f13e54639fb6eb31174635bffcfd7d98210f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0aedfa8132fee5b8d5aaccbcc85f5a3bbd20974ac5fd3648afe8e3bfafe234c4"
+      }
+    },
+    {
+      "id": "pcm-long-chunk-2049",
+      "profile": "pcm",
+      "file": "crates/isobmff/tests/fixtures/qt-pcm/pcm-long-chunk-2049.mov",
+      "sha256": "9b82ec0b20dec0b6543699488d1a0bb352ec11864cb172d374c95a5d9845cba2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7abb468de7b82315e82f4c0d8f2d8d080d3b8b6fd8dc9f2b8267af60d14e90fc"
+      }
+    },
+    {
+      "id": "pcm-multi-8k-u8-and-48k-twos",
+      "profile": "pcm",
+      "file": "crates/isobmff/tests/fixtures/qt-pcm/pcm-multi-8k-u8-and-48k-twos.mov",
+      "sha256": "cc5a2c1cbc74e8e7af195a960bde6b280218710107a00d12952f68f96381723f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "25eafce87be24ffba41ba0002729b79c978096ac20cf1e8897434b1bd6500cfe"
+      }
+    },
+    {
+      "id": "pcm-s16be-mono-end",
+      "profile": "pcm",
+      "file": "crates/isobmff/tests/fixtures/qt-pcm/pcm-s16be-mono-end.mov",
+      "sha256": "23042037892be9593ab0fe62d18cd5697c11a55c5db285f2deacc6cad8211359",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d857043a933793fb1fda07eca1ec9759eca88ba746eb0983b7e5e395596a892f"
+      }
+    },
+    {
+      "id": "pcm-s16be-stereo-front",
+      "profile": "pcm",
+      "file": "crates/isobmff/tests/fixtures/qt-pcm/pcm-s16be-stereo-front.mov",
+      "sha256": "9935d385a29e9dff961d037a9573234f40a05eb66bda8a72f08314062d70b1bb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7abb468de7b82315e82f4c0d8f2d8d080d3b8b6fd8dc9f2b8267af60d14e90fc"
+      }
+    },
+    {
+      "id": "pcm-u8-mono-front",
+      "profile": "pcm",
+      "file": "crates/isobmff/tests/fixtures/qt-pcm/pcm-u8-mono-front.mov",
+      "sha256": "2e36628bfefaffcffbd99b492d37ef0282d1580cc05d17ab36ba2afa9f16d476",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "ae09a327c7ba2f1355d13422b99904fcfcf6f0c017a64aebdf007658db604791"
+      }
+    },
+    {
+      "id": "pcm-u8-stereo-end",
+      "profile": "pcm",
+      "file": "crates/isobmff/tests/fixtures/qt-pcm/pcm-u8-stereo-end.mov",
+      "sha256": "5d5d1ec2bff2596a70af1a123afbab6d96ff8bc76989acdcc80f1e2ca37d9d2b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "6f9065502b15ab79feb5bb7012d637a99f0b559149db1594b5b521aa0358193f"
+      }
+    },
+    {
+      "id": "compression-and-packet-size",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/compression-and-packet-size.mov",
+      "sha256": "1fb3ee96f3cbafea56e5b6e3a64ec944beeccf06d744966303ab7a0c8437e065",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4b486dc0c5e8805091e8d278918a132edaa8bc3a58c8809754f34cff4acfcd21"
+      }
+    },
+    {
+      "id": "fractional-rate",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/fractional-rate.mov",
+      "sha256": "f60319bd4b9f24971e5872932c9fb62086874d0bb760f3a0bc7a8dd1ae7efbbb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b6b349b87fbaa7f0b1d78d332d0860f06fa4c03f32838784f8a2b1ed18f0d4f7"
+      }
+    },
+    {
+      "id": "partial-frame",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/partial-frame.mov",
+      "sha256": "3dec8f2c5c06d04f031cae5a520f712139232c6fdc8409f34bf02be1f9f85488",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "48c112b7e3bc0463842188216d6eb5e0f845eaa416116aa1693c90812a1d0d95"
+      }
+    },
+    {
+      "id": "raw-16bit-4ch",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/raw-16bit-4ch.mov",
+      "sha256": "6dde03f55cbcfb9947392bc4805a7e5dd66e0c6c6e490452f748a61011ce8c13",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "231b491913712550e816ca7d86a1dc26dd7ce993f78111f97ec8f528b5c4b0a8"
+      }
+    },
+    {
+      "id": "raw-8bit-0ch",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/raw-8bit-0ch.mov",
+      "sha256": "68ebc878473e0985241e5af9468a82cb207c83b50e08ac863b499271c514a758",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0e91dacc7f5571ebc8703b31824b38a29d465f047b01368c82b01d023c3836c2"
+      }
+    },
+    {
+      "id": "raw-8bit-3ch",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/raw-8bit-3ch.mov",
+      "sha256": "f47cb57cdaa2d548699f96691a3880531c25f51acbbd800d10c8a12f8099e14b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d84bdfeed4ad7be17d1f42642cfd00e5fa8423036a7f02797f952dcd7f72d57b"
+      }
+    },
+    {
+      "id": "sound-v1",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/sound-v1.mov",
+      "sha256": "68e83ceff3cddf5a37d68a9d66d9f3371c103b6fa8c4844c3641640cc42b8d41",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7cc9d90634fa8c2dd2e00ce11fb932e2d3073cf9efb4c955c2dffd29de9ac012"
+      }
+    },
+    {
+      "id": "sound-v2",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/sound-v2.mov",
+      "sha256": "e86fc8a5ea721f926828a4e24637b4fa0b3ebf89a610812ff8ca88c5d795e898",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7cc9d90634fa8c2dd2e00ce11fb932e2d3073cf9efb4c955c2dffd29de9ac012"
+      }
+    },
+    {
+      "id": "sowt-16bit-2ch",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/sowt-16bit-2ch.mov",
+      "sha256": "b005bd0c99d37fc0d9b9f36e775fb927ad3e998428ea2810f804f3107fe918c2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b7acaa215d118c91f0d976cac0f1b44570ba64abc97752c68e422f35c7512832"
+      }
+    },
+    {
+      "id": "sowt-24bit-7ch",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/sowt-24bit-7ch.mov",
+      "sha256": "e67782c2d8233b648cfb06a22653918163056fc2f80ef9e6c02b6b79560f4fe6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b7a0df2f513c1e5d67907b5ab4e747b0f150e4f6124924be808c9f17430ef718"
+      }
+    },
+    {
+      "id": "sowt-32bit-8ch",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/sowt-32bit-8ch.mov",
+      "sha256": "9ad51abf689fbe3fb767e7d97065577c88533abde9f787c4df89d88fc26721a9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "5e754a76ec976804102a1026450ba069d221ee52928e10dcf3d911a1a067cc44"
+      }
+    },
+    {
+      "id": "twos-24bit-5ch",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/twos-24bit-5ch.mov",
+      "sha256": "4213bb94070b4a1381479a2788cccfc67f5d6fd1c579ce8722d5f1503c9541a1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "57dc7e3d3e3aa9bfbc631765e65d1b4205feadde39462ca896cf5192af8e8d85"
+      }
+    },
+    {
+      "id": "twos-32bit-6ch",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/twos-32bit-6ch.mov",
+      "sha256": "a08ac2f382f1fbdc6b70bba0354d9df680bc3c86bc9099a12d9bbbc3e6c77750",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "086d2b25df7df90fda3d6e53a24a9a165ac5b4c8540d3c24b8ad9c3d8ad8ccd1"
+      }
+    },
+    {
+      "id": "twos-8bit-1ch",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/twos-8bit-1ch.mov",
+      "sha256": "72aed84a8dd3cee02ae63bc462527d0ad94501d3eeb1cd64924a72687e485094",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "ac18cc10fc05b5ec5d8e400d5ded2c75029df32e2ad140e4a7b5fe1ca7b26733"
+      }
+    }
+  ]
+}

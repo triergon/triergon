@@ -1,0 +1,291 @@
+{
+  "schema": 1,
+  "id": "mov-encoded-views",
+  "gate": "required",
+  "operation": "mov-encoded",
+  "candidate": "isobmff-views-worker",
+  "worker_operation": "mov-encoded-",
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-isobmff-views-native",
+  "contract": [
+    "Compare the encoded metadata, recovery and dependency views with the public MOV demuxer using +noparse+nofillin.",
+    "Compare each stream's id, kind, clock, seek preroll, codec name, exact configuration bytes, language, handler, vendor, creation time and skip-samples stream side data. Creation time compares the formatted compatibility value.",
+    "Each packet folds stream index, PTS and DTS with their presence bits and raw values, duration, physical position, flags, size and every payload byte in delivery order.",
+    "Compare packet skip-samples side data and terminal EOF or refusal. Dependency flags compare as demuxed flags where SDTP contributes the disposable bit.",
+    "Input loading and schedule parsing precede the operation. Both sides open, consume and release their readers inside it."
+  ],
+  "required_profiles": [
+    "metadata",
+    "recovery",
+    "dependency"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "creation-v0-0",
+        "creation-v0-1",
+        "creation-v0-1578905043",
+        "creation-v0-2082844799",
+        "creation-v0-2082844800",
+        "creation-v0-2082844801",
+        "creation-v0-4294967295",
+        "creation-v1-0",
+        "creation-v1-1",
+        "creation-v1-2082844799",
+        "creation-v1-2082844800",
+        "creation-v1-2082844801",
+        "creation-v1-9223372036854775807",
+        "creation-v1-9223372036854775808",
+        "qt-v1-after-terminator",
+        "qt-v1-duplicate-esds",
+        "qt-v1-duplicate-frma",
+        "qt-v1-missing-frma",
+        "qt-v1-missing-terminator",
+        "qt-v1-terminator-body",
+        "qt-v1-unframed-compression",
+        "qt-v1-unknown",
+        "qt-v1-wave",
+        "qt-v1-wrong-frma",
+        "creation-v0-2147483647",
+        "creation-v0-2147483648",
+        "creation-v1-4294967296",
+        "coverage-over",
+        "coverage-under",
+        "dangling-description",
+        "description-without-map",
+        "duplicate-description",
+        "empty-run",
+        "fragment-namespace",
+        "grouping-parameter",
+        "mapping-before-description",
+        "prol-negative-v1",
+        "reserved-source-retained",
+        "roll-multiple-descriptions",
+        "roll-negative-v0",
+        "roll-positive-v1",
+        "roll-prol-independent",
+        "roll-zero-association",
+        "unknown-group-unadmitted",
+        "variable-length-unadmitted",
+        "dep-STSS-conflict-preserved",
+        "dep-leading-raw-preserved",
+        "dep-no-groups",
+        "dep-no-hint",
+        "dep-real-roll-unadmitted",
+        "dep-referenced",
+        "dep-reserved-referenced-field",
+        "dep-unreferenced"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "creation-v0-0",
+        "creation-v0-1",
+        "creation-v0-1578905043",
+        "creation-v0-2082844799",
+        "creation-v0-2082844800",
+        "creation-v0-2082844801",
+        "creation-v0-4294967295",
+        "creation-v1-0",
+        "creation-v1-1",
+        "creation-v1-2082844799",
+        "creation-v1-2082844800",
+        "creation-v1-2082844801",
+        "creation-v1-9223372036854775807",
+        "creation-v1-9223372036854775808",
+        "qt-v1-after-terminator",
+        "qt-v1-duplicate-esds",
+        "qt-v1-duplicate-frma",
+        "qt-v1-missing-frma",
+        "qt-v1-missing-terminator",
+        "qt-v1-terminator-body",
+        "qt-v1-unframed-compression",
+        "qt-v1-unknown",
+        "qt-v1-wave",
+        "qt-v1-wrong-frma",
+        "creation-v0-2147483647",
+        "creation-v0-2147483648",
+        "creation-v1-4294967296",
+        "coverage-over",
+        "coverage-under",
+        "dangling-description",
+        "description-without-map",
+        "duplicate-description",
+        "empty-run",
+        "fragment-namespace",
+        "grouping-parameter",
+        "mapping-before-description",
+        "prol-negative-v1",
+        "reserved-source-retained",
+        "roll-multiple-descriptions",
+        "roll-negative-v0",
+        "roll-positive-v1",
+        "roll-prol-independent",
+        "roll-zero-association",
+        "unknown-group-unadmitted",
+        "variable-length-unadmitted",
+        "dep-STSS-conflict-preserved",
+        "dep-leading-raw-preserved",
+        "dep-no-groups",
+        "dep-no-hint",
+        "dep-real-roll-unadmitted",
+        "dep-referenced",
+        "dep-reserved-referenced-field",
+        "dep-unreferenced"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "creation-v0-0",
+        "creation-v0-1",
+        "creation-v0-1578905043",
+        "creation-v0-2082844799",
+        "creation-v0-2082844800",
+        "creation-v0-2082844801",
+        "creation-v0-4294967295",
+        "creation-v1-0",
+        "creation-v1-1",
+        "creation-v1-2082844799",
+        "creation-v1-2082844800",
+        "creation-v1-2082844801",
+        "creation-v1-9223372036854775807",
+        "creation-v1-9223372036854775808",
+        "qt-v1-after-terminator",
+        "qt-v1-duplicate-esds",
+        "qt-v1-duplicate-frma",
+        "qt-v1-missing-frma",
+        "qt-v1-missing-terminator",
+        "qt-v1-terminator-body",
+        "qt-v1-unframed-compression",
+        "qt-v1-unknown",
+        "qt-v1-wave",
+        "qt-v1-wrong-frma",
+        "creation-v0-2147483647",
+        "creation-v0-2147483648",
+        "creation-v1-4294967296",
+        "coverage-over",
+        "coverage-under",
+        "dangling-description",
+        "description-without-map",
+        "duplicate-description",
+        "empty-run",
+        "fragment-namespace",
+        "grouping-parameter",
+        "mapping-before-description",
+        "prol-negative-v1",
+        "reserved-source-retained",
+        "roll-multiple-descriptions",
+        "roll-negative-v0",
+        "roll-positive-v1",
+        "roll-prol-independent",
+        "roll-zero-association",
+        "unknown-group-unadmitted",
+        "variable-length-unadmitted",
+        "dep-STSS-conflict-preserved",
+        "dep-leading-raw-preserved",
+        "dep-no-groups",
+        "dep-no-hint",
+        "dep-real-roll-unadmitted",
+        "dep-referenced",
+        "dep-reserved-referenced-field",
+        "dep-unreferenced"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    }
+  ],
+  "pending_module_requirements": [
+    "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context.",
+    "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets.",
+    "The dependency profile does not admit referenced recovery or reserved referenced fields in these inputs."
+  ],
+  "open_cases": [
+    {
+      "id": "qt-v1-after-terminator",
+      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+    },
+    {
+      "id": "qt-v1-duplicate-esds",
+      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+    },
+    {
+      "id": "qt-v1-duplicate-frma",
+      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+    },
+    {
+      "id": "qt-v1-missing-frma",
+      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+    },
+    {
+      "id": "qt-v1-missing-terminator",
+      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+    },
+    {
+      "id": "qt-v1-terminator-body",
+      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+    },
+    {
+      "id": "qt-v1-unframed-compression",
+      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+    },
+    {
+      "id": "qt-v1-wrong-frma",
+      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+    },
+    {
+      "id": "coverage-over",
+      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
+    },
+    {
+      "id": "coverage-under",
+      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
+    },
+    {
+      "id": "dangling-description",
+      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
+    },
+    {
+      "id": "duplicate-description",
+      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
+    },
+    {
+      "id": "empty-run",
+      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
+    },
+    {
+      "id": "fragment-namespace",
+      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
+    },
+    {
+      "id": "grouping-parameter",
+      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
+    },
+    {
+      "id": "unknown-group-unadmitted",
+      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
+    },
+    {
+      "id": "variable-length-unadmitted",
+      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
+    },
+    {
+      "id": "dep-real-roll-unadmitted",
+      "requirement": "The dependency profile does not admit referenced recovery or reserved referenced fields in these inputs."
+    },
+    {
+      "id": "dep-reserved-referenced-field",
+      "requirement": "The dependency profile does not admit referenced recovery or reserved referenced fields in these inputs."
+    }
+  ]
+}

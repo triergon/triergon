@@ -304,6 +304,32 @@ FFmpeg-compatible open, index, seek and range-plan operations, and its
 regular table recovery cursors. `cargo xtask codecs isobmff-reader` compares every
 packet `Reader` delivers with the formats reference's `ffprobe`; its contract, rules and
 reviewed differences are in [harness/features/isobmff-reader](../../harness/features/isobmff-reader).
+The [PCM packet](../../harness/features/mov-pcm-packets/contract.json),
+[table recovery](../../harness/features/mov-run-recovery/contract.json) and
+[encoded view](../../harness/features/mov-encoded-views/contract.json) comparisons
+check MOV packet fields and payloads against the demuxer. The
+[QuickTime PCM sample](../../harness/features/quicktime-pcm-samples/contract.json)
+comparison checks the concatenated PCM bytes and whole-frame counts per stream.
+The [sound entry oracle](../../harness/features/quicktime-sound-description/contract.json)
+checks the complete version 0 description and the supported PCM layout.
+[DTS configuration](../../harness/features/isobmff-dts-signalling/contract.json)
+compares the core-signalling verdict, sample rate and samples per access unit with the
+demuxed configuration. An [independent entry oracle](../../harness/features/isobmff-dts-entry-source/contract.json)
+checks the declared base rate and the exact access-unit clock.
+The [one-track seek comparison](../../harness/features/mov-track-seek/contract.json)
+checks demux index landings after opening and after draining to EOF. The
+[source seek comparison](../../harness/features/isobmff-source-seek/contract.json)
+checks sample ranges, decode clocks and payloads with caller-specified preroll, and
+compares composition-time selections with demuxed presentation timestamps.
+
+The [segment index oracle](../../harness/features/isobmff-segment-indexes/contract.json)
+checks the complete `sidx`, `tfra` and `mfro` fields and derived ranges.
+The [index landing comparison](../../harness/features/isobmff-index-landings/contract.json)
+checks backward seek ranges and first-packet fragment clocks against the demuxer.
+The [MOV trace comparison](../../harness/features/mov-reference-trace/contract.json)
+checks public packet clocks, open diagnostics and configuration, the first packet
+read result, and open-time reads and seeks with fixed rewind geometry.
+
 Comparison results and gates are in [docs/status.md](../../docs/status.md) and
 [docs/quality.md](../../docs/quality.md).
 

@@ -1,0 +1,4070 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "tfra-movie",
+      "profile": "tfra",
+      "file": "crates/isobmff/tests/fixtures/f-tfra-mfra.mp4",
+      "sha256": "5c983040738d86590fd56f7168474c6e518988cb6214374ff1de2e300e696e9c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "999",
+        "62",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "3c40e7437ee52879bf29d98d184a31592a2fa02ce3de9f983a97bf3899f4f012"
+      }
+    },
+    {
+      "id": "mfro-movie",
+      "profile": "mfro",
+      "file": "crates/isobmff/tests/fixtures/f-tfra-mfra.mp4",
+      "sha256": "5c983040738d86590fd56f7168474c6e518988cb6214374ff1de2e300e696e9c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "1061",
+        "16",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "59c900742ff729412b0a751b1750a06ab109fc52ab9c4c7eee7c7cdb296904fb"
+      }
+    },
+    {
+      "id": "sidx-v0-empty",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-v0-empty.bin",
+      "sha256": "aeb6ec333a4af8b6e25896d7c0afcf2e6b846750c3871cb39b64c98225f86628",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "100",
+        "32",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "fbd576dec6908adb2d031428c24d5057e8628d8e7ba61ebcc94564f870422e92"
+      }
+    },
+    {
+      "id": "sidx-v0-one",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-v0-one.bin",
+      "sha256": "ed34ff8513bc5ac5e8433ce3981e3936fcbc5b929fdcdd12136662e625415e4d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "100",
+        "44",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "d1bbba0a3933d2b59d242be5fa53d1e26ed26c9098109f218a51eb7a88645b25"
+      }
+    },
+    {
+      "id": "sidx-v0-nested",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-v0-nested.bin",
+      "sha256": "d965dca9fe672c72f92d1f2100a3bf7f63bd02bb935b646262108a32780649cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "100",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "3bef459f4c903327dbfb0c02127bc4b58e94fc2ff54e12a073b51d84ac524801"
+      }
+    },
+    {
+      "id": "sidx-truncated-0",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-0.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "0",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-1",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-1.bin",
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "1",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-2",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-2.bin",
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "2",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-3",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-3.bin",
+      "sha256": "709e80c88487a2411e1ee4dfb9f22a861492d20c4765150c0c794abd70f8147c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "3",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-4",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-4.bin",
+      "sha256": "552d7d672c5bbbccfb210a425e36a1d65bc663d3d3c395114c8ebc9c7cf28394",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "4",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-5",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-5.bin",
+      "sha256": "7431cf1a6158115426ec8ca9439cf39854a8e93ff83211ce9b6787d48acdbd34",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "5",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-6",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-6.bin",
+      "sha256": "ca1ddcd32344ece902de4d90df27341e9e914dd014729c38b06ba738e9b6d304",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "6",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-7",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-7.bin",
+      "sha256": "76b5a0778c7ee9000a98bf03c931dcbf1f187fe492656915920ba7894b21445e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "7",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-8",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-8.bin",
+      "sha256": "d6ecf9738c91f15bbe6c645df696abb0a391a7a0d7c917d45d23ffcfb897bfa4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "8",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-9",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-9.bin",
+      "sha256": "5bc30dd93a7c4562c5d9397bc8e8f3d53c8e2a356f5e82846d2ed96f219cbe2b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "9",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-10",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-10.bin",
+      "sha256": "6abee9d8b91e5b25cd9f37796e787b515a7d246b64c8a25fc08b3e9364dc0587",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "10",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-11",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-11.bin",
+      "sha256": "6e0c59ce2be89238ebe8938033747c8888058817ee4ca238fabb0bac1541f444",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "11",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-12",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-12.bin",
+      "sha256": "2884f1e2679503e34a20aabfed494679779a51eeb75ef82ccec312f7cf3505fc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "12",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-13",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-13.bin",
+      "sha256": "36bba84bcf996249519f59062a992a7153c086168d78b63ef38649b4bbbfd607",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "13",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-14",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-14.bin",
+      "sha256": "0bac87c8db91ed364192788846fc15284cd1fa3f5ad21c0e51d96ea034b9ee08",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "14",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-15",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-15.bin",
+      "sha256": "b893ba57c8f28abf5a587f0aa35ecb0d9e4d14729f99bec3f6fd32f5d5b5165a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "15",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-16",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-16.bin",
+      "sha256": "3101cc5f9abb1b06e8c8d01ad3fbb925943749b89c4ffb0ba6a1c0e9658f585c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "16",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-17",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-17.bin",
+      "sha256": "b469f725d6de9ea1eb9dda593f9d19d321e63341515bb079fa4d0b461342ebe9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "17",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-18",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-18.bin",
+      "sha256": "1fc216591277bd4603af8cc64b49455e1a7eb9aa319805e071a0590a41d6792c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "18",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-19",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-19.bin",
+      "sha256": "61828712abc0db117b9fe2dc665d5f4f35cf41ae9793758673a6d3a48c4a971e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "19",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-20",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-20.bin",
+      "sha256": "6afbf4349d95dde13276f6f4835184367e6e315a0a76afcfbbd1d85d1edf9086",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "20",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-21",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-21.bin",
+      "sha256": "20782f13df6f1cc650e438bc5eebffc299b8e7ddfcd1fa67719a936dedc23408",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "21",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-22",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-22.bin",
+      "sha256": "597cc09bf449383e55834a54b71f52040b877aa50251db07d738cbade5b3809e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "22",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-23",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-23.bin",
+      "sha256": "77dced32764718ddb42e13e8820ebf2feace9d0cd3688318a4c7f4bfbd0f75c7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "23",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-24",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-24.bin",
+      "sha256": "fb9170492e670bc0a823c04997ce7ffcb9664f00468952ce595bd83e5ca9d0ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "24",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-25",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-25.bin",
+      "sha256": "1ae2f2b43d0c0674c1caba097236ee56eb4bd6e357ab1a88d399a786a104f2b4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "25",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-26",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-26.bin",
+      "sha256": "afa4162880203bccf36c2046c928dac25aee1fde4dc6c04ad82525a937f44d96",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "26",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-27",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-27.bin",
+      "sha256": "affdf600bc500e7c59925c883798b7680126d679737a391e725a9a2e0e5f7701",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "27",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-28",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-28.bin",
+      "sha256": "365b362176dd5faf91e0f4c5682efe55f34a356e0d5497c4dd28049e09b2760e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "28",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-29",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-29.bin",
+      "sha256": "da28e7f861b8ea6d3212447a97a18a1624d99638d0c45964f98601c99613f796",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "29",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-30",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-30.bin",
+      "sha256": "bed81bd1313ffb01dedd70ccfa2acb636303af6f36b407f64cfc9f62584fce73",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "30",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-31",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-31.bin",
+      "sha256": "4ac227e1bdb648dd70e2c01607cb4a5ecd932df334de76937431256a7120d158",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "31",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-32",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-32.bin",
+      "sha256": "4eff861cda43f648a96bed8baa300869d8bac0df8ea0d45016ba34a0b16a3862",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "32",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-33",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-33.bin",
+      "sha256": "043a425a87849b59c2f7d88fa45bcb90b20e298fe392ccc03cbcda73c4dcfdff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "33",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-34",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-34.bin",
+      "sha256": "9f19f43dae49012f1843753b7c24fceebcda167d8eb1091aebf7b74b40c2b435",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "34",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-35",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-35.bin",
+      "sha256": "57c467218a2868a676286eef552f32841aae817263ff1db6723314909eb8e1c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "35",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-36",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-36.bin",
+      "sha256": "676a7b20bba16a6ef9c6f62b4295fe60dc44979b1d51230cc3ef5cf7f79cd2a6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "36",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-37",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-37.bin",
+      "sha256": "9643d04446e5815bfea7fdfd2c648717c3ea12e84166353dcc4ce0bbb9d5ae68",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "37",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-38",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-38.bin",
+      "sha256": "aad723300e6b4249e9efd94522646273a7ee15aa1d051becb01570a4e7d25b68",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "38",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-39",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-39.bin",
+      "sha256": "e864a856e4d82a3677b09c831a6075086e78573a64a7dacf881ca1542721ee74",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "39",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-40",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-40.bin",
+      "sha256": "8fd7763c79dde9f482ab38011627d9b1fdc79b8bd99545ddb408025102ca3ba3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "40",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-41",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-41.bin",
+      "sha256": "42902fe3e63d282549492b09acb8a0bac804ffa07a0b49f7b8a1d11a962cf68e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "41",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-42",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-42.bin",
+      "sha256": "9e4f91daf5604b510748a1afdcce0a61322a97ccd3fe437b1b7df416a25c2fc1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "42",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "sidx-truncated-43",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-truncated-43.bin",
+      "sha256": "284f11d5b9c828e9fe9e715f2d441b9c49c981cb63c51af2c3fa9761899f45c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "43",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-v0-empty",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-empty.bin",
+      "sha256": "d399fc6e07893f5f977e8068954dd378097c179dc140e7566bf2d45814e66754",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "24",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "3b3bcce49d44add4d0c13ef37a97b0af62e4614794660f67c6f18f643ef35e87"
+      }
+    },
+    {
+      "id": "tfra-v0-111",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-111.bin",
+      "sha256": "10aa179221db0f1dd3af96d1a2d06611b793f5cb5865f2ff2ae73d1eac7d1fdb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "46",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "0062e52162da4411bf346cf368a82967890816d5b093f6b79b1a4e35dd4592f7"
+      }
+    },
+    {
+      "id": "tfra-v0-112",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-112.bin",
+      "sha256": "076a72c8eac7ae1b02acf5191cad0f61ab59b4537ef73afd0e155f01d38689d6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "48",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "b082b3bcaa7d81d1639b8f83c57fbf04a633f463bd9dbe2d9fff451093ae5c0a"
+      }
+    },
+    {
+      "id": "tfra-v0-113",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-113.bin",
+      "sha256": "bf597a21ecfb6fe4c59de06a5e8eea4ee73bfb203a6a93c412902040f058d2ab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "50",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "5a57b1d270ba46843d9e482fe53d8fad2e9b21394cedd3fc410bc131cf736633"
+      }
+    },
+    {
+      "id": "tfra-v0-114",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-114.bin",
+      "sha256": "0b0654a83a042d107e9296d55c8db56d7eb380120fc2f27d8cefefa7b37186b2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "4f79937fd9986b0d673bf82b8d14c73a423afe969f63540724e27fbc9c5ca3e2"
+      }
+    },
+    {
+      "id": "tfra-v0-121",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-121.bin",
+      "sha256": "dfe95b9bd5257c254f6bd5fcde80899c0d237700a39bf4ca57cae3f32c231b4c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "48",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "bc10052142f3ea3e099082fc42cefc5b83472f85682dcabf215c6e35f47418d7"
+      }
+    },
+    {
+      "id": "tfra-v0-122",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-122.bin",
+      "sha256": "e4cfe9b4e0acab8166625c0fa7ab7df1e1d75e3df4694de54cfc5037e88b35c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "50",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "e3fea7be434edf7408bea2602421c9af6b775b12cce34313bc41ad730e784f62"
+      }
+    },
+    {
+      "id": "tfra-v0-123",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-123.bin",
+      "sha256": "2d545fcf3dd2fa506536e25bff146e1f3110a5b5925b7541fa78c09c1dedf7c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "7c0d4c86d383adcb84f21b6f402e56ebe5cb0112c43ba8526a9962f98fdf24f7"
+      }
+    },
+    {
+      "id": "tfra-v0-124",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-124.bin",
+      "sha256": "4d2f2cbf530dc681ede01b1625b723ae9b48d47ec1f8af70000087fb33f21e36",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "0e3f674247c4bdca69a6e86ec4c0671d63cd599e6d56aa4fa698849badc6f95d"
+      }
+    },
+    {
+      "id": "tfra-v0-131",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-131.bin",
+      "sha256": "75c04446856df1a4d77c20fabf5aacd8329fa0ce07d90c45547f506630b8589b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "50",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "0f22f41b1451e2cdc55622561e2d0d00068058cad060a189d72be802e7086eee"
+      }
+    },
+    {
+      "id": "tfra-v0-132",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-132.bin",
+      "sha256": "c4d3787b2e781cdc4c1aa7a3acb0d382e380df350eef33b2290633657572b17e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "72a1e2b3cf3f0c166ff4dcbf9101a9dd99b204a1777b350e6da4e2f8c9af79c9"
+      }
+    },
+    {
+      "id": "tfra-v0-133",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-133.bin",
+      "sha256": "2a6ef73d13a6ed87c6bdeb35e8f9f07a3148fca1040aeb2520e7cce0d4e86062",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "5af3ad42339b6e58a214a61ae698b0dec9916e6371f35d1207949ce56e76880c"
+      }
+    },
+    {
+      "id": "tfra-v0-134",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-134.bin",
+      "sha256": "9358b9ae384577ce08439173079f9b6b580eb5b5a8aa2a1c99c1cf3a0e0af1c8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "28858b3a8177735992ee9dd681eee3604bebba0185ecd831f3f8e31c67e5fc62"
+      }
+    },
+    {
+      "id": "tfra-v0-141",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-141.bin",
+      "sha256": "bdf3b4c39bb4dc7bb8aae07ba37ada8e39e1ca1f941445a1184b1b96c35b7f46",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "59be11d5f163cc0d398b7abeeab14626e96ef4b1b027687d8961586340f80bc5"
+      }
+    },
+    {
+      "id": "tfra-v0-142",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-142.bin",
+      "sha256": "6d9906a9e8e7b01f4958ac46dd519ef07387919422bdd4e170aeb1e89d4e5dd1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "a50c0625160f07d4cea9da7fba511dee0bdae4d123467308bbf196f79fbdb252"
+      }
+    },
+    {
+      "id": "tfra-v0-143",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-143.bin",
+      "sha256": "46e0a332bc56178104f8622feb3ba99b8f96266e2cb8633c7e7d52c884f7df1b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "f4bcffcd338ea4f1d88350f282e0af52c19461b75e805683afa9cbebe3453f23"
+      }
+    },
+    {
+      "id": "tfra-v0-144",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-144.bin",
+      "sha256": "13d6047bff6687f2d500ebf408bf9fdef15c0d4d4fd2d82f50f73e3d6764360d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "58",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "947065adbbd7bea1f2deac786ec45fd52948ff421ee0eba5c7519a3247173a7f"
+      }
+    },
+    {
+      "id": "tfra-v0-211",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-211.bin",
+      "sha256": "4950b073fcdd42b077651a450e1ee81d3323c1a39d4dc175369da980c42e2b44",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "48",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "2ab486b9a5f4d9f5ef9e1fec24e0f5cd0a9516db7a1bb357a2b19360c547125c"
+      }
+    },
+    {
+      "id": "tfra-v0-212",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-212.bin",
+      "sha256": "0b6d285a7645c73c511f40cd4c9c65c6844f18207e9c9b63280058ee0e87ff94",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "50",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "f88e3d1517a66b7760f78f12d63f0c609bbc9dc062ad6c7952f8cf8221968121"
+      }
+    },
+    {
+      "id": "tfra-v0-213",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-213.bin",
+      "sha256": "9591ce44c704f2ed94540e96f411578aa82499f662e96a3ffa3f313540b1fcc4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "faf2b73425f616531b52a7b0b4a0a5bbb4ff56889b4ba50b920e3d73f382834c"
+      }
+    },
+    {
+      "id": "tfra-v0-214",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-214.bin",
+      "sha256": "60eaf03f92d3df3f59f592c824bba92f9cde9d7b56735231f3f2f2920ad6e686",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "a0eb80f77f3db15ba88730cc6ad9ff9d689e51cd7903d3c34947b1c2db90e836"
+      }
+    },
+    {
+      "id": "tfra-v0-221",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-221.bin",
+      "sha256": "e3d7bd40e9df877fccdc3c2021cd8718955cd57067cde16ee973b938c9b1f154",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "50",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "db29532836dc55790b462e4d83ab944762154ba878fa3ab75132b401b9f84915"
+      }
+    },
+    {
+      "id": "tfra-v0-222",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-222.bin",
+      "sha256": "169700aa362b0d72a85b363216b4be026f4827552c20f49bdb783bb5d4de1306",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "51315637b8404364b7c12be43b835a0bf5c109ab18b9ceba05efa923e9c7a719"
+      }
+    },
+    {
+      "id": "tfra-v0-223",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-223.bin",
+      "sha256": "d3f2d9d03fc24408e0fdf8686b6c3421408957e4528cf6d4a64452519f9dec7d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "a199a095a50d58000c3fcd520a9080f90ea917462e0a71a5d3c4b062aed2f598"
+      }
+    },
+    {
+      "id": "tfra-v0-224",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-224.bin",
+      "sha256": "662a66db50027b5c84710670303058150b79fb6da43efac514c110930e8f5012",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "faa0a3ce5766c59dfaa268671304e6767af5f922eb32e98e2f26d55a7d37de00"
+      }
+    },
+    {
+      "id": "tfra-v0-231",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-231.bin",
+      "sha256": "ecbb2cbd2f2b021fcd30f8f418ef3d7f302a6daa5d2045ae4794d211e350463f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "584699c67d05056ca5b283b51af86929e87842156fe23959955cee9211bd775a"
+      }
+    },
+    {
+      "id": "tfra-v0-232",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-232.bin",
+      "sha256": "a02ee13fac9082f551713aba76afc02ef37e194305bf5b858dfa5f8f3b679de9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "951c26e864f8b62c297239ee2df5e3a6c841b1aa6c5ad9513ee92fd1c94fbafa"
+      }
+    },
+    {
+      "id": "tfra-v0-233",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-233.bin",
+      "sha256": "8a7b8b6a576da849c20896697713d5b26050b0078063731411a23c283a6964a1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "deaf388c28547ade1f19217b44c33d9e3c73b94d7dd4a475fb990fa8b29887d1"
+      }
+    },
+    {
+      "id": "tfra-v0-234",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-234.bin",
+      "sha256": "277d2b45d771375f666795c461414ad0bd08867824783f599934b590a7e24cc4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "58",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "ae1ea03385bc6d3d5d083c04ef05e18fdd8c672f940ab7c342b31bd7a012ddd4"
+      }
+    },
+    {
+      "id": "tfra-v0-241",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-241.bin",
+      "sha256": "d95845496184d32f773944210919bb5b1b4c570eb87a42a99b97d7a9aa243e13",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "ecb91fb11a190689e7b8c8fdbde74043752bd0613e18f5a8fadad6bb1954055d"
+      }
+    },
+    {
+      "id": "tfra-v0-242",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-242.bin",
+      "sha256": "b317dad3efd9e8a21fd17d4626e2e73619657e93f7df6b4c3380d83be71f1e41",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "ad11ebfac63ec08a2ea3801efd7be2c5649696366959504b33c5ba289c6758e4"
+      }
+    },
+    {
+      "id": "tfra-v0-243",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-243.bin",
+      "sha256": "b66334375a67a78c8d5c76fa61aecf8bc90d11513c60a0c9a892ab7f18e558d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "58",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "862762e77cc7b6b63b72d3f82a27375e36421976959410b99cf9e643333b9605"
+      }
+    },
+    {
+      "id": "tfra-v0-244",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-244.bin",
+      "sha256": "d7df03a88a1cf3410e4420049ef6fe09ea971a5ba032dfd9f1168eaf4cf79fb3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "60",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "c451b1b73e4f062ee8cd1d83623900484781814bd5842bc5a1f866966f22d3b7"
+      }
+    },
+    {
+      "id": "tfra-v0-311",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-311.bin",
+      "sha256": "2f1b17bf8e7ddfb96ded982bb097cfe3c683503e98d6cd4ae77cbeb6f588cd27",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "50",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "94b4ed8c286fed59a7d818aa5ca7416df1257a5b4d5bac5acb1aebdcadf1edef"
+      }
+    },
+    {
+      "id": "tfra-v0-312",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-312.bin",
+      "sha256": "b638f460b5941405dd49e2815229615ec38b96c1f7e62b1da15099bfec6d3b71",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "5fda10c48062e0b2f875db1523b702beb05ded39f5b8057d1b3340a6507434ab"
+      }
+    },
+    {
+      "id": "tfra-v0-313",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-313.bin",
+      "sha256": "39ff15afac75ade260cb8e19ca00d2a07e002de39933d5c6c4a9adf2a9d60bd8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "b76b660084d838805a668fb1f408611a0aa0d333418c4fa87693c38263ca3f0e"
+      }
+    },
+    {
+      "id": "tfra-v0-314",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-314.bin",
+      "sha256": "50d8933086cb8fcad53f87b44bcca440739da1a2c67ee96d9224eececbcb1961",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "19ee02e2793175f04d948b8b12f65395d7572778f9d5d13f5da0d7a2d76b5268"
+      }
+    },
+    {
+      "id": "tfra-v0-321",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-321.bin",
+      "sha256": "0d309d8d6b68f1edc624bb77d054f6f710a025f3f6913a24c53db593b07b3895",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "f084dbab34bc029f4b97c616fafc0f200dbcc5722928b948caae843f6ca354e8"
+      }
+    },
+    {
+      "id": "tfra-v0-322",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-322.bin",
+      "sha256": "a220d5f18d1ddfe20f2d5cda2bc90d44b6bca4623a45f011a4c4cafaabdf679e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "e7027707175e0a8ee958dd5280808e1a38e76d0acf92e8349eb61a3db9420aac"
+      }
+    },
+    {
+      "id": "tfra-v0-323",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-323.bin",
+      "sha256": "073c59ecefb2309d925355a33b0981787d5fa23be18923fe2897a5d0f48665a5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "f98a058a7cc925d27ae0c283231edc520e32df57b110eb16b061d566a19ebb54"
+      }
+    },
+    {
+      "id": "tfra-v0-324",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-324.bin",
+      "sha256": "1418a015c44a5c7f99a9dd8e0f02d3b4d1d6f7b271c8418d11e0b69a53379459",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "58",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "684abcd42da9ae884a494b8e901aec1b44142de528bc518788ceac0e56aef0a0"
+      }
+    },
+    {
+      "id": "tfra-v0-331",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-331.bin",
+      "sha256": "5ded31babc9ff5d5e2d80630c9269bf2a348b69ac13918af602cf31e9aafd060",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "85b8579ab02ce4d5b846cf283f3d0828e92d03aa89da3e82bca00b2b2f1ed314"
+      }
+    },
+    {
+      "id": "tfra-v0-332",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-332.bin",
+      "sha256": "02a804e3e49596a289e5f8aee6c5096b9dbc8612b09c33c1c639142e0fa88f11",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "2afdfb9aa6d51b560f5043e623b102416b9a3ba61af23fbeabbc9a4492a4e6fc"
+      }
+    },
+    {
+      "id": "tfra-v0-333",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-333.bin",
+      "sha256": "59d525365357a07fe973789c1ea8c8b4e27925e53bdc8edf692f5ff7478e76e5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "58",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "338e2959dbb501ba254d5b8d87b35d695bb0c558504a3860d5f2d16051f45c67"
+      }
+    },
+    {
+      "id": "tfra-v0-334",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-334.bin",
+      "sha256": "84dc6f42dfbe4f59fe2beafe1d059c3fbcd7cf0f8ff4e002b62ec6347e0ba931",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "60",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "bc1371f6b4178c94bf71ee0ef31d81b99f6c75838605aa61460bfca2242f1ef1"
+      }
+    },
+    {
+      "id": "tfra-v0-341",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-341.bin",
+      "sha256": "5b4a19d4764116e212a19364c36f0886b7851f25106efa3c9ac27dbfaefd9ed2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "a274098f20432c55e62beb105089bdcdd650900a221984a013d6ebcf7b7d555e"
+      }
+    },
+    {
+      "id": "tfra-v0-342",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-342.bin",
+      "sha256": "c15367e6b763248d217afb41381541f405650aa0ad122bfd260dcbea851fa2e4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "58",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "b4273685955ab60bd5ad2b6c3cef6a194e9d4373c6783234df00a6e13096699f"
+      }
+    },
+    {
+      "id": "tfra-v0-343",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-343.bin",
+      "sha256": "6d7a00b4a3765a219fb2adb50e13ff420d0d67c9756b91ee8ac9d94c1327f5e5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "60",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "567e775dbf0de3500281ba86577ab840511435136b14b2c8adf355aaf610e168"
+      }
+    },
+    {
+      "id": "tfra-v0-344",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-344.bin",
+      "sha256": "2f037a1d91e4546ce012d02fb8e2e003522c89ef47fb4322a2f72611020bcfd7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "62",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "e766b28d4b142a95c0744c295aa7d78801db5e19d8cdfd9961fc8f6bd7fd2a13"
+      }
+    },
+    {
+      "id": "tfra-v0-411",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-411.bin",
+      "sha256": "4388563c347cfc468625bdb8449a7eccae8ab3ffc80b6209fab352f887eaa1b2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "25dfdddef404e75e74491126ec9489d0afa78727d62f23a09d33afd1defcb7f0"
+      }
+    },
+    {
+      "id": "tfra-v0-412",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-412.bin",
+      "sha256": "71b3b851887bf7b4a77a87d75200a0cc94f65f6f090a6078c5600a6f955596fc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "4e36ccd15f6c779f68569f2709a0eecce80436261808b215e51e34078074867a"
+      }
+    },
+    {
+      "id": "tfra-v0-413",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-413.bin",
+      "sha256": "2b75b7c2dc16a3d40620c696f68d5e99db5a7d2cb8f6d3423d1b7047a6c65126",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "373603762fffe61ac4315fb26a49bf0ac61cd8013401d779da6a2d5d886eecaf"
+      }
+    },
+    {
+      "id": "tfra-v0-414",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-414.bin",
+      "sha256": "3977c9488ec52187f373a65252ff9d2c6f93248de71ec9d2e76014acb0b1920c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "58",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "c66751624924c3ca6d551997a867072acafeff9f32ea532297d3adeb6b077d64"
+      }
+    },
+    {
+      "id": "tfra-v0-421",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-421.bin",
+      "sha256": "b2363affd3afe2130d98f7e5db1dee4d9b1dea52949653dcb9190d8eef3bd104",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "54",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "76227a729590dd083e6b2b5888fad8639cb0859ead4ca93e858c560527deeb04"
+      }
+    },
+    {
+      "id": "tfra-v0-422",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-422.bin",
+      "sha256": "25c2d59536e435e63c893b3150eeec3dc0ba142d5777516f5d72b53f577ee8f8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "079459865af9f5f5c7a02e632e9c137235862d6ef51fbebaf85659ec823b8d6a"
+      }
+    },
+    {
+      "id": "tfra-v0-423",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-423.bin",
+      "sha256": "b7744ff148b82fe769426871166333d2becf071527b3c5910406771e24836191",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "58",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "eeaa3331077476c7af2e660b7797345479343d4348d3b5b827fd40f40d1a6921"
+      }
+    },
+    {
+      "id": "tfra-v0-424",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-424.bin",
+      "sha256": "e3001b29b800076e577d3b54bf36047a0fc60280dcd3b2119798bd1870036c2c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "60",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "0057cec06b3441230e7cbae8288cd42f18b789e18c0aedb87031c655e1dde059"
+      }
+    },
+    {
+      "id": "tfra-v0-431",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-431.bin",
+      "sha256": "16bced543baad387e7f2f04e3a09b5348086d8009d10d5b14ff43c32ab6881f2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "56",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "a3f5895307dcebacfcc50e9076f3ab137f8601f84e3b35265c3d878f1f6d2d2a"
+      }
+    },
+    {
+      "id": "tfra-v0-432",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-432.bin",
+      "sha256": "9000183d5ee48406a6eb6bc5c6897909db9941351d1e154a65601fd2799b0a65",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "58",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "ec56bbb452031463f6b05e817c12dadd70eb4f6e88b2272af3eb6540dffa9fdb"
+      }
+    },
+    {
+      "id": "tfra-v0-433",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-433.bin",
+      "sha256": "6da207a61ac55eb16601a35da10ff9e449a8874e7594c01c7646dffcfce2becb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "60",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "27dd4abc7b3599d794db9aa4081a1172ab41ecc43209872d4230ae321ad863f2"
+      }
+    },
+    {
+      "id": "tfra-v0-434",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-434.bin",
+      "sha256": "525b8122b1b83de5ff04ea2e49f0995fd75de981df0981a973b01e5edfe9b6f8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "62",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "a3a4b2be890385b9ec29fadaab0d6956a5a9a8666b3cb215fa55505b8b6a0f19"
+      }
+    },
+    {
+      "id": "tfra-v0-441",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-441.bin",
+      "sha256": "ab497144a65101955632a27790892768d785eda472d5e6e11b0f3c9395c89f97",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "58",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "03085a9ef81ca10d9625f9f6314cbce9d06317cb0e1f4a1074876a9969058cd3"
+      }
+    },
+    {
+      "id": "tfra-v0-442",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-442.bin",
+      "sha256": "73ef71a222dea3838a5537945ea0b79262869a3dfb97e4b28e502e1fec6695de",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "60",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "28bff9b99b2a941d9555d44a148bff2f186016727faa30dcb3fa0e37416018ee"
+      }
+    },
+    {
+      "id": "tfra-v0-443",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-443.bin",
+      "sha256": "f963896e4d3b127dd0432f8bcc8fb40072953bff0d75e7ceb85ee92318db9cbc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "62",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "8a784db3841f40b5ea5044a6dff1cbdb210e1bb2e44c013be5d5c47ea51a3f7b"
+      }
+    },
+    {
+      "id": "tfra-v0-444",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v0-444.bin",
+      "sha256": "67e94aa7f69dda6670944e5eebfac18e65f980933884bb4560c9d57b5c47ddde",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "64",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "3bf02aa06717e2691b856b9978a4e7adf730285692e47e271fa216a4c3f374ec"
+      }
+    },
+    {
+      "id": "sidx-v1-empty",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-v1-empty.bin",
+      "sha256": "29608caf511a5e17d39aaec82b8f2a5c3f6626ee5e91778038290663224e76df",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "100",
+        "40",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "408a72c96fb6adb11354bad156a024efc82ec00f6a869818e9c21ec826ab10f9"
+      }
+    },
+    {
+      "id": "sidx-v1-one",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-v1-one.bin",
+      "sha256": "ea46f344d8a0fa588bd9d042f5625329b9b62bb12cd7eb775ef7f7c6421dec34",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "100",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "9bdfc32768e2cc052c7cd373df9fa7da0ae9ce84e13f3242588a36da87bef407"
+      }
+    },
+    {
+      "id": "sidx-v1-nested",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-v1-nested.bin",
+      "sha256": "80a3fee56f53b01de9166807554442d0ad80175fdf7dfafa072f8506d39c1d37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "100",
+        "64",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "8760bf1e67ffbd0d2544186c1f007d08ca325d22d600cdbc063b3f02a5d1fef9"
+      }
+    },
+    {
+      "id": "tfra-v1-empty",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-empty.bin",
+      "sha256": "15357dbd0a0966539f8689e9b550e12cb4601b2c348beaf926b87f47177d571a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "24",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "c55fe8938450568e4b7a82cc55e5f6eb9184daeaabe57e33c8765bbfe26c6d6b"
+      }
+    },
+    {
+      "id": "tfra-v1-111",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-111.bin",
+      "sha256": "e897c4aacf4da14d334fe3e19979cb96b043d979b07fa208e7370c515ffe7a15",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "62",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "5aaefcb77c53fd504ed039c51af1c56efa966f504e36798c02160b58d4bfa9aa"
+      }
+    },
+    {
+      "id": "tfra-v1-112",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-112.bin",
+      "sha256": "5e81a48c86a4ee92bbaa7f2b0a9aae18b75529a00a58aee4d94798f96351022a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "64",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "553ca48a2589c50cca9ba4df2fbf89f16cd140bce50c539ff487689ba8bc54b4"
+      }
+    },
+    {
+      "id": "tfra-v1-113",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-113.bin",
+      "sha256": "d4565d18e9821af6f29d38c78dabc0c536aaca0c9f4ab696d95ffa0175f5101b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "66",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "667189ca9ea3ac85c57bf25efc6418ead98e38fd83e8fd369ec589589a52abed"
+      }
+    },
+    {
+      "id": "tfra-v1-114",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-114.bin",
+      "sha256": "045a11a70fe7edb86043d972659a65c0eb63371b9dc6c85c57e908ebe1f6e183",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "68",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "fb64e72c8bc2aab8adc1dc1901732fa67e89fd8473e746c0546d2d1b568e12f3"
+      }
+    },
+    {
+      "id": "tfra-v1-121",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-121.bin",
+      "sha256": "453865ce07b0e0893c02cfec098bbe58c6c7d34a790590a6eda1c7d136b781c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "64",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "09182bdb5a16ab229de4b2b969074eb35be87b9d528f673296cb2ee4037ef5ab"
+      }
+    },
+    {
+      "id": "tfra-v1-122",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-122.bin",
+      "sha256": "42740b1b7f650213fdad96b64425f1f063a04f23ac1aa2d4c350b7633e5ff365",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "66",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "fcaac03c66b9c8e76218a65ce09441a7c07ba9c54166c9360365156655c7463c"
+      }
+    },
+    {
+      "id": "tfra-v1-123",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-123.bin",
+      "sha256": "ae6120753b62537045dd8aa3a1d60044c48207c8f6066fe6b47e4a0874276061",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "68",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "90c97153b601d7fcb5878285e8763d1b16b4aac70def54f73d2bb473273c7f17"
+      }
+    },
+    {
+      "id": "tfra-v1-124",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-124.bin",
+      "sha256": "d52697d18474a43a2996c851573d8b3ef09359179f67ef47bf0778cd936e38d5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "09d901f83d3ec2b87d2b2111b21241d9d054f325be6c16a1e345c2c8d1740695"
+      }
+    },
+    {
+      "id": "tfra-v1-131",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-131.bin",
+      "sha256": "9d656c00c56803c6041bfe0ee6896d620c87e1db4f338686902637c3013a9437",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "66",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "53c9256f4548eccc8d4d0bbb7740496fc0722af25e2fd22c7b727c24c19bf6ab"
+      }
+    },
+    {
+      "id": "tfra-v1-132",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-132.bin",
+      "sha256": "3bdf79342579d532f8477cbb18e7d6529f8c8ed396354f0a1d3510b89d7fa5c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "68",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "9bc875bc9fd8fbb8a00f6aaf1ba47007be5a6c5caad51b2d74e948bc8ad96c10"
+      }
+    },
+    {
+      "id": "tfra-v1-133",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-133.bin",
+      "sha256": "bc81ad2b764d7894bf2a69774e081c1c9acfb189d8439ccb8f8882d94ced521b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "3327b549ec8b2c1a5547ce4a52292b5a545ce4cb1f730942e594aadd9530aeeb"
+      }
+    },
+    {
+      "id": "tfra-v1-134",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-134.bin",
+      "sha256": "26f6985badb6b92eaab76621a1b493ec88909212c77ea1b9182d12c271c9f6fa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "fd4348a2bdec8d47f2f574b8534f621d9adcd8918c02b78e887b7eacb4faf0fb"
+      }
+    },
+    {
+      "id": "tfra-v1-141",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-141.bin",
+      "sha256": "dd2dfcc17dc8a247223e5addb9f617a18b8b6bfa29286f65e845139a49fa9e5c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "68",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "ad1bdf12716a3c2a858bc247ae77f2fa244cadd4d747e5f5923e3f8587f50091"
+      }
+    },
+    {
+      "id": "tfra-v1-142",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-142.bin",
+      "sha256": "ea2f9d060f45a6f8b3b8645a4045498048232f5a4cc40cf32c0a8ef1869bfc5e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "c178df08cbd61b0999f4e1d239e48c45fd55e8726e8738a3dfbab0d6c7ecf2cb"
+      }
+    },
+    {
+      "id": "tfra-v1-143",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-143.bin",
+      "sha256": "e36a9d4fe8c74c19b0a1410df4bab44f0a82117d9ca77e6777b734d5078beaeb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "b5e793fcc3f914bf37df678207cbaf0f7f7939d02d57ccb2eae93a251258b96b"
+      }
+    },
+    {
+      "id": "tfra-v1-144",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-144.bin",
+      "sha256": "669ccd3bde61c313f3b52a188e40e5b8e34df61fedac71720309294e46f91509",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "74",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "34c00328d00c2c335be7805b3a2a6cc9079d82e51772d10e0855c60f0f89a49b"
+      }
+    },
+    {
+      "id": "tfra-v1-211",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-211.bin",
+      "sha256": "850d7e7accadf632880afdb618f480d7bbe0f9773ad07891af0ced99b678840d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "64",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "9c80d229e56c072838c8de7610201f609b3475168880da79820632104d602fbd"
+      }
+    },
+    {
+      "id": "tfra-v1-212",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-212.bin",
+      "sha256": "4af5435135ac1aa32f46f3e611e8f14659e8cb621e18486aff6360268851f359",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "66",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "f495ee52f948ce30c936bc803a871066f1853d74882de1d2de7c55ac3cc32491"
+      }
+    },
+    {
+      "id": "tfra-v1-213",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-213.bin",
+      "sha256": "0970aecb2dffc50e954fa11ad1f7f2c19bddc394b561ed4d651068b1f3df1d29",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "68",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "dc60a2e12171a166df05dab8c86a4028cca09b7011e3d42b4cb6c1f4d2d23ab7"
+      }
+    },
+    {
+      "id": "tfra-v1-214",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-214.bin",
+      "sha256": "5964d9bb6699fd0949dd216e16ad039d6940db87278e24a0a55d9f7295ec2dcf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "89bb675aa58273353d6460c24ab77ab1f026a792cdc2b640e6e9b431fb1979db"
+      }
+    },
+    {
+      "id": "tfra-v1-221",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-221.bin",
+      "sha256": "cb8ca6c42f0fd97a7e62a0fe1c7a926a694f02612ae0b941f9e2d9a704ec19dd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "66",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "2a95b0c6079cc9410a64ef2d7423134cbdc071c4b9b27730d048e36426d39f44"
+      }
+    },
+    {
+      "id": "tfra-v1-222",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-222.bin",
+      "sha256": "9aa541771f9fc972be422fb5c40f6caf0b747e568edcbf553c921456e3847589",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "68",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "4f8c0e6c45fd04229095e2effc5d2e207b93e15132a5424d8852c96678c121f0"
+      }
+    },
+    {
+      "id": "tfra-v1-223",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-223.bin",
+      "sha256": "bcc710adc30fa5969d340ae773fc5a929d10534419b3010fff5e995fbf347d95",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "f987778e3c534c2f72a0b519579240b3b1c9cafa7ee49bc42a7f611795c3b143"
+      }
+    },
+    {
+      "id": "tfra-v1-224",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-224.bin",
+      "sha256": "1e6852a67f4e1fe87ea338c1a35adeef9f9af3120371dee6a72211aedccc3dc7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "0f3ccd4b53b7af4cc91a4f8b82475243cb65429b594cd8de227aacee6ffab128"
+      }
+    },
+    {
+      "id": "tfra-v1-231",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-231.bin",
+      "sha256": "77103c7549f6e2703d7daf4a6f29ca4af49190ab76dcbdac2a1e429387247814",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "68",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "9cfc3e984f2da4021c264732a073fa8f4dc61e97f62e22f6b15ff63146e6fb0f"
+      }
+    },
+    {
+      "id": "tfra-v1-232",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-232.bin",
+      "sha256": "624486b80507dbbfcf08bac1d66e028fece8530cec34c5d17af7727357511fa8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "5c62dd0981a0461a555d057f24ab4067a88e0de964ee75044a1e6f3f14c8b9d9"
+      }
+    },
+    {
+      "id": "tfra-v1-233",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-233.bin",
+      "sha256": "0c51f63cabcee74b353df9fd777d52034a23d7c256c0f7c5124a95e1e973b306",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "f2f771c7f7af38cf7e369cb2e9ebdc56d04d68776ffeebc901bd2a43fccba302"
+      }
+    },
+    {
+      "id": "tfra-v1-234",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-234.bin",
+      "sha256": "394033d4906dbb76c06093946af428bb9a27021f60ae47ff42e61537b044180d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "74",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "6219c50beca6101d0cf053446c2c7de6484ad517abfad3bff611cf0b0a03ee05"
+      }
+    },
+    {
+      "id": "tfra-v1-241",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-241.bin",
+      "sha256": "269a105767ef0691a990ff071c2a57084c82e34e102e0c4f71aed352408fcf22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "f8db6bf49fae60affb7e81e1710c55cce936cc850e81396415ccf02129bd1f8a"
+      }
+    },
+    {
+      "id": "tfra-v1-242",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-242.bin",
+      "sha256": "bdd9cdd9a5a2ecdc4a9613e3cd4fa70078039abb3e616fe501182435caadac8d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "9ccd0b695478c4a4b5497eb7ae1712f2dacedb436fc9e17c30123935d4684b28"
+      }
+    },
+    {
+      "id": "tfra-v1-243",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-243.bin",
+      "sha256": "417aeae2f45b4c37096fce574c2fe9e26262468f254d06a110a46af5c8ba4a08",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "74",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "8292f49c859fef13f9df36b85a5b25cb5ac18889eca421ba582f34210ab11bcb"
+      }
+    },
+    {
+      "id": "tfra-v1-244",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-244.bin",
+      "sha256": "22165fd52f0903d1c933888723ac857d13c880386d057c78abdebb38a9f4cc6c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "76",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "3a08ec6b183e6144969aeb66fc0e5e89a788fb51ee82d639a04105627673d41a"
+      }
+    },
+    {
+      "id": "tfra-v1-311",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-311.bin",
+      "sha256": "6c9b7ba400f6ba16376cba7db354f66ddf0accc4dc85bf93ef520cbbcddd7183",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "66",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "29af6bad698d8dad424fade69701ebe71c3006d3f6333ad33bc22901d2560d17"
+      }
+    },
+    {
+      "id": "tfra-v1-312",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-312.bin",
+      "sha256": "d54cb231de87dc71a538ac4221846bae363fa92fb60aba483d10a603ead6dcca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "68",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "ca2a14f3a7bd7e7891e61a0b8732151199f861f5d3ed50885ba2328262a42cb6"
+      }
+    },
+    {
+      "id": "tfra-v1-313",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-313.bin",
+      "sha256": "18360b9d795731bcfff213982dc47c0e004566c7b9dbd624980ba149063618a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "51c60b96a6a16500057c64a83dae8358d11228cceac5bd03bcbcb3024a0283a6"
+      }
+    },
+    {
+      "id": "tfra-v1-314",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-314.bin",
+      "sha256": "85c8e6ffa25c5f2e77fdb81b4465736556160f46f69337b40c3cd8b52696e979",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "0da115b184f0472e48fb30d073a2672135e23b67e626b10e142681177a1525d4"
+      }
+    },
+    {
+      "id": "tfra-v1-321",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-321.bin",
+      "sha256": "ed78f00ed3293975e62d366089af5c6995f435de1b9ffe78873ed5cf21cf879f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "68",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "bd86751b9f0f10230e9b69c4eb0807f1a7ed040b395b08f5eddfed2fea6c65ea"
+      }
+    },
+    {
+      "id": "tfra-v1-322",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-322.bin",
+      "sha256": "0f736e927bbdb3f110e93db53d1ec9462bee68a580566cdbdbd82fa21facfa52",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "693edc97ddc70acfdd33f58cf657278393afef84e248f9764fd4238cc898e34a"
+      }
+    },
+    {
+      "id": "tfra-v1-323",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-323.bin",
+      "sha256": "1ed0a89b102c880e945a65d77fe75e64193702cc623516f3afd68e576f15e017",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "edd6531fdb4426c072dabc4ca499c4308de9ee9bb7ed182245900ecfce2aab73"
+      }
+    },
+    {
+      "id": "tfra-v1-324",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-324.bin",
+      "sha256": "3c2973c2a8b74c06ba4475fb67a72d6f69216bf338c92d127aecef4553368312",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "74",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "c15b36ea1c99ac4a25c9f9fd002e25ad4f061a648276262294c7a57b5411d1e4"
+      }
+    },
+    {
+      "id": "tfra-v1-331",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-331.bin",
+      "sha256": "cbd05ee1dcac71db0c62196f32ebcaedadc6c299e717681cf51e2414fd44d8d7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "1aa3cbee216b4f189c55540b0629996a3e309109bae453e6ed81e9cc452be23c"
+      }
+    },
+    {
+      "id": "tfra-v1-332",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-332.bin",
+      "sha256": "8c41419415dbd9fdefddcfaf610392591c8e5a054f9a192fc093a05501ba4f96",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "2364db21c6cfa0710b2977d463476c7e89fa9ceb412bc2e55b8a67be5e9d8812"
+      }
+    },
+    {
+      "id": "tfra-v1-333",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-333.bin",
+      "sha256": "f4e3a474b1c4b54f6a8a851647208bb07dde1cf17afbea11b17038352c892196",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "74",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "0291075a5837182de3703358fa044f36942a8d6c56dec5a43a9a333bd938bdde"
+      }
+    },
+    {
+      "id": "tfra-v1-334",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-334.bin",
+      "sha256": "cd3140d304077b0b7ac412bc19655b4f6c063940fb76b8e83f6a84bcf4eb8619",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "76",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "e6f799a3c1d7a39ff581405fe34c44103b1f7cb565635d061910920a2e2ffcde"
+      }
+    },
+    {
+      "id": "tfra-v1-341",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-341.bin",
+      "sha256": "9b49247e3f643f98d0beabae62fb72f97356b485f1f547e5f0244e2cc87a0859",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "020530a436da01d90d1dcc764e456c7af42ec5cbfc36dc638d5adb5079cdf725"
+      }
+    },
+    {
+      "id": "tfra-v1-342",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-342.bin",
+      "sha256": "cc37953318e43a9d5b777a8d1786f9e22085e6e64c824915bfc8ed10e08a6e31",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "74",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "328e63517eeb1132a9d3735415a88d4756f1bff768b33e6f1aa337565abd31a6"
+      }
+    },
+    {
+      "id": "tfra-v1-343",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-343.bin",
+      "sha256": "8af244f3e018ceddfcff51bd5560da2d8728d0f1390b056c472b3f46171dfbf6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "76",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "4c0f9dec20a9231c00f8a7bb2edb8d952794a2b4a717c984c91ccc92288a8a84"
+      }
+    },
+    {
+      "id": "tfra-v1-344",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-344.bin",
+      "sha256": "13d3710b85bf939d528587bd2344519a83f0d9aed4dfd7388b7060252269caad",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "78",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "ccc5ae21e37c227fe9db5c5cdf5bbdedca79f155f9a9bd6ba0f28b27dba413fb"
+      }
+    },
+    {
+      "id": "tfra-v1-411",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-411.bin",
+      "sha256": "bfa180cf031daeb658515e35c860b728a912a509a6d594b66f3daeb420fde005",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "68",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "f662a94faca8cf7cb5bc2e25c681747294372694d41bd036c59805c9efea55f7"
+      }
+    },
+    {
+      "id": "tfra-v1-412",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-412.bin",
+      "sha256": "f40e24c04fe8d7d51dd6d6790655230d294ddfef4c06b8a7c416c007c822adb1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "3d812b8e1da7e69463dd3c09e61fa7185dea662942a19453527885934d5d4cb0"
+      }
+    },
+    {
+      "id": "tfra-v1-413",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-413.bin",
+      "sha256": "c07f2430b39a60a81d25fe459d028ce552a2d8e9a56c16c42eab84c548920e1f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "0e6e5d698cab21826d6b53053d6ddbfc13633f071230db1d0c8105433a9d4462"
+      }
+    },
+    {
+      "id": "tfra-v1-414",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-414.bin",
+      "sha256": "1c5a7f5baf2c1b6f937d588d29aae6b7d65877531589d3581b360d26bf3b8c12",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "74",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "f70000fcb795ab8829fc2082326fed99af6a560422c7955535505a01d176857b"
+      }
+    },
+    {
+      "id": "tfra-v1-421",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-421.bin",
+      "sha256": "b87082258140960f20955a382df99f145d72a85ecd9e7911e996d67f07547458",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "70",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "de51c47bc5b1a2d6d8bf89f1f0ded52bab1de4dc4f1dd81bf442d6ac45f42631"
+      }
+    },
+    {
+      "id": "tfra-v1-422",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-422.bin",
+      "sha256": "b8f8eeceffd32131f3460da9f16ebc6bd37d81fb4d1ce87886c6684f1ccb1d50",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "e0422b570fa503c5c2c766745ad01f42be703b76f25f659c3edd32d85a601ca7"
+      }
+    },
+    {
+      "id": "tfra-v1-423",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-423.bin",
+      "sha256": "2f1ee40ef0fa504f82a034f6972b4cc00dc14a6371e5b331b31fd576100aeb5c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "74",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "8411d56608cca0809387b3befbaa6147392f4a48498a2d65d445449747039b7a"
+      }
+    },
+    {
+      "id": "tfra-v1-424",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-424.bin",
+      "sha256": "0069ec7e61f97a1e5e325ea38524ff4210d45ac9482ee60128a979641aa56dff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "76",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "8598909ef37c96d8d50037a0a75cd96b894365783571d88261cc67dea5d9c9c3"
+      }
+    },
+    {
+      "id": "tfra-v1-431",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-431.bin",
+      "sha256": "9536f03399fd0ae281a0049e7f1663352280df10d6633718d38267358d43e1c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "72",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "eb9be2f18a93bde606915f00ab177a159a7725ca42c95207cb15049d76f438cc"
+      }
+    },
+    {
+      "id": "tfra-v1-432",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-432.bin",
+      "sha256": "8c3e0fb90e7a009d39baa172ec65353d95ecf025315f4c4a5e3e4f13a643d7e4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "74",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "fb3c72ae49e50462219f4a0325b27f6f47269eb397512d378659cf29496cae45"
+      }
+    },
+    {
+      "id": "tfra-v1-433",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-433.bin",
+      "sha256": "2940e223a0792432979bdb386833c45643c14daaba1b61f58ac7e3d2be53de2a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "76",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "81078b10d3c444b57ffad5250a6425fc7c2631a8288ca4082738506aafddc828"
+      }
+    },
+    {
+      "id": "tfra-v1-434",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-434.bin",
+      "sha256": "b4ef625b88f5f89e18d096655c75e895f82896011aa6e820cf0998ae199aa8b6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "78",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "3d03576a39179d329e42cc51ea424f4b40754837b32c1866419656abcb34c740"
+      }
+    },
+    {
+      "id": "tfra-v1-441",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-441.bin",
+      "sha256": "05ba2e45886be6cefe6ccddeb47161682ead2f5698be0785073f52015eb670e5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "74",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "9c23e29c7138da41d63d1969bf2a2bcc6995fa7fcf3a02078ef012a7c24eac53"
+      }
+    },
+    {
+      "id": "tfra-v1-442",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-442.bin",
+      "sha256": "6d5f62f696d9749c4d5186166f2c344d51b8e97ccc641ca6f4bfd5d764f6c0ff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "76",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "b2f182f7642cacc150b4287419b96a16eb2f3aafccc0295fb34632c1478e5030"
+      }
+    },
+    {
+      "id": "tfra-v1-443",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-443.bin",
+      "sha256": "814c50ac5e4a69593e6ab6401147efe39a9418230ad845bdd2b9684dd7989df4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "78",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "8f0c1b28cb0f99fe09e3ad6f7d513fa2f2a23de474b2bc0df875927bcb656ac8"
+      }
+    },
+    {
+      "id": "tfra-v1-444",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-v1-444.bin",
+      "sha256": "7df040d5b9c568fc92cd853c8937c033e43f1162e78deccaa36ea5d5ffcc682c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "80",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "ffa9e0f3ca857283cf8b5082aaab4e4756b8f38bcbfc8843d3c23767306495c0"
+      }
+    },
+    {
+      "id": "sidx-max-rows-all-sap",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-max-rows-all-sap.bin",
+      "sha256": "b2b70b09ef68940a19f2f3217ce667a198c2793a2bf33c7f69d5a30232493ea3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "786460",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "45ab994dfc0ea72392d36ba27cfc0ff227af0b585a5eedc675853f953f03358a"
+      }
+    },
+    {
+      "id": "sidx-range-overflow",
+      "profile": "sidx",
+      "file": ".research/isobmff-index-fixtures/sidx-range-overflow.bin",
+      "sha256": "12d15bae647cdb4cea23c459dece660185f55682f175cf7f4450cfc6de454c49",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "sidx",
+        "0",
+        "52",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "9fe524e2a54916c2f94ca38a35c45e365cd0cd2a44ece5103ab905bfd3563b74"
+      }
+    },
+    {
+      "id": "tfra-truncated-0",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-0.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "0",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-1",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-1.bin",
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "1",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-2",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-2.bin",
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "2",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-3",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-3.bin",
+      "sha256": "709e80c88487a2411e1ee4dfb9f22a861492d20c4765150c0c794abd70f8147c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "3",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-4",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-4.bin",
+      "sha256": "6b0e4bfa8dc9b19ccc121b2bd0d22da7298d7a4d72b4ba1df1bbec5d56800a66",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "4",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-5",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-5.bin",
+      "sha256": "f86d551183ab1bdb5b19b63504469f2cd1a7f02e24fc50861dc1c80f2aa1515f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "5",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-6",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-6.bin",
+      "sha256": "bc2d09d15ed90fd603f87180a68b905354beecd8f14e0afa513691eff5cd4433",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "6",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-7",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-7.bin",
+      "sha256": "a216ef0a0aa4bdc6b26e2614e830ca6231f5fedc37f2eebfc080ecb65d214532",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "7",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-8",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-8.bin",
+      "sha256": "ae760c0a2c9bfcf516b58723a2b5de1dbb3d43ea382ee9ac62a51249becb6210",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "8",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-9",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-9.bin",
+      "sha256": "e9f1957b788fcfc2bbb78786f9257f60234e10a935fb290b0943cfc27db6c422",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "9",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-10",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-10.bin",
+      "sha256": "e3d92b0e415b3427ed84c9ba92ff5bc5100c0dd252f17cca300f5df33fa0753e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "10",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-11",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-11.bin",
+      "sha256": "d494a981c90436ecafd5367e8456d7790d369314fe9a04fa8255620aebad590b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "11",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-12",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-12.bin",
+      "sha256": "c6f37af2244011825082982b61b10fe419beb7dc19f6aaba023b99bfe4cec326",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "12",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-13",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-13.bin",
+      "sha256": "09473b0d38b7822aa354c436d3515ae6b5e62fb52cee7ea914721993481a6dda",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "13",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-14",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-14.bin",
+      "sha256": "3b4a1226b4dc8233e59ef828cf69460974e77b21a0a58e8e0be1304645fddcde",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "14",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-15",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-15.bin",
+      "sha256": "75ea268bfb8414813de88284dd2b0112d2585bba9e41d1e995388f665e895f6a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "15",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-16",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-16.bin",
+      "sha256": "fa6f6af72102337dd72d93459aacc920927dd9f932e0cff3f9c5314b2a98c41f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "16",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-17",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-17.bin",
+      "sha256": "9f347a08de26e2118039f04bc7e4895ec9f5a06111dd9e78bdf639b097968242",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "17",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-18",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-18.bin",
+      "sha256": "0411386f1423ce9369b4058dc4f3c35cd1cb101e6970c961ae53301c69b3d176",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "18",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-19",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-19.bin",
+      "sha256": "b066994990a10723d8499bbf975174c4cb69bbd1b3ba8c156360daf63f80f5c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "19",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-20",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-20.bin",
+      "sha256": "97f7a75cc709497ec7182176f0e91f36f3ff1baad71c63f052ce4aed0e4c2e1f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "20",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-21",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-21.bin",
+      "sha256": "4ec929209028501da53c52c16b738e517df5d9ce7bd49d645f3ea1794913d2f5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "21",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-22",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-22.bin",
+      "sha256": "e9bb8309eca5049a7402aeb634332104f41d605c37ab188a2afaec6fcb86f84f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "22",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-23",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-23.bin",
+      "sha256": "0ca42911bd23b547df1348d6fab1e0762b44adbffc97fd6018cd0eb2544f2444",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "23",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-24",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-24.bin",
+      "sha256": "56a20501775ac7dc6e81a39f7ca90791268d640e1b573c60a6c9f1c445776598",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "24",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-25",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-25.bin",
+      "sha256": "ef104523f39d9cbc9f172c6d8ae703711f3eeeebfd976a8a3c1c7a6aab605d0a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "25",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-26",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-26.bin",
+      "sha256": "375d2f28cd61b1544c67f95b0d27ebebe4033464d429686783305d604bdfcd19",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "26",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-27",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-27.bin",
+      "sha256": "782cd782ab870918375cccf275e257d44e17c4814a3b702e28b248cf6134bf96",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "27",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-28",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-28.bin",
+      "sha256": "9b27890a3285e747e8612ae51cc106be7b2378bbb7bd2022dc183773793aa2fa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "28",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-29",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-29.bin",
+      "sha256": "b83d6404e20124ff48e1fe67a6d79432b8f157a32f9899ff3aaeb04f7086f8c2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "29",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-30",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-30.bin",
+      "sha256": "5d5e134e9e8be64524bafb50f6d561ee148157afa94a11819cda3817628d92b8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "30",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-31",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-31.bin",
+      "sha256": "1d5a8a703d5c04afdf888a07004ff2e98958dbc85c506805d3c0e2cf45e1d4db",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "31",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-32",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-32.bin",
+      "sha256": "2cfb2d3c1ff339284fe873a3abbc630528f14ea03892647823f3d9850e65d37a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "32",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-33",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-33.bin",
+      "sha256": "527ce5ffb1725f5188ba2012cf6b224ca3985e79a3a2074f35c9b21dc4c418dd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "33",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-34",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-34.bin",
+      "sha256": "efa66b868935c1e5b4c3322f36b640982422dc51fcb5f540bb1c3746e92aa5b5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "34",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-35",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-35.bin",
+      "sha256": "49909868cda4f5c658e1109546de6feff38b8edb1f8f556de106eb86ba7fbe63",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "35",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-36",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-36.bin",
+      "sha256": "c4097d8b5961670de5a7cb63d08ddef4c308f7284c0c5621a99ee6309408abc3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "36",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-37",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-37.bin",
+      "sha256": "ea86d341b244d1c1725d86f977fdf46f0289af891eb8049a6113b7ed685df68c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "37",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-38",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-38.bin",
+      "sha256": "eb463b1706912c777106ed252e4a1d722b51ba8aa710c919f3ed9ca5bbf05793",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "38",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-39",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-39.bin",
+      "sha256": "75283520790db0e7cdf9b695e73894b80701ec53cfa41a4366225541d0d3cedc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "39",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-40",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-40.bin",
+      "sha256": "a4e1b3116561b8403161fad72b18aa07f34c01b3ca1cb7a368db7d9e719771d6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "40",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-41",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-41.bin",
+      "sha256": "274a3e6a5203b26bbeaf7c99bea12f1b7b2dd9738aa724d8308a26d5f8e0e4d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "41",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-42",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-42.bin",
+      "sha256": "9d19f462dc229da13d5c06c05295a450b1860a689c00919a093eec308da23374",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "42",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-43",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-43.bin",
+      "sha256": "9ce38af41b00bcb98776b04847021480db4238f6a9e0eaf0bf69ae048a8bf146",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "43",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-44",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-44.bin",
+      "sha256": "05c13838e1b0d64ae65a1545a2d31c1006d136943273d15cec0bd4baa153c34d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "44",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-45",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-45.bin",
+      "sha256": "2c970c1a1a97a52ef6cf299ee193d206ba6ca4f57443352f6982200e673f7b7c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "45",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-truncated-46",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-truncated-46.bin",
+      "sha256": "e9dac47f68b4fb2cf480425463e73a51b7a41ac1391b0c1444edd2bdbd61a235",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "46",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-count-too-large",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-count-too-large.bin",
+      "sha256": "10a2801c9fdfcec07e66c9b358fe7dd9958837a17b2f19e18a5cda7f339469e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "47",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-reserved",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-reserved.bin",
+      "sha256": "5c67be7dbe86aa10c77e64455209a77831c4b268065b904dbe6c4d99bc32b8d6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "47",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "tfra-zero-coordinate",
+      "profile": "tfra",
+      "file": ".research/isobmff-index-fixtures/tfra-zero-coordinate.bin",
+      "sha256": "b984c02baffa8968e0c881c3b60dc7513f9148b88112d7761f93826fbda12db2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "tfra",
+        "0",
+        "47",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "d8ebb94566048c7666f5a85b0e450f55244eadf0f2569b2e08af5220e28642c6"
+      }
+    },
+    {
+      "id": "mfro-parent",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-parent.bin",
+      "sha256": "2c0d654b13058dba89a1e9879eb90a7087bca4054dfa9d270b0f90a2a9c7b5cf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "16",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "df0a655d5554a9171bb77e1728efc2a42f6e2c105ac8cafaf7fff4af5df78f9e"
+      }
+    },
+    {
+      "id": "mfro-truncated-0",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-0.bin",
+      "sha256": "308941f849a1cbd0215a87d4cd030f01ba9893b407a9d259bc48323c4502aa63",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "0",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-1",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-1.bin",
+      "sha256": "22fc769a66c8830af60b2850dc655f4edf43b4278fc22eac8e1ad95883a1ca55",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "1",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-2",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-2.bin",
+      "sha256": "1f7b6a1643f34190be702d2f2a5d549600193c7ec18a5b0e0a9736dde0532839",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "2",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-3",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-3.bin",
+      "sha256": "df0eac34fe941c17da2a5039e16aa7d2165abaa9114c2aeca702e1cba3cc17eb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "3",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-4",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-4.bin",
+      "sha256": "d58b38e102e182a8346716704670d2ef71faedc04f24f3be196b56d7156fb268",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "4",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-5",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-5.bin",
+      "sha256": "91e69455b7ecf6f60d42fe6e42ea32f03f3111b0e5d543d5593227a1de4146ec",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "5",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-6",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-6.bin",
+      "sha256": "eb525811fba54f5bf7e654faf6b68528a5557f5070b67cb4b5deffb4aaf25eff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "6",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-7",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-7.bin",
+      "sha256": "96731364eec7c220aa698ac1b4bef349ee574c3203fea58c5ea7e3134c7e6029",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "7",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-8",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-8.bin",
+      "sha256": "8f303b4ce61e1f0e06382b2585fe8de52744ca7fd5b920ceda2e01d21ce893b8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "8",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-9",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-9.bin",
+      "sha256": "ae726e7a780bded6373a508b2db5d3906f532b0e726d612b5e92687427c28cce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "9",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-10",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-10.bin",
+      "sha256": "a467246da596a7716c089db8ccf8c0a52002557089938de98880b8d4f3c1a46f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "10",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-11",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-11.bin",
+      "sha256": "919bb85d0519169627bbba554462b2cc05b6deb9dd6f9b73dc6f07de62a90209",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "11",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-12",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-12.bin",
+      "sha256": "e710c58fc51979cee2c91ddabf9cdf911934e2b1539002a01fbd9b7c304af817",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "12",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-13",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-13.bin",
+      "sha256": "ab635bd2c44787f9e743b72ad4432673eccfa759ef156529c965d8ca1e73c280",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "13",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-14",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-14.bin",
+      "sha256": "9a20b1f7ccc1dedac2efdd1ea42099221e0043b2bbbe13a0b10f47f1acffb547",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "14",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-truncated-15",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-truncated-15.bin",
+      "sha256": "3df8d05161c2426ecbda6720afeab22cf29d4ace8a71d9b67e0bf4a6c3ac56a5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "15",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-before-start",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-before-start.bin",
+      "sha256": "8eca8e3134c946130639a7ffd1937f5f1e2880368690df0031862f2df1440760",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "16",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mfro-wrong-kind",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-wrong-kind.bin",
+      "sha256": "a42d7890e69020e3bfd9a94aa0f74e4403b58e9ef24e19d35b059f88ec8a70b6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "16",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "49a221be8e73a01c7cd92303e1b2da0fe844672d7233d01ba7a6418c21a78267"
+      }
+    },
+    {
+      "id": "mfro-short-parent",
+      "profile": "mfro",
+      "file": ".research/isobmff-index-fixtures/mfro-short-parent.bin",
+      "sha256": "83ee84a5479e73ef0ef144025c5fa74d12cb7dba7e8a431a9fd5090018090fc6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mfro",
+        "8",
+        "16",
+        "1"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    }
+  ]
+}

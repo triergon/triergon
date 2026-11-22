@@ -1,0 +1,707 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "ddts-largest-duration",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-largest-duration.mov",
+      "sha256": "ad8bca65ae99ea9a35716f32597deaad52936f062c766148ce36f10774370a42",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0007282e249d1ef3fed3bdf3177c050af0c19704e8f5a32fa00c462b990760d5"
+      }
+    },
+    {
+      "id": "ddts-truncated-00",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-00.mov",
+      "sha256": "0cfd9dfb8ba700b32c98982735074140864909823afca710d2f7644d24969539",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-01",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-01.mov",
+      "sha256": "4a6bbd802f26396f312bf84fb7adda34df4ac63d1e9e1c8d9c259c4d85b0d6de",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-02",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-02.mov",
+      "sha256": "ada4dc057a45f4a098bf16c20f1761721ce32e53d6aebcbfb5065f82bcce1295",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-03",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-03.mov",
+      "sha256": "dec58f5ebf43457e20de4cab9cd060e7824f8da8fff82d96db2d5b99842c62ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-04",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-04.mov",
+      "sha256": "b20c21d12c6c3c9e5bde3ae205125a8f54da814840d8c1f54c4d33f3eef5cd4a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-05",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-05.mov",
+      "sha256": "9d3f140bfd1d271ab64787c197ba91640aebff80bddc63c33795e53eb754c903",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-06",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-06.mov",
+      "sha256": "673276276c880e8645fc0a725dabf9fec22efa645467887cf42af00e11830c44",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-07",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-07.mov",
+      "sha256": "6c5a40172687fc6c88ff58c9a603bac65e6b162379d09533cca5e80ec5037008",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-08",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-08.mov",
+      "sha256": "dfbb2feefcf370adc268ab835892ca160004c2c3624ad4be5f14db51dd32f545",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-09",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-09.mov",
+      "sha256": "3d542ad2e7623bab087fc0de6f63a2f3bbacaea053f84482eb9aa23180c35dec",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-10",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-10.mov",
+      "sha256": "17797e10470e278f5cea1e3b3a79d09d9e43d0c320db236f79557e55d648ec51",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-11",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-11.mov",
+      "sha256": "ba46d026edfa01567e0823c94610a00d4852d4ff7e74cf0739f387e743c9c6ee",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-12",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-12.mov",
+      "sha256": "d5f160afbb6b8dae9f08a7ff8d2f1227da6a2c0c037d8a0eb00e5ecc4e23efd1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-13",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-13.mov",
+      "sha256": "23c372bdd732e71aa331043f8848d8e28c9c2fc19ed5703423b795dfe3b9f450",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-14",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-14.mov",
+      "sha256": "43477f94a4a13a8e3f9955653658cfff59b638f4e2ca3e0f4d56192a218c5f0b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-15",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-15.mov",
+      "sha256": "098f532a0c2302923c6647e80dfa2d8f00b0bec5146e4c89b7f4d09799489172",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-16",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-16.mov",
+      "sha256": "b1f40f7620eb70a9761601d68f7d4f5b97fc0fa96482e78b2a25a189927523f3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-17",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-17.mov",
+      "sha256": "886eecf251bad47169e3e03171b0dddcee894068894072a216016cf238c905d4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-18",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-18.mov",
+      "sha256": "be1cd18142c783178193e88ac3b1b6ed907196c99fd6d095f7eb0d829c8eb43d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-truncated-19",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-truncated-19.mov",
+      "sha256": "d10e69246d478cf99f35a5392a81668d682292f7e2e469b7b0dda6e963de3945",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-zero-frequency",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/ddts-zero-frequency.mov",
+      "sha256": "be71c448ba3d160f29152e8c7292ccde5c7c0ea17d6e555114079fbe9e93e0b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "dtsc-quicktime-v1",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/dtsc-quicktime-v1.mov",
+      "sha256": "9f3dd2fe3431fd9aa73d321dd9b6154fd2433c3a266893208d1a6c4f036e6c98",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0df9ec4350d87f8669844ba46273c23be2a998901bc0812dc3f54ee556cc1a41"
+      }
+    },
+    {
+      "id": "dtsc",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/dtsc.mov",
+      "sha256": "df994eb5d2f835a476e0e0e5e14a058332ea655d9d84253748c2f8d8f0283669",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "79234d154972c2dd6b3118ec5f3fca296274dc6d7e425996b93e7e0ca2c4f04e"
+      }
+    },
+    {
+      "id": "dtse",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/dtse.mov",
+      "sha256": "2381fbcf035c3eb7f1f6c2f74e1502e3cc1a4b1b0bdcc2935739b111702a8a83",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "dtsh",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/dtsh.mov",
+      "sha256": "9484e5cc5c0802550b672238d02f003e3094b5e6bfe2dece1e22e90378f12706",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "23e0d49661523059a3173a8831b7b669e2183d5107a31c9c5c25cbc2f6ea1dcf"
+      }
+    },
+    {
+      "id": "dtsl",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/dtsl.mov",
+      "sha256": "5ef42966945901d24cdcaf55af635284955ce29c10e7ad4015df4cc650e1bfd3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7ce257ad0213abed39296b5898523485f753b35f9aaf9d59715509084b932921"
+      }
+    },
+    {
+      "id": "dtsx",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/dtsx.mov",
+      "sha256": "d9dea87189ab940a221a23abb6e7cba56d851b73285ae5a601dc2926317f17ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "mp4a-object-40",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/mp4a-object-40.mov",
+      "sha256": "fe440824e9c50a54de002440bc1437ad96e02f81111a6bbc670f7d7990de112f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c712d05c875a69d4b7b0d07aadbaf0d6e469add414e37d74abcd16236cbb0a56"
+      }
+    },
+    {
+      "id": "mp4a-object-a9",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/mp4a-object-a9.mov",
+      "sha256": "4b90c43cbc2e04f6fbcec1b8b9e6295054d9e8576a6aa5e6dd36d0ba8dcbdd7d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0df9ec4350d87f8669844ba46273c23be2a998901bc0812dc3f54ee556cc1a41"
+      }
+    },
+    {
+      "id": "mp4a-object-aa",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/mp4a-object-aa.mov",
+      "sha256": "619585509c3f79412fded99e1dd4a78730d94220823c17bafcc9bcf30e59bd12",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0df9ec4350d87f8669844ba46273c23be2a998901bc0812dc3f54ee556cc1a41"
+      }
+    },
+    {
+      "id": "mp4a-object-ab",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/mp4a-object-ab.mov",
+      "sha256": "ff2f04bb8b6df00980f20a140f285f75db46b198e820ba3ddb9953e8e5499393",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "mp4a-object-ac",
+      "profile": "dts-entry",
+      "file": "harness/features/isobmff-dts-signalling/variants/mp4a-object-ac.mov",
+      "sha256": "847fe598d49ef2aa2bccbfa1855e2935b8ee13d841aa7c32ec8b634a2974be09",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    },
+    {
+      "id": "ddts-layout-ff00",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-layout-ff00.mov",
+      "sha256": "812f12fdcaf4fe0e68394c7d225468d0ccf0723cd903d054196496b85f659602",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "dfac347cb71ae693ba8a54687f7112aff24ec67f88a3c66f69a7bf968fa2ac16"
+      }
+    },
+    {
+      "id": "ddts-only-size-19",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-19.mov",
+      "sha256": "04bda09604f418da2948e193ec8ffc471ec8ce4d0a7eeab2590c33972396bf39",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "dfac347cb71ae693ba8a54687f7112aff24ec67f88a3c66f69a7bf968fa2ac16"
+      }
+    },
+    {
+      "id": "ddts-only-size-20",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-20.mov",
+      "sha256": "2137a1f75500a7f0e5d589abb2e9719f751d9dc3c026cc47836d76599cbc2980",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "dfac347cb71ae693ba8a54687f7112aff24ec67f88a3c66f69a7bf968fa2ac16"
+      }
+    },
+    {
+      "id": "ddts-only-size-7",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/ddts-only-size-7.mov",
+      "sha256": "8eebebf4eb383162e0b9fd78843bad565406f0589857058d12b3f68cbd6e384a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "dfac347cb71ae693ba8a54687f7112aff24ec67f88a3c66f69a7bf968fa2ac16"
+      }
+    },
+    {
+      "id": "dOps-valid-after-ddts",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/private-catalogue/dOps-valid-after-ddts.mov",
+      "sha256": "2b4801dd8c76570519962078a7772fa1e85b584e663eb0b89e3c87d04d7ea9c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "dfac347cb71ae693ba8a54687f7112aff24ec67f88a3c66f69a7bf968fa2ac16"
+      }
+    },
+    {
+      "id": "original",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/encoded-edit/original.mp4",
+      "sha256": "7f2f92cb0e7a97920828fc9f79daeec2471a58d990572305d7aa08c30fb512fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "bc7deb87c5fea6941eaf96a674b53ca5fe2639230c2a64c2e8d9b38c70541d7d"
+      }
+    },
+    {
+      "id": "audio0",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/encoded-edit/audio0.mp4",
+      "sha256": "d6298032f57381d192e2ed8262a956c73b509e0edda37dea2db27a1043a5d24c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "bc7deb87c5fea6941eaf96a674b53ca5fe2639230c2a64c2e8d9b38c70541d7d"
+      }
+    },
+    {
+      "id": "audio1024",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/encoded-edit/audio1024.mp4",
+      "sha256": "dc3bd669f7efd589e7d46e614cbf47ba7c80b0bdd657ed9775e0bf68c2e602a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "bc7deb87c5fea6941eaf96a674b53ca5fe2639230c2a64c2e8d9b38c70541d7d"
+      }
+    },
+    {
+      "id": "audio2048",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/encoded-edit/audio2048.mp4",
+      "sha256": "d5a6b2c8d1c186269c9e228de31b79bdf7a0353ff9e16126a692896669235bdc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "bc7deb87c5fea6941eaf96a674b53ca5fe2639230c2a64c2e8d9b38c70541d7d"
+      }
+    },
+    {
+      "id": "video0",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/encoded-edit/video0.mp4",
+      "sha256": "4a0e909f823734dee1ee27b5c9df4bb9ac09b2d621c742938d5469d9616521f6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "bc7deb87c5fea6941eaf96a674b53ca5fe2639230c2a64c2e8d9b38c70541d7d"
+      }
+    },
+    {
+      "id": "video2673",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/encoded-edit/video2673.mp4",
+      "sha256": "7b35954e86b3911c6e70f604951f9d283bfc3f61516a6521b47430d64fe25e90",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "bc7deb87c5fea6941eaf96a674b53ca5fe2639230c2a64c2e8d9b38c70541d7d"
+      }
+    },
+    {
+      "id": "leading-ac3",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/range-encoded-edits/leading-ac3.mp4",
+      "sha256": "a6832ce2bbe535b472ec4dac68d5dd0c9cb29c54be216ffcb63ed3ce358e4288",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c712d05c875a69d4b7b0d07aadbaf0d6e469add414e37d74abcd16236cbb0a56"
+      }
+    },
+    {
+      "id": "leading-eac3",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/range-encoded-edits/leading-eac3.mp4",
+      "sha256": "9643b17169b00d94eb63f2c3040471f7ba2d3ffd33a621a7b47cd29da77c6bcb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c712d05c875a69d4b7b0d07aadbaf0d6e469add414e37d74abcd16236cbb0a56"
+      }
+    },
+    {
+      "id": "quicktime-avc",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/range-encoded-edits/quicktime-avc.mov",
+      "sha256": "b34c430144ceef539b07d5f31f51af3ebdc42f782db76b75bd497322bf075e72",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "dfac347cb71ae693ba8a54687f7112aff24ec67f88a3c66f69a7bf968fa2ac16"
+      }
+    },
+    {
+      "id": "aac-program-edit",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/range-encoded-edits/aac-program-edit.mov",
+      "sha256": "0042a7fcaa5815e7541c61ce569a66e3cfeb547861123e5554ca6ea453c16e73",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c712d05c875a69d4b7b0d07aadbaf0d6e469add414e37d74abcd16236cbb0a56"
+      }
+    },
+    {
+      "id": "avc-opus-edit",
+      "profile": "controls",
+      "file": "crates/isobmff/tests/fixtures/range-encoded-edits/avc-opus-edit.mp4",
+      "sha256": "109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "bc7deb87c5fea6941eaf96a674b53ca5fe2639230c2a64c2e8d9b38c70541d7d"
+      }
+    },
+    {
+      "id": "dtsc-mismatched-format",
+      "profile": "mismatched",
+      "file": "harness/features/isobmff-dts-signalling/variants/dtsc.mov",
+      "sha256": "df994eb5d2f835a476e0e0e5e14a058332ea655d9d84253748c2f8d8f0283669",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096",
+        "mismatched-format"
+      ],
+      "expected": {
+        "trace_sha256": "a011a27eaac8013dbb431f3458e31680d28e9ed205070d7c894950032b7b792f"
+      }
+    }
+  ]
+}
