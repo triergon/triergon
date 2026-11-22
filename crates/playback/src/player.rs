@@ -483,6 +483,13 @@ fn mp4_seek_tick_comparison_keeps_exact_order() {
     }
 }
 
+#[derive(Debug)]
+#[repr(C)]
+struct PendingEvent {
+    event: Event,
+    source: triergon_core::SourceId,
+}
+
 /// Drives one engine over its source: reads within work budgets, classifies the
 /// delivery of each event, and queues outputs in a bounded FIFO.
 #[derive(Debug)]
@@ -501,12 +508,7 @@ pub struct Player<S: Source> {
     head: usize,
     count: usize,
     bytes: usize,
-    /// An event read but not yet published, and the source it was read from. The
-    /// two are set and taken together and stay two fields: one option of the pair
-    /// cost 0.45% of the instructions of a program read and up to 1.4% of a range
-    /// read.
-    pending: Option<Event>,
-    pending_source: Option<triergon_core::SourceId>,
+    pending: Option<PendingEvent>,
     request: Option<InputRequest>,
     seek: Option<ActiveSeek>,
     seek_read: u64,
@@ -580,7 +582,6 @@ impl<S: Source> Player<S> {
             count: 0,
             bytes: 0,
             pending: None,
-            pending_source: None,
             request: None,
             seek: None,
             seek_read: 0,
@@ -695,7 +696,6 @@ impl<S: Source> Player<S> {
         self.count = 0;
         self.bytes = 0;
         self.pending = None;
-        self.pending_source = None;
         self.request = None;
     }
     fn shutdown(&mut self, state: State) {
@@ -794,18 +794,19 @@ impl<S: Source> Player<S> {
             }
             return Err(e);
         }
+        let source = engine.source();
         self.source.as_mut().ok_or(Error::Closed)?.invalidate();
         self.drain();
         self.epoch = epoch;
         self.generation = after;
         self.selection = selection;
-        self.stage_seek(intent);
+        self.stage_seek(source, intent);
         if self.state == State::Ended {
             self.state = State::Running;
         }
         Ok(true)
     }
-    pub(crate) fn stage_seek(&mut self, intent: SeekIntent) {
+    pub(crate) fn stage_seek(&mut self, source: triergon_core::SourceId, intent: SeekIntent) {
         // Integral packet PTS is below the exact target precisely when it
         // is below its ceiling in nanoseconds. Keep the original time for
         // delivery and the rational comparison for laced or extreme clocks.
@@ -825,8 +826,10 @@ impl<S: Source> Player<S> {
             reached_target: false,
         });
         self.seek_read = 0;
-        self.pending = Some(Event::Seek(intent));
-        self.pending_source = self.engine.as_ref().map(Engine::source);
+        self.pending = Some(PendingEvent {
+            event: Event::Seek(intent),
+            source,
+        });
     }
 
     /// Seeks to the media point `command` maps to, on the player's clock. Fails with
@@ -1124,12 +1127,14 @@ impl<S: Source> Player<S> {
         for (i, slot) in queue.as_mut_slice().iter_mut().enumerate() {
             *slot = self.queue.as_mut_slice()[(self.head + i) % self.policy.slots].take();
         }
+        let pending = self.pending.take();
+        let pending_source = pending.as_ref().map(|pending| pending.source);
         let retired = crate::mp4::catalogue::RetiredCatalogue {
             engine: self.engine.replace(next.engine),
             queue,
             head: 0,
-            pending: self.pending.take(),
-            pending_source: self.pending_source.take(),
+            pending: pending.map(|pending| pending.event),
+            pending_source,
             request: self.request.take(),
             seek: self.seek.take().map(|seek| seek.intent),
         };
@@ -1262,24 +1267,36 @@ impl<S: Source> Player<S> {
             *slot = Some(output);
             return Ok(Progress::Queued);
         }
-        loop {
+        let mut events = self.events;
+        let result = loop {
             let before = work.remaining();
-            let result = self.drive::<true>(work, cancel, Some(slot), cursor.as_deref_mut())?;
+            let result = match self.drive_counted::<true>(
+                work,
+                cancel,
+                Some(slot),
+                cursor.as_deref_mut(),
+                &mut events,
+            ) {
+                Ok(progress) => progress,
+                Err(error) => break Err(error),
+            };
             if work.remaining() == 0 {
-                return Ok(result);
+                break Ok(result);
             }
             match result {
                 Progress::NeedInput(_) => continue,
                 Progress::Yield if self.request.is_none() && work.remaining() < before => continue,
                 Progress::Yield => {
-                    return Ok(self
+                    break Ok(self
                         .request
                         .clone()
                         .map_or(Progress::Yield, Progress::NeedInput));
                 }
-                other => return Ok(other),
+                other => break Ok(other),
             }
-        }
+        };
+        self.events = events;
+        result
     }
 
     fn drive<const READY: bool>(
@@ -1289,11 +1306,25 @@ impl<S: Source> Player<S> {
         slot: Option<&mut Option<Output>>,
         cursor: Option<&mut PacketCursor<'_>>,
     ) -> Result<Progress> {
+        let mut events = self.events;
+        let result = self.drive_counted::<READY>(w, c, slot, cursor, &mut events);
+        self.events = events;
+        result
+    }
+
+    fn drive_counted<const READY: bool>(
+        &mut self,
+        w: &mut WorkBudget,
+        c: &AtomicBool,
+        slot: Option<&mut Option<Output>>,
+        cursor: Option<&mut PacketCursor<'_>>,
+        events: &mut u64,
+    ) -> Result<Progress> {
         if c.load(Ordering::Relaxed) {
             self.cancel();
             return Err(Error::Cancelled);
         }
-        let result = self.inner::<READY>(w, slot, cursor);
+        let result = self.inner::<READY>(w, slot, cursor, events);
         if let Err(Error::Backpressure(triergon_core::Backpressure {
             requested,
             available,
@@ -1314,6 +1345,7 @@ impl<S: Source> Player<S> {
         w: &mut WorkBudget,
         slot: Option<&mut Option<Output>>,
         cursor: Option<&mut PacketCursor<'_>>,
+        events: &mut u64,
     ) -> Result<Progress> {
         match self.state {
             State::Paused => return Ok(Progress::Paused),
@@ -1334,19 +1366,15 @@ impl<S: Source> Player<S> {
         if slot.is_none() && self.queue.is_empty() {
             Self::allocate_slots(&mut self.queue, self.policy.slots)?;
         }
-        if let Some(event) = self.pending.as_ref() {
-            let Some((bytes, delivery)) = self.admit(event, w)? else {
+        if let Some(pending) = self.pending.as_ref() {
+            let Some((bytes, delivery)) = self.admit(&pending.event, w, *events)? else {
                 return Ok(Progress::Yield);
             };
-            let event = self
+            let PendingEvent { event, source } = self
                 .pending
                 .take()
                 .ok_or(Error::Invalid("pending event missing"))?;
-            let source = self
-                .pending_source
-                .take()
-                .ok_or(Error::Invalid("pending event source binding"))?;
-            return Ok(self.publish(source, event, bytes, delivery, slot));
+            return Ok(self.publish(source, event, bytes, delivery, slot, events));
         }
         if let Some(r) = self.request.clone() {
             let reply = self
@@ -1365,7 +1393,13 @@ impl<S: Source> Player<S> {
             match matroska.step(w, &self.cancel)? {
                 triergon_matroska::ParseStep::Event(event) => {
                     let source = engine.source();
-                    return self.accept_event::<READY>(source, Event::Matroska(event), w, slot);
+                    return self.accept_event::<READY>(
+                        source,
+                        Event::Matroska(event),
+                        w,
+                        slot,
+                        events,
+                    );
                 }
                 step => Ok(EngineStep::from_matroska(step)),
             }
@@ -1376,14 +1410,14 @@ impl<S: Source> Player<S> {
         };
         let skipped = engine.take_suppressed_events();
         if skipped != 0 {
-            let events = self.events.checked_add(skipped).ok_or(Error::Overflow)?;
-            Self::check_event_limit(events, self.policy.maximum_events)?;
-            self.events = events;
+            let next = events.checked_add(skipped).ok_or(Error::Overflow)?;
+            Self::check_event_limit(next, self.policy.maximum_events)?;
+            *events = next;
         }
         match step {
             Ok(EngineStep::Event(event)) => {
                 let source = engine.source();
-                self.accept_event::<READY>(source, event, w, slot)
+                self.accept_event::<READY>(source, event, w, slot, events)
             }
             Ok(EngineStep::NeedInput(r)) => {
                 self.request = Some(r.clone());
@@ -1413,11 +1447,12 @@ impl<S: Source> Player<S> {
         event: Event,
         work: &mut WorkBudget,
         slot: Option<&mut Option<Output>>,
+        events: &mut u64,
     ) -> Result<Progress> {
         let progress = if READY {
-            match self.admit(&event, work) {
+            match self.admit(&event, work, *events) {
                 Ok(Some((bytes, delivery))) => {
-                    return Ok(self.publish(source, event, bytes, delivery, slot));
+                    return Ok(self.publish(source, event, bytes, delivery, slot, events));
                 }
                 Ok(None) => Ok(Progress::Yield),
                 Err(error @ Error::Backpressure { .. }) => Err(error),
@@ -1426,12 +1461,16 @@ impl<S: Source> Player<S> {
         } else {
             Ok(Progress::Yield)
         };
-        self.pending_source = Some(source);
-        self.pending = Some(event);
+        self.pending = Some(PendingEvent { event, source });
         progress
     }
 
-    fn admit(&self, e: &Event, w: &mut WorkBudget) -> Result<Option<(usize, Delivery)>> {
+    fn admit(
+        &self,
+        e: &Event,
+        w: &mut WorkBudget,
+        events: u64,
+    ) -> Result<Option<(usize, Delivery)>> {
         let bytes = e.payload_bytes();
         if bytes > self.policy.queued_payload_bytes {
             return Err(Error::Limit {
@@ -1550,7 +1589,7 @@ impl<S: Source> Player<S> {
                 },
             }
         };
-        let events = self.events.checked_add(1).ok_or(Error::Overflow)?;
+        let events = events.checked_add(1).ok_or(Error::Overflow)?;
         Self::check_event_limit(events, self.policy.maximum_events)?;
         Ok(Some((bytes, delivery)))
     }
@@ -1574,6 +1613,7 @@ impl<S: Source> Player<S> {
         bytes: usize,
         delivery: Delivery,
         slot: Option<&mut Option<Output>>,
+        events: &mut u64,
     ) -> Progress {
         if let Some(seek) = self.seek.as_mut().filter(|seek| !seek.reached_target)
             && bytes != 0
@@ -1611,7 +1651,7 @@ impl<S: Source> Player<S> {
             delivery,
             bytes,
         });
-        self.events += 1;
+        *events += 1;
         Progress::Queued
     }
 }

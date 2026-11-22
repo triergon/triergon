@@ -230,7 +230,7 @@ impl<S: Source> CatalogueCommit<'_, S> {
             self.player
                 .commit_mp4_catalogue(next, self.selection, self.epoch, self.queue);
         if let Some(intent) = seek {
-            self.player.stage_seek(intent);
+            self.player.stage_seek(boundary.source, intent);
         }
         Ok((retired, boundary))
     }
