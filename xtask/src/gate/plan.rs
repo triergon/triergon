@@ -57,6 +57,8 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ("text-extraction-oracle", Coverage::Item("oracle-compare")),
     ("tx3g-config-oracle", Coverage::Item("oracle-compare")),
     ("tx3g-semantics", Coverage::Item("oracle-compare")),
+    ("ts-video-descriptors", Coverage::Item("oracle-compare")),
+    ("ts-packet-fields", Coverage::Item("oracle-compare")),
     ("dts-core-header", Coverage::Item("oracle-compare")),
     ("av1-obu-wire", Coverage::Item("oracle-compare")),
     ("aac-adts-header", Coverage::Item("oracle-compare")),
