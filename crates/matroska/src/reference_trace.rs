@@ -13,8 +13,8 @@
 
 pub use crate::reader::blocking::seek_initial_trim;
 
-/// The reader's zlib decoder and the one-shot decoder the harness compares with an
-/// independent zlib.
+/// The reader's zlib decoding of one complete stream, which the harness compares
+/// with an independent zlib.
 pub mod zlib {
-    pub use crate::zlib::{InflateLimits, Inflater, decompress};
+    pub use crate::zlib::{InflateLimits, decompress};
 }

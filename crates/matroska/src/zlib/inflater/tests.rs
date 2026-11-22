@@ -45,6 +45,31 @@ fn immutable_fixed_tables_match_every_rfc_code_including_reserved_symbols() {
 }
 
 #[test]
+fn oversubscribed_incomplete_and_empty_code_length_trees_are_refused() {
+    let build = |lengths: &[u8], code_lengths: bool| {
+        Build::new(code_lengths).advance(
+            &mut Tree::empty(),
+            lengths,
+            &mut WorkBudget::new(1 << 20),
+            &AtomicBool::new(false),
+        )
+    };
+    assert!(matches!(
+        build(&[1, 1, 1], false),
+        Err(Error::Invalid("oversubscribed Huffman tree"))
+    ));
+    assert!(matches!(
+        build(&[2], false),
+        Err(Error::Invalid("incomplete Huffman tree"))
+    ));
+    assert!(matches!(build(&[1], false), Ok(true)));
+    assert!(matches!(
+        build(&[0; 19], true),
+        Err(Error::Invalid("empty code-length tree"))
+    ));
+}
+
+#[test]
 fn dynamic_quick_fill_resumes_one_actual_slot_at_a_time_and_keeps_long_codes() {
     // Complete prefix tree: 0, 10, 110, ... and two 15-bit leaves.
     // This includes short quick entries and a real >9-bit fallback prefix.

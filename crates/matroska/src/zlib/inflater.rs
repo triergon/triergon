@@ -365,7 +365,7 @@ enum Phase {
 /// Output and bit/block/tree/copy/checksum state survive both work yields and
 /// retained-output backpressure. No partial decoded packet is returned.
 #[derive(Debug)]
-pub struct Inflater {
+pub(crate) struct Inflater {
     source: SharedBytes,
     state: State,
 }
@@ -408,7 +408,7 @@ impl Inflater {
     /// charged to `pool` and bounded by `limits`. Fails with [`Error::ForeignPool`]
     /// when `source` is charged to another pool.
     #[inline(always)]
-    pub fn new(source: SharedBytes, limits: InflateLimits, pool: &Budget) -> Result<Self> {
+    pub(crate) fn new(source: SharedBytes, limits: InflateLimits, pool: &Budget) -> Result<Self> {
         if !source.belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
@@ -448,8 +448,8 @@ impl Inflater {
         })
     }
     /// Bytes decoded so far; the whole output length once decoding has finished.
-    #[cfg(any(test, feature = "reference-trace"))]
-    pub fn output_len(&self) -> usize {
+    #[cfg(test)]
+    fn output_len(&self) -> usize {
         self.state.output_len()
     }
     /// Decodes within `work`: [`ParseStep::Yield`] when the budget runs out,
@@ -458,7 +458,7 @@ impl Inflater {
     /// calls. Fails with [`Error::Invalid`] or [`Error::Truncated`] for a malformed
     /// stream, [`Error::Unsupported`] for a preset dictionary, [`Error::Policy`] past
     /// `limits` and [`Error::Cancelled`]; after a failure it only fails again.
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

@@ -45,7 +45,7 @@ impl RestorePlan {
             borrow_stored: false,
         }
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "reference-trace"))]
     pub(crate) fn zlib() -> Self {
         let mut steps = std::array::from_fn(|_| None);
         steps[0] = Some(DecodeStep::Zlib);
