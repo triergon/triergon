@@ -415,7 +415,7 @@ impl PacketPlan {
                         pps: None,
                         insertion_index: 0,
                     });
-                    self.nal = Some(kind);
+                    self.nal = kind;
                     self.nals += 1;
                     self.phase = PlanPhase::AvcBuffering(length_width);
                     return Ok(NEXT);
@@ -462,7 +462,7 @@ impl PacketPlan {
                 _ => {}
             }
         }
-        self.nal = Some(kind);
+        self.nal = kind;
         self.nals += 1;
         if codec == Codec::Hevc && self.nals == 1 {
             // Lookahead counted all packet NALs. IRAP packets inject the full
@@ -683,9 +683,8 @@ impl PacketPlan {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        // Carrying the start-code policy in the phase adds 0.061% on multi-array AVC.
-        let kind = self.nal.ok_or(Error::Invalid("missing source NAL"))?;
-        let prefix = if state.codec == Codec::Hevc || matches!(kind, 7 | 8) || state.total == 0 {
+        let prefix = if state.codec == Codec::Hevc || matches!(self.nal, 7 | 8) || state.total == 0
+        {
             4
         } else {
             3
@@ -697,7 +696,6 @@ impl PacketPlan {
         self.offset = end;
         self.length = 0;
         self.prefix_read = 0;
-        self.nal = None;
         self.phase = PlanPhase::Scan;
         Ok(NEXT)
     }

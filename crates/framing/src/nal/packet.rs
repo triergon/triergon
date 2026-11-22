@@ -1165,6 +1165,7 @@ struct PacketState<'a> {
     observed_packet: bool,
     packet_source_refusal: Option<NalHeaderError>,
 }
+// `repr(C)` keeps the declared order, which puts `phase` at byte 82.
 #[repr(C)]
 struct PacketPlan {
     // A hint sizes a later spill without reserving while descriptors fit inline.
@@ -1178,9 +1179,10 @@ struct PacketPlan {
     prefix_read: usize,
     nals: usize,
     look_nals: usize,
-    nal: Option<u8>,
-    phase: PlanPhase,
+    // The type of the NAL unit at `offset`, written with `offset` and `length`.
+    nal: u8,
     injected_irap: bool,
+    phase: PlanPhase,
     has_irap: bool,
 }
 enum PacketStorageBound {
@@ -1196,7 +1198,7 @@ impl PacketPlan {
             length: 0,
             prefix_read: 0,
             nals: 0,
-            nal: None,
+            nal: 0,
             injection_index: 0,
             injected_irap: false,
             has_irap: false,
