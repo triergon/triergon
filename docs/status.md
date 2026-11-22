@@ -20,6 +20,7 @@ Containers, framing, subtitles and playback are measured against FFmpeg git revi
 terminal-media matrix against the FFmpeg 9.0.2 release; fonts against FreeType 2.15.0;
 shaping against HarfBuzz 14.6.0 and FriBidi 1.0.17; rasterising, ASS parsing and ASS
 rendering against libass 0.17.5 ([reference pins](quality.md#reference-and-corpus)).
+The harness records the exact MPEG-TS PES reference build in its worker identity.
 Workers and references link under the [link policy](quality.md#measuring-performance)
 `static-toolchain-runtime-trained-order-v1`: both sides link their toolchain runtime
 support libraries from their static archives, and the media, playback and Matroska
