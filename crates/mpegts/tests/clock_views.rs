@@ -9,7 +9,7 @@ use triergon_mpegts::clock::{
     ClockKey, SourceClockAnchor, SourceClockSample, SourceTimePolicy, SourceTimeStatus,
     source_timestamp,
 };
-use triergon_mpegts::compat::pes::{DemuxClock, DemuxProfile, TimestampOrigin};
+use triergon_mpegts::compat::pes::{DemuxClock, TimestampOrigin};
 use triergon_mpegts::pes::{Pes, PesAssembler};
 use triergon_mpegts::stream::{TraceEvent, TransportStream};
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
@@ -96,22 +96,6 @@ fn check_demux(
     let pes = packets(&events);
     assert_eq!(pes.len(), raw_pts.len());
     let mut context = DemuxClock::new(1).unwrap();
-    let profile = DemuxProfile::PesPackets;
-    #[cfg(feature = "reference-trace")]
-    {
-        assert_eq!(
-            profile.reference_revision(),
-            "d32b387f2b0a484599d4587d651891f0c63c4238"
-        );
-        assert_eq!(
-            profile.worker_sha256(),
-            "19c06e53c62852b409eec9771cb11d9d7f5164b4618545a449d7e993f99346df"
-        );
-        assert_eq!(profile.operation(), "mpegts-demux-pes-observation");
-        assert_eq!(profile.flags(), 48);
-        assert!(profile.default_overflow_correction());
-        assert!(!profile.find_stream_info());
-    }
     for (index, source) in pes.iter().enumerate() {
         let header = source.header.as_bytes().to_vec();
         let payload = source.payload().flatten().copied().collect::<Vec<_>>();
@@ -121,7 +105,6 @@ fn check_demux(
             .project(source, &mut WorkBudget::new(1), &AtomicBool::new(false))
             .expect("expected a demux clock projection")
             .unwrap();
-        assert_eq!(view.profile, profile);
         assert_eq!(view.program, 1);
         assert_eq!(view.pid, source.pid);
         assert_eq!(view.source_epochs, source.epochs);

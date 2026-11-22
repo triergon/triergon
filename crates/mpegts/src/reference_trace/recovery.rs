@@ -8,7 +8,6 @@
 //!
 //! Opt-in real rejected-carrier observation. No validated source packet/header
 //! is forged. OPCR and explicit selected-AVC diagnostic policies are separate.
-use crate::compat::pes::clock::DemuxProfile;
 use crate::compat::pes::fault::TransportFaultJob;
 use crate::compat::pes::observer::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, PrivateAudioCarriage,
@@ -62,8 +61,6 @@ impl EncodedHeader {
 /// A packet the demuxer emits from a carrier the source view rejected.
 #[derive(Debug)]
 pub struct RecoveredPacket {
-    /// The demux profile the packet was cut under.
-    pub profile: DemuxProfile,
     /// The program number of the observed scope.
     pub program: u16,
     /// The 13-bit PID of the observed scope.
@@ -169,7 +166,6 @@ impl RecoveryObserver {
     ///
     /// Fails as [`DemuxObserver::new_registered`] does.
     pub fn new(
-        profile: DemuxProfile,
         scope: DemuxScope,
         carriage: RegisteredCarriage,
         policy: RejectedPolicy,
@@ -177,7 +173,7 @@ impl RecoveryObserver {
         limits: ParseLimits,
     ) -> Result<Self> {
         Ok(Self {
-            inner: DemuxObserver::new_registered(profile, scope, carriage, budget.clone(), limits)?,
+            inner: DemuxObserver::new_registered(scope, carriage, budget.clone(), limits)?,
             budget,
             policy,
             pmt_binding: None,
@@ -192,7 +188,6 @@ impl RecoveryObserver {
     /// Explicit finite private-audio operation; rejected source carriers stay
     /// outside this profile. Accepted carriers use the same charged assembly.
     pub fn new_private_audio(
-        profile: DemuxProfile,
         scope: DemuxScope,
         carriage: PrivateAudioCarriage,
         descriptors: PrivateAudioDescriptors<'_>,
@@ -201,7 +196,6 @@ impl RecoveryObserver {
     ) -> Result<Self> {
         Ok(Self {
             inner: DemuxObserver::new_private_audio(
-                profile,
                 scope,
                 carriage,
                 descriptors,
@@ -222,7 +216,6 @@ impl RecoveryObserver {
     /// Observe finite DVB subtitle PES in the selected program. The namespace,
     /// descriptors and stream identifiers must satisfy [`DemuxObserver::new_dvb_subtitles`].
     pub fn new_dvb_subtitles(
-        profile: DemuxProfile,
         scope: DemuxScope,
         namespace: crate::psi::DescriptorNamespace,
         descriptors: crate::compat::pes::observer::DvbSubtitlesDescriptors<'_>,
@@ -231,7 +224,6 @@ impl RecoveryObserver {
     ) -> Result<Self> {
         Ok(Self {
             inner: DemuxObserver::new_dvb_subtitles(
-                profile,
                 scope,
                 namespace,
                 descriptors,
@@ -664,7 +656,6 @@ impl RecoveryObserver {
                     );
                     return Ok(AssemblyStep::Output(DemuxObservation::FromRejectedCarrier(
                         RecoveredPacket {
-                            profile: DemuxProfile::PesPackets,
                             program: scope.program,
                             pid: scope.pid,
                             source_origin: SourceLocation {

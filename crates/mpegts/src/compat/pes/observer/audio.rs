@@ -1,7 +1,6 @@
 //! The demuxer's private-audio interpretation, not source namespace
 //! inference, audio-frame parsing, ATSC service conformance or decoder config.
 use super::{DemuxObserver, DemuxScope};
-use crate::compat::pes::clock::DemuxProfile;
 use crate::psi::Descriptors;
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, Error, Result};
@@ -168,14 +167,13 @@ impl DemuxObserver {
     /// The scope and PES ID must agree with the PMT signalling. Invalid limits,
     /// unsupported signalling and a mismatched declared carriage are refused.
     pub fn new_private_audio(
-        profile: DemuxProfile,
         scope: DemuxScope,
         carriage: PrivateAudioCarriage,
         source: PrivateAudioDescriptors<'_>,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
-        Self::with_private_audio(profile, scope, carriage, budget, limits, || {
+        Self::with_private_audio(scope, carriage, budget, limits, || {
             PrivateAudioCarriage::from_observed_pmt(scope.stream_type, source, limits)
         })
     }
@@ -187,20 +185,18 @@ impl DemuxObserver {
     /// Fails as [`new_private_audio`](Self::new_private_audio) does, and with `Unsupported` for
     /// another registration or a missing one on stream type 0x06.
     pub fn new_hls_private_audio(
-        profile: DemuxProfile,
         scope: DemuxScope,
         carriage: PrivateAudioCarriage,
         source: PrivateAudioDescriptors<'_>,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
-        Self::with_private_audio(profile, scope, carriage, budget, limits, || {
+        Self::with_private_audio(scope, carriage, budget, limits, || {
             PrivateAudioCarriage::from_hls_pmt(scope.stream_type, source, limits)
         })
     }
 
     fn with_private_audio(
-        profile: DemuxProfile,
         scope: DemuxScope,
         carriage: PrivateAudioCarriage,
         budget: Budget,
@@ -229,7 +225,7 @@ impl DemuxObserver {
                 "selected private audio carriage disagrees with the PMT",
             ));
         }
-        let mut observer = Self::admitted(profile, scope, budget, limits)?;
+        let mut observer = Self::admitted(scope, budget, limits)?;
         observer.private_audio = Some(carriage);
         Ok(observer)
     }

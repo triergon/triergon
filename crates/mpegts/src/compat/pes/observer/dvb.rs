@@ -2,7 +2,6 @@
 //! parsing or source namespace inference. The demux packet keeps the complete
 //! PES data field, including identifier/stream ID/tail bytes and opaque faults.
 use super::{DemuxObserver, DemuxScope};
-use crate::compat::pes::clock::DemuxProfile;
 use crate::psi::{DescriptorNamespace, Descriptors};
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, Error, Result};
@@ -92,7 +91,6 @@ impl DemuxObserver {
     /// without a DVB namespace or unless `descriptors` hold exactly one single-service subtitling
     /// descriptor.
     pub fn new_dvb_subtitles(
-        profile: DemuxProfile,
         scope: DemuxScope,
         namespace: DescriptorNamespace,
         descriptors: DvbSubtitlesDescriptors<'_>,
@@ -100,7 +98,7 @@ impl DemuxObserver {
         limits: ParseLimits,
     ) -> Result<Self> {
         preflight(scope, namespace, descriptors, limits)?;
-        let mut observer = Self::admitted(profile, scope, budget, limits)?;
+        let mut observer = Self::admitted(scope, budget, limits)?;
         observer.payload_format = super::PayloadFormat::Dvb;
         Ok(observer)
     }

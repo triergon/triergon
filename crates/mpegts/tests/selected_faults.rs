@@ -5,9 +5,7 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, SourceLocation,
     Step, WorkBudget,
 };
-use triergon_mpegts::compat::pes::{
-    DemuxClock, DemuxProfile, DemuxScope, RegisteredCarriage, SourceContext,
-};
+use triergon_mpegts::compat::pes::{DemuxClock, DemuxScope, RegisteredCarriage, SourceContext};
 use triergon_mpegts::reference_trace::recovery::{
     DemuxObservation, DiagnosticPacket, RecoveryObserver, RejectedPolicy, SelectedFault,
 };
@@ -67,13 +65,8 @@ fn context(n: u64) -> SourceContext {
     }
 }
 fn observer(b: &Budget) -> RecoveryObserver {
-    RecoveryObserver::new_selected_avc_faults(
-        DemuxProfile::PesPackets,
-        scope(),
-        b.clone(),
-        ParseLimits::default(),
-    )
-    .expect("expected an AVC PES observer with source fault recovery")
+    RecoveryObserver::new_selected_avc_faults(scope(), b.clone(), ParseLimits::default())
+        .expect("expected an AVC PES observer with source fault recovery")
 }
 fn collect(data: &[u8], b: &Budget) -> Vec<(TraceEvent, SourceEpochs)> {
     let backing = Bytes::copy_from_slice(b, data).unwrap();
@@ -772,7 +765,6 @@ fn plain_observer_still_refuses_damaged_transport() {
         panic!()
     };
     let mut o = RecoveryObserver::new(
-        DemuxProfile::PesPackets,
         scope(),
         RegisteredCarriage::Avc,
         RejectedPolicy::OpcrWithoutPcr,

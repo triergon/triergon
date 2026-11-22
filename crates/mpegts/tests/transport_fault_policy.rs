@@ -4,9 +4,8 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{
-    DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, PesFaultCarrier, PesFaultKind,
-    PesFaultPolicy, RecoveredPes, SourceContext, TransportFaultKind, TransportFaultPacket,
-    TransportFaultRecovery,
+    DemuxClock, DemuxObserver, DemuxScope, PesFaultCarrier, PesFaultKind, PesFaultPolicy,
+    RecoveredPes, SourceContext, TransportFaultKind, TransportFaultPacket, TransportFaultRecovery,
 };
 use triergon_mpegts::stream::{TraceEvent, TraceFault, TransportStream};
 use triergon_mpegts::transport::TransportPacket;
@@ -29,7 +28,6 @@ fn context(ordinal: u64) -> SourceContext {
 }
 fn observer(budget: &Budget, limits: ParseLimits) -> DemuxObserver {
     DemuxObserver::new(
-        DemuxProfile::PesPackets,
         DemuxScope {
             program: 1,
             pid: 256,

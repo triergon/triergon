@@ -5,9 +5,7 @@ use triergon_core::{Budget, BudgetVec, SourceLocation};
 use triergon_mpegts::pes::PesHeader;
 use triergon_mpegts::{
     SourceEpochs, SourceRange,
-    compat::pes::{
-        CompactDemuxPacket, CompactPayload, DemuxPacket, DemuxPayloadKind, DemuxProfile, DemuxSpan,
-    },
+    compat::pes::{CompactDemuxPacket, CompactPayload, DemuxPacket, DemuxPayloadKind, DemuxSpan},
 };
 
 /// What a reader checks of a PES before it takes the payload, the same for
@@ -18,8 +16,6 @@ pub struct PesFacts<'a> {
     pub program: u16,
     /// The PID the PES was carried on.
     pub pid: u16,
-    /// The observer profile that cut the PES.
-    pub profile: DemuxProfile,
     /// Where the PES started in the source.
     pub source_origin: SourceLocation,
     /// The source's clock and configuration epochs at the PES.
@@ -73,7 +69,6 @@ impl PesInput for DemuxPacket {
         PesFacts {
             program: self.program,
             pid: self.pid,
-            profile: self.profile,
             source_origin: self.source_origin,
             source_epochs: self.source_epochs,
             flags: self.flags,
@@ -100,7 +95,6 @@ impl PesInput for CompactDemuxPacket {
         PesFacts {
             program: self.program,
             pid: self.pid,
-            profile: self.profile,
             source_origin: self.source_origin,
             source_epochs: self.source_epochs,
             flags: self.flags,

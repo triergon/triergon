@@ -4,8 +4,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_mpegts::compat::pes::{
-    DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, SourceContext,
-    TimestampOrigin,
+    DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, SourceContext, TimestampOrigin,
 };
 use triergon_mpegts::transport::{TransportPacket, parse_transport};
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
@@ -49,13 +48,7 @@ fn input(source: &[u8], format: PacketFormat, budget: &Budget) -> Vec<TransportP
 }
 
 fn observer(budget: &Budget) -> DemuxObserver {
-    DemuxObserver::new(
-        DemuxProfile::PesPackets,
-        scope(),
-        budget.clone(),
-        ParseLimits::default(),
-    )
-    .unwrap()
+    DemuxObserver::new(scope(), budget.clone(), ParseLimits::default()).unwrap()
 }
 
 fn drain(observer: &mut DemuxObserver, ended: bool) -> Vec<DemuxPacket> {
@@ -199,7 +192,6 @@ fn check(source: &[u8], format: PacketFormat, specs: &[Expected]) {
     let mut clock = DemuxClock::new(1).unwrap();
     for (packet, spec) in output.iter().zip(specs) {
         let physical = physical(&packets, spec);
-        assert_eq!(packet.profile, DemuxProfile::PesPackets);
         assert_eq!(packet.program, 1);
         assert_eq!(packet.pid, 256);
         assert_eq!(packet.source_origin.source, SourceId(1));
@@ -576,8 +568,7 @@ fn configured_payload_limit_is_not_bypassed_by_demux_view() {
         pes_bytes: 100,
         ..ParseLimits::default()
     };
-    let mut observer =
-        DemuxObserver::new(DemuxProfile::PesPackets, scope(), budget.clone(), limits).unwrap();
+    let mut observer = DemuxObserver::new(scope(), budget.clone(), limits).unwrap();
     observer.push(packets[2].clone(), context(2)).unwrap();
     let mut found = false;
     for _ in 0..1000 {
@@ -675,35 +666,17 @@ fn unproven_stream_profile_is_an_explicit_nonpass() {
     let mut unproven = scope();
     unproven.stream_type = 0x24;
     assert!(matches!(
-        DemuxObserver::new(
-            DemuxProfile::PesPackets,
-            unproven,
-            budget,
-            ParseLimits::default()
-        ),
+        DemuxObserver::new(unproven, budget, ParseLimits::default()),
         Err(Error::Unsupported(
             "AVC PES requires PMT stream type 0x1b and PES stream ID 0xe0"
         ))
     ));
 }
 
-#[cfg(feature = "reference-trace")]
 #[test]
-fn demux_profile_keeps_exact_original_reference_contract() {
+fn observer_exposes_the_admitted_scope_and_limits() {
     let budget = Budget::new(4096).unwrap();
     let observer = observer(&budget);
-    let profile = DemuxProfile::PesPackets;
-    assert_eq!(
-        profile.worker_sha256(),
-        "19c06e53c62852b409eec9771cb11d9d7f5164b4618545a449d7e993f99346df"
-    );
-    assert_eq!(
-        profile.reference_revision(),
-        "d32b387f2b0a484599d4587d651891f0c63c4238"
-    );
-    assert_eq!(profile.flags(), 48);
-    assert!(profile.default_overflow_correction());
-    assert!(!profile.find_stream_info());
     assert_eq!(observer.scope(), scope());
     assert_eq!(
         observer.limits().pes_bytes,
@@ -723,7 +696,6 @@ fn check_rejected_original(source: &[u8]) {
     let budget = Budget::new(1 << 20).unwrap();
     let backing = Bytes::copy_from_slice(&budget, source).unwrap();
     let mut observer = RecoveryObserver::new(
-        DemuxProfile::PesPackets,
         scope(),
         RegisteredCarriage::Avc,
         RejectedPolicy::OpcrWithoutPcr,
@@ -775,7 +747,6 @@ fn check_rejected_original(source: &[u8]) {
                     count += 1;
                     let raw = &source[offset..offset + 188];
                     let start = 5 + usize::from(raw[4]);
-                    assert_eq!(packet.profile, DemuxProfile::PesPackets);
                     assert_eq!((packet.program, packet.pid), (1, 256));
                     assert_eq!(packet.source_epochs, EPOCHS);
                     assert_eq!(packet.source_origin.source, SourceId(1));

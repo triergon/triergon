@@ -81,7 +81,6 @@ pub(super) fn run(
                                 epochs: context.epochs,
                             };
                             let observer = DemuxObserver::new_registered(
-                                PROFILE,
                                 scope,
                                 RegisteredCarriage::Avc,
                                 pool.clone(),

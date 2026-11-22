@@ -5,7 +5,7 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{
-    DemuxObserver, DemuxProfile, DemuxScope, DvbSubtitlesDescriptors, PrivateAudioCarriage,
+    DemuxObserver, DemuxScope, DvbSubtitlesDescriptors, PrivateAudioCarriage,
     PrivateAudioDescriptors, selected_track_kind,
 };
 use triergon_mpegts::psi::{
@@ -213,7 +213,6 @@ fn private_audio_admission_does_not_backfill_source_classification() {
         };
         let observer = if namespace == DescriptorNamespace::Unspecified {
             DemuxObserver::new_hls_private_audio(
-                DemuxProfile::PesPackets,
                 scope,
                 carriage,
                 descriptors,
@@ -222,7 +221,6 @@ fn private_audio_admission_does_not_backfill_source_classification() {
             )
         } else {
             DemuxObserver::new_private_audio(
-                DemuxProfile::PesPackets,
                 scope,
                 carriage,
                 descriptors,
@@ -253,7 +251,6 @@ fn private_audio_admission_does_not_backfill_source_classification() {
         assert_eq!(stream.descriptor_bytes.as_ref(), raw);
 
         let wrong_pid = DemuxObserver::new_private_audio(
-            DemuxProfile::PesPackets,
             DemuxScope {
                 pid: stream.pid + 1,
                 ..scope
@@ -290,7 +287,6 @@ fn private_audio_stays_unselected_after_carriage_refusal() {
         let parsed = map(program, 6, raw, DVB);
         let stream = &parsed.streams.as_slice()[0];
         let observer = DemuxObserver::new_private_audio(
-            DemuxProfile::PesPackets,
             DemuxScope {
                 program: 1,
                 pid: stream.pid,
@@ -343,7 +339,6 @@ fn subtitle_signalling_and_selected_pes_admission_remain_distinct() {
         let parsed = map(&[], 6, raw, namespace);
         let stream = &parsed.streams.as_slice()[0];
         let observer = DemuxObserver::new_dvb_subtitles(
-            DemuxProfile::PesPackets,
             DemuxScope {
                 program: 1,
                 pid: stream.pid,

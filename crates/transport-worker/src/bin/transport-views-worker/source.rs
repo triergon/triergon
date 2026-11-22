@@ -11,9 +11,9 @@ use triergon_core::{
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep};
 use triergon_mpegts::compat::pes::{
-    CompactDemuxPacket, DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope,
-    DemuxSpanViews, DvbSubtitlesDescriptors, PrivateAudioCarriage, PrivateAudioDescriptors,
-    RegisteredCarriage, SourceContext,
+    CompactDemuxPacket, DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, DemuxSpanViews,
+    DvbSubtitlesDescriptors, PrivateAudioCarriage, PrivateAudioDescriptors, RegisteredCarriage,
+    SourceContext,
 };
 use triergon_mpegts::pes::{Pes, PesAssembler, PesHeader};
 use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, DvbNamespaceEvidence, ProgramMap};
@@ -594,14 +594,11 @@ impl Observer {
             entity: input.source(),
             epochs,
         };
-        let profile = DemuxProfile::PesPackets;
         let budget = input.budget().clone();
         let limits = ParseLimits::default();
         let mut demux = match (form, registered) {
-            (ObserverForm::Unregistered, _) => DemuxObserver::new(profile, scope, budget, limits),
-            (_, Some(carriage)) => {
-                DemuxObserver::new_registered(profile, scope, carriage, budget, limits)
-            }
+            (ObserverForm::Unregistered, _) => DemuxObserver::new(scope, budget, limits),
+            (_, Some(carriage)) => DemuxObserver::new_registered(scope, carriage, budget, limits),
             (_, None) => {
                 let program = map.program_descriptors.as_ref();
                 let elementary = stream.descriptor_bytes.as_ref();
@@ -611,7 +608,6 @@ impl Observer {
                         .any(|entry| entry.is_ok_and(|entry| entry.tag == 0x59));
                 if dvb_subtitle {
                     DemuxObserver::new_dvb_subtitles(
-                        profile,
                         scope,
                         map.descriptor_namespace,
                         DvbSubtitlesDescriptors {
@@ -631,14 +627,7 @@ impl Observer {
                         descriptors,
                         limits,
                     )?;
-                    DemuxObserver::new_private_audio(
-                        profile,
-                        scope,
-                        carriage,
-                        descriptors,
-                        budget,
-                        limits,
-                    )
+                    DemuxObserver::new_private_audio(scope, carriage, descriptors, budget, limits)
                 }
             }
         }?;

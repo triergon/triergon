@@ -2,9 +2,7 @@
 //!
 //! These report what FFmpeg's demuxer does with an input, so the harness can compare
 //! traces byte for byte. They are not behaviour a consumer selects outside a
-//! comparison, and they are absent from default builds. With the feature enabled,
-//! [`DemuxProfile`](crate::compat::pes::DemuxProfile) also names the reference
-//! build and its options, and these are also available:
+//! comparison, and they are absent from default builds. The feature also exposes
 //! [`DemuxClock::project_encoded_header`](crate::compat::pes::DemuxClock::project_encoded_header),
 //! [`DemuxClock::project_diagnostic_header`](crate::compat::pes::DemuxClock::project_diagnostic_header),
 //! [`InputContext::basis`](crate::compat::input::InputContext::basis) and

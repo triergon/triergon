@@ -13,7 +13,11 @@ pub(crate) const SYNC_BYTE: &str = "TS sync byte";
 /// An adaptation field that signals an OPCR without a PCR.
 pub(crate) const OPCR_WITHOUT_PCR: &str = "OPCR without PCR";
 
-const STUFFING: [u8; 182] = [0xff; 182];
+#[repr(align(16))]
+struct AlignedStuffing([u8; 182]);
+
+// A 16-byte-aligned operand avoids extra memcmp instructions on split TS headers.
+static STUFFING: AlignedStuffing = AlignedStuffing([0xff; 182]);
 pub(crate) const TS188_BYTES: usize = 188;
 pub(crate) const TS_PAYLOAD_START: usize = 4;
 pub(crate) const PLAIN_PAYLOAD_BYTES: usize = TS188_BYTES - TS_PAYLOAD_START;
@@ -98,7 +102,7 @@ impl PlainCarrier {
                 } else {
                     None
                 };
-                if data[stuffing_start..end] != STUFFING[..stuffing] {
+                if data[stuffing_start..end] != STUFFING.0[..stuffing] {
                     return None;
                 }
                 (end, Some(data[5]), pcr, charge)
@@ -527,7 +531,7 @@ impl TransportInspector {
                     .as_ref()
                     .ok_or(Error::Invalid("carrier owner missing"))?;
                 let stuffing = &source.as_ref()[start..start + count];
-                let invalid = (stuffing != &STUFFING[..count])
+                let invalid = (stuffing != &STUFFING.0[..count])
                     .then(|| stuffing.iter().position(|&byte| byte != 0xff))
                     .flatten();
                 if let Some(invalid) = invalid {
