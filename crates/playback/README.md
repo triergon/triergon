@@ -157,11 +157,12 @@ Matroska feeds, packet bridges and subtitle receivers over these outputs are in
 data never mean end of stream; only `SourceReply::End` does, and transport
 failure is a separate reply. `abort` wakes and quiesces any I/O producer
 before `close`. HTTP, authentication and retry policy belong to the caller.
-`triergon_core::blocking` is the other way to feed a parser: its `Blocking` and
-`Feed` read a `std::io` source inside the call, which suits a `ContainerReader`
-on a thread that may block and cannot serve a player, whose source never waits.
-Under a player, serve a local file's bytes from a `ByteSource` or implement
-`Source` over your own reads.
+A player takes a `Source`, whose `poll` answers at once (data, the end, a
+failure, or `Pending` to be asked again), so it can run on an event loop: serve
+a local file's bytes from a `ByteSource`, or implement `Source` over your own I/O.
+`triergon_core::blocking::{Blocking, Feed}` read a `std::io` source inside the
+call instead, for a `ContainerReader` or a parser's `InputCursor` on a thread
+that may block; they cannot serve a player.
 
 **Bounded work.** Every call takes a `WorkBudget` and a cancel flag, and all
 retained memory is charged to a `triergon_core::Budget`. `Backpressure` is

@@ -72,13 +72,12 @@ retained. Insufficient work, invalid tail metadata or allocation pressure keeps
 ordered span assembly, so a later invalid span still follows earlier valid frames.
 
 `cargo xtask progressive` checks three comparable AVC/AAC TS188 packet folds and
-all five authored functional controls through the bounded sequential reader.
-All ten literal worker outcomes are required, including positive Rust output and
-the recorded reference refusal on the legal duplicate control. The
+all five authored functional controls through the bounded sequential reader:
+ten literal worker outcomes, including the reference refusal of the legal
+duplicate control. The
 [contract](../../harness/features/progressive-ts188/contract.json) preserves complete
-packet fields and payloads with two retained units per stream. `--benchmark --memory`
-uses the standard paired harness for the three original comparable cases only;
-native gate-build qualification remains pending.
+packet fields and payloads with two retained units per stream; `--benchmark
+--memory` times the three comparable cases.
 
 ## Conformance
 
