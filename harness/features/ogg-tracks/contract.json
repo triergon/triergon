@@ -205,20 +205,12 @@
   ],
   "open_cases": [
     {
-      "id": "vorbis-chapter-extension-demo.ogg",
-      "requirement": "The candidate retains the chapter comments. The reference publishes them through a chapter view and omits them from its stream dictionary."
-    },
-    {
       "id": "chain-opus.opus",
       "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
     },
     {
       "id": "chain-vorbis.ogg",
       "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
-    },
-    {
-      "id": "crc-bad.opus",
-      "requirement": "The post-CRC-loss end scan reports different Opus stream end ticks."
     },
     {
       "id": "ogg-flac-chained-meta.ogg",
@@ -233,46 +225,84 @@
       "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
     },
     {
-      "id": "speex-nb.spx",
-      "requirement": "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open."
-    },
-    {
-      "id": "speex-wb.spx",
-      "requirement": "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open."
-    },
-    {
-      "id": "speex-uwb-stereo.spx",
-      "requirement": "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open."
-    },
-    {
-      "id": "speex-skeleton.spx",
-      "requirement": "The candidate exposes the Skeleton identification packet. The reference exposes an unconfigured stream with no extradata."
-    },
-    {
       "id": "chain-speex.spx",
       "requirement": "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open."
-    },
-    {
-      "id": "comment-fields",
-      "requirement": "The comment packet contains an empty TITLE field. The candidate emits the field and the reference drops it."
-    },
-    {
-      "id": "bad-comment",
-      "requirement": "The candidate reports the Opus identification alongside a second-header error. The reference refuses to open the malformed header sequence."
-    },
-    {
-      "id": "theora-0-0",
-      "requirement": "A 0/0 frame rate is invalid. The candidate exposes a header error without a frame rate. The reference publishes a default 25 Hz frame clock."
     }
   ],
   "pending_module_requirements": [
-    "A 0/0 frame rate is invalid. The candidate exposes a header error without a frame rate. The reference publishes a default 25 Hz frame clock.",
     "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration.",
-    "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open.",
-    "The candidate exposes the Skeleton identification packet. The reference exposes an unconfigured stream with no extradata.",
-    "The candidate reports the Opus identification alongside a second-header error. The reference refuses to open the malformed header sequence.",
-    "The candidate retains the chapter comments. The reference publishes them through a chapter view and omits them from its stream dictionary.",
-    "The comment packet contains an empty TITLE field. The candidate emits the field and the reference drops it.",
-    "The post-CRC-loss end scan reports different Opus stream end ticks."
+    "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open."
+  ],
+  "open_deviations": [
+    {
+      "reading": "Chapter comments are still source comments",
+      "clause": "Xiph Vorbis I section 5.2 and Xiph VorbisComment chapter extension define the textual comment field and the CHAPTERxxx names.",
+      "candidate": "retains the chapter keys and values alongside the ordinary fields",
+      "reference": "exports chapters separately and omits the keys from the stream dictionary",
+      "compat": "compat::ogg::chapter_comments",
+      "cases": [
+        "vorbis-chapter-extension-demo.ogg"
+      ]
+    },
+    {
+      "reading": "Use the last Opus granule and pre-skip for the source end",
+      "clause": "RFC 3533 section 6 and RFC 7845 sections 4.2–4.4 define the page granule and conversion to PCM samples by subtracting pre-skip, including at EOS.",
+      "candidate": "publishes 59232 ticks from the EOS granule 59544 less 312 samples of pre-skip",
+      "reference": "reports duration corresponding to 64032 ticks after a CRC failure",
+      "compat": "compat::ogg::estimated_duration",
+      "cases": [
+        "crc-bad.opus"
+      ]
+    },
+    {
+      "reading": "Preserve the Speex final source granule",
+      "clause": "RFC 3533 section 6 assigns granule_position to the logical stream. Xiph Speex manual, Formats and standards, Speex in Ogg, gives the mapping’s sample clock and packet framing.",
+      "candidate": "reports the EOS granules 9872, 9600 and 28800 samples",
+      "reference": "publishes durations of 9920, 10560 and 29149 ticks from the demux stream",
+      "compat": "compat::ogg::estimated_duration",
+      "cases": [
+        "speex-nb.spx",
+        "speex-wb.spx",
+        "speex-uwb-stereo.spx"
+      ]
+    },
+    {
+      "reading": "Retain the Skeleton identification packet as opaque configuration",
+      "clause": "RFC 3533 section 3 and the Xiph Ogg Skeleton Metadata Bitstream, Identifying the Ogg Skeleton, define the BOS identification packet. Track::configuration retains the first packet of an opaque mapping.",
+      "candidate": "publishes the fishead signature and its original configuration bytes",
+      "reference": "publishes the stream without configuration bytes",
+      "cases": [
+        "speex-skeleton.spx"
+      ]
+    },
+    {
+      "reading": "An empty text value is present in the comment packet",
+      "clause": "Xiph Vorbis I section 5.2 defines length-delimited UTF-8 name=value fields and specifies no minimum value length.",
+      "candidate": "reports the present TITLE with a zero-byte value",
+      "reference": "omits the empty TITLE from the dictionary",
+      "compat": "compat::ogg::omit_empty_comments",
+      "cases": [
+        "comment-fields"
+      ]
+    },
+    {
+      "reading": "Expose a valid Opus identification with the error in the following header",
+      "clause": "RFC 7845 sections 5.1 and 5.2 require the identification and comment packets and allow refusal of a short comment. Track::header_error exposes a failed header without losing source identification.",
+      "candidate": "retains the OpusHead and reports a second-header error",
+      "reference": "refuses the demux open",
+      "cases": [
+        "bad-comment"
+      ]
+    },
+    {
+      "reading": "A zero Theora frame-rate denominator has no frame clock",
+      "clause": "Theora I section 6.2 requires a positive FRN and FRD; Annex A.2.3 derives the granule clock from the coded frame period.",
+      "candidate": "reports a header error with no frame rate",
+      "reference": "publishes a 25 Hz frame clock",
+      "compat": "compat::ogg::theora_rate_fallback",
+      "cases": [
+        "theora-0-0"
+      ]
+    }
   ]
 }
