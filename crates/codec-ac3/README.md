@@ -108,6 +108,8 @@ hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
 
 ATSC A/52:2018; `src/spec_tables.rs` is generated from its text by
 `harness/codecs/ac3/gen_tables.py`. `examples/strip_dither.rs` rewrites a stream without
-dither. Derivation notes and tools:
+dither. The [dither-free comparison](../../harness/codecs/nodither-streams.json)
+retains a diagnostic difference for bytes before the first E-AC-3 syncframe.
+Derivation notes and tools:
 [harness/codecs/ac3](../../harness/codecs/ac3/STATUS.md); results in
 [docs/status.md](../../docs/status.md).

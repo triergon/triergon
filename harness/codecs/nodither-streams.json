@@ -7,8 +7,17 @@
     "nodither-monsters_inc_2.0_192_small.ac3",
     "nodither-monsters_inc_5.1_448_small.ac3",
     "nodither-mp3ac325_a0.ac3",
-    "nodither-mp3ac325_a1.ac3",
-    "nodither-csi_miami_stereo_128_spx.eac3"
+    "nodither-mp3ac325_a1.ac3"
+  ],
+  "open_deviations": [
+    {
+      "reading": "Bytes before the first valid E-AC-3 syncword do not form an audio packet",
+      "clause": "ATSC A/52:2018 section 5.4.1.1 and Annex E section 2.2.1 specify the syncword at the start of each frame",
+      "candidate": "Skips 352 bytes before the first syncword on the original and rewritten input, then emits 999936 samples per channel without a packet error.",
+      "reference": "Submits the same 352-byte prefix as a packet and reports an invalid input diagnostic. It emits 999936 samples per channel from the subsequent frames within the existing E-AC-3 PCM bounds.",
+      "compat": "compat::eac3::unsynchronised_prefix_packet",
+      "cases": ["nodither-csi_miami_stereo_128_spx.eac3"]
+    }
   ],
   "vectors": [
     {
@@ -138,7 +147,6 @@
     "nodither-monsters_inc_2.0_192_small.ac3": "The strip preserves an incomplete final syncframe. FFmpeg reports it even when concealment delivers the same sample count.",
     "nodither-monsters_inc_5.1_448_small.ac3": "The strip preserves an incomplete final syncframe. FFmpeg reports it even when concealment delivers the same sample count.",
     "nodither-mp3ac325_a0.ac3": "The strip preserves an incomplete final syncframe. FFmpeg reports it even when concealment delivers the same sample count.",
-    "nodither-mp3ac325_a1.ac3": "The strip preserves an incomplete final syncframe. FFmpeg reports it even when concealment delivers the same sample count.",
-    "nodither-csi_miami_stereo_128_spx.eac3": "FFmpeg reports an invalid E-AC-3 packet on this AHT and SPX stream. The bit product and the numeric comparison remain recorded."
+    "nodither-mp3ac325_a1.ac3": "The strip preserves an incomplete final syncframe. FFmpeg reports it even when concealment delivers the same sample count."
   }
 }
