@@ -123,6 +123,11 @@ then keeps the element order of the PCE, and so does the AAC decoder.
 
 ## Conformance
 
+The [layout comparison](../../harness/features/codec-layouts/contract.json) checks the decoded
+sample rate, speaker on each plane, layout mask and name, native and Vorbis permutations, and
+published downmix gains. The Ogg inputs include Vorbis and Opus with one through eight
+channels.
+
 Speaker ids and names follow FFmpeg's channel layout API (`AV_CHAN_*`, `AV_CH_*`).
 The channel order is verified through the codec crates, whose output planes are
 compared with FFmpeg channel by channel; unit tests pin layout equality, masks and

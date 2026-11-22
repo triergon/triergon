@@ -1,0 +1,3839 @@
+{
+  "schema": 1,
+  "id": "picture-properties",
+  "gate": "required",
+  "operation": "picture-properties",
+  "candidate": "codec-views-worker",
+  "worker_operation": "picture-props-",
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-codec-views-native",
+  "contract": [
+    "Decode the elementary stream through the candidate decoders and the FFmpeg parser and decoder. Compare each visible picture in decoder output order.",
+    "Fold kind 4 with visible width, height, sample depth, plane count, reduced sample aspect ratio (0/0 for unspecified), CICP primaries, transfer and matrix, range, H.264 field coding, and a 16-byte MD5 of each visible plane in order.",
+    "Range is the full-range flag for H.264, and 0 unspecified, 1 narrow, 2 full for HEVC. The candidate pictures do not publish chroma location or top-field-first. Decoding is timed by codec-workloads."
+  ],
+  "required_profiles": [
+    "h264",
+    "hevc"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "parity_timeout_seconds": 240,
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "AUD_MW_E.264",
+        "BA1_FT_C.264",
+        "BA1_Sony_D.jsv",
+        "BA2_Sony_F.jsv",
+        "BA3_SVA_C.264",
+        "BAMQ1_JVC_C.264",
+        "BAMQ2_JVC_C.264",
+        "BANM_MW_D.264",
+        "BASQP1_Sony_C.jsv",
+        "BA_MW_D.264",
+        "CABA1_SVA_B.264",
+        "CABA1_Sony_D.jsv",
+        "CABA2_SVA_B.264",
+        "CABA2_Sony_E.jsv",
+        "CABA3_SVA_B.264",
+        "CABA3_Sony_C.jsv",
+        "CABA3_TOSHIBA_E.264",
+        "CABACI3_Sony_B.jsv",
+        "CABAST3_Sony_E.jsv",
+        "CABASTBR3_Sony_B.jsv",
+        "CABREF3_Sand_D.264",
+        "CACQP3_Sony_D.jsv",
+        "CAFI1_SVA_C.264",
+        "CAMA1_Sony_C.jsv",
+        "CAMA1_TOSHIBA_B.264",
+        "CAMA3_Sand_E.264",
+        "CAMACI3_Sony_C.jsv",
+        "CAMANL1_TOSHIBA_B.264",
+        "CAMANL2_TOSHIBA_B.264",
+        "CAMANL3_Sand_E.264",
+        "CAMASL3_Sony_B.jsv",
+        "CAMP_MOT_MBAFF_L30.26l",
+        "CAMP_MOT_MBAFF_L31.26l",
+        "CANL1_SVA_B.264",
+        "CANL1_Sony_E.jsv",
+        "CANL1_TOSHIBA_G.264",
+        "CANL2_SVA_B.264",
+        "CANL2_Sony_E.jsv",
+        "CANL3_SVA_B.264",
+        "CANL3_Sony_C.jsv",
+        "CANL4_SVA_B.264",
+        "CANLMA2_Sony_C.jsv",
+        "CANLMA3_Sony_C.jsv",
+        "CAPA1_TOSHIBA_B.264",
+        "CAPAMA3_Sand_F.264",
+        "CAPCM1_Sand_E.264",
+        "CAPCMNL1_Sand_E.264",
+        "CAPM3_Sony_D.jsv",
+        "CAQP1_Sony_B.jsv",
+        "CAWP1_TOSHIBA_E.264",
+        "CAWP5_TOSHIBA_E.264",
+        "CI1_FT_B.264",
+        "CI_MW_D.264",
+        "CVBS3_Sony_C.jsv",
+        "CVCANLMA2_Sony_C.jsv",
+        "CVFC1_Sony_C.jsv",
+        "CVFI1_SVA_C.264",
+        "CVFI1_Sony_D.jsv",
+        "CVFI2_SVA_C.264",
+        "CVFI2_Sony_H.jsv",
+        "CVMA1_Sony_D.jsv",
+        "CVMA1_TOSHIBA_B.264",
+        "CVMANL1_TOSHIBA_B.264",
+        "CVMANL2_TOSHIBA_B.264",
+        "CVMAPAQP3_Sony_E.jsv",
+        "CVMAQP2_Sony_G.jsv",
+        "CVMAQP3_Sony_D.jsv",
+        "CVMP_MOT_FLD_L30_B.26l",
+        "CVMP_MOT_FRM_L31_B.26l",
+        "CVNLFI1_Sony_C.jsv",
+        "CVNLFI2_Sony_H.jsv",
+        "CVPA1_TOSHIBA_B.264",
+        "CVPCMNL1_SVA_C.264",
+        "CVPCMNL2_SVA_C.264",
+        "CVSE2_Sony_B.jsv",
+        "CVSE3_Sony_H.jsv",
+        "CVSEFDFT3_Sony_E.jsv",
+        "CVWP1_TOSHIBA_E.264",
+        "CVWP2_TOSHIBA_E.264",
+        "CVWP3_TOSHIBA_E.264",
+        "CVWP5_TOSHIBA_E.264",
+        "FI1_Sony_E.jsv",
+        "FM1_BT_B.h264",
+        "FM1_FT_E.264",
+        "FM2_SVA_B.264",
+        "FM2_SVA_C.264",
+        "FREXT01_JVC_D.264",
+        "FREXT02_JVC_C.264",
+        "FRExt1_Panasonic.avc",
+        "FRExt2_Panasonic.avc",
+        "FRExt3_Panasonic.avc",
+        "FRExt4_Panasonic.avc",
+        "FRExt_MMCO4_Sony_B.264",
+        "Freh12_B.264",
+        "Freh1_B.264",
+        "Freh2_B.264",
+        "Freh7_B.264",
+        "HCAFF1_HHI.264",
+        "HCAFR1_HHI.264",
+        "HCAFR2_HHI.264",
+        "HCAFR3_HHI.264",
+        "HCAFR4_HHI.264",
+        "HCAMFF1_HHI.264",
+        "HPCADQ_BRCM_B.264",
+        "HPCAFLNL_BRCM_C.264",
+        "HPCAFL_BRCM_C.264",
+        "HPCALQ_BRCM_B.264",
+        "HPCAMAPALQ_BRCM_B.264",
+        "HPCAMOLQ_BRCM_B.264",
+        "HPCANL_BRCM_C.264",
+        "HPCAQ2LQ_BRCM_B.264",
+        "HPCA_BRCM_C.264",
+        "HPCVFLNL_BRCM_A.264",
+        "HPCVFL_BRCM_A.264",
+        "HPCVMOLQ_BRCM_B.264",
+        "HPCVNL_BRCM_A.264",
+        "HPCV_BRCM_A.264",
+        "Hi422FR10_SONY_B.264",
+        "Hi422FR13_SONY_B.264",
+        "Hi422FR1_SONY_A.jsv",
+        "Hi422FR6_SONY_A.jsv",
+        "PPH10I1_Panasonic_A.264",
+        "PPH10I2_Panasonic_A.264",
+        "PPH10I3_Panasonic_A.264",
+        "PPH10I4_Panasonic_A.264",
+        "PPH10I5_Panasonic_A.264",
+        "PPH10I6_Panasonic_A.264",
+        "PPH10I7_Panasonic_A.264",
+        "PPH422I1_Panasonic_A.264",
+        "PPH422I2_Panasonic_A.264",
+        "PPH422I3_Panasonic_A.264",
+        "PPH422I4_Panasonic_A.264",
+        "PPH422I5_Panasonic_A.264",
+        "PPH422I6_Panasonic_A.264",
+        "PPH422I7_Panasonic_A.264",
+        "freh10.264",
+        "freh11.264",
+        "freh3.264",
+        "freh4.264",
+        "freh5.264",
+        "freh6.264",
+        "freh8.264",
+        "freh9.264",
+        "test8b43.264",
+        "HCBP1_HHI_A.264",
+        "HCBP2_HHI_A.264",
+        "HCMP1_HHI_A.264",
+        "LS_SVA_D.264",
+        "MIDR_MW_D.264",
+        "MPS_MW_A.264",
+        "MR1_BT_A.h264",
+        "MR1_MW_A.264",
+        "MR2_MW_A.264",
+        "MR2_TANDBERG_E.264",
+        "MR3_TANDBERG_B.264",
+        "MR4_TANDBERG_C.264",
+        "MR5_TANDBERG_C.264",
+        "MR6_BT_B.h264",
+        "MR7_BT_B.h264",
+        "MR8_BT_B.h264",
+        "MR9_BT_B.h264",
+        "NL1_Sony_D.jsv",
+        "NL2_Sony_H.jsv",
+        "NL3_SVA_E.264",
+        "NLMQ1_JVC_C.264",
+        "NLMQ2_JVC_C.264",
+        "NRF_MW_E.264",
+        "SL1_SVA_B.264",
+        "SVA_BA1_B.264",
+        "SVA_BA2_D.264",
+        "SVA_Base_B.264",
+        "SVA_CL1_E.264",
+        "SVA_FM1_E.264",
+        "SVA_NL1_B.264",
+        "SVA_NL2_E.264",
+        "Sharp_MP_Field_1_B.jvt",
+        "Sharp_MP_Field_2_B.jvt",
+        "Sharp_MP_Field_3_B.jvt",
+        "Sharp_MP_PAFF_1r2.jvt",
+        "Sharp_MP_PAFF_2.jvt",
+        "cama1_vtc_c.avc",
+        "cama2_vtc_b.avc",
+        "cama3_vtc_b.avc",
+        "camp_mot_fld0_full.26l",
+        "camp_mot_frm0_full.26l",
+        "camp_mot_mbaff0_full.26l",
+        "camp_mot_picaff0_full.26l",
+        "cvmp_mot_fld0_full_B.26l",
+        "cvmp_mot_frm0_full_B.26l",
+        "cvmp_mot_mbaff0_full_B.26l",
+        "cvmp_mot_picaff0_full_B.26l",
+        "slice2_field_aurora4.264",
+        "sp1_bt_a.h264",
+        "sp2_bt_b.h264",
+        "src19td.IBP.264",
+        "ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit",
+        "AMP_A_Samsung_4.bit",
+        "AMP_A_Samsung_6.bit",
+        "AMP_B_Samsung_4.bit",
+        "AMP_B_Samsung_6.bit",
+        "AMP_D_Hisilicon.bit",
+        "AMP_E_Hisilicon.bit",
+        "AMP_F_Hisilicon_3.bit",
+        "AMVP_A_MTK_4.bit",
+        "AMVP_B_MTK_4.bit",
+        "AMVP_C_Samsung_4.bit",
+        "AMVP_C_Samsung_6.bit",
+        "BUMPING_A_ericsson_1.bit",
+        "CAINIT_A_SHARP_4.bit",
+        "CAINIT_B_SHARP_4.bit",
+        "CAINIT_C_SHARP_3.bit",
+        "CAINIT_D_SHARP_3.bit",
+        "CAINIT_E_SHARP_3.bit",
+        "CAINIT_F_SHARP_3.bit",
+        "CAINIT_G_SHARP_3.bit",
+        "CAINIT_H_SHARP_3.bit",
+        "CIP_A_Panasonic_3.bit",
+        "CIP_C_Panasonic_2.bit",
+        "CONFWIN_A_Sony_1.bit",
+        "DBLK_A_MAIN10_VIXS_2.bit",
+        "DBLK_A_MAIN10_VIXS_3.bit",
+        "DBLK_A_SONY_3.bit",
+        "DBLK_B_SONY_3.bit",
+        "DBLK_C_SONY_3.bit",
+        "DBLK_D_VIXS_1.bit",
+        "DBLK_D_VIXS_2.bit",
+        "DBLK_E_VIXS_1.bit",
+        "DBLK_E_VIXS_2.bit",
+        "DBLK_F_VIXS_1.bit",
+        "DBLK_F_VIXS_2.bit",
+        "DBLK_G_VIXS_1.bit",
+        "DBLK_G_VIXS_2.bit",
+        "DELTAQP_A_BRCM_4.bit",
+        "DELTAQP_B_SONY_3.bit",
+        "DELTAQP_C_SONY_3.bit",
+        "DSLICE_A_HHI_5.bit",
+        "DSLICE_B_HHI_5.bit",
+        "DSLICE_C_HHI_5.bit",
+        "ENTP_A_LG_2.bit",
+        "ENTP_A_Qualcomm_1.bit",
+        "ENTP_B_LG_2.bit",
+        "ENTP_B_Qualcomm_1.bit",
+        "ENTP_C_LG_3.bit",
+        "ENTP_C_Qualcomm_1.bit",
+        "EXT_A_ericsson_3.bit",
+        "EXT_A_ericsson_4.bit",
+        "FILLER_A_Sony_1.bit",
+        "HRD_A_Fujitsu_2.bit",
+        "HRD_A_Fujitsu_3.bit",
+        "INITQP_A_Sony_1.bit",
+        "INITQP_B_Sony_1.bit",
+        "IPCM_A_RExt_NEC.bit",
+        "IPCM_B_RExt_NEC.bit",
+        "IPRED_A_docomo_2.bit",
+        "IPRED_B_Nokia_3.bit",
+        "IPRED_C_Mitsubishi_2.bit",
+        "IPRED_C_Mitsubishi_3.bit",
+        "LS_A_Orange_2.bit",
+        "LS_B_ORANGE_3.bit",
+        "LS_B_ORANGE_4.bit",
+        "LTRPSPS_A_Qualcomm_1.bit",
+        "MAXBINS_A_TI_4.bit",
+        "MAXBINS_B_TI_4.bit",
+        "MAXBINS_C_TI_4.bit",
+        "MERGE_A_TI_3.bit",
+        "MERGE_B_TI_3.bit",
+        "MERGE_C_TI_3.bit",
+        "MERGE_D_TI_3.bit",
+        "MERGE_E_TI_3.bit",
+        "MERGE_F_MTK_4.bit",
+        "MERGE_G_HHI_4.bit",
+        "MVCLIP_A_qualcomm_3.bit",
+        "MVDL1ZERO_A_docomo_3.bit",
+        "MVEDGE_A_qualcomm_3.bit",
+        "MVHEVCS_A.bit",
+        "MVHEVCS_B.bit",
+        "MVHEVCS_E.bit",
+        "MVHEVCS_F.bit",
+        "Main_422_10_A_RExt_Sony_1.bin",
+        "Main_422_10_B_RExt_Sony_1.bin",
+        "NUT_A_ericsson_4.bit",
+        "NUT_A_ericsson_5.bit",
+        "NoOutPrior_A_Qualcomm_1.bit",
+        "NoOutPrior_B_Qualcomm_1.bit",
+        "OPFLAG_A_Qualcomm_1.bit",
+        "OPFLAG_B_Qualcomm_1.bit",
+        "OPFLAG_C_Qualcomm_1.bit",
+        "PERSIST_RPARAM_A_RExt_Sony_1.bit",
+        "PERSIST_RPARAM_A_RExt_Sony_3.bit",
+        "PICSIZE_A_Bossen_1.bit",
+        "PICSIZE_B_Bossen_1.bit",
+        "PICSIZE_C_Bossen_1.bit",
+        "PICSIZE_D_Bossen_1.bit",
+        "PMERGE_A_TI_3.bit",
+        "PMERGE_B_TI_3.bit",
+        "PMERGE_C_TI_3.bit",
+        "PMERGE_D_TI_3.bit",
+        "PMERGE_E_TI_3.bit",
+        "POC_A_Bossen_3.bit",
+        "PPS_A_qualcomm_7.bit",
+        "PS_A_VIDYO_3.bit",
+        "PS_B_VIDYO_3.bit",
+        "QMATRIX_A_RExt_Sony_1.bit",
+        "RAP_A_docomo_4.bit",
+        "RAP_B_Bossen_1.bit",
+        "RPLM_A_qualcomm_4.bit",
+        "RPLM_B_qualcomm_4.bit",
+        "RPS_A_docomo_4.bit",
+        "RPS_B_qualcomm_5.bit",
+        "RPS_C_ericsson_4.bit",
+        "RPS_C_ericsson_5.bit",
+        "RPS_D_ericsson_5.bit",
+        "RPS_D_ericsson_6.bit",
+        "RPS_E_qualcomm_5.bit",
+        "RPS_F_docomo_1.bit",
+        "RQT_A_HHI_4.bit",
+        "RQT_B_HHI_4.bit",
+        "RQT_C_HHI_4.bit",
+        "RQT_D_HHI_4.bit",
+        "RQT_E_HHI_4.bit",
+        "RQT_F_HHI_4.bit",
+        "RQT_G_HHI_4.bit",
+        "SAO_A_MediaTek_4.bit",
+        "SAO_A_RExt_MediaTek_1.bit",
+        "SAO_B_MediaTek_5.bit",
+        "SAO_C_Samsung_4.bit",
+        "SAO_C_Samsung_5.bit",
+        "SAO_D_Samsung_4.bit",
+        "SAO_D_Samsung_5.bit",
+        "SAO_E_Canon_4.bit",
+        "SAO_F_Canon_3.bit",
+        "SAO_G_Canon_3.bit",
+        "SDH_A_Orange_3.bit",
+        "SLICES_A_Rovi_3.bit",
+        "SLIST_A_Sony_4.bit",
+        "SLIST_B_Sony_8.bit",
+        "SLIST_C_Sony_3.bit",
+        "SLIST_D_Sony_9.bit",
+        "SLPPLP_A_VIDYO_1.bit",
+        "SLPPLP_A_VIDYO_2.bit",
+        "STRUCT_A_Samsung_5.bit",
+        "STRUCT_B_Samsung_4.bit",
+        "STRUCT_B_Samsung_6.bit",
+        "TILES_A_Cisco_2.bit",
+        "TILES_B_Cisco_1.bit",
+        "TMVP_A_MS_2.bit",
+        "TMVP_A_MS_3.bit",
+        "TSCL_A_VIDYO_5.bit",
+        "TSCL_B_VIDYO_4.bit",
+        "TSKIP_A_MS_2.bit",
+        "TSKIP_A_MS_3.bit",
+        "TSUNEQBD_A_MAIN10_Technicolor_2.bit",
+        "TUSIZE_A_Samsung_1.bit",
+        "VPSID_A_VIDYO_1.bit",
+        "VPSID_A_VIDYO_2.bit",
+        "WPP_A_ericsson_MAIN10_2.bit",
+        "WPP_A_ericsson_MAIN_2.bit",
+        "WPP_B_ericsson_MAIN10_2.bit",
+        "WPP_B_ericsson_MAIN_2.bit",
+        "WPP_C_ericsson_MAIN10_2.bit",
+        "WPP_C_ericsson_MAIN_2.bit",
+        "WPP_D_ericsson_MAIN10_2.bit",
+        "WPP_D_ericsson_MAIN_2.bit",
+        "WPP_E_ericsson_MAIN10_2.bit",
+        "WPP_E_ericsson_MAIN_2.bit",
+        "WPP_F_ericsson_MAIN10_2.bit",
+        "WPP_F_ericsson_MAIN_2.bit",
+        "WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit",
+        "WP_A_MAIN10_Toshiba_3.bit",
+        "WP_A_Toshiba_3.bit",
+        "WP_B_Toshiba_3.bit",
+        "WP_MAIN10_B_Toshiba_3.bit",
+        "cip_B_NEC_2.bit",
+        "cip_B_NEC_3.bit",
+        "ipcm_A_NEC_2.bit",
+        "ipcm_A_NEC_3.bit",
+        "ipcm_B_NEC_2.bit",
+        "ipcm_B_NEC_3.bit",
+        "ipcm_C_NEC_2.bit",
+        "ipcm_C_NEC_3.bit",
+        "ipcm_D_NEC_2.bit",
+        "ipcm_D_NEC_3.bit",
+        "ipcm_E_NEC_2.bit",
+        "h264-high-1080p",
+        "h264-main-1920x800",
+        "h264-high-720p",
+        "hevc-main-1080p",
+        "hevc-main10-1080p",
+        "hevc-main10-2160p"
+      ],
+      "cause": "Codec workloads measure decode. This operation adds the visible-plane hashes and picture properties."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "AUD_MW_E.264",
+        "BA1_FT_C.264",
+        "BA1_Sony_D.jsv",
+        "BA2_Sony_F.jsv",
+        "BA3_SVA_C.264",
+        "BAMQ1_JVC_C.264",
+        "BAMQ2_JVC_C.264",
+        "BANM_MW_D.264",
+        "BASQP1_Sony_C.jsv",
+        "BA_MW_D.264",
+        "CABA1_SVA_B.264",
+        "CABA1_Sony_D.jsv",
+        "CABA2_SVA_B.264",
+        "CABA2_Sony_E.jsv",
+        "CABA3_SVA_B.264",
+        "CABA3_Sony_C.jsv",
+        "CABA3_TOSHIBA_E.264",
+        "CABACI3_Sony_B.jsv",
+        "CABAST3_Sony_E.jsv",
+        "CABASTBR3_Sony_B.jsv",
+        "CABREF3_Sand_D.264",
+        "CACQP3_Sony_D.jsv",
+        "CAFI1_SVA_C.264",
+        "CAMA1_Sony_C.jsv",
+        "CAMA1_TOSHIBA_B.264",
+        "CAMA3_Sand_E.264",
+        "CAMACI3_Sony_C.jsv",
+        "CAMANL1_TOSHIBA_B.264",
+        "CAMANL2_TOSHIBA_B.264",
+        "CAMANL3_Sand_E.264",
+        "CAMASL3_Sony_B.jsv",
+        "CAMP_MOT_MBAFF_L30.26l",
+        "CAMP_MOT_MBAFF_L31.26l",
+        "CANL1_SVA_B.264",
+        "CANL1_Sony_E.jsv",
+        "CANL1_TOSHIBA_G.264",
+        "CANL2_SVA_B.264",
+        "CANL2_Sony_E.jsv",
+        "CANL3_SVA_B.264",
+        "CANL3_Sony_C.jsv",
+        "CANL4_SVA_B.264",
+        "CANLMA2_Sony_C.jsv",
+        "CANLMA3_Sony_C.jsv",
+        "CAPA1_TOSHIBA_B.264",
+        "CAPAMA3_Sand_F.264",
+        "CAPCM1_Sand_E.264",
+        "CAPCMNL1_Sand_E.264",
+        "CAPM3_Sony_D.jsv",
+        "CAQP1_Sony_B.jsv",
+        "CAWP1_TOSHIBA_E.264",
+        "CAWP5_TOSHIBA_E.264",
+        "CI1_FT_B.264",
+        "CI_MW_D.264",
+        "CVBS3_Sony_C.jsv",
+        "CVCANLMA2_Sony_C.jsv",
+        "CVFC1_Sony_C.jsv",
+        "CVFI1_SVA_C.264",
+        "CVFI1_Sony_D.jsv",
+        "CVFI2_SVA_C.264",
+        "CVFI2_Sony_H.jsv",
+        "CVMA1_Sony_D.jsv",
+        "CVMA1_TOSHIBA_B.264",
+        "CVMANL1_TOSHIBA_B.264",
+        "CVMANL2_TOSHIBA_B.264",
+        "CVMAPAQP3_Sony_E.jsv",
+        "CVMAQP2_Sony_G.jsv",
+        "CVMAQP3_Sony_D.jsv",
+        "CVMP_MOT_FLD_L30_B.26l",
+        "CVMP_MOT_FRM_L31_B.26l",
+        "CVNLFI1_Sony_C.jsv",
+        "CVNLFI2_Sony_H.jsv",
+        "CVPA1_TOSHIBA_B.264",
+        "CVPCMNL1_SVA_C.264",
+        "CVPCMNL2_SVA_C.264",
+        "CVSE2_Sony_B.jsv",
+        "CVSE3_Sony_H.jsv",
+        "CVSEFDFT3_Sony_E.jsv",
+        "CVWP1_TOSHIBA_E.264",
+        "CVWP2_TOSHIBA_E.264",
+        "CVWP3_TOSHIBA_E.264",
+        "CVWP5_TOSHIBA_E.264",
+        "FI1_Sony_E.jsv",
+        "FM1_BT_B.h264",
+        "FM1_FT_E.264",
+        "FM2_SVA_B.264",
+        "FM2_SVA_C.264",
+        "FREXT01_JVC_D.264",
+        "FREXT02_JVC_C.264",
+        "FRExt1_Panasonic.avc",
+        "FRExt2_Panasonic.avc",
+        "FRExt3_Panasonic.avc",
+        "FRExt4_Panasonic.avc",
+        "FRExt_MMCO4_Sony_B.264",
+        "Freh12_B.264",
+        "Freh1_B.264",
+        "Freh2_B.264",
+        "Freh7_B.264",
+        "HCAFF1_HHI.264",
+        "HCAFR1_HHI.264",
+        "HCAFR2_HHI.264",
+        "HCAFR3_HHI.264",
+        "HCAFR4_HHI.264",
+        "HCAMFF1_HHI.264",
+        "HPCADQ_BRCM_B.264",
+        "HPCAFLNL_BRCM_C.264",
+        "HPCAFL_BRCM_C.264",
+        "HPCALQ_BRCM_B.264",
+        "HPCAMAPALQ_BRCM_B.264",
+        "HPCAMOLQ_BRCM_B.264",
+        "HPCANL_BRCM_C.264",
+        "HPCAQ2LQ_BRCM_B.264",
+        "HPCA_BRCM_C.264",
+        "HPCVFLNL_BRCM_A.264",
+        "HPCVFL_BRCM_A.264",
+        "HPCVMOLQ_BRCM_B.264",
+        "HPCVNL_BRCM_A.264",
+        "HPCV_BRCM_A.264",
+        "Hi422FR10_SONY_B.264",
+        "Hi422FR13_SONY_B.264",
+        "Hi422FR1_SONY_A.jsv",
+        "Hi422FR6_SONY_A.jsv",
+        "PPH10I1_Panasonic_A.264",
+        "PPH10I2_Panasonic_A.264",
+        "PPH10I3_Panasonic_A.264",
+        "PPH10I4_Panasonic_A.264",
+        "PPH10I5_Panasonic_A.264",
+        "PPH10I6_Panasonic_A.264",
+        "PPH10I7_Panasonic_A.264",
+        "PPH422I1_Panasonic_A.264",
+        "PPH422I2_Panasonic_A.264",
+        "PPH422I3_Panasonic_A.264",
+        "PPH422I4_Panasonic_A.264",
+        "PPH422I5_Panasonic_A.264",
+        "PPH422I6_Panasonic_A.264",
+        "PPH422I7_Panasonic_A.264",
+        "freh10.264",
+        "freh11.264",
+        "freh3.264",
+        "freh4.264",
+        "freh5.264",
+        "freh6.264",
+        "freh8.264",
+        "freh9.264",
+        "test8b43.264",
+        "HCBP1_HHI_A.264",
+        "HCBP2_HHI_A.264",
+        "HCMP1_HHI_A.264",
+        "LS_SVA_D.264",
+        "MIDR_MW_D.264",
+        "MPS_MW_A.264",
+        "MR1_BT_A.h264",
+        "MR1_MW_A.264",
+        "MR2_MW_A.264",
+        "MR2_TANDBERG_E.264",
+        "MR3_TANDBERG_B.264",
+        "MR4_TANDBERG_C.264",
+        "MR5_TANDBERG_C.264",
+        "MR6_BT_B.h264",
+        "MR7_BT_B.h264",
+        "MR8_BT_B.h264",
+        "MR9_BT_B.h264",
+        "NL1_Sony_D.jsv",
+        "NL2_Sony_H.jsv",
+        "NL3_SVA_E.264",
+        "NLMQ1_JVC_C.264",
+        "NLMQ2_JVC_C.264",
+        "NRF_MW_E.264",
+        "SL1_SVA_B.264",
+        "SVA_BA1_B.264",
+        "SVA_BA2_D.264",
+        "SVA_Base_B.264",
+        "SVA_CL1_E.264",
+        "SVA_FM1_E.264",
+        "SVA_NL1_B.264",
+        "SVA_NL2_E.264",
+        "Sharp_MP_Field_1_B.jvt",
+        "Sharp_MP_Field_2_B.jvt",
+        "Sharp_MP_Field_3_B.jvt",
+        "Sharp_MP_PAFF_1r2.jvt",
+        "Sharp_MP_PAFF_2.jvt",
+        "cama1_vtc_c.avc",
+        "cama2_vtc_b.avc",
+        "cama3_vtc_b.avc",
+        "camp_mot_fld0_full.26l",
+        "camp_mot_frm0_full.26l",
+        "camp_mot_mbaff0_full.26l",
+        "camp_mot_picaff0_full.26l",
+        "cvmp_mot_fld0_full_B.26l",
+        "cvmp_mot_frm0_full_B.26l",
+        "cvmp_mot_mbaff0_full_B.26l",
+        "cvmp_mot_picaff0_full_B.26l",
+        "slice2_field_aurora4.264",
+        "sp1_bt_a.h264",
+        "sp2_bt_b.h264",
+        "src19td.IBP.264",
+        "ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit",
+        "AMP_A_Samsung_4.bit",
+        "AMP_A_Samsung_6.bit",
+        "AMP_B_Samsung_4.bit",
+        "AMP_B_Samsung_6.bit",
+        "AMP_D_Hisilicon.bit",
+        "AMP_E_Hisilicon.bit",
+        "AMP_F_Hisilicon_3.bit",
+        "AMVP_A_MTK_4.bit",
+        "AMVP_B_MTK_4.bit",
+        "AMVP_C_Samsung_4.bit",
+        "AMVP_C_Samsung_6.bit",
+        "BUMPING_A_ericsson_1.bit",
+        "CAINIT_A_SHARP_4.bit",
+        "CAINIT_B_SHARP_4.bit",
+        "CAINIT_C_SHARP_3.bit",
+        "CAINIT_D_SHARP_3.bit",
+        "CAINIT_E_SHARP_3.bit",
+        "CAINIT_F_SHARP_3.bit",
+        "CAINIT_G_SHARP_3.bit",
+        "CAINIT_H_SHARP_3.bit",
+        "CIP_A_Panasonic_3.bit",
+        "CIP_C_Panasonic_2.bit",
+        "CONFWIN_A_Sony_1.bit",
+        "DBLK_A_MAIN10_VIXS_2.bit",
+        "DBLK_A_MAIN10_VIXS_3.bit",
+        "DBLK_A_SONY_3.bit",
+        "DBLK_B_SONY_3.bit",
+        "DBLK_C_SONY_3.bit",
+        "DBLK_D_VIXS_1.bit",
+        "DBLK_D_VIXS_2.bit",
+        "DBLK_E_VIXS_1.bit",
+        "DBLK_E_VIXS_2.bit",
+        "DBLK_F_VIXS_1.bit",
+        "DBLK_F_VIXS_2.bit",
+        "DBLK_G_VIXS_1.bit",
+        "DBLK_G_VIXS_2.bit",
+        "DELTAQP_A_BRCM_4.bit",
+        "DELTAQP_B_SONY_3.bit",
+        "DELTAQP_C_SONY_3.bit",
+        "DSLICE_A_HHI_5.bit",
+        "DSLICE_B_HHI_5.bit",
+        "DSLICE_C_HHI_5.bit",
+        "ENTP_A_LG_2.bit",
+        "ENTP_A_Qualcomm_1.bit",
+        "ENTP_B_LG_2.bit",
+        "ENTP_B_Qualcomm_1.bit",
+        "ENTP_C_LG_3.bit",
+        "ENTP_C_Qualcomm_1.bit",
+        "EXT_A_ericsson_3.bit",
+        "EXT_A_ericsson_4.bit",
+        "FILLER_A_Sony_1.bit",
+        "HRD_A_Fujitsu_2.bit",
+        "HRD_A_Fujitsu_3.bit",
+        "INITQP_A_Sony_1.bit",
+        "INITQP_B_Sony_1.bit",
+        "IPCM_A_RExt_NEC.bit",
+        "IPCM_B_RExt_NEC.bit",
+        "IPRED_A_docomo_2.bit",
+        "IPRED_B_Nokia_3.bit",
+        "IPRED_C_Mitsubishi_2.bit",
+        "IPRED_C_Mitsubishi_3.bit",
+        "LS_A_Orange_2.bit",
+        "LS_B_ORANGE_3.bit",
+        "LS_B_ORANGE_4.bit",
+        "LTRPSPS_A_Qualcomm_1.bit",
+        "MAXBINS_A_TI_4.bit",
+        "MAXBINS_B_TI_4.bit",
+        "MAXBINS_C_TI_4.bit",
+        "MERGE_A_TI_3.bit",
+        "MERGE_B_TI_3.bit",
+        "MERGE_C_TI_3.bit",
+        "MERGE_D_TI_3.bit",
+        "MERGE_E_TI_3.bit",
+        "MERGE_F_MTK_4.bit",
+        "MERGE_G_HHI_4.bit",
+        "MVCLIP_A_qualcomm_3.bit",
+        "MVDL1ZERO_A_docomo_3.bit",
+        "MVEDGE_A_qualcomm_3.bit",
+        "MVHEVCS_A.bit",
+        "MVHEVCS_B.bit",
+        "MVHEVCS_E.bit",
+        "MVHEVCS_F.bit",
+        "Main_422_10_A_RExt_Sony_1.bin",
+        "Main_422_10_B_RExt_Sony_1.bin",
+        "NUT_A_ericsson_4.bit",
+        "NUT_A_ericsson_5.bit",
+        "NoOutPrior_A_Qualcomm_1.bit",
+        "NoOutPrior_B_Qualcomm_1.bit",
+        "OPFLAG_A_Qualcomm_1.bit",
+        "OPFLAG_B_Qualcomm_1.bit",
+        "OPFLAG_C_Qualcomm_1.bit",
+        "PERSIST_RPARAM_A_RExt_Sony_1.bit",
+        "PERSIST_RPARAM_A_RExt_Sony_3.bit",
+        "PICSIZE_A_Bossen_1.bit",
+        "PICSIZE_B_Bossen_1.bit",
+        "PICSIZE_C_Bossen_1.bit",
+        "PICSIZE_D_Bossen_1.bit",
+        "PMERGE_A_TI_3.bit",
+        "PMERGE_B_TI_3.bit",
+        "PMERGE_C_TI_3.bit",
+        "PMERGE_D_TI_3.bit",
+        "PMERGE_E_TI_3.bit",
+        "POC_A_Bossen_3.bit",
+        "PPS_A_qualcomm_7.bit",
+        "PS_A_VIDYO_3.bit",
+        "PS_B_VIDYO_3.bit",
+        "QMATRIX_A_RExt_Sony_1.bit",
+        "RAP_A_docomo_4.bit",
+        "RAP_B_Bossen_1.bit",
+        "RPLM_A_qualcomm_4.bit",
+        "RPLM_B_qualcomm_4.bit",
+        "RPS_A_docomo_4.bit",
+        "RPS_B_qualcomm_5.bit",
+        "RPS_C_ericsson_4.bit",
+        "RPS_C_ericsson_5.bit",
+        "RPS_D_ericsson_5.bit",
+        "RPS_D_ericsson_6.bit",
+        "RPS_E_qualcomm_5.bit",
+        "RPS_F_docomo_1.bit",
+        "RQT_A_HHI_4.bit",
+        "RQT_B_HHI_4.bit",
+        "RQT_C_HHI_4.bit",
+        "RQT_D_HHI_4.bit",
+        "RQT_E_HHI_4.bit",
+        "RQT_F_HHI_4.bit",
+        "RQT_G_HHI_4.bit",
+        "SAO_A_MediaTek_4.bit",
+        "SAO_A_RExt_MediaTek_1.bit",
+        "SAO_B_MediaTek_5.bit",
+        "SAO_C_Samsung_4.bit",
+        "SAO_C_Samsung_5.bit",
+        "SAO_D_Samsung_4.bit",
+        "SAO_D_Samsung_5.bit",
+        "SAO_E_Canon_4.bit",
+        "SAO_F_Canon_3.bit",
+        "SAO_G_Canon_3.bit",
+        "SDH_A_Orange_3.bit",
+        "SLICES_A_Rovi_3.bit",
+        "SLIST_A_Sony_4.bit",
+        "SLIST_B_Sony_8.bit",
+        "SLIST_C_Sony_3.bit",
+        "SLIST_D_Sony_9.bit",
+        "SLPPLP_A_VIDYO_1.bit",
+        "SLPPLP_A_VIDYO_2.bit",
+        "STRUCT_A_Samsung_5.bit",
+        "STRUCT_B_Samsung_4.bit",
+        "STRUCT_B_Samsung_6.bit",
+        "TILES_A_Cisco_2.bit",
+        "TILES_B_Cisco_1.bit",
+        "TMVP_A_MS_2.bit",
+        "TMVP_A_MS_3.bit",
+        "TSCL_A_VIDYO_5.bit",
+        "TSCL_B_VIDYO_4.bit",
+        "TSKIP_A_MS_2.bit",
+        "TSKIP_A_MS_3.bit",
+        "TSUNEQBD_A_MAIN10_Technicolor_2.bit",
+        "TUSIZE_A_Samsung_1.bit",
+        "VPSID_A_VIDYO_1.bit",
+        "VPSID_A_VIDYO_2.bit",
+        "WPP_A_ericsson_MAIN10_2.bit",
+        "WPP_A_ericsson_MAIN_2.bit",
+        "WPP_B_ericsson_MAIN10_2.bit",
+        "WPP_B_ericsson_MAIN_2.bit",
+        "WPP_C_ericsson_MAIN10_2.bit",
+        "WPP_C_ericsson_MAIN_2.bit",
+        "WPP_D_ericsson_MAIN10_2.bit",
+        "WPP_D_ericsson_MAIN_2.bit",
+        "WPP_E_ericsson_MAIN10_2.bit",
+        "WPP_E_ericsson_MAIN_2.bit",
+        "WPP_F_ericsson_MAIN10_2.bit",
+        "WPP_F_ericsson_MAIN_2.bit",
+        "WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit",
+        "WP_A_MAIN10_Toshiba_3.bit",
+        "WP_A_Toshiba_3.bit",
+        "WP_B_Toshiba_3.bit",
+        "WP_MAIN10_B_Toshiba_3.bit",
+        "cip_B_NEC_2.bit",
+        "cip_B_NEC_3.bit",
+        "ipcm_A_NEC_2.bit",
+        "ipcm_A_NEC_3.bit",
+        "ipcm_B_NEC_2.bit",
+        "ipcm_B_NEC_3.bit",
+        "ipcm_C_NEC_2.bit",
+        "ipcm_C_NEC_3.bit",
+        "ipcm_D_NEC_2.bit",
+        "ipcm_D_NEC_3.bit",
+        "ipcm_E_NEC_2.bit",
+        "h264-high-1080p",
+        "h264-main-1920x800",
+        "h264-high-720p",
+        "hevc-main-1080p",
+        "hevc-main10-1080p",
+        "hevc-main10-2160p"
+      ],
+      "cause": "Codec workloads measure decode. This operation adds the visible-plane hashes and picture properties."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "AUD_MW_E.264",
+        "BA1_FT_C.264",
+        "BA1_Sony_D.jsv",
+        "BA2_Sony_F.jsv",
+        "BA3_SVA_C.264",
+        "BAMQ1_JVC_C.264",
+        "BAMQ2_JVC_C.264",
+        "BANM_MW_D.264",
+        "BASQP1_Sony_C.jsv",
+        "BA_MW_D.264",
+        "CABA1_SVA_B.264",
+        "CABA1_Sony_D.jsv",
+        "CABA2_SVA_B.264",
+        "CABA2_Sony_E.jsv",
+        "CABA3_SVA_B.264",
+        "CABA3_Sony_C.jsv",
+        "CABA3_TOSHIBA_E.264",
+        "CABACI3_Sony_B.jsv",
+        "CABAST3_Sony_E.jsv",
+        "CABASTBR3_Sony_B.jsv",
+        "CABREF3_Sand_D.264",
+        "CACQP3_Sony_D.jsv",
+        "CAFI1_SVA_C.264",
+        "CAMA1_Sony_C.jsv",
+        "CAMA1_TOSHIBA_B.264",
+        "CAMA3_Sand_E.264",
+        "CAMACI3_Sony_C.jsv",
+        "CAMANL1_TOSHIBA_B.264",
+        "CAMANL2_TOSHIBA_B.264",
+        "CAMANL3_Sand_E.264",
+        "CAMASL3_Sony_B.jsv",
+        "CAMP_MOT_MBAFF_L30.26l",
+        "CAMP_MOT_MBAFF_L31.26l",
+        "CANL1_SVA_B.264",
+        "CANL1_Sony_E.jsv",
+        "CANL1_TOSHIBA_G.264",
+        "CANL2_SVA_B.264",
+        "CANL2_Sony_E.jsv",
+        "CANL3_SVA_B.264",
+        "CANL3_Sony_C.jsv",
+        "CANL4_SVA_B.264",
+        "CANLMA2_Sony_C.jsv",
+        "CANLMA3_Sony_C.jsv",
+        "CAPA1_TOSHIBA_B.264",
+        "CAPAMA3_Sand_F.264",
+        "CAPCM1_Sand_E.264",
+        "CAPCMNL1_Sand_E.264",
+        "CAPM3_Sony_D.jsv",
+        "CAQP1_Sony_B.jsv",
+        "CAWP1_TOSHIBA_E.264",
+        "CAWP5_TOSHIBA_E.264",
+        "CI1_FT_B.264",
+        "CI_MW_D.264",
+        "CVBS3_Sony_C.jsv",
+        "CVCANLMA2_Sony_C.jsv",
+        "CVFC1_Sony_C.jsv",
+        "CVFI1_SVA_C.264",
+        "CVFI1_Sony_D.jsv",
+        "CVFI2_SVA_C.264",
+        "CVFI2_Sony_H.jsv",
+        "CVMA1_Sony_D.jsv",
+        "CVMA1_TOSHIBA_B.264",
+        "CVMANL1_TOSHIBA_B.264",
+        "CVMANL2_TOSHIBA_B.264",
+        "CVMAPAQP3_Sony_E.jsv",
+        "CVMAQP2_Sony_G.jsv",
+        "CVMAQP3_Sony_D.jsv",
+        "CVMP_MOT_FLD_L30_B.26l",
+        "CVMP_MOT_FRM_L31_B.26l",
+        "CVNLFI1_Sony_C.jsv",
+        "CVNLFI2_Sony_H.jsv",
+        "CVPA1_TOSHIBA_B.264",
+        "CVPCMNL1_SVA_C.264",
+        "CVPCMNL2_SVA_C.264",
+        "CVSE2_Sony_B.jsv",
+        "CVSE3_Sony_H.jsv",
+        "CVSEFDFT3_Sony_E.jsv",
+        "CVWP1_TOSHIBA_E.264",
+        "CVWP2_TOSHIBA_E.264",
+        "CVWP3_TOSHIBA_E.264",
+        "CVWP5_TOSHIBA_E.264",
+        "FI1_Sony_E.jsv",
+        "FM1_BT_B.h264",
+        "FM1_FT_E.264",
+        "FM2_SVA_B.264",
+        "FM2_SVA_C.264",
+        "FREXT01_JVC_D.264",
+        "FREXT02_JVC_C.264",
+        "FRExt1_Panasonic.avc",
+        "FRExt2_Panasonic.avc",
+        "FRExt3_Panasonic.avc",
+        "FRExt4_Panasonic.avc",
+        "FRExt_MMCO4_Sony_B.264",
+        "Freh12_B.264",
+        "Freh1_B.264",
+        "Freh2_B.264",
+        "Freh7_B.264",
+        "HCAFF1_HHI.264",
+        "HCAFR1_HHI.264",
+        "HCAFR2_HHI.264",
+        "HCAFR3_HHI.264",
+        "HCAFR4_HHI.264",
+        "HCAMFF1_HHI.264",
+        "HPCADQ_BRCM_B.264",
+        "HPCAFLNL_BRCM_C.264",
+        "HPCAFL_BRCM_C.264",
+        "HPCALQ_BRCM_B.264",
+        "HPCAMAPALQ_BRCM_B.264",
+        "HPCAMOLQ_BRCM_B.264",
+        "HPCANL_BRCM_C.264",
+        "HPCAQ2LQ_BRCM_B.264",
+        "HPCA_BRCM_C.264",
+        "HPCVFLNL_BRCM_A.264",
+        "HPCVFL_BRCM_A.264",
+        "HPCVMOLQ_BRCM_B.264",
+        "HPCVNL_BRCM_A.264",
+        "HPCV_BRCM_A.264",
+        "Hi422FR10_SONY_B.264",
+        "Hi422FR13_SONY_B.264",
+        "Hi422FR1_SONY_A.jsv",
+        "Hi422FR6_SONY_A.jsv",
+        "PPH10I1_Panasonic_A.264",
+        "PPH10I2_Panasonic_A.264",
+        "PPH10I3_Panasonic_A.264",
+        "PPH10I4_Panasonic_A.264",
+        "PPH10I5_Panasonic_A.264",
+        "PPH10I6_Panasonic_A.264",
+        "PPH10I7_Panasonic_A.264",
+        "PPH422I1_Panasonic_A.264",
+        "PPH422I2_Panasonic_A.264",
+        "PPH422I3_Panasonic_A.264",
+        "PPH422I4_Panasonic_A.264",
+        "PPH422I5_Panasonic_A.264",
+        "PPH422I6_Panasonic_A.264",
+        "PPH422I7_Panasonic_A.264",
+        "freh10.264",
+        "freh11.264",
+        "freh3.264",
+        "freh4.264",
+        "freh5.264",
+        "freh6.264",
+        "freh8.264",
+        "freh9.264",
+        "test8b43.264",
+        "HCBP1_HHI_A.264",
+        "HCBP2_HHI_A.264",
+        "HCMP1_HHI_A.264",
+        "LS_SVA_D.264",
+        "MIDR_MW_D.264",
+        "MPS_MW_A.264",
+        "MR1_BT_A.h264",
+        "MR1_MW_A.264",
+        "MR2_MW_A.264",
+        "MR2_TANDBERG_E.264",
+        "MR3_TANDBERG_B.264",
+        "MR4_TANDBERG_C.264",
+        "MR5_TANDBERG_C.264",
+        "MR6_BT_B.h264",
+        "MR7_BT_B.h264",
+        "MR8_BT_B.h264",
+        "MR9_BT_B.h264",
+        "NL1_Sony_D.jsv",
+        "NL2_Sony_H.jsv",
+        "NL3_SVA_E.264",
+        "NLMQ1_JVC_C.264",
+        "NLMQ2_JVC_C.264",
+        "NRF_MW_E.264",
+        "SL1_SVA_B.264",
+        "SVA_BA1_B.264",
+        "SVA_BA2_D.264",
+        "SVA_Base_B.264",
+        "SVA_CL1_E.264",
+        "SVA_FM1_E.264",
+        "SVA_NL1_B.264",
+        "SVA_NL2_E.264",
+        "Sharp_MP_Field_1_B.jvt",
+        "Sharp_MP_Field_2_B.jvt",
+        "Sharp_MP_Field_3_B.jvt",
+        "Sharp_MP_PAFF_1r2.jvt",
+        "Sharp_MP_PAFF_2.jvt",
+        "cama1_vtc_c.avc",
+        "cama2_vtc_b.avc",
+        "cama3_vtc_b.avc",
+        "camp_mot_fld0_full.26l",
+        "camp_mot_frm0_full.26l",
+        "camp_mot_mbaff0_full.26l",
+        "camp_mot_picaff0_full.26l",
+        "cvmp_mot_fld0_full_B.26l",
+        "cvmp_mot_frm0_full_B.26l",
+        "cvmp_mot_mbaff0_full_B.26l",
+        "cvmp_mot_picaff0_full_B.26l",
+        "slice2_field_aurora4.264",
+        "sp1_bt_a.h264",
+        "sp2_bt_b.h264",
+        "src19td.IBP.264",
+        "ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit",
+        "AMP_A_Samsung_4.bit",
+        "AMP_A_Samsung_6.bit",
+        "AMP_B_Samsung_4.bit",
+        "AMP_B_Samsung_6.bit",
+        "AMP_D_Hisilicon.bit",
+        "AMP_E_Hisilicon.bit",
+        "AMP_F_Hisilicon_3.bit",
+        "AMVP_A_MTK_4.bit",
+        "AMVP_B_MTK_4.bit",
+        "AMVP_C_Samsung_4.bit",
+        "AMVP_C_Samsung_6.bit",
+        "BUMPING_A_ericsson_1.bit",
+        "CAINIT_A_SHARP_4.bit",
+        "CAINIT_B_SHARP_4.bit",
+        "CAINIT_C_SHARP_3.bit",
+        "CAINIT_D_SHARP_3.bit",
+        "CAINIT_E_SHARP_3.bit",
+        "CAINIT_F_SHARP_3.bit",
+        "CAINIT_G_SHARP_3.bit",
+        "CAINIT_H_SHARP_3.bit",
+        "CIP_A_Panasonic_3.bit",
+        "CIP_C_Panasonic_2.bit",
+        "CONFWIN_A_Sony_1.bit",
+        "DBLK_A_MAIN10_VIXS_2.bit",
+        "DBLK_A_MAIN10_VIXS_3.bit",
+        "DBLK_A_SONY_3.bit",
+        "DBLK_B_SONY_3.bit",
+        "DBLK_C_SONY_3.bit",
+        "DBLK_D_VIXS_1.bit",
+        "DBLK_D_VIXS_2.bit",
+        "DBLK_E_VIXS_1.bit",
+        "DBLK_E_VIXS_2.bit",
+        "DBLK_F_VIXS_1.bit",
+        "DBLK_F_VIXS_2.bit",
+        "DBLK_G_VIXS_1.bit",
+        "DBLK_G_VIXS_2.bit",
+        "DELTAQP_A_BRCM_4.bit",
+        "DELTAQP_B_SONY_3.bit",
+        "DELTAQP_C_SONY_3.bit",
+        "DSLICE_A_HHI_5.bit",
+        "DSLICE_B_HHI_5.bit",
+        "DSLICE_C_HHI_5.bit",
+        "ENTP_A_LG_2.bit",
+        "ENTP_A_Qualcomm_1.bit",
+        "ENTP_B_LG_2.bit",
+        "ENTP_B_Qualcomm_1.bit",
+        "ENTP_C_LG_3.bit",
+        "ENTP_C_Qualcomm_1.bit",
+        "EXT_A_ericsson_3.bit",
+        "EXT_A_ericsson_4.bit",
+        "FILLER_A_Sony_1.bit",
+        "HRD_A_Fujitsu_2.bit",
+        "HRD_A_Fujitsu_3.bit",
+        "INITQP_A_Sony_1.bit",
+        "INITQP_B_Sony_1.bit",
+        "IPCM_A_RExt_NEC.bit",
+        "IPCM_B_RExt_NEC.bit",
+        "IPRED_A_docomo_2.bit",
+        "IPRED_B_Nokia_3.bit",
+        "IPRED_C_Mitsubishi_2.bit",
+        "IPRED_C_Mitsubishi_3.bit",
+        "LS_A_Orange_2.bit",
+        "LS_B_ORANGE_3.bit",
+        "LS_B_ORANGE_4.bit",
+        "LTRPSPS_A_Qualcomm_1.bit",
+        "MAXBINS_A_TI_4.bit",
+        "MAXBINS_B_TI_4.bit",
+        "MAXBINS_C_TI_4.bit",
+        "MERGE_A_TI_3.bit",
+        "MERGE_B_TI_3.bit",
+        "MERGE_C_TI_3.bit",
+        "MERGE_D_TI_3.bit",
+        "MERGE_E_TI_3.bit",
+        "MERGE_F_MTK_4.bit",
+        "MERGE_G_HHI_4.bit",
+        "MVCLIP_A_qualcomm_3.bit",
+        "MVDL1ZERO_A_docomo_3.bit",
+        "MVEDGE_A_qualcomm_3.bit",
+        "MVHEVCS_A.bit",
+        "MVHEVCS_B.bit",
+        "MVHEVCS_E.bit",
+        "MVHEVCS_F.bit",
+        "Main_422_10_A_RExt_Sony_1.bin",
+        "Main_422_10_B_RExt_Sony_1.bin",
+        "NUT_A_ericsson_4.bit",
+        "NUT_A_ericsson_5.bit",
+        "NoOutPrior_A_Qualcomm_1.bit",
+        "NoOutPrior_B_Qualcomm_1.bit",
+        "OPFLAG_A_Qualcomm_1.bit",
+        "OPFLAG_B_Qualcomm_1.bit",
+        "OPFLAG_C_Qualcomm_1.bit",
+        "PERSIST_RPARAM_A_RExt_Sony_1.bit",
+        "PERSIST_RPARAM_A_RExt_Sony_3.bit",
+        "PICSIZE_A_Bossen_1.bit",
+        "PICSIZE_B_Bossen_1.bit",
+        "PICSIZE_C_Bossen_1.bit",
+        "PICSIZE_D_Bossen_1.bit",
+        "PMERGE_A_TI_3.bit",
+        "PMERGE_B_TI_3.bit",
+        "PMERGE_C_TI_3.bit",
+        "PMERGE_D_TI_3.bit",
+        "PMERGE_E_TI_3.bit",
+        "POC_A_Bossen_3.bit",
+        "PPS_A_qualcomm_7.bit",
+        "PS_A_VIDYO_3.bit",
+        "PS_B_VIDYO_3.bit",
+        "QMATRIX_A_RExt_Sony_1.bit",
+        "RAP_A_docomo_4.bit",
+        "RAP_B_Bossen_1.bit",
+        "RPLM_A_qualcomm_4.bit",
+        "RPLM_B_qualcomm_4.bit",
+        "RPS_A_docomo_4.bit",
+        "RPS_B_qualcomm_5.bit",
+        "RPS_C_ericsson_4.bit",
+        "RPS_C_ericsson_5.bit",
+        "RPS_D_ericsson_5.bit",
+        "RPS_D_ericsson_6.bit",
+        "RPS_E_qualcomm_5.bit",
+        "RPS_F_docomo_1.bit",
+        "RQT_A_HHI_4.bit",
+        "RQT_B_HHI_4.bit",
+        "RQT_C_HHI_4.bit",
+        "RQT_D_HHI_4.bit",
+        "RQT_E_HHI_4.bit",
+        "RQT_F_HHI_4.bit",
+        "RQT_G_HHI_4.bit",
+        "SAO_A_MediaTek_4.bit",
+        "SAO_A_RExt_MediaTek_1.bit",
+        "SAO_B_MediaTek_5.bit",
+        "SAO_C_Samsung_4.bit",
+        "SAO_C_Samsung_5.bit",
+        "SAO_D_Samsung_4.bit",
+        "SAO_D_Samsung_5.bit",
+        "SAO_E_Canon_4.bit",
+        "SAO_F_Canon_3.bit",
+        "SAO_G_Canon_3.bit",
+        "SDH_A_Orange_3.bit",
+        "SLICES_A_Rovi_3.bit",
+        "SLIST_A_Sony_4.bit",
+        "SLIST_B_Sony_8.bit",
+        "SLIST_C_Sony_3.bit",
+        "SLIST_D_Sony_9.bit",
+        "SLPPLP_A_VIDYO_1.bit",
+        "SLPPLP_A_VIDYO_2.bit",
+        "STRUCT_A_Samsung_5.bit",
+        "STRUCT_B_Samsung_4.bit",
+        "STRUCT_B_Samsung_6.bit",
+        "TILES_A_Cisco_2.bit",
+        "TILES_B_Cisco_1.bit",
+        "TMVP_A_MS_2.bit",
+        "TMVP_A_MS_3.bit",
+        "TSCL_A_VIDYO_5.bit",
+        "TSCL_B_VIDYO_4.bit",
+        "TSKIP_A_MS_2.bit",
+        "TSKIP_A_MS_3.bit",
+        "TSUNEQBD_A_MAIN10_Technicolor_2.bit",
+        "TUSIZE_A_Samsung_1.bit",
+        "VPSID_A_VIDYO_1.bit",
+        "VPSID_A_VIDYO_2.bit",
+        "WPP_A_ericsson_MAIN10_2.bit",
+        "WPP_A_ericsson_MAIN_2.bit",
+        "WPP_B_ericsson_MAIN10_2.bit",
+        "WPP_B_ericsson_MAIN_2.bit",
+        "WPP_C_ericsson_MAIN10_2.bit",
+        "WPP_C_ericsson_MAIN_2.bit",
+        "WPP_D_ericsson_MAIN10_2.bit",
+        "WPP_D_ericsson_MAIN_2.bit",
+        "WPP_E_ericsson_MAIN10_2.bit",
+        "WPP_E_ericsson_MAIN_2.bit",
+        "WPP_F_ericsson_MAIN10_2.bit",
+        "WPP_F_ericsson_MAIN_2.bit",
+        "WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit",
+        "WP_A_MAIN10_Toshiba_3.bit",
+        "WP_A_Toshiba_3.bit",
+        "WP_B_Toshiba_3.bit",
+        "WP_MAIN10_B_Toshiba_3.bit",
+        "cip_B_NEC_2.bit",
+        "cip_B_NEC_3.bit",
+        "ipcm_A_NEC_2.bit",
+        "ipcm_A_NEC_3.bit",
+        "ipcm_B_NEC_2.bit",
+        "ipcm_B_NEC_3.bit",
+        "ipcm_C_NEC_2.bit",
+        "ipcm_C_NEC_3.bit",
+        "ipcm_D_NEC_2.bit",
+        "ipcm_D_NEC_3.bit",
+        "ipcm_E_NEC_2.bit",
+        "h264-high-1080p",
+        "h264-main-1920x800",
+        "h264-high-720p",
+        "hevc-main-1080p",
+        "hevc-main10-1080p",
+        "hevc-main10-2160p"
+      ],
+      "cause": "Codec workloads measure decode. This operation adds the visible-plane hashes and picture properties."
+    }
+  ],
+  "open_cases": [
+    {
+      "id": "AUD_MW_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "BA1_FT_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "BA1_Sony_D.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "BA2_Sony_F.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "BA3_SVA_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "BAMQ1_JVC_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "BAMQ2_JVC_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "BANM_MW_D.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "BASQP1_Sony_C.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "BA_MW_D.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CABA1_SVA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CABA1_Sony_D.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CABA2_SVA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CABA2_Sony_E.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CABA3_SVA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CABA3_Sony_C.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CABA3_TOSHIBA_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CABACI3_Sony_B.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CABAST3_Sony_E.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CABASTBR3_Sony_B.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CABREF3_Sand_D.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CACQP3_Sony_D.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAFI1_SVA_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAMA1_Sony_C.jsv",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAMA1_TOSHIBA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAMA3_Sand_E.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAMACI3_Sony_C.jsv",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAMANL1_TOSHIBA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAMANL2_TOSHIBA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAMANL3_Sand_E.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAMASL3_Sony_B.jsv",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAMP_MOT_MBAFF_L30.26l",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAMP_MOT_MBAFF_L31.26l",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CANL1_SVA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CANL1_Sony_E.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CANL1_TOSHIBA_G.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CANL2_SVA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CANL2_Sony_E.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CANL3_SVA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CANL3_Sony_C.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CANL4_SVA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CANLMA2_Sony_C.jsv",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CANLMA3_Sony_C.jsv",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAPA1_TOSHIBA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAPAMA3_Sand_F.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAPCM1_Sand_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAPCMNL1_Sand_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAPM3_Sony_D.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAQP1_Sony_B.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAWP1_TOSHIBA_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAWP5_TOSHIBA_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CI1_FT_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CI_MW_D.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVBS3_Sony_C.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVCANLMA2_Sony_C.jsv",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVFC1_Sony_C.jsv",
+      "requirement": "Reconcile visible width, CICP defaults or signaling, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVFI1_SVA_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVFI1_Sony_D.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVFI2_SVA_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVFI2_Sony_H.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVMA1_Sony_D.jsv",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVMA1_TOSHIBA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVMANL1_TOSHIBA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVMANL2_TOSHIBA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVMAPAQP3_Sony_E.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVMAQP2_Sony_G.jsv",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVMAQP3_Sony_D.jsv",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVMP_MOT_FLD_L30_B.26l",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVMP_MOT_FRM_L31_B.26l",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVNLFI1_Sony_C.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVNLFI2_Sony_H.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVPA1_TOSHIBA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVPCMNL1_SVA_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVPCMNL2_SVA_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVWP1_TOSHIBA_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVWP2_TOSHIBA_E.264",
+      "requirement": "Reconcile CICP defaults or signaling, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVWP3_TOSHIBA_E.264",
+      "requirement": "Reconcile CICP defaults or signaling, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CVWP5_TOSHIBA_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "FI1_Sony_E.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "FM1_FT_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "FREXT01_JVC_D.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "FREXT02_JVC_C.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "FRExt1_Panasonic.avc",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "FRExt2_Panasonic.avc",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "FRExt3_Panasonic.avc",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "FRExt4_Panasonic.avc",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "FRExt_MMCO4_Sony_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Freh12_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Freh1_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Freh2_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Freh7_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HCAFF1_HHI.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HCAFR1_HHI.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HCAFR2_HHI.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HCAFR3_HHI.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HCAFR4_HHI.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HCAMFF1_HHI.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCADQ_BRCM_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCAFLNL_BRCM_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCAFL_BRCM_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCALQ_BRCM_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCAMAPALQ_BRCM_B.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCAMOLQ_BRCM_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCANL_BRCM_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCAQ2LQ_BRCM_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCA_BRCM_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCVFLNL_BRCM_A.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCVFL_BRCM_A.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCVMOLQ_BRCM_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCVNL_BRCM_A.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HPCV_BRCM_A.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Hi422FR10_SONY_B.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Hi422FR13_SONY_B.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Hi422FR1_SONY_A.jsv",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Hi422FR6_SONY_A.jsv",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH10I1_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH10I2_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH10I3_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH10I4_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH10I5_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH10I6_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH10I7_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH422I1_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH422I2_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH422I3_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH422I4_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH422I5_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH422I6_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPH422I7_Panasonic_A.264",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "freh10.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "freh11.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "freh3.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "freh4.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "freh5.264",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "freh6.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "freh8.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "freh9.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "test8b43.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HCBP1_HHI_A.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HCBP2_HHI_A.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HCMP1_HHI_A.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "LS_SVA_D.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MIDR_MW_D.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MPS_MW_A.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MR1_BT_A.h264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MR1_MW_A.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MR2_MW_A.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MR2_TANDBERG_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MR3_TANDBERG_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MR4_TANDBERG_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MR5_TANDBERG_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MR9_BT_B.h264",
+      "requirement": "Reconcile H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "NL1_Sony_D.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "NL2_Sony_H.jsv",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "NL3_SVA_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "NLMQ1_JVC_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "NLMQ2_JVC_C.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "NRF_MW_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SL1_SVA_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SVA_BA1_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SVA_BA2_D.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SVA_Base_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SVA_CL1_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SVA_FM1_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SVA_NL1_B.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SVA_NL2_E.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Sharp_MP_Field_1_B.jvt",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Sharp_MP_Field_2_B.jvt",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Sharp_MP_Field_3_B.jvt",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Sharp_MP_PAFF_1r2.jvt",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Sharp_MP_PAFF_2.jvt",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "cama1_vtc_c.avc",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "cama2_vtc_b.avc",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "cama3_vtc_b.avc",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "camp_mot_fld0_full.26l",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "camp_mot_frm0_full.26l",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "camp_mot_mbaff0_full.26l",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "camp_mot_picaff0_full.26l",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "cvmp_mot_fld0_full_B.26l",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "cvmp_mot_frm0_full_B.26l",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "cvmp_mot_mbaff0_full_B.26l",
+      "requirement": "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "cvmp_mot_picaff0_full_B.26l",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sp1_bt_a.h264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sp2_bt_b.h264",
+      "requirement": "Reconcile visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "src19td.IBP.264",
+      "requirement": "Reconcile CICP defaults or signaling in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "AMP_A_Samsung_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "AMP_A_Samsung_6.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "AMP_B_Samsung_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "AMP_B_Samsung_6.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "AMP_D_Hisilicon.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "AMP_E_Hisilicon.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "AMP_F_Hisilicon_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "AMVP_A_MTK_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "AMVP_B_MTK_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "AMVP_C_Samsung_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "AMVP_C_Samsung_6.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "BUMPING_A_ericsson_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAINIT_A_SHARP_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAINIT_B_SHARP_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAINIT_C_SHARP_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAINIT_D_SHARP_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAINIT_E_SHARP_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAINIT_F_SHARP_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAINIT_G_SHARP_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CAINIT_H_SHARP_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CIP_A_Panasonic_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CIP_C_Panasonic_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "CONFWIN_A_Sony_1.bit",
+      "requirement": "Reconcile visible width, range presence or value, visible-plane bytes in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_A_MAIN10_VIXS_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_A_MAIN10_VIXS_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_A_SONY_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_B_SONY_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_C_SONY_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_D_VIXS_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_D_VIXS_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_E_VIXS_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_E_VIXS_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_F_VIXS_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_F_VIXS_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_G_VIXS_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DBLK_G_VIXS_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DELTAQP_A_BRCM_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DELTAQP_B_SONY_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DELTAQP_C_SONY_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DSLICE_A_HHI_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DSLICE_B_HHI_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "DSLICE_C_HHI_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ENTP_A_LG_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ENTP_A_Qualcomm_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ENTP_B_LG_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ENTP_B_Qualcomm_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ENTP_C_LG_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ENTP_C_Qualcomm_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "EXT_A_ericsson_3.bit",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "EXT_A_ericsson_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "FILLER_A_Sony_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HRD_A_Fujitsu_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "HRD_A_Fujitsu_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "INITQP_A_Sony_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "INITQP_B_Sony_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "IPCM_A_RExt_NEC.bit",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "IPCM_B_RExt_NEC.bit",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "IPRED_A_docomo_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "IPRED_B_Nokia_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "IPRED_C_Mitsubishi_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "IPRED_C_Mitsubishi_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "LS_A_Orange_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "LS_B_ORANGE_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "LS_B_ORANGE_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "LTRPSPS_A_Qualcomm_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MAXBINS_A_TI_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MAXBINS_B_TI_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MAXBINS_C_TI_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MERGE_A_TI_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MERGE_B_TI_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MERGE_C_TI_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MERGE_D_TI_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MERGE_E_TI_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MERGE_F_MTK_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MERGE_G_HHI_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MVCLIP_A_qualcomm_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MVDL1ZERO_A_docomo_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MVEDGE_A_qualcomm_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MVHEVCS_A.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MVHEVCS_B.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MVHEVCS_E.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "MVHEVCS_F.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Main_422_10_A_RExt_Sony_1.bin",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "Main_422_10_B_RExt_Sony_1.bin",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "NUT_A_ericsson_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "NUT_A_ericsson_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "NoOutPrior_A_Qualcomm_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "NoOutPrior_B_Qualcomm_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "OPFLAG_A_Qualcomm_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "OPFLAG_B_Qualcomm_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "OPFLAG_C_Qualcomm_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PERSIST_RPARAM_A_RExt_Sony_1.bit",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PERSIST_RPARAM_A_RExt_Sony_3.bit",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PICSIZE_A_Bossen_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PICSIZE_B_Bossen_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PICSIZE_C_Bossen_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PICSIZE_D_Bossen_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PMERGE_A_TI_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PMERGE_B_TI_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PMERGE_C_TI_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PMERGE_D_TI_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PMERGE_E_TI_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "POC_A_Bossen_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PPS_A_qualcomm_7.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PS_A_VIDYO_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "PS_B_VIDYO_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "QMATRIX_A_RExt_Sony_1.bit",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RAP_A_docomo_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RAP_B_Bossen_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RPLM_A_qualcomm_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RPLM_B_qualcomm_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RPS_A_docomo_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RPS_B_qualcomm_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RPS_C_ericsson_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RPS_C_ericsson_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RPS_D_ericsson_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RPS_D_ericsson_6.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RPS_E_qualcomm_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RPS_F_docomo_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RQT_A_HHI_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RQT_B_HHI_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RQT_C_HHI_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RQT_D_HHI_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RQT_E_HHI_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RQT_F_HHI_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "RQT_G_HHI_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SAO_A_MediaTek_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SAO_A_RExt_MediaTek_1.bit",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SAO_B_MediaTek_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SAO_C_Samsung_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SAO_C_Samsung_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SAO_D_Samsung_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SAO_D_Samsung_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SAO_E_Canon_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SAO_F_Canon_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SAO_G_Canon_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SDH_A_Orange_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SLICES_A_Rovi_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SLIST_A_Sony_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SLIST_B_Sony_8.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SLIST_C_Sony_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SLIST_D_Sony_9.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SLPPLP_A_VIDYO_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "SLPPLP_A_VIDYO_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "STRUCT_A_Samsung_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "STRUCT_B_Samsung_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "STRUCT_B_Samsung_6.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "TILES_A_Cisco_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "TILES_B_Cisco_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "TMVP_A_MS_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "TMVP_A_MS_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "TSCL_A_VIDYO_5.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "TSCL_B_VIDYO_4.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "TSKIP_A_MS_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "TSKIP_A_MS_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "TSUNEQBD_A_MAIN10_Technicolor_2.bit",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "TUSIZE_A_Samsung_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "VPSID_A_VIDYO_1.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "VPSID_A_VIDYO_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_A_ericsson_MAIN10_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_A_ericsson_MAIN_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_B_ericsson_MAIN10_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_B_ericsson_MAIN_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_C_ericsson_MAIN10_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_C_ericsson_MAIN_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_D_ericsson_MAIN10_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_D_ericsson_MAIN_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_E_ericsson_MAIN10_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_E_ericsson_MAIN_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_F_ericsson_MAIN10_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_F_ericsson_MAIN_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit",
+      "requirement": "Reconcile decoded picture availability or drain behavior for this conformance input",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WP_A_MAIN10_Toshiba_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WP_A_Toshiba_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WP_B_Toshiba_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "WP_MAIN10_B_Toshiba_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "cip_B_NEC_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "cip_B_NEC_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ipcm_A_NEC_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ipcm_A_NEC_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ipcm_B_NEC_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ipcm_B_NEC_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ipcm_C_NEC_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ipcm_C_NEC_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ipcm_D_NEC_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ipcm_D_NEC_3.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ipcm_E_NEC_2.bit",
+      "requirement": "Reconcile range presence or value in the first differing decoded picture",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
+  "pending_module_requirements": [
+    "Reconcile CICP defaults or signaling in the first differing decoded picture",
+    "Reconcile CICP defaults or signaling, H.264 interlace flag in the first differing decoded picture",
+    "Reconcile CICP defaults or signaling, H.264 interlace flag, visible-plane bytes in the first differing decoded picture",
+    "Reconcile CICP defaults or signaling, visible-plane bytes in the first differing decoded picture",
+    "Reconcile visible width, CICP defaults or signaling, visible-plane bytes in the first differing decoded picture",
+    "Reconcile decoded picture availability or drain behavior for this conformance input",
+    "Reconcile H.264 interlace flag in the first differing decoded picture",
+    "Reconcile visible-plane bytes in the first differing decoded picture",
+    "Reconcile range presence or value in the first differing decoded picture",
+    "Reconcile visible width, range presence or value, visible-plane bytes in the first differing decoded picture"
+  ]
+}

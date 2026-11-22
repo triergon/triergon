@@ -123,6 +123,10 @@ assert_eq!(Crc32Ieee::of(b"123456789"), 0xcbf4_3926);
 
 ## Conformance
 
+The [CRC comparison](../../harness/features/crc-values/contract.json) checks the MPEG-2, Ogg,
+EBML, FLAC, AC-3 and MPEG audio registers against `av_crc`. It covers whole inputs,
+incremental updates across seeded splits and lengths from zero through 64 bytes.
+
 The [bit reader comparison](../../harness/features/bit-readers/contract.json) checks
 field values, refusals, positions and overruns against independent MSB, LSB and Rice
 models. The [RBSP comparison](../../harness/features/rbsp-unescape/contract.json)

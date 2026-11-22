@@ -1,0 +1,6561 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "ac3-diatonis.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/diatonis.ac3",
+      "sha256": "d4b9294410dbf587aeda7ee8f469d8e383ba9027ec5297eaaeed85f9bbac2b7c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 210,
+        "bytes": 378,
+        "digest": 14522421504929552832
+      }
+    },
+    {
+      "id": "ac3-millers_crossing_4.0.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/millers_crossing_4.0.ac3",
+      "sha256": "faa06c7b1ccbc5cf3c7897afb50004dd3d49feaa19d26bdeb03dc9bb4ec20802",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 310,
+        "bytes": 186,
+        "digest": 18208531289526400832
+      }
+    },
+    {
+      "id": "ac3-monsters_inc_2.0_192_small.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/monsters_inc_2.0_192_small.ac3",
+      "sha256": "4df071457c23d1a39fe52322892bc9333921ad6dfc8f87ffa0797bdfb5101bae",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 393,
+        "bytes": 786,
+        "digest": 1742214278779398047
+      }
+    },
+    {
+      "id": "ac3-monsters_inc_5.1_448_small.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/monsters_inc_5.1_448_small.ac3",
+      "sha256": "74fefeef070f663378a0864beb064cf88ee1186152f7ac320984af15be2f22db",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 280,
+        "bytes": 504,
+        "digest": 11500314486885093376
+      }
+    },
+    {
+      "id": "ac3-mp3ac325_a0.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/mp3ac325_a0.ac3",
+      "sha256": "890487cadca665da46e2822b006116eaec29233d6ccc447ea77def38e47586d3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 45,
+        "digest": 15492953223934262784
+      }
+    },
+    {
+      "id": "ac3-mp3ac325_a1.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/mp3ac325_a1.ac3",
+      "sha256": "d22b569a39c4dfe4461cb4a56496f43c473e588193524398d4ba0bb1e0cbf310",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 30,
+        "digest": 6003209199259014089
+      }
+    },
+    {
+      "id": "eac3-csi_miami_5.1_256_spx_small.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/csi_miami_5.1_256_spx_small.eac3",
+      "sha256": "84f50317a49a98509bf174ace814b39860e6ab2a1d61bdbd10ada9081f2bb2b3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 235,
+        "bytes": 423,
+        "digest": 6586351915982647229
+      }
+    },
+    {
+      "id": "eac3-csi_miami_stereo_128_spx.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/csi_miami_stereo_128_spx.eac3",
+      "sha256": "f96b45fa4d249522cd83dea009cd528ce552ec9d947e03cdecab44652bc86ecb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 1953,
+        "bytes": 3906,
+        "digest": 33529311402680903
+      }
+    },
+    {
+      "id": "eac3-csi_miami_stereo_128_spx_small.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/csi_miami_stereo_128_spx_small.eac3",
+      "sha256": "adc397f12472353237f7dc8139c2223937abc23eff9cd80ac2e3471814a04c3a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 1464,
+        "bytes": 2928,
+        "digest": 3178659548056238600
+      }
+    },
+    {
+      "id": "eac3-matrix2_commentary1_stereo_192_small.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/matrix2_commentary1_stereo_192_small.eac3",
+      "sha256": "ea095d557bd6787266f4b7276a2be818a7fbc924997748be89d9ead962a3391c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 390,
+        "bytes": 780,
+        "digest": 17907368466836247466
+      }
+    },
+    {
+      "id": "eac3-serenity_english_5.1_1536_small.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/serenity_english_5.1_1536_small.eac3",
+      "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 485,
+        "bytes": 873,
+        "digest": 10663636694609267931
+      }
+    },
+    {
+      "id": "eac3-the_great_wall_7.1.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/the_great_wall_7.1.eac3",
+      "sha256": "d698981ddc1c10e65d234dd6a02ff2b0f4c88787595c9d3e5adf7f097f2c9e50",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 785,
+        "bytes": 471,
+        "digest": 12408023837283481443
+      }
+    },
+    {
+      "id": "aac-aac-sce-in-stereo.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/aac-sce-in-stereo.adts",
+      "sha256": "04947370585296a25c63f1e31252c4290328151a0fa2ecf3271518b4d4db8796",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 651,
+        "bytes": 1302,
+        "digest": 4894047047394053457
+      }
+    },
+    {
+      "id": "aac-al04_44.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al04_44.adts",
+      "sha256": "ce01790c62e932cc33eb3a1092cece90df608e9f8b6b88baaa57b623488c8f1e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 1065,
+        "bytes": 1420,
+        "digest": 13412712411868795689
+      }
+    },
+    {
+      "id": "aac-al05_44.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al05_44.adts",
+      "sha256": "7b11acefbea0c1180b370405d4933ef06a80e3abbb558e1400bc264384146903",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 960,
+        "bytes": 1920,
+        "digest": 11893771085200899904
+      }
+    },
+    {
+      "id": "aac-al06_44.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al06_44.adts",
+      "sha256": "a28702cffbea3ade83390c2b8e83833261ca87468c139df3490ea9ef1dda399f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 1065,
+        "bytes": 1065,
+        "digest": 13421345990827084600
+      }
+    },
+    {
+      "id": "aac-al07_96.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al07_96.adts",
+      "sha256": "77b8c71a77c98816f95a49b209264af383d4a515a5fd24486e9806bdfda2961a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 2340,
+        "bytes": 2340,
+        "digest": 17876283371765626624
+      }
+    },
+    {
+      "id": "aac-al15_44.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al15_44.adts",
+      "sha256": "b6646ef38d56f50824a0ad3108bff9d560d3cb75833fbe2bcd69daa4bb1072d0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 390,
+        "bytes": 4290,
+        "digest": 15110220385311291520
+      }
+    },
+    {
+      "id": "aac-al17_44.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al17_44.adts",
+      "sha256": "15ce1b21c69691275140c4c0a474b660331716ba2b177f0c9abbbc8b8763be42",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 969,
+        "bytes": 1938,
+        "digest": 8595950458419527595
+      }
+    },
+    {
+      "id": "aac-al18_44.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al18_44.adts",
+      "sha256": "17e6246f5e46613e903000b4387672586252b12128b3af882d8fa9b98ce127ba",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 8439,
+        "bytes": 11252,
+        "digest": 5152100163681937033
+      }
+    },
+    {
+      "id": "aac-al22_chCfg0PCE_44.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al22_chCfg0PCE_44.adts",
+      "sha256": "bcc3a68808c793f9865d87b1ec3d895c5010b5f6a6bd206cb1426d4151f9bad6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 156,
+        "bytes": 572,
+        "digest": 4802443819189482880
+      }
+    },
+    {
+      "id": "aac-al_sbr_cm_48_2.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al_sbr_cm_48_2.adts",
+      "sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 2262,
+        "bytes": 4524,
+        "digest": 10300927792430815962
+      }
+    },
+    {
+      "id": "aac-al_sbr_cm_48_5.1.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al_sbr_cm_48_5.1.adts",
+      "sha256": "2f756af575771e9890c97841c13c555612599ce85e82af47df175a1e0e16d6a8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 2262,
+        "bytes": 24882,
+        "digest": 11949614868110272256
+      }
+    },
+    {
+      "id": "aac-al_sbr_ps_04_new.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al_sbr_ps_04_new.adts",
+      "sha256": "f95a16be6678ced08108ed788a3c4619501cea3936eabd831ad450b76b91f43f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 318,
+        "bytes": 636,
+        "digest": 16022445743675242162
+      }
+    },
+    {
+      "id": "aac-al_sbr_ps_06_new.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al_sbr_ps_06_new.adts",
+      "sha256": "cc7e5b18455c04c76efa8a87bf7db40f297fb38aa56b93d4bd7f97a397b4fa87",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 636,
+        "bytes": 1272,
+        "digest": 10418851212415372900
+      }
+    },
+    {
+      "id": "aac-al_sbr_sr_48_2_fsaac48.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/al_sbr_sr_48_2_fsaac48.adts",
+      "sha256": "10f2d0f66455a3b9dea8138a1f21d9c39cd9633fde3f31750b8e61e16a59fb75",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 3444,
+        "bytes": 6888,
+        "digest": 8395358730247797036
+      }
+    },
+    {
+      "id": "aac-am00_88.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/am00_88.adts",
+      "sha256": "1ff00000c44317a3eb32c7b6b67b1e2269e16e941cc3ff7990d473584c00688f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 16938,
+        "bytes": 22584,
+        "digest": 8579339913331151456
+      }
+    },
+    {
+      "id": "aac-am05_44.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/am05_44.adts",
+      "sha256": "090ecd1da2493bd920536964870423719bf6061202b8a27d8033507d08a122c1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 390,
+        "bytes": 390,
+        "digest": 16199160474742744832
+      }
+    },
+    {
+      "id": "aac-ap05_48.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ap05_48.adts",
+      "sha256": "ec4aa0192a7672510eeca67d733868ada88600124f8ca81777fba75e98952005",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 2673,
+        "bytes": 5346,
+        "digest": 11647357958476162551
+      }
+    },
+    {
+      "id": "aac-ct_File1_fixed_raw.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_File1_fixed_raw.adts",
+      "sha256": "76e84aa3e0d142696699bdb5d9bc8b037415065c604e2fa9f7d00e5f59bb597d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_File1_raw.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_File1_raw.adts",
+      "sha256": "2b7312468bef3ba96a41b51e6e43b54a3edb1f6638d4c6cb96331efb757818b4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_File2.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_File2.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_File3.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_File3.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_File4.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_File4.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_File5.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_File5.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_File6.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_File6.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_File7.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_File7.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_faac-adts.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_faac-adts.adts",
+      "sha256": "052f9c7c5359d642fbba887d57fc72fe5745fc75b34cddc7a7adc0a912f9cf9c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 2580,
+        "bytes": 5160,
+        "digest": 11185744974798390268
+      }
+    },
+    {
+      "id": "aac-ct_sbr_bc-ps_bc.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_sbr_bc-ps_bc.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_sbr_bc-ps_i.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_sbr_bc-ps_i.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_sbr_bic-ps_i.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_sbr_bic-ps_i.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_sbr_i-ps_bic.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_sbr_i-ps_bic.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_sbr_i-ps_i.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_sbr_i-ps_i.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-ct_sbr_i-ps_i_raw.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/ct_sbr_i-ps_i_raw.adts",
+      "sha256": "76e84aa3e0d142696699bdb5d9bc8b037415065c604e2fa9f7d00e5f59bb597d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 507,
+        "bytes": 1014,
+        "digest": 6507687779342169249
+      }
+    },
+    {
+      "id": "aac-foo.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/foo.adts",
+      "sha256": "4439c5a704ed599e45d3b88fe135f994d32d2b65f5d0c0f6a8eb329ea69c45ec",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 255,
+        "bytes": 510,
+        "digest": 10669274831435017069
+      }
+    },
+    {
+      "id": "aac-id3v1.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/id3v1.adts",
+      "sha256": "2a0fc1de29e543806699655fa35d0f30ae5796b125e371fa59fa2848a04d0bdd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 30,
+        "digest": 6003209199259014089
+      }
+    },
+    {
+      "id": "aac-id3v2.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/id3v2.adts",
+      "sha256": "a671b99d08c1b7c78a77685fceb1824587fa7139cb42fe839c4b0bed113acd64",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 702,
+        "bytes": 936,
+        "digest": 16349214058927595552
+      }
+    },
+    {
+      "id": "aac-id3v2_two_tags.adts",
+      "profile": "aac",
+      "file": ".research/codec-derived/aac/id3v2_two_tags.adts",
+      "sha256": "ccaab043f75b6949dce4569da9a8d311d992e0c3da0d0989cc993100291eb281",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 1407,
+        "bytes": 1876,
+        "digest": 2779591840596922701
+      }
+    },
+    {
+      "id": "aac-ps-change-while-off.adts",
+      "profile": "aac",
+      "file": "harness/codecs/aac/ps/vectors/ps-change-while-off.adts",
+      "sha256": "6f326fe923bae64b5d5793073f5c8fbb15a4ac36a01a7bea40e853c1e35c1102",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 78,
+        "bytes": 156,
+        "digest": 4450915980579614218
+      }
+    },
+    {
+      "id": "aac-ps-ipd-after-iid34.adts",
+      "profile": "aac",
+      "file": "harness/codecs/aac/ps/vectors/ps-ipd-after-iid34.adts",
+      "sha256": "967cd0355a507128fb7adf06b0544252a1f56e6d04dd78b74733f821c35e18ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 60,
+        "digest": 5178332793619225722
+      }
+    },
+    {
+      "id": "aac-ps-no-sbr-element.adts",
+      "profile": "aac",
+      "file": "harness/codecs/aac/ps/vectors/ps-no-sbr-element.adts",
+      "sha256": "e22e5c0730680743e810384f56ad31a68cf993ecab119b21de506dedb88c30a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 78,
+        "bytes": 156,
+        "digest": 4450915980579614218
+      }
+    },
+    {
+      "id": "dts-core_51_24_48_768_0.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/core_51_24_48_768_0.core.dts",
+      "sha256": "e5023922b122a661c554c6ca411bf4664b541ac33ecf53b1bc99091f029fd143",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "dts-core_51_24_48_768_1.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/core_51_24_48_768_1.core.dts",
+      "sha256": "4df3d0ff921105a78716c0a2cf5cf6935290719daa7469f6a0db9f4393efea00",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "dts-dts.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/dts.core.dts",
+      "sha256": "a7c8f6f8df1fa822449ac7537afe75735aa858861aae3d2481e1ec14e91e5612",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 759,
+        "bytes": 2277,
+        "digest": 211411894822376640
+      }
+    },
+    {
+      "id": "dts-dts_es.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/dts_es.core.dts",
+      "sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 750,
+        "bytes": 750,
+        "digest": 15749812892702546688
+      }
+    },
+    {
+      "id": "dts-dtsx_7.1.4_24bit.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/dtsx_7.1.4_24bit.core.dts",
+      "sha256": "eb5ceab778e7a5aedf0c47627b5de45858a3dd81903b12d153271f4830c09bc2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 18,
+        "digest": 9712619805407442944
+      }
+    },
+    {
+      "id": "dts-master_audio_7.1_24bit.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/master_audio_7.1_24bit.core.dts",
+      "sha256": "fd230401e49b41fbc892246cf22d7b04419104e02978215b50dcba3751c8de5f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 3516,
+        "bytes": 10548,
+        "digest": 10632245486958391296
+      }
+    },
+    {
+      "id": "dts-x96_51_24_96_1509.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/x96_51_24_96_1509.core.dts",
+      "sha256": "e902cc493e94aa95024a276ff0d36f5ac76d614ed8c163621d3222112e1cdb93",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 10530322780230408192
+      }
+    },
+    {
+      "id": "dts-x96_xch_61_24_96_3840.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/x96_xch_61_24_96_3840.core.dts",
+      "sha256": "1674302b733a95f25077101dc5a18de8fe9c624c0bbf4f5d2c70b747de155a5c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 18,
+        "digest": 17024198236015748352
+      }
+    },
+    {
+      "id": "dts-x96_xxch_71_24_96_3840.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/x96_xxch_71_24_96_3840.core.dts",
+      "sha256": "19e3f42286e7616a0c06fba72fb0af51be7eec5dfc98bcb778b921ca89ffd897",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "dts-xbr_51_24_48_3840.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xbr_51_24_48_3840.core.dts",
+      "sha256": "8500ec431e95f254eca8f3b6b42a2e243d52dc63526412ca3cdb709a84b1de40",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "dts-xbr_xch_61_24_48_3840.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xbr_xch_61_24_48_3840.core.dts",
+      "sha256": "cfa5ec0089bd981f36b21aba617149b37299ed149055ed9bb3ab4efcee87bdac",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 18,
+        "digest": 17024198236015748352
+      }
+    },
+    {
+      "id": "dts-xbr_xxch_71_24_48_3840.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xbr_xxch_71_24_48_3840.core.dts",
+      "sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "dts-xch_61_24_48_768.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xch_61_24_48_768.core.dts",
+      "sha256": "dc0a4caf2c2bf999772b537994d988e5b5bef316cdd01e82dac67156bbf4e2ba",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 18,
+        "digest": 17024198236015748352
+      }
+    },
+    {
+      "id": "dts-xll_51_16_192_768_0.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xll_51_16_192_768_0.core.dts",
+      "sha256": "e92ea6eb72e254d134b2351b4a91e6d55da7f7397825fb042b819c447805a681",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "dts-xll_51_16_192_768_1.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xll_51_16_192_768_1.core.dts",
+      "sha256": "03d51e49c3dbfb9574c3c222b8c9d4d11daef4719882835e030becfbb8308319",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "dts-xll_51_24_48_768.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xll_51_24_48_768.core.dts",
+      "sha256": "d168cd189728296889ed5d9fb0b1e5d2cd6a1bcfec5a8088519b4e065f4e58d3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "dts-xll_51_24_48_none.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xll_51_24_48_none.core.dts",
+      "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 27,
+        "digest": 18182107788963294400
+      }
+    },
+    {
+      "id": "dts-xll_71_24_48_768_0.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xll_71_24_48_768_0.core.dts",
+      "sha256": "3c5497ae22b12644fdaa0661c4d203dc131271e93ea10e1b3cdbfd6edf0ba3c0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "dts-xll_71_24_48_768_1.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xll_71_24_48_768_1.core.dts",
+      "sha256": "69ea01316c4322248cb02a01219c67ad2a7555b1494544630d9b3bc6b534b968",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "dts-xll_71_24_96_768.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xll_71_24_96_768.core.dts",
+      "sha256": "c4ea4e1a9cc7357656692dd1376e2a269d69a74b86c421e868cb497cd0bbf16a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "dts-xll_x96_51_24_96_1509.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xll_x96_51_24_96_1509.core.dts",
+      "sha256": "e84b744c459a0c668668e481a16435e65facf2857a958fab90496dbab89b8956",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 10530322780230408192
+      }
+    },
+    {
+      "id": "dts-xll_xch_61_24_48_768.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xll_xch_61_24_48_768.core.dts",
+      "sha256": "eb8e3d2edc9cbb7ae2d45739331dd883d9e5a3be6dc335a85e14b5519d6a2fb9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 18,
+        "digest": 17024198236015748352
+      }
+    },
+    {
+      "id": "dts-xxch_71_24_48_2046.core.dts",
+      "profile": "dts",
+      "file": ".research/codec-derived/dts/xxch_71_24_48_2046.core.dts",
+      "sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 54,
+        "digest": 11690769054719666176
+      }
+    },
+    {
+      "id": "flac-01 - blocksize 4096.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/01 - blocksize 4096.flac",
+      "sha256": "02c7e60ae7788c2cb6898a0a46985d759f1e62482ddd965a374dfd09a2a8390f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 228,
+        "bytes": 456,
+        "digest": 17281699298629500780
+      }
+    },
+    {
+      "id": "flac-02 - blocksize 4608.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/02 - blocksize 4608.flac",
+      "sha256": "f4e97914fb9a8cd95b9be90c9970f6d553d76ded55a7a443dbd0d5dfa7bd2819",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 201,
+        "bytes": 402,
+        "digest": 5268910510072882859
+      }
+    },
+    {
+      "id": "flac-03 - blocksize 16.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/03 - blocksize 16.flac",
+      "sha256": "164d0747e8c4855407990182b784fcd7475da228bf20a6cff67e947c683959b3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 57882,
+        "bytes": 115764,
+        "digest": 12500055914459794862
+      }
+    },
+    {
+      "id": "flac-04 - blocksize 192.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/04 - blocksize 192.flac",
+      "sha256": "0f9f7e2fc262e16e8cd92de3e8869d13197a5e9c3ef7239f8ee749cbd2689980",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 4824,
+        "bytes": 9648,
+        "digest": 7141450700382427400
+      }
+    },
+    {
+      "id": "flac-05 - blocksize 254.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/05 - blocksize 254.flac",
+      "sha256": "8965c9616f769573d3bf8ef5b92ee5a2827e797c098a9436a5e3366feb9c9ae2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3648,
+        "bytes": 7296,
+        "digest": 7228960245186647744
+      }
+    },
+    {
+      "id": "flac-06 - blocksize 512.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/06 - blocksize 512.flac",
+      "sha256": "ba705cc365abf5b8bd6b4d4392a2668ae395844f82d04e74be3e19b60cb03260",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 1809,
+        "bytes": 3618,
+        "digest": 13607624823736756483
+      }
+    },
+    {
+      "id": "flac-07 - blocksize 725.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/07 - blocksize 725.flac",
+      "sha256": "ffc15a2ead7a6651e2cd36fa886edcffffc32e831077dce852fb7df6f131d2b3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 1278,
+        "bytes": 2556,
+        "digest": 12692736830604911898
+      }
+    },
+    {
+      "id": "flac-08 - blocksize 1000.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/08 - blocksize 1000.flac",
+      "sha256": "fa189c885be140510348f18899fe151a903f0199d502982ecc7863cb85810ba6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 927,
+        "bytes": 1854,
+        "digest": 4415292815656003917
+      }
+    },
+    {
+      "id": "flac-09 - blocksize 1937.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/09 - blocksize 1937.flac",
+      "sha256": "8786ea66bf5d0083fcf760b874216ac566d0b2688ba58e5711f46525841a0028",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 480,
+        "bytes": 960,
+        "digest": 12342006503264264096
+      }
+    },
+    {
+      "id": "flac-10 - blocksize 2304.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/10 - blocksize 2304.flac",
+      "sha256": "8ec67465e9041373a67f2440220825ba9d7706789584bffbbb3f109424df25ee",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 405,
+        "bytes": 810,
+        "digest": 1161404159390918735
+      }
+    },
+    {
+      "id": "flac-11 - partition order 8.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/11 - partition order 8.flac",
+      "sha256": "07596315fc9b297702984deab49041f4695e1482ec3e1d081888d1bf13198e53",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 180,
+        "bytes": 360,
+        "digest": 2970434443783144924
+      }
+    },
+    {
+      "id": "flac-12 - qlp precision 15 bit.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/12 - qlp precision 15 bit.flac",
+      "sha256": "d33731350269929542c6e0a788c1b9a27eb91dcb3a20f5f960b8569be012c6fa",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 144,
+        "bytes": 288,
+        "digest": 9004534569681870000
+      }
+    },
+    {
+      "id": "flac-13 - qlp precision 2 bit.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/13 - qlp precision 2 bit.flac",
+      "sha256": "b60e113a6a3b97d7a3c48be90913ced8c85f1ee332c6c5dd5a79b46cdc38108a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 144,
+        "bytes": 288,
+        "digest": 9004534569681870000
+      }
+    },
+    {
+      "id": "flac-14 - wasted bits.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/14 - wasted bits.flac",
+      "sha256": "58fa05681bd646168ea2a19bc9a6f4ee9d6de295fd832c1f70da1bdbf32d74cb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 1278,
+        "bytes": 2556,
+        "digest": 12692736830604911898
+      }
+    },
+    {
+      "id": "flac-15 - only verbatim subframes.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/15 - only verbatim subframes.flac",
+      "sha256": "80459f8ad5a9c7edf081a10f9269c55c29136749021e5a55483bc173aaaa82b0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 162,
+        "bytes": 324,
+        "digest": 14157558198246268614
+      }
+    },
+    {
+      "id": "flac-16 - partition order 8 containing escaped partitions.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/16 - partition order 8 containing escaped partitions.flac",
+      "sha256": "5562cff546a1b0d93cea31c0c375c5df65658311de1fc3d322d14b8a2c5ac930",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 153,
+        "bytes": 306,
+        "digest": 2877227430507266331
+      }
+    },
+    {
+      "id": "flac-17 - all fixed orders.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/17 - all fixed orders.flac",
+      "sha256": "d6f082cbbbcb03015f861b8fa30cf16708a62b85520905a126da28db29645feb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 612,
+        "bytes": 1224,
+        "digest": 6759029703547587564
+      }
+    },
+    {
+      "id": "flac-18 - precision search.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/18 - precision search.flac",
+      "sha256": "562dd053a92a83bf64baf90ae5f9b3d0af58121c5534b3c05353d77b2ff25aaa",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 162,
+        "bytes": 324,
+        "digest": 14157558198246268614
+      }
+    },
+    {
+      "id": "flac-19 - samplerate 35467Hz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/19 - samplerate 35467Hz.flac",
+      "sha256": "72ee52c82ee46eea28d659392ce75557e66df1051563fde1936d3e5a8fd8d2c2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 261,
+        "bytes": 522,
+        "digest": 2943763916667362560
+      }
+    },
+    {
+      "id": "flac-20 - samplerate 39kHz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/20 - samplerate 39kHz.flac",
+      "sha256": "9c87394f650fda9d08bc6b4a7c56a4fd56dcac3531913aa536e7d4d576580ee0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 144,
+        "bytes": 288,
+        "digest": 1509558419495512176
+      }
+    },
+    {
+      "id": "flac-21 - samplerate 22050Hz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/21 - samplerate 22050Hz.flac",
+      "sha256": "a808ffa5c3cb99c7bc8268141f2d01fb7ccb4c3ced617fd7909f578fb9363f88",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 81,
+        "bytes": 162,
+        "digest": 8721303004713893037
+      }
+    },
+    {
+      "id": "flac-22 - 12 bit per sample.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/22 - 12 bit per sample.flac",
+      "sha256": "d9c385129c4253da4c0de34ed5b163b404523aa971773277b8b74ef92f7d4f44",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 162,
+        "bytes": 324,
+        "digest": 14157558198246268614
+      }
+    },
+    {
+      "id": "flac-23 - 8 bit per sample.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/23 - 8 bit per sample.flac",
+      "sha256": "d72ad54e1d0ebe5d65b1b1addd13ee873d38c58cb3357774a1943ced2d984cf9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 252,
+        "bytes": 504,
+        "digest": 15931419355803194420
+      }
+    },
+    {
+      "id": "flac-24 - variable blocksize file created with flake revision 264.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/24 - variable blocksize file created with flake revision 264.flac",
+      "sha256": "c6664710c935e4d862ab04f146ddd7f6df9e2278b651c17a432934e61488eaf7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 1212,
+        "bytes": 2424,
+        "digest": 11459928297568605044
+      }
+    },
+    {
+      "id": "flac-25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac",
+      "sha256": "df5658969201d6867a1cc64d69e30a8ec833b53f7239345eda7eefff1a4a2ad8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 15573,
+        "bytes": 31146,
+        "digest": 13233902604788090383
+      }
+    },
+    {
+      "id": "flac-26 - variable blocksize file created with CUETools.Flake 2.1.6.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/26 - variable blocksize file created with CUETools.Flake 2.1.6.flac",
+      "sha256": "355ddbac0f596623f805c3d3ff8cf4ba25d3a13c9d61e63719a8d02ebb647c19",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 1011,
+        "bytes": 2022,
+        "digest": 1310957332805141257
+      }
+    },
+    {
+      "id": "flac-27 - old format variable blocksize file created with Flake 0.11.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac",
+      "sha256": "21b486a42dbf64c043d57dcd5a038163dc77f5eec398312d994643617ec3c5b6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 1170,
+        "bytes": 2340,
+        "digest": 6614314665008856982
+      }
+    },
+    {
+      "id": "flac-28 - high resolution audio, default settings.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/28 - high resolution audio, default settings.flac",
+      "sha256": "62322a5c7821081bae99cc1a3f398f177a17cf9312131a5fbcfcc2ee38539346",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 615,
+        "bytes": 1230,
+        "digest": 17307041879667023281
+      }
+    },
+    {
+      "id": "flac-29 - high resolution audio, blocksize 16384.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/29 - high resolution audio, blocksize 16384.flac",
+      "sha256": "7551605d8a90a7e74e788b31273493ce5e24059d839b1d44dbad89cf9fb132a5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 141,
+        "bytes": 282,
+        "digest": 17822071859989748539
+      }
+    },
+    {
+      "id": "flac-30 - high resolution audio, blocksize 13456.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/30 - high resolution audio, blocksize 13456.flac",
+      "sha256": "d2e6b73cc0888419d709a03c317f59dfb8d48fcdc29e73fb0c099d5de7d512be",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 174,
+        "bytes": 348,
+        "digest": 9087604363873143490
+      }
+    },
+    {
+      "id": "flac-31 - high resolution audio, using only 32nd order predictors.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/31 - high resolution audio, using only 32nd order predictors.flac",
+      "sha256": "caf84fbf740a98e3371a58df03422722a7d6058289b11a291f0b39103ea20133",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 282,
+        "bytes": 564,
+        "digest": 13366823569270712502
+      }
+    },
+    {
+      "id": "flac-32 - high resolution audio, partition order 8 containing escaped partitions.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/32 - high resolution audio, partition order 8 containing escaped partitions.flac",
+      "sha256": "479474ac6a101725976aa9a4e94580040d650779da41db2981be03aa41ef7fdd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 564,
+        "bytes": 1128,
+        "digest": 8118490152326322796
+      }
+    },
+    {
+      "id": "flac-33 - samplerate 192kHz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/33 - samplerate 192kHz.flac",
+      "sha256": "4833aafc6a7d652bac05de6d304d3e63cc419a731df995b146d91294062bbcd0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 1128,
+        "bytes": 2256,
+        "digest": 18122107042966249688
+      }
+    },
+    {
+      "id": "flac-34 - samplerate 192kHz, using only 32nd order predictors.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/34 - samplerate 192kHz, using only 32nd order predictors.flac",
+      "sha256": "b32a7e21114034610fea4d43610980111dc9c40faa315a3111196102a7bac36e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 282,
+        "bytes": 564,
+        "digest": 9000813354625931958
+      }
+    },
+    {
+      "id": "flac-35 - samplerate 134560Hz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/35 - samplerate 134560Hz.flac",
+      "sha256": "ffe10b26321fdc1a1be31cfd7034a4f98b1c0cb3e32e9c1cc129b7ff4a259177",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 792,
+        "bytes": 1584,
+        "digest": 3695341683028590760
+      }
+    },
+    {
+      "id": "flac-36 - samplerate 384kHz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/36 - samplerate 384kHz.flac",
+      "sha256": "63fc6b1ae16fc0285f7053f49ce967087f6a041630ee105d3d67fd8d34e45b7c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2256,
+        "bytes": 4512,
+        "digest": 13531339059520008624
+      }
+    },
+    {
+      "id": "flac-37 - 20 bit per sample.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/37 - 20 bit per sample.flac",
+      "sha256": "8d8c0526b7823099974a348a6ae80eff9c7eeb4be4e3da270e8e2e9e45d74b3c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 564,
+        "bytes": 1128,
+        "digest": 8118490152326322796
+      }
+    },
+    {
+      "id": "flac-38 - 3 channels (3.0).flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/38 - 3 channels (3.0).flac",
+      "sha256": "44d14d0efa374049fd9f56aaee3a068a30045e62a571df574c7b824ae596a3cf",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 126,
+        "bytes": 126,
+        "digest": 14760672653790228752
+      }
+    },
+    {
+      "id": "flac-39 - 4 channels (4.0).flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/39 - 4 channels (4.0).flac",
+      "sha256": "ac670ce52561023dca32f7bd20fbe94c1e1459f06188cd0f870801ea5fb23cee",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 186,
+        "bytes": 248,
+        "digest": 5893199766114854798
+      }
+    },
+    {
+      "id": "flac-40 - 5 channels (5.0).flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/40 - 5 channels (5.0).flac",
+      "sha256": "bf616e933caab9b7a5da64f9527390f83f208134d327c72a16225c0779ba0da0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 186,
+        "bytes": 558,
+        "digest": 2911368936776437414
+      }
+    },
+    {
+      "id": "flac-41 - 6 channels (5.1).flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/41 - 6 channels (5.1).flac",
+      "sha256": "c12650fda54a384abf017d4b931491de043eaa7a815ae74c7a9b49d4087d6193",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 264,
+        "bytes": 792,
+        "digest": 4872970742748664320
+      }
+    },
+    {
+      "id": "flac-42 - 7 channels (6.1).flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/42 - 7 channels (6.1).flac",
+      "sha256": "07a5d7fc8c4dd74c634b2f0e912a063496f67dd2ba9fbe14f7b5fa37fee8f638",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 300,
+        "bytes": 300,
+        "digest": 12433940370078766224
+      }
+    },
+    {
+      "id": "flac-43 - 8 channels (7.1).flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/43 - 8 channels (7.1).flac",
+      "sha256": "9c39ff436f316b3a8e72200c8f38af2d9ef15418c25be555aa621d0c793a6254",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 324,
+        "bytes": 324,
+        "digest": 1755326956672892352
+      }
+    },
+    {
+      "id": "flac-44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac",
+      "sha256": "1a0e8c17392ae03b2cb04e8c82fcc1f924580fdc978884101faa3e9cf7ed9197",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 531,
+        "bytes": 531,
+        "digest": 177224337682411413
+      }
+    },
+    {
+      "id": "flac-45 - no total number of samples set.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/45 - no total number of samples set.flac",
+      "sha256": "336a18eb7a78f7fc0ab34980348e2895bc3f82db440a2430d9f92e996f889f9a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 249,
+        "bytes": 498,
+        "digest": 5595936812010918831
+      }
+    },
+    {
+      "id": "flac-46 - no min-max framesize set.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/46 - no min-max framesize set.flac",
+      "sha256": "9dc39732ce17815832790901b768bb50cd5ff0cd21b28a123c1cabc16ed776cc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 210,
+        "bytes": 420,
+        "digest": 238623382241700798
+      }
+    },
+    {
+      "id": "flac-47 - only STREAMINFO.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/47 - only STREAMINFO.flac",
+      "sha256": "9a62c79f634849e74cb2183f9e3a9bd284f51e2591c553008d3e6449967eef85",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 171,
+        "bytes": 342,
+        "digest": 9858928206393546765
+      }
+    },
+    {
+      "id": "flac-48 - Extremely large SEEKTABLE.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/48 - Extremely large SEEKTABLE.flac",
+      "sha256": "4417aca6b5f90971c50c28766d2f32b3acaa7f9f9667bd313336242dae8b2531",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 192,
+        "bytes": 384,
+        "digest": 8199871064847193408
+      }
+    },
+    {
+      "id": "flac-49 - Extremely large PADDING.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/49 - Extremely large PADDING.flac",
+      "sha256": "7bc44fa2754536279fde4f8fb31d824f43b8d0b3f93d27d055d209682914f20e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 192,
+        "bytes": 384,
+        "digest": 8199871064847193408
+      }
+    },
+    {
+      "id": "flac-50 - Extremely large PICTURE.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/50 - Extremely large PICTURE.flac",
+      "sha256": "1f04f237d74836104993a8072d4223e84a5d3bd76fbc44555c221c7e69a23594",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 195,
+        "bytes": 390,
+        "digest": 14296861997288240309
+      }
+    },
+    {
+      "id": "flac-51 - Extremely large VORBISCOMMENT.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/51 - Extremely large VORBISCOMMENT.flac",
+      "sha256": "033160e8124ed287b0b5d615c94ac4139477e47d6e4059b1c19b7141566f5ef9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 213,
+        "bytes": 426,
+        "digest": 6496238977758034099
+      }
+    },
+    {
+      "id": "flac-52 - Extremely large APPLICATION.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/52 - Extremely large APPLICATION.flac",
+      "sha256": "0e45a4f8dbef15cbebdd8dfe690d8ae60e0c6abb596db1270a9161b62a7a3f1c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 234,
+        "bytes": 468,
+        "digest": 7009788127323550310
+      }
+    },
+    {
+      "id": "flac-53 - CUESHEET with very many indexes.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/53 - CUESHEET with very many indexes.flac",
+      "sha256": "513fad18578f3225fae5de1bda8f700415be6fd8aa1e7af533b5eb796ed2d461",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2133,
+        "bytes": 4266,
+        "digest": 5826800704808922419
+      }
+    },
+    {
+      "id": "flac-54 - 1000x repeating VORBISCOMMENT.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/54 - 1000x repeating VORBISCOMMENT.flac",
+      "sha256": "b68dc6644784fac35aa07581be8603a360d1697e07a2265d7eb24001936fd247",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 318,
+        "bytes": 636,
+        "digest": 3633492883606370226
+      }
+    },
+    {
+      "id": "flac-55 - file 48-53 combined.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/55 - file 48-53 combined.flac",
+      "sha256": "a756b460df79b7cc492223f80cda570e4511f2024e5fa0c4d505ba51b86191f6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 1938,
+        "bytes": 3876,
+        "digest": 8424661710972164246
+      }
+    },
+    {
+      "id": "flac-56 - JPG PICTURE.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/56 - JPG PICTURE.flac",
+      "sha256": "5cebe7a3710cf8924bd2913854e9ca60b4cd53cfee5a3af0c3c73fddc1888963",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 162,
+        "bytes": 324,
+        "digest": 14157558198246268614
+      }
+    },
+    {
+      "id": "flac-57 - PNG PICTURE.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/57 - PNG PICTURE.flac",
+      "sha256": "c6abff7f8bb63c2821bd21dd9052c543f10ba0be878e83cb419c248f14f72697",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 165,
+        "bytes": 330,
+        "digest": 6302011158179994751
+      }
+    },
+    {
+      "id": "flac-58 - GIF PICTURE.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/58 - GIF PICTURE.flac",
+      "sha256": "7c2b1a963a665847167a7275f9924f65baeb85c21726c218f61bf3f803f301c8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 162,
+        "bytes": 324,
+        "digest": 14157558198246268614
+      }
+    },
+    {
+      "id": "flac-59 - AVIF PICTURE.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/59 - AVIF PICTURE.flac",
+      "sha256": "7395d02bf8d9533dc554cce02dee9de98c77f8731a45f62d0a243bd0d6f9a45c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 165,
+        "bytes": 330,
+        "digest": 6302011158179994751
+      }
+    },
+    {
+      "id": "flac-60 - mono audio.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/60 - mono audio.flac",
+      "sha256": "20539fbbd6ae28cea2b2182a4c60c6c70cbb710a136199fc83200c4e5fa00b1c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 168,
+        "bytes": 224,
+        "digest": 8450107050156238720
+      }
+    },
+    {
+      "id": "flac-61 - predictor overflow check, 16-bit.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/61 - predictor overflow check, 16-bit.flac",
+      "sha256": "9b15791a8b8ca14a6b9a2374ecf7c34be25bc7b9e64fa600eb5f7608194b0b61",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 168,
+        "bytes": 224,
+        "digest": 8450107050156238720
+      }
+    },
+    {
+      "id": "flac-62 - predictor overflow check, 20-bit.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/62 - predictor overflow check, 20-bit.flac",
+      "sha256": "a6b3904e8bcce7a93ad529f9b07e64d06d6647ea7a775ba91490dbacc3c771b7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 168,
+        "bytes": 224,
+        "digest": 8450107050156238720
+      }
+    },
+    {
+      "id": "flac-63 - predictor overflow check, 24-bit.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/63 - predictor overflow check, 24-bit.flac",
+      "sha256": "d5e072373f2d9e80ca2e49b7dd349ebd4340929143d7e5f2c154a97f04755c38",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 168,
+        "bytes": 224,
+        "digest": 8450107050156238720
+      }
+    },
+    {
+      "id": "flac-64 - rice partitions with escape code zero.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/64 - rice partitions with escape code zero.flac",
+      "sha256": "3ad0bf2e9b9c78cd04deb0a8e133f5d088db051e42cbf3ffb15e1b528f009ca6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 138,
+        "bytes": 184,
+        "digest": 6046588007937107936
+      }
+    },
+    {
+      "id": "flac-01 - changing samplerate.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/01 - changing samplerate.flac",
+      "sha256": "9fa8f7c57186be8708f42620885a71d4c4871767ff55cfe063eb1cf3bad8d0a5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 408,
+        "bytes": 816,
+        "digest": 15425548226139527464
+      }
+    },
+    {
+      "id": "flac-02 - increasing number of channels.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/02 - increasing number of channels.flac",
+      "sha256": "fe70d5e324bea56e9569d4ff9d4b6fa9c33d3f763e7fec5b1f27904e648a0482",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 468,
+        "bytes": 1104,
+        "digest": 4536434275044367400
+      }
+    },
+    {
+      "id": "flac-03 - decreasing number of channels.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/03 - decreasing number of channels.flac",
+      "sha256": "8e3c451d835cd9a0ef8914e027cf93c98985bd1bb4d7eea59deb15996b97be3b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 276,
+        "bytes": 404,
+        "digest": 3195568460799576046
+      }
+    },
+    {
+      "id": "flac-04 - changing bitdepth.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/04 - changing bitdepth.flac",
+      "sha256": "f614382d8bd33b881668f2384dff03478ec2f863cb7069c42120cf8586c145b7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 102,
+        "bytes": 136,
+        "digest": 17960513415885155616
+      }
+    },
+    {
+      "id": "flac-05 - 32bps audio.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/05 - 32bps audio.flac",
+      "sha256": "de71cbd81f0be1743fc8264f159a521dfc1d92a5e2056c30a64d66001e055eec",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 378,
+        "bytes": 756,
+        "digest": 8015552757966486990
+      }
+    },
+    {
+      "id": "flac-06 - samplerate 768kHz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/06 - samplerate 768kHz.flac",
+      "sha256": "3e773546d57f7aa7d126a225f8db152a34196725b71ffb76bf2fe05bad6fbb9f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 5898,
+        "bytes": 11796,
+        "digest": 13546322267812099142
+      }
+    },
+    {
+      "id": "flac-07 - 15 bit per sample.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/07 - 15 bit per sample.flac",
+      "sha256": "7defaacc8d1bcd3201081d7054de5df1665d17f79851c35b3c6360401d30aa71",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 381,
+        "bytes": 762,
+        "digest": 14903504358764496263
+      }
+    },
+    {
+      "id": "flac-08 - blocksize 65535.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/08 - blocksize 65535.flac",
+      "sha256": "2c0825fc761db080dbfdc11ea2d2b02ee414c9ed83c6240ffbac62db22d08714",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 48,
+        "digest": 17066337561203481800
+      }
+    },
+    {
+      "id": "flac-09 - Rice partition order 15.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/09 - Rice partition order 15.flac",
+      "sha256": "33ee6f02cc9d930dd421e02b716bc2d9d520c3facdf98030eb09c303227f8626",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 16,
+        "digest": 8542067908286275392
+      }
+    },
+    {
+      "id": "flac-10 - file starting at frame header.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/10 - file starting at frame header.flac",
+      "sha256": "d95f63e8101320f5ac7ffe249bc429a209eb0e10996a987301eaa63386a8faa1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 489,
+        "bytes": 652,
+        "digest": 7722055285789212457
+      }
+    },
+    {
+      "id": "flac-11 - file starting with unparsable data.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/11 - file starting with unparsable data.flac",
+      "sha256": "40c58b833fb07f0de41259d83cde78211e3faaf9e5f844aed43fa52c18435d2f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 417,
+        "bytes": 556,
+        "digest": 9273085593052931241
+      }
+    },
+    {
+      "id": "flac-ff_s16_block16.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block16.flac",
+      "sha256": "548054363fae3e66ad73b3d02909d1f5ca548a40b96d9009ac6f1c782e2f959d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 9924,
+        "bytes": 19848,
+        "digest": 15007928689033079564
+      }
+    },
+    {
+      "id": "flac-ff_s16_block16384.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block16384.flac",
+      "sha256": "fb8acf5a8c172a6c4bf4255492ce2ac9e7a253b2ae8c4b11e7eb4ee7f30ea860",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 24,
+        "digest": 555411007705568356
+      }
+    },
+    {
+      "id": "flac-ff_s16_block192.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block192.flac",
+      "sha256": "9bd59526cb74e88c358453ca87c01cb5beccf79c445e606f61b7e5892576cdb3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 828,
+        "bytes": 1656,
+        "digest": 16419140433427973876
+      }
+    },
+    {
+      "id": "flac-ff_s16_block32768.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block32768.flac",
+      "sha256": "e90680b9245ad0dca98423753da3911d37e1ded023e2993cd0a0b362406aeab3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 12,
+        "digest": 16209294735076985778
+      }
+    },
+    {
+      "id": "flac-ff_s16_block4608.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block4608.flac",
+      "sha256": "94e667f9699121d3f56225c6d60b4d880dfd23c4299fbf25d74f852b2acfbf8e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 72,
+        "digest": 18083229185424251180
+      }
+    },
+    {
+      "id": "flac-ff_s16_block576.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block576.flac",
+      "sha256": "b88d3145b2078ef88519130407733b5a3834c7222a4c31edd8b99f344da1132a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 276,
+        "bytes": 552,
+        "digest": 10206614590077483260
+      }
+    },
+    {
+      "id": "flac-ff_s16_ch1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch1.flac",
+      "sha256": "e2572bd922f520a88c2743e22da6c84f9746ba2c08342a1e8992fd820e392e5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 52,
+        "digest": 17909231251810827657
+      }
+    },
+    {
+      "id": "flac-ff_s16_ch2.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch2.flac",
+      "sha256": "822a5b4df6458efa3b3ca9160bdc6a398d5d859cc6c73c2f4553cdf6abcfb67d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_ch3.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch3.flac",
+      "sha256": "8741fea36f842fca66a27dd151e43cf903d4faf0d7bf64ec0fbc8c7162f0dade",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 39,
+        "digest": 15563621025164041288
+      }
+    },
+    {
+      "id": "flac-ff_s16_ch4.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch4.flac",
+      "sha256": "3df23dae51a03aa7f6b871290977679ea061c0332f50e1826c587f95058b1a8a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 52,
+        "digest": 7648438586665279397
+      }
+    },
+    {
+      "id": "flac-ff_s16_ch5.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch5.flac",
+      "sha256": "c4e2ff9a2493c508a4c2f69adaf17bbfb3ca2226bff0e479b09e0636c5cfbc9e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 117,
+        "digest": 16280359793165239561
+      }
+    },
+    {
+      "id": "flac-ff_s16_ch6.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch6.flac",
+      "sha256": "cff18a774fb64c8423036ad36ff56c522b4be867701a9ad62926749240dbd81a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 117,
+        "digest": 14543981568143993980
+      }
+    },
+    {
+      "id": "flac-ff_s16_ch7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch7.flac",
+      "sha256": "e997e05c739b0104a6efc26dc529a18edd291e144786a0f3def337312ba83f8c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 39,
+        "digest": 11004200809082089844
+      }
+    },
+    {
+      "id": "flac-ff_s16_ch8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch8.flac",
+      "sha256": "9edc3f3a43f1c4821ffa5f216666fa305cbf99b261d07b9603ebf61eaeb5b710",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 39,
+        "digest": 13184119681068656145
+      }
+    },
+    {
+      "id": "flac-ff_s16_exact_rice.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_exact_rice.flac",
+      "sha256": "1e021859d83a6e221e837b0609d79b6731fba8638a493e83f90686b5a8e3cda4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_indep.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_indep.flac",
+      "sha256": "b3a4216e1717b58be3e75968080e0a98020b3f4d208f76d49dbe9fa4b2ab0424",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_left_side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_left_side.flac",
+      "sha256": "9b51bf7f46170a49d601457cbf212c0ffa1ec98e5fe7214a5bd2c7ded09103ae",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level0.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level0.flac",
+      "sha256": "3f950058f59a5ebd34a3bddd41632a71d5d9fec069fc6feb5b575815faa36307",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level1.flac",
+      "sha256": "4342de09d616d703d78c51c85d01566300365c4e68745cb31c4311ec9830e778",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level10.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level10.flac",
+      "sha256": "050b3577bfa9886b187e0e16244183fb9290c144b684388bbaec8943425dcc08",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level11.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level11.flac",
+      "sha256": "208f540bd2c16231e594bc8aa7ec7967868bc4cadf4d186d3ef97e0a4bd090c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level12.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level12.flac",
+      "sha256": "6def173a90a26b390aaf58ff05ea01ca602f1baf993b6a966d79fe347b2375a7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level2.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level2.flac",
+      "sha256": "bf4a37c3bdc2562663185e14989491afaf6c2c5ba3a70c28e13e89c320ef4f74",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level3.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level3.flac",
+      "sha256": "ed317d269c8aee3c8f917257526a348930eb175b767c2cee48f17e8307179f84",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level4.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level4.flac",
+      "sha256": "ab21aea393eca66feecc9b2a571a5c723f2ba44265fa79ab10bf6b0ce230545f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level5.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level5.flac",
+      "sha256": "4c55b1f461f2c865fdab156d7185a6419d2fd1319bb16f5bd23a8f32fc5274c1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level6.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level6.flac",
+      "sha256": "1d810f1ca1a207676c31afc23c1f3483db57068b7683fa842da69ac296465e7a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level7.flac",
+      "sha256": "dcf23b025b0c9e62596bbdc84541107b9f00a48ee37611db964b3b553805364c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level8.flac",
+      "sha256": "b83f9a907078f200c15a968e4b081e32b3ddeb8eacba5a9fce70d44772277bad",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_level9.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level9.flac",
+      "sha256": "dc7b39cf4f145bb6db77a4941fca37b22e0da95554943e28e6e091797091cdd3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_lpc_cholesky.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_lpc_cholesky.flac",
+      "sha256": "6a2e75c52399d2a5c9b7f5f6215800434e5301cb5e33048ef4da81e899d8b263",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 521782981209623579
+      }
+    },
+    {
+      "id": "flac-ff_s16_lpc_fixed.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_lpc_fixed.flac",
+      "sha256": "4b0d80200ea522bfd0cb9994bd2959bf9b1fc0e32b86005deb02d48c1450de18",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 521782981209623579
+      }
+    },
+    {
+      "id": "flac-ff_s16_lpc_levinson.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_lpc_levinson.flac",
+      "sha256": "d3e36709f7741cb2e678fdf71def9ab063965f86b0ce35c407cab90c4bc8591a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 521782981209623579
+      }
+    },
+    {
+      "id": "flac-ff_s16_lpc_none.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_lpc_none.flac",
+      "sha256": "ae0bcfe9fb938f87024a11b1b48530ef37d4de845b421c767cd975cdcf4288f3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 521782981209623579
+      }
+    },
+    {
+      "id": "flac-ff_s16_mid_side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_mid_side.flac",
+      "sha256": "f844dff967e5a93e1be922b0ab0903426313bcb2e26a1a4e1ebc7d31cfaf3940",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_multi_dim_quant.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_multi_dim_quant.flac",
+      "sha256": "d37b2f6012d36366985183d266660148dec71d825ad82881274e88bb6e329eeb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_order_2level.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_order_2level.flac",
+      "sha256": "c277537fbaf18f76e789bcf00953abfa939ad0ad42d6c10c9d0239705f68b55f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_order_estimation.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_order_estimation.flac",
+      "sha256": "4cfd751c9b9a28519821fcbbd3395755810a0f21dab36de3fbf1239b371c803c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_order_log.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_order_log.flac",
+      "sha256": "b5439e68aa7d2e8d55ae972c2f8ca8b28dcf7292f19ddce2ba6ccb00b3832c00",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_order_search.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_order_search.flac",
+      "sha256": "23574ab898a1a1998dc48bb7b1cf9e55a120f2d1ddefe3a8cf41e23cfd2b9305",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_partitions_0_0.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_partitions_0_0.flac",
+      "sha256": "eabd68c9a72c3b620859166da9b0b10b71653c83a1cca8e9e1655f92efd935ec",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_partitions_0_8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_partitions_0_8.flac",
+      "sha256": "058fc1a24c6647d0284f10a9131469434dc2454028aad6ec71941a7993fbb643",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_partitions_8_8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_partitions_8_8.flac",
+      "sha256": "40f4670f10480da5d6ff6385a4766438fa1e7eff364b7511bd4c6db556a5f02f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_rate11025.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate11025.flac",
+      "sha256": "309e9d19fe3b6f33370c6b105d9b8fa2283fa759a2f290e42bfdc06ed1db0164",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10619479884565859278
+      }
+    },
+    {
+      "id": "flac-ff_s16_rate176400.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate176400.flac",
+      "sha256": "9361ce60edff58863639cc6271ff6b40f77a057df4f8813f3adaa6ba47b3b23d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 7796824351119954113
+      }
+    },
+    {
+      "id": "flac-ff_s16_rate192000.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate192000.flac",
+      "sha256": "d36e59816ebc2d22efbbbad0f792046252f6029b1e32ad9909f9a246eb0030d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 9785059506863956379
+      }
+    },
+    {
+      "id": "flac-ff_s16_rate22050.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate22050.flac",
+      "sha256": "9cd6f31c9a8ba7811e1a173a3cc60953739e853d43ad0cc2accc0717920599d6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 16580217540239316139
+      }
+    },
+    {
+      "id": "flac-ff_s16_rate32000.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate32000.flac",
+      "sha256": "95eaed2637cce53d2e2ac763c9db68e8e57ec147af13d20ba1339779415d76b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 57,
+        "bytes": 114,
+        "digest": 4556683347446647535
+      }
+    },
+    {
+      "id": "flac-ff_s16_rate37800.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate37800.flac",
+      "sha256": "e0d4eae4f7a6ff283f792356fe6c2500012831f145e7411f10c21011df2bb93d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 10963647726019677787
+      }
+    },
+    {
+      "id": "flac-ff_s16_rate8000.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate8000.flac",
+      "sha256": "ea264945397e3f2e11c60282bcca1d2ebc8a8d0c0fcadc166620c776eebccda9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 57,
+        "bytes": 114,
+        "digest": 7147849592065615279
+      }
+    },
+    {
+      "id": "flac-ff_s16_rate88200.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate88200.flac",
+      "sha256": "b07dad3095f0944219df7a160be6c3bc0ffa4ffeb86d4fac77fa8141aff2c3f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 15451155326860954073
+      }
+    },
+    {
+      "id": "flac-ff_s16_right_side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_right_side.flac",
+      "sha256": "20671462cf0d9d2c999f4ff8b330587075d0e883aeeeb160a62746ec6745ca13",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s16_wasted2.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_wasted2.flac",
+      "sha256": "ebc7785dff177f21c91eb1a36440bd172beda390ddd2f4a1615f7bbf5db43866",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-ff_s24_ch1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_ch1.flac",
+      "sha256": "5c704c0facc4fac3d723442b3c3e2f62b250f2b9df1250569e8d12d3c905b014",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 60,
+        "digest": 5085071056912507949
+      }
+    },
+    {
+      "id": "flac-ff_s24_ch6.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_ch6.flac",
+      "sha256": "9432219736b7dbbc1f6d15f9e25b76e44e2872bda2b5c127d4a406bea27290b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 135,
+        "digest": 4701763744253697216
+      }
+    },
+    {
+      "id": "flac-ff_s24_ch8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_ch8.flac",
+      "sha256": "3fbb8c4a2c9272b3da67a5ce2fae2101e5674d1d0a92d21ad5417fbbdc8f26ef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 45,
+        "digest": 3720034450806749493
+      }
+    },
+    {
+      "id": "flac-ff_s24_indep.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_indep.flac",
+      "sha256": "3860e4370bbb28506b2e52b47cb8ef6104ef4080be3b4dfab765f8c26a35398b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 3609541823094401179
+      }
+    },
+    {
+      "id": "flac-ff_s24_left_side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_left_side.flac",
+      "sha256": "adafa194ae2332569b260f96cfec6da519a0eeeae2b241431f13e786455d22cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 3609541823094401179
+      }
+    },
+    {
+      "id": "flac-ff_s24_mid_side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_mid_side.flac",
+      "sha256": "7283261a9de033f31fbf7c80501cb17c03d112378f43221958bbadf15c317956",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 3609541823094401179
+      }
+    },
+    {
+      "id": "flac-ff_s24_order1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_order1.flac",
+      "sha256": "67de173e96c651740cabbd91d86d44696f3ee773125117aca190254e2208472e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 3609541823094401179
+      }
+    },
+    {
+      "id": "flac-ff_s24_order12.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_order12.flac",
+      "sha256": "d07c0ed6cec52006cd2d92d464a95745930b60855d92f40fdc22c1ff337c8e80",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 3609541823094401179
+      }
+    },
+    {
+      "id": "flac-ff_s24_order32.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_order32.flac",
+      "sha256": "9924386b6c13f0a4f29d00e88883fd95d85b6c382a6202e20e3562c77586ef98",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 3609541823094401179
+      }
+    },
+    {
+      "id": "flac-ff_s24_right_side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_right_side.flac",
+      "sha256": "898097ae4729f45a4295564eae364dca37d7c3177c84292cad462befde587fdd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 3609541823094401179
+      }
+    },
+    {
+      "id": "flac-ff_s24_wasted8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_wasted8.flac",
+      "sha256": "03094ef0dea69375bf779e05e7c09e4d698f9da4a22d54bcf45d3afb392d120d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 521782981209623579
+      }
+    },
+    {
+      "id": "flac-ff_s32_ch1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_ch1.flac",
+      "sha256": "32dd1355c8e8ac6be74c6c27f3fd102a275cc7fa78ff9311a4603206fd0abab1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 60,
+        "digest": 5085071056912507949
+      }
+    },
+    {
+      "id": "flac-ff_s32_ch6.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_ch6.flac",
+      "sha256": "01ecc5387291d0e059eabdd02abf19b737d35d2430f57b914c41583e186db031",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 135,
+        "digest": 4701763744253697216
+      }
+    },
+    {
+      "id": "flac-ff_s32_ch8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_ch8.flac",
+      "sha256": "15ac9aee06187a081b9e28a42cee18273ab5feabbb81ce2584bfef25d66b19ad",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 45,
+        "digest": 3720034450806749493
+      }
+    },
+    {
+      "id": "flac-ff_s32_indep.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_indep.flac",
+      "sha256": "32ff8af7ee7c2b1240271e35be6661b3e17b2d7fbc4426ceb52b9faac797cdb3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 521782981209623579
+      }
+    },
+    {
+      "id": "flac-ff_s32_left_side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_left_side.flac",
+      "sha256": "38e02c90dc8b2e6051b1cfb9e38bb333b4b4acc0ecafbfe1117a24b692779ba8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 521782981209623579
+      }
+    },
+    {
+      "id": "flac-ff_s32_mid_side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_mid_side.flac",
+      "sha256": "1751955ef7f50f04342dd2d4c59c416fa715d3cab14a58b2e7e588e33f265868",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 521782981209623579
+      }
+    },
+    {
+      "id": "flac-ff_s32_order32.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_order32.flac",
+      "sha256": "811c62f212fb19d931d8ba730f0957f25220ed517cf9e2e83296227386bdc430",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 521782981209623579
+      }
+    },
+    {
+      "id": "flac-ff_s32_right_side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_right_side.flac",
+      "sha256": "fc57c6e0e9faa97a1859603d984641a5d4c4f67c650af3b36d006b198cd9916e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 521782981209623579
+      }
+    },
+    {
+      "id": "flac-flac_3ch_odd_mask.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_3ch_odd_mask.flac",
+      "sha256": "87e97b0c67626ee73d88345e60caa579ad712b4d3cb350b8caa2b1a3dbd5c087",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 299,
+        "digest": 7235103512750375328
+      }
+    },
+    {
+      "id": "flac-flac_5ch_back_mask.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_5ch_back_mask.flac",
+      "sha256": "46b58f8553252ac71271500937c2a7f1b6fa62ee42f7acd4d09cbab9b27aa144",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 39,
+        "digest": 6568551812980452549
+      }
+    },
+    {
+      "id": "flac-flac_b12_ch7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b12_ch7.flac",
+      "sha256": "e60b6a181cc50ac131534860cceeda69ed0da3c7e8a5e433b7750bce6d38e512",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 45,
+        "digest": 11889171619133402240
+      }
+    },
+    {
+      "id": "flac-flac_b12_stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b12_stereo.flac",
+      "sha256": "404783304e2124a405de7b276d44b828ef8e3f9a40d1fcf5544f4e5198114e14",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_b15_stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b15_stereo.flac",
+      "sha256": "a760b0266139626acc5d5758f086079efa1f27524497d67dce7c0dad418f72fa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_b16_stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b16_stereo.flac",
+      "sha256": "7d41e98d4ebafcee67348280ea047d8bb272e52bec06b267747d9e1a0d525f81",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_b20_ch7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b20_ch7.flac",
+      "sha256": "e87d93f2ba06f74efbd3a6d67514cd297e4bbd8cb13c992ba35eb666409461eb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 45,
+        "digest": 11889171619133402240
+      }
+    },
+    {
+      "id": "flac-flac_b20_stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b20_stereo.flac",
+      "sha256": "0a4d1e866cc47239e6df1d15414dd2fe966f53743e33d505a70282a11698ec46",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_b24_stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b24_stereo.flac",
+      "sha256": "da357d4634baca5d924a70638b7acf6aab35b6986654969a32024470aed1f287",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_b28_stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b28_stereo.flac",
+      "sha256": "c5b8cceb426b01250aa9415694529c0f91f9e00ae94f5443ca67dee8dc5eaec8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_b31_stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b31_stereo.flac",
+      "sha256": "2d34e0f5ad927022d6b28873c4c0cabc23092144541a702f825edbb5e73215d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_b32_stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b32_stereo.flac",
+      "sha256": "44ead8e11d162c12e35d1d021f5c6587e253d53d9bae6cd5683910426b865652",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_b4_stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b4_stereo.flac",
+      "sha256": "8cfc3fee961265c839230c38edd95e0137fd6faf7491ed6add9ae861e5d81f45",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_b5_stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b5_stereo.flac",
+      "sha256": "5c3934c2e5a569168583d5e7a74e10f48a967f064dcd2d2ea10ff932e2831294",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_b8_ch7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b8_ch7.flac",
+      "sha256": "b04f63546b56858cec9a33af22f6fa12506c7b648a8b12a05bdbba32b41e460d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 45,
+        "digest": 11889171619133402240
+      }
+    },
+    {
+      "id": "flac-flac_b8_stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b8_stereo.flac",
+      "sha256": "42469f93bd23c20ba4275fcf01fb5872a30fb9f69a63b11877cefd170ca01e22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_quad_side_mask.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_quad_side_mask.flac",
+      "sha256": "bc4f8a82c4d48cf015cde1e12cd52063f4a2d2d4375730df4fdeea8ee9b53dac",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 130,
+        "digest": 18403927712892397061
+      }
+    },
+    {
+      "id": "flac-flac_s16_adaptive_mid_side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_adaptive_mid_side.flac",
+      "sha256": "3b8e6f786f80db709f56c013cd3b0d44c52cf5d0de4ab13968a34ba2275e9bbc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_s16_block16.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_block16.flac",
+      "sha256": "9693d2722d3c2c0d86b568621584e6230c70961b64043df8e963dc5b4355f78f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 9924,
+        "bytes": 13232,
+        "digest": 4779103645982689472
+      }
+    },
+    {
+      "id": "flac-flac_s16_block65535.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_block65535.flac",
+      "sha256": "ecc66bf25625890684c64e8042d00d2c63ae75231870ffcfbab773170a66d94e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 19724956411131449
+      }
+    },
+    {
+      "id": "flac-flac_s16_ch1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch1.flac",
+      "sha256": "631ca35739a1c4cd1922c8e343e344f1b79c0cbb8ba9b0ae296f2c49204eb847",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 52,
+        "digest": 17909231251810827657
+      }
+    },
+    {
+      "id": "flac-flac_s16_ch2.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch2.flac",
+      "sha256": "b61ba81d31f68d70ce7f8ca80544e364aa66405f8e91a9edb1350d865e943ffb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_s16_ch3.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch3.flac",
+      "sha256": "ec57dcf43828fdd4ae09150601a4e23eb98aea815fca63040e062fbfe24ab2e7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 39,
+        "digest": 15563621025164041288
+      }
+    },
+    {
+      "id": "flac-flac_s16_ch4.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch4.flac",
+      "sha256": "f1f88c8262da575049e15d9557b25025051cfe435c8bf1226401d16837092927",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 52,
+        "digest": 7648438586665279397
+      }
+    },
+    {
+      "id": "flac-flac_s16_ch5.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch5.flac",
+      "sha256": "9561b0176da556d0dff463724f77887a36cb58e39ae23098f50e206e3f19ce8e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 117,
+        "digest": 16280359793165239561
+      }
+    },
+    {
+      "id": "flac-flac_s16_ch6.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch6.flac",
+      "sha256": "d800fa59e65da9aee53a61e878518f52e7cc5173ac8003f106e75e582e6f55b8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 117,
+        "digest": 14543981568143993980
+      }
+    },
+    {
+      "id": "flac-flac_s16_ch7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch7.flac",
+      "sha256": "e9ef7aa20fd6c456baa868e9a7d5d8f16f1150ddeb97d4699273988bdd61652f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 39,
+        "digest": 11004200809082089844
+      }
+    },
+    {
+      "id": "flac-flac_s16_ch8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch8.flac",
+      "sha256": "1fffdd88054f0964b839f8c84df54752b42a33d686a2b02044074f174cd50c7f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 39,
+        "digest": 13184119681068656145
+      }
+    },
+    {
+      "id": "flac-flac_s16_exhaustive.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_exhaustive.flac",
+      "sha256": "197229d7c0f6641fbb7077f58026aa73836592000c937c57ab00a3f591b3ca79",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_s16_level0.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_level0.flac",
+      "sha256": "c120d0b2c6a0b36ac896e0538cc3e79af52463f124051d09c7907da55c47109e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 138,
+        "bytes": 276,
+        "digest": 10935793870078203390
+      }
+    },
+    {
+      "id": "flac-flac_s16_level3.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_level3.flac",
+      "sha256": "16dfa93e3576f7516e1bea12ad86b3e4e76a515d498e510296b2711ed7384d68",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_s16_level5.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_level5.flac",
+      "sha256": "beab06952dd5b05bf800974e6fbcc8038a650ef6a1fcd5f9b6d987366f5b884c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_s16_no_mid_side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_no_mid_side.flac",
+      "sha256": "155898f16330c1dbc878546331a19cd4728ab2b74f1877d7dba1ab95feb3ef2d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_s16_partition15.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_partition15.flac",
+      "sha256": "a4759d7c67560e33c5d3153df5ed51f64b48caf49e735fd740159defa0082dc1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 8,
+        "digest": 15142913391108782880
+      }
+    },
+    {
+      "id": "flac-flac_s16_precision5.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_precision5.flac",
+      "sha256": "449f24301fcf5ad557c6321a6dd0de641504487849b2e9638f19187bd1ae0a2e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_s16_rate1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_rate1.flac",
+      "sha256": "5a235bd079ae95f6317a9311aef06de4a067235f8fb213be4209be061fafae12",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 4,
+        "digest": 6120008990310509292
+      }
+    },
+    {
+      "id": "flac-flac_s16_wasted3.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_wasted3.flac",
+      "sha256": "415f469be74378e22775a6e722192982c8b4daa94bd91aa35b34046780311753",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 39,
+        "bytes": 78,
+        "digest": 10054948777876678245
+      }
+    },
+    {
+      "id": "flac-flac_s20_rate768k.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s20_rate768k.flac",
+      "sha256": "ea3c5aa6fd530bd0b14f893f151904119d6d140d228bbfe67e4a1ac413f4bb0f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 675,
+        "bytes": 1350,
+        "digest": 83726721589231189
+      }
+    },
+    {
+      "id": "flac-flac_s24_lax_order32.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s24_lax_order32.flac",
+      "sha256": "8149571f13902f4c38f7aa4dedae8cce5cc0ff4cf2d16ec6ebe5915f3cdc442d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 87,
+        "bytes": 174,
+        "digest": 11431449921699422017
+      }
+    },
+    {
+      "id": "flac-flac_s32_lax_order32.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s32_lax_order32.flac",
+      "sha256": "cf908410b01401472170878dc3acf772724e8e40f3e50bf2bf2e1b591d0c4e5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 45,
+        "bytes": 90,
+        "digest": 521782981209623579
+      }
+    },
+    {
+      "id": "mp3-compl.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/compl.bit",
+      "sha256": "3b93f3675821a5af4826abcff7097fa2e42efcc46154e02c992995f7e31dbc8e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 651,
+        "bytes": 868,
+        "digest": 17556907625673423373
+      }
+    },
+    {
+      "id": "mp3-he_32khz.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/he_32khz.bit",
+      "sha256": "965065cdcac3f45a61a9f54b4f94d59d0334f4b5cb74840a5aec7d405e2e050f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 450,
+        "bytes": 600,
+        "digest": 18214709694834106336
+      }
+    },
+    {
+      "id": "mp3-he_44khz.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/he_44khz.bit",
+      "sha256": "a64212281a8896d90e00f06c9b21f2c8f21ef9cb7367cae692a92ea421984441",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 1230,
+        "bytes": 1640,
+        "digest": 8743979729883343008
+      }
+    },
+    {
+      "id": "mp3-he_48khz.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/he_48khz.bit",
+      "sha256": "dd0383075710570648b8961f3cd0ce692f07a679b265fc4997e50883b3958299",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 450,
+        "bytes": 600,
+        "digest": 14838799685638451168
+      }
+    },
+    {
+      "id": "mp3-he_free.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/he_free.bit",
+      "sha256": "b55afc2a21492c4b3035d423f36fe87560ef34f65eb997da60af9b01f300362c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "mp3-he_mode.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/he_mode.bit",
+      "sha256": "fb90396d9bb13311be35284d061e19196830d213d823e05297b18172c88d90ce",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 384,
+        "bytes": 712,
+        "digest": 14083571280797333636
+      }
+    },
+    {
+      "id": "mp3-hecommon.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/hecommon.bit",
+      "sha256": "21999b77716aeba047c7f55c2c1ce17b54c780b6dc007912f251b7ea189676ef",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 90,
+        "bytes": 180,
+        "digest": 9860509654795433070
+      }
+    },
+    {
+      "id": "mp3-si.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/si.bit",
+      "sha256": "4f3382de1d9265013d42249ff108023d4a90ecf3c0136489d199243a90a5d0f9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 354,
+        "bytes": 472,
+        "digest": 11120873723030972512
+      }
+    },
+    {
+      "id": "mp3-si_block.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/si_block.bit",
+      "sha256": "1d12956840638bf6b81164fc510c3e8269eeb038a51dc4548469e21a71e52b69",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 192,
+        "bytes": 256,
+        "digest": 16875349429686363136
+      }
+    },
+    {
+      "id": "mp3-si_huff.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/si_huff.bit",
+      "sha256": "fda6d8a7d4e1df3cb17d3560b57013ef98abbf9c60d940455c2e3ebf63eae0ef",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 225,
+        "bytes": 300,
+        "digest": 13659768278784985257
+      }
+    },
+    {
+      "id": "mp3-sin1k0db.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/sin1k0db.bit",
+      "sha256": "64775e23c29aa84e27f68777460f88e0717af2ed64e732d287a20c5a92c9fa3e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 954,
+        "bytes": 1908,
+        "digest": 11825247926855323790
+      }
+    },
+    {
+      "id": "mp3-l3_11k_32.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_11k_32.mp3",
+      "sha256": "8d5f9087792cb7baf9e5fd1359f3ff9bc0ee05954435a03690cd3a5f3f4960f4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 348,
+        "bytes": 696,
+        "digest": 3320246849559016888
+      }
+    },
+    {
+      "id": "mp3-l3_12k_24_mono.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_12k_24_mono.mp3",
+      "sha256": "16bfe024b825abf421e1334199b9b414292137b0706d1dc44ceb2e426c23688d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 378,
+        "bytes": 504,
+        "digest": 481571039995494496
+      }
+    },
+    {
+      "id": "mp3-l3_16k_32_mono.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_16k_32_mono.mp3",
+      "sha256": "ae079f158edac2c65a2fbf2d9c4b63de06f85248a2d1c3ec6368f303fcb08465",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 504,
+        "bytes": 672,
+        "digest": 17636673129520668800
+      }
+    },
+    {
+      "id": "mp3-l3_22k_64_joint.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_64_joint.mp3",
+      "sha256": "b81664df7924f37421f22cb0fed3b42bf6152c5fd196c3a49f37713764221a48",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 693,
+        "bytes": 1386,
+        "digest": 8149516557387616129
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s0_ms0_slen2.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s0_ms0_slen2.mp3",
+      "sha256": "03f409515f3fcec5719242df8d1d9352bcd13a0f77405781f093f0ae4e75539d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s0_ms0_slen3.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s0_ms0_slen3.mp3",
+      "sha256": "4c2d8caa52a145db485f2426c3febed10e1969c2c0bb08101ac3deb0dc8b325a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s0_ms0_slen4.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s0_ms0_slen4.mp3",
+      "sha256": "c0d99f344fd326953e93081f56fd0d1327cf363923459b21c25067e2f0a171c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s0_ms1_slen2.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s0_ms1_slen2.mp3",
+      "sha256": "0c4dca244e24f7f492706678083f61543e5ce87bfff0eb6e7af24912a510bfd0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s0_ms1_slen3.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s0_ms1_slen3.mp3",
+      "sha256": "ef9e5fbc9122ee85c510ccc77dd2466e9901b74312b597596e54382c8ea9d272",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s0_ms1_slen4.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s0_ms1_slen4.mp3",
+      "sha256": "0803563c8ac3545b3a909d0bf8fc311eb0ec960d85b1d778e4490d034d76adfc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s1_ms0_slen2.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s1_ms0_slen2.mp3",
+      "sha256": "80f9d84205385ad988a8c3e9abcd1bd1f7e1485ab5667589d1631a96da278338",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s1_ms0_slen3.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s1_ms0_slen3.mp3",
+      "sha256": "b5c389f37a10a6fb46fab0cea46840f52b8ce802d8b6654bb825a9464b40712f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s1_ms0_slen4.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s1_ms0_slen4.mp3",
+      "sha256": "110f929b6f21df042e75a7ca75b42e869aa3602a2e5c8557bb851fc2087c0798",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s1_ms1_slen2.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s1_ms1_slen2.mp3",
+      "sha256": "a6fe5a47d5b284f50af6cbf0d52523085eb0dabf02eaf972180175f354f4657b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s1_ms1_slen3.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s1_ms1_slen3.mp3",
+      "sha256": "9bce52856d3ccd8c72e921e7f17f2cf7df668a848c6462268798cbddc4d75134",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_22k_intensity_s1_ms1_slen4.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_22k_intensity_s1_ms1_slen4.mp3",
+      "sha256": "e2e648b1f9559b7f73ab1f452dc2579377b2fdc95270bdfbd58fe9626015cbbc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 69,
+        "bytes": 138,
+        "digest": 9041486823287092945
+      }
+    },
+    {
+      "id": "mp3-l3_24k_vbr4.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_24k_vbr4.mp3",
+      "sha256": "2a6531785477165af3a1e675fc7320b64acd7fd228cd3493de9349a0f93b8eb3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 753,
+        "bytes": 1506,
+        "digest": 1174310472685393463
+      }
+    },
+    {
+      "id": "mp3-l3_32k_64_mono.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_32k_64_mono.mp3",
+      "sha256": "f6a75f75a5df8e12e60ee56bc9fd87ba5deb7efa8c65f623ba035d74c1685c25",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 504,
+        "bytes": 672,
+        "digest": 1299278165775835264
+      }
+    },
+    {
+      "id": "mp3-l3_44k_128_id3.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_44k_128_id3.mp3",
+      "sha256": "20a7564e46460ca48e6fed51a97fe8c308049e27eb6c18432e62d8389af2d3cf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 693,
+        "bytes": 1386,
+        "digest": 13669513014905285039
+      }
+    },
+    {
+      "id": "mp3-l3_44k_128_joint.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_44k_128_joint.mp3",
+      "sha256": "a07a0943e2b89b03db04e3db0f81e69debd941e2962bfb6eb0398187d90f34e4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 693,
+        "bytes": 1386,
+        "digest": 13669513014905285039
+      }
+    },
+    {
+      "id": "mp3-l3_44k_128_noreservoir.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_44k_128_noreservoir.mp3",
+      "sha256": "6006cdd19a0ed415cf0b2f0c749d64037da60c860237f1b04676925b81ed440d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 693,
+        "bytes": 1386,
+        "digest": 13669513014905285039
+      }
+    },
+    {
+      "id": "mp3-l3_44k_128_noxing.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_44k_128_noxing.mp3",
+      "sha256": "ab4ed5ab6fd135e1bc974acbc108cefcf2b2f398a4b2cfc766cb7ee5df8a6362",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 693,
+        "bytes": 1386,
+        "digest": 13669513014905285039
+      }
+    },
+    {
+      "id": "mp3-l3_44k_320_stereo.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_44k_320_stereo.mp3",
+      "sha256": "dde86cc9e7e8dee80bc0b9b2d14767c0ebc86c011dbdb3fa4dac9b6942303d20",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 693,
+        "bytes": 1386,
+        "digest": 13669513014905285039
+      }
+    },
+    {
+      "id": "mp3-l3_44k_32_joint.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_44k_32_joint.mp3",
+      "sha256": "870a32247ecee552a5cbfadd86f42aae080c3a7025db2d0683d04e724381d552",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 693,
+        "bytes": 1386,
+        "digest": 13669513014905285039
+      }
+    },
+    {
+      "id": "mp3-l3_44k_abr160.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_44k_abr160.mp3",
+      "sha256": "27da2358e1638e124d07dd025747e35a16bf7e9831e7df9c178e182fbf2735d2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 693,
+        "bytes": 1386,
+        "digest": 13669513014905285039
+      }
+    },
+    {
+      "id": "mp3-l3_48k_vbr2.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_48k_vbr2.mp3",
+      "sha256": "cfd4b11e7562aca02d17c4d5519f35f72df5cae6f54238e9b8836bf7fa122b91",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 753,
+        "bytes": 1506,
+        "digest": 11649422777537311095
+      }
+    },
+    {
+      "id": "mp3-l3_8k_16.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_8k_16.mp3",
+      "sha256": "8a50b9659dd05afdf7206da3582b051b72d7848fc760565b8bcd2583b01c3f4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 255,
+        "bytes": 510,
+        "digest": 3428742769467216153
+      }
+    },
+    {
+      "id": "mp3-l3_8k_8_mono.mp3",
+      "profile": "mp3",
+      "file": ".research/mp3/vectors/l3_8k_8_mono.mp3",
+      "sha256": "0dd6fa772cb93bd64ec0421474b076b01e9c33d19f7d45f52b49e44fe14c2724",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 255,
+        "bytes": 340,
+        "digest": 9700100448897506701
+      }
+    },
+    {
+      "id": "mp2-l2_16k_32_mono.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2_16k_32_mono.mp2",
+      "sha256": "4c0d99e1b49929d7d7a5fe6a81fe3172df81c681197dcc17c82559882d179284",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 252,
+        "bytes": 336,
+        "digest": 32323403228651584
+      }
+    },
+    {
+      "id": "mp2-l2_22k_96.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2_22k_96.mp2",
+      "sha256": "1b5d012e587442815fdfcf51a3b59cf00628b9be0bc187c3172944dda11789bd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 345,
+        "bytes": 690,
+        "digest": 7541174770358868373
+      }
+    },
+    {
+      "id": "mp2-l2_24k_64.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2_24k_64.mp2",
+      "sha256": "b7af9875eeee4b3b1e2e3bf16b03bfeb0d6c7f417b631ff3811c3129cb9859f5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 375,
+        "bytes": 750,
+        "digest": 18151843079996355297
+      }
+    },
+    {
+      "id": "mp2-l2_32k_192.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2_32k_192.mp2",
+      "sha256": "ce76ad0db332c461b14983386f2d039c820c0fe910413d0f09e35e94b20d5e08",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 501,
+        "bytes": 1002,
+        "digest": 13943416819083844371
+      }
+    },
+    {
+      "id": "mp2-l2_32k_48_mono.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2_32k_48_mono.mp2",
+      "sha256": "ed2d6eb7e346437a6ea5da8095221d4609ec0e701ff8a334208f936ee8f453b0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 501,
+        "bytes": 668,
+        "digest": 15169567385807941421
+      }
+    },
+    {
+      "id": "mp2-l2_44k_128.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2_44k_128.mp2",
+      "sha256": "271abb03271e0904e45f93959c8dc4a47fc34120eb304ddea91338987801322b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 690,
+        "bytes": 1380,
+        "digest": 9574814965055729654
+      }
+    },
+    {
+      "id": "mp2-l2_44k_32_mono.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2_44k_32_mono.mp2",
+      "sha256": "b208989cb865d52c68d6e794f4ec2a54ceb625f7a9928aab2a394d3fa322687c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 690,
+        "bytes": 920,
+        "digest": 5944905616163551072
+      }
+    },
+    {
+      "id": "mp2-l2_44k_80_mono.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2_44k_80_mono.mp2",
+      "sha256": "0ffe472ec3739527aebe434ff18bfb90efbcb0243f2b9f122c685a78e0953d3c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 690,
+        "bytes": 920,
+        "digest": 5944905616163551072
+      }
+    },
+    {
+      "id": "mp2-l2_48k_192.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2_48k_192.mp2",
+      "sha256": "70021b5d12d6efd034e87c34be2cdfe362026169437c062c28693972c1229c8a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 750,
+        "bytes": 1500,
+        "digest": 17588290520136126338
+      }
+    },
+    {
+      "id": "mp2-l2_48k_384.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2_48k_384.mp2",
+      "sha256": "a339e7eaa53828e958dd230aff8fc97adad5c139404942120a26886c0519703b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 750,
+        "bytes": 1500,
+        "digest": 17588290520136126338
+      }
+    },
+    {
+      "id": "mp2-l2fixed_44k_64_mono.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2fixed_44k_64_mono.mp2",
+      "sha256": "f8a2cd6d1e9c60cc7d52d3bb12d6e1d3327cf6276b7e9d12c80451ff622fc045",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 690,
+        "bytes": 920,
+        "digest": 5944905616163551072
+      }
+    },
+    {
+      "id": "mp2-l2fixed_48k_256.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2fixed_48k_256.mp2",
+      "sha256": "b3c5b1abdfc23801406b3793434a26349676531e72efde8a291339acc83c1a47",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 750,
+        "bytes": 1500,
+        "digest": 17588290520136126338
+      }
+    },
+    {
+      "id": "mp2-l2r_16k_64_joint.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2r_16k_64_joint.mp2",
+      "sha256": "01d413b04b5c074c0143845f5776c5cac052a4da669bdc17dad9707233c6c530",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 180,
+        "bytes": 360,
+        "digest": 15322056913103352300
+      }
+    },
+    {
+      "id": "mp2-l2r_22k_160_dual.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2r_22k_160_dual.mp2",
+      "sha256": "61f76585e1fd5d67227bec111bc794c9cb7bc074f47afcbbee2dd7b61071079a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 180,
+        "bytes": 360,
+        "digest": 7509449905345087716
+      }
+    },
+    {
+      "id": "mp2-l2r_32k_48_mono.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2r_32k_48_mono.mp2",
+      "sha256": "d3e164d7b69d8661bf3b98f0ae70e48a699533724da8db388ef24bf825f50eaf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 180,
+        "bytes": 240,
+        "digest": 9914854950192320
+      }
+    },
+    {
+      "id": "mp2-l2r_32k_80_mono.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2r_32k_80_mono.mp2",
+      "sha256": "5fb6adcfbd7344414e08de9eebd4791f30c9b36ed9d891724109016889fa5566",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 180,
+        "bytes": 240,
+        "digest": 9914854950192320
+      }
+    },
+    {
+      "id": "mp2-l2r_44k_112_stereo.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2r_44k_112_stereo.mp2",
+      "sha256": "f993b2ed28c226569f9fede952330a2d9de10d4e81250108a576ae05c65c0b2d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 180,
+        "bytes": 360,
+        "digest": 2970434443783144924
+      }
+    },
+    {
+      "id": "mp2-l2r_44k_160_stereo_crc.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2r_44k_160_stereo_crc.mp2",
+      "sha256": "aaf80a89bc7540b538c7d186e451abc0746d549c27144f223e030a8b56528e1b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 180,
+        "bytes": 360,
+        "digest": 2970434443783144924
+      }
+    },
+    {
+      "id": "mp2-l2r_44k_64_joint.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2r_44k_64_joint.mp2",
+      "sha256": "82ad4c752dd32c2215a17c8e6c42004ad2c6be1fcce97db9a2ad06e9e2f4f63c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 180,
+        "bytes": 360,
+        "digest": 2970434443783144924
+      }
+    },
+    {
+      "id": "mp2-l2r_48k_384_joint.mp2",
+      "profile": "mp2",
+      "file": ".research/mp3/vectors/l2r_48k_384_joint.mp2",
+      "sha256": "f1444a352dc1ec1503334fc12be51f098b2cdfa164e05d3d3bd08e4bd78b648c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 180,
+        "bytes": 360,
+        "digest": 3422495931786444268
+      }
+    },
+    {
+      "id": "mp1-l1_24k_128_joint.mp1",
+      "profile": "mp1",
+      "file": ".research/mp3/vectors/l1_24k_128_joint.mp1",
+      "sha256": "8e164f64e869877be1e01fb22b239929017522abda66e7a37c99fa846dc72d0d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp1"
+      ],
+      "expected": {
+        "packets": 360,
+        "bytes": 720,
+        "digest": 8356021724128013784
+      }
+    },
+    {
+      "id": "mp1-l1_32k_96_mono.mp1",
+      "profile": "mp1",
+      "file": ".research/mp3/vectors/l1_32k_96_mono.mp1",
+      "sha256": "51e9e13a52cdc2e52b2212c103b9a012be3fd7513feb78136363f30b0d2188f2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp1"
+      ],
+      "expected": {
+        "packets": 360,
+        "bytes": 480,
+        "digest": 13766673861336426880
+      }
+    },
+    {
+      "id": "mp1-l1_44k_384_stereo.mp1",
+      "profile": "mp1",
+      "file": ".research/mp3/vectors/l1_44k_384_stereo.mp1",
+      "sha256": "152b8902258fe9327d31971ca5a4ba9f99b7b9a503cad7881aaaed1d56704bad",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp1"
+      ],
+      "expected": {
+        "packets": 360,
+        "bytes": 720,
+        "digest": 11280087185661460408
+      }
+    },
+    {
+      "id": "mp1-l1_44k_448_dual_crc.mp1",
+      "profile": "mp1",
+      "file": ".research/mp3/vectors/l1_44k_448_dual_crc.mp1",
+      "sha256": "739cef5c3832d816cdab8f23d5c366c69c87c930b9fa69b78966720de9bbcd25",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp1"
+      ],
+      "expected": {
+        "packets": 360,
+        "bytes": 720,
+        "digest": 11280087185661460408
+      }
+    },
+    {
+      "id": "mp1-l1_48k_256_joint.mp1",
+      "profile": "mp1",
+      "file": ".research/mp3/vectors/l1_48k_256_joint.mp1",
+      "sha256": "002a4773b92123a867c850265fe8a5f8f7f2edeca2bffae2054af269f1042c5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp1"
+      ],
+      "expected": {
+        "packets": 360,
+        "bytes": 720,
+        "digest": 6891601479290757080
+      }
+    },
+    {
+      "id": "vorbis-1.0-test_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/1.0-test_small.ogg",
+      "sha256": "9f510e92b976eaf735009b444511f856db601eb13698b54fdfc9c4e078f9f3bc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 822,
+        "bytes": 1644,
+        "digest": 11556765403060475458
+      }
+    },
+    {
+      "id": "vorbis-1.0.1-test_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/1.0.1-test_small.ogg",
+      "sha256": "1eef411505a81a7b4e2e6bcc382844479fa51db88f2d03ed8e638682b0786e4e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1002,
+        "bytes": 2004,
+        "digest": 10980194816339014174
+      }
+    },
+    {
+      "id": "vorbis-6.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/6.ogg",
+      "sha256": "1dbce194fb1ca74250c156b4aba10b3bf76f90bc5ca8896823cef6c965a2c46a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1107,
+        "bytes": 1107,
+        "digest": 3964419843268599496
+      }
+    },
+    {
+      "id": "vorbis-beta3-test_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/beta3-test_small.ogg",
+      "sha256": "c756dbf9e72680b6b35b9d5547aa15a76298e3d53600b85f17f1a2d19714ec14",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 783,
+        "bytes": 1566,
+        "digest": 9985472200121909405
+      }
+    },
+    {
+      "id": "vorbis-beta4-test_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/beta4-test_small.ogg",
+      "sha256": "67517ea51560fac1c6190bd90ab3c18ff1bcdbc30d8e10e3585476ea44aba518",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1389,
+        "bytes": 1852,
+        "digest": 2584870542996822633
+      }
+    },
+    {
+      "id": "vorbis-chain-test1_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/chain-test1_small.ogg",
+      "sha256": "f5099bddbe1c7dd80c1b46ba99930cd7f818c63f5120d7c5a5d9d991852cafe0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1047,
+        "bytes": 2094,
+        "digest": 14423693465334145845
+      }
+    },
+    {
+      "id": "vorbis-chain-test2_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/chain-test2_small.ogg",
+      "sha256": "48e5024d95170b064208c469ea75915e98294cf74c7fcec2b73b4e679d0dfd0a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1722,
+        "bytes": 2296,
+        "digest": 5124307755119132896
+      }
+    },
+    {
+      "id": "vorbis-highrate-test_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/highrate-test_small.ogg",
+      "sha256": "9974ea9a70159b6157ff8c157ca6969183037a8e6ccdc4f0d84e4a8aa607e923",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 615,
+        "bytes": 1230,
+        "digest": 1911858002018437413
+      }
+    },
+    {
+      "id": "vorbis-lsp-test2_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/lsp-test2_small.ogg",
+      "sha256": "6946aa25a4d27153b38aefeb3c139fa8542689adafc5ae2bdb2ce4aa3af77e54",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1434,
+        "bytes": 2868,
+        "digest": 15664081819015209006
+      }
+    },
+    {
+      "id": "vorbis-lsp-test3_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/lsp-test3_small.ogg",
+      "sha256": "3358bacdc7cd33b0b75e4ed84913b1f11847e1d556dbe00ff60fb1e30cf711f5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1086,
+        "bytes": 2172,
+        "digest": 4891359823190122202
+      }
+    },
+    {
+      "id": "vorbis-lsp-test4_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/lsp-test4_small.ogg",
+      "sha256": "5dd55ac71ebffe5db1a351fc5beaeddeab61e415853ce351d268eda547b2264e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 885,
+        "bytes": 1770,
+        "digest": 11209196851557597167
+      }
+    },
+    {
+      "id": "vorbis-lsp-test_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/lsp-test_small.ogg",
+      "sha256": "f908598728585cdec80f47d96ae36eaa9f3afaa2774c01638f52b11a6e4c5727",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1167,
+        "bytes": 2334,
+        "digest": 4480214911020657949
+      }
+    },
+    {
+      "id": "vorbis-mono_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/mono_small.ogg",
+      "sha256": "67565c74021eb0a6b68bd20bbef431ff76a0bd7d8c4865702b6d6408860f54cd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 2532,
+        "bytes": 3376,
+        "digest": 8185916849268178624
+      }
+    },
+    {
+      "id": "vorbis-moog_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/moog_small.ogg",
+      "sha256": "25778a973824fcf488c751ecbc2fdbc594e8655666802e1f7d319c11c2814461",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1053,
+        "bytes": 2106,
+        "digest": 6303385042240189287
+      }
+    },
+    {
+      "id": "vorbis-rc1-test_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/rc1-test_small.ogg",
+      "sha256": "0db535709f6b3f9810c6980370ec72911df2a22d67cf0a32c1445aa5f2b43e99",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1614,
+        "bytes": 3228,
+        "digest": 8931433886589968394
+      }
+    },
+    {
+      "id": "vorbis-rc2-test2_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/rc2-test2_small.ogg",
+      "sha256": "db45e1c0ad0c172f2ac32a09984c1a8486963e4be4924bdf3049a4db46880ab7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 3222,
+        "bytes": 6444,
+        "digest": 6178183248010314850
+      }
+    },
+    {
+      "id": "vorbis-rc2-test_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/rc2-test_small.ogg",
+      "sha256": "2277d4f8278a0b38894cded850e036db53702f16b6631d69a1407f575bed2e59",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1758,
+        "bytes": 3516,
+        "digest": 3935581780065260730
+      }
+    },
+    {
+      "id": "vorbis-rc3-test_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/rc3-test_small.ogg",
+      "sha256": "f6e63631d1e757780ebee1cc82844a3f5e7aa7b49daa0ff7963bd9bcc27659d6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 954,
+        "bytes": 1908,
+        "digest": 11825247926855323790
+      }
+    },
+    {
+      "id": "vorbis-sleepzor_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/sleepzor_small.ogg",
+      "sha256": "dcc01bcbccd9c1ed4cd2304f893a52e3f551573a99a2183635c8db070d18ada2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1158,
+        "bytes": 2316,
+        "digest": 12463243726491693362
+      }
+    },
+    {
+      "id": "vorbis-test-short2_small.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/test-short2_small.ogg",
+      "sha256": "56900907a3603f842970467a3ea0ed19d4d7426b9c31388333cf45ca2566561c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 624,
+        "bytes": 1248,
+        "digest": 10818351036667198544
+      }
+    },
+    {
+      "id": "vorbis-vorbis_chapter_extension_demo.ogg",
+      "profile": "vorbis",
+      "file": ".research/fate-samples/vorbis/vorbis_chapter_extension_demo.ogg",
+      "sha256": "b3490672085ff1377f6d23f2d4738129a1b96d3e735711654f535f42228730df",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 2190,
+        "bytes": 2920,
+        "digest": 16814839139788397728
+      }
+    },
+    {
+      "id": "opus-silk-lbrr-mono.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/silk-lbrr-mono.mka",
+      "sha256": "1d0460fc34e81bd77fd80544a5fe69ff08bd4c6cc013607c49e1726a3d25986d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 141,
+        "bytes": 188,
+        "digest": 3462368331447577133
+      }
+    },
+    {
+      "id": "opus-silk-lbrr.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/silk-lbrr.mka",
+      "sha256": "66a7e6e4bde29844a1dc5abf1009fe389b10fbf6d04718f7f5ce9f9d1ee36034",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 150,
+        "bytes": 300,
+        "digest": 14659945442842628378
+      }
+    },
+    {
+      "id": "opus-testvector01.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector01.mka",
+      "sha256": "cb4a114f280a67508fe789fd2e5c24b97dc1937b54bcedb15d7a362d7fc56911",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 6441,
+        "bytes": 12882,
+        "digest": 7317066596421561599
+      }
+    },
+    {
+      "id": "opus-testvector02.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector02.mka",
+      "sha256": "307991e828e9a2b0a5e5382fdca8c759131634aa8727da5ff22c7ba25c1ae3e1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 3558,
+        "bytes": 7116,
+        "digest": 9571548357535990346
+      }
+    },
+    {
+      "id": "opus-testvector03.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector03.mka",
+      "sha256": "630b879dc0c029412926abe25247fae570aff9937bc7a695feedb6bcba7e99bf",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 2994,
+        "bytes": 5988,
+        "digest": 12101436498914004958
+      }
+    },
+    {
+      "id": "opus-testvector04.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector04.mka",
+      "sha256": "3aedbb60b4ecc141048bfc5b5e469b10cd171d0bba70b22fb26f1493cddb2adc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 3795,
+        "bytes": 7590,
+        "digest": 2467914408093077285
+      }
+    },
+    {
+      "id": "opus-testvector05.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector05.mka",
+      "sha256": "43ab4d88d711caa22d105f5e6b5cc3d8a9d2e7a5a213354e57c166c3ce3ff088",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 6111,
+        "bytes": 12222,
+        "digest": 16302394902808380025
+      }
+    },
+    {
+      "id": "opus-testvector06.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector06.mka",
+      "sha256": "50dbc1ec0a9167dd38aeca57a8aeedbd63f1a137b3110485a5935dd0441011a9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 5628,
+        "bytes": 11256,
+        "digest": 9703569621457615076
+      }
+    },
+    {
+      "id": "opus-testvector07.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector07.mka",
+      "sha256": "7cd5525823e767bfffbd858296e697a1f9db58ff878819e225d9cda7b4cd613f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 12558,
+        "bytes": 25116,
+        "digest": 12002710712072886882
+      }
+    },
+    {
+      "id": "opus-testvector08.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector08.mka",
+      "sha256": "80d6e986cd88980a5d66a4e6f81fe62924adbad8ee848c2fb89b2d578e5ab44b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 3741,
+        "bytes": 7482,
+        "digest": 4441126655806034219
+      }
+    },
+    {
+      "id": "opus-testvector09.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector09.mka",
+      "sha256": "937a1afe1cf0efca819bf9a76bc4cb86414ea6b52204befa65854d7ca5f162cc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 4011,
+        "bytes": 8022,
+        "digest": 16770941424453517581
+      }
+    },
+    {
+      "id": "opus-testvector10.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector10.mka",
+      "sha256": "e9b64f66759e1673e75258de59c5f5e8c2fec1a5690fff67f7b47f4ef272bc69",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 5736,
+        "bytes": 11472,
+        "digest": 8402518611417690840
+      }
+    },
+    {
+      "id": "opus-testvector11.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector11.mka",
+      "sha256": "c31956a638851fcd99d9d3112f138af3daa3eb151248553e8e5421bba954a6cc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1659,
+        "bytes": 3318,
+        "digest": 7214429672970991805
+      }
+    },
+    {
+      "id": "opus-testvector12.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/testvector12.mka",
+      "sha256": "d2a089e4e3c8062c9b1a6884a159b80e5233b29359def67e89e7d97236aa2c24",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 3996,
+        "bytes": 7992,
+        "digest": 4106349061267235908
+      }
+    },
+    {
+      "id": "opus-tron.6ch.tinypkts.mka",
+      "profile": "opus",
+      "file": ".research/fate-samples/opus/tron.6ch.tinypkts.mka",
+      "sha256": "3c3dec9da0992dd01bdb2bef6231ece3d54f7b34326275978693db5390b07909",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 4587,
+        "bytes": 4587,
+        "digest": 12733396456243358476
+      }
+    },
+    {
+      "id": "opus-audio_120ms.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/audio_120ms.opus",
+      "sha256": "04eb6714e04a823ac761f7bdb1b78b271b6a2aeac38a76af21d46c246a2ba5fb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 201,
+        "bytes": 402,
+        "digest": 16273431140310721119
+      }
+    },
+    {
+      "id": "opus-audio_vbr_st.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/audio_vbr_st.opus",
+      "sha256": "fd7c97aec4ff10735707614141f3a4d65b1ed8c7da0f1be1d6c18fd7e332c904",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1203,
+        "bytes": 2406,
+        "digest": 5449707233209374789
+      }
+    },
+    {
+      "id": "opus-celt_mo_10.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/celt_mo_10.opus",
+      "sha256": "506b6f6f4ef66c897bc7e87fbcb1a99704d346d1f17bd431cb82fca60bb1cc28",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 2403,
+        "bytes": 3204,
+        "digest": 1155872070759511949
+      }
+    },
+    {
+      "id": "opus-celt_mo_2.5.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/celt_mo_2.5.opus",
+      "sha256": "3d7699a5da485480ce3d596be9cbbeb346f9b9067580dcfb58711198af478ac3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 9600,
+        "bytes": 12800,
+        "digest": 7511071604307503104
+      }
+    },
+    {
+      "id": "opus-celt_mo_20.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/celt_mo_20.opus",
+      "sha256": "49c91cf1a606ffefe5112393d9ed05a2413bfbc3251b8328b093d8a850ffcb51",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1203,
+        "bytes": 1604,
+        "digest": 15039455124983614605
+      }
+    },
+    {
+      "id": "opus-celt_mo_5.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/celt_mo_5.opus",
+      "sha256": "2c0179516b795f125078c65556f51b12243b94e2e977e7342feaf368256b59bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 4803,
+        "bytes": 6404,
+        "digest": 718582860237655437
+      }
+    },
+    {
+      "id": "opus-celt_st_10.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/celt_st_10.opus",
+      "sha256": "58cb20bbd9d390279c5155fb7dbf0d3b5c5b3e6fbe9fab31f625bbe4e3f4cf98",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 2403,
+        "bytes": 4806,
+        "digest": 9044934327662960917
+      }
+    },
+    {
+      "id": "opus-celt_st_2.5.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/celt_st_2.5.opus",
+      "sha256": "27af157bca9d99b0fd9dcf6d3c1bcdbee193835778d46d8a8da270aea1d427f8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 9600,
+        "bytes": 19200,
+        "digest": 5702449835640170112
+      }
+    },
+    {
+      "id": "opus-celt_st_20.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/celt_st_20.opus",
+      "sha256": "cda45aa32d43ec8f02ba4e6c210d74e4ab23f36d9dc1928d604325b27795febb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1203,
+        "bytes": 2406,
+        "digest": 5449707233209374789
+      }
+    },
+    {
+      "id": "opus-celt_st_5.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/celt_st_5.opus",
+      "sha256": "2e82bc58d003eb595f7b8f0617707507da7f1b47b1166b9e3d5aadc6ca87a8fb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 4803,
+        "bytes": 9606,
+        "digest": 1403990147383505589
+      }
+    },
+    {
+      "id": "opus-celt_st_highrate.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/celt_st_highrate.opus",
+      "sha256": "1f1276533fa18a686669fa6b5c9fdac3b9a0694a01ab06e36f193b540fffcdef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1203,
+        "bytes": 2406,
+        "digest": 5449707233209374789
+      }
+    },
+    {
+      "id": "opus-celt_st_lowrate.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/celt_st_lowrate.opus",
+      "sha256": "0b98976a4b9501a39549f0cb71731d055ea580bdf3b78888aa9d3781b21eadc7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1203,
+        "bytes": 2406,
+        "digest": 5449707233209374789
+      }
+    },
+    {
+      "id": "opus-hybrid_fb_10.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/hybrid_fb_10.opus",
+      "sha256": "d0a716df4e8728ed6949c33430ad5e564629841b612aea9133eb92bc6adbf87f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 2403,
+        "bytes": 4806,
+        "digest": 9044934327662960917
+      }
+    },
+    {
+      "id": "opus-hybrid_fb_20.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/hybrid_fb_20.opus",
+      "sha256": "b09207bf200e0d64a60e52a73420fa36a65ee30e05906d79673341563a41865f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1203,
+        "bytes": 2406,
+        "digest": 5449707233209374789
+      }
+    },
+    {
+      "id": "opus-hybrid_mo_20.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/hybrid_mo_20.opus",
+      "sha256": "0c03666dfdb06ba767e03a805c4fdf13e395ee988ccbf8bee2584e3ca4559847",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1203,
+        "bytes": 1604,
+        "digest": 15039455124983614605
+      }
+    },
+    {
+      "id": "opus-hybrid_swb_20.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/hybrid_swb_20.opus",
+      "sha256": "ccfba18c1400a6e8659c009a45d24f5da054d8b50ae5ca844acaaef31b725493",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1203,
+        "bytes": 2406,
+        "digest": 5449707233209374789
+      }
+    },
+    {
+      "id": "opus-mc_255.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/mc_255.opus",
+      "sha256": "3121ea0229b1b1d951b0b0c74ad1cd2b12405fb6d177dd3fd290fe04b2fb28ae",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 753,
+        "bytes": 2510,
+        "digest": 14665428289456378110
+      }
+    },
+    {
+      "id": "opus-mc_3.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/mc_3.opus",
+      "sha256": "3c5c2942706ddc8bf4bf2cb33a1d7de20170ae95f98be3d46463d56f91734c65",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 753,
+        "bytes": 753,
+        "digest": 10721493125583291340
+      }
+    },
+    {
+      "id": "opus-mc_4.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/mc_4.opus",
+      "sha256": "452235d7379d4dfd9589767bfff71bab53526ed8ca554f4c37b2c2bf12b6799e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 753,
+        "bytes": 1004,
+        "digest": 11905946343098418103
+      }
+    },
+    {
+      "id": "opus-mc_5.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/mc_5.opus",
+      "sha256": "46335e7a658fa2d1e445186be90df4e4716a4bdcfb63afe71a0a122c6724d37c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 753,
+        "bytes": 753,
+        "digest": 11493863128605687895
+      }
+    },
+    {
+      "id": "opus-mc_6.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/mc_6.opus",
+      "sha256": "82f012a439e35fab36d9f513e432b5cf5571e04be97b13d7a9fd4e03160d1ca3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 753,
+        "bytes": 753,
+        "digest": 10492340067596270732
+      }
+    },
+    {
+      "id": "opus-mc_6_voip.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/mc_6_voip.opus",
+      "sha256": "b1f53172a3de84f1ae993a5cbce48229e9deae4d1301d10878afca10f62d45fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 753,
+        "bytes": 753,
+        "digest": 10492340067596270732
+      }
+    },
+    {
+      "id": "opus-mc_7.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/mc_7.opus",
+      "sha256": "46a0b5154455634df35990c02916113557495ed6fea16d0a4a76b1b8c096e44e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 753,
+        "bytes": 753,
+        "digest": 1954325334585443968
+      }
+    },
+    {
+      "id": "opus-mc_8.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/mc_8.opus",
+      "sha256": "a0a2bac681901fbff7110d3c3bad1b636de4ae63cf0275e02c50d922d8803876",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 753,
+        "bytes": 753,
+        "digest": 9779758082973549685
+      }
+    },
+    {
+      "id": "opus-nophaseinv.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/nophaseinv.opus",
+      "sha256": "c6a44935ea908a49bff4e901d9b9635ec3260bd1095bf9c16acf14960098954e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1203,
+        "bytes": 2406,
+        "digest": 5449707233209374789
+      }
+    },
+    {
+      "id": "opus-silk_nb_10.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/silk_nb_10.opus",
+      "sha256": "8710e35238b61b405755e4e8c1de489809d0117ed23feb931a62df7341adfb6f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 2406,
+        "bytes": 4812,
+        "digest": 5624355296526582474
+      }
+    },
+    {
+      "id": "opus-silk_nb_20.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/silk_nb_20.opus",
+      "sha256": "d8076bf272decce64ebddbccece975a7cff8b1d5a4fb8d1adf7d6693fad18e7e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1206,
+        "bytes": 2412,
+        "digest": 16295000782073443834
+      }
+    },
+    {
+      "id": "opus-silk_nb_40.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/silk_nb_40.opus",
+      "sha256": "484cfa96f14858e9b15178e44491329ded045f6355ca0107a24f93c5cf9a2018",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 606,
+        "bytes": 1212,
+        "digest": 9162408850862524306
+      }
+    },
+    {
+      "id": "opus-silk_nb_60.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/silk_nb_60.opus",
+      "sha256": "8be020dc2888c96d266ac959915f631c2c52c16f62dc781a983ce20c358d032f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 405,
+        "bytes": 810,
+        "digest": 1707823031698390515
+      }
+    },
+    {
+      "id": "opus-silk_wb_10.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/silk_wb_10.opus",
+      "sha256": "19848c5fb6365b98ac1c2c9977efcf063d2909504454b7c1e7f319828d5efeb3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 2403,
+        "bytes": 3204,
+        "digest": 1155872070759511949
+      }
+    },
+    {
+      "id": "opus-silk_wb_20.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/silk_wb_20.opus",
+      "sha256": "17f8dfd46f1b73d661aae2013dc42a4bbf422dd5537da29b0e3c46c995ae1be3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1203,
+        "bytes": 1604,
+        "digest": 15039455124983614605
+      }
+    },
+    {
+      "id": "opus-silk_wb_40.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/silk_wb_40.opus",
+      "sha256": "ca2c64eb25fa78e9c9c4194535937bd5c580273537800db3a0532f3cd51f13ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 603,
+        "bytes": 804,
+        "digest": 14517777613003020045
+      }
+    },
+    {
+      "id": "opus-silk_wb_60.opus",
+      "profile": "opus",
+      "file": ".research/opus-generated/silk_wb_60.opus",
+      "sha256": "c3d56e792a8132119af8c9639796755754b5a5dedb717139254c18b533af89f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 402,
+        "bytes": 536,
+        "digest": 15243407329797485280
+      }
+    },
+    {
+      "id": "opus-ts71.mka",
+      "profile": "opus",
+      "file": ".research/opus-generated/ts71.mka",
+      "sha256": "53c92c27dfa01fa713e96626040c9ef66f5218a88d54c0fe369e4361ad98f6a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1536,
+        "bytes": 1536,
+        "digest": 18114363316107026432
+      }
+    },
+    {
+      "id": "aac-aac-lc-5.1.aac",
+      "profile": "aac",
+      "file": ".research/codec-inputs/aac-lc-5.1.aac",
+      "sha256": "266795d0d249358e1773ea2ff575d1c49730ae2a6f7f5b7b93129323cdfe8839",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 1410,
+        "bytes": 1410,
+        "digest": 7931452472793997184
+      }
+    },
+    {
+      "id": "aac-aac-lc-stereo.aac",
+      "profile": "aac",
+      "file": ".research/codec-inputs/aac-lc-stereo.aac",
+      "sha256": "8211fabe2b5d6448420e31cae63839be4f876ad9a54a70a2a53bf31620e74537",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 1296,
+        "bytes": 2592,
+        "digest": 17792043948388172336
+      }
+    },
+    {
+      "id": "aac-al_sbr_cm_48_2.adts-codec-inputs",
+      "profile": "aac",
+      "file": ".research/codec-inputs/al_sbr_cm_48_2.adts",
+      "sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 2262,
+        "bytes": 4524,
+        "digest": 10300927792430815962
+      }
+    },
+    {
+      "id": "aac-al_sbr_cm_48_5.1.adts-codec-inputs",
+      "profile": "aac",
+      "file": ".research/codec-inputs/al_sbr_cm_48_5.1.adts",
+      "sha256": "2f756af575771e9890c97841c13c555612599ce85e82af47df175a1e0e16d6a8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 2262,
+        "bytes": 24882,
+        "digest": 11949614868110272256
+      }
+    },
+    {
+      "id": "aac-al_sbr_ps_06_new.adts-codec-inputs",
+      "profile": "aac",
+      "file": ".research/codec-inputs/al_sbr_ps_06_new.adts",
+      "sha256": "cc7e5b18455c04c76efa8a87bf7db40f297fb38aa56b93d4bd7f97a397b4fa87",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 636,
+        "bytes": 1272,
+        "digest": 10418851212415372900
+      }
+    },
+    {
+      "id": "dts-core-dts_es.dts",
+      "profile": "dts",
+      "file": ".research/codec-inputs/core-dts_es.dts",
+      "sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 750,
+        "bytes": 750,
+        "digest": 15749812892702546688
+      }
+    },
+    {
+      "id": "dts-core-master_audio_7.1_24bit.dts",
+      "profile": "dts",
+      "file": ".research/codec-inputs/core-master_audio_7.1_24bit.dts",
+      "sha256": "fd230401e49b41fbc892246cf22d7b04419104e02978215b50dcba3751c8de5f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "dts"
+      ],
+      "expected": {
+        "packets": 3516,
+        "bytes": 10548,
+        "digest": 10632245486958391296
+      }
+    },
+    {
+      "id": "ac3-monsters_inc_5.1_448_small.ac3-fate-samples",
+      "profile": "ac3",
+      "file": ".research/fate-samples/ac3/monsters_inc_5.1_448_small.ac3",
+      "sha256": "74fefeef070f663378a0864beb064cf88ee1186152f7ac320984af15be2f22db",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 280,
+        "bytes": 504,
+        "digest": 11500314486885093376
+      }
+    },
+    {
+      "id": "ac3-monsters_inc_2.0_192_small.ac3-fate-samples",
+      "profile": "ac3",
+      "file": ".research/fate-samples/ac3/monsters_inc_2.0_192_small.ac3",
+      "sha256": "4df071457c23d1a39fe52322892bc9333921ad6dfc8f87ffa0797bdfb5101bae",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 393,
+        "bytes": 786,
+        "digest": 1742214278779398047
+      }
+    },
+    {
+      "id": "ac3-millers_crossing_4.0.ac3-fate-samples",
+      "profile": "ac3",
+      "file": ".research/fate-samples/ac3/millers_crossing_4.0.ac3",
+      "sha256": "faa06c7b1ccbc5cf3c7897afb50004dd3d49feaa19d26bdeb03dc9bb4ec20802",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 310,
+        "bytes": 186,
+        "digest": 18208531289526400832
+      }
+    },
+    {
+      "id": "eac3-the_great_wall_7.1.eac3-fate-samples",
+      "profile": "eac3",
+      "file": ".research/fate-samples/eac3/the_great_wall_7.1.eac3",
+      "sha256": "d698981ddc1c10e65d234dd6a02ff2b0f4c88787595c9d3e5adf7f097f2c9e50",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 785,
+        "bytes": 471,
+        "digest": 12408023837283481443
+      }
+    },
+    {
+      "id": "eac3-csi_miami_5.1_256_spx_small.eac3-fate-samples",
+      "profile": "eac3",
+      "file": ".research/fate-samples/eac3/csi_miami_5.1_256_spx_small.eac3",
+      "sha256": "84f50317a49a98509bf174ace814b39860e6ab2a1d61bdbd10ada9081f2bb2b3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 235,
+        "bytes": 423,
+        "digest": 6586351915982647229
+      }
+    },
+    {
+      "id": "eac3-csi_miami_stereo_128_spx.eac3-fate-samples",
+      "profile": "eac3",
+      "file": ".research/fate-samples/eac3/csi_miami_stereo_128_spx.eac3",
+      "sha256": "f96b45fa4d249522cd83dea009cd528ce552ec9d947e03cdecab44652bc86ecb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 1953,
+        "bytes": 3906,
+        "digest": 33529311402680903
+      }
+    },
+    {
+      "id": "eac3-serenity_english_5.1_1536_small.eac3-fate-samples",
+      "profile": "eac3",
+      "file": ".research/fate-samples/eac3/serenity_english_5.1_1536_small.eac3",
+      "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 485,
+        "bytes": 873,
+        "digest": 10663636694609267931
+      }
+    },
+    {
+      "id": "flac-flac-16-44k-stereo.flac",
+      "profile": "flac",
+      "file": ".research/codec-inputs/flac-16-44k-stereo.flac",
+      "sha256": "481aeb8ab56e57948e56cf308d2a457ade063e4d1564c93a23dc716aea402364",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 969,
+        "bytes": 1938,
+        "digest": 8595950458419527595
+      }
+    },
+    {
+      "id": "flac-flac-24-96k-5.1.flac",
+      "profile": "flac",
+      "file": ".research/codec-inputs/flac-24-96k-5.1.flac",
+      "sha256": "d1362bda1ffec3ffbf1e17f928305f323fa3a44ae30c94f3b5e31de70c067142",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 705,
+        "bytes": 705,
+        "digest": 17919303135517291788
+      }
+    },
+    {
+      "id": "mp3-mp3-cbr-128-joint.mp3",
+      "profile": "mp3",
+      "file": ".research/codec-inputs/mp3-cbr-128-joint.mp3",
+      "sha256": "829d58c07690b06675f8fb4151dfeab5b41bd6f017c1cffcfbdad71b6d24f81f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3450,
+        "bytes": 6900,
+        "digest": 13279573240165900750
+      }
+    },
+    {
+      "id": "mp3-mp3-vbr-v2.mp3",
+      "profile": "mp3",
+      "file": ".research/codec-inputs/mp3-vbr-v2.mp3",
+      "sha256": "463afda155d878b8c56f94e522a1ee0533e86a2cff164a4d60c1cad82bf6e376",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3450,
+        "bytes": 6900,
+        "digest": 13279573240165900750
+      }
+    },
+    {
+      "id": "mp2-mp2-256-48k.mp2",
+      "profile": "mp2",
+      "file": ".research/codec-inputs/mp2-256-48k.mp2",
+      "sha256": "77241c48c7edb65ec0c8b48e9511399d3e6a9f8178dc120c3a68d1bfcd532030",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp2"
+      ],
+      "expected": {
+        "packets": 3750,
+        "bytes": 7500,
+        "digest": 17977044382081070986
+      }
+    },
+    {
+      "id": "vorbis-vorbis-q5-stereo.ogg",
+      "profile": "vorbis",
+      "file": ".research/codec-inputs/vorbis-q5-stereo.ogg",
+      "sha256": "9c1a76b5f322590ea9d13df55627a30a7b8fa6e34e4573be1d2eed893e6ca44b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 3897,
+        "bytes": 7794,
+        "digest": 9605661974253826811
+      }
+    },
+    {
+      "id": "vorbis-vorbis-q3-5.1.ogg",
+      "profile": "vorbis",
+      "file": ".research/codec-inputs/vorbis-q3-5.1.ogg",
+      "sha256": "f81902a813fed92af7005e551d4fb956ac115e0a083a7359b559804254d8a998",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 1422,
+        "bytes": 1422,
+        "digest": 16349075683745905792
+      }
+    },
+    {
+      "id": "opus-opus-music-128-stereo.opus",
+      "profile": "opus",
+      "file": ".research/codec-inputs/opus-music-128-stereo.opus",
+      "sha256": "80b95dcf025d636dc747b67d14d8a532f0bed4e1f1dbeb61c16591ba0fe29e6c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 4503,
+        "bytes": 9006,
+        "digest": 3968135883262294657
+      }
+    },
+    {
+      "id": "opus-opus-speech-24-mono.opus",
+      "profile": "opus",
+      "file": ".research/codec-inputs/opus-speech-24-mono.opus",
+      "sha256": "41c55bb1f4cdffbab74d4a04dce8afc857d7c1ab2d5b8704ec6952efe9a075bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 4503,
+        "bytes": 6004,
+        "digest": 5940187142733636301
+      }
+    },
+    {
+      "id": "opus-opus-5.1-256.opus",
+      "profile": "opus",
+      "file": ".research/codec-inputs/opus-5.1-256.opus",
+      "sha256": "0434eebcdfff1dd9d7351cada961fa8befffb03d8eaa3f1a1396f3cdb9a80e0c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 1503,
+        "bytes": 1503,
+        "digest": 3385593029732263948
+      }
+    },
+    {
+      "id": "opus-long-preskip-1272.opus",
+      "profile": "opus",
+      "file": ".research/codec-variants/long-preskip-1272.opus",
+      "sha256": "b27f5e56a4a19c067303ddb06aa5519cdaf876cad646e13cafc7d405b317ea25",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 4500,
+        "bytes": 9000,
+        "digest": 3389773179611364364
+      }
+    },
+    {
+      "id": "opus-long-preskip-2232.opus",
+      "profile": "opus",
+      "file": ".research/codec-variants/long-preskip-2232.opus",
+      "sha256": "b2e61f36876bea5321498da4e73ea55fc53f547077a7f80ff360efeff015d6cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 4497,
+        "bytes": 8994,
+        "digest": 18238620235720079319
+      }
+    },
+    {
+      "id": "wide-opus-1.opus",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/opus-1.opus",
+      "sha256": "c956ae31ee363aafd4683f5f94bf48c6099549c11302bc6022a62336b3b343e4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 48,
+        "digest": 10311126786979294656
+      }
+    },
+    {
+      "id": "wide-opus-2.opus",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/opus-2.opus",
+      "sha256": "1b7a9ac4447ae232b664ca8fbb34569df8f4d3168b330be9fccaf50aa792ff13",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 72,
+        "digest": 12520965855013215740
+      }
+    },
+    {
+      "id": "wide-opus-3.opus",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/opus-3.opus",
+      "sha256": "2a80c60d312ec5f8381a3a83e9df03fbd19358604280aaa7dd29fd4b797094ef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 36,
+        "digest": 84252789839995312
+      }
+    },
+    {
+      "id": "wide-opus-4.opus",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/opus-4.opus",
+      "sha256": "c51db2291346024209bf6187dcc3dff0cd42038a56784454e1f5aa23c75c312f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 48,
+        "digest": 8193733653519245308
+      }
+    },
+    {
+      "id": "wide-opus-5.opus",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/opus-5.opus",
+      "sha256": "93f4676680e7c88f3b7fc03f6776bad2f60a096bd6f2f0b0654a9549018b80e1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 36,
+        "digest": 16702590565172035324
+      }
+    },
+    {
+      "id": "wide-opus-6.opus",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/opus-6.opus",
+      "sha256": "22d9f70fe779d598c36bc0e49f19e939bd9ee51223784bd91520b4d76d65241f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 36,
+        "digest": 2887736740599404288
+      }
+    },
+    {
+      "id": "wide-opus-7.opus",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/opus-7.opus",
+      "sha256": "604351d8b23ebbcacf5620f126f8ae3f5b213f6e4ce94e89a1db84a70ee6bbba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 36,
+        "digest": 1987858445586549248
+      }
+    },
+    {
+      "id": "wide-opus-8.opus",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/opus-8.opus",
+      "sha256": "2f824e9ca387347b5ba6cd44a3e71435a13b900c0660849dc924397ca4c103a1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "opus"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 36,
+        "digest": 5405965898199547584
+      }
+    },
+    {
+      "id": "wide-vorbis-1.ogg",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/vorbis-1.ogg",
+      "sha256": "067d1b430f7baf1df6dff102bbc93313cda35ee5b40c607f9fac6588876da23b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 44,
+        "digest": 11138813410563251053
+      }
+    },
+    {
+      "id": "wide-vorbis-2.ogg",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/vorbis-2.ogg",
+      "sha256": "21d46c2e8621c74b7dd9b7b52676c4463a15bcda79a2ec83f572f702093669ef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 66,
+        "digest": 3870838424167034311
+      }
+    },
+    {
+      "id": "wide-vorbis-3.ogg",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/vorbis-3.ogg",
+      "sha256": "41470909e06ed9ec464dbb01a08525aba97da26fbc1f61fca8269954f5830c4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 33,
+        "digest": 2053084310568382988
+      }
+    },
+    {
+      "id": "wide-vorbis-4.ogg",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/vorbis-4.ogg",
+      "sha256": "353d1ba8e01f90e050d21ad132cf37354cde14bb7c44e093b98cc2ef15432f09",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 44,
+        "digest": 16231435541655834631
+      }
+    },
+    {
+      "id": "wide-vorbis-5.ogg",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/vorbis-5.ogg",
+      "sha256": "f7b13ddf5b6022168fe348ca5c4d9ff875a0422bfba1fd209b892c6c31f85000",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 33,
+        "digest": 11925414266856365223
+      }
+    },
+    {
+      "id": "wide-vorbis-6.ogg",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/vorbis-6.ogg",
+      "sha256": "71d4571f6f35be7e6e7f35acdfd5204229b9b238405702315beb43aac94107d5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 33,
+        "digest": 8472444411973716108
+      }
+    },
+    {
+      "id": "wide-vorbis-7.ogg",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/vorbis-7.ogg",
+      "sha256": "894d53afeab395aff7209ff5789fd04dd8492b45d455b54d1331460b5586dd4d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 33,
+        "digest": 10558535576024202880
+      }
+    },
+    {
+      "id": "wide-vorbis-8.ogg",
+      "profile": "wide",
+      "file": ".research/codec-layout-inputs/vorbis-8.ogg",
+      "sha256": "a011b9a54f188f69a9fac2070e110d5e6271fddef9e2210f04234a0eaa48ac0c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vorbis"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 33,
+        "digest": 16403531892267338613
+      }
+    }
+  ]
+}

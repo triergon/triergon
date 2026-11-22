@@ -1,0 +1,2541 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "AUD_MW_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/AUD_MW_E.264",
+      "sha256": "173b75a2883f3208894877549362f118721f45633bf08007396703ef2c358987",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 10565600514481045949
+      }
+    },
+    {
+      "id": "BA1_FT_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/BA1_FT_C.264",
+      "sha256": "1bd3abeea6a5612602556a455cd2c59f235cba23e09a1a5556641296324c0bb7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 14594470143717992482
+      }
+    },
+    {
+      "id": "BA1_Sony_D.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/BA1_Sony_D.jsv",
+      "sha256": "90c84dee7e57151b80918e4b81910d33885fba2ce131fa119e1753c1892086fc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 1464792725046800200
+      }
+    },
+    {
+      "id": "BA2_Sony_F.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/BA2_Sony_F.jsv",
+      "sha256": "ea4d6cc823bb931b22fb4f5947745d0d0829cd79eca72209bb990b890afded0a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 15567020643422750894
+      }
+    },
+    {
+      "id": "BA3_SVA_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/BA3_SVA_C.264",
+      "sha256": "f21e84fb480d24d1d912cc61d6487afd4f05b9a4956536313715a5741e3b695b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 15550647118092723103
+      }
+    },
+    {
+      "id": "BAMQ1_JVC_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/BAMQ1_JVC_C.264",
+      "sha256": "3cb7ccaf39846b1e6a5de48580461427f7e96ad563918d4f9c85c8133da5d1f9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 11258628409114568743
+      }
+    },
+    {
+      "id": "BAMQ2_JVC_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/BAMQ2_JVC_C.264",
+      "sha256": "7f251c556b17b26c1117ab30effb40867552ec3ace16a2c6262ae486d699b4e4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 6914112253780967821
+      }
+    },
+    {
+      "id": "BANM_MW_D.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/BANM_MW_D.264",
+      "sha256": "5f370f414beadadc7bb8a5c4c7a410924fda0ae2e7c31037932b961418279231",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 15567020643422750894
+      }
+    },
+    {
+      "id": "BASQP1_Sony_C.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/BASQP1_Sony_C.jsv",
+      "sha256": "14cf421b985e0e5f62ac01129ea56c343a9804a13d4bd16122916a3315e6b71c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 17479405712070328854
+      }
+    },
+    {
+      "id": "BA_MW_D.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/BA_MW_D.264",
+      "sha256": "47c59fbe8de6edad04457b8b412579d10cf6ecf87393f252cb2493f9c20dca32",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 15567020643422750894
+      }
+    },
+    {
+      "id": "CABA1_SVA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CABA1_SVA_B.264",
+      "sha256": "2c1319be664863d68bf22c26ccfff417b7eeca1d8d6360f1862b5b3aa4c24c0a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 12413012906429199678
+      }
+    },
+    {
+      "id": "CABA1_Sony_D.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CABA1_Sony_D.jsv",
+      "sha256": "eade82fff74fba464a7fbd89bd455b867877a6dce657f2f438e3a06662582cec",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 12413012906429199678
+      }
+    },
+    {
+      "id": "CABA2_SVA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CABA2_SVA_B.264",
+      "sha256": "31fbacc6c673226cd8300613cd1826714adf1dc467165870952c3568c2e0a011",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 8135933861196620708
+      }
+    },
+    {
+      "id": "CABA2_Sony_E.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CABA2_Sony_E.jsv",
+      "sha256": "cc57f355f300338b345631ac828d28bc5423f6b155e198d7cf027547c84d5d22",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 8135933861196620708
+      }
+    },
+    {
+      "id": "CABA3_SVA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CABA3_SVA_B.264",
+      "sha256": "dd84719d9049ba58dd168c523d9636cc3334268c291a75978630b652b3a3bf30",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 14148726105143965453
+      }
+    },
+    {
+      "id": "CABA3_Sony_C.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CABA3_Sony_C.jsv",
+      "sha256": "79bf1a6779d8e56047956e1d9344e456c01c89e277f22e084f042482ff6116be",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 14148726105143965453
+      }
+    },
+    {
+      "id": "CABA3_TOSHIBA_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CABA3_TOSHIBA_E.264",
+      "sha256": "5051192d0fa49c938048791a31b8de7110b5f0d2b1ceb791b57bcc172572e813",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 9276861155622606178
+      }
+    },
+    {
+      "id": "CABACI3_Sony_B.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CABACI3_Sony_B.jsv",
+      "sha256": "ef4c266b8478b6fdad06dd1d15299888ecc42c68ab5e1b6162e5c9d3fdbb781e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 11310059388115465195
+      }
+    },
+    {
+      "id": "CABAST3_Sony_E.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CABAST3_Sony_E.jsv",
+      "sha256": "8a4dcf13bacda58d7a208879b2e2a096b28f5530481040253b5959921bc5f8f1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 2990742058910419403
+      }
+    },
+    {
+      "id": "CABASTBR3_Sony_B.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CABASTBR3_Sony_B.jsv",
+      "sha256": "b2da637b6447340e8a63764bee20a49c255e2b59a9520ce45a303a5402752177",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 2990742058910419403
+      }
+    },
+    {
+      "id": "CABREF3_Sand_D.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CABREF3_Sand_D.264",
+      "sha256": "93ff63a7f042abd81c7d1895d7e33ee7cd7264e493891752087c0f126e412cc9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 2084636744871141787
+      }
+    },
+    {
+      "id": "CACQP3_Sony_D.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CACQP3_Sony_D.jsv",
+      "sha256": "fb0dbedc8ce0bdfaf66e820068829bd8c5cd917e5058281c61b72955080cfbd9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 14148726105143965453
+      }
+    },
+    {
+      "id": "CAFI1_SVA_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAFI1_SVA_C.264",
+      "sha256": "e29f14280edf5d10ad9857efc43114d829ed692dd156abf61bd68b2ab8f43d37",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 15606360006226927067
+      }
+    },
+    {
+      "id": "CAMA1_Sony_C.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAMA1_Sony_C.jsv",
+      "sha256": "db49b84b320b2cc87c6ef9daaf1653c492fae113299c9eaf8ed62155d2c937bf",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 16403268776450684369
+      }
+    },
+    {
+      "id": "CAMA1_TOSHIBA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAMA1_TOSHIBA_B.264",
+      "sha256": "554a13ca140965b1e3401a90a4726dad5dcd374f8978f8b24a96f2430c9365cc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 17074940833005196426
+      }
+    },
+    {
+      "id": "CAMA3_Sand_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAMA3_Sand_E.264",
+      "sha256": "fea7da11585932184dbf804bf8aad22c7e34cda2369496a2588e19ab8dcd8b9a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 12788807162819620926
+      }
+    },
+    {
+      "id": "CAMACI3_Sony_C.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAMACI3_Sony_C.jsv",
+      "sha256": "07baf951ecf6a9c8381311056dd1c4ccd152cea836c16ce1643f88e4848295cc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 10285965044715489105
+      }
+    },
+    {
+      "id": "CAMANL1_TOSHIBA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAMANL1_TOSHIBA_B.264",
+      "sha256": "6a3505d67742e761ad56fcfa8cd4ecf6c13ca8452e726fe35ae701dda6b2f460",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 17074940833005196426
+      }
+    },
+    {
+      "id": "CAMANL2_TOSHIBA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAMANL2_TOSHIBA_B.264",
+      "sha256": "67ec3c3c36748125aefe35844e2418e7915afdc3218f56677a4fa9b6de2af6b7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 15138406406401659180
+      }
+    },
+    {
+      "id": "CAMANL3_Sand_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAMANL3_Sand_E.264",
+      "sha256": "7a60ca81fdd59d6a27219fdc884dce33ac8fcd94004ef7f30153767f35d6be6e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 12788807162819620926
+      }
+    },
+    {
+      "id": "CAMASL3_Sony_B.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAMASL3_Sony_B.jsv",
+      "sha256": "189dfeebe2f864507787cd7cb9c307e96dd2cf25cc77a018c64f4edc2b495fc2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 18293750281699954734
+      }
+    },
+    {
+      "id": "CAMP_MOT_MBAFF_L30.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAMP_MOT_MBAFF_L30.26l",
+      "sha256": "8b53b14b28c52dc0b9c5a61ad3bf9e38a857750233873868ea336cfe48cc7161",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 10260132914482050208
+      }
+    },
+    {
+      "id": "CAMP_MOT_MBAFF_L31.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAMP_MOT_MBAFF_L31.26l",
+      "sha256": "ecf283ed5c6b60a80fcabbf33f8c8b107eadd991890a3e44fd22bad3e88f5889",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 10260132914482050208
+      }
+    },
+    {
+      "id": "CANL1_SVA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CANL1_SVA_B.264",
+      "sha256": "40f9ea2fca09e08b0486c53eafd43bf064c3b488276f74ff96a1afcd414332d4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 13553940200855185148
+      }
+    },
+    {
+      "id": "CANL1_Sony_E.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CANL1_Sony_E.jsv",
+      "sha256": "13b760dc501f7da7b692b6c428eb3f0a9e8f4772175aeed188afc18f7d27d04c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 12413012906429199678
+      }
+    },
+    {
+      "id": "CANL1_TOSHIBA_G.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CANL1_TOSHIBA_G.264",
+      "sha256": "63a405361ae25276b6adcc00afc2e8f17d537e2b34bb96285ca6eea5d3c87489",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 13553940200855185148
+      }
+    },
+    {
+      "id": "CANL2_SVA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CANL2_SVA_B.264",
+      "sha256": "d757f31c2546cbe222df728536765d7c162dcd71eb30279c1be8a5785a135dc3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 12413012906429199678
+      }
+    },
+    {
+      "id": "CANL2_Sony_E.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CANL2_Sony_E.jsv",
+      "sha256": "b16bc6b910c0457194eec86a62aeb39ea70190d45b8159fdbad0f4248c25e1cc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 8135933861196620708
+      }
+    },
+    {
+      "id": "CANL3_SVA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CANL3_SVA_B.264",
+      "sha256": "ca3248a00e4a7ae20cd03c31f4fb32a3ef9865430d1af53dc9cf734d7fb6904a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 8135933861196620708
+      }
+    },
+    {
+      "id": "CANL3_Sony_C.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CANL3_Sony_C.jsv",
+      "sha256": "15e0d13ee6631ab750271fffe1102fd2946cf53c7a54fee54d728de66b98f15e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 14148726105143965453
+      }
+    },
+    {
+      "id": "CANL4_SVA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CANL4_SVA_B.264",
+      "sha256": "617f57d8efeb240145d3cf891085d81040a3f87624713122b22ddc09b2e93742",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 1795961008160503915
+      }
+    },
+    {
+      "id": "CANLMA2_Sony_C.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CANLMA2_Sony_C.jsv",
+      "sha256": "df797af98b7335d985c7c20197e61ece3a5d4e9c43cfbca9d4535c443551199f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 5610411089343161015
+      }
+    },
+    {
+      "id": "CANLMA3_Sony_C.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CANLMA3_Sony_C.jsv",
+      "sha256": "141bdf642d55421d3111c80dca838c9ab302763fa1d185d3fb5158280e9998d1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 5610411089343161015
+      }
+    },
+    {
+      "id": "CAPA1_TOSHIBA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAPA1_TOSHIBA_B.264",
+      "sha256": "aa102d2b94fe48304d6cafbfe8b0427312853e079083e351470983149c1b8a6c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 6885232789161987081
+      }
+    },
+    {
+      "id": "CAPAMA3_Sand_F.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAPAMA3_Sand_F.264",
+      "sha256": "a6490cfa63b5a3a8ce7e0a9d64af5dc2b32a1e66d2f0630bbcb182dceeef336c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 4986076246395967325
+      }
+    },
+    {
+      "id": "CAPCM1_Sand_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAPCM1_Sand_E.264",
+      "sha256": "02a3931287a0dfbf5cc5d95aaf95817b7c6c5791e665fc2a37c75abe211a5a25",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 13992393426512157964
+      }
+    },
+    {
+      "id": "CAPCMNL1_Sand_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAPCMNL1_Sand_E.264",
+      "sha256": "5ccbbf7529ef54e169faf03a838a4aaed5e228685c3d93a831da07c3735077df",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 13992393426512157964
+      }
+    },
+    {
+      "id": "CAPM3_Sony_D.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAPM3_Sony_D.jsv",
+      "sha256": "547cdfa56597adf715bc55cde3fcf1cf31cebe2dfa9272a6901d76768ea45d11",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 14148726105143965453
+      }
+    },
+    {
+      "id": "CAQP1_Sony_B.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAQP1_Sony_B.jsv",
+      "sha256": "0bba43b35aa2369f4f766f9621b5fdd9fd36dc1911601d20b0f53f302cc5f49c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 12413012906429199678
+      }
+    },
+    {
+      "id": "CAWP1_TOSHIBA_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAWP1_TOSHIBA_E.264",
+      "sha256": "d3c060da31a63e435bd6fcd8f6d8f8bdb2af1ae912cc29ade39d4f9042874326",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 13735676534003212193
+      }
+    },
+    {
+      "id": "CAWP5_TOSHIBA_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CAWP5_TOSHIBA_E.264",
+      "sha256": "6989abb80de85749862c33f6db57417f780aeab5214dd5544ff7794a0da96f1f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 11156063566834124508
+      }
+    },
+    {
+      "id": "CI1_FT_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CI1_FT_B.264",
+      "sha256": "900f033372ebd2f7b621a708eea82494b5a635140e5563a989ed9b824282fea6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 3697201235912216933
+      }
+    },
+    {
+      "id": "CI_MW_D.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CI_MW_D.264",
+      "sha256": "d773df1155183b9bcd01292c7f4dc4348732071b240f4fcc1bc871a0d41ff15b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 4720568689409785007
+      }
+    },
+    {
+      "id": "CVBS3_Sony_C.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVBS3_Sony_C.jsv",
+      "sha256": "cda3fd657ff71f143a53e3c41e2dd2326b8c4ab550503449dd3dabeaae646ebd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 11038118704554558572
+      }
+    },
+    {
+      "id": "CVCANLMA2_Sony_C.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVCANLMA2_Sony_C.jsv",
+      "sha256": "699b0395f7b55c41b79e1b3d31507bf73d169fb46b1e5552787f5f6756589932",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 7579245487129832628
+      }
+    },
+    {
+      "id": "CVFC1_Sony_C.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVFC1_Sony_C.jsv",
+      "sha256": "c8a1bc3e646d31cab9abaac3474769cf0fe134767ca53f9f88d9a3c272bb2ab3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 7242927636688219437
+      }
+    },
+    {
+      "id": "CVFI1_SVA_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVFI1_SVA_C.264",
+      "sha256": "ca8ce1ed0a82f3404b16811b1a482bfdbe03dcc246effe1ca83b2669a38fa8a6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 12743095774235123155
+      }
+    },
+    {
+      "id": "CVFI1_Sony_D.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVFI1_Sony_D.jsv",
+      "sha256": "dd90b73308db2e3c5cfd4a4e98dac088fd02938cd37ac49deda55dc7b894c2fa",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 4184050793832612590
+      }
+    },
+    {
+      "id": "CVFI2_SVA_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVFI2_SVA_C.264",
+      "sha256": "3708bf1db5f7fbe00668775389536a8df85a2bc8f52e20f7494af46345e60e82",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 3842844215995737113
+      }
+    },
+    {
+      "id": "CVFI2_Sony_H.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVFI2_Sony_H.jsv",
+      "sha256": "75f0a9326f9bb22928316db6326355b14dc0be235d87fed63e7c887eff024406",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 6855798646704598711
+      }
+    },
+    {
+      "id": "CVMA1_Sony_D.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVMA1_Sony_D.jsv",
+      "sha256": "f5268668039ae7bf115702643a0dabe11d94b752288afb245a0ab1caf34c73eb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 6545196693476545072
+      }
+    },
+    {
+      "id": "CVMA1_TOSHIBA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVMA1_TOSHIBA_B.264",
+      "sha256": "2e5af580fdeb99b2ae7cae616bd75a1c32353590a889f190bd435880711b33ce",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 10079480271453377257
+      }
+    },
+    {
+      "id": "CVMANL1_TOSHIBA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVMANL1_TOSHIBA_B.264",
+      "sha256": "22342adae9a2c629aca85f348f76b5852b4f2cc17b1bc212546fd4102b0d37c4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 10079480271453377257
+      }
+    },
+    {
+      "id": "CVMANL2_TOSHIBA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVMANL2_TOSHIBA_B.264",
+      "sha256": "8cfb15cf5571fc18e8d025f260b6e8101454392cd5121be436e80265a362d79d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 8142945844849840011
+      }
+    },
+    {
+      "id": "CVMAPAQP3_Sony_E.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVMAPAQP3_Sony_E.jsv",
+      "sha256": "8a4bc3e7b291d405a2c2102e1147f53495d5af3e2fc3a3878c83e549bc63fc10",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 13301740842440741022
+      }
+    },
+    {
+      "id": "CVMAQP2_Sony_G.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVMAQP2_Sony_G.jsv",
+      "sha256": "785ba74a2a60efce6c081d8ac0001e13d1db8cd7ec1c83c8f7bfc47c27ec7d4d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 14768045913463270982
+      }
+    },
+    {
+      "id": "CVMAQP3_Sony_D.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVMAQP3_Sony_D.jsv",
+      "sha256": "05edde53c10f651a0e214ded4e00d67e9df95cb9e660aab25dec3db80b9bf091",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 18021809598139048111
+      }
+    },
+    {
+      "id": "CVMP_MOT_FLD_L30_B.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVMP_MOT_FLD_L30_B.26l",
+      "sha256": "9fa4178d0695cd5508d8523f4f6a614a0091df5c8cbddd338c591ba7ed1523b7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 6401773628911430108
+      }
+    },
+    {
+      "id": "CVMP_MOT_FRM_L31_B.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVMP_MOT_FRM_L31_B.26l",
+      "sha256": "707f7d4e56d925df950e8e6958cf7c22a2f37aa52a5113f2dc6023877632a475",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 6401773628911430108
+      }
+    },
+    {
+      "id": "CVNLFI1_Sony_C.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVNLFI1_Sony_C.jsv",
+      "sha256": "a3b1f8eb0b271987edacc7b8f1447794032d2e74fc946cac089233ddb9a47cf6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 4184050793832612590
+      }
+    },
+    {
+      "id": "CVNLFI2_Sony_H.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVNLFI2_Sony_H.jsv",
+      "sha256": "448ea665fe7f81f1d2d76a53e75b34448d09d7df0c1c40ee154f85cd0e625468",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 3639332342572144343
+      }
+    },
+    {
+      "id": "CVPA1_TOSHIBA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVPA1_TOSHIBA_B.264",
+      "sha256": "23c2b3299efed3475956b0f7e6a098387ceba1cf3f0b17aff8906daadaf09dc3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 18336516301319719528
+      }
+    },
+    {
+      "id": "CVPCMNL1_SVA_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVPCMNL1_SVA_C.264",
+      "sha256": "6d8dee9086d4cedaa255c0c40fa61165fc9dd56d2bbec16b0bfed6f1f1d33f0c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 5912826489814263805
+      }
+    },
+    {
+      "id": "CVPCMNL2_SVA_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVPCMNL2_SVA_C.264",
+      "sha256": "d9def347076d58aa17ce2b5ba14cf00bfcf3378f8b8c2f0b61db29f69eb846fc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 6189858163027741197
+      }
+    },
+    {
+      "id": "CVSE2_Sony_B.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVSE2_Sony_B.jsv",
+      "sha256": "f10009500cef910947b3e9f0369f27c44a1de2f966a5c75d852a1c8d70e2cfa7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 12034473489592103423
+      }
+    },
+    {
+      "id": "CVSE3_Sony_H.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVSE3_Sony_H.jsv",
+      "sha256": "abe5743d9ee4e94fed9f203b6eaec147a0654c865407dd1b27a18917f141f827",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 13619901714942898873
+      }
+    },
+    {
+      "id": "CVSEFDFT3_Sony_E.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVSEFDFT3_Sony_E.jsv",
+      "sha256": "4ddecf869f616f49ef5a8cac725479082b834bf496357f47f6da7e214954a444",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 13619899899110367547
+      }
+    },
+    {
+      "id": "CVWP1_TOSHIBA_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVWP1_TOSHIBA_E.264",
+      "sha256": "a2cbf860dd8e15fd66cdda72ba37cb81c378b49fe7439200f9c2c9c1ec9f2dbb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 15227302185235086432
+      }
+    },
+    {
+      "id": "CVWP2_TOSHIBA_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVWP2_TOSHIBA_E.264",
+      "sha256": "6b2b6205398d2cfebbee5708c4d4d8c67bb56cd4991f1cc4d90836a14215e257",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 15966140926862145513
+      }
+    },
+    {
+      "id": "CVWP3_TOSHIBA_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVWP3_TOSHIBA_E.264",
+      "sha256": "1ad8b8dcb156dbd3bf050ce0c3cee0334a27f1b8a5d494fd5ce6b96db0eacfb8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 7994802646429420555
+      }
+    },
+    {
+      "id": "CVWP5_TOSHIBA_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/CVWP5_TOSHIBA_E.264",
+      "sha256": "3ed038ac27d66283049b15da0aa9c62e042eb39d057d65dc3e5ded2a18fecc22",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 11353462625675136187
+      }
+    },
+    {
+      "id": "FI1_Sony_E.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FI1_Sony_E.jsv",
+      "sha256": "bb23c948562ff4da94baf70daeec531403345d866ebed885eb394831f9f21caf",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 13657409062249280957
+      }
+    },
+    {
+      "id": "FM1_BT_B.h264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FM1_BT_B.h264",
+      "sha256": "0d55226469e9515a4b80a086f3f419e9407ce452422b7afc3c04220f9cbe2568",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 8041639217159952612
+      }
+    },
+    {
+      "id": "FM1_FT_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FM1_FT_E.264",
+      "sha256": "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 17454822405194630748
+      }
+    },
+    {
+      "id": "FM2_SVA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FM2_SVA_B.264",
+      "sha256": "1695c27d34ce6723a16ce1606b56db235c942876d65b61b724a864229122d031",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 73015891439219371
+      }
+    },
+    {
+      "id": "FM2_SVA_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FM2_SVA_C.264",
+      "sha256": "f36f1435af82ac64cb5ba27f48da05b9878ca1d2aac4725712216255ae824220",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 8008894045438603434
+      }
+    },
+    {
+      "id": "FREXT01_JVC_D.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/FREXT01_JVC_D.264",
+      "sha256": "4a2fc1dea3c99ff7f37c55442f193d2beb4a042d5d9dcbbe79f0b95b409c0093",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 1368347566737464983
+      }
+    },
+    {
+      "id": "FREXT02_JVC_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/FREXT02_JVC_C.264",
+      "sha256": "29328da062fda0c3d5dddb9343a7aa17a6372a28dcc7101588adf23684c553f1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 1474206470280512470
+      }
+    },
+    {
+      "id": "FRExt1_Panasonic.avc",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/FRExt1_Panasonic.avc",
+      "sha256": "13a40fa31692f5c2a96a7dfcd5786df1a1c41e3234268a017e9d53364e21c5fc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 8604007362447714734
+      }
+    },
+    {
+      "id": "FRExt2_Panasonic.avc",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/FRExt2_Panasonic.avc",
+      "sha256": "ba31155d719727ff4f2cfe16881ba30a298782f012d1d4c45765344354fae3be",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 72,
+        "bytes": 0,
+        "digest": 9431259374360007453
+      }
+    },
+    {
+      "id": "FRExt3_Panasonic.avc",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/FRExt3_Panasonic.avc",
+      "sha256": "53a3aeb2d43c50ea07a83d6f0afb221bfab34d445f17181801b34774b7f0ed34",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 8556938530283368465
+      }
+    },
+    {
+      "id": "FRExt4_Panasonic.avc",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/FRExt4_Panasonic.avc",
+      "sha256": "80c13db18b18122cd4cb772ab460933a9858a7c32dd887f55df52ac3a9323acb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 11840382962195790449
+      }
+    },
+    {
+      "id": "FRExt_MMCO4_Sony_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/FRExt_MMCO4_Sony_B.264",
+      "sha256": "0704a0b6a784eac78b1eca3636439e23704d4d87a9faa3e655c19ad28331edf0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 75,
+        "bytes": 0,
+        "digest": 11621957366359631497
+      }
+    },
+    {
+      "id": "Freh12_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/Freh12_B.264",
+      "sha256": "57c4be9b9d00d6f370441373b42aa829a8575028e925972e2e66f57514db74d9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 18442180498241362116
+      }
+    },
+    {
+      "id": "Freh1_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/Freh1_B.264",
+      "sha256": "64fe5b208fa46d9cab5e8138c6ad48c4ae4ac75ac1d6b943b485e8dde447e426",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 14028165824708438241
+      }
+    },
+    {
+      "id": "Freh2_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/Freh2_B.264",
+      "sha256": "6ea81f1bed5731ccf3d357d925405f968b53bd19854a9371e67c7a001c3c4dc3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 18442180498241362116
+      }
+    },
+    {
+      "id": "Freh7_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/Freh7_B.264",
+      "sha256": "75495d41eba792d752e54dbf2273a1adeac71ef6fc70d1d6f3332a3b47ffca46",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 1539612548877155076
+      }
+    },
+    {
+      "id": "HCAFF1_HHI.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HCAFF1_HHI.264",
+      "sha256": "752efafeb176bbf622565e5b3853c82e35bb50143e7175239802576b18e9f22c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 620595681756251764
+      }
+    },
+    {
+      "id": "HCAFR1_HHI.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HCAFR1_HHI.264",
+      "sha256": "bc6b6fe1d3860c88eb6564125c20c3cd272240bf6a22b4fb93876c64cb1b6e83",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 2104369621488337972
+      }
+    },
+    {
+      "id": "HCAFR2_HHI.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HCAFR2_HHI.264",
+      "sha256": "7e8717fcd5be62f3853a3daae2157193c8ccadcb79a79d962ff63bc92c7ce57d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 2104369621488337972
+      }
+    },
+    {
+      "id": "HCAFR3_HHI.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HCAFR3_HHI.264",
+      "sha256": "7e1cde6697bb8903d6e74ed0bbcd0924bac7bd84aa34a80afc6d64be8301d86d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 2104369621488337972
+      }
+    },
+    {
+      "id": "HCAFR4_HHI.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HCAFR4_HHI.264",
+      "sha256": "db1c1f97ef74e6c0cc254a8147daabb4c01cbfba6d8f579144597eabeba8e4f8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 2104369621488337972
+      }
+    },
+    {
+      "id": "HCAMFF1_HHI.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HCAMFF1_HHI.264",
+      "sha256": "329608bd31d8f56a8250e69b17d2add59faeff86815d135761e227d491d774fc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 1368347566737464983
+      }
+    },
+    {
+      "id": "HPCADQ_BRCM_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCADQ_BRCM_B.264",
+      "sha256": "cc1c948ae04c383eec03a2f47fb27c163ecb21e0e265e3fa36f94d9c1b0b6fc9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 18442180498241362116
+      }
+    },
+    {
+      "id": "HPCAFLNL_BRCM_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCAFLNL_BRCM_C.264",
+      "sha256": "acdac1869bdca2a05da12e57a61fe5cfa165e753d42b6980e2b923930731fbbc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 12533445912498922819
+      }
+    },
+    {
+      "id": "HPCAFL_BRCM_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCAFL_BRCM_C.264",
+      "sha256": "37f7560b75430159c3c44f5bd4f2697708c03739f88159309247d177f2403121",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 12533445912498922819
+      }
+    },
+    {
+      "id": "HPCALQ_BRCM_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCALQ_BRCM_B.264",
+      "sha256": "cc1c948ae04c383eec03a2f47fb27c163ecb21e0e265e3fa36f94d9c1b0b6fc9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 18442180498241362116
+      }
+    },
+    {
+      "id": "HPCAMAPALQ_BRCM_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCAMAPALQ_BRCM_B.264",
+      "sha256": "173b7e5d6fd6123f033512d0a9e3faf648740b375e3549f80c938018a9e77da0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 4441052050401980614
+      }
+    },
+    {
+      "id": "HPCAMOLQ_BRCM_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCAMOLQ_BRCM_B.264",
+      "sha256": "4dc94a4e602cfdf9107924ab1a6101f52b23ec0acaf522231f6ca11b3a2bfb6a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 17716572051527452773
+      }
+    },
+    {
+      "id": "HPCANL_BRCM_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCANL_BRCM_C.264",
+      "sha256": "fd920ee62b103c422b81dbcbf244e8dfc37fa9d24c0fe129bd5253635bf75246",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 10989269788153578243
+      }
+    },
+    {
+      "id": "HPCAQ2LQ_BRCM_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCAQ2LQ_BRCM_B.264",
+      "sha256": "5c6879de17a2eb8922cdf0f1727a84eb6c77516e3f5c1c3f5060756f4c166af6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 18442180498241362116
+      }
+    },
+    {
+      "id": "HPCA_BRCM_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCA_BRCM_C.264",
+      "sha256": "0e0b8fedcd50c3659f35de4a462c43fe3625b2d0d4165759fd9836cbb87e914d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 10989269788153578243
+      }
+    },
+    {
+      "id": "HPCVFLNL_BRCM_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCVFLNL_BRCM_A.264",
+      "sha256": "2460cb4cda146924af95bd359b73090c9731690ed64b0cd5035dfeea8a1637d6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 7710314230633599746
+      }
+    },
+    {
+      "id": "HPCVFL_BRCM_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCVFL_BRCM_A.264",
+      "sha256": "5fd105148550967d57a3d0ed335c32d84643697061b78b9e5c7e835a57396983",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 7710314230633599746
+      }
+    },
+    {
+      "id": "HPCVMOLQ_BRCM_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCVMOLQ_BRCM_B.264",
+      "sha256": "5071e978fe987043ef3dc6222ffaef7346639aad3ad180b8688b46f1d91a6e8c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 12893440369662129700
+      }
+    },
+    {
+      "id": "HPCVNL_BRCM_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCVNL_BRCM_A.264",
+      "sha256": "7bde98589d16b64bfad343b763aa112cf430e61e427b7f5077697547919bc561",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 6166138106288255170
+      }
+    },
+    {
+      "id": "HPCV_BRCM_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/HPCV_BRCM_A.264",
+      "sha256": "87858e53b1d9b121efaf3e6f8adec967e7b74c0c9e2223e3b7e8b81c448d4176",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 6166138106288255170
+      }
+    },
+    {
+      "id": "Hi422FR10_SONY_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/Hi422FR10_SONY_B.264",
+      "sha256": "8aed60728f2b8be7dd4886a94e73702532941557d712e04680ce8c258be7ccec",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 10659309363914590287
+      }
+    },
+    {
+      "id": "Hi422FR13_SONY_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/Hi422FR13_SONY_B.264",
+      "sha256": "aa55f7064732a83c86fe228ba3cf8ab065b3129cf0f107c9fba469e57dd59881",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 2006132833161073745
+      }
+    },
+    {
+      "id": "Hi422FR1_SONY_A.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/Hi422FR1_SONY_A.jsv",
+      "sha256": "d0fcd8a6699d85f78eb80d8c2b2113ce6eb03347a0dc8ed19aa51b308986a589",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 11117200416428021231
+      }
+    },
+    {
+      "id": "Hi422FR6_SONY_A.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/Hi422FR6_SONY_A.jsv",
+      "sha256": "2ba847a7f9756eebd6a1204f9eecbb85628ebc6b424d5af2493bccb4fd0e2e61",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 2464023885674504689
+      }
+    },
+    {
+      "id": "PPH10I1_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH10I1_Panasonic_A.264",
+      "sha256": "7c2f72b1091095840aed11dd659530531ad4d17ac59386145878fa51de6667f5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 9591408061589784484
+      }
+    },
+    {
+      "id": "PPH10I2_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH10I2_Panasonic_A.264",
+      "sha256": "80a02559ed20f0e3cc54d84faf7d8f6d79530c10067e7e4bbc663ef6590838c9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 17699815587614227429
+      }
+    },
+    {
+      "id": "PPH10I3_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH10I3_Panasonic_A.264",
+      "sha256": "66c5b426e66b97bb9951a590fc52435d5da03e73673a25bcfbdfddca72a9a117",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 17699815587614227429
+      }
+    },
+    {
+      "id": "PPH10I4_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH10I4_Panasonic_A.264",
+      "sha256": "fc9b9512027d6c6ae2034e583f12f109823fc1bab4cf6fa9fa8720975b4db37e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 8582151035050679670
+      }
+    },
+    {
+      "id": "PPH10I5_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH10I5_Panasonic_A.264",
+      "sha256": "72d732367e063fcc619ab3aeea79f894ba6afa702bab9855824a6d338bb92ee4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 16690558561075122615
+      }
+    },
+    {
+      "id": "PPH10I6_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH10I6_Panasonic_A.264",
+      "sha256": "eec1ad9774aa0d6844786980a83a2d8a0ffd16772c31e175dc6096396abc8afd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 13454487199403120440
+      }
+    },
+    {
+      "id": "PPH10I7_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH10I7_Panasonic_A.264",
+      "sha256": "50046fc1758b1f6bc71e6bdb8f99f8b752f1d590579ebb62ea520f8960599700",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 3116150651718011769
+      }
+    },
+    {
+      "id": "PPH422I1_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH422I1_Panasonic_A.264",
+      "sha256": "c6b53da3735d92a98bbf4f363e5af00e821bc8f8debe1ec9999910c7511b964c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 5539431904237274999
+      }
+    },
+    {
+      "id": "PPH422I2_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH422I2_Panasonic_A.264",
+      "sha256": "faca58ec834c82c63ddcf406374c7e76e112b3c5cc71adf0f016b1327f60bfbf",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 13647839430261717944
+      }
+    },
+    {
+      "id": "PPH422I3_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH422I3_Panasonic_A.264",
+      "sha256": "2fc5a02e724c6b726b489e45f08e17a0fb68f04fb0221bd30028776594e1677c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 13647839430261717944
+      }
+    },
+    {
+      "id": "PPH422I4_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH422I4_Panasonic_A.264",
+      "sha256": "af882d0e6e8ad83d6e7f414b0378867125732df987fb0f364167cd998d6802bf",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 4530174877698170185
+      }
+    },
+    {
+      "id": "PPH422I5_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH422I5_Panasonic_A.264",
+      "sha256": "532df6d3e181bd8f4e148bca0489614d1f5b370dc0f2d4e2d933e1a72ebc1d62",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 12638582403722613130
+      }
+    },
+    {
+      "id": "PPH422I6_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH422I6_Panasonic_A.264",
+      "sha256": "3e462f2f89c0313b4a53121785a4ccf6a944bf7d9cacb9be48f6988f7a5bdf52",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 9402511042050610955
+      }
+    },
+    {
+      "id": "PPH422I7_Panasonic_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/PPH422I7_Panasonic_A.264",
+      "sha256": "b0d2b9fd99bc44033a9b22715644fd83fd563bdccabf6a092394a3e1f3507d4e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 66,
+        "bytes": 0,
+        "digest": 17510918568075053900
+      }
+    },
+    {
+      "id": "freh10.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/freh10.264",
+      "sha256": "bb0a280deb95c6ad01b0d9b9659ee6035ebd077ae0566237ea46413399378e40",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 1539612548877155076
+      }
+    },
+    {
+      "id": "freh11.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/freh11.264",
+      "sha256": "933b5ca93e46a8470b0bbd29671a8013b168e674449f8ce2fb88f621b4f751b5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 1539612548877155076
+      }
+    },
+    {
+      "id": "freh3.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/freh3.264",
+      "sha256": "341a96f765114a6a05eae2039f546f4846e12e79ea339cb77e7b1a9d0f609318",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 404553432864209698
+      }
+    },
+    {
+      "id": "freh4.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/freh4.264",
+      "sha256": "395e1e37c7697220dc8ec0c7c7f77f3bbe2f97a7972b4e31a83e06ef0551a6e0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 1948729557209554274
+      }
+    },
+    {
+      "id": "freh5.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/freh5.264",
+      "sha256": "9ddbef250b94b5bd1cfc496553ef80153b5f0b7ad08b5186504cf3bcee49d439",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 12652899975158033413
+      }
+    },
+    {
+      "id": "freh6.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/freh6.264",
+      "sha256": "e994aea2f71a0aefa0d332b5d66140a56267504ebe37e5627f5d9f5303fe9fe1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 15163224940721383619
+      }
+    },
+    {
+      "id": "freh8.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/freh8.264",
+      "sha256": "d2e32d901e791ae8d9673982909b6cfeb4e10fb094c121c622d09e926baa9db7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 18442180498241362116
+      }
+    },
+    {
+      "id": "freh9.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/freh9.264",
+      "sha256": "00e1b08935f3acb3fdbd4963df1566deaf071c038be9fa32fe5d93d7e135b21f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 18442180498241362116
+      }
+    },
+    {
+      "id": "test8b43.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/FRext/test8b43.264",
+      "sha256": "be27c2f2e160850affcbfe4ca254dacb676d864f32f8335ce6599ef6a19a0252",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 2335781393979240611
+      }
+    },
+    {
+      "id": "HCBP1_HHI_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/HCBP1_HHI_A.264",
+      "sha256": "96581d0ce8dcb4788520e1133599bf5f25ea5378ecfe375505288d17689ae644",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 638485426439352250
+      }
+    },
+    {
+      "id": "HCBP2_HHI_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/HCBP2_HHI_A.264",
+      "sha256": "a3263e8212c6a03d123a972cbe8eb0066d03fe839d51b2026201efa6c640d25c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 638485426439352250
+      }
+    },
+    {
+      "id": "HCMP1_HHI_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/HCMP1_HHI_A.264",
+      "sha256": "f9bf6d36a7250dd86cf325cd458e92f3319236dcde075000e70f73028f05111a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 15714779832051332854
+      }
+    },
+    {
+      "id": "LS_SVA_D.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/LS_SVA_D.264",
+      "sha256": "f11195ecadf83dde3a6774fc072c2f1f07528b5f23f1ae0f61569f661962ae79",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 6914112253780967821
+      }
+    },
+    {
+      "id": "MIDR_MW_D.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MIDR_MW_D.264",
+      "sha256": "b39ba07a9734328a61d23ebc798ce32a17d6a88290d92501e94e5da731ba2a49",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 15567020643422750894
+      }
+    },
+    {
+      "id": "MPS_MW_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MPS_MW_A.264",
+      "sha256": "f35413b51c427cc549779961209ca75c56e5e23614f88d27a10e7d66c3db6056",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 15567020643422750894
+      }
+    },
+    {
+      "id": "MR1_BT_A.h264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MR1_BT_A.h264",
+      "sha256": "20dc67331c81adcf40048bb37357883a69b3ab002b0927e599f43d86be9c3d8b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 1959570610544007534
+      }
+    },
+    {
+      "id": "MR1_MW_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MR1_MW_A.264",
+      "sha256": "d441f223c9dff05da43645cd5539eec21e8aef2684160040b61faf799f7f3b1f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 15472723430662075917
+      }
+    },
+    {
+      "id": "MR2_MW_A.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MR2_MW_A.264",
+      "sha256": "90b75468443485a893702b1349ce116a2e75e20f92df7d5bf8aca63b7ad2533c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 72,
+        "bytes": 0,
+        "digest": 758330795032771940
+      }
+    },
+    {
+      "id": "MR2_TANDBERG_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MR2_TANDBERG_E.264",
+      "sha256": "24d95632d3adff1808f391402d2bae4f111dd051c1187b915701c2201f995254",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 74,
+        "bytes": 0,
+        "digest": 4515652876451815842
+      }
+    },
+    {
+      "id": "MR3_TANDBERG_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MR3_TANDBERG_B.264",
+      "sha256": "05614f0c5c3b169d3520eb297796edb5227a2c7bcf84a1bfd15bbae42210fabc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 73,
+        "bytes": 0,
+        "digest": 3519922577554448946
+      }
+    },
+    {
+      "id": "MR4_TANDBERG_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MR4_TANDBERG_C.264",
+      "sha256": "22c7460de21aa0b3ec68d2eb9e5ea712597e781c2e90940ed9c23803073d35e0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 73,
+        "bytes": 0,
+        "digest": 1399984246093773684
+      }
+    },
+    {
+      "id": "MR5_TANDBERG_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MR5_TANDBERG_C.264",
+      "sha256": "d0749c59e6e34c607dac9aca210f470003947b64db6cdc5c3237ce9f53bfef93",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 73,
+        "bytes": 0,
+        "digest": 2459953411824111315
+      }
+    },
+    {
+      "id": "MR6_BT_B.h264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MR6_BT_B.h264",
+      "sha256": "6b7fc0b3e6d57d7b5f58286c1fb4f5afb2324cc21e6d1c9ee9a846471fc21ae8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 72,
+        "bytes": 0,
+        "digest": 626203892489901468
+      }
+    },
+    {
+      "id": "MR7_BT_B.h264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MR7_BT_B.h264",
+      "sha256": "8d66aae5033474155599b4cd7f06da9ef7977d89e3ccc2a23d364e1e772e3f27",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 72,
+        "bytes": 0,
+        "digest": 626203892489901468
+      }
+    },
+    {
+      "id": "MR8_BT_B.h264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MR8_BT_B.h264",
+      "sha256": "8ea256bd662006f28284e7485e9e71706fc036284a021873dec7d42d6eec986e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 72,
+        "bytes": 0,
+        "digest": 14876500165409579769
+      }
+    },
+    {
+      "id": "MR9_BT_B.h264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/MR9_BT_B.h264",
+      "sha256": "dd2712e64c602bfd5b79b1eff6ac9ed5826bd3619b0d70653850768ab95c4817",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 73,
+        "bytes": 0,
+        "digest": 12975564692016965747
+      }
+    },
+    {
+      "id": "NL1_Sony_D.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/NL1_Sony_D.jsv",
+      "sha256": "125f334b98af2609b481d9c2d34a2b855d0ced981145c8021618c5f10cb864e5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 1464792725046800200
+      }
+    },
+    {
+      "id": "NL2_Sony_H.jsv",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/NL2_Sony_H.jsv",
+      "sha256": "5a4666b7269291f1d22d4190cfb9d327f818b212cdbc0c8e83d037f05d52a58c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 15567020643422750894
+      }
+    },
+    {
+      "id": "NL3_SVA_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/NL3_SVA_E.264",
+      "sha256": "1fbaf6149a8d346cba7968de3c09604e883a35c4b0e494d7353a135f1631a987",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 17132097681280648650
+      }
+    },
+    {
+      "id": "NLMQ1_JVC_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/NLMQ1_JVC_C.264",
+      "sha256": "5e84ad3a0dc3f5b7578a38d3b1c6cc70e051b7eeba183104a690f8d0700557e5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 11258628409114568743
+      }
+    },
+    {
+      "id": "NLMQ2_JVC_C.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/NLMQ2_JVC_C.264",
+      "sha256": "9ef3595fbf4604d8d2189fe75d76c619b2d4c0f313d3cdbe05422068476906ee",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 6914112253780967821
+      }
+    },
+    {
+      "id": "NRF_MW_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/NRF_MW_E.264",
+      "sha256": "02e5b0f3e018a998adcd4cfbeed184298a1c8e0cf27ef4f16bcf780b23a03c00",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 15567020643422750894
+      }
+    },
+    {
+      "id": "SL1_SVA_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/SL1_SVA_B.264",
+      "sha256": "47cdb0ded4dab7f41d8fdda4e76d7d01d38a5b58d8ac57e44e93b389bf107158",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 11390509814762107851
+      }
+    },
+    {
+      "id": "SVA_BA1_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/SVA_BA1_B.264",
+      "sha256": "67c74b563820b3da6bda325dd2b37a957e9573429715464debe9b0d98d35636f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 2605720019472785670
+      }
+    },
+    {
+      "id": "SVA_BA2_D.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/SVA_BA2_D.264",
+      "sha256": "b7212b4610f8e64f7c894bbd70e48786061decaadbab623209c93ff061899a67",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 16707947937848736364
+      }
+    },
+    {
+      "id": "SVA_Base_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/SVA_Base_B.264",
+      "sha256": "e33d00e0e9358b118f152250b848e26f8d995a7bb06748e9f21f2f3cdd5c33e2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 13843872743923831275
+      }
+    },
+    {
+      "id": "SVA_CL1_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/SVA_CL1_E.264",
+      "sha256": "81fc3e69b2ed52204d77473175593fa2fa0128a0c8736dc91a3bfd8d80b3b43d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 12702945449497845805
+      }
+    },
+    {
+      "id": "SVA_FM1_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/SVA_FM1_E.264",
+      "sha256": "a997221bc0f056175ecc71d4d3e612ded7d460f8b5d8ff4f0b7648924f4e87f8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 12702945449497845805
+      }
+    },
+    {
+      "id": "SVA_NL1_B.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/SVA_NL1_B.264",
+      "sha256": "8ff7ef385325e54e5f383eb652d82436b3c5dbac6d76a39c8ce1bb6793e24d46",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 67,
+        "bytes": 0,
+        "digest": 1464792725046800200
+      }
+    },
+    {
+      "id": "SVA_NL2_E.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/SVA_NL2_E.264",
+      "sha256": "006daffa233010b1abc20f8368ff773ae96f1860cedc66e0a07e125a401f2cba",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 15567020643422750894
+      }
+    },
+    {
+      "id": "Sharp_MP_Field_1_B.jvt",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/Sharp_MP_Field_1_B.jvt",
+      "sha256": "19f22b627c6da7d075efc552c0b0d04429375f4ac7317b357175684d7c91ca19",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 3083486113926070285
+      }
+    },
+    {
+      "id": "Sharp_MP_Field_2_B.jvt",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/Sharp_MP_Field_2_B.jvt",
+      "sha256": "0800f039c62966dfe89c07c0e3a0f250918e0a7d7a6731f267b9cb3031e41470",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 3083486113926070285
+      }
+    },
+    {
+      "id": "Sharp_MP_Field_3_B.jvt",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/Sharp_MP_Field_3_B.jvt",
+      "sha256": "27e7e304c8298481270087b67c22e2ed8abd07d406b63c061e85ae50b1f570e6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 12612796996948418132
+      }
+    },
+    {
+      "id": "Sharp_MP_PAFF_1r2.jvt",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/Sharp_MP_PAFF_1r2.jvt",
+      "sha256": "541df810a033d64a2706d25cc335b80d562041af586f3f622d2d1d79566bd588",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 12612796996948418132
+      }
+    },
+    {
+      "id": "Sharp_MP_PAFF_2.jvt",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/Sharp_MP_PAFF_2.jvt",
+      "sha256": "930856ab505cff7680353601c02b0fbf4e55800974065f7e90cebb9d8adf58cb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 1161513484790685685
+      }
+    },
+    {
+      "id": "cama1_vtc_c.avc",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/cama1_vtc_c.avc",
+      "sha256": "e70ea27b1a543f0ab021636398aa912a796a7d1ef4ce444cea73c74cb38d365c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 4059583146046686365
+      }
+    },
+    {
+      "id": "cama2_vtc_b.avc",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/cama2_vtc_b.avc",
+      "sha256": "f0ccd58dc44d8d8a8163fb21466cb19e63b6d4cce53be382329c4d60dcad6cd4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 12982223365197579517
+      }
+    },
+    {
+      "id": "cama3_vtc_b.avc",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/cama3_vtc_b.avc",
+      "sha256": "8b7bc245e3465c90906f395076def7c97057df606c00ab5194b6e9402fb0953f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 12982223365197579517
+      }
+    },
+    {
+      "id": "camp_mot_fld0_full.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/camp_mot_fld0_full.26l",
+      "sha256": "2ff34d3b7fa25106dda248350730de340beeb32c94ed2028eb610dfeea377499",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 9512381029500836989
+      }
+    },
+    {
+      "id": "camp_mot_frm0_full.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/camp_mot_frm0_full.26l",
+      "sha256": "36e1188ae32f0ffe764921d9471390687a7b07481d18b4d9fca4450c17116fac",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 10996154969232923197
+      }
+    },
+    {
+      "id": "camp_mot_mbaff0_full.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/camp_mot_mbaff0_full.26l",
+      "sha256": "9c6ba659900a635da5a93e0bb68325fdea77db90ec8fcb4b19d9a54cad6e539e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 10260132914482050208
+      }
+    },
+    {
+      "id": "camp_mot_picaff0_full.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/camp_mot_picaff0_full.26l",
+      "sha256": "cdf09622b0879240864f1258dd3ae0a0fe03690028780d4be834f528ecdade83",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 9512381029500836989
+      }
+    },
+    {
+      "id": "cvmp_mot_fld0_full_B.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/cvmp_mot_fld0_full_B.26l",
+      "sha256": "3dd58a1be9fd9b800f0dec163c0bce19c8c9021cadb23824c1da5de1f0b9681f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 12495752605637520186
+      }
+    },
+    {
+      "id": "cvmp_mot_frm0_full_B.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/cvmp_mot_frm0_full_B.26l",
+      "sha256": "d21e49a4f174a6933015ff2ecd94886d2ee5b5ebcf7cf1350ec7a97249e7bd77",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 13979526545369606394
+      }
+    },
+    {
+      "id": "cvmp_mot_mbaff0_full_B.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/cvmp_mot_mbaff0_full_B.26l",
+      "sha256": "91d8e29a16e7cab22797d384dbdbd30643e4f8284866c3a81e2aabdb45f5c97b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 13243504490618733405
+      }
+    },
+    {
+      "id": "cvmp_mot_picaff0_full_B.26l",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/cvmp_mot_picaff0_full_B.26l",
+      "sha256": "872fbc427c37e13c5c9fd49e6094f1cc59a3074226e687d225fa417dedd28ab6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 12495752605637520186
+      }
+    },
+    {
+      "id": "slice2_field_aurora4.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/slice2_field_aurora4.264",
+      "sha256": "e38d4b7812401babc5f413dda83bc666cfeac9501d07f586eb950d2fbd7f2777",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 72,
+        "bytes": 0,
+        "digest": 16561187820431375727
+      }
+    },
+    {
+      "id": "sp1_bt_a.h264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/sp1_bt_a.h264",
+      "sha256": "2126d0489811e0bae6c3fd751506f883a673f9ecf1e4687d2cc1fbf791f6223f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 70,
+        "bytes": 0,
+        "digest": 7173526515840143115
+      }
+    },
+    {
+      "id": "sp2_bt_b.h264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/sp2_bt_b.h264",
+      "sha256": "6482a8a5a7f1c1600ed291dca5be8417b88dd4c6d47aa724afde17eafabe43bf",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 71,
+        "bytes": 0,
+        "digest": 12527160583330706476
+      }
+    },
+    {
+      "id": "src19td.IBP.264",
+      "profile": "h264",
+      "file": ".research/fate-samples/h264-conformance/src19td.IBP.264",
+      "sha256": "5dc8e06bb1730033dd1ef06e88994704f1f30662a9229df5105bf78b0c29622b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 69,
+        "bytes": 0,
+        "digest": 17090133945959013275
+      }
+    }
+  ]
+}

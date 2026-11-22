@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "id": "ac3-frame-info",
+  "gate": "required",
+  "operation": "ac3-frame-info",
+  "candidate": "codec-views-worker",
+  "worker_operation": "ac3-frame-info-",
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-codec-views-native",
+  "contract": [
+    "Decode the same elementary input through Decoder::decode and the FFmpeg decoder. Compare geometry, syntax and dialogue level, CRC result and concealment flags, layout, service and matrix, and the reference downmix side data.",
+    "Kind 4 first holds syntax, bitstream ID, mode, LFE, dialogue normalization code, rate, samples, syncframe count, CRC validity, concealment, service and matrix. The codec-layouts records then follow. The reference projects the original dialogue code and CRC domain from its parser packets and takes concealment from the frame's error and corrupt flags.",
+    "Decode and output mixing are measured by the AC-3 and E-AC-3 rows of codec-workloads."
+  ],
+  "required_profiles": [
+    "ac3",
+    "eac3"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "parity_timeout_seconds": 180,
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "ac3-diatonis.ac3",
+        "ac3-millers_crossing_4.0.ac3",
+        "ac3-monsters_inc_2.0_192_small.ac3",
+        "ac3-monsters_inc_5.1_448_small.ac3",
+        "ac3-mp3ac325_a0.ac3",
+        "ac3-mp3ac325_a1.ac3",
+        "eac3-csi_miami_5.1_256_spx_small.eac3",
+        "eac3-csi_miami_stereo_128_spx.eac3",
+        "eac3-csi_miami_stereo_128_spx_small.eac3",
+        "eac3-matrix2_commentary1_stereo_192_small.eac3",
+        "eac3-serenity_english_5.1_1536_small.eac3",
+        "eac3-the_great_wall_7.1.eac3",
+        "ac3-monsters_inc_5.1_448_small.ac3-fate-samples",
+        "ac3-monsters_inc_2.0_192_small.ac3-fate-samples",
+        "ac3-millers_crossing_4.0.ac3-fate-samples",
+        "eac3-the_great_wall_7.1.eac3-fate-samples",
+        "eac3-csi_miami_5.1_256_spx_small.eac3-fate-samples",
+        "eac3-csi_miami_stereo_128_spx.eac3-fate-samples",
+        "eac3-serenity_english_5.1_1536_small.eac3-fate-samples"
+      ],
+      "cause": "Codec workloads measure AC-3 and E-AC-3 decode. This operation adds the published per-frame facts."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "ac3-diatonis.ac3",
+        "ac3-millers_crossing_4.0.ac3",
+        "ac3-monsters_inc_2.0_192_small.ac3",
+        "ac3-monsters_inc_5.1_448_small.ac3",
+        "ac3-mp3ac325_a0.ac3",
+        "ac3-mp3ac325_a1.ac3",
+        "eac3-csi_miami_5.1_256_spx_small.eac3",
+        "eac3-csi_miami_stereo_128_spx.eac3",
+        "eac3-csi_miami_stereo_128_spx_small.eac3",
+        "eac3-matrix2_commentary1_stereo_192_small.eac3",
+        "eac3-serenity_english_5.1_1536_small.eac3",
+        "eac3-the_great_wall_7.1.eac3",
+        "ac3-monsters_inc_5.1_448_small.ac3-fate-samples",
+        "ac3-monsters_inc_2.0_192_small.ac3-fate-samples",
+        "ac3-millers_crossing_4.0.ac3-fate-samples",
+        "eac3-the_great_wall_7.1.eac3-fate-samples",
+        "eac3-csi_miami_5.1_256_spx_small.eac3-fate-samples",
+        "eac3-csi_miami_stereo_128_spx.eac3-fate-samples",
+        "eac3-serenity_english_5.1_1536_small.eac3-fate-samples"
+      ],
+      "cause": "Codec workloads measure AC-3 and E-AC-3 decode. This operation adds the published per-frame facts."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "ac3-diatonis.ac3",
+        "ac3-millers_crossing_4.0.ac3",
+        "ac3-monsters_inc_2.0_192_small.ac3",
+        "ac3-monsters_inc_5.1_448_small.ac3",
+        "ac3-mp3ac325_a0.ac3",
+        "ac3-mp3ac325_a1.ac3",
+        "eac3-csi_miami_5.1_256_spx_small.eac3",
+        "eac3-csi_miami_stereo_128_spx.eac3",
+        "eac3-csi_miami_stereo_128_spx_small.eac3",
+        "eac3-matrix2_commentary1_stereo_192_small.eac3",
+        "eac3-serenity_english_5.1_1536_small.eac3",
+        "eac3-the_great_wall_7.1.eac3",
+        "ac3-monsters_inc_5.1_448_small.ac3-fate-samples",
+        "ac3-monsters_inc_2.0_192_small.ac3-fate-samples",
+        "ac3-millers_crossing_4.0.ac3-fate-samples",
+        "eac3-the_great_wall_7.1.eac3-fate-samples",
+        "eac3-csi_miami_5.1_256_spx_small.eac3-fate-samples",
+        "eac3-csi_miami_stereo_128_spx.eac3-fate-samples",
+        "eac3-serenity_english_5.1_1536_small.eac3-fate-samples"
+      ],
+      "cause": "Codec workloads measure AC-3 and E-AC-3 decode. This operation adds the published per-frame facts."
+    }
+  ],
+  "open_cases": [
+    {
+      "id": "ac3-monsters_inc_2.0_192_small.ac3",
+      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ac3-monsters_inc_5.1_448_small.ac3",
+      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ac3-mp3ac325_a0.ac3",
+      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ac3-mp3ac325_a1.ac3",
+      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ac3-monsters_inc_5.1_448_small.ac3-fate-samples",
+      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ac3-monsters_inc_2.0_192_small.ac3-fate-samples",
+      "requirement": "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
+  "pending_module_requirements": [
+    "Retain the syncframe dialogue normalization value through concealment, where the candidate returns zero and the reference reconstruction still reads the wire value"
+  ]
+}

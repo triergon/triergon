@@ -1,0 +1,699 @@
+{
+  "schema": 1,
+  "id": "ac3-frame-header",
+  "gate": "required",
+  "operation": "ac3-frame-header",
+  "candidate": "codec-views-worker",
+  "worker_operation": "ac3-header-",
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-codec-views-native",
+  "contract": [
+    "Compare the AC-3 and E-AC-3 syncframe header view with av_ac3_parse_header and the AC-3 parser's output, including dependent syncframes in grouped packets.",
+    "Fold kind 3 with source offset, syntax, bitstream ID, declared byte extent, rate, audio block count, audio coding mode, LFE flag and actual byte extent. Fold kind 8 with offset on a refused syncframe. Coding mode and LFE come from the fixed wire header where the parser does not expose those codes."
+  ],
+  "required_profiles": [
+    "ac3",
+    "eac3",
+    "authored"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "parity_timeout_seconds": 180,
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "ac3-diatonis.ac3",
+        "ac3-millers_crossing_4.0.ac3",
+        "ac3-monsters_inc_2.0_192_small.ac3",
+        "ac3-monsters_inc_5.1_448_small.ac3",
+        "ac3-mp3ac325_a0.ac3",
+        "ac3-mp3ac325_a1.ac3",
+        "eac3-csi_miami_5.1_256_spx_small.eac3",
+        "eac3-csi_miami_stereo_128_spx.eac3",
+        "eac3-csi_miami_stereo_128_spx_small.eac3",
+        "eac3-matrix2_commentary1_stereo_192_small.eac3",
+        "eac3-serenity_english_5.1_1536_small.eac3",
+        "eac3-the_great_wall_7.1.eac3",
+        "ac3-monsters_inc_5.1_448_small.ac3-fate-samples",
+        "ac3-monsters_inc_2.0_192_small.ac3-fate-samples",
+        "ac3-millers_crossing_4.0.ac3-fate-samples",
+        "eac3-the_great_wall_7.1.eac3-fate-samples",
+        "eac3-csi_miami_5.1_256_spx_small.eac3-fate-samples",
+        "eac3-csi_miami_stereo_128_spx.eac3-fate-samples",
+        "eac3-serenity_english_5.1_1536_small.eac3-fate-samples",
+        "fscod-0",
+        "fscod-1",
+        "fscod-2",
+        "frmsizecod-00",
+        "frmsizecod-01",
+        "frmsizecod-02",
+        "frmsizecod-03",
+        "frmsizecod-04",
+        "frmsizecod-05",
+        "frmsizecod-06",
+        "frmsizecod-07",
+        "frmsizecod-08",
+        "frmsizecod-09",
+        "frmsizecod-10",
+        "frmsizecod-11",
+        "frmsizecod-12",
+        "frmsizecod-13",
+        "frmsizecod-14",
+        "frmsizecod-15",
+        "frmsizecod-16",
+        "frmsizecod-17",
+        "frmsizecod-18",
+        "frmsizecod-19",
+        "frmsizecod-20",
+        "frmsizecod-21",
+        "frmsizecod-22",
+        "frmsizecod-23",
+        "frmsizecod-24",
+        "frmsizecod-25",
+        "frmsizecod-26",
+        "frmsizecod-27",
+        "frmsizecod-28",
+        "frmsizecod-29",
+        "frmsizecod-30",
+        "frmsizecod-31",
+        "frmsizecod-32",
+        "frmsizecod-33",
+        "frmsizecod-34",
+        "frmsizecod-35",
+        "frmsizecod-36",
+        "frmsizecod-37",
+        "acmod-0-lfe-0",
+        "acmod-0-lfe-1",
+        "acmod-1-lfe-0",
+        "acmod-1-lfe-1",
+        "acmod-2-lfe-0",
+        "acmod-2-lfe-1",
+        "acmod-3-lfe-0",
+        "acmod-3-lfe-1",
+        "acmod-4-lfe-0",
+        "acmod-4-lfe-1",
+        "acmod-5-lfe-0",
+        "acmod-5-lfe-1",
+        "acmod-6-lfe-0",
+        "acmod-6-lfe-1",
+        "acmod-7-lfe-0",
+        "acmod-7-lfe-1",
+        "bsid-9",
+        "bsid-10"
+      ],
+      "cause": "Awaiting runtime, peak heap and total RSS collection on isolated AArch64 and ARMv7 gate hosts."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "ac3-diatonis.ac3",
+        "ac3-millers_crossing_4.0.ac3",
+        "ac3-monsters_inc_2.0_192_small.ac3",
+        "ac3-monsters_inc_5.1_448_small.ac3",
+        "ac3-mp3ac325_a0.ac3",
+        "ac3-mp3ac325_a1.ac3",
+        "eac3-csi_miami_5.1_256_spx_small.eac3",
+        "eac3-csi_miami_stereo_128_spx.eac3",
+        "eac3-csi_miami_stereo_128_spx_small.eac3",
+        "eac3-matrix2_commentary1_stereo_192_small.eac3",
+        "eac3-serenity_english_5.1_1536_small.eac3",
+        "eac3-the_great_wall_7.1.eac3",
+        "ac3-monsters_inc_5.1_448_small.ac3-fate-samples",
+        "ac3-monsters_inc_2.0_192_small.ac3-fate-samples",
+        "ac3-millers_crossing_4.0.ac3-fate-samples",
+        "eac3-the_great_wall_7.1.eac3-fate-samples",
+        "eac3-csi_miami_5.1_256_spx_small.eac3-fate-samples",
+        "eac3-csi_miami_stereo_128_spx.eac3-fate-samples",
+        "eac3-serenity_english_5.1_1536_small.eac3-fate-samples",
+        "fscod-0",
+        "fscod-1",
+        "fscod-2",
+        "frmsizecod-00",
+        "frmsizecod-01",
+        "frmsizecod-02",
+        "frmsizecod-03",
+        "frmsizecod-04",
+        "frmsizecod-05",
+        "frmsizecod-06",
+        "frmsizecod-07",
+        "frmsizecod-08",
+        "frmsizecod-09",
+        "frmsizecod-10",
+        "frmsizecod-11",
+        "frmsizecod-12",
+        "frmsizecod-13",
+        "frmsizecod-14",
+        "frmsizecod-15",
+        "frmsizecod-16",
+        "frmsizecod-17",
+        "frmsizecod-18",
+        "frmsizecod-19",
+        "frmsizecod-20",
+        "frmsizecod-21",
+        "frmsizecod-22",
+        "frmsizecod-23",
+        "frmsizecod-24",
+        "frmsizecod-25",
+        "frmsizecod-26",
+        "frmsizecod-27",
+        "frmsizecod-28",
+        "frmsizecod-29",
+        "frmsizecod-30",
+        "frmsizecod-31",
+        "frmsizecod-32",
+        "frmsizecod-33",
+        "frmsizecod-34",
+        "frmsizecod-35",
+        "frmsizecod-36",
+        "frmsizecod-37",
+        "acmod-0-lfe-0",
+        "acmod-0-lfe-1",
+        "acmod-1-lfe-0",
+        "acmod-1-lfe-1",
+        "acmod-2-lfe-0",
+        "acmod-2-lfe-1",
+        "acmod-3-lfe-0",
+        "acmod-3-lfe-1",
+        "acmod-4-lfe-0",
+        "acmod-4-lfe-1",
+        "acmod-5-lfe-0",
+        "acmod-5-lfe-1",
+        "acmod-6-lfe-0",
+        "acmod-6-lfe-1",
+        "acmod-7-lfe-0",
+        "acmod-7-lfe-1",
+        "bsid-9",
+        "bsid-10"
+      ],
+      "cause": "Awaiting runtime, peak heap and total RSS collection on isolated AArch64 and ARMv7 gate hosts."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "ac3-diatonis.ac3",
+        "ac3-millers_crossing_4.0.ac3",
+        "ac3-monsters_inc_2.0_192_small.ac3",
+        "ac3-monsters_inc_5.1_448_small.ac3",
+        "ac3-mp3ac325_a0.ac3",
+        "ac3-mp3ac325_a1.ac3",
+        "eac3-csi_miami_5.1_256_spx_small.eac3",
+        "eac3-csi_miami_stereo_128_spx.eac3",
+        "eac3-csi_miami_stereo_128_spx_small.eac3",
+        "eac3-matrix2_commentary1_stereo_192_small.eac3",
+        "eac3-serenity_english_5.1_1536_small.eac3",
+        "eac3-the_great_wall_7.1.eac3",
+        "ac3-monsters_inc_5.1_448_small.ac3-fate-samples",
+        "ac3-monsters_inc_2.0_192_small.ac3-fate-samples",
+        "ac3-millers_crossing_4.0.ac3-fate-samples",
+        "eac3-the_great_wall_7.1.eac3-fate-samples",
+        "eac3-csi_miami_5.1_256_spx_small.eac3-fate-samples",
+        "eac3-csi_miami_stereo_128_spx.eac3-fate-samples",
+        "eac3-serenity_english_5.1_1536_small.eac3-fate-samples",
+        "fscod-0",
+        "fscod-1",
+        "fscod-2",
+        "frmsizecod-00",
+        "frmsizecod-01",
+        "frmsizecod-02",
+        "frmsizecod-03",
+        "frmsizecod-04",
+        "frmsizecod-05",
+        "frmsizecod-06",
+        "frmsizecod-07",
+        "frmsizecod-08",
+        "frmsizecod-09",
+        "frmsizecod-10",
+        "frmsizecod-11",
+        "frmsizecod-12",
+        "frmsizecod-13",
+        "frmsizecod-14",
+        "frmsizecod-15",
+        "frmsizecod-16",
+        "frmsizecod-17",
+        "frmsizecod-18",
+        "frmsizecod-19",
+        "frmsizecod-20",
+        "frmsizecod-21",
+        "frmsizecod-22",
+        "frmsizecod-23",
+        "frmsizecod-24",
+        "frmsizecod-25",
+        "frmsizecod-26",
+        "frmsizecod-27",
+        "frmsizecod-28",
+        "frmsizecod-29",
+        "frmsizecod-30",
+        "frmsizecod-31",
+        "frmsizecod-32",
+        "frmsizecod-33",
+        "frmsizecod-34",
+        "frmsizecod-35",
+        "frmsizecod-36",
+        "frmsizecod-37",
+        "acmod-0-lfe-0",
+        "acmod-0-lfe-1",
+        "acmod-1-lfe-0",
+        "acmod-1-lfe-1",
+        "acmod-2-lfe-0",
+        "acmod-2-lfe-1",
+        "acmod-3-lfe-0",
+        "acmod-3-lfe-1",
+        "acmod-4-lfe-0",
+        "acmod-4-lfe-1",
+        "acmod-5-lfe-0",
+        "acmod-5-lfe-1",
+        "acmod-6-lfe-0",
+        "acmod-6-lfe-1",
+        "acmod-7-lfe-0",
+        "acmod-7-lfe-1",
+        "bsid-9",
+        "bsid-10"
+      ],
+      "cause": "Awaiting runtime, peak heap and total RSS collection on isolated AArch64 and ARMv7 gate hosts."
+    }
+  ],
+  "open_cases": [
+    {
+      "id": "fscod-0",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fscod-1",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fscod-2",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-00",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-01",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-02",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-03",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-04",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-05",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-06",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-07",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-08",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-09",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-10",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-11",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-12",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-13",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-14",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-15",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-16",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-17",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-18",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-19",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-20",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-21",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-22",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-23",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-24",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-25",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-26",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-27",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-28",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-29",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-30",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-31",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-32",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-33",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-34",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-35",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-36",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "frmsizecod-37",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-0-lfe-0",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-0-lfe-1",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-1-lfe-0",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-1-lfe-1",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-2-lfe-0",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-2-lfe-1",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-3-lfe-0",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-3-lfe-1",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-4-lfe-0",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-4-lfe-1",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-5-lfe-0",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-5-lfe-1",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-6-lfe-0",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-6-lfe-1",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-7-lfe-0",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "acmod-7-lfe-1",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "bsid-9",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "bsid-10",
+      "requirement": "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
+  "pending_module_requirements": [
+    "Publish the one-syncframe rate and six-block count at drain, where the reference parser leaves its context rate and duration unset"
+  ]
+}

@@ -91,6 +91,12 @@ identical output.
 
 ## Conformance
 
+The [access-unit comparison](../../harness/features/hevc-access-units/contract.json) checks
+every byte of the splitter output in stream order. The [picture
+properties](../../harness/features/picture-properties/contract.json) and
+[NAL-input](../../harness/features/video-nal-input/contract.json) comparisons check the
+visible plane hashes alongside the published properties and caller timestamps, respectively.
+
 The `codecs` item compares the nightly SIMD build’s decoded planes and the SIMD worker’s
 RGBA output. The three HEVC workloads have a separate SIMD collection.
 

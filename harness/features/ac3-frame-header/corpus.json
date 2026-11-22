@@ -1,0 +1,1020 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "ac3-diatonis.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/diatonis.ac3",
+      "sha256": "d4b9294410dbf587aeda7ee8f469d8e383ba9027ec5297eaaeed85f9bbac2b7c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 42,
+        "bytes": 0,
+        "digest": 17122771666896659028
+      }
+    },
+    {
+      "id": "ac3-millers_crossing_4.0.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/millers_crossing_4.0.ac3",
+      "sha256": "faa06c7b1ccbc5cf3c7897afb50004dd3d49feaa19d26bdeb03dc9bb4ec20802",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 62,
+        "bytes": 0,
+        "digest": 5525691231911303224
+      }
+    },
+    {
+      "id": "ac3-monsters_inc_2.0_192_small.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/monsters_inc_2.0_192_small.ac3",
+      "sha256": "4df071457c23d1a39fe52322892bc9333921ad6dfc8f87ffa0797bdfb5101bae",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 131,
+        "bytes": 0,
+        "digest": 10145569266701203267
+      }
+    },
+    {
+      "id": "ac3-monsters_inc_5.1_448_small.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/monsters_inc_5.1_448_small.ac3",
+      "sha256": "74fefeef070f663378a0864beb064cf88ee1186152f7ac320984af15be2f22db",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 56,
+        "bytes": 0,
+        "digest": 3449716989943875256
+      }
+    },
+    {
+      "id": "ac3-mp3ac325_a0.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/mp3ac325_a0.ac3",
+      "sha256": "890487cadca665da46e2822b006116eaec29233d6ccc447ea77def38e47586d3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 16383299880942694169
+      }
+    },
+    {
+      "id": "ac3-mp3ac325_a1.ac3",
+      "profile": "ac3",
+      "file": ".research/codec-derived/ac3/mp3ac325_a1.ac3",
+      "sha256": "d22b569a39c4dfe4461cb4a56496f43c473e588193524398d4ba0bb1e0cbf310",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 14708940085694436733
+      }
+    },
+    {
+      "id": "eac3-csi_miami_5.1_256_spx_small.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/csi_miami_5.1_256_spx_small.eac3",
+      "sha256": "84f50317a49a98509bf174ace814b39860e6ab2a1d61bdbd10ada9081f2bb2b3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 47,
+        "bytes": 0,
+        "digest": 11909623029017597140
+      }
+    },
+    {
+      "id": "eac3-csi_miami_stereo_128_spx.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/csi_miami_stereo_128_spx.eac3",
+      "sha256": "f96b45fa4d249522cd83dea009cd528ce552ec9d947e03cdecab44652bc86ecb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 651,
+        "bytes": 0,
+        "digest": 13545597512873071608
+      }
+    },
+    {
+      "id": "eac3-csi_miami_stereo_128_spx_small.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/csi_miami_stereo_128_spx_small.eac3",
+      "sha256": "adc397f12472353237f7dc8139c2223937abc23eff9cd80ac2e3471814a04c3a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 488,
+        "bytes": 0,
+        "digest": 1299198620944436032
+      }
+    },
+    {
+      "id": "eac3-matrix2_commentary1_stereo_192_small.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/matrix2_commentary1_stereo_192_small.eac3",
+      "sha256": "ea095d557bd6787266f4b7276a2be818a7fbc924997748be89d9ead962a3391c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 130,
+        "bytes": 0,
+        "digest": 2077389789265911824
+      }
+    },
+    {
+      "id": "eac3-serenity_english_5.1_1536_small.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/serenity_english_5.1_1536_small.eac3",
+      "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 97,
+        "bytes": 0,
+        "digest": 753989680227137777
+      }
+    },
+    {
+      "id": "eac3-the_great_wall_7.1.eac3",
+      "profile": "eac3",
+      "file": ".research/codec-derived/ac3/the_great_wall_7.1.eac3",
+      "sha256": "d698981ddc1c10e65d234dd6a02ff2b0f4c88787595c9d3e5adf7f097f2c9e50",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 314,
+        "bytes": 0,
+        "digest": 10992245736415817622
+      }
+    },
+    {
+      "id": "ac3-monsters_inc_5.1_448_small.ac3-fate-samples",
+      "profile": "ac3",
+      "file": ".research/fate-samples/ac3/monsters_inc_5.1_448_small.ac3",
+      "sha256": "74fefeef070f663378a0864beb064cf88ee1186152f7ac320984af15be2f22db",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 56,
+        "bytes": 0,
+        "digest": 3449716989943875256
+      }
+    },
+    {
+      "id": "ac3-monsters_inc_2.0_192_small.ac3-fate-samples",
+      "profile": "ac3",
+      "file": ".research/fate-samples/ac3/monsters_inc_2.0_192_small.ac3",
+      "sha256": "4df071457c23d1a39fe52322892bc9333921ad6dfc8f87ffa0797bdfb5101bae",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 131,
+        "bytes": 0,
+        "digest": 10145569266701203267
+      }
+    },
+    {
+      "id": "ac3-millers_crossing_4.0.ac3-fate-samples",
+      "profile": "ac3",
+      "file": ".research/fate-samples/ac3/millers_crossing_4.0.ac3",
+      "sha256": "faa06c7b1ccbc5cf3c7897afb50004dd3d49feaa19d26bdeb03dc9bb4ec20802",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 62,
+        "bytes": 0,
+        "digest": 5525691231911303224
+      }
+    },
+    {
+      "id": "eac3-the_great_wall_7.1.eac3-fate-samples",
+      "profile": "eac3",
+      "file": ".research/fate-samples/eac3/the_great_wall_7.1.eac3",
+      "sha256": "d698981ddc1c10e65d234dd6a02ff2b0f4c88787595c9d3e5adf7f097f2c9e50",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 314,
+        "bytes": 0,
+        "digest": 10992245736415817622
+      }
+    },
+    {
+      "id": "eac3-csi_miami_5.1_256_spx_small.eac3-fate-samples",
+      "profile": "eac3",
+      "file": ".research/fate-samples/eac3/csi_miami_5.1_256_spx_small.eac3",
+      "sha256": "84f50317a49a98509bf174ace814b39860e6ab2a1d61bdbd10ada9081f2bb2b3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 47,
+        "bytes": 0,
+        "digest": 11909623029017597140
+      }
+    },
+    {
+      "id": "eac3-csi_miami_stereo_128_spx.eac3-fate-samples",
+      "profile": "eac3",
+      "file": ".research/fate-samples/eac3/csi_miami_stereo_128_spx.eac3",
+      "sha256": "f96b45fa4d249522cd83dea009cd528ce552ec9d947e03cdecab44652bc86ecb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 651,
+        "bytes": 0,
+        "digest": 13545597512873071608
+      }
+    },
+    {
+      "id": "eac3-serenity_english_5.1_1536_small.eac3-fate-samples",
+      "profile": "eac3",
+      "file": ".research/fate-samples/eac3/serenity_english_5.1_1536_small.eac3",
+      "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 97,
+        "bytes": 0,
+        "digest": 753989680227137777
+      }
+    },
+    {
+      "id": "fscod-0",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/fscod-0.ac3",
+      "sha256": "100642e4c23dee5904044840b28f9af5915156f55a0f8b8877413ab6f3c4662c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 3651199858956375694
+      }
+    },
+    {
+      "id": "fscod-1",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/fscod-1.ac3",
+      "sha256": "9c9a65c5382a17fbf66ba45b23da3920915ba5ec0e5e1c97756580a7c5373cb8",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 17343673940220321454
+      }
+    },
+    {
+      "id": "fscod-2",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/fscod-2.ac3",
+      "sha256": "79957ee7a3158e6015d20f4c1a2ffc5ef717afc70ad67edb11e3adbdedc34579",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 12019068051701843790
+      }
+    },
+    {
+      "id": "frmsizecod-00",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-00.ac3",
+      "sha256": "1a075d44cf4cd53ff1db515cf315312cd135eff50d39e18f25cf5cc4804ab6d2",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 14835377324531337240
+      }
+    },
+    {
+      "id": "frmsizecod-01",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-01.ac3",
+      "sha256": "ec076a803710c931306f1e8a0f412c8bed39b7c2bf0652d1f1af72c57fafdc33",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 16844078459217180826
+      }
+    },
+    {
+      "id": "frmsizecod-02",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-02.ac3",
+      "sha256": "d0a5417bd63bbef8313c8dda801520daaa07545515b2776dcbf65343c6e79ddd",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 14098509601457418556
+      }
+    },
+    {
+      "id": "frmsizecod-03",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-03.ac3",
+      "sha256": "b010e38175aceba5e076d875a15022307d7107456c5576310fc3a5c2e08a2682",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 16107210736143262142
+      }
+    },
+    {
+      "id": "frmsizecod-04",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-04.ac3",
+      "sha256": "7991066c6488a210644ecaedb7e061b8e5b2f9dd105e7a34451afa26d84f61c1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 11352940743697656286
+      }
+    },
+    {
+      "id": "frmsizecod-05",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-05.ac3",
+      "sha256": "90385337813093e66a129eaa9f924be33448fde6f133b521d67852072211fdce",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 13361641878383499872
+      }
+    },
+    {
+      "id": "frmsizecod-06",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-06.ac3",
+      "sha256": "24f7d9da756489f6316344223d7606cfe825798afebcc68f98351f12f6a7d53a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 8607371885937894016
+      }
+    },
+    {
+      "id": "frmsizecod-07",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-07.ac3",
+      "sha256": "51991851c444339623df07e6a5b554b14f743c054cbf0175a65b1e60f9252d0f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 10616073020623737602
+      }
+    },
+    {
+      "id": "frmsizecod-08",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-08.ac3",
+      "sha256": "14a9ed5a0e77b39d317b97020fc486dbd5ebcfd0daf914c48a1d81f3f3b46614",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 7870504162863975332
+      }
+    },
+    {
+      "id": "frmsizecod-09",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-09.ac3",
+      "sha256": "b88f7d059d02053a1291d37bc88de05f9e2e1f91680aeaf7b71be997aaff9c2d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 9879205297549818918
+      }
+    },
+    {
+      "id": "frmsizecod-10",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-10.ac3",
+      "sha256": "067832bb62257bc23ef529bf40e2f9a5a99828e973d0616eada9b0c1dd0f73ab",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 4388067582030294378
+      }
+    },
+    {
+      "id": "frmsizecod-11",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-11.ac3",
+      "sha256": "cbec7d82f9ed37d45e49ba7a4661c0489a16897de3d21e66522fa85a7d24d8c0",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 6396768716716137964
+      }
+    },
+    {
+      "id": "frmsizecod-12",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-12.ac3",
+      "sha256": "9c9a65c5382a17fbf66ba45b23da3920915ba5ec0e5e1c97756580a7c5373cb8",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 17343673940220321454
+      }
+    },
+    {
+      "id": "frmsizecod-13",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-13.ac3",
+      "sha256": "f5de134e0bd64fe127afd6e712ec65e1566d5dd6309a2dd9993bd995c2092e0d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 905631001196613424
+      }
+    },
+    {
+      "id": "frmsizecod-14",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-14.ac3",
+      "sha256": "ab0dfac5628747fef9b0567fab8c6fc69fd8cc52c3f4557c9aa092f58fb90b95",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 13861237359386640500
+      }
+    },
+    {
+      "id": "frmsizecod-15",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-15.ac3",
+      "sha256": "415853ea67d27b16484fd311a0cef20abad5068d2c3343ef259abca6a0a83e22",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 15869938494072484086
+      }
+    },
+    {
+      "id": "frmsizecod-16",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-16.ac3",
+      "sha256": "c6415f00ba395d2f8288b84a9a2048948fd4a6910fe0f1b2770bb6c36292bda7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 10378800778552959546
+      }
+    },
+    {
+      "id": "frmsizecod-17",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-17.ac3",
+      "sha256": "a9255fc281c21419f7e1fca687b9b32c7943fbbe02517b13ede28622f3b50cfa",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 12387501913238803132
+      }
+    },
+    {
+      "id": "frmsizecod-18",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-18.ac3",
+      "sha256": "872730294b41f5a6aae59bd6a49edfed3b2045b87046567ef2ea293ac59c45c3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 3413927616885597638
+      }
+    },
+    {
+      "id": "frmsizecod-19",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-19.ac3",
+      "sha256": "7394a943bb41538fa6f0aaf9f3f6bc079315584ca93c9df39a2774344b8fade5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 5422628751571441224
+      }
+    },
+    {
+      "id": "frmsizecod-20",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-20.ac3",
+      "sha256": "4067ace7d0e0c0a2c0beab7abea065211b4288081f1ea47b708c4446abf8baf6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 12887097394241943760
+      }
+    },
+    {
+      "id": "frmsizecod-21",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-21.ac3",
+      "sha256": "3e8a9200052fe3a6f0b642b56e28b5edffb8765824ccce9cac181d7d6530fab2",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 14895798528927787346
+      }
+    },
+    {
+      "id": "frmsizecod-22",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-22.ac3",
+      "sha256": "4189ac989c5cdcbcba82d78d5a62704a52d1ab2255777bf2ecf95c7ed99160c4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 5922224232574581852
+      }
+    },
+    {
+      "id": "frmsizecod-23",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-23.ac3",
+      "sha256": "71670dbe19d5a724e2caae9e28f254c708b0f742667512e399785cc7558f7a64",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 7930925367260425438
+      }
+    },
+    {
+      "id": "frmsizecod-24",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-24.ac3",
+      "sha256": "216095c93de88e5d113f0dcde9448180a231541c39b010f49d78e3006f58409e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 17404095144616771560
+      }
+    },
+    {
+      "id": "frmsizecod-25",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-25.ac3",
+      "sha256": "a0c35469ea1379c67d396c3079829e09f55f292b157e0e992d30b4704bc25f46",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 966052205593063530
+      }
+    },
+    {
+      "id": "frmsizecod-26",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-26.ac3",
+      "sha256": "b2795e0c0a11d13fec8f59bc44617933502ffa7147a8db8e03b86c0bc00c5167",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1465647686596204158
+      }
+    },
+    {
+      "id": "frmsizecod-27",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-27.ac3",
+      "sha256": "cb25e566422c2b82f0d744be94f8bce10b7695cafb6b499e3214155f1f4558ba",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 3474348821282047744
+      }
+    },
+    {
+      "id": "frmsizecod-28",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-28.ac3",
+      "sha256": "93825f6b2365b67cf159c8f2d951aa46d271e1dba03e4a981c23c168dc5d8349",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 3973944302285188372
+      }
+    },
+    {
+      "id": "frmsizecod-29",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-29.ac3",
+      "sha256": "1913570ce31f6c312e8a3025a003d81d2b94c77940fc64ddab54f4e2e0781c9b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 5982645436971031958
+      }
+    },
+    {
+      "id": "frmsizecod-30",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-30.ac3",
+      "sha256": "6d745f8663b7df1b95262d8df947fa209c8c3bf8802a2869dcb7faab05dbcb2c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 8490942052660016172
+      }
+    },
+    {
+      "id": "frmsizecod-31",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-31.ac3",
+      "sha256": "3f386707a1b62f138c1d13009f35162994584251a9095e4de57e9ed51e30da68",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 10499643187345859758
+      }
+    },
+    {
+      "id": "frmsizecod-32",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-32.ac3",
+      "sha256": "9ae324094f5a723e33d84078193e8f616f5ab685956fc208131ea3c843c95fbb",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 10999238668349000386
+      }
+    },
+    {
+      "id": "frmsizecod-33",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-33.ac3",
+      "sha256": "95e812322ad17dff2aef643bd9398bd881281c154ec5ba9f9338ffac2f362cbc",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 13007939803034843972
+      }
+    },
+    {
+      "id": "frmsizecod-34",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-34.ac3",
+      "sha256": "f782f45d5b8d7dc3e52be78b4eca3fbecfdbe0fcb93e32399488652869f52173",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 13507535284037984600
+      }
+    },
+    {
+      "id": "frmsizecod-35",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-35.ac3",
+      "sha256": "7370836ea3bce0155703ba8573a7c8e2a9fdb94c3874070b4a819fc1f2558e9a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 15516236418723828186
+      }
+    },
+    {
+      "id": "frmsizecod-36",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-36.ac3",
+      "sha256": "975d464789ddfdb99877951b9ebdf031817815c071b00ea5b4e34e7e2c5e9a69",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 18024533034412812400
+      }
+    },
+    {
+      "id": "frmsizecod-37",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/frmsizecod-37.ac3",
+      "sha256": "5125db80aa706aca20f0779f3f2add7335d993409ddc9c4d5915ef99d2ae584a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1586490095389104370
+      }
+    },
+    {
+      "id": "acmod-0-lfe-0",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-0-lfe-0.ac3",
+      "sha256": "a443b8544cdae622d40c92d052b547323140717a5feb8d87b2ae87fcb3777fd1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 2075874291379274250
+      }
+    },
+    {
+      "id": "acmod-0-lfe-1",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-0-lfe-1.ac3",
+      "sha256": "192c3b856437a41bd846b4fef185382b61d9ef1276b03b0d54e51c1ac1e6078e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 2101282768275679112
+      }
+    },
+    {
+      "id": "acmod-1-lfe-0",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-1-lfe-0.ac3",
+      "sha256": "9b408b0ec6c87b0b71a47e73efaceae1d9b4fc61444043f7f9e1b411b6acf701",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 2863537075167824972
+      }
+    },
+    {
+      "id": "acmod-1-lfe-1",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-1-lfe-1.ac3",
+      "sha256": "2564effb5adcdf22b9349643ec3e72cb45aae7ea9a35d988729233292ec3923b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 2888945552064229834
+      }
+    },
+    {
+      "id": "acmod-2-lfe-0",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-2-lfe-0.ac3",
+      "sha256": "100642e4c23dee5904044840b28f9af5915156f55a0f8b8877413ab6f3c4662c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 3651199858956375694
+      }
+    },
+    {
+      "id": "acmod-2-lfe-1",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-2-lfe-1.ac3",
+      "sha256": "fa5d28770afa13dd22a9ac16ec1a8417dc7567164fc08d753b52939df9c3c6f0",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 3676608335852780556
+      }
+    },
+    {
+      "id": "acmod-3-lfe-0",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-3-lfe-0.ac3",
+      "sha256": "163f4bcc487d86abfa59d62194af88238ee8dc9e14bdec64633be55f31550888",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 4438862642744926416
+      }
+    },
+    {
+      "id": "acmod-3-lfe-1",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-3-lfe-1.ac3",
+      "sha256": "aff0623461445ac6c8d614e2f88e91fd6f74c35fdff5bc9de421689949a3edf2",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 4464271119641331278
+      }
+    },
+    {
+      "id": "acmod-4-lfe-0",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-4-lfe-0.ac3",
+      "sha256": "6475cebe1e192bc5c220a6e88627321e3672fef58c6c4599164811ffda252e52",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 5226525426533477138
+      }
+    },
+    {
+      "id": "acmod-4-lfe-1",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-4-lfe-1.ac3",
+      "sha256": "99d7bf756e85b2388e73f54f84dbe5e98f14ac74b9420f1fdde492374f95c827",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 5251933903429882000
+      }
+    },
+    {
+      "id": "acmod-5-lfe-0",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-5-lfe-0.ac3",
+      "sha256": "b5a4609924745ab85443e0c8186fe96a851db3927761b07d32ce9ebff3c52dd4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 6014188210322027860
+      }
+    },
+    {
+      "id": "acmod-5-lfe-1",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-5-lfe-1.ac3",
+      "sha256": "4f40bed6d1f5a20177476a982d52c7bb7ed94c99cdaa7137b823162eed6e2af6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 6039596687218432722
+      }
+    },
+    {
+      "id": "acmod-6-lfe-0",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-6-lfe-0.ac3",
+      "sha256": "1a5cec65ab97329bfb4c4704340bda79c8a58a696c95c408429e4f9d520e703d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 6801850994110578582
+      }
+    },
+    {
+      "id": "acmod-6-lfe-1",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-6-lfe-1.ac3",
+      "sha256": "c45c3874dabb2e28b3decd8c2840707818618815c15b487c1583e263f173fc5d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 6827259471006983444
+      }
+    },
+    {
+      "id": "acmod-7-lfe-0",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-7-lfe-0.ac3",
+      "sha256": "f20794a7948b44d6ef35ec378a84a4dbfcfb5ba0ecafe0554a1e6fea1c42718d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 7589513777899129304
+      }
+    },
+    {
+      "id": "acmod-7-lfe-1",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/acmod-7-lfe-1.ac3",
+      "sha256": "380f702ff9d9765a52251b6f8d5a69facb31a6ba9b9e70268f153d8f33ded806",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 7614922254795534166
+      }
+    },
+    {
+      "id": "bsid-9",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/bsid-9.ac3",
+      "sha256": "0ff0c35ec4aa60a62eaaf4922b576428cab4698a922bb2c215825b2cb691788d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 16313888456358834128
+      }
+    },
+    {
+      "id": "bsid-10",
+      "profile": "authored",
+      "file": "harness/features/ac3-frame-header/inputs/bsid-10.ac3",
+      "sha256": "b8b90f027b2628b5d5abfdbd5521635c4acf81bcbf3418758c3396f2706324f8",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 10529832980051740946
+      }
+    }
+  ]
+}

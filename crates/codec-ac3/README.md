@@ -104,6 +104,13 @@ hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
 
 ## Conformance
 
+The [syncframe header comparison](../../harness/features/ac3-frame-header/contract.json)
+checks header geometry, and the [decoded frame
+comparison](../../harness/features/ac3-frame-info/contract.json) checks sample geometry,
+layout and downmix side data. The [audio block
+oracle](../../harness/features/ac3-features/contract.json) checks the coding-tool flags on
+main-body controls with zero-width mantissas.
+
 - Specification: ATSC A/52:2018. Tables are generated from the specification text by
   `harness/codecs/ac3/gen_tables.py` (`src/spec_tables.rs`).
 - Reference: FFmpeg 9.0.2's float decoder on the FATE AC-3/E-AC-3 vectors and on streams

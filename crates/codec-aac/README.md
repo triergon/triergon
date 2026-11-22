@@ -151,6 +151,10 @@ on both targets; every other worker stays on stable.
 
 ## Conformance
 
+The [ADTS search comparison](../../harness/features/adts-sync/contract.json) checks
+`adts::find_frame` against the reference AAC parser's offsets, header fields and packet bytes.
+It includes protected headers, junk, false syncwords and truncated final frames.
+
 The `codecs-audio` item grades the stable scalar and nightly SIMD builds against the live
 reference. Its container priming lane compares retained PCM against FFmpeg with `-flags2
 +skip_manual`. The `aac-access-units` item compares configured AAC-LC across the fixed and

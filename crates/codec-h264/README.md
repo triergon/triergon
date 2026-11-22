@@ -113,6 +113,13 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
 
 ## Conformance
 
+The [picture properties comparison](../../harness/features/picture-properties/contract.json)
+checks sample aspect ratio, colour and interlaced coding alongside the visible plane hashes.
+The [inspection comparison](../../harness/features/h264-stream-inspection/contract.json)
+checks syntax-element sets and flags. The [NAL-input
+comparison](../../harness/features/video-nal-input/contract.json) checks native planes and
+timestamps for both per-NAL entry points.
+
 - Specification: Rec. ITU-T H.264 (V15, 08/2024). Tables are transcribed from the text
   with the table number in a comment; Table 9-26 prints ctxIdx 641 where 541 is meant.
 - Reference: FFmpeg 9.0.2 (`-threads 1 -f framemd5 -pix_fmt yuv420p -fps_mode

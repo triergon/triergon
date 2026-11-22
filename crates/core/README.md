@@ -212,6 +212,10 @@ semantic contract is described in
 
 ## Conformance
 
+The [rescale comparison](../../harness/features/time-rescale/contract.json) checks
+`TimeBase::rescale` and `TickScale::rescale` in all five modes over the common `AVRational`
+domain. The exact-time oracle also covers wider rational bases and ties-to-even conversion.
+
 The arithmetic follows exact rational semantics; there is no external
 specification. Verification:
 

@@ -93,3 +93,11 @@ nothing), the payload's MD5 as `hash`, the sample `ordinal` and its `description
 With a seek, `request_seek` asks for that track's time once the movie is open and the
 receipt is a line of its own (`{"event":"seek", ...}`). The last line lists the tracks,
 with their edit lists and the movie timescale, and how reading ended.
+
+## Codec views
+
+`codec-views-worker` serves the checksum, clock, ADTS sync, audio header and
+layout, HEVC access-unit, H.264 inspection, and decoded picture contracts in
+[`harness/features`](../../harness/features/). Its video workload commands
+feed complete NAL units individually and produce the same letterboxed RGBA
+record format as `codec-worker`.
