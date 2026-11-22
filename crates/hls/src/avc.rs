@@ -467,7 +467,7 @@ impl AvcTsReader {
     /// start code's lookahead, as it does right after a unit is published.
     /// Later units of a similar size are then assembled without allocating.
     /// Otherwise the unit is dropped. Outputs and work are the same either way.
-    pub fn reuse_unit(&mut self, unit: AvcTsAccessUnit) {
+    pub(crate) fn reuse_unit(&mut self, unit: AvcTsAccessUnit) {
         let AvcTsAccessUnit { source, .. } = unit;
         if self.bytes.len() > LOOKAHEAD || !source.belongs_to(&self.pool) {
             return;

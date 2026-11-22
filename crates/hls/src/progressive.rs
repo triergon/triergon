@@ -576,9 +576,9 @@ impl<S: Source> TsProgressiveReader<S> {
         Ok(())
     }
 
-    /// `unit`, a unit of this reader, through [`PacketInfo`](triergon_core::container::PacketInfo)
-    /// with its track: an audio frame at its presentation time. Fails with `Overflow` for
-    /// a time its clock cannot count.
+    /// Borrows this reader's unit as a packet, using the active PMT's PID and the
+    /// presentation clock for audio. Fails with `Invalid` before tracks are known
+    /// or `Overflow` when a timestamp cannot fit its packet clock.
     pub fn packet<'a>(&self, unit: &'a TsProgressiveUnit) -> Result<UnitPacket<'a>> {
         let tracks = self
             .tracks
@@ -597,8 +597,8 @@ impl<S: Source> TsProgressiveReader<S> {
         }
     }
 
-    /// Returns storage for reuse. Return a video unit when the next one arrives
-    /// to reuse its buffer without changing outputs or work.
+    /// Takes a finished video unit back when the next one arrives so its unshared
+    /// buffer can be reused. An audio unit releases its storage when dropped.
     pub fn reuse_unit(&mut self, unit: TsProgressiveUnit) {
         #[cfg(test)]
         if !self.reuse_storage {

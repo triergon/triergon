@@ -111,9 +111,9 @@ impl HlsSegment {
             .map(|clock| clock.demux90.pts_and_dts)
     }
 
-    /// `unit`, a unit of this segment, through [`PacketInfo`](triergon_core::container::PacketInfo)
-    /// with its track: an audio frame at its segment clock. Fails with `Overflow` for a
-    /// time its clock cannot count.
+    /// Borrows this segment's unit as a packet with its PID and segment clock.
+    /// Fails with `Invalid` for audio when the segment has no audio track,
+    /// or `Overflow` when a timestamp cannot fit its packet clock.
     pub fn packet<'a>(&self, unit: &HlsFeedUnit<'a>) -> Result<UnitPacket<'a>> {
         match *unit {
             HlsFeedUnit::Video(unit) => UnitPacket::video(self.pids.0, unit),
