@@ -13,7 +13,7 @@
   "contract": [
     "the rendering fixtures whose libass result C leaves to the target, rendered and folded as ass-render renders and folds them: libass's renderer overflows int or converts a double out of int's range on the way to the result (a horizontal border beyond 2^30 frame pixels doubled in int for the width of an event's box; an event box taller than int holds, whose collision boxes end up 2^31 or more rows apart, where cmp_rect_y0's int subtraction wraps and glibc's merge sort orders them)",
     "each case is pinned per target from that target's own reference run; a case passes when the candidate, the reference and the target's pin agree, and a target a case has no pin for runs and reports it without comparing",
-    "the renderer follows libass built with GCC for 32-bit ARM hard-float: an int overflow wraps and a conversion out of int's range saturates; where libass for aarch64-unknown-linux-gnu gives another result, the case is open there as a deliberate divergence",
+    "the renderer follows libass built with GCC for 32-bit ARM hard-float: an int overflow wraps and a conversion out of int's range saturates; where libass for aarch64-unknown-linux-gnu gives another result, the divergence is declared there",
     "the fixture and its attached font files are read before each timed and memory operation, which, as a player does, creates the library, hands it the attached fonts (ass_add_font copies them; the candidate copies them into its budget), opens the default font file (libass through FreeType; the candidate reads it), creates and configures the renderer, reads the script or runs the stream and renders every frame; the timed span is the reading and the rendering, on both sides: it starts once the renderer is configured, since each libass setter empties the renderer's caches (ass_reconfigure), and ends before the track, renderer and library are freed, so neither side times a cache reset or the teardown; libass opens the default font file when a glyph first needs it, inside the span, and the candidate reads it before",
     "timing and memory are measured against libass-player-native, libass.a linked as a player links it with none of its sources compiled into the worker; the parity reference libass-ass-native compiles libass's rendering, drawing and parsing sources with checks that note the conversions C leaves to the target, and is never timed or measured"
   ],
@@ -27,37 +27,24 @@
   "iterations": 1,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves the signed 32-bit range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC"
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "border-x-overflow-ass-1080p",
-      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves the signed 32-bit range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
+      "reading": "Extreme event box sizes follow the renderer's fixed 32-bit arithmetic",
+      "clause": "ISO C sections 6.3.1.3, 6.3.1.4 and 6.5 paragraph 5 leave out-of-range signed conversion and arithmetic dependent on the implementation or undefined",
+      "candidate": "Saturates out-of-range event box fields and retains the documented 32-bit treatment of a doubled border.",
+      "reference": "The AArch64 output uses different event box bounds after converting the extreme border and drawing fields.",
+      "compat": "compat::ass::host_width_event_boxes",
+      "cases": ["border-x-overflow-ass-1080p", "border-x-overflow-ass-720p"],
+      "targets": ["aarch64-unknown-linux-gnu"]
     },
     {
-      "id": "border-x-overflow-ass-720p",
-      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves the signed 32-bit range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "collision-far-tops-ass-1080p",
-      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves the signed 32-bit range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "collision-far-tops-ass-720p",
-      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves the signed 32-bit range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
+      "reading": "Saturated event rectangles determine collision placement",
+      "clause": "ISO C sections 6.3.1.4 and 6.5 paragraph 5 and the documented event box and collision rules",
+      "candidate": "Uses the saturated event rectangles and the documented 32-bit collision order at both resolutions.",
+      "reference": "The AArch64 output places events at different pixel positions for the same extreme box coordinates.",
+      "compat": "compat::ass::host_width_collisions",
+      "cases": ["collision-far-tops-ass-1080p", "collision-far-tops-ass-720p"],
+      "targets": ["aarch64-unknown-linux-gnu"]
     }
   ],
   "parity_timeout_seconds": 120

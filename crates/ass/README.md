@@ -247,6 +247,8 @@ convention asks:
   its box, as in libass built with GCC; event box values outside the signed
   32-bit range saturate, as on 32-bit ARM, where libass for AArch64 keeps their
   low 32 bits.
+  The [target-specific rendering comparison](../../harness/features/ass-render-host/contract.json)
+  checks extreme event boxes and collision placement at both frame sizes.
 
 ## Behaviour and limits
 
