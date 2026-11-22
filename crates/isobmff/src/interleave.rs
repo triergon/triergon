@@ -9,10 +9,11 @@ use crate::{
     CursorStatus, Next, Sample,
     boxes::BoxHeader,
     fragment::{FragmentCursor, FragmentIndex, RunPosition},
-    sample::SampleSpan,
+    sample::{SampleSpan, require_range_within},
     table::{SampleCursor, SampleRanges, SampleTable, TimingRunPolicy, TimingRunSurplus},
 };
 use std::{
+    num::NonZeroU64,
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -244,13 +245,26 @@ struct Slot<'a> {
     ended: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Phase {
-    ValidateMedia,
+#[derive(Clone, Copy, Debug)]
+struct SampleOrder {
+    start: u64,
+    ordinal: NonZeroU64,
+}
+
+#[derive(Debug)]
+#[repr(u8)]
+enum Phase<'a> {
+    ValidateMedia(&'a [Range<u64>]),
     ValidateEnter,
     ValidateRead,
-    ValidateBounds,
-    ValidateOrder,
+    ValidateBounds {
+        media: &'a [Range<u64>],
+        sample: SampleOrder,
+        end: u64,
+        low: usize,
+        high: usize,
+    },
+    ValidateOrder(SampleOrder),
     Fill,
     ReadHead,
     Select,
@@ -281,15 +295,11 @@ pub struct PhysicalSampleCursor<'a> {
     forward_media: Option<ForwardRegularMdat>,
     deferred_media: bool,
     limits: PhysicalInterleaveLimits,
-    phase: Phase,
+    phase: Phase<'a>,
     index: usize,
     best: Option<usize>,
-    previous_start: Option<u64>,
-    previous_ordinal: Option<u64>,
+    previous: Option<SampleOrder>,
     validated: u64,
-    pending_validation: Option<Sample>,
-    extent_low: usize,
-    extent_high: usize,
     layout_error: Option<Error>,
     ready: Option<InterleavedSample>,
     failed: Option<Error>,
@@ -439,8 +449,8 @@ impl<'a> PhysicalSampleCursor<'a> {
             forward_media: None,
             deferred_media: false,
             limits,
-            phase: if media_extents.is_some() {
-                Phase::ValidateMedia
+            phase: if let Some(media) = media_extents {
+                Phase::ValidateMedia(media)
             } else if tracks.is_empty() {
                 Phase::End
             } else {
@@ -448,12 +458,8 @@ impl<'a> PhysicalSampleCursor<'a> {
             },
             index: 0,
             best: None,
-            previous_start: None,
-            previous_ordinal: None,
+            previous: None,
             validated: 0,
-            pending_validation: None,
-            extent_low: 0,
-            extent_high: 0,
             layout_error: None,
             ready: None,
             failed: None,
@@ -468,7 +474,7 @@ impl<'a> PhysicalSampleCursor<'a> {
     /// checked against media extents and no media is deferred. Returns `false` without
     /// advancing in any other state.
     pub fn resume_in_track_order(&mut self) -> bool {
-        if self.phase != Phase::ValidateEnter
+        if !matches!(self.phase, Phase::ValidateEnter)
             || self.index != self.slots.len()
             || self.layout_error.is_none()
             || self.failed != self.layout_error
@@ -513,11 +519,8 @@ impl<'a> PhysicalSampleCursor<'a> {
             if self.ready.is_some() {
                 return Ok(CursorStatus::Ready);
             }
-            match self.phase {
-                Phase::ValidateMedia => {
-                    let media = self
-                        .media_extents
-                        .ok_or(Error::Invalid("missing media extents"))?;
+            match &mut self.phase {
+                Phase::ValidateMedia(media) => {
                     if self.index == media.len() {
                         self.index = 0;
                         self.phase = Phase::ValidateEnter;
@@ -557,8 +560,7 @@ impl<'a> PhysicalSampleCursor<'a> {
                         Next::End => {
                             slot.cursor = TrackSampleCursor::new(slot.source);
                             self.index += 1;
-                            self.previous_start = None;
-                            self.previous_ordinal = None;
+                            self.previous = None;
                             self.phase = Phase::ValidateEnter;
                         }
                         Next::Item(sample) => {
@@ -572,62 +574,63 @@ impl<'a> PhysicalSampleCursor<'a> {
                                         .map_err(|_| Error::Overflow)?,
                                 });
                             }
-                            if sample.range.start > sample.range.end || sample.ordinal == 0 {
-                                return Err(Error::Invalid("source sample range/ordinal"));
-                            }
-                            self.pending_validation = Some(sample);
-                            self.extent_low = 0;
-                            self.extent_high = self.media_extents.map_or(0, |media| media.len());
-                            self.phase = if self.media_extents.is_some() {
-                                Phase::ValidateBounds
+                            let start = sample.range.start;
+                            let end = sample.range.end;
+                            let ordinal = NonZeroU64::new(sample.ordinal)
+                                .filter(|_| start <= end)
+                                .ok_or(Error::Invalid("source sample range/ordinal"))?;
+                            let sample = SampleOrder { start, ordinal };
+                            self.phase = if let Some(media) = self.media_extents {
+                                Phase::ValidateBounds {
+                                    media,
+                                    sample,
+                                    end,
+                                    low: 0,
+                                    high: media.len(),
+                                }
                             } else {
-                                Phase::ValidateOrder
+                                Phase::ValidateOrder(sample)
                             };
                         }
                     }
                 }
-                Phase::ValidateBounds => {
-                    let media = self
-                        .media_extents
-                        .ok_or(Error::Invalid("missing media extents"))?;
-                    let sample = self
-                        .pending_validation
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing media validation sample"))?;
-                    if self.extent_low < self.extent_high {
+                Phase::ValidateBounds {
+                    media,
+                    sample,
+                    end,
+                    low,
+                    high,
+                } => {
+                    if *low < *high {
                         if !work.try_charge(1) {
                             return Ok(CursorStatus::Yield);
                         }
-                        let mid = self.extent_low + (self.extent_high - self.extent_low) / 2;
-                        if media[mid].start <= sample.range.start {
-                            self.extent_low = mid.checked_add(1).ok_or(Error::Overflow)?;
+                        let mid = *low + (*high - *low) / 2;
+                        if media[mid].start <= sample.start {
+                            *low = mid.checked_add(1).ok_or(Error::Overflow)?;
                         } else {
-                            self.extent_high = mid;
+                            *high = mid;
                         }
                         continue;
                     }
-                    let selected = self
-                        .extent_low
+                    let selected = low
                         .checked_sub(1)
                         .ok_or(Error::Invalid("sample outside self-contained mdat"))?;
+                    let range = sample.start..*end;
                     if self
                         .forward_media
-                        .is_some_and(|bounds| bounds.can_defer(&sample.range))
+                        .is_some_and(|bounds| bounds.can_defer(&range))
                     {
                         self.deferred_media = true;
                     } else {
-                        sample.require_within(media[selected].clone())?;
+                        require_range_within(&range, media[selected].clone())?;
                     }
-                    self.phase = Phase::ValidateOrder;
+                    self.phase = Phase::ValidateOrder(*sample);
                 }
-                Phase::ValidateOrder => {
-                    let sample = self
-                        .pending_validation
-                        .take()
-                        .ok_or(Error::Invalid("missing source validation sample"))?;
+                Phase::ValidateOrder(sample) => {
                     if self
-                        .previous_start
-                        .is_some_and(|start| sample.range.start < start)
+                        .previous
+                        .is_some_and(|prior| sample.start < prior.start)
                     {
                         let error = Error::Unsupported(
                             "physical merge needs nondecreasing per-track source offsets",
@@ -640,13 +643,12 @@ impl<'a> PhysicalSampleCursor<'a> {
                         self.layout_error = Some(error);
                     }
                     if self
-                        .previous_ordinal
-                        .is_some_and(|ordinal| sample.ordinal <= ordinal)
+                        .previous
+                        .is_some_and(|prior| sample.ordinal <= prior.ordinal)
                     {
                         return Err(Error::Invalid("source sample ordinal not increasing"));
                     }
-                    self.previous_start = Some(sample.range.start);
-                    self.previous_ordinal = Some(sample.ordinal);
+                    self.previous = Some(*sample);
                     self.phase = Phase::ValidateRead;
                 }
                 Phase::Fill => {
