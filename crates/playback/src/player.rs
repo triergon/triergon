@@ -621,20 +621,26 @@ impl<S: Source> Player<S> {
         }
         let engine = self.engine.as_mut().ok_or(Error::Closed)?;
         selection.validate(engine)?;
-        let enabled_video = match (&*engine, track) {
+        let enabled_target = match (&*engine, track) {
             (Engine::Mp4(mp4), TrackKey::Mp4(id)) => mp4
                 .plan
                 .track(id)
                 .is_ok_and(|t| t.snapshot.handler == *b"vide" && t.snapshot.enabled),
             (Engine::Mp4(_), _) => false,
-            _ => engine
-                .facts()?
-                .as_slice()
-                .iter()
-                .any(|f| f.key == track && f.kind == TrackKind::Video && f.enabled),
+            _ => engine.facts()?.as_slice().iter().any(|f| {
+                f.key == track
+                    && f.enabled
+                    && (f.kind == TrackKind::Video
+                        || matches!(
+                            (&*engine, track, f.kind),
+                            (Engine::Matroska(_), TrackKey::Matroska(_), TrackKind::Audio)
+                        ))
+            }),
         };
-        if !enabled_video {
-            return Err(Error::Invalid("seek target must be source video"));
+        if !enabled_target {
+            return Err(Error::Invalid(
+                "seek target track is disabled or unsupported",
+            ));
         }
         let epoch = self.epoch.checked_add(1).ok_or(Error::Overflow)?;
         let intent = SeekIntent {

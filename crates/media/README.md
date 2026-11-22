@@ -172,7 +172,8 @@ single audio track with `A_AAC` AudioSpecificConfig `12 10` (AAC-LC, 44.1 kHz,
 stereo), zero CodecDelay and zero SeekPreRoll. It requires a preceding Cue and
 does not scan for uncued packets. It validates the referenced block and returns
 its source clock and bytes; it does not validate or decode AAC payloads. The
-general playback and video seek operations continue to require video.
+neutral `ContainerReader::request_seek` routes audio requests through this same
+checked operation; video requests retain their existing seek policies.
 
 The `media-worker` and public libavformat reference expose the `cued-aac-`
 worker protocol. The reference uses a backward `av_seek_frame` and public flags

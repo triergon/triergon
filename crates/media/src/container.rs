@@ -260,6 +260,12 @@ impl ContainerReader for Reader {
         let requested_ns = request
             .target
             .to_nanoseconds(triergon_core::Rounding::Floor)?;
+        if self.tracks()[track].kind == 2 {
+            if !crate::matroska::typed::seek::cued_aac_profile(self.tracks(), track) {
+                return Err(Error::Unsupported("seek requires single-track cued AAC-LC"));
+            }
+            return self.seek_cued_aac(track, requested_ns);
+        }
         match request.policy {
             SeekPolicy::PreviousRandomAccess => self.seek_previous(track, requested_ns),
             SeekPolicy::PlaybackPreroll => self.seek_for_playback(track, requested_ns),

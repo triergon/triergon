@@ -1673,6 +1673,167 @@ fn coded_cued_aac_suffix_projects_the_decodable_packet_clocks() {
 }
 
 #[test]
+fn coded_cued_aac_playback_seek_invalidates_queue_and_feeds_indexed_suffix() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-aac/inputs/coded-cues.mkv");
+    let (mut player, pool) = player_with_input(fixture, 7);
+    let cancel = AtomicBool::new(false);
+    let old = loop {
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
+        if let Some(output) = player.pop()
+            && matches!(output.event(), RawEvent::Matroska(Event::Packet(_)))
+        {
+            break output;
+        }
+    };
+    while player.queued() == 0 {
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
+    }
+    let target = Time::new(1, 10).unwrap();
+    assert!(
+        player
+            .seek_and_select(
+                TrackKey::Matroska(7),
+                target,
+                Selection::All,
+                &mut WorkBudget::new(1),
+                &cancel
+            )
+            .unwrap()
+    );
+    assert!(!player.current(&old));
+    assert_eq!(player.queued(), 0);
+    let outputs = collect_with_work(&mut player, 1);
+    let receipt = outputs
+        .iter()
+        .find_map(|o| match o.event() {
+            RawEvent::Matroska(Event::Seek(receipt)) => Some(receipt),
+            _ => None,
+        })
+        .unwrap();
+    assert!(receipt.used_index);
+    assert_eq!(receipt.actual_ns, 93_000_000);
+    let configuration = outputs
+        .iter()
+        .find_map(|o| match o.event() {
+            RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+            _ => None,
+        })
+        .unwrap();
+    let feed = setup(&pool, configuration, 0);
+    let packets: Vec<_> = outputs
+        .iter()
+        .filter(|o| matches!(o.event(), RawEvent::Matroska(Event::Packet(_))))
+        .collect();
+    assert_eq!(packets.len(), 4);
+    let mut probe = feed
+        .native_aac_clock_probe(&pool, packets.len())
+        .unwrap()
+        .unwrap();
+    for (ordinal, (output, ms)) in packets.iter().zip([93, 116, 139, 163]).enumerate() {
+        let packet = frame(&feed, output);
+        assert_eq!(
+            packet.source.packet.data.as_ref(),
+            &[0x20, 0x64, 0, 1, 0x90, 0, 0x0e]
+        );
+        assert_eq!(packet.source.packet.pts_ns, Some(ms * 1_000_000));
+        assert_eq!(
+            output.delivery(),
+            if ms < 100 {
+                Delivery::DecodeOnly { until: target }
+            } else {
+                Delivery::Present
+            }
+        );
+        assert_eq!(probe.push(&packet).unwrap(), ordinal);
+    }
+    let clock = probe.finish();
+    for (ordinal, ms) in [93, 116, 139, 163].into_iter().enumerate() {
+        let timing = clock.timing(ordinal).unwrap();
+        assert_eq!(
+            (timing.pts_ns, timing.dts_ns, timing.duration_ns),
+            (Some(ms * 1_000_000), Some(ms * 1_000_000), Some(23_000_000))
+        );
+    }
+}
+
+#[test]
+fn unsupported_matroska_audio_seek_preserves_playback() {
+    let mut fixture =
+        include_bytes!("../../../harness/features/matroska-cued-aac/inputs/coded-cues.mkv")
+            .to_vec();
+    let at = fixture.windows(2).position(|w| w == [0x12, 0x10]).unwrap();
+    fixture[at + 1] = 0x08;
+    let (mut player, _) = player_with_input(&fixture, 7);
+    let cancel = AtomicBool::new(false);
+    let old = loop {
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
+        if let Some(output) = player.pop()
+            && matches!(output.event(), RawEvent::Matroska(Event::Packet(_)))
+        {
+            break output;
+        }
+    };
+    for track in [TrackKey::Matroska(7), TrackKey::Matroska(99)] {
+        assert!(
+            player
+                .seek_and_select(
+                    track,
+                    Time::new(1, 10).unwrap(),
+                    Selection::All,
+                    &mut WorkBudget::new(1),
+                    &cancel
+                )
+                .is_err()
+        );
+        assert!(player.current(&old));
+    }
+    let outputs = collect_with_work(&mut player, 1);
+    assert_eq!(
+        outputs
+            .iter()
+            .filter(|o| matches!(o.event(), RawEvent::Matroska(Event::Packet(_))))
+            .count(),
+        7
+    );
+}
+
+#[test]
+fn multitrack_audio_seek_refusal_preserves_playback() {
+    let (mut player, _) = player(7);
+    let cancel = AtomicBool::new(false);
+    let mut audio = None;
+    let old = loop {
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
+        if let Some(output) = player.pop() {
+            if let RawEvent::Matroska(Event::Configuration(configuration)) = output.event() {
+                audio = Some(TrackKey::Matroska(configuration.tracks()[2].number));
+            }
+            if matches!(output.event(), RawEvent::Matroska(Event::Packet(_))) {
+                break output;
+            }
+        }
+    };
+    assert!(
+        player
+            .seek_and_select(
+                audio.unwrap(),
+                Time::new(1, 10).unwrap(),
+                Selection::All,
+                &mut WorkBudget::new(1),
+                &cancel
+            )
+            .is_err()
+    );
+    assert!(player.current(&old));
+    assert!(
+        collect_with_work(&mut player, 1)
+            .iter()
+            .any(|o| matches!(o.event(), RawEvent::Matroska(Event::Packet(_))))
+    );
+}
+
+#[test]
 fn matroska_dolby_source_clock_preserves_damaged_ac3_before_decoder_admission() {
     use triergon_playback::matroska_feed::MatroskaPacketTiming;
 
