@@ -11,6 +11,32 @@
 # Opus, Vorbis and FLAC streams, a multiplexed and a multichannel Opus file, two chained
 # files, and three damaged copies of a_opus.opus (harness/codecs/ogg/damage.py).
 set -eu
+if [ "${1:-}" = "--layouts" ]; then
+    [ "$#" -eq 5 ] || { echo "usage: $0 --layouts FFMPEG OGGENC OPUSENC OUT_DIR" >&2; exit 2; }
+    shift
+    FFMPEG=$1
+    OGGENC=$2
+    OPUSENC=$3
+    OUT=$4
+    mkdir -p "$OUT"
+    pcm=$(mktemp)
+    trap 'rm -f "$pcm"' EXIT HUP INT TERM
+    for channels in 1 2 3 4 5 6 7 8; do
+        expression=
+        channel=0
+        while [ "$channel" -lt "$channels" ]; do
+            expression="${expression}${expression:+|}0.1*sin(2*PI*$((300 + channel * 79))*t)"
+            channel=$((channel + 1))
+        done
+        "$FFMPEG" -nostdin -v error -y -f lavfi -i "aevalsrc=$expression:s=48000:d=0.22" \
+            -c:a pcm_s16le -f s16le "$pcm"
+        "$OGGENC" -Q --raw --raw-rate 48000 --raw-chan "$channels" --serial "$((1000 + channels))" \
+            -o "$OUT/vorbis-$channels.ogg" "$pcm"
+        "$OPUSENC" --quiet --raw --raw-rate 48000 --raw-chan "$channels" --serial "$((2000 + channels))" \
+            "$pcm" "$OUT/opus-$channels.opus"
+    done
+    exit 0
+fi
 [ $# -eq 2 ] || { echo "usage: $0 FFMPEG OUT_DIR" >&2; exit 2; }
 FFMPEG=$1
 OUT=$2

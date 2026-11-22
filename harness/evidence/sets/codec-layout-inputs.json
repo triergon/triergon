@@ -1,0 +1,76 @@
+{
+ "name": "codec-layout-inputs",
+ "path": "codec-layout-inputs",
+ "retention": "retained",
+ "reason": "Synthetic Vorbis and Opus streams with one through eight separately excited channels, compared by codec-layouts.",
+ "key": "evidence/codec-layout-inputs/c99829b40ab0e3a096a1975601b655b0caf56de83b2c4c6be7a69a9ecc699eda.tar.gz",
+ "sha256": "c99829b40ab0e3a096a1975601b655b0caf56de83b2c4c6be7a69a9ecc699eda",
+ "bytes": 98040,
+ "unpacked_at": "repository",
+ "files": [
+  {
+   "path": ".research/codec-layout-inputs/opus-1.opus",
+   "sha256": "c956ae31ee363aafd4683f5f94bf48c6099549c11302bc6022a62336b3b343e4"
+  },
+  {
+   "path": ".research/codec-layout-inputs/opus-2.opus",
+   "sha256": "1b7a9ac4447ae232b664ca8fbb34569df8f4d3168b330be9fccaf50aa792ff13"
+  },
+  {
+   "path": ".research/codec-layout-inputs/opus-3.opus",
+   "sha256": "2a80c60d312ec5f8381a3a83e9df03fbd19358604280aaa7dd29fd4b797094ef"
+  },
+  {
+   "path": ".research/codec-layout-inputs/opus-4.opus",
+   "sha256": "c51db2291346024209bf6187dcc3dff0cd42038a56784454e1f5aa23c75c312f"
+  },
+  {
+   "path": ".research/codec-layout-inputs/opus-5.opus",
+   "sha256": "93f4676680e7c88f3b7fc03f6776bad2f60a096bd6f2f0b0654a9549018b80e1"
+  },
+  {
+   "path": ".research/codec-layout-inputs/opus-6.opus",
+   "sha256": "22d9f70fe779d598c36bc0e49f19e939bd9ee51223784bd91520b4d76d65241f"
+  },
+  {
+   "path": ".research/codec-layout-inputs/opus-7.opus",
+   "sha256": "604351d8b23ebbcacf5620f126f8ae3f5b213f6e4ce94e89a1db84a70ee6bbba"
+  },
+  {
+   "path": ".research/codec-layout-inputs/opus-8.opus",
+   "sha256": "2f824e9ca387347b5ba6cd44a3e71435a13b900c0660849dc924397ca4c103a1"
+  },
+  {
+   "path": ".research/codec-layout-inputs/vorbis-1.ogg",
+   "sha256": "067d1b430f7baf1df6dff102bbc93313cda35ee5b40c607f9fac6588876da23b"
+  },
+  {
+   "path": ".research/codec-layout-inputs/vorbis-2.ogg",
+   "sha256": "21d46c2e8621c74b7dd9b7b52676c4463a15bcda79a2ec83f572f702093669ef"
+  },
+  {
+   "path": ".research/codec-layout-inputs/vorbis-3.ogg",
+   "sha256": "41470909e06ed9ec464dbb01a08525aba97da26fbc1f61fca8269954f5830c4f"
+  },
+  {
+   "path": ".research/codec-layout-inputs/vorbis-4.ogg",
+   "sha256": "353d1ba8e01f90e050d21ad132cf37354cde14bb7c44e093b98cc2ef15432f09"
+  },
+  {
+   "path": ".research/codec-layout-inputs/vorbis-5.ogg",
+   "sha256": "f7b13ddf5b6022168fe348ca5c4d9ff875a0422bfba1fd209b892c6c31f85000"
+  },
+  {
+   "path": ".research/codec-layout-inputs/vorbis-6.ogg",
+   "sha256": "71d4571f6f35be7e6e7f35acdfd5204229b9b238405702315beb43aac94107d5"
+  },
+  {
+   "path": ".research/codec-layout-inputs/vorbis-7.ogg",
+   "sha256": "894d53afeab395aff7209ff5789fd04dd8492b45d455b54d1331460b5586dd4d"
+  },
+  {
+   "path": ".research/codec-layout-inputs/vorbis-8.ogg",
+   "sha256": "a011b9a54f188f69a9fac2070e110d5e6271fddef9e2210f04234a0eaa48ac0c"
+  }
+ ]
+}
