@@ -275,9 +275,10 @@ selective style overrides), in the frame and storage size and margins of its
   A frame of a script without events reports new content and leaves the
   previous frame in place for the next comparison, as libass does.
 
-Settings beyond the frame and storage size (margins, `use_margins`, a pixel
-aspect, font scale, line spacing and position) follow libass's formulas but
-are not compared. The glyphs of `@` fonts from U+02F1 on are drawn as libass
+The renderer applies margins around the video and optionally uses those margins
+to place regular events. Settings can also override pixel aspect, scale fonts,
+set line spacing in pixels and shift bottom-aligned events up by a percentage.
+The glyphs of `@` fonts from U+02F1 on are drawn as libass
 draws them, turned by 90° about their scaled vertical advance and the
 typographic descender and advancing by their linear vertical advance, and are
 shaped with the default-load vertical advance of every glyph libass's glyph
@@ -458,7 +459,11 @@ panics.
   `aarch64-unknown-linux-gnu` and `thumbv7neon-unknown-linux-gnueabihf` from that
   target's reference. All four cases pass on ARMv7; on AArch64 all four are
   open as a deliberate divergence.
-- Runtime and memory of both features are taken against `libass-player-native`
+- [`ass-render-settings`](../../harness/features/ass-render-settings/contract.json)
+  compares frame changes and every image against libass at 1920×1080 over
+  1280×720 storage. Its 133 cases vary margins, use of margins, pixel aspect,
+  font scale, line spacing and line position across scripts and a packet stream.
+- Runtime and memory of the rendering features are taken against `libass-player-native`
   (`harness/reference_ass_player.h`: `libass.a` linked into the worker, none of
   its sources compiled in) by `cargo xtask report`, 30 timing and 30 memory
   pairs per case, and graded by `cargo xtask grade`. The reference replaces

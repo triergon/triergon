@@ -52,6 +52,7 @@ impl Tree {
         crate::corpus::generate_all(&paths)?;
         crate::framing_bench::generate(&generated.join(".research/fixtures-packet-framing"))?;
         crate::framing_views::dts::gate_fixtures(root, &generated)?;
+        crate::framing_views::stream_controls(&paths)?;
         let mut tree = Self::committed(root)?;
         tree.generated = Some(generated);
         for pin in crate::fetch::pins(root)? {
@@ -64,7 +65,8 @@ impl Tree {
                 if let (Some(path), Some(pin)) = (
                     sample.get("path").and_then(Value::as_str),
                     sample.get("sha256").and_then(Value::as_str),
-                ) && path.starts_with("dts-corpus/")
+                ) && (path.starts_with("dts-corpus/")
+                    || path.starts_with("stream-parser-fixtures/"))
                 {
                     tree.fetched
                         .insert(format!(".research/{path}"), pin.to_owned());
