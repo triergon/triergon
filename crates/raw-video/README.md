@@ -27,7 +27,9 @@ the caller's cadence. Borrow the NAL slices in order with
 
 The [probe comparison](../../harness/features/playback-probe/contract.json)
 checks that the combined probe's detection and handoff agree for containers
-and raw video, and checks transport sync spacing independently. The
+and raw video, and checks transport sync spacing independently. For AVC and
+HEVC the returned source also delivers the same access units and terminal
+result as a fresh reader, with every unit checked against the input bytes. The
 [raw source views](../../harness/features/playback-source-view/contract.json)
 compare the initial SPS-derived frame rate and the default unstamped queue timestamps.
 The [raw Annex B comparison](../../harness/features/raw-annex-b/contract.json)

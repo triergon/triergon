@@ -5,10 +5,10 @@ mod lifecycle;
 use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    Budget, Bytes, InputCursor, SourceCapabilities, SourceId, Step, WorkBudget,
+    Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, Step, WorkBudget,
     signature::TransportSync,
 };
-use triergon_framing::nal::{Codec, RawAnnexBLimits};
+use triergon_framing::nal::{Codec, RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
 use triergon_harness_protocol::{
     digest::{fold, fold_bytes},
     md5,
@@ -20,6 +20,7 @@ use triergon_playback::{
 };
 use triergon_raw_video::{
     PlaybackInput, PlaybackInputKind, PlaybackProbe, PlaybackProbeStep, RawVideoProbeLimits,
+    RawVideoSource,
 };
 
 const ID: SourceId = SourceId(1);
@@ -87,9 +88,14 @@ fn compare(pool: &Budget, data: &Bytes, window: usize, raw: bool, trace: bool) -
             {
                 handoff(selected, &cancel)?
             }
-            (PlaybackInputKind::RawVideo(detected), PlaybackInput::RawVideo { codec, .. })
+            (PlaybackInputKind::RawVideo(detected), PlaybackInput::RawVideo { codec, source })
                 if detected == codec =>
             {
+                let reader =
+                    RawAnnexBReader::new(pool, codec, ID, caps, RawAnnexBLimits::default())?;
+                let direct =
+                    RawVideoSource::new(reader, ByteSource::new(ID, data.clone(), window)?);
+                check_raw_replay(source, direct, data, &cancel)?;
                 (
                     match codec {
                         Codec::Avc => 9,
@@ -124,12 +130,57 @@ fn compare(pool: &Budget, data: &Bytes, window: usize, raw: bool, trace: bool) -
     Ok(record(verdict, width, replay, trace))
 }
 
-fn refused(error: triergon_core::Error, data: &[u8], trace: bool) -> Result<Totals> {
+fn raw_step<S: Source>(
+    source: &mut RawVideoSource<S>,
+    cancel: &AtomicBool,
+) -> triergon_core::Result<Step<RawAccessUnit>> {
+    loop {
+        match source.poll(&mut WorkBudget::new(WORK), cancel)? {
+            Step::Yield => {}
+            Step::NeedInput(_) => return Err(Error::Invalid("preloaded raw source went pending")),
+            step => return Ok(step),
+        }
+    }
+}
+
+fn check_raw_replay<S: Source>(
+    mut replay: RawVideoSource<S>,
+    mut direct: RawVideoSource<ByteSource>,
+    original: &[u8],
+    cancel: &AtomicBool,
+) -> Result<()> {
+    loop {
+        match (raw_step(&mut replay, cancel), raw_step(&mut direct, cancel)) {
+            (Ok(Step::Ready(a)), Ok(Step::Ready(b))) => {
+                let start = usize::try_from(b.range.start)?;
+                let end = usize::try_from(b.range.end)?;
+                let bytes = original
+                    .get(start..end)
+                    .ok_or("raw unit outside its source")?;
+                if a.source != b.source
+                    || a.codec != b.codec
+                    || a.range != b.range
+                    || a.has_vcl != b.has_vcl
+                    || a.random_access != b.random_access
+                    || !a.segments().flatten().copied().eq(bytes.iter().copied())
+                {
+                    return Err("raw probe handoff changed the original access unit".into());
+                }
+            }
+            (Ok(Step::End(a)), Ok(Step::End(b))) if a == b => return Ok(()),
+            (Err(a), Err(b))
+                if a == b && a != Error::Invalid("preloaded raw source went pending") =>
+            {
+                return Ok(());
+            }
+            _ => return Err("raw probe handoff changed the terminal result".into()),
+        }
+    }
+}
+
+fn refused(error: Error, data: &[u8], trace: bool) -> Result<Totals> {
     match error {
-        triergon_core::Error::Unsupported(_)
-        | triergon_core::Error::Invalid(_)
-        | triergon_core::Error::Truncated
-        | triergon_core::Error::Limit { .. } => {
+        Error::Unsupported(_) | Error::Invalid(_) | Error::Truncated | Error::Limit { .. } => {
             if trace {
                 eprintln!("probe refusal: {error}");
             }

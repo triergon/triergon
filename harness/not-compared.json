@@ -195,12 +195,6 @@
     "triergon-raster": [],
     "triergon-raw-video": [
       {
-        "name": "combined-probe",
-        "entry_points": ["PlaybackProbe", "PlaybackProbeStep", "PlaybackInput", "PlaybackInputKind"],
-        "degree": "unit-tests",
-        "needs": "as playback's container-probe, with raw AVC and HEVC verdicts against the reference's h264 and hevc probe scores; raw-annex-b runs RawVideoProbe alone"
-      },
-      {
         "name": "configuration-tracking-on-its-own",
         "entry_points": ["RawVideoConfigTracker", "RawVideoConfiguration", "AvcVuiTiming", "HevcVuiTiming", "hevc_startup"],
         "degree": "step",
