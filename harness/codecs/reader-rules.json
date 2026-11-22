@@ -3,6 +3,11 @@
  "frozen_utc": "2026-11-08T09:51:00Z",
  "reference": "ffprobe of FFmpeg 9.0.2, the decode profile of cargo xtask prepare-ffmpeg (.research/reference-decode/install/bin/ffprobe), -show_packets with the demuxer forced",
  "candidate": "codec-worker packets FORMAT FILE: every packet triergon_ogg::BlockingReader or the triergon_elementary reader of FORMAT emits, as the reader reports it, and for Ogg also the reader's FFmpeg-compatible view (triergon_ogg::compat::clock::packet_timing)",
+ "variants": {
+  "push": "Each file is read with windows of 1, 7 and 4096 bytes under the default pool and the smallest successful power-of-two pool starting at 4096 bytes. Every packet, event and terminal row must match the blocking worker byte for byte before reference dispositions apply.",
+  "sequential": "The candidate opens a Read-only Ogg source and the reference reads pipe:0. The Ogg packet fields and reviewed dispositions remain in force.",
+  "elementary_seek": "Exact seeks count and remove only reference packets before the candidate byte landing. Estimated seeks compare the landing frame positions before comparing the complete suffix. A reviewed open case must reproduce its exact recorded packet differences and landing observations."
+ },
  "views": {
   "native": "what the reader reports: its own times, durations and trims",
   "compat": "the reader's FFmpeg-compatible policy of the same packets; a native difference this view does not have is reproduced-by-compat and needs no disposition"
