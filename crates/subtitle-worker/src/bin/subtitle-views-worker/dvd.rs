@@ -1,5 +1,7 @@
 use std::ffi::OsString;
 
+use triergon_core::{Budget, BudgetVec};
+use triergon_subtitles::compat::dvd::VobSubEntry;
 use triergon_subtitles::dvd::vobsub::{Line, Lines};
 
 use super::protocol::Operation;
@@ -10,19 +12,20 @@ pub(super) fn operation<'a>(
     input: &'a [u8],
     arguments: &[OsString],
 ) -> Result<Operation<'a>, String> {
-    let [_index_path, _sub_path] = arguments else {
+    let [_index_path, sub_path] = arguments else {
         return Err(format!("usage: {prefix} INDEX_PATH SUB_PATH"));
     };
+    let sub = std::fs::read(sub_path).map_err(|error| error.to_string())?;
     Ok(Operation {
         name: "vobsub-index",
         run: Box::new(move |work, trace| {
             let mut records = Records { work, trace };
-            index_view(&mut records, input)
+            index_view(&mut records, input, &sub)
         }),
     })
 }
 
-fn index_view(records: &mut Records<'_, '_>, input: &[u8]) -> Result<(), String> {
+fn index_view(records: &mut Records<'_, '_>, input: &[u8], sub: &[u8]) -> Result<(), String> {
     let mut header = Vec::new();
     let mut tracks = Vec::new();
     let mut packets = Vec::new();
@@ -66,7 +69,7 @@ fn index_view(records: &mut Records<'_, '_>, input: &[u8]) -> Result<(), String>
         return records.refused();
     }
     records.row(3, &[comments, blanks], &[])?;
-    for (ordinal, (id, language)) in tracks.into_iter().enumerate() {
+    for (ordinal, &(id, language)) in tracks.iter().enumerate() {
         records.row(
             2,
             &[
@@ -79,8 +82,34 @@ fn index_view(records: &mut Records<'_, '_>, input: &[u8]) -> Result<(), String>
         )?;
         records.row(2, &[ordinal as u64, header.len() as u64], &header)?;
     }
-    packets.sort_by_key(|&(pts, pos, track)| (pts, track, pos));
-    for (pts, pos, track) in packets {
+    // An index entry names a source position. The demuxer only publishes a
+    // packet when a program-stream unit can be read there.
+    packets.sort_by_key(|&(pts, pos, track)| (track, pos, pts));
+    let pool = Budget::new(16 * 1024 * 1024).map_err(|error| error.to_string())?;
+    let mut output = BudgetVec::new(&pool);
+    let mut admitted = Vec::new();
+    for (i, &(pts, pos, track)) in packets.iter().enumerate() {
+        let Some(data) = usize::try_from(pos).ok().and_then(|at| sub.get(at..)) else {
+            continue;
+        };
+        let entry = VobSubEntry {
+            milliseconds: pts,
+            filepos: pos,
+            end: packets
+                .get(i + 1)
+                .filter(|next| next.2 == track)
+                .map(|next| next.1),
+            substream: tracks[track].0,
+        };
+        if entry
+            .read(data, &mut output)
+            .map_err(|error| error.to_string())?
+        {
+            admitted.push((pts, pos, track));
+        }
+    }
+    admitted.sort_by_key(|&(pts, pos, track)| (pts, track, pos));
+    for (pts, pos, track) in admitted {
         records.row(1, &[track as u64, pts as u64, pos], &[])?;
     }
     records.row(7, &[], &[])

@@ -8,7 +8,7 @@
   "reference": "ffmpeg-subtitle-views-native",
   "runner": "cargo xtask report",
   "contract": [
-    "Project setting lines before the first id as LF-terminated extradata, each track as id, language and default disposition, and timestamps with delay as millisecond PTS and sub file offsets. Compare the public VobSub demuxer output. Blank and comment counts are read independently from the raw index."
+    "Project setting lines before the first id as LF-terminated extradata, each track as id, language and default disposition, and timestamps with delay as millisecond PTS and sub file offsets for entries that admit a program-stream unit in the companion file. Compare the public VobSub demuxer output. Blank and comment counts are read independently from the raw index."
   ],
   "required_profiles": [
     "authored",
@@ -673,7 +673,6 @@
     }
   ],
   "pending_module_requirements": [
-    "Lines retains each declared index offset; the reference omits a packet whose referenced program-stream data is truncated, unaligned or outside the file.",
     "The line view retains all tied timestamps and shared offsets; the reference schedules and suppresses entries while reading the subpicture stream.",
     "The line view keeps every admitted timestamp form in PTS order. The reference queue reads the entries in a different order when positions repeat.",
     "The line view retains the declared empty track. The reference publishes only the stream with packet entries.",
@@ -685,22 +684,8 @@
   ],
   "open_cases": [
     {
-      "id": "vobsub-fixture-hd-source-hd-truncated-header-00",
-      "requirement": "Lines retains each declared index offset; the reference omits a packet whose referenced program-stream data is truncated, unaligned or outside the file.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "vobsub-extent-ties",
       "requirement": "The line view retains all tied timestamps and shared offsets; the reference schedules and suppresses entries while reading the subpicture stream.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "vobsub-extent-misaligned",
-      "requirement": "Lines retains each declared index offset; the reference omits a packet whose referenced program-stream data is truncated, unaligned or outside the file.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
@@ -729,13 +714,6 @@
     {
       "id": "vobsub-idx-no-index",
       "requirement": "Lines retains the written language and no index; the reference recovers the line as language und and id zero.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "vobsub-idx-past-end",
-      "requirement": "Lines retains each declared index offset; the reference omits a packet whose referenced program-stream data is truncated, unaligned or outside the file.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

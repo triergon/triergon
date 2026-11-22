@@ -264,4 +264,6 @@ the [text fixture facts](../../harness/features/text-extraction-oracle/contract.
 [tx3g configuration](../../harness/features/tx3g-config-oracle/contract.json)
 and [timed text semantics](../../harness/features/tx3g-semantics/contract.json).
 The [tx3g decoder header comparison](../../harness/features/tx3g-configuration/contract.json)
-covers the fields the reference derives from the sample description.
+covers the fields the reference derives from each distinct sample description.
+The source views preserve signed Matroska presentation clocks without inferring
+DTS, and keep the full unsigned sample delta of an ISO BMFF time-to-sample entry.
