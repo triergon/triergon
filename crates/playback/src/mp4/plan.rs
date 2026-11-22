@@ -90,20 +90,18 @@ pub struct TrackMetadata {
     pub base: SourceTimeBase,
     /// The handler type, such as `vide` or `soun`.
     pub handler: [u8; 4],
-    /// Whether the track header enables the track.
-    pub enabled: bool,
-    /// The track header box.
-    pub raw_tkhd: BoxView,
+    pub(crate) enabled: bool,
+    #[expect(dead_code, reason = "preserve the charged box and its debug view")]
+    raw_tkhd: BoxView,
     /// The media header box.
     pub raw_mdhd: BoxView,
-    /// The handler box.
-    pub raw_hdlr: BoxView,
-    /// The sample table box.
-    pub raw_table: BoxView,
-    /// The edit box, if any.
-    pub raw_edits: Option<BoxView>,
-    /// The data reference box.
-    pub raw_dref: BoxView,
+    #[expect(dead_code, reason = "preserve the charged box and its debug view")]
+    raw_hdlr: BoxView,
+    #[expect(dead_code, reason = "preserve the charged box and its debug view")]
+    raw_table: BoxView,
+    raw_edits: Option<BoxView>,
+    #[expect(dead_code, reason = "preserve the charged box and its debug view")]
+    raw_dref: BoxView,
     /// The track as the demux view reads it, or why the demux view leaves it out.
     pub demux_stream: std::result::Result<StreamView, Error>,
     _charge: Reservation,
@@ -143,10 +141,8 @@ pub struct PlanTrack {
     pub(crate) fragment_aac_trim: u32,
     /// The track's metadata.
     pub snapshot: TrackSnapshot,
-    /// The sample descriptions, in table order.
-    pub descriptions: BudgetVec<SampleDescription>,
-    /// The edit list, if the track has one.
-    pub edits: Option<EditList>,
+    pub(crate) descriptions: BudgetVec<SampleDescription>,
+    edits: Option<EditList>,
     /// What [`PreparedMp4::identify_tracks`] read of the first sample entry.
     identity: Option<Charged<Box<EntryConfiguration>>>,
 }
@@ -319,10 +315,6 @@ impl PreparedMp4 {
     pub fn terminal_mdat(&self) -> Option<iso::payload::TerminalMdat> {
         self.terminal_mdat
     }
-    /// The movie header's time base.
-    pub fn movie_base(&self) -> TimeBase {
-        self.movie_base
-    }
     /// The samples the tables declare, in physical order. A forward plan checks a
     /// row against the `mdat` that follows before it reads or delivers its payload.
     pub fn source_rows(&self) -> &[SourceRow] {
@@ -336,15 +328,9 @@ impl PreparedMp4 {
     pub fn tracks(&self) -> &[PlanTrack] {
         self.tracks.as_slice()
     }
-    /// The top-level boxes the plan retains.
-    #[cfg(feature = "reference-trace")]
-    pub fn raw_roots(&self) -> &[BoxView] {
-        self.raw_roots.as_slice()
-    }
-
     /// Where a front demux plan stops reading, if it does. Source rows continue
     /// past it; only the demux occurrences end there.
-    pub fn front_read_boundary(&self) -> Option<iso::compat::mov::front::FrontReadBoundary> {
+    pub(crate) fn front_read_boundary(&self) -> Option<iso::compat::mov::front::FrontReadBoundary> {
         self.front_boundary
     }
     pub(crate) fn next_demux_empty_duration(
@@ -375,8 +361,7 @@ impl PreparedMp4 {
             PlanView::Demux => self.demux_rows.len(),
         }
     }
-    /// Row `at` of the engine's view, as a source row.
-    pub fn row(&self, at: usize) -> Option<SourceRow> {
+    pub(crate) fn row(&self, at: usize) -> Option<SourceRow> {
         if self.demux_front && !self.demux_order_replay && self.encoded_edits.is_none() {
             return self.source_rows.as_slice().get(at).cloned();
         }
@@ -396,20 +381,12 @@ impl PreparedMp4 {
             .find(|t| t.snapshot.track_id == id)
             .ok_or(Error::Invalid("unknown plan track"))
     }
-    /// Occurrence `at` of the demux view; `None` on the source view.
-    pub fn demux_row(&self, at: usize) -> Option<&PacketOccurrence> {
+    pub(crate) fn demux_row(&self, at: usize) -> Option<&PacketOccurrence> {
         if self.view == PlanView::Demux {
             self.demux_rows.as_slice().get(at)
         } else {
             None
         }
-    }
-    /// The configuration of `row`'s sample description at `revision`. Fails with
-    /// `Invalid` for an unknown track or description.
-    #[cfg(feature = "reference-trace")]
-    pub fn config(&self, row: &SourceRow, revision: u64) -> Result<Mp4Configuration> {
-        self.track(row.track_id)?
-            .configuration(row.sample.description_index, revision)
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

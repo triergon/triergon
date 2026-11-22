@@ -154,21 +154,15 @@ pub enum Event {
     clippy::large_enum_variant,
     reason = "one bounded inline event; queue slots and all retained buffers use Budget; a per-event Box would add an untracked allocation"
 )]
-pub enum EngineStep {
-    /// The next event, in delivery order.
+pub(crate) enum EngineStep {
     Event(Event),
-    /// The engine waits on this input request.
     NeedInput(InputRequest),
-    /// The work budget ran out.
     Yield,
-    /// The source ended and the engine drained.
     End,
     /// The pool is full of output the caller still holds: release some, then
     /// advance again.
     Backpressure {
-        /// Bytes the step needed.
         requested: usize,
-        /// Bytes the pool had free.
         available: usize,
     },
     /// A TS entity ended: continue with the next entity or finish the logical source.

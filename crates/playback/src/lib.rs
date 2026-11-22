@@ -20,10 +20,11 @@ pub mod pump;
 mod source;
 
 pub use engine::{Engine, Track};
-pub use event::{DemuxTimes, EngineStep, Event, Packet, TsEvent};
+pub(crate) use event::EngineStep;
+pub use event::{DemuxTimes, Event, Packet, TsEvent};
 pub use player::{
     ClockChoice, Delivery, Output, OutputScope, Player, PlayerPolicy, Progress, SeekIntent,
-    Selection, State, TrackKey, TrackKind,
+    Selection, State, TrackKey,
 };
 pub use source::{ByteSource, Source, SourceOwner, SourceReply};
 pub use triergon_core::{Error, Result};

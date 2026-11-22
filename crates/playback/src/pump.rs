@@ -17,12 +17,6 @@ pub struct FeedToken {
     scope: InputToken,
     ordinal: u64,
 }
-impl FeedToken {
-    /// The feed's position in the pump's order.
-    pub fn ordinal(&self) -> u64 {
-        self.ordinal
-    }
-}
 /// One player output on its way to a sink.
 #[derive(Debug)]
 pub struct Feed {
@@ -30,15 +24,15 @@ pub struct Feed {
     output: Output,
 }
 impl Feed {
-    /// The feed's token.
+    /// Token the sink returns when it accepts this output and again when it completes it.
     pub fn token(&self) -> &FeedToken {
         &self.token
     }
-    /// The output.
+    /// Borrows the queued output while the feed keeps its storage alive.
     pub fn output(&self) -> &Output {
         &self.output
     }
-    /// Takes the output.
+    /// Transfers the output and its retained storage to the caller.
     pub fn into_output(self) -> Output {
         self.output
     }

@@ -32,8 +32,7 @@ pub struct PesFacts<'a> {
     pub payload_kind: DemuxPayloadKind,
     /// The PES header as the source carries it.
     pub source_header: &'a PesHeader,
-    /// Whether the header's timestamps apply to this packet.
-    pub time_header_applies: bool,
+    time_header_applies: bool,
     /// Payload length in bytes.
     pub payload_len: usize,
     /// Whether the payload is empty.

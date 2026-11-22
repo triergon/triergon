@@ -12,8 +12,9 @@ use crate::engine::ts::{Delivery as TsDelivery, Entities, TsEngine};
 use crate::event::EngineStep;
 use crate::source::SourceReply;
 use crate::{
-    Format, Result, SeekIntent, TrackKey, TrackKind,
+    Result, SeekIntent, TrackKey,
     mp4::plan::{PlanTrack, PreparedMp4},
+    player::TrackKind,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{CodecId, ColourDescription, MediaKind, TrackId, TrackInfo};
@@ -292,14 +293,6 @@ impl Engine {
             _ => None,
         }
     }
-    /// The container format.
-    pub fn format(&self) -> Format {
-        match self {
-            Self::Matroska(_) => Format::Matroska,
-            Self::Mp4(_) => Format::Mp4,
-            Self::Ts(t) => Format::Ts(t.format),
-        }
-    }
     pub(crate) fn validate_binding(&self) -> Result<()> {
         if let Self::Matroska(m) = self
             && !m.reader.is_unstarted()
@@ -353,8 +346,7 @@ impl Engine {
             Self::Ts(r) => r.input.generation(),
         }
     }
-    /// The budget the engine's storage is charged to.
-    pub fn pool(&self) -> &Budget {
+    pub(crate) fn pool(&self) -> &Budget {
         match self {
             Self::Matroska(r) => r.reader.budget(),
             Self::Mp4(r) => r.input.budget(),
@@ -364,7 +356,7 @@ impl Engine {
     /// Hands a source reply to the engine, and returns whether it made progress: `false`
     /// for `Pending` or empty data. A failure reply fails with `Transport` or
     /// `Cancelled`.
-    pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
+    pub(crate) fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         match self {
             Self::Mp4(r) => reply.provide_to(&mut r.input),
             Self::Ts(r) => r.provide(reply),
@@ -394,7 +386,7 @@ impl Engine {
     }
     /// Demuxes within `w`. Fails with `Invalid` for a compact progressive TS engine,
     /// which only its reader polls.
-    pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<EngineStep> {
+    pub(crate) fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<EngineStep> {
         match self {
             Self::Matroska(r) => Ok(EngineStep::from_matroska(r.step(w, c)?)),
             Self::Mp4(r) => r.poll(w, c, None),

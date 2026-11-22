@@ -30,7 +30,7 @@ pub struct CatalogueBoundary {
     pub source: SourceId,
     /// The input generation its outputs carry.
     pub input_generation: u64,
-    /// The player's delivery epoch of its outputs.
+    /// Delivery epoch that fences callbacks from the preceding catalogue.
     pub delivery_epoch: u64,
 }
 
@@ -81,10 +81,6 @@ impl<S: Source> Mp4Catalogue<S> {
     /// The candidate's engine.
     pub fn engine(&self) -> &Engine {
         &self.engine
-    }
-    /// The candidate's source.
-    pub fn source(&self) -> SourceId {
-        self.engine.source()
     }
 }
 
@@ -189,7 +185,7 @@ impl<S: Source> CatalogueCommit<'_, S> {
         })
     }
     /// The candidate's engine. Fails with `Invalid` when the candidate is gone.
-    pub fn next_engine(&self) -> Result<&Engine> {
+    pub(crate) fn next_engine(&self) -> Result<&Engine> {
         Ok(&self
             .next
             .as_ref()

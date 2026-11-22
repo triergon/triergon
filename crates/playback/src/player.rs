@@ -26,16 +26,11 @@ pub enum TrackKey {
         pid: u16,
     },
 }
-/// The kind of a track.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TrackKind {
-    /// Video.
+pub(crate) enum TrackKind {
     Video,
-    /// Audio.
     Audio,
-    /// Subtitles.
     Subtitle,
-    /// Data and unknown tracks.
     Other,
 }
 /// The tracks a player delivers.
@@ -123,7 +118,7 @@ pub enum Delivery {
     Unselected,
     /// A packet before the seek target: decode it, but do not present it.
     DecodeOnly {
-        /// The seek target.
+        /// Seek target on the chosen playback clock. Decode the packet without presenting it.
         until: Time,
     },
     /// A packet to present.
