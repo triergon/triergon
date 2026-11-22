@@ -292,6 +292,8 @@ seeks one track or all of them, `front` reads a forward-only input, `encoded` ad
 encoded sample entries, `recovery` keeps malformed tables readable as the demuxer does,
 and `pcm` groups QuickTime PCM samples into the demuxer's packets. The module
 documentation names the FFmpeg revision it reproduces.
+An edited track can retain a final sample with a zero decode delta. Its
+source range and occurrence remain available in the seek index.
 
 ## Comparison traces
 

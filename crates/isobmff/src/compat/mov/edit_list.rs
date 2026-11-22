@@ -1,13 +1,13 @@
 //! FFmpeg's MOV demuxer applying an edit list to a regular track. `EditCursor`
 //! emits each media edit's samples from the preceding sync sample on, up to a sync
 //! sample that reaches the edit's end, and so repeats, trims and shifts samples,
-//! for rate-one edits over samples with no composition offsets and positive decode
-//! deltas. The source table is never changed.
+//! for rate-one edits over samples with no composition offsets. Decode deltas
+//! must be positive except for the final sample. The source table is unchanged.
 //!
 //! Specification: Apple QuickTime File Format and Adobe F4V (edit mapping, gaps and
 //! repetition).
 use crate::{
-    Access, CursorStatus, Next, Sample,
+    CursorStatus, Next, Sample,
     compat::mov::{
         clocks::ClockField,
         view::{PacketProjector, PacketView, ProjectedEdit},
@@ -215,8 +215,8 @@ impl<'a> EditCursor<'a> {
     /// Advances to the next packet. Failures are sticky. `Error::Unsupported` for
     /// an edit whose rate is not one, a media edit with a negative start or zero
     /// duration, one that starts outside the samples or after no sync sample, and
-    /// a sample with a composition offset, a zero delta, unknown or unequal clocks,
-    /// or partial sync, dependency or unknown access flags.
+    /// a sample with a composition offset, a zero delta before the last sample,
+    /// or partial sync or dependency flags.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<CursorStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -232,13 +232,8 @@ impl<'a> EditCursor<'a> {
         if let Next::Item(sample) = &step {
             self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
             count_limit(self.scanned, self.limits.max_scanned_samples)?;
-            if sample.composition_offset.is_some()
-                || sample.duration_ticks == 0
-                || sample.partial_sync
-                || sample.dependency.is_some()
-                || sample.access == Access::Unknown
-                || sample.dts_ticks.is_none()
-                || sample.dts_ticks != sample.cts_ticks
+            if sample.partial_sync
+                || (sample.duration_ticks == 0 && sample.ordinal != self.table.sample_count())
             {
                 return Err(EDIT_PROFILE);
             }
@@ -525,6 +520,9 @@ impl<'a> EditCursor<'a> {
                     }
                     if entry.media_time < 0 || entry.segment_duration == 0 {
                         return Err(Error::Unsupported("negative or zero-duration media edit"));
+                    }
+                    if self.table.has_composition_offsets() || self.table.has_dependency_table() {
+                        return Err(EDIT_PROFILE);
                     }
                     self.source_start =
                         Time::from_ticks(i128::from(entry.media_time), self.media_base)?;

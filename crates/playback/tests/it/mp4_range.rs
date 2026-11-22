@@ -689,6 +689,57 @@ fn encoded_range_open(
 
 const RTP_HINTS: &[u8] = include_bytes!("../fixtures/mp4/avc-aac-rtp-hints.mp4");
 
+#[test]
+fn native_range_seek_keeps_rtp_hints_and_their_final_zero_delta() {
+    let (mut player, movie, _, _) = native_range_player(RTP_HINTS);
+    first_packet(&mut player);
+    let mut seek = player
+        .prepare_mp4_demux_seek(
+            &movie,
+            Mp4DemuxSeekRequest {
+                video: 1,
+                timestamp: 26_880,
+                limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
+            },
+            Selection::All,
+        )
+        .unwrap();
+    let cancel = off();
+    assert!((0..100_000).any(|_| seek.poll(&mut WorkBudget::new(3), &cancel).unwrap()));
+    let command = seek.finish().unwrap();
+    assert_eq!(command.receipt().selected.position, 40_670);
+    assert!(
+        player
+            .apply_mp4_demux_seek(&command, &mut WorkBudget::new(1), &cancel)
+            .unwrap()
+    );
+    let events = collect(&mut player, 1).unwrap();
+    let packets = mp4_packets(&events);
+    for (track_id, count) in [(3, 50), (4, 8)] {
+        let hints: Vec<_> = packets
+            .iter()
+            .filter(|packet| packet.configuration.track.track_id == track_id)
+            .collect();
+        assert_eq!(hints.len(), count);
+        for packet in &hints {
+            let range = &packet.source.sample.range;
+            assert_eq!(
+                packet.source.payload.as_ref(),
+                &RTP_HINTS[range.start as usize..range.end as usize]
+            );
+        }
+        if track_id == 3 {
+            let last = hints.last().unwrap();
+            let demux = &last.occurrence.as_ref().unwrap().demux;
+            assert_eq!(last.source.sample.range.start, 79_250);
+            assert_eq!(
+                (demux.pts, demux.dts, demux.duration, demux.flags),
+                (Some(356_400), Some(356_400), 0, 4)
+            );
+        }
+    }
+}
+
 fn rtp_hints_with_wide_clock() -> Vec<u8> {
     let mut bytes = RTP_HINTS.to_vec();
     let (at, _) = bytes
@@ -716,17 +767,7 @@ fn range_media_projection_keeps_packets_and_both_seek_paths() {
 
     let mut complete =
         Mp4RangeOpen::new(&opened.movie, Some(&plans), PlanLimits::default()).unwrap();
-    let refusal = (0..100_000).find_map(|_| match complete.poll(&mut WorkBudget::new(3), &off()) {
-        Ok(false) => None,
-        Ok(true) => panic!("expected the hint track edit to be refused"),
-        Err(error) => Some(error),
-    });
-    assert_eq!(
-        refusal,
-        Some(C::Unsupported(
-            "edit over reordered, zero-delta or recovery samples"
-        ))
-    );
+    assert!((0..100_000).any(|_| complete.poll(&mut WorkBudget::new(3), &off()).unwrap()));
     drop(complete);
 
     let mut projected =

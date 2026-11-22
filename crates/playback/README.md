@@ -203,6 +203,8 @@ QuickTime range playback reads AAC configuration from version 1 and version 2
 sound descriptions with `wave` extensions.
 `Mp4RangeOpen::for_media` projects media tracks for playback and seek alignment.
 Data tracks such as RTP hints and timecode still have their sample extents checked.
+An all-track demux seek retains RTP hint samples, including a final sample with
+a zero decode delta when it belongs to the replay.
 Supply any edit plans in source track order, with `None` for each data track.
 Progressive playback of a front-`moov` file continues through later
 `moof`/`mdat` pairs with at most 64 pending fragment slots. A size-zero
