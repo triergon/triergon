@@ -46,7 +46,11 @@ impl<'a> Cases<'a> {
         data: &[u8],
         write: bool,
     ) -> Result<(String, String), String> {
-        let file = format!("harness/features/{}/inputs/{name}", self.id);
+        let directory = match self.id {
+            "ac3-features" | "time-rescale" => "inputs",
+            _ => "authored",
+        };
+        let file = format!("harness/features/{}/{directory}/{name}", self.id);
         let path = self.root.join(&file);
         if fs::read(&path).as_deref().ok() != Some(data) {
             if !write {

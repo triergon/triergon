@@ -9429,7 +9429,7 @@
     {
       "id": "h264-no-eos-nal",
       "profile": "h264",
-      "file": "harness/features/video-nal-input/inputs/h264-no-eos.h264",
+      "file": "harness/features/video-nal-input/authored/h264-no-eos.h264",
       "sha256": "76460acc3bfc5376661ce04417b4a562ad01f3168ab9df8d1023c0fec840e62e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9445,7 +9445,7 @@
     {
       "id": "h264-no-eos-nals-split",
       "profile": "h264",
-      "file": "harness/features/video-nal-input/inputs/h264-no-eos.h264",
+      "file": "harness/features/video-nal-input/authored/h264-no-eos.h264",
       "sha256": "76460acc3bfc5376661ce04417b4a562ad01f3168ab9df8d1023c0fec840e62e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9461,7 +9461,7 @@
     {
       "id": "h264-mid-eos-nal",
       "profile": "h264",
-      "file": "harness/features/video-nal-input/inputs/h264-mid-eos.h264",
+      "file": "harness/features/video-nal-input/authored/h264-mid-eos.h264",
       "sha256": "0cdac1925d142b2d9b0fd14607ef99e0df57c8f8c7bdda71f24b2e3c072ac5fa",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9477,7 +9477,7 @@
     {
       "id": "h264-mid-eos-nals-split",
       "profile": "h264",
-      "file": "harness/features/video-nal-input/inputs/h264-mid-eos.h264",
+      "file": "harness/features/video-nal-input/authored/h264-mid-eos.h264",
       "sha256": "0cdac1925d142b2d9b0fd14607ef99e0df57c8f8c7bdda71f24b2e3c072ac5fa",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9493,7 +9493,7 @@
     {
       "id": "h264-damaged-slice-nal",
       "profile": "h264",
-      "file": "harness/features/video-nal-input/inputs/h264-damaged-slice.h264",
+      "file": "harness/features/video-nal-input/authored/h264-damaged-slice.h264",
       "sha256": "a4e1c07c527c58420265a425b8bec1ae4fa1996f4fc26f046b0cc2ba4954fba6",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9509,7 +9509,7 @@
     {
       "id": "h264-damaged-slice-nals-split",
       "profile": "h264",
-      "file": "harness/features/video-nal-input/inputs/h264-damaged-slice.h264",
+      "file": "harness/features/video-nal-input/authored/h264-damaged-slice.h264",
       "sha256": "a4e1c07c527c58420265a425b8bec1ae4fa1996f4fc26f046b0cc2ba4954fba6",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9557,7 +9557,7 @@
     {
       "id": "hevc-no-eos-nal",
       "profile": "hevc",
-      "file": "harness/features/video-nal-input/inputs/hevc-no-eos.hevc",
+      "file": "harness/features/video-nal-input/authored/hevc-no-eos.hevc",
       "sha256": "f6ce36d642462840df7347d66305ee05b9716a1417d292d7d58390b5a47f2a56",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9573,7 +9573,7 @@
     {
       "id": "hevc-mid-eos-nal",
       "profile": "hevc",
-      "file": "harness/features/video-nal-input/inputs/hevc-mid-eos.hevc",
+      "file": "harness/features/video-nal-input/authored/hevc-mid-eos.hevc",
       "sha256": "649dfa3b9c2adfc521d17ab173315ce7d3550eaaefebe2900f69c0cada5771dc",
       "rights": "authored-synthetic",
       "arguments": [
@@ -9589,7 +9589,7 @@
     {
       "id": "hevc-damaged-slice-nal",
       "profile": "hevc",
-      "file": "harness/features/video-nal-input/inputs/hevc-damaged-slice.hevc",
+      "file": "harness/features/video-nal-input/authored/hevc-damaged-slice.hevc",
       "sha256": "df3bf8ba3ca949716e4198daa793dffaf999171b0208cb95d51af175ef3b6918",
       "rights": "authored-synthetic",
       "arguments": [

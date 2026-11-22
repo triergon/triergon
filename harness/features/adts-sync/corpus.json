@@ -1318,7 +1318,7 @@
     {
       "id": "junk-prefix-and-sync-payload",
       "profile": "search",
-      "file": "harness/features/adts-sync/inputs/junk-prefix-and-sync-payload.adts",
+      "file": "harness/features/adts-sync/authored/junk-prefix-and-sync-payload.adts",
       "sha256": "b4dc18b559be2a214b44d7ad48f7737edcf96579b6f15261b7eeedfabaeaae47",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -1331,7 +1331,7 @@
     {
       "id": "junk-between-frames",
       "profile": "search",
-      "file": "harness/features/adts-sync/inputs/junk-between-frames.adts",
+      "file": "harness/features/adts-sync/authored/junk-between-frames.adts",
       "sha256": "e2c43dc88832b85fe93547c21a870bd95ac35523fce314b65e5905185e278441",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -1344,7 +1344,7 @@
     {
       "id": "bad-length-then-frames",
       "profile": "search",
-      "file": "harness/features/adts-sync/inputs/bad-length-then-frames.adts",
+      "file": "harness/features/adts-sync/authored/bad-length-then-frames.adts",
       "sha256": "1324f445a808bc98f1b390d23e33211f2b891ac1266746669dc6b27f65bdab24",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -1357,7 +1357,7 @@
     {
       "id": "short-final-frame",
       "profile": "search",
-      "file": "harness/features/adts-sync/inputs/short-final-frame.adts",
+      "file": "harness/features/adts-sync/authored/short-final-frame.adts",
       "sha256": "4db0a39059fa6dd1a4bbaad7cf7a0eca033cd27877d021db120949ddc46c85e0",
       "rights": "authored-synthetic",
       "arguments": [],
@@ -1370,7 +1370,7 @@
     {
       "id": "protected-after-junk",
       "profile": "search",
-      "file": "harness/features/adts-sync/inputs/protected-after-junk.adts",
+      "file": "harness/features/adts-sync/authored/protected-after-junk.adts",
       "sha256": "ad8a0e16f062ad319d7205285e326ec08a2b4c5994b3125a3a773867ee0474a6",
       "rights": "authored-synthetic",
       "arguments": [],
