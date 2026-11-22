@@ -212,7 +212,7 @@ fn complete_transport_traces_match_explicit_phase_traversal() {
     }
 }
 
-// Record source bytes and coordinates, excluding allocation-owner Debug state.
+// Record source bytes and coordinates, excluding storage Debug state.
 fn source_trace(event: triergon_mpegts::TraceEvent) -> String {
     use triergon_mpegts::TraceEvent;
     match event {
