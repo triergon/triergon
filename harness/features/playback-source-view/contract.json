@@ -102,37 +102,9 @@
         "matroska-startup-seek-startup-hevc-repeated-configuration",
         "matroska-startup-seek-startup-hevc-vps-timed-no-default",
         "matroska-startup-seek-seek-avc-seek-0-fresh",
-        "matroska-startup-seek-seek-avc-seek-0-eof",
-        "matroska-startup-seek-seek-avc-seek-700-fresh",
-        "matroska-startup-seek-seek-avc-seek-700-eof",
-        "matroska-startup-seek-seek-avc-seek-1420-fresh",
-        "matroska-startup-seek-seek-avc-seek-1420-eof",
-        "matroska-startup-seek-seek-avc-seek-2700-fresh",
-        "matroska-startup-seek-seek-avc-seek-2700-eof",
         "matroska-startup-seek-seek-hevc-seek-0-fresh",
-        "matroska-startup-seek-seek-hevc-seek-0-eof",
-        "matroska-startup-seek-seek-hevc-seek-700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-700-eof",
-        "matroska-startup-seek-seek-hevc-seek-1420-fresh",
-        "matroska-startup-seek-seek-hevc-seek-1420-eof",
-        "matroska-startup-seek-seek-hevc-seek-2700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-2700-eof",
         "matroska-startup-seek-seek-hevc-seek-no-default-0-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-0-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-default-700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-700-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-default-1420-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-1420-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-default-2700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-2700-eof",
         "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-0-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-700-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-eof",
         "ts-program-ts188-basic",
         "ts-program-program-eof-avc-aac",
         "ts-program-program-pmt-retype",
@@ -168,13 +140,7 @@
         "ts-program-m2ts-replay-avc-aac-00-audio",
         "ts-program-m2ts-replay-hevc-aac-00-video",
         "ts-program-m2ts-entry-hevc-aac-44100-01-video",
-        "progressive-pending-description",
         "progressive-pending-empty-endpoint",
-        "progressive-pending-pair",
-        "progressive-pending-reverse-ranges",
-        "progressive-pending-two-mdats",
-        "progressive-pending-unknown-clock",
-        "progressive-ten-sequential-batches",
         "source-carriage-aac-adts-direct",
         "source-carriage-hevc-direct",
         "source-hls-contiguous-part-a",
@@ -269,37 +235,9 @@
         "matroska-startup-seek-startup-hevc-repeated-configuration",
         "matroska-startup-seek-startup-hevc-vps-timed-no-default",
         "matroska-startup-seek-seek-avc-seek-0-fresh",
-        "matroska-startup-seek-seek-avc-seek-0-eof",
-        "matroska-startup-seek-seek-avc-seek-700-fresh",
-        "matroska-startup-seek-seek-avc-seek-700-eof",
-        "matroska-startup-seek-seek-avc-seek-1420-fresh",
-        "matroska-startup-seek-seek-avc-seek-1420-eof",
-        "matroska-startup-seek-seek-avc-seek-2700-fresh",
-        "matroska-startup-seek-seek-avc-seek-2700-eof",
         "matroska-startup-seek-seek-hevc-seek-0-fresh",
-        "matroska-startup-seek-seek-hevc-seek-0-eof",
-        "matroska-startup-seek-seek-hevc-seek-700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-700-eof",
-        "matroska-startup-seek-seek-hevc-seek-1420-fresh",
-        "matroska-startup-seek-seek-hevc-seek-1420-eof",
-        "matroska-startup-seek-seek-hevc-seek-2700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-2700-eof",
         "matroska-startup-seek-seek-hevc-seek-no-default-0-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-0-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-default-700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-700-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-default-1420-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-1420-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-default-2700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-2700-eof",
         "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-0-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-700-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-eof",
         "ts-program-ts188-basic",
         "ts-program-program-eof-avc-aac",
         "ts-program-program-pmt-retype",
@@ -335,13 +273,7 @@
         "ts-program-m2ts-replay-avc-aac-00-audio",
         "ts-program-m2ts-replay-hevc-aac-00-video",
         "ts-program-m2ts-entry-hevc-aac-44100-01-video",
-        "progressive-pending-description",
         "progressive-pending-empty-endpoint",
-        "progressive-pending-pair",
-        "progressive-pending-reverse-ranges",
-        "progressive-pending-two-mdats",
-        "progressive-pending-unknown-clock",
-        "progressive-ten-sequential-batches",
         "source-carriage-aac-adts-direct",
         "source-carriage-hevc-direct",
         "source-hls-contiguous-part-a",
@@ -436,37 +368,9 @@
         "matroska-startup-seek-startup-hevc-repeated-configuration",
         "matroska-startup-seek-startup-hevc-vps-timed-no-default",
         "matroska-startup-seek-seek-avc-seek-0-fresh",
-        "matroska-startup-seek-seek-avc-seek-0-eof",
-        "matroska-startup-seek-seek-avc-seek-700-fresh",
-        "matroska-startup-seek-seek-avc-seek-700-eof",
-        "matroska-startup-seek-seek-avc-seek-1420-fresh",
-        "matroska-startup-seek-seek-avc-seek-1420-eof",
-        "matroska-startup-seek-seek-avc-seek-2700-fresh",
-        "matroska-startup-seek-seek-avc-seek-2700-eof",
         "matroska-startup-seek-seek-hevc-seek-0-fresh",
-        "matroska-startup-seek-seek-hevc-seek-0-eof",
-        "matroska-startup-seek-seek-hevc-seek-700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-700-eof",
-        "matroska-startup-seek-seek-hevc-seek-1420-fresh",
-        "matroska-startup-seek-seek-hevc-seek-1420-eof",
-        "matroska-startup-seek-seek-hevc-seek-2700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-2700-eof",
         "matroska-startup-seek-seek-hevc-seek-no-default-0-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-0-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-default-700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-700-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-default-1420-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-1420-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-default-2700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-default-2700-eof",
         "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-0-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-700-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-eof",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-fresh",
-        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-eof",
         "ts-program-ts188-basic",
         "ts-program-program-eof-avc-aac",
         "ts-program-program-pmt-retype",
@@ -502,13 +406,7 @@
         "ts-program-m2ts-replay-avc-aac-00-audio",
         "ts-program-m2ts-replay-hevc-aac-00-video",
         "ts-program-m2ts-entry-hevc-aac-44100-01-video",
-        "progressive-pending-description",
         "progressive-pending-empty-endpoint",
-        "progressive-pending-pair",
-        "progressive-pending-reverse-ranges",
-        "progressive-pending-two-mdats",
-        "progressive-pending-unknown-clock",
-        "progressive-ten-sequential-batches",
         "source-carriage-aac-adts-direct",
         "source-carriage-hevc-direct",
         "source-hls-contiguous-part-a",
@@ -1044,105 +942,7 @@
       ]
     },
     {
-      "id": "matroska-startup-seek-seek-avc-seek-0-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-avc-seek-700-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-avc-seek-700-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-avc-seek-1420-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-avc-seek-1420-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-avc-seek-2700-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-avc-seek-2700-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "matroska-startup-seek-seek-hevc-seek-0-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-0-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-700-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-700-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-1420-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-1420-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-2700-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-2700-eof",
       "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
       "targets": [
         "aarch64-unknown-linux-gnu"
@@ -1156,105 +956,7 @@
       ]
     },
     {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-default-0-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-default-700-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-default-700-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-default-1420-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-default-1420-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-default-2700-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-default-2700-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-0-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-700-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-700-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-1420-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-1420-eof",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-2700-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-2700-eof",
       "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
       "targets": [
         "aarch64-unknown-linux-gnu"
@@ -1506,49 +1208,7 @@
       ]
     },
     {
-      "id": "progressive-pending-description",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "progressive-pending-empty-endpoint",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "progressive-pending-pair",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "progressive-pending-reverse-ranges",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "progressive-pending-two-mdats",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "progressive-pending-unknown-clock",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "progressive-ten-sequential-batches",
       "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
       "targets": [
         "aarch64-unknown-linux-gnu"
@@ -1684,7 +1344,7 @@
   "open_deviations": [
     {
       "reading": "Surplus composition timing entries make a strict sample table inadmissible",
-      "clause": "ISO/IEC 14496-12:2015 §§8.6.1.3.1–8.6.1.3.3 and §8.7.3.2.2 define one timing fact per sample described by the size table. This fixture writes 12 timing occurrences for six samples.",
+      "clause": "ISO/IEC 14496-12:2015 \u00a7\u00a78.6.1.3.1\u20138.6.1.3.3 and \u00a78.7.3.2.2 define one timing fact per sample described by the size table. This fixture writes 12 timing occurrences for six samples.",
       "candidate": "The strict source opener refuses the inconsistent sample table.",
       "reference": "The MOV demuxer opens and emits the six samples using the readable timing prefix.",
       "compat": "A caller needing bounded prefix recovery selects TimingRunPolicy::BoundedPrefix and the compat::mov index.",
@@ -1697,7 +1357,7 @@
     },
     {
       "reading": "Surplus decode timing entries make a strict sample table inadmissible",
-      "clause": "ISO/IEC 14496-12:2015 §§8.6.1.2.1–8.6.1.2.3 and §8.7.3.2.2 define one timing fact per sample described by the size table. This fixture writes 7 timing occurrences for six samples.",
+      "clause": "ISO/IEC 14496-12:2015 \u00a7\u00a78.6.1.2.1\u20138.6.1.2.3 and \u00a78.7.3.2.2 define one timing fact per sample described by the size table. This fixture writes 7 timing occurrences for six samples.",
       "candidate": "The strict source opener refuses the inconsistent sample table.",
       "reference": "The MOV demuxer opens and emits the six samples using the readable timing prefix.",
       "compat": "A caller needing bounded prefix recovery selects TimingRunPolicy::BoundedPrefix and the compat::mov index.",
