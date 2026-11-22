@@ -319,7 +319,14 @@ static int hvcc_annexb_run(const ViewCase *input, ViewWork *work)
         nal_refusal(work, &word, type >= 0, status);
     } else if (status >= 0) {
         NalView converted = {bsf->par_out->extradata, (size_t)bsf->par_out->extradata_size};
-        nal_config_units(work, AV_CODEC_ID_HEVC, converted, 1, 0, decoder);
+        /* Successful filter initialization can leave its extradata untouched
+         * (including an absent record). Only a conversion is hvcC writer
+         * output. Neither an empty nor a nonempty passthrough converted bytes. */
+        if (converted.size == source.size &&
+            (!source.size || !memcmp(converted.data, source.data, source.size)))
+            nal_refusal(work, NULL, 0, AVERROR_INVALIDDATA);
+        else
+            nal_config_units(work, AV_CODEC_ID_HEVC, converted, 1, 0, decoder);
     }
     av_bsf_free(&bsf);
     return status == AVERROR_INVALIDDATA || status >= 0 ? 0 : 2;

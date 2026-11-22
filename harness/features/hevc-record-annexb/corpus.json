@@ -47,7 +47,7 @@
       "expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 217
+        "digest": 8
       }
     },
     {
@@ -63,7 +63,7 @@
       "expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 6727
+        "digest": 8
       }
     },
     {
@@ -77,9 +77,9 @@
         "all"
       ],
       "expected": {
-        "packets": 2,
-        "bytes": 3,
-        "digest": 56057877717
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -93,9 +93,9 @@
         "decoder"
       ],
       "expected": {
-        "packets": 2,
-        "bytes": 3,
-        "digest": 1737794209227
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -342,70 +342,6 @@
       "id": "hvcc-remux-hevc-aud0-decoder",
       "profile": "reference-written",
       "file": "hvcc-remux-hevc-aud0.hvcc",
-      "sha256": "b9467aaeec131d696d4be15d08f30664e32e95ed03d31994e867c3cbd84cac1d",
-      "rights": "authored-synthetic",
-      "required": true,
-      "arguments": [
-        "decoder"
-      ],
-      "expected": {
-        "packets": 4,
-        "bytes": 72,
-        "digest": 5091043353834172469
-      }
-    },
-    {
-      "id": "hvcc-remux-hevc-aud1-all",
-      "profile": "reference-written",
-      "file": "hvcc-remux-hevc-aud1.hvcc",
-      "sha256": "b9467aaeec131d696d4be15d08f30664e32e95ed03d31994e867c3cbd84cac1d",
-      "rights": "authored-synthetic",
-      "required": true,
-      "arguments": [
-        "all"
-      ],
-      "expected": {
-        "packets": 4,
-        "bytes": 72,
-        "digest": 7899958590711559467
-      }
-    },
-    {
-      "id": "hvcc-remux-hevc-aud1-decoder",
-      "profile": "reference-written",
-      "file": "hvcc-remux-hevc-aud1.hvcc",
-      "sha256": "b9467aaeec131d696d4be15d08f30664e32e95ed03d31994e867c3cbd84cac1d",
-      "rights": "authored-synthetic",
-      "required": true,
-      "arguments": [
-        "decoder"
-      ],
-      "expected": {
-        "packets": 4,
-        "bytes": 72,
-        "digest": 5091043353834172469
-      }
-    },
-    {
-      "id": "hvcc-remux-hevc-eos-all",
-      "profile": "reference-written",
-      "file": "hvcc-remux-hevc-eos.hvcc",
-      "sha256": "b9467aaeec131d696d4be15d08f30664e32e95ed03d31994e867c3cbd84cac1d",
-      "rights": "authored-synthetic",
-      "required": true,
-      "arguments": [
-        "all"
-      ],
-      "expected": {
-        "packets": 4,
-        "bytes": 72,
-        "digest": 7899958590711559467
-      }
-    },
-    {
-      "id": "hvcc-remux-hevc-eos-decoder",
-      "profile": "reference-written",
-      "file": "hvcc-remux-hevc-eos.hvcc",
       "sha256": "b9467aaeec131d696d4be15d08f30664e32e95ed03d31994e867c3cbd84cac1d",
       "rights": "authored-synthetic",
       "required": true,

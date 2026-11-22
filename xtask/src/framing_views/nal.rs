@@ -385,7 +385,7 @@ fn raw_fixture(paths: &Paths, id: &str, codec: Codec, corpora: &mut Corpora<'_>)
         return Err(format!("raw extents omit bytes: {id}"));
     }
     raw_controls(id, codec, &packets, corpora)?;
-    if codec == Codec::Hevc {
+    if codec == Codec::Hevc && id == "hevc-aud0" {
         corpora.hvcc(
             &format!("hvcc-remux-{id}"),
             "reference-written",

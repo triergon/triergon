@@ -9,7 +9,7 @@
   "reference": "ffmpeg-framing-views-native",
   "contract": [
     "Parse hvcC with HvcConfigParser. In all mode write every unit with HvcAnnexBWriter. In decoder mode HvcDecoderConfigWriter accepts records whose declared array types are VPS, SPS, PPS, prefix SEI or suffix SEI. A disallowed array refuses the record as a whole.",
-    "The pinned hevc_mp4toannexb initializer converts those same five array types and refuses other declared types. In decoder mode the public FFmpeg log gives the first disallowed declaration after a reference refusal. The candidate array index is printed in trace.",
+    "The pinned hevc_mp4toannexb initializer converts those same five array types and refuses other declared types. When initialization retains extradata byte for byte, it did not convert an hvcC record. In decoder mode the public FFmpeg log gives the first disallowed declaration after a reference refusal. The candidate array index is printed in trace.",
     "Compare Annex B output in record order. Each unit begins with a four-byte start code. Fold kind 1 with the type and length and bytes including the header, and kind 7 with the count and decoder refusal absence. Fold kind 8 for a parse or filter refusal, adding the type for the typed decoder refusal.",
     "Loading is outside the operation. Parser and filter setup, writing, folding and teardown are inside."
   ],
@@ -25,85 +25,54 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "A missing or Annex B configuration is outside the hvcC parser and FFmpeg initializes it as unconverted input",
-    "The strict hvcC parser refuses a three-byte sample length field and FFmpeg initializes the record",
-    "The all-array writer preserves every declared array while FFmpeg rejects unsupported array types, including empty declarations",
-    "The hvcC parser enforces the caller record, array or NAL count limit and FFmpeg initializes the record",
-    "The hvcC parser refuses a partial array header without a type and FFmpeg logs a disallowed type zero for it"
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "hvcc-hevc-no-extra-all",
-      "requirement": "A missing or Annex B configuration is outside the hvcC parser and FFmpeg initializes it as unconverted input"
+      "reading": "A three-byte sample length in a strict hvcC record",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord lengthSizeMinusOne, as documented by HvcConfigFields and HvcConfigParser",
+      "candidate": "refuses the record before writing parameter sets",
+      "reference": "initializes it and writes VPS, SPS and PPS",
+      "compat": "compat::nal::ReceiverHevcConfigParser",
+      "cases": [
+        "hvcc-hevc-width3-all",
+        "hvcc-hevc-width3-decoder"
+      ]
     },
     {
-      "id": "hvcc-hevc-no-extra-decoder",
-      "requirement": "A missing or Annex B configuration is outside the hvcC parser and FFmpeg initializes it as unconverted input"
+      "reading": "All-array writing retains unsupported declaration types and their bytes",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord array syntax, as documented by HvcAnnexBWriter; ITU-T H.265 Table 7-1",
+      "candidate": "writes the available units in record order, including AUD or opaque types, and emits nothing for an empty array",
+      "reference": "refuses the record as a whole on a disallowed array declaration, including empty declarations",
+      "compat": "HvcDecoderConfigWriter selects the existing decoder array policy",
+      "cases": [
+        "hvcc-hevc-config-unknown_empty-all",
+        "hvcc-aud-array-all",
+        "hvcc-unknown-array-all",
+        "hvcc-unknown-empty-all",
+        "hvcc-opaque-arrays-all"
+      ]
     },
     {
-      "id": "hvcc-hevc-annexb-extra-all",
-      "requirement": "A missing or Annex B configuration is outside the hvcC parser and FFmpeg initializes it as unconverted input"
+      "reading": "Caller bounds on the hvcC record, array and NAL counts",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord field widths, as documented by HvcConfigLimits and HvcConfigParser",
+      "candidate": "refuses limits of 131072 record bytes, 64 arrays or 256 NALs when exceeded",
+      "reference": "emits the full output at the next size or count",
+      "cases": [
+        "hvcc-array-limit-plus-one-all",
+        "hvcc-array-limit-plus-one-decoder",
+        "hvcc-nal-count-limit-plus-one-all",
+        "hvcc-nal-count-limit-plus-one-decoder",
+        "hvcc-record-size-limit-plus-one-all",
+        "hvcc-record-size-limit-plus-one-decoder"
+      ]
     },
     {
-      "id": "hvcc-hevc-annexb-extra-decoder",
-      "requirement": "A missing or Annex B configuration is outside the hvcC parser and FFmpeg initializes it as unconverted input"
-    },
-    {
-      "id": "hvcc-hevc-width3-all",
-      "requirement": "The strict hvcC parser refuses a three-byte sample length field and FFmpeg initializes the record"
-    },
-    {
-      "id": "hvcc-hevc-width3-decoder",
-      "requirement": "The strict hvcC parser refuses a three-byte sample length field and FFmpeg initializes the record"
-    },
-    {
-      "id": "hvcc-hevc-config-unknown_empty-all",
-      "requirement": "The all-array writer preserves every declared array while FFmpeg rejects unsupported array types, including empty declarations"
-    },
-    {
-      "id": "hvcc-aud-array-all",
-      "requirement": "The all-array writer preserves every declared array while FFmpeg rejects unsupported array types, including empty declarations"
-    },
-    {
-      "id": "hvcc-unknown-array-all",
-      "requirement": "The all-array writer preserves every declared array while FFmpeg rejects unsupported array types, including empty declarations"
-    },
-    {
-      "id": "hvcc-unknown-empty-all",
-      "requirement": "The all-array writer preserves every declared array while FFmpeg rejects unsupported array types, including empty declarations"
-    },
-    {
-      "id": "hvcc-array-limit-plus-one-all",
-      "requirement": "The hvcC parser enforces the caller record, array or NAL count limit and FFmpeg initializes the record"
-    },
-    {
-      "id": "hvcc-array-limit-plus-one-decoder",
-      "requirement": "The hvcC parser enforces the caller record, array or NAL count limit and FFmpeg initializes the record"
-    },
-    {
-      "id": "hvcc-nal-count-limit-plus-one-all",
-      "requirement": "The hvcC parser enforces the caller record, array or NAL count limit and FFmpeg initializes the record"
-    },
-    {
-      "id": "hvcc-nal-count-limit-plus-one-decoder",
-      "requirement": "The hvcC parser enforces the caller record, array or NAL count limit and FFmpeg initializes the record"
-    },
-    {
-      "id": "hvcc-record-size-limit-plus-one-all",
-      "requirement": "The hvcC parser enforces the caller record, array or NAL count limit and FFmpeg initializes the record"
-    },
-    {
-      "id": "hvcc-record-size-limit-plus-one-decoder",
-      "requirement": "The hvcC parser enforces the caller record, array or NAL count limit and FFmpeg initializes the record"
-    },
-    {
-      "id": "hvcc-truncated-array-header-decoder",
-      "requirement": "The hvcC parser refuses a partial array header without a type and FFmpeg logs a disallowed type zero for it"
-    },
-    {
-      "id": "hvcc-opaque-arrays-all",
-      "requirement": "The all-array writer preserves every declared array while FFmpeg rejects unsupported array types, including empty declarations"
+      "reading": "A record ending inside an array header",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord array syntax, as documented by HvcConfigParser: NAL_unit_type is followed by a 16-bit numNalus",
+      "candidate": "refuses truncation without a disallowed-array diagnostic",
+      "reference": "refuses but logs a disallowed type of 0 from the truncated declaration",
+      "cases": [
+        "hvcc-truncated-array-header-decoder"
+      ]
     }
   ],
   "open_unmeasured": [
@@ -114,7 +83,7 @@
         "hvcc-hevc-annexb-extra-decoder", "hvcc-hevc-width1-all", "hvcc-hevc-width1-decoder", "hvcc-hevc-width2-all", "hvcc-hevc-width2-decoder",
         "hvcc-hevc-width3-all", "hvcc-hevc-width3-decoder", "hvcc-hevc-config-empty-all", "hvcc-hevc-config-empty-decoder", "hvcc-hevc-config-sei-all",
         "hvcc-hevc-config-sei-decoder", "hvcc-hevc-config-duplicate-all", "hvcc-hevc-config-duplicate-decoder", "hvcc-hevc-config-unknown_empty-all", "hvcc-remux-hevc-aud0-all",
-        "hvcc-remux-hevc-aud0-decoder", "hvcc-remux-hevc-aud1-all", "hvcc-remux-hevc-aud1-decoder", "hvcc-remux-hevc-eos-all", "hvcc-remux-hevc-eos-decoder",
+        "hvcc-remux-hevc-aud0-decoder",
         "hvcc-out-of-order-all", "hvcc-out-of-order-decoder", "hvcc-aud-array-all", "hvcc-unknown-array-all", "hvcc-unknown-empty-all",
         "hvcc-empty-array-all", "hvcc-empty-array-decoder", "hvcc-zero-arrays-all", "hvcc-zero-arrays-decoder", "hvcc-duplicate-array-all",
         "hvcc-duplicate-array-decoder", "hvcc-declaration-mismatch-all", "hvcc-declaration-mismatch-decoder", "hvcc-complete-all", "hvcc-complete-decoder",
@@ -141,7 +110,7 @@
         "hvcc-hevc-annexb-extra-decoder", "hvcc-hevc-width1-all", "hvcc-hevc-width1-decoder", "hvcc-hevc-width2-all", "hvcc-hevc-width2-decoder",
         "hvcc-hevc-width3-all", "hvcc-hevc-width3-decoder", "hvcc-hevc-config-empty-all", "hvcc-hevc-config-empty-decoder", "hvcc-hevc-config-sei-all",
         "hvcc-hevc-config-sei-decoder", "hvcc-hevc-config-duplicate-all", "hvcc-hevc-config-duplicate-decoder", "hvcc-hevc-config-unknown_empty-all", "hvcc-remux-hevc-aud0-all",
-        "hvcc-remux-hevc-aud0-decoder", "hvcc-remux-hevc-aud1-all", "hvcc-remux-hevc-aud1-decoder", "hvcc-remux-hevc-eos-all", "hvcc-remux-hevc-eos-decoder",
+        "hvcc-remux-hevc-aud0-decoder",
         "hvcc-out-of-order-all", "hvcc-out-of-order-decoder", "hvcc-aud-array-all", "hvcc-unknown-array-all", "hvcc-unknown-empty-all",
         "hvcc-empty-array-all", "hvcc-empty-array-decoder", "hvcc-zero-arrays-all", "hvcc-zero-arrays-decoder", "hvcc-duplicate-array-all",
         "hvcc-duplicate-array-decoder", "hvcc-declaration-mismatch-all", "hvcc-declaration-mismatch-decoder", "hvcc-complete-all", "hvcc-complete-decoder",
@@ -168,7 +137,7 @@
         "hvcc-hevc-annexb-extra-decoder", "hvcc-hevc-width1-all", "hvcc-hevc-width1-decoder", "hvcc-hevc-width2-all", "hvcc-hevc-width2-decoder",
         "hvcc-hevc-width3-all", "hvcc-hevc-width3-decoder", "hvcc-hevc-config-empty-all", "hvcc-hevc-config-empty-decoder", "hvcc-hevc-config-sei-all",
         "hvcc-hevc-config-sei-decoder", "hvcc-hevc-config-duplicate-all", "hvcc-hevc-config-duplicate-decoder", "hvcc-hevc-config-unknown_empty-all", "hvcc-remux-hevc-aud0-all",
-        "hvcc-remux-hevc-aud0-decoder", "hvcc-remux-hevc-aud1-all", "hvcc-remux-hevc-aud1-decoder", "hvcc-remux-hevc-eos-all", "hvcc-remux-hevc-eos-decoder",
+        "hvcc-remux-hevc-aud0-decoder",
         "hvcc-out-of-order-all", "hvcc-out-of-order-decoder", "hvcc-aud-array-all", "hvcc-unknown-array-all", "hvcc-unknown-empty-all",
         "hvcc-empty-array-all", "hvcc-empty-array-decoder", "hvcc-zero-arrays-all", "hvcc-zero-arrays-decoder", "hvcc-duplicate-array-all",
         "hvcc-duplicate-array-decoder", "hvcc-declaration-mismatch-all", "hvcc-declaration-mismatch-decoder", "hvcc-complete-all", "hvcc-complete-decoder",

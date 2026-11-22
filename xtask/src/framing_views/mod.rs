@@ -126,13 +126,24 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
 }
 
 pub(super) fn command(root: &Path, args: &[String], family: &str) -> Result<(), String> {
-    let usage =
-        || format!("usage: cargo xtask {family} fixtures [FEATURE] | manifest --record [FEATURE]");
-    let (record, id) = match args {
-        [cmd, flag, rest @ ..] if cmd == "manifest" && flag == "--record" && rest.len() <= 1 => {
-            (true, rest.first())
+    let usage = || {
+        format!(
+            "usage: cargo xtask {family} fixtures [FEATURE] | manifest --record [FEATURE [--cases ID...]]"
+        )
+    };
+    let (record, id, selected) = match args {
+        [cmd, flag, id, select, cases @ ..]
+            if cmd == "manifest"
+                && flag == "--record"
+                && select == "--cases"
+                && !cases.is_empty() =>
+        {
+            (true, Some(id), cases)
         }
-        [cmd, rest @ ..] if cmd == "fixtures" && rest.len() <= 1 => (false, rest.first()),
+        [cmd, flag, rest @ ..] if cmd == "manifest" && flag == "--record" && rest.len() <= 1 => {
+            (true, rest.first(), &[][..])
+        }
+        [cmd, rest @ ..] if cmd == "fixtures" && rest.len() <= 1 => (false, rest.first(), &[][..]),
         _ => return Err(usage()),
     };
     let candidate = format!("{family}-worker");
@@ -160,12 +171,15 @@ pub(super) fn command(root: &Path, args: &[String], family: &str) -> Result<(), 
         let (mut listing, _) = manifest::read(root, &corpus_path)?;
         if record {
             if contract.get("oracle").is_some() {
+                if !selected.is_empty() {
+                    return Err("selected recording needs a reference worker".into());
+                }
                 oracle_compare::record(root, &contract, &mut listing)?;
                 if contract.get("id").and_then(Value::as_str) == Some("dts-unpacking") {
                     dts::decode_pins(root, &mut listing, true)?;
                 }
             } else {
-                reference_pins(root, &path, &corpus_path, &contract, &mut listing)?;
+                reference_pins(root, &path, &corpus_path, &contract, &mut listing, selected)?;
             }
             report::save_checkpoint(&corpus_path, &listing)?;
             println!("recorded {}", corpus_path.display());
@@ -205,6 +219,7 @@ fn reference_pins(
     manifest_path: &Path,
     contract: &Value,
     listing: &mut Value,
+    selected: &[String],
 ) -> Result<(), String> {
     if crate::generators::pinned_per_target(contract) {
         return Err("per-target folds need a feature-specific recorder".into());
@@ -220,7 +235,17 @@ fn reference_pins(
         .ok_or("no operation")?;
     let timeout = worker::contract_parity_timeout(contract)?;
     let mut cases = Vec::new();
+    let mut pending: std::collections::BTreeSet<_> = selected.iter().map(String::as_str).collect();
     for mut case in feature.cases.clone() {
+        if !selected.is_empty()
+            && !case
+                .get("id")
+                .and_then(Value::as_str)
+                .is_some_and(|id| pending.remove(id))
+        {
+            cases.push(case);
+            continue;
+        }
         let input = feature.verified_input(&case)?;
         let mut command = vec![
             reference.as_os_str().to_owned(),
@@ -254,6 +279,9 @@ fn reference_pins(
         let summary = crate::harness::comparison::work_summary(&observed, &feature.work_fields)?;
         crate::harness::validation::put(&mut case, "expected", summary)?;
         cases.push(case);
+    }
+    if !pending.is_empty() {
+        return Err(format!("unknown selected case IDs: {pending:?}"));
     }
     crate::harness::validation::put(listing, "cases", Value::Array(cases))
 }
