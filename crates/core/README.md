@@ -214,7 +214,9 @@ semantic contract is described in
 
 The [rescale comparison](../../harness/features/time-rescale/contract.json) checks
 `TimeBase::rescale` and `TickScale::rescale` in all five modes over the common `AVRational`
-domain. The exact-time oracle also covers wider rational bases and ties-to-even conversion.
+domain. Both methods preserve the exact minimum signed tick. The reference uses
+that value as its overflow sentinel and changes it on identity conversion.
+The exact-time oracle also covers wider rational bases and ties-to-even conversion.
 
 The arithmetic follows exact rational semantics; there is no external
 specification. Verification:

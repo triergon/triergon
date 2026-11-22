@@ -998,42 +998,32 @@
       "cause": "Awaiting runtime, peak heap and total RSS collection on isolated AArch64 and ARMv7 gate hosts."
     }
   ],
-  "pending_module_requirements": [
-    "Preserve the representable output INT64_MIN, which coincides with the reference API's overflow sentinel",
-    "Preserve INT64_MIN on an identity conversion, which the reference API clamps to INT64_MIN + 1"
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "clock-07-02-direct",
-      "requirement": "Preserve the representable output INT64_MIN, which coincides with the reference API's overflow sentinel"
+      "reading": "A scaled result can equal the minimum signed tick",
+      "clause": "The TimeBase::rescale and TickScale::rescale contracts in crates/core/README.md return every representable rounded integer. Multiplying -4611686018427387904 by two gives exactly -9223372036854775808 in all five modes.",
+      "candidate": "returns -9223372036854775808 as a successful result",
+      "reference": "returns the same bits as its overflow sentinel, which the reference projection reports as overflow",
+      "compat": "compat::time::sentinel_rescale",
+      "cases": [
+        "clock-07-02-direct",
+        "clock-07-02-prepared",
+        "clock-08-03-direct",
+        "clock-08-03-prepared",
+        "double-direct",
+        "double-prepared"
+      ]
     },
     {
-      "id": "clock-07-02-prepared",
-      "requirement": "Preserve the representable output INT64_MIN, which coincides with the reference API's overflow sentinel"
-    },
-    {
-      "id": "clock-08-03-direct",
-      "requirement": "Preserve the representable output INT64_MIN, which coincides with the reference API's overflow sentinel"
-    },
-    {
-      "id": "clock-08-03-prepared",
-      "requirement": "Preserve the representable output INT64_MIN, which coincides with the reference API's overflow sentinel"
-    },
-    {
-      "id": "double-direct",
-      "requirement": "Preserve the representable output INT64_MIN, which coincides with the reference API's overflow sentinel"
-    },
-    {
-      "id": "double-prepared",
-      "requirement": "Preserve the representable output INT64_MIN, which coincides with the reference API's overflow sentinel"
-    },
-    {
-      "id": "minimum-identity-direct",
-      "requirement": "Preserve INT64_MIN on an identity conversion, which the reference API clamps to INT64_MIN + 1"
-    },
-    {
-      "id": "minimum-identity-prepared",
-      "requirement": "Preserve INT64_MIN on an identity conversion, which the reference API clamps to INT64_MIN + 1"
+      "reading": "The minimum signed tick is invariant under an identity conversion",
+      "clause": "The TimeBase::rescale and TickScale::rescale contracts in crates/core/README.md preserve every representable rounded tick. The identity has no fractional remainder in any rounding mode.",
+      "candidate": "returns -9223372036854775808 unchanged",
+      "reference": "returns -9223372036854775807",
+      "compat": "compat::time::sentinel_rescale",
+      "cases": [
+        "minimum-identity-direct",
+        "minimum-identity-prepared"
+      ]
     }
   ]
 }
