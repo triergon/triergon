@@ -75,8 +75,6 @@ implementations come with the crate:
   size as libass does: a glyph whose first lookup is through a code point that
   `rotates` (U+02F1 and above) advances by its default-load vertical advance,
   and a glyph first asked for an advance or extents stays horizontal.
-  The [rotation gate](../../harness/features/libass-rotations/contract.json) compares
-  the advances visible to the caller after character, advance and extents lookups.
 
 `Scale` reproduces HarfBuzz's scaling arithmetic, including hinting device tables
 when a ppem is set.
@@ -112,7 +110,7 @@ tables or libass's FriBidi hold them; two bidi properties take FriBidi's values
 where they differ from the UCD's (the defaults of unassigned code points in
 right-to-left blocks, and the joining type of format characters).
 
-## What it covers
+## Supported
 
 **Pipeline.** The glyph ids, clusters and positions `hb_shape` gives for a
 horizontal run with default buffer flags (not the glyph flags it also sets, such
@@ -203,12 +201,14 @@ Bidi resolution and line reordering run under `bidi::Limits`: each paragraph a
 (default 65536); running out is `Error::Policy`. Paragraphs are limited to 2³²
 characters.
 
-## Verification
+## Conformance
 
-`cargo test -p triergon-shape` runs unit tests and a mutation test. The
-comparison with HarfBuzz 14.6.0 and FriBidi 1.0.17 runs through
+The comparison with HarfBuzz 14.6.0 and FriBidi 1.0.17 runs through
 [`shape-worker`](../shape-worker/README.md) and the `harness/features/shape-*`
-features; [docs/status.md](../../docs/status.md) has the results.
+features (`cargo xtask shape compare`), and the
+[rotation comparison](../../harness/features/libass-rotations/contract.json) compares
+the advances `SizedMetrics::rotating` gives after character, advance and extents
+lookups with libass's. Results are in [docs/status.md](../../docs/status.md).
 
 ## Licence
 

@@ -87,7 +87,7 @@ glyph and its `BorderStroke`, and a composite by `Effects::key` and its glyphs'
 bitmaps and places in the run, whose origin `Composite::origin_of` gives before
 the composite exists, as libass keys them.
 
-## What it matches
+## Supported
 
 | Stage | What libass does | Here |
 |---|---|---|
@@ -138,9 +138,6 @@ default `MAX_BITMAP_BYTES`, libass's own bound just under 2³¹ bytes, so only t
 budget limits what libass draws). Running out of work or exceeding a limit is
 `Error::Policy`. A bitmap beyond libass's bound is not drawn, and a blur whose
 intermediate planes would pass it leaves the bitmap unblurred, as in libass.
-The [raster sweep](../../harness/features/raster-sweep/contract.json) records
-composite allocation failures as `Error::Allocation` where the ARMv7
-reference omits the composite.
 
 Outline coordinates stay within ±(2²⁸ − 1); conversions and transforms that leave
 the range are `Error::Invalid`, and the glyph pipeline drops such outlines as
@@ -158,12 +155,14 @@ including arithmetic overflow in debug builds.
   how their images are allocated (the renderer).
 - The large-tile build of libass (`--enable-large-tiles`) and its SIMD engines.
 
-## Verification
+## Conformance
 
-`cargo test -p triergon-raster` runs unit tests and a mutation test. The
-comparison with libass 0.17.5's C engine runs through
+The comparison with libass 0.17.5's C engine runs through
 [raster-worker](../raster-worker/README.md) and the `harness/features/raster-*`
-features; [docs/status.md](../../docs/status.md) has the results.
+features (`cargo xtask raster compare`). The on-demand
+[raster sweep](../../harness/features/raster-sweep/contract.json) records a composite
+whose allocation fails as `Error::Allocation` where the 32-bit ARMv7 reference omits it.
+Results are in [docs/status.md](../../docs/status.md).
 
 ## Licence
 

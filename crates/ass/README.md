@@ -237,8 +237,6 @@ convention asks:
   coordinate therefore discards the drawing. A coordinate landing exactly on
   `INT_MIN`, which libass built with GCC accepts through `abs(INT_MIN)`
   overflow, is rejected.
-  The [target-specific parsing comparison](../../harness/features/ass-parse-host/contract.json)
-  checks the fixed drawing-coordinate bounds.
 - Collision handling sorts the placed boxes as libass does on glibc (`qsort`,
   a stable merge sort), including the order its overflowing comparison of the
   tops gives for tops 2³¹ or more apart; another C library may order such
@@ -247,8 +245,6 @@ convention asks:
   its box, as in libass built with GCC; event box values outside the signed
   32-bit range saturate, as on 32-bit ARM, where libass for AArch64 keeps their
   low 32 bits.
-  The [target-specific rendering comparison](../../harness/features/ass-render-host/contract.json)
-  checks extreme event boxes and collision placement at both frame sizes.
 
 ## Behaviour and limits
 
@@ -271,10 +267,11 @@ wants libass's unbounded behaviour raises the setting. Shaping and bidi also run
 under the limits of their crates. Malformed input is read as libass reads it,
 skipping what it skips, and never panics.
 
-## Cargo features
+## Features
 
-- `work-probe`: a development aid that adds `Renderer::work_spent`, the work the
-  last frame spent. Not needed in production.
+| Feature | Default | Effect |
+|---|---|---|
+| `work-probe` | off | `Renderer::work_spent`, the work the last frame spent |
 
 ## Not supported
 
@@ -284,12 +281,14 @@ nothing), track features (`ass_track_set_feature`), `ass_step_sub`,
 `ass_configure_prune` (a player calls `prune_events`), system font providers,
 reading files and charset conversion.
 
-## Verification
+## Conformance
 
-`cargo test -p triergon-ass` runs unit tests, a mutation test and rendering tests
-with a font built in memory. The comparison with libass 0.17.5 runs through
-[`ass-worker`](../ass-worker/README.md) and the `harness/features/ass-*`
-features; [docs/status.md](../../docs/status.md) has the results.
+The comparison with libass 0.17.5 runs through [`ass-worker`](../ass-worker/README.md)
+and the `harness/features/ass-*` features (`cargo xtask ass compare`). The
+target-specific [parsing](../../harness/features/ass-parse-host/contract.json) and
+[rendering](../../harness/features/ass-render-host/contract.json) comparisons check the
+drawing-coordinate bounds, extreme event boxes and collision placement against libass
+built for 32-bit ARM. Results are in [docs/status.md](../../docs/status.md).
 
 ## Licence
 
