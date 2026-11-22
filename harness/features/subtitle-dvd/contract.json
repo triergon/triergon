@@ -25,8 +25,7 @@
       "clause": "DVD-Video Part 3, VTSI_MAT VTS_PGCITI sector pointer and DVD sector size, as documented in harness/subtitles/dvd_streams.py and crates/subtitles/src/dvd/receiver.rs",
       "candidate": "The unsigned offset is 2^32 bytes in a two-sector file. Uses the fallback palette with first rectangle entries 00000000 ff000000 ff7f7f7f fffefefe.",
       "reference": "Publishes the same rectangle geometry with palette entries 00008800 ff008800 ff008800 ff008800, consistent with addressing a different in-file table.",
-      "cases": ["vobsub-ifo-palette-sector-overflow"],
-      "targets": ["aarch64-unknown-linux-gnu"]
+      "cases": ["vobsub-ifo-palette-sector-overflow"]
     }
   ],
   "open_unmeasured": [
