@@ -125,31 +125,51 @@ fn inval(what: &'static str) -> DecodeError {
     DecodeError::Invalid(what)
 }
 
-/// Parse only the fields needed to find the PPS (first_mb_in_slice, slice_type, pps_id).
-pub(crate) fn peek_pps_id(r: &mut BitReader<'_>) -> R<(u32, u32, u32)> {
-    let first_mb = r.ue();
-    let st = r.ue();
-    let pps_id = r.ue();
-    if pps_id > 255 || st > 9 {
-        return Err(inval("slice header"));
-    }
-    Ok((first_mb, st, pps_id))
+/// The slice header fields before the parameter sets are known.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Prefix {
+    pub(crate) first_mb: u32,
+    pub(crate) slice_type: SliceType,
+    pub(crate) pps_id: u32,
 }
 
+impl Prefix {
+    /// first_mb_in_slice, slice_type and pic_parameter_set_id.
+    pub(crate) fn read(r: &mut BitReader<'_>) -> R<Prefix> {
+        let first_mb = r.ue();
+        let st = r.ue();
+        let pps_id = r.ue();
+        if pps_id > 255 || st > 9 {
+            return Err(inval("slice header"));
+        }
+        let slice_type = match st % 5 {
+            0 => SliceType::P,
+            1 => SliceType::B,
+            2 => SliceType::I,
+            3 => SliceType::SP,
+            _ => SliceType::SI,
+        };
+        Ok(Prefix {
+            first_mb,
+            slice_type,
+            pps_id,
+        })
+    }
+}
+
+/// The rest of the slice header after `prefix`, which named `pps` (and through it `sps`).
 pub(crate) fn parse_slice_header(
     r: &mut BitReader<'_>,
+    prefix: Prefix,
     nal: NalHeader,
     sps: &Sps,
     pps: &Pps,
 ) -> R<SliceHeader> {
-    let (first_mb, st, _) = peek_pps_id(r)?;
-    let slice_type = match st % 5 {
-        0 => SliceType::P,
-        1 => SliceType::B,
-        2 => SliceType::I,
-        3 => SliceType::SP,
-        _ => SliceType::SI,
-    };
+    let Prefix {
+        first_mb,
+        slice_type,
+        ..
+    } = prefix;
     let idr = nal.nal_unit_type == 5;
     if sps.separate_colour_plane {
         r.read(2);

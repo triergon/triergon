@@ -577,8 +577,8 @@ impl Decoder {
     fn decode_slice_nal(&mut self, nal: &[u8], h: nal::NalHeader) -> Result<(), DecodeError> {
         let len = unescape(&nal[1..], &mut self.rbsp)?;
         let mut r = BitReader::with_end(&self.rbsp, len * 8);
-        let (_, _, pps_id) = slice::peek_pps_id(&mut r.clone())?;
-        let pps = self.ppss[pps_id as usize]
+        let prefix = slice::Prefix::read(&mut r)?;
+        let pps = self.ppss[prefix.pps_id as usize]
             .as_deref()
             .ok_or(DecodeError::Invalid("missing PPS"))?
             .clone();
@@ -587,7 +587,7 @@ impl Decoder {
             .ok_or(DecodeError::Invalid("missing SPS"))?
             .clone();
         Self::check_supported(&sps, &pps)?;
-        let sh = slice::parse_slice_header(&mut r, h, &sps, &pps)?;
+        let sh = slice::parse_slice_header(&mut r, prefix, h, &sps, &pps)?;
         if matches!(sh.slice_type, SliceType::SP | SliceType::SI) {
             return Err(DecodeError::Unsupported("SP/SI slices (Extended profile)"));
         }

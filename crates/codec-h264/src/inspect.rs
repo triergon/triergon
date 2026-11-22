@@ -3,7 +3,7 @@
 
 use crate::nal::{parse_header, unescape};
 use crate::ps::{Pps, Sps, parse_pps, parse_sps};
-use crate::slice::{SliceType, parse_slice_header, peek_pps_id};
+use crate::slice::{Prefix, SliceType, parse_slice_header};
 use std::collections::BTreeSet;
 use triergon_bitstream::BitReader;
 use triergon_codec::{Budget, BudgetVec};
@@ -137,18 +137,17 @@ pub fn inspect(data: &[u8]) -> StreamFeatures {
                 Err(e) => f.errors.push(format!("pps: {e:?}")),
             },
             1 | 5 => {
-                let mut r2 = r;
-                let Ok((first_mb, _, pps_id)) = peek_pps_id(&mut r2) else {
+                let Ok(prefix) = Prefix::read(&mut r) else {
                     continue;
                 };
-                let Some(pps) = ppss[pps_id as usize].as_deref() else {
+                let Some(pps) = ppss[prefix.pps_id as usize].as_deref() else {
                     f.errors.push("slice references missing pps".into());
                     continue;
                 };
                 let Some(sps) = spss[pps.sps_id as usize].as_deref() else {
                     continue;
                 };
-                if first_mb == 0 {
+                if prefix.first_mb == 0 {
                     slices_in_pic = 0;
                 }
                 slices_in_pic += 1;
@@ -156,7 +155,7 @@ pub fn inspect(data: &[u8]) -> StreamFeatures {
                 if slices_in_pic > 1 {
                     f.multi_slice = true;
                 }
-                match parse_slice_header(&mut r, h, sps, pps) {
+                match parse_slice_header(&mut r, prefix, h, sps, pps) {
                     Ok(sh) => {
                         f.slice_types.insert(match sh.slice_type {
                             SliceType::I => "I",
