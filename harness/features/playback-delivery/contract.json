@@ -1250,9 +1250,6 @@
         "pump-seek-avc-seek-1420-eof",
         "pump-seek-avc-seek-2700-fresh",
         "pump-seek-avc-seek-2700-eof"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -1292,9 +1289,6 @@
         "pump-seek-hevc-seek-no-default-1420-eof",
         "pump-seek-hevc-seek-no-default-2700-fresh",
         "pump-seek-hevc-seek-no-default-2700-eof"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -1367,9 +1361,6 @@
         "pump-seek-hevc-seek-no-cues-1420-eof",
         "pump-seek-hevc-seek-no-cues-2700-fresh",
         "pump-seek-hevc-seek-no-cues-2700-eof"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
