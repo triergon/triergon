@@ -72,20 +72,7 @@
         "needs": "ARMv7 parity for the capture configuration cases, which compare configured GOP, rates, VBV and multiplex settings, including a matching refusal for a one-bit buffer on AArch64"
       }
     ],
-    "triergon-codec": [
-      {
-        "name": "channel-layouts",
-        "entry_points": ["ChannelLayout", "Speaker", "ChannelLayout::name", "ChannelLayout::mask", "layout::native_order", "layout::vorbis_order"],
-        "degree": "step",
-        "needs": "each decoder output folded with its layout name and mask against the reference's channel layout; compared only through the channel order of the graded output"
-      },
-      {
-        "name": "downmix-levels",
-        "entry_points": ["DownmixLevels", "SurroundEncoding"],
-        "degree": "step",
-        "needs": "each frame's downmix levels folded against the reference's downmix side data; compared only through the stereo mix"
-      }
-    ],
+    "triergon-codec": [],
     "triergon-codec-aac": [
       {
         "name": "inspection-aids",
@@ -111,7 +98,7 @@
         "name": "frame-info",
         "entry_points": ["FrameFeatures"],
         "degree": "no-reference",
-        "needs": "The reference does not publish audio block tool flags. The ac3-features oracle compares main-body flags in the zero-width mantissa profile. General mantissa allocation and Annex E need a specification oracle."
+        "needs": "The reference does not publish audio block tool flags. The ac3-features oracle compares complete version-8 AC-3 syncframes. Annex E syntax, other bitstream versions and truncated audio blocks need separate oracle coverage."
       },
       {
         "name": "bit-position-trace",
@@ -135,38 +122,13 @@
         "needs": "The flac-crc-reject lane compares Reject with FFmpeg crccheck. Frame counts differ where the reference logs a damaged frame and still emits PCM."
       }
     ],
-    "triergon-codec-h264": [
-      {
-        "name": "picture-properties",
-        "entry_points": ["Picture::colour", "Picture::sar", "Picture::interlaced", "ColourDescription"],
-        "degree": "unit-tests",
-        "needs": "each picture's sample aspect ratio, colour description and field flag folded against the reference's frames; the h264 lane compares planes, size and pixel format"
-      },
-      {
-        "name": "nal-input",
-        "entry_points": ["Decoder::send_nal", "Decoder::send_nals"],
-        "degree": "step",
-        "needs": "a worker operation feeding NAL units one at a time, folded against the same reference pictures; compared only through Decoder::send of whole access units"
-      },
-      {
-        "name": "stream-inspection",
-        "entry_points": ["inspect::inspect", "inspect::StreamFeatures"],
-        "degree": "unit-tests",
-        "needs": "a reference view of the parameter-set and slice-header features each stream uses"
-      }
-    ],
+    "triergon-codec-h264": [],
     "triergon-codec-hevc": [
       {
         "name": "picture-properties",
-        "entry_points": ["Picture::colour", "Picture::sar", "ColourDescription"],
-        "degree": "unit-tests",
-        "needs": "each picture's sample aspect ratio and colour description folded against the reference's frames; the hevc lane compares planes, size and pixel format"
-      },
-      {
-        "name": "nal-input",
-        "entry_points": ["Decoder::send_nal"],
-        "degree": "step",
-        "needs": "a worker operation feeding NAL units one at a time, folded against the same reference pictures; compared only through Decoder::send of whole access units"
+        "entry_points": ["ColourDescription::colour_description_present"],
+        "degree": "no-reference",
+        "needs": "The frame reference exposes the three CICP values but no independent bit for presence of the description. The picture-properties contract compares the values, range, aspect ratio and visible planes."
       }
     ],
     "triergon-codec-mp3": [],
