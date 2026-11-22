@@ -88,9 +88,11 @@ impl Options {
                     .split_once('=')
                     .filter(|(id, path)| !id.is_empty() && !path.is_empty())
                     .ok_or_else(|| format!("{flag} needs ID=PATH"))?;
-                if map.insert(id.to_owned(), root.join(path)).is_some() {
-                    return Err(format!("{flag} given twice for {id}"));
+                let path = root.join(path);
+                if map.get(id).is_some_and(|existing| existing != &path) {
+                    return Err(format!("{flag} gives conflicting paths for {id}"));
                 }
+                map.insert(id.to_owned(), path);
                 Ok(())
             };
             match flag.as_str() {
@@ -879,6 +881,23 @@ mod tests {
         assert!(parse(&["--corpus", "hls-segments=x"]).is_err());
         assert!(parse(&["--feature", "a", "--corpus", "a"]).is_err());
         assert!(parse(&["--frobnicate"]).is_err());
+    }
+
+    #[test]
+    fn a_shard_can_share_a_corpus_path_between_items() {
+        let root = Path::new("/repo");
+        let mut all = args(&[
+            "--feature",
+            "seek",
+            "--corpus",
+            "seek=fixtures",
+            "--corpus",
+            "seek=fixtures",
+        ]);
+        let options = Options::parse(root, &all).unwrap();
+        assert_eq!(options.corpora.get("seek"), Some(&root.join("fixtures")));
+        *all.last_mut().unwrap() = "seek=elsewhere".to_owned();
+        assert!(Options::parse(root, &all).is_err());
     }
 
     #[test]
