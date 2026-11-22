@@ -14,7 +14,7 @@
       "expected": {
         "packets": 41,
         "bytes": 1175,
-        "digest": 15441297065170326380
+        "digest": 12062461381833796620
       }
     },
     {
@@ -36,7 +36,7 @@
       "expected": {
         "packets": 41,
         "bytes": 1178,
-        "digest": 16953301507326846517
+        "digest": 3495125388082383253
       }
     },
     {
@@ -58,7 +58,7 @@
       "expected": {
         "packets": 41,
         "bytes": 1183,
-        "digest": 813697500725442212
+        "digest": 10301389254023589700
       }
     },
     {
@@ -80,7 +80,7 @@
       "expected": {
         "packets": 41,
         "bytes": 1316,
-        "digest": 17936926239918193583
+        "digest": 10077844485694039823
       }
     },
     {
@@ -102,7 +102,7 @@
       "expected": {
         "packets": 41,
         "bytes": 1158,
-        "digest": 1046253818029692395
+        "digest": 14891618005621647691
       }
     },
     {
@@ -225,9 +225,9 @@
         "Service01"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 8
       }
     },
     {
@@ -247,9 +247,9 @@
         "Service01"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 8
       }
     },
     {
@@ -269,9 +269,9 @@
         "Service01"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 8
       }
     },
     {
@@ -291,9 +291,9 @@
         "Service01"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 8
       }
     },
     {
@@ -313,9 +313,9 @@
         "Service01"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 8
       }
     },
     {
@@ -335,9 +335,9 @@
         "Service01"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 8
       }
     },
     {
@@ -357,9 +357,9 @@
         "Service01"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 9
       }
     },
     {
@@ -379,9 +379,9 @@
         "Service01"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 9
       }
     },
     {
@@ -401,9 +401,9 @@
         "Caf\u00e9"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 9
       }
     },
     {
@@ -423,9 +423,9 @@
         "Service01"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 8
       }
     },
     {
@@ -445,9 +445,9 @@
         "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 9
       }
     }
   ]

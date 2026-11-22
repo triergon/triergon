@@ -5,7 +5,7 @@
   "gate": "required",
   "candidate": "transport-views-worker",
   "worker_operation": "ts-mux-",
-  "reference": "ffmpeg-transport-views-native",
+  "reference": "ffmpeg-transport-views-raw-native",
   "operation": "ts-mux-readback",
   "corpus_directory": ".research/mux-views",
   "required_profiles": [
@@ -20,13 +20,13 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "contract": [
-    "The candidate calls Muxer::new and write_picture for every authored picture, then polls TransportStream to logical EOF over the resulting TS188 bytes. The reference demuxes those same muxed bytes with the pinned FFmpeg formats profile's MPEG-TS demuxer and +noparse+nofillin.",
+    "The candidate calls Muxer::new and write_picture for every authored picture, then polls TransportStream to logical EOF over the resulting TS188 bytes. The reference demuxes those same muxed bytes with the pinned FFmpeg 9.0.2 decode profile's MPEG-TS demuxer and +noparse+nofillin.",
     "Each case supplies default or decimal TSID, ONID, program, PMT PID, video PID and stream type followed by provider and service names. Each input picture has big-endian signed 64-bit PTS and DTS in 90 kHz ticks, a one-byte key indicator, a big-endian 32-bit payload length and the coded picture bytes.",
-    "Packet rows (kind 1) fold PID, optional PTS and DTS, flags, first carrier offset and payload length and all payload bytes, in order. Candidate clocks are raw period-zero PES values. Candidate flags carry the TS random-access indicator as bit 0. The reference folds AVPacket.flags.",
+    "Packet rows (kind 1) fold PID, optional PTS and DTS, flags, first carrier offset and payload length and all payload bytes, in order. Candidate clocks are raw period-zero PES values. Bit 0 compares the transport random-access indicator. On the reference side, read this bit at the demuxed packet position after verifying the TS sync, PID and payload start. Other public packet flags still compare.",
     "After draining, catalogue rows (kind 5) fold the program number and PMT PID, each stream PID and tag, then the provider and service tags with presence, length and bytes. The candidate reads the names from the emitted SDT service descriptor. A clean EOF adds kind 7.",
-    "A refused MuxConfig emits one kind 8 row. No TS is produced and the reference supplies zero rows. The refusal cases cover zero program number, reserved or colliding PIDs, unsupported stream type, non-printable or non-ASCII names, and both name length and combined SDT capacity."
+    "A refused MuxConfig emits one kind 8 row. When the candidate supplies no TS, the reference runs its own muxer against the same configuration. Header refusal with zero output emits kind 8. Successful TS output emits kind 9. The refusal cases cover zero program number, reserved or colliding PIDs, unsupported stream type, non-printable or non-ASCII names, and both name length and combined SDT capacity."
   ],
-  "pin_note": "Pins are recorded by transport-views manifest --record from the formats demuxer reading the candidate writer's TS output.",
+  "pin_note": "Pins are recorded by transport-views manifest --record from the decode demuxer for read-back and its muxer for configuration admission.",
   "open_unmeasured": [
     {
       "bound": "runtime",
@@ -128,74 +128,42 @@
       "cause": "A refused configuration produces no TS to demux"
     }
   ],
-  "pending_module_requirements": [
-    "Review the transport random-access indicator against FFmpeg's packet key flag.",
-    "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "default",
-      "requirement": "Review the transport random-access indicator against FFmpeg's packet key flag."
+      "reading": "A writer configured for MPEG-1/2 video refuses AVC",
+      "clause": "H.222.0 \u00a72.4.4.10 Table 2-34 assigns stream type 0x1B to AVC. MuxConfig limits its writer to types 0x01 and 0x02.",
+      "candidate": "Refuses the AVC configuration before writing carriers.",
+      "reference": "Admits AVC and emits TS188 with stream type 0x1B.",
+      "cases": [
+        "refuse-stream-type"
+      ]
     },
     {
-      "id": "program-42",
-      "requirement": "Review the transport random-access indicator against FFmpeg's packet key flag."
+      "reading": "The provider name contains a tab",
+      "clause": "ETSI EN 300 468 \u00a76.2.33 and Annex A \u00a7A.1 define the service text layout and permitted control codes. MuxConfig admits printable ASCII.",
+      "candidate": "Refuses the provider name before writing carriers.",
+      "reference": "Accepts the tab in the provider field and emits TS188.",
+      "cases": [
+        "refuse-provider-control"
+      ]
     },
     {
-      "id": "program-65535",
-      "requirement": "Review the transport random-access indicator against FFmpeg's packet key flag."
+      "reading": "The service name requires a non-ASCII character",
+      "clause": "ETSI EN 300 468 \u00a76.2.33 and Annex A \u00a7A.2 provide alternative text encodings. MuxConfig admits printable ASCII.",
+      "candidate": "Refuses Caf\u00e9 before writing carriers.",
+      "reference": "Admits the non-ASCII service name and emits TS188.",
+      "cases": [
+        "refuse-service-non-ascii"
+      ]
     },
     {
-      "id": "sdt-full",
-      "requirement": "Review the transport random-access indicator against FFmpeg's packet key flag."
-    },
-    {
-      "id": "sdt-empty",
-      "requirement": "Review the transport random-access indicator against FFmpeg's packet key flag."
-    },
-    {
-      "id": "refuse-program-zero",
-      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
-    },
-    {
-      "id": "refuse-pmt-low",
-      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
-    },
-    {
-      "id": "refuse-pmt-null",
-      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
-    },
-    {
-      "id": "refuse-video-low",
-      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
-    },
-    {
-      "id": "refuse-video-null",
-      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
-    },
-    {
-      "id": "refuse-pid-collision",
-      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
-    },
-    {
-      "id": "refuse-stream-type",
-      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
-    },
-    {
-      "id": "refuse-provider-control",
-      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
-    },
-    {
-      "id": "refuse-service-non-ascii",
-      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
-    },
-    {
-      "id": "refuse-name-too-long",
-      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
-    },
-    {
-      "id": "refuse-sdt-overflow",
-      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+      "reading": "The names together exceed one SDT carrier",
+      "clause": "ETSI EN 300 468 \u00a7\u00a75.1.2 and 6.2.33 permit a section across carriers. MuxConfig limits the names to 158 combined bytes so the SDT fits one carrier.",
+      "candidate": "Refuses the 159-byte combined names before writing carriers.",
+      "reference": "Admits both names and emits TS188 using a second SDT carrier.",
+      "cases": [
+        "refuse-sdt-overflow"
+      ]
     }
   ]
 }

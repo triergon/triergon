@@ -1,5 +1,6 @@
 /* Read the current writer's output through the public MPEG-TS demuxer. */
 #include <fcntl.h>
+#include <limits.h>
 #include <spawn.h>
 #include <sys/wait.h>
 
@@ -100,12 +101,117 @@ static void transport_mux_catalogue(ViewWork *work, const AVFormatContext *forma
     }
 }
 
+/* No candidate stream exists for a rejected configuration. Ask the reference
+ * muxer to admit the same options and verify its output independently. */
+static int transport_mux_config(const ViewCase *input, ViewWork *work)
+{
+    if (input->argc != 8 || input->size < 21)
+        return 2;
+    static const char *const keys[] = {
+        "mpegts_transport_stream_id", "mpegts_original_network_id",
+        "mpegts_service_id", "mpegts_pmt_start_pid", "mpegts_start_pid",
+    };
+    const int avc = !strcmp(input->argv[5], "27");
+    if (!avc && strcmp(input->argv[5], "1") && strcmp(input->argv[5], "2"))
+        return 2;
+    AVFormatContext *format = NULL;
+    AVPacket *packet = NULL;
+    AVDictionary *options = NULL;
+    uint8_t *bytes = NULL;
+    int result = 2;
+    if (avformat_alloc_output_context2(&format, NULL, "mpegts", NULL) < 0 ||
+        avio_open_dyn_buf(&format->pb) < 0)
+        goto done;
+    for (size_t i = 0; i < sizeof(keys) / sizeof(*keys); ++i)
+        if (av_dict_set(&options, keys[i], input->argv[i], 0) < 0)
+            goto done;
+    if (av_dict_set(&format->metadata, "service_provider", input->argv[6], 0) < 0 ||
+        av_dict_set(&format->metadata, "service_name", input->argv[7], 0) < 0)
+        goto done;
+    AVStream *stream = avformat_new_stream(format, NULL);
+    if (!stream)
+        goto done;
+    stream->time_base = (AVRational){1, 90000};
+    stream->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
+    stream->codecpar->codec_id = avc ? AV_CODEC_ID_H264
+        : input->argv[5][0] == '1' ? AV_CODEC_ID_MPEG1VIDEO : AV_CODEC_ID_MPEG2VIDEO;
+    stream->codecpar->width = 16;
+    stream->codecpar->height = 16;
+    int status = avformat_write_header(format, &options);
+    if (status < 0) {
+        int extent = avio_close_dyn_buf(format->pb, &bytes);
+        format->pb = NULL;
+        const int name_overflow = strlen(input->argv[6]) > UINT8_MAX ||
+                                  strlen(input->argv[7]) > UINT8_MAX;
+        if (extent == 0 && (status == AVERROR(ERANGE) || status == AVERROR(EINVAL) ||
+                            (name_overflow && status == AVERROR(ENOMEM)))) {
+            transport_view_row(work, 8, NULL, 0, NULL, 0);
+            result = 0;
+        }
+        goto done;
+    }
+    if (av_dict_count(options))
+        goto done;
+    /* A short Annex B AUD and opaque IDR payload suffice for TS mux admission.
+     * The configuration operation does not decode the elementary stream. */
+    static const uint8_t avc_picture[] = {0, 0, 0, 1, 9, 0xf0, 0, 0, 1, 0x65, 0x88, 0x80};
+    size_t len = ((size_t)input->data[17] << 24) | ((size_t)input->data[18] << 16) |
+                 ((size_t)input->data[19] << 8) | input->data[20];
+    if (!len || len > input->size - 21 || len > INT_MAX)
+        goto done;
+    const uint8_t *picture = avc ? avc_picture : input->data + 21;
+    if (avc)
+        len = sizeof(avc_picture);
+    packet = av_packet_alloc();
+    if (!packet || av_new_packet(packet, (int)len) < 0)
+        goto done;
+    memcpy(packet->data, picture, len);
+    packet->pts = 3000;
+    packet->dts = 0;
+    packet->flags = AV_PKT_FLAG_KEY;
+    if (av_write_frame(format, packet) < 0 || av_write_trailer(format) < 0)
+        goto done;
+    int extent = avio_close_dyn_buf(format->pb, &bytes);
+    format->pb = NULL;
+    if (extent < 188 || extent % 188)
+        goto done;
+    for (int offset = 0; offset < extent; offset += 188)
+        if (bytes[offset] != 0x47)
+            goto done;
+    transport_view_row(work, 9, NULL, 0, NULL, 0);
+    result = 0;
+done:
+    av_packet_free(&packet);
+    av_dict_free(&options);
+    if (format && format->pb) {
+        avio_close_dyn_buf(format->pb, &bytes);
+        format->pb = NULL;
+    }
+    av_free(bytes);
+    avformat_free_context(format);
+    return result;
+}
+
+static int transport_mux_random_access(const TransportMuxOutput *output,
+                                       int64_t position, int pid)
+{
+    if (position < 0 || (uint64_t)position >= output->size ||
+        position % 188 || output->size - (size_t)position < 188)
+        return -1;
+    const uint8_t *ts = output->data + position;
+    if (ts[0] != 0x47 || !(ts[1] & 0x40) ||
+        ((ts[1] & 0x1f) * 256 + ts[2]) != pid || !(ts[3] & 0x10))
+        return -1;
+    if ((ts[3] & 0x20) && ts[4] > 182)
+        return -1;
+    return (ts[3] & 0x20) && ts[4] && (ts[5] & 0x40);
+}
+
 static int transport_mux_read(const ViewCase *input, ViewWork *work)
 {
     const TransportMuxOutput *output = input->prepared;
-    // A refused mux configuration supplies no TS and so no reference records.
     if (!output->size)
-        return 0;
+        return transport_mux_config(input, work);
     const ViewCase ts = {.data = output->data, .size = output->size};
     TransportViewInput source;
     int status = transport_view_open(&source, &ts, 4096, "mpegts");
@@ -115,11 +221,18 @@ static int transport_mux_read(const ViewCase *input, ViewWork *work)
     if (status >= 0) {
         while ((status = av_read_frame(source.format, packet)) >= 0) {
             const AVStream *stream = source.format->streams[packet->stream_index];
+            int random_access = transport_mux_random_access(output, packet->pos, stream->id);
+            if (random_access < 0) {
+                status = AVERROR_INVALIDDATA;
+                break;
+            }
+            unsigned flags = (unsigned)packet->flags & ~(unsigned)AV_PKT_FLAG_KEY;
+            flags |= (unsigned)random_access;
             const uint64_t words[] = {
                 (uint64_t)stream->id,
                 packet->pts != AV_NOPTS_VALUE, packet->pts == AV_NOPTS_VALUE ? 0 : (uint64_t)packet->pts,
                 packet->dts != AV_NOPTS_VALUE, packet->dts == AV_NOPTS_VALUE ? 0 : (uint64_t)packet->dts,
-                (uint64_t)packet->flags, (uint64_t)packet->pos, (uint64_t)packet->size,
+                flags, (uint64_t)packet->pos, (uint64_t)packet->size,
             };
             transport_view_row(work, 1, words, 8, packet->data, (size_t)packet->size);
             av_packet_unref(packet);
