@@ -33,6 +33,8 @@ pub const RENDER_SIZES: [(&str, [&str; 4]); 2] = [
     ("720p", ["1280", "720", "720", "576"]),
 ];
 
+const PLAY_EXAMPLE: &str = "decorations-orientation-example.ass";
+
 const SETTINGS_FIXTURES: [&str; 12] = [
     "animation.ass",
     "basic.ass",
@@ -304,7 +306,7 @@ fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
 fn render_rows(root: &Path, per_target: bool) -> R<Vec<Value>> {
     let mut rows = Vec::new();
     for (name, data) in fixtures(root, RENDER_FIXTURES)? {
-        if RENDER_PER_TARGET.contains(&name.as_str()) != per_target {
+        if name == PLAY_EXAMPLE || RENDER_PER_TARGET.contains(&name.as_str()) != per_target {
             continue;
         }
         for (suffix, size) in RENDER_SIZES {
@@ -367,6 +369,15 @@ fn settings_rows(root: &Path) -> R<Vec<Value>> {
             )?);
         }
     }
+    let path = root.join(RENDER_FIXTURES).join(PLAY_EXAMPLE);
+    let data = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    rows.push(render_row(
+        PLAY_EXAMPLE,
+        &data,
+        "360p",
+        ["640", "360", "640", "360"],
+        &[],
+    )?);
     Ok(rows)
 }
 
@@ -462,12 +473,19 @@ mod tests {
         let rendered = std::fs::read_dir(root.join(super::RENDER_FIXTURES))
             .unwrap()
             .count();
+        assert_eq!(
+            files("ass-render-settings")
+                .iter()
+                .filter(|path| *path == super::PLAY_EXAMPLE)
+                .count(),
+            1
+        );
         let sizes = super::RENDER_SIZES.len();
         let host = rows(root, "ass-render-host").unwrap();
         assert_eq!(host.len(), super::RENDER_PER_TARGET.len() * sizes);
         assert_eq!(
             rows(root, "ass-render").unwrap().len() + host.len(),
-            rendered * sizes
+            (rendered - 1) * sizes
         );
     }
 }

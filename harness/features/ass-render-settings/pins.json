@@ -3,6 +3,11 @@
   "reference": "libass-ass-native",
   "note": "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
   "pins": {
+    "decorations-orientation-example-ass-360p": {
+      "packets": 17,
+      "bytes": 57558,
+      "digest": 4498970249145222070
+    },
     "animation-ass-1080p-margins": {
       "packets": 378,
       "bytes": 9908001,

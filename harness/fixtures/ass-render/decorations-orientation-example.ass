@@ -1,0 +1,62 @@
+;@default-family Triergon Orientation
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 500 500 1000
+; Underlines and strike-outs over glyphs whose outlines run either way or
+; have no orientation, in an embedded face assembled with
+;   cargo xtask fonts assemble --embed orientation-contours.ttf
+;     harness/fonts/probes/orientation-contours.probe OUTPUT
+; (A clockwise, B reversed, C and D an outer contour and hole each way, E
+; areas that cancel, F a single point, G zero area, H, I and J figure eights,
+; K and L curves, M a reversed outer contour round a hole, N no points, O
+; zero advance): alone, between clockwise glyphs, emboldened, slanted, with
+; a border, and from the style.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Triergon Orientation,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,-1,-1,100,100,0,0,1,0,0,7,20,20,20,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,20)}A B C D E F G H
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,100)}I J K L M N O
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,180)}B{\u0\s0}A{\u1\s1}E{\u0}A{\u1}F{\s0}A{\s1}G
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,260)}AOB NNN MOM HAJ
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,340)\b1}ABEFGHKMNO
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,420)\i1}ABEFGHKMNO
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,500)\b1\i1}ABEFGHKMNO
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,580)\bord3\shad2}ABDEGMN
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(700,580)\fscx150\fsp8\frz10}BCEHL
+
+[Fonts]
+fontname: orientation-contours.ttf
+!!%!!!!+!)!!!Q!A4V-P-EXE6SI!!!#M!!!!9'.N98!#:A-[!!!"$!!!!*RH<(FGT&I]71!!!;A!!!)I
+;'6B:')U1H9!!!01!!!!.GBI:7%$)A,.!!!%#!!!!#2I<82Y)SA&X!!!"#Q!!!"!<'^D91!!%H1!!!2M
+!!!!2'VB?(!"9Q"+!!!%M!!!!#"O97VF%4)B0A!!".!!!!$;='^T>0_,!$Q!!!7M!!!!)!!%!!!"E!!&
+!!!!!!!!!!!!!!!!!!!!!!!!!$Q"'!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"55E>/!%!!!0``
+!S$`/!!!!S!!S!!!!!!!!!!!!!!!!!!!!!!!!!!!!!%!!Q!"!!!!$!!%!*!!!!!A!#!!"!!!!%%!1A"$
+!%1!21"'!%=!3!"*!%I!3Q"-!%U!4A"0``]!!!""!%)!1Q"%!%5!2A"(!%A!31"+!%M!4!".!%Y!4```
+`]$`Q0`!`]$`Q0`!`]$`Q0`!`]$`Q0`!`]$`Q0`!!!%!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!"!'1!!!(U!LQ!!Q!!!1%"!1"E!!!"E!!!!!!#P!!!`51!!1"E!!!"^!+]!!-!!!%"!1%!:!'1
+!!$_=!!!!!!#P!!!!!)!:!!!!@1#P!!$!!=!!!%"!1%"!1%"!'1!!!'1!!$_V!$)!!$`/!!!!LQ!!0V%
+!'1!!!(U!!!!!A"E!!!"^!+]!!-!"Q!!!1%"!1%"!1%!:!'1!!$_=!"E!!!!S!!!!!!!!!+]!!$^K!(U
+!!$_$!!#!'1!!!-A!:!!!Q!(!!!"!1%"!1%"!1"E!!!",!!!!'1",!!!`N1!!!'1!!$_=!!!!!!"E!!!
+!!%",!%M!3Q",!!!!!!"!3Q",!!!!1"E!!!"^!+]!!)!!!%"!1"E!:$`/!!!!LT_IA!!!1"E!!!"^!+]
+!!-!!!%"!1%!:!'1!!$_=!!!!LT^2!+]!!%!:!!!!@1#P!!$!!!"!1%"!'1!!!'1!!!!!!+]`51!S!!"
+!'1!!!(U!LQ!!Q!!!1%"!1"E!:!!!0ZQ!!!!S0]Y!LQ!!1"E`H!"^!+]!!1!!!%!!1!!!'1!!!'1!!$`
+/!!!!LQ!!0V%`H!!!!%!:!!!!@1#P!!$!!!!!!!!!'1!S!$)`TA",0\5!3Q"E!!#!!$`H!*9!S!!!Q!(
+!!!"!1%"!1%"!1!!!FA!!0WI!0I!!!"E!!$`H!!!!Y1!!0Y-!'1!!0_=!!%!:!!!!@1#P!!$!!!"!1%"
+!'1!!!'1!!!!!!+]!!$^2!!"!!!!!1!!.R*9[V]0005!!!0I!!!!!!!!!!!!!!!!!!!!!!!!`H!$)!-A
+!!!!#!!#!!%!!!!!!!%!!!-A`TA!!!/%!!!!!!!!!!%!!!!!!!!!!!!!!!!!!!!1!@1!!!*9!'1#7!"E
+!FA!:!*9!'1$B!"E!FA",!*9!'1#7!"E!FA!:!*9!'1#7!"E!FA!:!*9!!!"E!!!!!!!:!!!!!!!!!!!
+!!!!)A!!!%1!!!"]!!!!N!!!!/Q!!!%!!!!"(A!!!5!!!!&C!!!"B!!!!;Q!!!(/!!!#"A!!!A9!!!)I
+!!%!!!!1!!A!!A!!!!!!!A!1!%!!1!!!!1!!!!!!!!!!!!!%!$9!!Q!""!E!!1!I!!!!!Q!""!E!!A!/
+!#A!!Q!""!E!"!!Y!$9!!Q!""!E!"A!W!'Y!6!"S!'E!:1"S!'=!<Q"O!#!!4Q"S!'E!:1"O!(1!91"U
+!'E!<Q"O!&)!:1"H!(5!<!"B!()!6!"S!'E!:1"S!'=!<Q"O!#!!4Q"S!'E!:1"O!(1!91"U!'E!<Q"O
+!#!!5A"F!'=!>1"M!'%!=A"5!()!;1"F!()!:Q"P!'Y!4Q"S!'E!:1"O!(1!91"U!'E!<Q"O!#U!5A"F
+!'=!>1"M!'%!=A!!!!-!!!!!!!$`C!!]!!!!!!!!!!!!!!!!!!!!!!!!!!!

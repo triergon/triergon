@@ -11,6 +11,7 @@
   "compare_order": 6,
   "contract": [
     "render the authored ASS scripts and Matroska packet stream at their fixture times, with a 1920x1080 frame over 1280x720 storage and the font attachments, fallback, hinting, bitmap engine and cache configuration of ass-render",
+    "render the facade example orientation script at 500 and 1000 ms with a 640x360 frame and storage size",
     "after frame and storage size, apply the explicitly supplied settings in this order: margins in top,bottom,left,right order, use-margins, pixel-aspect, font-scale, line-spacing, line-position; omitted settings have the renderer's defaults",
     "fold each frame's time, change code and image count, followed by each image's kind, position, size, colour and alpha rows in render order, with the same background box kind as ass-render; packets count images and bytes count their alpha bytes",
     "parse the fixture envelope and renderer settings and read the attached font files before the operation; the timed span starts at the configured renderer and ends after the last frame fold, with memory covering setup, rendering and teardown as in ass-render",
@@ -34,6 +35,7 @@
     {
       "bound": "runtime",
       "cases": [
+        "decorations-orientation-example-ass-360p",
         "animation-ass-1080p-margins",
         "animation-ass-1080p-letterbox",
         "animation-ass-1080p-use-margins",
@@ -173,6 +175,7 @@
     {
       "bound": "heap",
       "cases": [
+        "decorations-orientation-example-ass-360p",
         "animation-ass-1080p-margins",
         "animation-ass-1080p-letterbox",
         "animation-ass-1080p-use-margins",
@@ -312,6 +315,7 @@
     {
       "bound": "total_rss",
       "cases": [
+        "decorations-orientation-example-ass-360p",
         "animation-ass-1080p-margins",
         "animation-ass-1080p-letterbox",
         "animation-ass-1080p-use-margins",
