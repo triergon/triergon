@@ -293,6 +293,13 @@
         "mpegts-access-units"
       ]
     },
+    {"area": "MPEG-TS fault and completion facts", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-fault-facts"},
+    {"area": "MPEG-TS recovery trace", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-recovery-trace"},
+    {"area": "MPEG-TS reader views", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-reader-views"},
+    {"area": "MPEG-TS continuity reader", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-reader-container"},
+    {"area": "MPEG-TS single-entity indexed seek", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-epoch-index-seek"},
+    {"area": "MPEG-TS bounded source clocks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-bounded-time"},
+    {"area": "MPEG-TS source clock oracle", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-bounded-time-oracle"},
     {
       "area": "MPEG-TS free-format audio",
       "targets": [
