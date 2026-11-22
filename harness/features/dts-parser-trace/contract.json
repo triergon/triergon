@@ -23,47 +23,6 @@
   "confidence": 0.95,
   "reference": "ffmpeg-framing-views-native",
   "runner": "cargo xtask report",
-  "pending_module_requirements": [
-    "The comparison-only parser model projects no clock or profile for a frame with EXT_AUDIO set or an extension substream after it, until crates/framing models the reference parser's clock and profile there"
-  ],
-  "open_cases": [
-    {
-      "id": "parser-extension-0",
-      "requirement": "The comparison-only parser model projects no clock or profile for a frame with EXT_AUDIO set or an extension substream after it, until crates/framing models the reference parser's clock and profile there"
-    },
-    {
-      "id": "parser-extension-1",
-      "requirement": "The comparison-only parser model projects no clock or profile for a frame with EXT_AUDIO set or an extension substream after it, until crates/framing models the reference parser's clock and profile there"
-    },
-    {
-      "id": "parser-extension-2",
-      "requirement": "The comparison-only parser model projects no clock or profile for a frame with EXT_AUDIO set or an extension substream after it, until crates/framing models the reference parser's clock and profile there"
-    },
-    {
-      "id": "parser-extension-3",
-      "requirement": "The comparison-only parser model projects no clock or profile for a frame with EXT_AUDIO set or an extension substream after it, until crates/framing models the reference parser's clock and profile there"
-    },
-    {
-      "id": "parser-extension-4",
-      "requirement": "The comparison-only parser model projects no clock or profile for a frame with EXT_AUDIO set or an extension substream after it, until crates/framing models the reference parser's clock and profile there"
-    },
-    {
-      "id": "parser-extension-5",
-      "requirement": "The comparison-only parser model projects no clock or profile for a frame with EXT_AUDIO set or an extension substream after it, until crates/framing models the reference parser's clock and profile there"
-    },
-    {
-      "id": "parser-extension-6",
-      "requirement": "The comparison-only parser model projects no clock or profile for a frame with EXT_AUDIO set or an extension substream after it, until crates/framing models the reference parser's clock and profile there"
-    },
-    {
-      "id": "parser-extension-7",
-      "requirement": "The comparison-only parser model projects no clock or profile for a frame with EXT_AUDIO set or an extension substream after it, until crates/framing models the reference parser's clock and profile there"
-    },
-    {
-      "id": "parser-extension-substream-sync",
-      "requirement": "The comparison-only parser model projects no clock or profile for a frame with EXT_AUDIO set or an extension substream after it, until crates/framing models the reference parser's clock and profile there"
-    }
-  ],
   "open_unmeasured": [
     {
       "bound": "runtime",
