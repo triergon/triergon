@@ -1153,6 +1153,7 @@ fn prepare_check(part: Option<Part>) -> Task {
             &["prepare-ffmpeg", "--profile", "transport-mpeg-video"],
             &["prepare-mpg123"],
             &["prepare-ffmpeg", "--profile", "video"],
+            &["prepare-ffmpeg", "--profile", "subtitles"],
             &["fixtures"],
             &["fetch-vectors"],
             &["fonts", "prepare"],
