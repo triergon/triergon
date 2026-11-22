@@ -672,7 +672,15 @@ impl DtsCoreFrameReader {
                         self.frame = Frame::Ready { header, bytes };
                     }
                 },
-                Frame::Ready { .. } => return self.publish(work),
+                Frame::Ready { header, bytes } => {
+                    if !work.try_charge(1) {
+                        return Ok(Step::Yield);
+                    }
+                    let header = *header;
+                    let bytes = bytes.clone();
+                    self.frame = Frame::Header(HeaderPart::Sync);
+                    return self.publish(header, bytes);
+                }
                 Frame::Ended(end) => return Ok(Step::End(*end)),
             }
         }
@@ -752,15 +760,7 @@ impl DtsCoreFrameReader {
             step: BodyStep::Reserve,
         })
     }
-    /// Returns the ready frame and moves on to the next one.
-    fn publish(&mut self, work: &mut WorkBudget) -> Result<Step<DtsCoreFrame>> {
-        if !work.try_charge(1) {
-            return Ok(Step::Yield);
-        }
-        let next = Frame::Header(HeaderPart::Sync);
-        let Frame::Ready { header, bytes } = std::mem::replace(&mut self.frame, next) else {
-            unreachable!("the frame is ready")
-        };
+    fn publish(&mut self, header: DtsCoreHeader, bytes: Bytes) -> Result<Step<DtsCoreFrame>> {
         if bytes.len() != header.frame_bytes {
             return Err(Error::Invalid("DTS output/envelope size disagreement"));
         }

@@ -567,7 +567,7 @@ impl DtsHeaderInspector {
                     self.issues = issues;
                     *phase = Phase::Publish(views);
                 }
-                Phase::Publish(_) => {
+                Phase::Publish(views) => {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
@@ -575,21 +575,16 @@ impl DtsHeaderInspector {
                         value(&self.fields, DtsCoreField::Sync),
                         value(&self.fields, DtsCoreField::CrcPresent),
                     );
-                    let State::Inspecting {
-                        raw,
-                        phase: Phase::Publish(views),
-                    } = std::mem::replace(&mut self.state, State::Complete)
-                    else {
-                        unreachable!("the inspection is checked")
-                    };
-                    return Ok(Step::Ready(DtsInspection {
-                        raw,
+                    let inspection = DtsInspection {
+                        raw: raw.clone(),
                         identity: self.identity,
                         fields: self.fields,
                         issues: self.issues,
-                        views,
+                        views: *views,
                         required_bits,
-                    }));
+                    };
+                    self.state = State::Complete;
+                    return Ok(Step::Ready(inspection));
                 }
             }
         }
