@@ -324,11 +324,11 @@ impl BorderStroke {
 }
 
 /// The state of one run of glyphs composited together: the sub-pixel origin
-/// its first drawn glyph sets, and how many glyphs it has drawn.
+/// its first drawn glyph sets, and whether a glyph has drawn.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Run {
     offset: RunOffset,
-    drawn: usize,
+    drawn: bool,
 }
 
 /// Where a glyph's border bitmap comes from once the glyph is placed.
@@ -388,7 +388,7 @@ impl Run {
             effects,
             transform,
         } = request;
-        let starts = self.drawn == 0;
+        let starts = !self.drawn;
         let continued = (!starts).then_some(self.offset);
         let quantized = BitmapTransform::quantize(transform.matrix(), shape.cbox(), continued)?;
         if starts {
@@ -444,7 +444,7 @@ impl Run {
         if fill.is_none() && border.is_none() {
             return None;
         }
-        self.drawn += 1;
+        self.drawn = true;
         Some(GlyphBitmaps { fill, border })
     }
 }
