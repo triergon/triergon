@@ -398,6 +398,7 @@ pub struct TransportStream {
     discover_program: bool,
     feed_omissions: Option<u64>,
     feed_validated_carriers: bool,
+    feed_report_counter_breaks: bool,
     unbounded_adts: bool,
     deferred_feed_events: u64,
     descriptor_namespace: DescriptorNamespace,
@@ -505,6 +506,18 @@ impl TransportStream {
         Ok(stream)
     }
 
+    /// Share carriers during replay and report signalled counter breaks on active
+    /// routes, including table and adaptation-only carriers.
+    pub fn new_single_program_replay(
+        budget: Budget,
+        limits: ParseLimits,
+        descriptor_namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        let mut stream = Self::new_single_program_feed(budget, limits, descriptor_namespace)?;
+        stream.feed_report_counter_breaks = true;
+        Ok(stream)
+    }
+
     /// A sequential feed publishes PES carriers after continuity validation.
     /// PAT, PMT, continuity breaks, clock transitions and faults remain visible.
     pub fn new_single_program_progressive_feed(
@@ -554,6 +567,7 @@ impl TransportStream {
             discover_program: program.is_none(),
             feed_omissions: None,
             feed_validated_carriers: false,
+            feed_report_counter_breaks: false,
             unbounded_adts: false,
             deferred_feed_events: 0,
             descriptor_namespace,
@@ -2203,7 +2217,11 @@ impl TransportStream {
                             continue;
                         }
                         if let Some(outcome) = outcome {
-                            if FEED && self.feed_omissions.is_some() {
+                            if FEED
+                                && self.feed_omissions.is_some()
+                                && !(outcome == ContinuityOutcome::SignalledDiscontinuity
+                                    && self.feed_report_counter_breaks)
+                            {
                                 self.omit_feed_events(1)?;
                                 continue;
                             }

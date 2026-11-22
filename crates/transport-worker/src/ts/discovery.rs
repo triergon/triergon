@@ -14,11 +14,14 @@ struct Track {
 
 impl Track {
     fn check_counter(&self, packet: &TransportPacket) -> triergon_core::Result<()> {
-        if packet.payload.is_some()
-            && self
-                .next_counter
-                .is_some_and(|next| next != packet.continuity_counter)
-        {
+        if self.next_counter.is_some_and(|next| {
+            let expected = if packet.payload.is_some() {
+                next
+            } else {
+                next.wrapping_sub(1) & 15
+            };
+            expected != packet.continuity_counter
+        }) {
             return Err(Error::Invalid("discovery continuity fault"));
         }
         Ok(())
@@ -94,6 +97,22 @@ pub(super) fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -
             _ => return Err("unexpected startup boundary".into()),
         }
     };
+    // Before the first PAT there are no table or clock routes. The lookup
+    // needs only the active PMT, so non-PAT headers cannot affect it on the
+    // established grid. Replay still inspects every carrier for source faults.
+    let mut table_start = offset;
+    for carrier in raw.as_ref()[usize::try_from(offset)?..].chunks_exact(188) {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled.into());
+        }
+        if carrier[0] != 0x47 || (carrier[1] & 31 == 0 && carrier[2] == 0) {
+            break;
+        }
+        table_start += 188;
+    }
+    if table_start != offset {
+        input.request_range_reusing_window(table_start)?;
+    }
     let mut source = TransportStream::new_single_program_feed(
         pool.clone(),
         ParseLimits::default(),
@@ -153,7 +172,7 @@ pub(super) fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -
     // Replay the detected grid through the source reader once. Its validated
     // carrier views and table/clock events drive the same bounded fold.
     input.request_range_reusing_window(offset)?;
-    let mut replay = TransportStream::new_single_program_feed(
+    let mut replay = TransportStream::new_single_program_replay(
         pool.clone(),
         ParseLimits::default(),
         DescriptorNamespace::Unspecified,
@@ -187,17 +206,20 @@ pub(super) fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -
                     if work.remaining() < 3 {
                         return Ok(FeedContinuation::Emit);
                     }
-                    match track
+                    track.check_counter(packet)?;
+                    let continuation = match track
                         .observer
                         .append_ready_continuation(packet, context, work, cancel)?
                     {
-                        ReadyContinuation::Unhandled => Ok(FeedContinuation::Emit),
-                        ReadyContinuation::Buffered => Ok(FeedContinuation::Buffered),
+                        ReadyContinuation::Unhandled => return Ok(FeedContinuation::Emit),
+                        ReadyContinuation::Buffered => FeedContinuation::Buffered,
                         ReadyContinuation::Complete => {
                             completed = Some(index);
-                            Ok(FeedContinuation::Yield)
+                            FeedContinuation::Yield
                         }
-                    }
+                    };
+                    track.record_payload(packet.continuity_counter);
+                    Ok(continuation)
                 },
             )?;
         if let Some(index) = completed {
