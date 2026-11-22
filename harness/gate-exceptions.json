@@ -10,6 +10,9 @@
     "gated_by_another_command": 44,
     "not_gated": 3,
     "open": {
+      "harness/codecs/packed-dts.json": {"open_cases": {"aarch64-unknown-linux-gnu": 3, "thumbv7neon-unknown-linux-gnueabihf": 3}},
+      "harness/codecs/nodither-streams.json": {"open_cases": {"aarch64-unknown-linux-gnu": 7, "thumbv7neon-unknown-linux-gnueabihf": 7}},
+      "harness/codecs/crc-damage.json": {"open_cases": {"aarch64-unknown-linux-gnu": 189, "thumbv7neon-unknown-linux-gnueabihf": 189}},
       "harness/features/carriage-trace/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 834, "thumbv7neon-unknown-linux-gnueabihf": 834}, "open_cases": {"aarch64-unknown-linux-gnu": 214}},
       "harness/features/charset-packets/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 240, "thumbv7neon-unknown-linux-gnueabihf": 240}, "open_cases": {"aarch64-unknown-linux-gnu": 7}},
       "harness/features/charset-streams/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 279, "thumbv7neon-unknown-linux-gnueabihf": 279}, "open_cases": {"aarch64-unknown-linux-gnu": 16}},
@@ -213,7 +216,7 @@
       "triergon-capture": 1,
       "triergon-codec": 2,
       "triergon-codec-aac": 2,
-      "triergon-codec-ac3": 3,
+      "triergon-codec-ac3": 4,
       "triergon-codec-dca": 1,
       "triergon-codec-flac": 2,
       "triergon-codec-h264": 3,
