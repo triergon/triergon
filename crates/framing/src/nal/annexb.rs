@@ -145,22 +145,11 @@ impl AnnexBWriter {
         if !work.try_charge(1) {
             return Ok(BuildStep::Yield);
         }
-        let State::Writing { input, output } = std::mem::replace(&mut self.state, State::Complete)
-        else {
-            unreachable!("the writer is writing")
-        };
-        match output.freeze() {
-            Ok(bytes) => Ok(BuildStep::Ready(AnnexBOutput {
-                bytes,
-                source_facts: self.facts,
-            })),
-            Err(refused) => {
-                self.state = State::Writing {
-                    input,
-                    output: refused.value,
-                };
-                Err(refused.error)
-            }
-        }
+        let bytes = crate::freeze_whole(output)?;
+        self.state = State::Complete;
+        Ok(BuildStep::Ready(AnnexBOutput {
+            bytes,
+            source_facts: self.facts,
+        }))
     }
 }

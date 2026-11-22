@@ -441,19 +441,16 @@ impl<'a> DeclaredConfigParser<'a> {
                     self.phase = Phase::StartArray;
                 }
                 Phase::Finish => {
-                    let State::Reading { raw, arrays, nals } =
-                        std::mem::replace(&mut self.state, State::Complete)
-                    else {
-                        unreachable!("the parser is reading")
-                    };
-                    return Ok(BuildStep::Ready(DeclaredConfiguration {
+                    let configuration = DeclaredConfiguration {
                         source: self.source,
                         codec: self.codec,
-                        raw,
+                        raw: raw.clone(),
                         sample_width: self.sample_width,
-                        arrays,
-                        nals,
-                    }));
+                        arrays: std::mem::replace(arrays, BudgetVec::new(raw.budget())),
+                        nals: std::mem::replace(nals, BudgetVec::new(raw.budget())),
+                    };
+                    self.state = State::Complete;
+                    return Ok(BuildStep::Ready(configuration));
                 }
             }
         }
