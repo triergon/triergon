@@ -831,76 +831,6 @@
       }
     },
     {
-      "id": "carriage-ac3-dvb",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 9949399113737223988
-      }
-    },
-    {
-      "id": "carriage-eac3-dvb",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 9949399113737223988
-      }
-    },
-    {
-      "id": "carriage-ac3-direct",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 9949399113737223988
-      }
-    },
-    {
-      "id": "carriage-eac3-direct",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 9949399113737223988
-      }
-    },
-    {
-      "id": "elementary-bytes-cross-pes",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 5,
-        "digest": 8203004531478402716
-      }
-    },
-    {
       "id": "au-avc-one",
       "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
       "candidate": {
@@ -1448,6 +1378,37 @@
     }
   ],
   "open_deviations": [
+    {
+      "reading": "Private DVB descriptors require a declared private-audio namespace",
+      "clause": "ITU-T H.222.0 (08/2023) section 2.4.4.10 Table 2-34 and ETSI EN 300 468 V1.17.1 Annex D define private data signalling and the DVB AC-3 and Enhanced AC-3 descriptors",
+      "candidate": "The default facade has no DVB namespace and publishes no decoded access unit from either 27-byte opaque payload",
+      "reference": "Recognizes AC-3 or Enhanced AC-3 and publishes the 27-byte PES payload at PTS 90000 as a key packet",
+      "compat": "compat::mpegts::private_audio_carriage",
+      "cases": [
+        "carriage-ac3-dvb",
+        "carriage-eac3-dvb"
+      ]
+    },
+    {
+      "reading": "Private direct type numbers carry no codec identity without their namespace",
+      "clause": "ITU-T H.222.0 (08/2023) section 2.4.4.10 Table 2-34 assigns stream types 0x80 through 0xFF to user private signalling",
+      "candidate": "The default facade keeps 0x81 and 0x87 private and produces no access unit from their 27-byte opaque payloads",
+      "reference": "Identifies the routes as AC-3 and Enhanced AC-3 and publishes a 27-byte key packet for each",
+      "compat": "compat::mpegts::private_audio_carriage",
+      "cases": [
+        "carriage-ac3-direct",
+        "carriage-eac3-direct"
+      ]
+    },
+    {
+      "reading": "An AVC access-unit delimiter alone does not carry a picture",
+      "clause": "ITU-T H.264 (08/2024) sections 3.1, 7.4.1.2.3 and 7.4.2.4 require a coded picture in an access unit and define the delimiter as separate syntax",
+      "candidate": "Publishes no AVC access unit after concatenating the two PES payload spans",
+      "reference": "Publishes the five-byte delimiter 00000109f0 as a packet at PTS zero",
+      "cases": [
+        "elementary-bytes-cross-pes"
+      ]
+    },
     {
       "reading": "A PES marked AVC or HEVC contains bytes before any admissible Annex B start code",
       "clause": "ITU-T H.264 (08/2024) \u00a7B.1 and H.265 (07/2024) \u00a7B.2 define byte-stream NAL units with a 0x000001 prefix and allow only zero-valued leading padding; H.222.0 \u00a7\u00a72.1 and 2.4.3.6 distinguish a video elementary stream from a PES envelope.",

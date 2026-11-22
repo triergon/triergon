@@ -194,6 +194,8 @@ pictures with presentation times, and stereo PCM. Matroska and MP4 use
 and compares the selected AAC output from presentation time zero. MPEG-TS uses
 its source access-unit reader. The facade also has
 separate comparisons for strict MPEG-TS access units and seek delivery.
+The MPEG-TS comparison records source admission differences for private
+audio carriage and for video delimiters without a coded picture.
 The Matroska seek comparison verifies earlier audio and subtitle packets
 against a sequential read and checks their exact Block clocks.
 See the [play corpus](../../harness/codecs/play-manifest.json) and
