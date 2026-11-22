@@ -18,7 +18,7 @@ use std::process::ExitCode;
 
 use triergon::ogg::ReaderEvent;
 use triergon::{AnyOther, Budget, CodecId, ContainerReader, Event, MediaKind, PacketInfo, TrackId};
-use triergon_codec::{AudioDecoder, AudioFrame, ChannelLayout};
+use triergon_codec::{AudioFrame, ChannelLayout};
 use triergon_codec_vorbis::{Decoder, Limits};
 use triergon_framing::vorbis::VorbisHeaders;
 

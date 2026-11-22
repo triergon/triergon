@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use triergon_codec::{AudioDecoder, AudioFrame, Budget};
+use triergon_codec::{AudioFrame, Budget};
 use triergon_codec_vorbis::{DecodeError, Decoder, Limits};
 
 fn stream(name: &str) -> Option<Vec<Vec<u8>>> {

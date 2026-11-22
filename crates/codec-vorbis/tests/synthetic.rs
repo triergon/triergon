@@ -1,6 +1,6 @@
 //! Decoder behaviour on authored streams: budgets, malformed packets, recovery.
 
-use triergon_codec::{AudioDecoder, AudioFrame, Budget};
+use triergon_codec::{AudioFrame, Budget};
 use triergon_codec_vorbis::{DecodeError, Decoder, Limits};
 
 /// LSB-first bit packing (Vorbis I section 2).

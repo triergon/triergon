@@ -21,22 +21,20 @@ use celt::Emphasis;
 use multistream::Mapping;
 use packet::Packet;
 use stream::{Staging, StreamDecoder, Workspace};
-pub use triergon_codec::DecodeError;
-use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, Charged, DownmixLevels, Reservation,
-};
+use triergon_codec::{AudioDecoder, BudgetVec, Charged, DownmixLevels, Reservation};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Speaker, StorageError};
 use triergon_framing::opus::{self, OpusHead};
 
-/// Bounds of one decoder.
+/// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Heap bytes the decoder may hold for its streams and the output frame.
+    /// Bytes of storage that depends on the stream: the state of every stream and the
+    /// output frame the decoder fills. The default, 64 MiB, holds the state of 255
+    /// streams and the largest output frame (93 channels of 120 ms) with a wide margin.
     pub live_storage_bytes: usize,
 }
 
 impl Default for Limits {
-    /// 64 MiB: the state of 255 streams and the largest output frame (93 channels of
-    /// 120 ms) fit with a wide margin.
     fn default() -> Self {
         Limits {
             live_storage_bytes: 64 << 20,
@@ -76,7 +74,8 @@ impl Decoder {
         Decoder::with_limits(configuration, Limits::default())
     }
 
-    /// As [`Decoder::new`], with its own pool of `limits.live_storage_bytes`.
+    /// As [`Decoder::new`], with its own pool of `limits.live_storage_bytes`. Fails as
+    /// `new` does, or for a limit below a pool's own charge.
     pub fn with_limits(configuration: &[u8], limits: Limits) -> Result<Decoder, DecodeError> {
         Decoder::new_in(configuration, &Budget::new(limits.live_storage_bytes)?)
     }
@@ -110,7 +109,7 @@ impl Decoder {
 
     /// The range decoder's final `rng` after the last frame of the last packet, XORed
     /// with that of its redundant frame and over the streams. A stream whose last frame
-    /// has at most one byte contributes 0, as one does after [`AudioDecoder::reset`].
+    /// has at most one byte contributes 0, as one does after [`Decoder::reset`].
     /// The RFC 6716 test vectors record this value per packet.
     pub fn final_range(&self) -> u32 {
         self.streams
@@ -142,10 +141,10 @@ impl Decoder {
         Ok(())
     }
 
-    /// Decode one (multistream) packet. Everything that can refuse it, from the framing
-    /// of each sub-packet to the output frame's charge, comes before the first stream
-    /// decodes, so a refused packet leaves every stream as it was.
-    fn decode_packet(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+    /// Decode one (multistream) packet into `out`. Everything that can refuse it, from
+    /// the framing of each sub-packet to the output frame's charge, comes before the
+    /// first stream decodes, so a refused packet leaves every stream as it was.
+    pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
         out.samples_per_channel = 0;
         let (samples, emphasis) = self.check(au)?;
         out.try_resize(self.mapping.channels(), samples, &mut self.output_charge)?;
@@ -163,6 +162,13 @@ impl Decoder {
         }
         self.finish(samples, out);
         Ok(())
+    }
+
+    /// Drop the signal history of every stream after a discontinuity.
+    pub fn reset(&mut self) {
+        for stream in self.streams.iter_mut() {
+            stream.reset();
+        }
     }
 
     /// De-emphasise the first `samples` of every plane a stream channel feeds, with and
@@ -238,7 +244,8 @@ impl AudioDecoder for Decoder {
         au: &[u8],
         out: &mut AudioFrame,
     ) -> Result<Option<DownmixLevels>, DecodeError> {
-        self.decode_packet(au, out).map(|()| None)
+        Decoder::decode(self, au, out)?;
+        Ok(None)
     }
 
     fn delay(&self) -> usize {
@@ -250,9 +257,7 @@ impl AudioDecoder for Decoder {
     }
 
     fn reset(&mut self) {
-        for stream in self.streams.iter_mut() {
-            stream.reset();
-        }
+        Decoder::reset(self);
     }
 }
 

@@ -32,26 +32,26 @@ extern crate self as triergon_codec_dca;
 mod synthetic;
 
 pub use pack::Packing;
-pub use triergon_codec::{AudioFrame, ChannelLayout, DecodeError, Speaker};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Speaker, StorageError};
 
 use frame::FrameDecoder;
-use triergon_codec::{AudioDecoder, Budget, BudgetVec, DownmixLevels};
+use triergon_codec::{AudioDecoder, BudgetVec, DownmixLevels};
 
 /// Storage limits of one decoder.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Live storage that depends on the stream: subband rows, the X96 extension's rows
-    /// and 64-band filter bank, synthesis scratch, the normalization
-    /// buffer of 14-bit and little-endian packings, and the output frame the decoder
-    /// fills. The default holds the largest frame the syntax allows (128 blocks, X96,
-    /// eight output planes) about three times over.
+    /// Bytes of storage that depends on the stream: subband rows, the X96 extension's
+    /// rows and 64-band filter bank, synthesis scratch, the normalization buffer of
+    /// 14-bit and little-endian packings, and the output frame the decoder fills. The
+    /// default, 2 MiB, holds the largest frame the syntax allows (128 blocks, X96, eight
+    /// output planes) about three times over.
     pub live_storage_bytes: usize,
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Limits {
-            live_storage_bytes: 2 * 1024 * 1024,
+            live_storage_bytes: 2 << 20,
         }
     }
 }
@@ -80,7 +80,8 @@ impl Decoder {
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 
-    /// A decoder with its own pool of `limits.live_storage_bytes`.
+    /// A decoder with its own pool of `limits.live_storage_bytes`. Fails only for a
+    /// limit below a pool's own charge.
     pub fn with_limits(limits: Limits) -> Result<Self, DecodeError> {
         Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
     }
@@ -125,6 +126,7 @@ impl AudioDecoder for Decoder {
         Decoder::decode(self, au, out)?;
         Ok(None)
     }
+
     fn reset(&mut self) {
         Decoder::reset(self);
     }

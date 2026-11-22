@@ -16,21 +16,20 @@ mod layer3;
 mod subband;
 mod synthesis;
 
-pub use triergon_codec::DecodeError;
-use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, ChannelLayout, Charged, DownmixLevels, Reservation, Speaker,
-};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Speaker, StorageError};
+
+use triergon_codec::{AudioDecoder, Charged, DownmixLevels, Reservation};
 use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegLayer};
 
 use layer3::Layer3;
 use synthesis::Synthesis;
 
-/// Bounds of one decoder.
+/// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Heap bytes the decoder may hold: its signal state, built with the first frame,
-    /// and the output frame it fills (at most 1152 samples of two channels). The default
-    /// leaves a wide margin above both.
+    /// Bytes of storage that depends on the stream: the signal state, built with the
+    /// first frame, and the output frame the decoder fills (at most 1152 samples of two
+    /// channels). The default, 1 MiB, leaves a wide margin above both.
     pub live_storage_bytes: usize,
 }
 
@@ -68,7 +67,7 @@ impl Default for Decoder {
 }
 
 impl Decoder {
-    /// A decoder with the default limits.
+    /// A decoder with a pool of the default limit.
     pub fn new() -> Self {
         #[expect(
             clippy::expect_used,
@@ -77,7 +76,8 @@ impl Decoder {
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 
-    /// A decoder with its own pool of `limits.live_storage_bytes`.
+    /// A decoder with its own pool of `limits.live_storage_bytes`. Fails only for a
+    /// limit below a pool's own charge.
     pub fn with_limits(limits: Limits) -> Result<Self, DecodeError> {
         Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
     }
@@ -104,6 +104,18 @@ impl Decoder {
             out.clear();
         }
         decoded
+    }
+
+    /// Drop the bit reservoir and the filter bank and overlap history after a
+    /// discontinuity. Layer III scalefactors stay, as FFmpeg keeps them for a granule
+    /// that reuses them (`scfsi`) after a flush.
+    pub fn reset(&mut self) {
+        if let Some(state) = &mut self.state {
+            for filter in &mut state.synthesis {
+                filter.reset();
+            }
+            state.layer3.reset();
+        }
     }
 
     fn decode_body(
@@ -153,12 +165,7 @@ impl AudioDecoder for Decoder {
     }
 
     fn reset(&mut self) {
-        if let Some(state) = &mut self.state {
-            for filter in &mut state.synthesis {
-                filter.reset();
-            }
-            state.layer3.reset();
-        }
+        Decoder::reset(self);
     }
 }
 

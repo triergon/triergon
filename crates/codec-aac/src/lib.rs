@@ -30,10 +30,10 @@ mod tables;
 
 pub use adts::AdtsHeader;
 pub use error::{DecodeError, Feature};
-pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Speaker, StorageError};
 
 use triergon_bitstream::CachedBitReader;
-use triergon_codec::{AudioDecoder, Budget, DownmixLevels};
+use triergon_codec::{AudioDecoder, DownmixLevels};
 
 /// Optional AAC decoding policies.
 pub mod compat {
@@ -69,20 +69,20 @@ pub mod compat {
 }
 
 /// Storage limits of one decoder.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Live storage that depends on the stream: element and coupling-channel state
+    /// Bytes of storage that depends on the stream: element and coupling-channel state
     /// (overlap, prediction, LTP, spectra, SBR and PS) and the output frame the decoder
-    /// fills. The default holds 48 elements (16 tags each of SCE, CPE and LFE, the most a
-    /// PCE switch between two layouts holds) with SBR and Main prediction, 16 coupling
-    /// channels and four raw data blocks of 93 channels.
+    /// fills. The default, 32 MiB, holds 48 elements (16 tags each of SCE, CPE and LFE,
+    /// the most a PCE switch between two layouts holds) with SBR and Main prediction, 16
+    /// coupling channels and four raw data blocks of 93 channels.
     pub live_storage_bytes: usize,
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Limits {
-            live_storage_bytes: 32 * 1024 * 1024,
+            live_storage_bytes: 32 << 20,
         }
     }
 }
@@ -109,7 +109,8 @@ impl Decoder {
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 
-    /// A decoder with its own pool of `limits.live_storage_bytes`.
+    /// A decoder with its own pool of `limits.live_storage_bytes`. Fails only for a
+    /// limit below a pool's own charge.
     pub fn with_limits(limits: Limits) -> Result<Self, DecodeError> {
         Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
     }
@@ -149,6 +150,23 @@ impl Decoder {
         } else {
             0
         }
+    }
+}
+
+impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
+    fn decode(
+        &mut self,
+        au: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        Decoder::decode(self, au, out)?;
+        Ok(None)
+    }
+
+    fn reset(&mut self) {
+        Decoder::reset(self);
     }
 }
 
@@ -224,6 +242,11 @@ impl RawLcDecoder {
             decode_blocks::<true>(core, au, 1, false, out)
         })
     }
+
+    /// Reset overlap, prediction and PNS signal history after a discontinuity.
+    pub fn reset(&mut self) {
+        self.core.reset_history();
+    }
 }
 
 impl AudioDecoder for RawLcDecoder {
@@ -239,7 +262,7 @@ impl AudioDecoder for RawLcDecoder {
     }
 
     fn reset(&mut self) {
-        self.core.reset_history();
+        RawLcDecoder::reset(self);
     }
 }
 
@@ -333,20 +356,4 @@ fn decode_blocks<const RAW: bool>(
     out.layout = core.layout;
     out.samples_per_channel = out.planes.first().map_or(0, Vec::len);
     Ok(())
-}
-
-impl AudioDecoder for Decoder {
-    type Error = DecodeError;
-
-    fn decode(
-        &mut self,
-        au: &[u8],
-        out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeError> {
-        Decoder::decode(self, au, out)?;
-        Ok(None)
-    }
-    fn reset(&mut self) {
-        Decoder::reset(self);
-    }
 }

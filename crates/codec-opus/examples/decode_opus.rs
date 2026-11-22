@@ -15,7 +15,7 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use triergon::{Budget, CodecId, ContainerReader, MediaKind, PacketInfo};
-use triergon_codec::{AudioDecoder, AudioFrame};
+use triergon_codec::AudioFrame;
 use triergon_codec_opus::Decoder;
 
 /// The packets and final ranges of an RFC 6716 test vector.

@@ -14,7 +14,7 @@
 use std::io::Write;
 
 use triergon::{Budget, CodecId, ContainerReader, MediaKind, PacketInfo, TrackInfo};
-use triergon_codec::{AudioDecoder, AudioFrame};
+use triergon_codec::AudioFrame;
 use triergon_codec_mp3::Decoder;
 
 fn main() {

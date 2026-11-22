@@ -30,13 +30,13 @@ use trace::Trace;
 #[cfg(feature = "reference-trace")]
 pub use trace::{BlockTrace, FrameTrace, Trace};
 pub use triergon_bitstream::crc::crc16_a52 as crc16;
-pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Speaker, StorageError};
 
 use downmix::downmix_info;
 use header::{check_crc, peek_chanmap};
 use quant::GroupTables;
 use substream::{BlockSink, LFE, NCH, PlaneMap, Substream, acmod_channels};
-use triergon_codec::{AudioDecoder, Budget, Charged, DownmixLevels, Reservation};
+use triergon_codec::{AudioDecoder, Charged, DownmixLevels, Reservation};
 
 /// Maximum number of output channels (A/52 Annex E 3.8.2: at most 16 per program).
 pub const MAX_CHANNELS: usize = 16;
@@ -69,18 +69,18 @@ pub struct DecoderOptions {
 }
 
 /// Storage limits of one decoder.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Live storage that depends on the stream: dependent substream state and the
-    /// output frame the decoder fills. The default holds eight dependent substreams
-    /// and a 16-channel frame many times over.
+    /// Bytes of storage that depends on the stream: dependent substream state and the
+    /// output frame the decoder fills. The default, 4 MiB, holds eight dependent
+    /// substreams and a 16-channel frame many times over.
     pub live_storage_bytes: usize,
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Limits {
-            live_storage_bytes: 4 * 1024 * 1024,
+            live_storage_bytes: 4 << 20,
         }
     }
 }
@@ -694,15 +694,15 @@ impl AudioDecoder for Decoder {
         let info = Decoder::decode(self, au, out)?;
         Ok(info.downmix.map(|info| info.levels()))
     }
+
     fn reset(&mut self) {
         Decoder::reset(self);
     }
 }
 
 #[cfg(test)]
-mod budget_tests {
+mod tests {
     use super::*;
-    use triergon_codec::StorageError;
 
     #[test]
     fn a_refused_dependent_substream_leaves_its_slot_empty() {
@@ -737,17 +737,10 @@ mod budget_tests {
             .unwrap();
         assert!(budget.used() * 2 < budget.limit(), "{}", budget.used());
     }
-}
 
-#[cfg(test)]
-mod size_tests {
     #[test]
-    fn decoder_state_is_bounded() {
-        let sub = size_of::<crate::substream::Substream>();
-        eprintln!(
-            "Substream {sub} bytes, Decoder {} bytes",
-            size_of::<crate::Decoder>()
-        );
-        assert!(sub < 128 * 1024);
+    fn substream_state_stays_below_128_kib() {
+        let size = size_of::<Substream>();
+        assert!(size < 128 * 1024, "{size} bytes");
     }
 }

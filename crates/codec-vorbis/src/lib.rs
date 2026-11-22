@@ -21,13 +21,10 @@ mod tables;
 mod window;
 
 use triergon_bitstream::LsbReader;
-pub use triergon_codec::DecodeError;
 use triergon_codec::layout::{native_order, vorbis_order};
 use triergon_codec::mdct::Imdct;
-use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, DownmixLevels, Reservation,
-    StorageError,
-};
+use triergon_codec::{AudioDecoder, BudgetVec, DownmixLevels, Reservation};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Speaker, StorageError};
 use triergon_framing::vorbis::{VorbisHeaders, VorbisIdentification};
 
 use floor0::Coefficients;
@@ -38,13 +35,13 @@ use setup::{Floor, Setup};
 use spectra::Spectra;
 use window::{Block, Slopes, fade_out, fold, overlap_add};
 
-/// Bounds of one decoder.
+/// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Heap bytes the decoder may hold, output frame included: the setup header's
-    /// codebook, floor and residue tables, the per-channel block buffers and the frame
-    /// it fills. The default, 32 MiB, holds 93 channels of 8192-sample blocks (about
-    /// 7 MiB) next to setup tables many times those of any encoder.
+    /// Bytes of storage that depends on the stream: the setup header's codebook, floor
+    /// and residue tables, the per-channel block buffers and the output frame the
+    /// decoder fills. The default, 32 MiB, holds 93 channels of 8192-sample blocks
+    /// (about 7 MiB) next to setup tables many times those of any encoder.
     pub live_storage_bytes: usize,
 }
 
@@ -88,7 +85,7 @@ struct ChannelFloor {
 ///
 /// Each audio packet yields the samples from the centre of the previous block to the
 /// centre of its own, `previous / 4 + current / 4` per channel; the first packet after
-/// construction or [`AudioDecoder::reset`] only primes the overlap and yields none.
+/// construction or [`Decoder::reset`] only primes the overlap and yields none.
 /// Planes follow FFmpeg's native channel order.
 #[derive(Debug)]
 pub struct Decoder {
@@ -125,7 +122,8 @@ impl Decoder {
         Decoder::with_limits(configuration, Limits::default())
     }
 
-    /// As [`Decoder::new`], with a pool of `limits.live_storage_bytes`.
+    /// As [`Decoder::new`], with its own pool of `limits.live_storage_bytes`. Fails as
+    /// `new` does, or for a limit below a pool's own charge.
     pub fn with_limits(configuration: &[u8], limits: Limits) -> Result<Decoder, DecodeError> {
         Decoder::new_in(configuration, &Budget::new(limits.live_storage_bytes)?)
     }
@@ -219,7 +217,10 @@ impl Decoder {
         self.layout
     }
 
-    fn decode_packet(&mut self, packet: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+    /// Decode one audio packet into `out`: the samples from the centre of the previous
+    /// block to the centre of this one, none for the first packet after construction or
+    /// [`Decoder::reset`].
+    pub fn decode(&mut self, packet: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
         let r = &mut LsbReader::new(packet);
         let mode = self.read_mode(r)?;
         let block = mode.block;
@@ -242,6 +243,11 @@ impl Decoder {
         }
         apply_floors(setup, mapping, block, floors, spectra, coded);
         self.synthesize(block, out)
+    }
+
+    /// Drop the overlap after a discontinuity: the next packet primes it again.
+    pub fn reset(&mut self) {
+        self.previous = None;
     }
 
     /// Packet type, mode and window flags (section 4.3.1). The window shape follows from
@@ -430,10 +436,11 @@ impl AudioDecoder for Decoder {
         au: &[u8],
         out: &mut AudioFrame,
     ) -> Result<Option<DownmixLevels>, DecodeError> {
-        self.decode_packet(au, out).map(|()| None)
+        Decoder::decode(self, au, out)?;
+        Ok(None)
     }
 
     fn reset(&mut self) {
-        self.previous = None;
+        Decoder::reset(self);
     }
 }
