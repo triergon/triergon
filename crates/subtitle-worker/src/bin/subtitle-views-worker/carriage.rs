@@ -74,7 +74,7 @@ pub(super) fn operation<'a>(
                 records.row(3, &[1, code as u64], &[])?;
             }
             if let Some(stream) = &snapshot.stream {
-                stream_record(&mut records, stream)?;
+                stream_record(&mut records, stream, false)?;
             }
             for (ordinal, packet) in snapshot.packets.iter().enumerate() {
                 packet_record(&mut records, ordinal as u64, packet)?;
@@ -109,8 +109,14 @@ fn snapshot(pool: &Budget, source: Source, reader: Read) -> triergon::Result<Sna
 fn stream_record(
     records: &mut Records<'_, '_>,
     stream: &triergon_subtitles::reference_trace::carriage::Stream,
+    mov: bool,
 ) -> Result<(), String> {
-    let extra = stream.extradata.as_deref().unwrap_or_default();
+    let mut extra = stream.extradata.as_deref().unwrap_or_default();
+    if mov && !extra.is_empty() {
+        // The description follows the reserved bytes and data-reference index
+        // of the ISO BMFF SampleEntry. The decoder receives only the description.
+        extra = extra.get(8..).ok_or("short tx3g SampleEntry")?;
+    }
     records.row(
         2,
         &[
@@ -220,12 +226,23 @@ fn container(records: &mut Records<'_, '_>, input: &[u8], pool: &Budget) -> Resu
             duration_ticks: duration.map(i128::from),
         })
         .map_err(|error| error.to_string())?;
-        let snapshot = snapshot(pool, Source::Sample(source), Read::Sample(clock))
+        let mut snapshot = snapshot(pool, Source::Sample(source), Read::Sample(clock))
             .map_err(|error| error.to_string())?;
+        let mov = if let AnyPacket::Isobmff(packet) = &packet {
+            let sample = packet.sample();
+            let position = i64::try_from(sample.range.start).map_err(|error| error.to_string())?;
+            for projected in snapshot.packets.iter_mut() {
+                projected.position_raw = position;
+                projected.flags = i32::from(sample.is_container_sync());
+            }
+            true
+        } else {
+            false
+        };
         if ordinal == 0
             && let Some(stream) = &snapshot.stream
         {
-            stream_record(records, stream)?;
+            stream_record(records, stream, mov)?;
         }
         for packet in snapshot.packets.iter() {
             packet_record(records, ordinal, packet)?;

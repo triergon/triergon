@@ -8,7 +8,7 @@
   "reference": "ffmpeg-subtitle-views-native",
   "runner": "cargo xtask report",
   "contract": [
-    "Compare FFmpeg format-open and terminal return codes, stream codec, time base and private data, then packet ordinal, position, PTS, DTS, duration, flags, payload and ordered side data. The candidate uses document snapshots or demuxed sample snapshots from the carriage session."
+    "Compare FFmpeg format-open and terminal return codes, stream codec, time base and private data, then packet ordinal, position, PTS, DTS, duration, flags, payload and ordered side data. The candidate uses document snapshots or demuxed sample snapshots from the carriage session. For ISO BMFF, it adds the sample offset and sync flag and compares the tx3g description after the SampleEntry base fields."
   ],
   "required_profiles": [
     "mkv",
@@ -879,1504 +879,174 @@
     }
   ],
   "pending_module_requirements": [
-    "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-    "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings."
+    "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts."
   ],
   "open_cases": [
     {
-      "id": "tx3g-basic",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-byte-not-character-count",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-utf16be-bom",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-empty-sample",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-embedded-nul",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-line-codepoints-exact",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-style-highlight-raw",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-unknown-modifier",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-modifier-order",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-empty-with-modifier",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-u16-byte-count-boundary",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-missing-length",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-text-overrun",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-utf16-odd",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-lone-surrogate",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-short-box",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-box-overrun",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "tx3g-extended-box-gap",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "utf8-packet-markup",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "utf8-packet-unknown-time",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "utf8-packet-known-zero-duration",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "utf8-packet-negative-start",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "utf8-packet-raw-clock",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "utf8-packet-bom-nul-content",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "utf8-packet-too-large-scalar",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "utf8-packet-input-limit",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mkv-vtt-no-addition",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mkv-vtt-settings-id-comments",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mkv-vtt-present-empty-fields",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mkv-vtt-relative-inline-time",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mkv-vtt-unknown-addition-opaque",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mkv-vtt-truncated-addition",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ass-raw-order-overrides",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ass-ssa-empty-layer",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ass-private-verbatim",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ass-unknown-charset-opaque",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ass-empty-not-clear",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ass-known-duration-unknown-start",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ass-private-present-empty",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ass-invalid-utf8-unvalidated",
-      "requirement": "The sample snapshot has caller-owned fields, including position -1 and flags 0; the Matroska demuxer publishes container positions, flags, inferred DTS and its own codec and side-data mappings.",
+      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
-    },
+    }
+  ],
+  "open_deviations": [
     {
-      "id": "capsule-mov-text-bad-two",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-bom",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-box-refusal-then-good",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-clear-then-good",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-clear",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-config-invalid-font-size",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-config-one-dimension",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-config-too-short",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-config-valid-empty-fonts",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-configured-defaults",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-configured-style-font",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-cr-lf-markup",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-duplicate-fonts",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-duplicate-wrap",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-empty-event",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-empty-physical",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-extended-short",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-extended-wrap",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-ffff",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-flush-read-order",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-font-nul",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-font-utf16",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-highlight-color",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-highlight-empty",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-highlight-inverse",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-invalid-overlong",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-invalid-tail",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-known-zero-duration",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-negative-half",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-noncharacter-fffe",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-nul-invalid-tail",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-one-byte",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-overflow-clock",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-overrun-box",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-overstated",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-positive-half",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-rational-clock",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-short-body",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-short-box",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-size0",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-style-adjacent-different",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-style-adjacent-equal",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-style-all",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-style-empty",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-style-malformed-after-good",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-style-outside",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-style-overlap",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-style-repeated",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-style-reversed",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-style-unicode",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-style-zero-after-good",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-two-packets",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-basic",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-box-overrun",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-byte-not-character-count",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-embedded-nul",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-empty-sample",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-empty-with-modifier",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-extended-box-gap",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-line-codepoints-exact",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-lone-surrogate",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-missing-length",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-modifier-order",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-short-box",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-style-highlight-raw",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-text-overrun",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-u16-byte-count-boundary",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-unknown-modifier",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-utf16-odd",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-utf16be-bom",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-understated",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-unicode",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-unknown-clock",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-unknown",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-unset-clock",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-utf16be",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-utf16le",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-utf8-refusal-then-good",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-wrap-0",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-wrap-1",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-wrap-2",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-wrap-nul",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-colour-against-alpha",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-face-against-all",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-face-against-bold",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-font-long-names",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-font-table",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-highlight-coincident",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-highlight-coloured-default",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-highlight-ranges",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-highlight-style-colour",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-no-description",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-nul-transitions",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-ranges",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-size-colour-alpha",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-adjacent_style_runs_remain_distinct_source_records",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-cancellation_at_every_initial_single_unit_boundary_is_resumable",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-continuous_karaoke_empty_character_range_keeps_the_requested_prefix_during_pause",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-continuous_karaoke_resolves_prefix_from_source_display_flag",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-continuous_prefix_conflict_is_detected_even_outside_declared_start",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-default_style_and_all_rgba_bytes_stay_exact_without_renderer_substitution",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-derived_run_limit_preserves_real_boundaries_and_never_coalesces_to_pass",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-disjoint_dynamic_static_and_link_ranges_remain_legal",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-disparity_minimum_is_widened_before_negation",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-duplicate_and_missing_font_ids_are_explicit_semantic_errors",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-duplicate_global_modifiers_never_silently_choose_last",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-duplicate_karaoke_even_empty_and_unordered_times_refuse",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-dynamic_colour_is_foreground_while_static_colour_is_background",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-empty_karaoke_header_start_obeys_known_sample_duration",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-empty_text_has_no_runs_and_no_queryable_character",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-explicit_clock_absence_keeps_relative_times_unknown_even_with_raw_input_clock",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-font_names_are_decoded_from_source_utf8_or_utf16_bom_without_selecting_renderer_fallback",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-foreign_payload_configuration_and_label_owners_never_enter_the_job",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-full_u16_byte_count_is_not_reduced_to_recommended_2048",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-highlight_colour_order_does_not_change_semantic_authority",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-highlight_n_plus_one_sentinel_is_retained_as_a_derived_endpoint",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-hyperlink_empty_strings_are_preserved_not_invented_absolute_urls",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-hyperlink_requests_terminal_style_over_base_and_static_highlight",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-hyperlink_utf8_url_alt_fields_are_strict_length_delimited",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-inverted_and_beyond_text_ranges_refuse_without_clamping",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-karaoke_bounds_use_actual_track_ticks_not_assumed_milliseconds",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-karaoke_character_ranges_must_be_ordered_nonoverlapping",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-karaoke_events_have_half_open_time_intervals_and_zero_range_pauses",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-known_box_trailing_bytes_and_short_bodies_are_errors",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-malformed_advertised_record_counts_do_not_publish_partial_semantics",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-malformed_late_modifier_never_publishes_partial_semantic_output",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-missing_description_does_not_fake_complete_combination_validation",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-missing_description_does_not_invent_disparity_zero",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-missing_description_keeps_unbound_font_id_and_base_style_unknown",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-missing_duration_does_not_invent_a_time_bound_or_next_packet_end",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_ambiguity",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-original_style_highlight_fixture_resolves_requested_style_and_colour_authority",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-output_is_taken_once_and_old_owners_survive_job_drop",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-overlapping_styles_across_separate_boxes_are_not_last_wins",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-overlaps_within_highlights_links_and_blinks_are_rejected",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-pool_pressure_and_repeated_zero_work_retry_do_not_duplicate_modifiers",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-positive_event_after_zero_duration_still_conflicts_with_static_or_link",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-query_zero_work_and_cancel_preserve_search_progress",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-record_limit_failure_is_sticky_frees_construction_and_publishes_nothing",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-sample_disparity_overrides_description_and_retains_sixteenth_pixels",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-sample_styles_override_description_only_on_the_declared_half_open_ranges",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-sample_textbox_overrides_description_without_clamping_signed_geometry",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-scroll_delay_uses_track_ticks_and_only_specified_zero_default",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-stale_generation_is_rejected_while_original_caller_owners_remain",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-static_dynamic_and_dynamic_link_conflicts_are_rejected",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-static_highlight_without_colour_requests_terminal_inversion",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-style_and_blink_ranges_do_not_adopt_the_highlight_sentinel",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-unicode_scalar_offsets_are_not_utf8_byte_or_rendered_glyph_offsets",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-unknown_configuration_layout_does_not_infer_default_style_or_disparity",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-unknown_description_keeps_continuous_extent_unresolved",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-unknown_modifiers_remain_full_source_ranges_without_semantic_effect",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-unknown_query_time_is_not_replaced_with_zero",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-unknown_time_after_all_karaoke_ends_is_never_dynamic_in_any_description_context",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-unknown_time_character_membership_is_logarithmic_resumable_and_allocation_free",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_hyperlink_authority",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_static_highlight",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-unknown_time_with_only_zero_duration_karaoke_has_no_possible_dynamic_extent",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-zero_duration_karaoke_events_are_source_records_but_never_active",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-zero_duration_only_events_need_no_invented_continuous_context_for_conflicts",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-zero_duration_only_overlap_does_not_conflict_with_hyperlink",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-zero_duration_only_overlap_does_not_conflict_with_static_highlight",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-zero_duration_tail_never_extends_a_continuous_conflict_prefix",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-zero_font_id_and_sparse_high_ids_do_not_use_truthiness_as_knownness",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-zero_length_style_records_are_preserved_and_apply_to_no_character",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-zero_work_semantics_performs_no_progress_or_allocation",
-      "requirement": "The sample snapshot has position -1 and flags 0 for a caller-owned packet, while the MOV demuxer reports its physical sample offset and flags; the snapshot also keeps the SampleEntry prefix in caller-supplied configuration.",
+      "reading": "An unsigned stts sample delta of 4294967295",
+      "clause": "ISO/IEC 14496-12:2015 \u00a78.6.1.2, stts sample_delta is unsigned 32-bit",
+      "candidate": "returns the coded duration 4294967295",
+      "reference": "returns a duration of one tick",
+      "compat": "compat::mov::large_sample_delta_recovery",
+      "cases": [
+        "capsule-mov-text-overflow-clock"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
