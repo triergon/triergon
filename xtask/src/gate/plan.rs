@@ -977,9 +977,8 @@ impl Plan<'_> {
         let worker = format!("{}/codec-views-worker", self.release);
         let h264 = format!("video-h264={worker}");
         let hevc = format!("video-hevc={worker}");
-        let selected = lanes::video_workload_names(include_str!(
-            "../../../harness/codecs/nal-workloads.json"
-        ));
+        let selected =
+            lanes::video_workload_names(include_str!("../../../harness/codecs/nal-workloads.json"));
         let grade = "codecs-grade-nal-workloads";
         let mut steps = Vec::new();
         for (codec, package, example, name) in [
