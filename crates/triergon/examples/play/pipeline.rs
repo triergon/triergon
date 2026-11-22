@@ -1,18 +1,25 @@
-use std::{fs::File, io::Read, path::Path, sync::atomic::AtomicBool};
+use std::{
+    fs::File,
+    io::{Cursor, Read},
+    path::Path,
+    sync::atomic::AtomicBool,
+};
 use triergon::{
-    Backpressure, Budget, BudgetVec, Bytes, Error, PacketInfo, Result, Rounding,
-    SourceCapabilities, SourceId, TimeBase, TrackId, TrackInfo, WorkBudget,
+    AnyReader, Backpressure, Blocking, Budget, BudgetVec, Bytes, ContainerReader, Error,
+    PacketInfo, Result, Rounding, SourceCapabilities, SourceId, TimeBase, TrackInfo, WorkBudget,
     bridge::access::{AccessUnitLimits, AccessUnits},
     framing::BuildStep,
     matroska,
     playback::{
         ByteSource, Engine, Format, Output, Player, PlayerPolicy, Progress, Selection, Source,
-        probe::{Probe, ProbeProgress},
+        mp4::{Mp4IndexJob, Mp4Open, OpenLimits, OpenProgress, PlanLimits},
+        probe::{Probe, ProbeProgress, SelectedInput},
     },
-    render::ass::{Fonts, Options, Renderer, Script, Settings, Size},
+    render::ass::{Fonts, Options as ScriptOptions, Renderer, Script, Settings, Size},
     session::{
-        AudioSession, Canvas, Discard, PcmBlock, QueueLimits, SessionState, VideoSession,
-        audio_codec, audio_configuration, audio_decoder_in, video_codec, video_decoder_in,
+        AudioSession, Canvas, Discard, PcmBlock, Published, QueueLimits, SessionState,
+        VideoSession, audio_codec, audio_configuration, audio_decoder_in, video_codec,
+        video_decoder_in,
     },
 };
 
@@ -39,35 +46,75 @@ fn read_file(pool: &Budget, path: &Path) -> Result<Bytes> {
     bytes.freeze().map_err(|refused| refused.error)
 }
 
-fn open(pool: &Budget, file: &Path, cancel: &AtomicBool) -> Result<Player<impl Source + use<>>> {
-    let bytes = read_file(pool, file)?;
-    let caps = SourceCapabilities {
-        length: Some(bytes.len() as u64),
-        random_access: true,
-    };
-    let id = SourceId(1);
-    let mut probe = Probe::new(pool, id, caps, WINDOW, ByteSource::new(id, bytes, WINDOW)?)?;
-    loop {
-        match probe.advance(&mut work(), cancel)? {
-            ProbeProgress::Selected(Format::Matroska) => break,
-            ProbeProgress::Selected(_) => return Err(Error::Unsupported("expected Matroska")),
-            ProbeProgress::Yield | ProbeProgress::NeedInput(_) => {}
-        }
+#[derive(Clone, Copy)]
+pub(super) struct Options {
+    pub(super) canvas: Canvas,
+    pub(super) format: Option<Format>,
+    pub(super) video: Option<usize>,
+    pub(super) audio: Option<usize>,
+}
+
+pub(super) trait Observer {
+    fn packet(&mut self, _index: usize, _packet: &impl PacketInfo) -> Result<()> {
+        Ok(())
     }
-    let selected = probe.finish()?;
-    let reader = matroska::Reader::new(
-        pool,
-        selected.input.source(),
-        selected.input.capabilities(),
-        matroska::Limits::default(),
-        WINDOW,
-    )?;
-    Player::new_direct(
-        Engine::matroska(reader),
-        selected.source,
-        Selection::All,
-        PlayerPolicy::default(),
-    )
+
+    fn picture(&mut self, _picture: &Published) -> Result<()> {
+        Ok(())
+    }
+
+    fn pcm(&mut self, _block: &PcmBlock) -> Result<()> {
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct Count(Playback);
+
+impl Observer for Count {
+    fn picture(&mut self, picture: &Published) -> Result<()> {
+        self.0.video_frames += 1;
+        self.0.rgba_bytes = picture.rgba.len();
+        Ok(())
+    }
+
+    fn pcm(&mut self, block: &PcmBlock) -> Result<()> {
+        self.0.audio_samples += block.samples.len() / 2;
+        self.0.sample_rate = block.sample_rate;
+        Ok(())
+    }
+}
+
+fn play_source<S: Source>(
+    selected: SelectedInput<S>,
+    pool: &Budget,
+    cancel: &AtomicBool,
+) -> Result<Player<S>> {
+    let (engine, source) = match selected.format {
+        Format::Matroska => {
+            let reader = matroska::Reader::new(
+                pool,
+                selected.input.source(),
+                selected.input.capabilities(),
+                matroska::Limits::default(),
+                WINDOW,
+            )?;
+            (Engine::matroska(reader), selected.source)
+        }
+        Format::Mp4 => {
+            let mut open = Mp4Open::new(selected, OpenLimits::default())?;
+            while !matches!(open.advance(&mut work(), cancel)?, OpenProgress::Ready) {}
+            let opened = open.finish()?;
+            let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default())?;
+            while !index.poll(&mut work(), cancel)? {}
+            (
+                Engine::mp4(opened.input, index.finish()?, 1 << 20)?,
+                opened.source,
+            )
+        }
+        Format::Ts(_) => return Err(Error::Invalid("transport needs an access-unit reader")),
+    };
+    Player::new_direct(engine, source, Selection::All, PlayerPolicy::default())
 }
 
 fn work() -> WorkBudget {
@@ -106,71 +153,89 @@ fn next_output(player: &mut Player<impl Source>, cancel: &AtomicBool) -> Result<
     }
 }
 
-fn start_tracks(
-    pool: &Budget,
-    engine: &Engine,
-    video: &mut VideoSession,
-    audio: &mut AudioSession,
-    cancel: &AtomicBool,
-) -> Result<[(TrackId, AccessUnits); 2]> {
-    let tracks = || (0..engine.track_count()).filter_map(|i| engine.track(i));
-    let (video_track, video_format) = tracks()
-        .find_map(|track| video_codec(track.codec()).map(|codec| (track, codec)))
-        .ok_or(Error::Unsupported("no decodable video track"))?;
-    let (audio_track, audio_format) = tracks()
-        .find_map(|track| audio_codec(track.codec()).map(|codec| (track, codec)))
-        .ok_or(Error::Unsupported("no decodable audio track"))?;
-    let mut config = BudgetVec::new(pool);
-    audio_configuration(audio_format, audio_track.configuration(), &mut config)?;
-    audio.load(Some(audio_decoder_in(audio_format, &config, pool)?));
-    video.load(video_decoder_in(video_format, pool));
-    let frame = |track: &dyn TrackInfo| {
-        let mut setup = AccessUnits::for_track(pool, track, AccessUnitLimits::default())?;
-        ready(|work| setup.step(work, cancel)).map(|units| (track.id(), units))
-    };
-    Ok([frame(&video_track)?, frame(&audio_track)?])
+struct Decode<'a, O> {
+    pool: &'a Budget,
+    opts: Options,
+    video: VideoSession,
+    audio: AudioSession,
+    observer: &'a mut O,
+    framer: Option<Framers>,
 }
 
-fn pull_audio(audio: &mut AudioSession, played: &mut Playback) {
-    let mut pcm = PcmBlock::default();
-    audio.pull(None, 0, &mut pcm);
-    if !pcm.samples.is_empty() {
-        played.audio_samples += pcm.samples.len() / 2;
-        played.sample_rate = pcm.sample_rate;
-    }
+struct Framers {
+    video: (usize, AccessUnits),
+    audio: Option<(usize, AccessUnits)>,
 }
 
-pub(super) fn play(media: &Path, subtitles: &Path, now_ms: i64) -> ExampleResult<Playback> {
-    let pool = Budget::new(128 << 20)?;
-    let cancel = AtomicBool::new(false);
-    let mut player = open(&pool, media, &cancel)?;
-    let canvas = Canvas::new(WIDTH, HEIGHT).ok_or(Error::Invalid("example canvas"))?;
-    let mut video = VideoSession::with_canvas(QueueLimits::VIDEO, canvas);
-    let mut audio = AudioSession::new(QueueLimits::AUDIO);
-    let mut tracks = None;
-    let mut played = Playback::default();
-
-    while let Some(output) = next_output(&mut player, &cancel)? {
-        let Some(packet) = output.packet() else {
-            continue;
-        };
-        let [(video_id, video_units), (audio_id, audio_units)] = if let Some(tracks) = &mut tracks {
+impl<O: Observer> Decode<'_, O> {
+    fn start<T>(
+        &mut self,
+        tracks: impl Iterator<Item = (usize, T)> + Clone,
+        info: impl Fn(&T) -> &dyn TrackInfo,
+        cancel: &AtomicBool,
+    ) -> Result<Framers> {
+        let find = |wanted: Option<usize>| {
             tracks
-        } else {
-            let engine = player.engine().ok_or(Error::Closed)?;
-            tracks.insert(start_tracks(
-                &pool, engine, &mut video, &mut audio, &cancel,
-            )?)
+                .clone()
+                .filter(move |(index, _)| wanted.is_none_or(|i| *index == i))
         };
-        let framing = if packet.track() == *video_id {
-            video_units
-        } else if packet.track() == *audio_id {
-            audio_units
-        } else {
-            continue;
+        let (vi, vt, vc) = find(self.opts.video)
+            .find_map(|(i, track)| video_codec(info(&track).codec()).map(|codec| (i, track, codec)))
+            .ok_or(Error::Unsupported("no decodable video track"))?;
+        self.video.load(video_decoder_in(vc, self.pool));
+        let frame = |track: &dyn TrackInfo| {
+            let mut setup = AccessUnits::for_track(self.pool, track, AccessUnitLimits::default())?;
+            ready(|work| setup.step(work, cancel))
         };
-        let mut job = framing.packet(&packet)?;
-        let unit = ready(|work| job.step(work, &cancel))?;
+        let audio = if let Some((ai, at, ac)) = find(self.opts.audio)
+            .find_map(|(i, track)| audio_codec(info(&track).codec()).map(|codec| (i, track, codec)))
+        {
+            let mut config = BudgetVec::new(self.pool);
+            audio_configuration(ac, info(&at).configuration(), &mut config)?;
+            self.audio
+                .load(Some(audio_decoder_in(ac, &config, self.pool)?));
+            Some((ai, frame(info(&at))?))
+        } else if self.opts.audio.is_some() {
+            return Err(Error::Unsupported("no decodable selected audio track"));
+        } else {
+            None
+        };
+        Ok(Framers {
+            video: (vi, frame(info(&vt))?),
+            audio,
+        })
+    }
+
+    fn packet<T>(
+        &mut self,
+        tracks: impl Iterator<Item = (usize, T)> + Clone,
+        info: impl Fn(&T) -> &dyn TrackInfo,
+        packet: &impl PacketInfo,
+        cancel: &AtomicBool,
+    ) -> ExampleResult<()> {
+        let (index, _) = tracks
+            .clone()
+            .find(|(_, track)| info(track).id() == packet.track())
+            .ok_or(Error::Invalid("packet track is absent"))?;
+        if self.framer.is_none() {
+            self.framer = Some(self.start(tracks, info, cancel)?);
+        }
+        self.observer.packet(index, packet)?;
+        let Some(framers) = &mut self.framer else {
+            return Err(Error::Closed.into());
+        };
+        let video = index == framers.video.0;
+        let units = if video {
+            &mut framers.video.1
+        } else if let Some((audio_index, units)) = &mut framers.audio
+            && *audio_index == index
+        {
+            units
+        } else {
+            return Ok(());
+        };
+        let mut job = units.packet(packet)?;
+        let unit = ready(|work| job.step(work, cancel))?;
         let pts = unit
             .pts()
             .map(|pts| {
@@ -178,37 +243,131 @@ pub(super) fn play(media: &Path, subtitles: &Path, now_ms: i64) -> ExampleResult
                     .rescale(pts, TimeBase::NANOSECONDS, Rounding::Floor)
             })
             .transpose()?;
-        if unit.track() == *video_id {
-            video.feed(unit.payload(), pts)?;
-            while video.step(None) {
-                played.video_frames += 1;
-            }
+        if video {
+            self.video.feed(unit.payload(), pts)?;
+            self.step_video()?;
         } else {
-            audio.feed_discarding(unit.payload(), pts, Discard::of(&unit))?;
-            pull_audio(&mut audio, &mut played);
+            self.audio
+                .feed_discarding(unit.payload(), pts, Discard::of(&unit))?;
+            self.pull_audio()?;
         }
+        Ok(())
     }
-    if tracks.is_none() {
-        return Err(Error::Invalid("no Matroska packets").into());
-    }
-    video.end_of_stream();
-    while video.step(None) {
-        played.video_frames += 1;
-    }
-    audio.end_of_stream();
-    while audio.state() == SessionState::Running {
-        pull_audio(&mut audio, &mut played);
-    }
-    for state in [video.state(), audio.state()] {
-        if let SessionState::Failed(error) = state {
-            return Err(error.into());
-        }
-    }
-    played.rgba_bytes = video.latest().map_or(0, |picture| picture.rgba.len());
 
-    let options = Options {
+    fn step_video(&mut self) -> Result<()> {
+        while self.video.step(None) {
+            if let Some(picture) = self.video.latest() {
+                self.observer.picture(picture)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn pull_audio(&mut self) -> Result<()> {
+        let mut block = PcmBlock::default();
+        self.audio.pull(None, 0, &mut block);
+        if !block.samples.is_empty() {
+            self.observer.pcm(&block)?;
+        }
+        Ok(())
+    }
+
+    fn finish(mut self) -> Result<()> {
+        if self.framer.is_none() {
+            return Err(Error::Invalid("no media packets"));
+        }
+        self.video.end_of_stream();
+        self.step_video()?;
+        self.audio.end_of_stream();
+        while self.audio.state() == SessionState::Running {
+            self.pull_audio()?;
+        }
+        for state in [self.video.state(), self.audio.state()] {
+            if let SessionState::Failed(error) = state {
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+}
+
+pub(super) fn play_with(
+    pool: &Budget,
+    media: Bytes,
+    opts: Options,
+    observer: &mut impl Observer,
+) -> ExampleResult<()> {
+    let caps = SourceCapabilities {
+        length: Some(media.len() as u64),
+        random_access: true,
+    };
+    let id = SourceId(1);
+    let cancel = AtomicBool::new(false);
+    let source = ByteSource::new(id, media.clone(), WINDOW)?;
+    let mut probe = Probe::new(pool, id, caps, WINDOW, source)?;
+    while !matches!(
+        probe.advance(&mut work(), &cancel)?,
+        ProbeProgress::Selected(_)
+    ) {}
+    let selected = probe.finish()?;
+    if opts
+        .format
+        .is_some_and(|expected| expected != selected.format)
+    {
+        return Err(Error::Unsupported("unexpected playback container").into());
+    }
+    let mut decode = Decode {
+        pool,
+        video: VideoSession::with_canvas(QueueLimits::VIDEO, opts.canvas),
+        audio: AudioSession::new(QueueLimits::AUDIO),
+        opts,
+        observer,
+        framer: None,
+    };
+    if matches!(selected.format, Format::Ts(_)) {
+        let reader = AnyReader::open(&media, pool, id, caps)?;
+        let mut driver = Blocking::seekable(reader, Cursor::new(media), pool);
+        while let Some(packet) = driver.next_packet()? {
+            let reader = driver.reader();
+            let tracks =
+                (0..reader.track_count()).filter_map(|i| reader.track(i).map(|track| (i, track)));
+            decode.packet(tracks, |track| *track, &packet, &cancel)?;
+        }
+    } else {
+        let mut player = play_source(selected, pool, &cancel)?;
+        while let Some(output) = next_output(&mut player, &cancel)? {
+            if let Some(packet) = output.packet() {
+                let engine = player.engine().ok_or(Error::Closed)?;
+                let tracks = (0..engine.track_count())
+                    .filter_map(|i| engine.track(i).map(|track| (i, track)));
+                decode.packet(tracks, |track| track, &packet, &cancel)?;
+            }
+        }
+    }
+    decode.finish()?;
+    Ok(())
+}
+
+pub(super) fn play(media: &Path, subtitles: &Path, now_ms: i64) -> ExampleResult<Playback> {
+    let pool = Budget::new(128 << 20)?;
+    let canvas = Canvas::new(WIDTH, HEIGHT).ok_or(Error::Invalid("example canvas"))?;
+    let mut observer = Count::default();
+    play_with(
+        &pool,
+        read_file(&pool, media)?,
+        Options {
+            canvas,
+            format: Some(Format::Matroska),
+            video: None,
+            audio: None,
+        },
+        &mut observer,
+    )?;
+    let mut played = observer.0;
+
+    let options = ScriptOptions {
         extract_fonts: true,
-        ..Options::default()
+        ..ScriptOptions::default()
     };
     let mut script = Script::parse(&pool, &read_file(&pool, subtitles)?, &options)?;
     let settings = Settings::new(Size::new(WIDTH as u32, HEIGHT as u32));
