@@ -786,6 +786,7 @@ pub(crate) fn fixtures(paths: &Paths, manifests: bool) -> Result<String> {
     samples(paths, &mut corpora)?;
     hevc_controls(&mut corpora)?;
     corpora.config.retain_distinct();
+    corpora.units.retain_distinct();
     let mut total = 0;
     for (id, corpus) in IDS
         .into_iter()

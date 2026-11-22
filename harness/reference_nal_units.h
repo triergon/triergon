@@ -176,23 +176,63 @@ static unsigned nal_type(enum AVCodecID codec, NalView unit)
     return codec == AV_CODEC_ID_H264 ? unit.data[0] & 31 : (unit.data[0] >> 1) & 63;
 }
 
+static int nal_sample_unit(const NalScript *script, AVPacket *packet, NalView framed)
+{
+    AVBSFContext *filter = NULL;
+    int status = nal_bsf_open(nal_bsf_name(script->codec), script->codec,
+                              script->config, &filter);
+    if (status >= 0)
+        status = nal_send(filter, packet, framed);
+    if (status >= 0)
+        status = av_bsf_receive_packet(filter, packet);
+    av_bsf_free(&filter);
+    return status;
+}
+
 static int nal_units_run(const ViewCase *input, ViewWork *work)
 {
     const NalScript *script = input->prepared;
-    AVBSFContext *bsf = NULL;
     AVPacket *packet = av_packet_alloc();
-    int status = packet ? nal_bsf_open(nal_bsf_name(script->codec), script->codec,
-                                       script->config, &bsf) : AVERROR(ENOMEM);
-    if (status < 0)
-        goto finish;
+    if (!packet)
+        return 2;
+
+    int result = 0;
     for (unsigned sample = 0; sample < script->packet_count; ++sample) {
-        uint64_t index = 0, offset = 0, sample_word = sample;
-        status = nal_send(bsf, packet, script->packets[sample]);
-        if (status >= 0) {
-            while ((status = av_bsf_receive_packet(bsf, packet)) >= 0) {
-                NalView bytes = {packet->data, (size_t)packet->size}, unit;
-                int state;
-                while ((state = nal_annexb_next(&bytes, script->codec == AV_CODEC_ID_HEVC, &unit)) > 0) {
+        const NalView source = script->packets[sample];
+        NalView remaining = source;
+        uint64_t index = 0, sample_word = sample;
+        int status = 0;
+        while (remaining.size) {
+            /* Submit one declared unit at a time. The sample's physical length
+             * fields delimit the input even if opaque bytes contain 00 00 01.
+             * A fresh filter cannot inject another unit from earlier samples. */
+            NalView length, payload;
+            const uint8_t *start = remaining.data;
+            if (nal_take(&remaining, script->width, &length) ||
+                nal_take(&remaining, nal_be(length.data, script->width), &payload)) {
+                status = AVERROR_INVALIDDATA;
+                break;
+            }
+            NalView framed = {start, script->width + payload.size};
+            if (!payload.size && remaining.size) {
+                /* The converter gets the entire invalid suffix. Do not reinterpret
+                 * its bytes as separately convertible NAL units after a zero length. */
+                framed.size += remaining.size;
+                remaining.size = 0;
+            }
+            status = nal_sample_unit(script, packet, framed);
+            if (status == AVERROR(EAGAIN) && !payload.size)
+                continue;
+            if (status < 0)
+                break;
+            NalView converted = {packet->data, (size_t)packet->size};
+            if (converted.size) {
+                size_t prefix;
+                if (nal_start(converted, 0, &prefix) != 0) {
+                    const uint64_t size = converted.size;
+                    nal_record(work, 3, &size, 1, converted);
+                } else {
+                    NalView unit = {converted.data + prefix, converted.size - prefix};
                     unsigned first = 0, second = 0;
                     if (unit.size && script->codec == AV_CODEC_ID_H264)
                         first = (unit.data[0] >> 5) & 3;
@@ -200,33 +240,27 @@ static int nal_units_run(const ViewCase *input, ViewWork *work)
                         first = ((unit.data[0] & 1) << 5) | (unit.data[1] >> 3);
                         second = unit.data[1] & 7;
                     }
-                    offset += script->width;
-                    uint64_t words[] = {sample, index++, offset, nal_type(script->codec, unit),
-                                        first, second, unit.size};
+                    const uint64_t offset = (uint64_t)(payload.data - source.data);
+                    const uint64_t words[] = {sample, index++, offset, nal_type(script->codec, unit),
+                                              first, second, unit.size};
                     nal_record(work, 1, words, 7, unit);
-                    offset += unit.size;
                 }
-                if (state < 0) {
-                    const uint64_t length = bytes.size;
-                    nal_record(work, 3, &length, 1, bytes);
-                }
-                av_packet_unref(packet);
             }
+            av_packet_unref(packet);
         }
-        if (status == AVERROR(EAGAIN) || status == AVERROR_EOF || status == 0) {
-            uint64_t words[] = {sample, index};
-            nal_record(work, 7, words, 2, (NalView){0});
-        } else if (status == AVERROR_INVALIDDATA) {
+        if (status == AVERROR_INVALIDDATA) {
             nal_refusal(work, &sample_word, 1, status);
+        } else if (status == 0 || status == AVERROR(EAGAIN)) {
+            const uint64_t words[] = {sample, index};
+            nal_record(work, 7, words, 2, (NalView){0});
         } else {
-            goto finish;
+            result = 2;
+            break;
         }
+        av_packet_unref(packet);
     }
-    status = 0;
-finish:
     av_packet_free(&packet);
-    av_bsf_free(&bsf);
-    return status < 0 ? 2 : 0;
+    return result;
 }
 
 static void nal_config_units(ViewWork *work, enum AVCodecID codec, NalView bytes, int four,
