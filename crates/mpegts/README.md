@@ -100,6 +100,9 @@ continuations directly to a `compat::pes::DemuxObserver`.
 The [PSI gate](../../harness/features/ts-psi-readers/contract.json) compares the
 standalone section and table readers with FFmpeg on TS188 and M2TS192, including
 current table versions, program membership, language flags and DVB services.
+In the active program, `ProgramStream::language` returns the first well-formed
+ISO 639 code from the PMT in source order. The descriptor iterator preserves
+every coded language and its role.
 
 ## Access units
 

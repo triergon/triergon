@@ -42,6 +42,8 @@ impl<'a> ActiveProgram<'a> {
 }
 
 /// One elementary stream of an [`ActiveProgram`]. Its [`TrackInfo`] is the PMT entry's.
+/// The neutral language is the first three-letter ISO 639 code in section order.
+/// The descriptor view retains all language codes and roles.
 #[derive(Clone, Copy, Debug)]
 pub struct ProgramStream<'a> {
     route: &'a PesRoute,
@@ -92,6 +94,23 @@ impl TrackInfo for ProgramStream<'_> {
     fn configuration(&self) -> &[u8] {
         &[]
     }
+    fn language(&self) -> Option<&str> {
+        self.descriptors()
+            .filter_map(|descriptor| {
+                let descriptor = descriptor.ok()?;
+                descriptor.languages().ok()?;
+                Some(descriptor.data.chunks_exact(4))
+            })
+            .flatten()
+            .find_map(|entry| {
+                let code = &entry[..3];
+                if code.iter().all(u8::is_ascii_alphabetic) {
+                    std::str::from_utf8(code).ok()
+                } else {
+                    None
+                }
+            })
+    }
 }
 
 impl TransportStream {
@@ -104,5 +123,44 @@ impl TransportStream {
             section: self.pmt_source.as_ref()?,
             version: self.pmt_version?,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::SourceEpochs;
+    use triergon_core::Budget;
+
+    #[test]
+    fn neutral_track_borrows_the_first_well_formed_language_code() {
+        let budget = Budget::new(1024).unwrap();
+        for (descriptors, expected) in [
+            (b"\x0a\x08eng\x01fra\x02".as_slice(), Some("eng")),
+            (b"\x0a\x0c\xff00\x00FrA\x02eng\x01", Some("FrA")),
+            (b"\x0a\x03eng", None),
+            (b"\x0a\x04\xff00\x00", None),
+            (b"\x59\x08eng\x14\x00\x01\x00\x02", None),
+            (b"", None),
+        ] {
+            let route = PesRoute {
+                pid: 256,
+                stream_type: 0x1b,
+                descriptors: Bytes::copy_from_slice(&budget, descriptors).unwrap(),
+                epochs: SourceEpochs {
+                    clock: 0,
+                    configuration: 0,
+                },
+                continuity: None,
+                assembler: None,
+                reuse: None,
+            };
+            let stream = ProgramStream {
+                route: &route,
+                namespace: DescriptorNamespace::Unspecified,
+            };
+            assert_eq!(stream.language(), expected);
+            assert_eq!(stream.descriptor_bytes().as_ref(), descriptors);
+        }
     }
 }
