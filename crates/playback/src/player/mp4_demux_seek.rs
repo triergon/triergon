@@ -114,7 +114,7 @@ impl<S: Source> Player<S> {
         let Some(engine @ Engine::Mp4(_)) = self.engine.as_ref() else {
             return Err(Error::Invalid("demux seek requires MP4"));
         };
-        self.check_native_seek_clock()?;
+        self.check_demux_seek_clock()?;
         Mp4DemuxSeekJob::new(engine, movie, request, selection, None)
     }
 
@@ -127,7 +127,7 @@ impl<S: Source> Player<S> {
         request: Mp4DemuxSeekRequest,
         selection: Selection,
     ) -> Result<Mp4DemuxSeekJob<'a>> {
-        self.check_native_seek_clock()?;
+        self.check_demux_seek_clock()?;
         let engine = self.progressive_seek_candidate(next)?;
         Mp4DemuxSeekJob::new(engine, movie, request, selection, Some(self.generation))
     }
@@ -146,7 +146,7 @@ impl<S: Source> Player<S> {
             .transpose()
     }
 
-    fn check_native_seek_clock(&self) -> Result<()> {
+    fn check_demux_seek_clock(&self) -> Result<()> {
         if self.clock != ClockChoice::Demux {
             return Err(Error::Unsupported(
                 "demux seek requires a complete MP4 range plan",
@@ -208,7 +208,7 @@ impl<'a> Mp4DemuxSeekJob<'a> {
         }
         let base = MediaClock::from_source(selected.snapshot.base.require()?)?.demux_base;
         let target = Time::from_ticks(i128::from(request.timestamp), base)?;
-        let global = native_global_seek(
+        let global = demux_global_seek(
             movie,
             plan.encoded_edits.as_ref().map(BudgetVec::as_slice),
             request,
@@ -233,7 +233,7 @@ impl<'a> Mp4DemuxSeekJob<'a> {
     }
 }
 
-pub(super) fn native_global_seek<'a>(
+pub(super) fn demux_global_seek<'a>(
     movie: &'a Movie,
     edits: Option<&'a [Option<EncodedEditPlan>]>,
     request: Mp4DemuxSeekRequest,
@@ -247,11 +247,11 @@ pub(super) fn native_global_seek<'a>(
             maximum,
         });
     }
-    let mut native = BudgetVec::new(movie.pool());
-    native.try_reserve_exact(tracks.len())?;
+    let mut demux_tracks = BudgetVec::new(movie.pool());
+    demux_tracks.try_reserve_exact(tracks.len())?;
     let movie_base = movie.header().time_base()?;
     for track in tracks {
-        native
+        demux_tracks
             .try_push(DemuxTrack {
                 track_id: track.header().track_id,
                 table: track.table(),
@@ -264,7 +264,7 @@ pub(super) fn native_global_seek<'a>(
     Ok(if media_tracks_only {
         GlobalSeekJob::new_projected(
             movie.pool(),
-            native.as_slice(),
+            demux_tracks.as_slice(),
             movie.media(),
             (request.video, request.timestamp),
             request.limits,
@@ -274,7 +274,7 @@ pub(super) fn native_global_seek<'a>(
     } else if let Some(plans) = edits {
         GlobalSeekJob::new_encoded_regular_rescaled(
             movie.pool(),
-            native.as_slice(),
+            demux_tracks.as_slice(),
             movie.media(),
             (request.video, request.timestamp),
             request.limits,
@@ -283,7 +283,7 @@ pub(super) fn native_global_seek<'a>(
     } else {
         GlobalSeekJob::new_complete_source_rescaled(
             movie.pool(),
-            native.as_slice(),
+            demux_tracks.as_slice(),
             movie.media(),
             request.video,
             request.timestamp,

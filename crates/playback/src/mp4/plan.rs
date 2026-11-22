@@ -349,7 +349,7 @@ impl PreparedMp4 {
     pub fn front_read_boundary(&self) -> Option<iso::compat::mov::front::FrontReadBoundary> {
         self.front_boundary
     }
-    pub(crate) fn next_native_empty_duration(
+    pub(crate) fn next_demux_empty_duration(
         &self,
         packet: &PacketOccurrence,
         completed_run: bool,
@@ -441,7 +441,7 @@ pub struct Mp4IndexJob<'a> {
     movie: &'a Movie,
     plan: Option<PreparedMp4>,
     source: Option<PhysicalSampleCursor<'a>>,
-    native: Option<PacketCursor<'a>>,
+    demux: Option<PacketCursor<'a>>,
     range_duration: Option<RangeDuration>,
     limits: PlanLimits,
     phase: IndexPhase,
@@ -451,7 +451,7 @@ pub struct Mp4IndexJob<'a> {
     root: usize,
     extent: usize,
     pending_source: Option<SourceRow>,
-    pending_native: Option<PacketOccurrence>,
+    pending_demux: Option<PacketOccurrence>,
     source_track_order: bool,
     source_sort: Option<SampleSort>,
     zero_scale_clock: Option<MediaClock>,
@@ -622,7 +622,7 @@ impl<'a> Mp4IndexJob<'a> {
         }
         let b = movie.pool();
         let mut sources = BudgetVec::new(b);
-        let mut native = BudgetVec::new(b);
+        let mut demux_tracks = BudgetVec::new(b);
         let mut zero_scale_clock = None;
         for t in movie.tracks() {
             let media_base = if t.header().timescale == 0 && movie.native_recovery() {
@@ -651,7 +651,7 @@ impl<'a> Mp4IndexJob<'a> {
                 )?;
             }
             push(
-                &mut native,
+                &mut demux_tracks,
                 DemuxTrack {
                     track_id: t.header().track_id,
                     table: t.table(),
@@ -727,78 +727,78 @@ impl<'a> Mp4IndexJob<'a> {
                 timing_policy,
             )?)
         };
-        let native = if view == PlanView::Demux {
-            let native_limits = limits.packet_limits();
+        let demux = if view == PlanView::Demux {
+            let packet_limits = limits.packet_limits();
             let media_tracks_only = range_duration
                 .as_ref()
                 .is_some_and(|range| range.media_tracks_only);
             Some(if media_tracks_only {
                 PacketCursor::new_projected(
                     b,
-                    native.as_slice(),
+                    demux_tracks.as_slice(),
                     movie.media(),
-                    native_limits,
+                    packet_limits,
                     encoded_edits,
                     |index| include_media_track(movie, index),
                 )?
             } else if let Some(plans) = encoded_edits.filter(|_| demux_front) {
                 PacketCursor::new_front_with_encoded_edits(
                     b,
-                    native.as_slice(),
+                    demux_tracks.as_slice(),
                     movie.media(),
-                    native_limits,
+                    packet_limits,
                     plans,
                 )?
             } else if let Some(plans) = encoded_edits {
                 PacketCursor::new_encoded_regular(
                     b,
-                    native.as_slice(),
+                    demux_tracks.as_slice(),
                     movie.media(),
-                    native_limits,
+                    packet_limits,
                     plans,
                     iso::compat::mov::edits::EncodedEditProfile,
                 )?
             } else if let Some(bounds) = forward_regular {
                 PacketCursor::new_front_regular(
                     b,
-                    native.as_slice(),
+                    demux_tracks.as_slice(),
                     movie.media(),
                     bounds,
-                    native_limits,
+                    packet_limits,
                     DemuxProfile::NoParseNoFillin,
                 )?
             } else if demux_front && !movie.trex().is_empty() {
                 PacketCursor::new_front_fragmented(
                     b,
-                    native.as_slice(),
+                    demux_tracks.as_slice(),
                     movie.media(),
                     movie.terminal_mdat(),
                     movie.trex(),
-                    native_limits,
+                    packet_limits,
                 )?
             } else if demux_front {
                 PacketCursor::new_front_source(
                     b,
-                    native.as_slice(),
+                    demux_tracks.as_slice(),
                     movie.media(),
                     movie.terminal_mdat(),
-                    native_limits,
+                    packet_limits,
                     DemuxProfile::NoParseNoFillin,
                 )?
             } else if movie.read_scope() == crate::mp4::open::MetadataReadScope::CompleteEntity {
                 PacketCursor::new_complete_source(
                     b,
-                    native.as_slice(),
+                    demux_tracks.as_slice(),
                     movie.media(),
-                    native_limits,
+                    packet_limits,
                     DemuxProfile::NoParseNoFillin,
                 )?
             } else {
                 PacketCursor::new(
                     b,
-                    native.as_slice(),
+                    demux_tracks.as_slice(),
                     movie.media(),
-                    native_limits,
+                    packet_limits,
                     DemuxProfile::NoParseNoFillin,
                 )?
             })
@@ -854,7 +854,7 @@ impl<'a> Mp4IndexJob<'a> {
                 pool: b.clone(),
             }),
             source,
-            native,
+            demux,
             range_duration,
             limits,
             phase: IndexPhase::Tracks,
@@ -864,7 +864,7 @@ impl<'a> Mp4IndexJob<'a> {
             root: 0,
             extent: 0,
             pending_source: None,
-            pending_native: None,
+            pending_demux: None,
             source_track_order: false,
             source_sort: None,
             zero_scale_clock,
@@ -1010,7 +1010,7 @@ impl<'a> Mp4IndexJob<'a> {
             push(&mut p.media_cache, extent.clone())?;
         } else {
             self.phase = if let Some(duration) = &self.range_duration {
-                if let Some(cursor) = &mut self.native {
+                if let Some(cursor) = &mut self.demux {
                     if duration.scan {
                         cursor.check_duration_before_replay()?;
                     } else {
@@ -1149,7 +1149,7 @@ impl<'a> Mp4IndexJob<'a> {
         let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
         if let Some(duration) = &mut self.range_duration {
             let cursor = self
-                .native
+                .demux
                 .as_mut()
                 .ok_or(Error::Invalid("demux range cursor missing"))?;
             match cursor.poll(w, c)? {
@@ -1170,10 +1170,10 @@ impl<'a> Mp4IndexJob<'a> {
                 }
             }
         }
-        if self.pending_native.is_some() && !w.try_charge(1) {
+        if self.pending_demux.is_some() && !w.try_charge(1) {
             return Ok(false);
         }
-        if let Some(mut row) = self.pending_native.take() {
+        if let Some(mut row) = self.pending_demux.take() {
             if let Some(clock) = self.zero_scale_clock
                 && p.track(row.track_id)?.snapshot.base.get().is_none()
             {
@@ -1213,7 +1213,7 @@ impl<'a> Mp4IndexJob<'a> {
             let duration = if row.source.range.is_empty() {
                 None
             } else {
-                p.next_native_empty_duration(&row, true)
+                p.next_demux_empty_duration(&row, true)
             };
             match p.demux_rows.try_push(row) {
                 Ok(()) => {
@@ -1221,17 +1221,17 @@ impl<'a> Mp4IndexJob<'a> {
                     p.empty_duration = duration;
                 }
                 Err(e) => {
-                    self.pending_native = Some(e.value);
+                    self.pending_demux = Some(e.value);
                     return Err(e.error);
                 }
             }
             return Ok(false);
         }
-        if let Some(native) = self.native.as_mut() {
-            match native.poll(w, c)? {
+        if let Some(cursor) = self.demux.as_mut() {
+            match cursor.poll(w, c)? {
                 CursorStatus::Yield => {}
                 CursorStatus::Ready => {
-                    self.pending_native = Some(native.take_occurrence()?);
+                    self.pending_demux = Some(cursor.take_occurrence()?);
                 }
                 CursorStatus::End => {
                     self.track = 0;
@@ -1261,7 +1261,7 @@ impl<'a> Mp4IndexJob<'a> {
                     Err(Error::Backpressure { .. })
                         if self.range_duration.is_some()
                             && self
-                                .native
+                                .demux
                                 .as_mut()
                                 .is_some_and(PacketCursor::discard_seek_checkpoints) =>
                     {
@@ -1294,7 +1294,7 @@ impl<'a> Mp4IndexJob<'a> {
             return Ok(false);
         }
         let state = self
-            .native
+            .demux
             .as_ref()
             .ok_or(Error::Invalid("front demux cursor missing"))?
             .front_track(self.track)?;
@@ -1310,13 +1310,13 @@ impl<'a> Mp4IndexJob<'a> {
         self.plan.take().ok_or(Error::Invalid("plan consumed"))
     }
 
-    pub(crate) fn finish_native_range(mut self) -> Result<(PreparedMp4, PacketCursor<'a>, i64)> {
+    pub(crate) fn finish_demux_range(mut self) -> Result<(PreparedMp4, PacketCursor<'a>, i64)> {
         let duration = self
             .range_duration
             .take()
             .ok_or(Error::Invalid("missing range duration"))?;
         let cursor = self
-            .native
+            .demux
             .take()
             .ok_or(Error::Invalid("demux range cursor missing"))?;
         Ok((self.finish()?, cursor, duration.micros))

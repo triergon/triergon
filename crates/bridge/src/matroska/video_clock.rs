@@ -100,12 +100,12 @@ impl DecodeClock {
             self.valid = false;
             return Err(error);
         }
-        let native = triergon_matroska::compat::clock::packet_timing(timing)?;
-        let pts_ns = native
+        let exact = triergon_matroska::compat::clock::packet_timing(timing)?;
+        let pts_ns = exact
             .pts
             .map(triergon_matroska::timing::ExactTime::rounded_ns)
             .transpose()?;
-        let duration_ns = match native.duration {
+        let duration_ns = match exact.duration {
             Some(duration) => Some(duration.rounded_duration_ns()?),
             None => fallback_duration(timing.scale_ns),
         };

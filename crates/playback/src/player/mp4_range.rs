@@ -3,7 +3,7 @@
 
 use super::{
     ClockChoice, Mp4DemuxSeekRequest, Output, Player, PlayerPolicy, Progress, Selection, TrackKey,
-    mp4_demux_seek::native_global_seek,
+    mp4_demux_seek::demux_global_seek,
 };
 use crate::{
     Engine, Result, Source, SourceOwner,
@@ -84,7 +84,7 @@ impl<'a> Mp4RangeOpen<'a> {
         if !input.capabilities().random_access {
             return Err(Error::Unsupported("MP4 range playback needs random access"));
         }
-        let (plan, mut cursor, duration_us) = self.index.finish_native_range()?;
+        let (plan, mut cursor, duration_us) = self.index.finish_demux_range()?;
         // Leave space for packet/input staging and selection validation.
         // The fact vector grows over at most 64 tracks, including its old
         // allocation during a growth step.
@@ -215,7 +215,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             (Some(checked), None, None)
         } else {
             let global =
-                native_global_seek(self.movie, self.edits, request, self.media_tracks_only)?;
+                demux_global_seek(self.movie, self.edits, request, self.media_tracks_only)?;
             let global = match opus_audio {
                 Some(audio) => global.with_opus_recovery(audio)?,
                 None => global,

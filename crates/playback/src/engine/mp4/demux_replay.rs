@@ -207,14 +207,14 @@ mod tests {
             dependency: None,
             fragment_flags: None,
         };
-        let native = PacketProjector::new(base, None)
+        let demux = PacketProjector::new(base, None)
             .project(&source, None)
             .unwrap();
         PacketOccurrence {
             track_id,
-            scheduling_clock: SchedulingClock::from_demux_clock(native.dts_field, base).unwrap(),
+            scheduling_clock: SchedulingClock::from_demux_clock(demux.dts_field, base).unwrap(),
             source,
-            demux: native,
+            demux,
             edit: None,
             clock_origin: ClockOrigin::SourceClock,
             media_clock: MediaClock::from_source(base).unwrap(),

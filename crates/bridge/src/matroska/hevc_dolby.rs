@@ -450,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn native_duration_uses_whole_ticks_of_the_final_independent_syncframe() {
+    fn demux_duration_uses_whole_ticks_of_the_final_independent_syncframe() {
         let data = eac3_frame();
         let duration = |raw: &[u8], scale| dolby_duration_ns(Ac3Family::Eac3, raw, scale);
         assert_eq!(duration(data, 1_000_000), Some(32_000_000));

@@ -57,12 +57,12 @@ impl SourceCursor {
 struct Cursor {
     cursor: SourceCursor,
     head: Option<SourceRow>,
-    native: Option<iso::compat::mov::front::FrontSample>,
+    front: Option<iso::compat::mov::front::FrontSample>,
 }
 #[derive(Debug)]
 struct PendingRow {
     source: SourceRow,
-    native: Option<iso::compat::mov::front::FrontSample>,
+    front: Option<iso::compat::mov::front::FrontSample>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
@@ -522,7 +522,7 @@ impl ProgressiveState {
                         SourceCursor::Physical(index.into_cursor())
                     },
                     head: None,
-                    native: None,
+                    front: None,
                 });
             }
             return Ok(EngineStep::Yield);
@@ -633,7 +633,7 @@ impl ProgressiveState {
                     iso::CursorStatus::Ready => {
                         let head = cursor.take_sample()?;
                         let source = head.source().clone();
-                        current.native = Some(head);
+                        current.front = Some(head);
                         Next::Item(source)
                     }
                 },
@@ -715,7 +715,7 @@ impl ProgressiveState {
                 .ok_or(Error::Invalid("pending cursor"))?;
             let row = PendingRow {
                 source: cursor.head.take().ok_or(Error::Invalid("merge head"))?,
-                native: cursor.native.take(),
+                front: cursor.front.take(),
             };
             let track = usize::from(self.cursor_tracks[at]);
             let next = if self.demux_next[track] == 0 {
@@ -742,7 +742,7 @@ impl ProgressiveState {
                     .as_mut()
                     .ok_or(Error::Invalid("pending cursor"))?;
                 cursor.head = Some(error.value.source);
-                cursor.native = error.value.native;
+                cursor.front = error.value.front;
                 self.best = Some(at);
                 return Err(error.error);
             }
@@ -831,7 +831,7 @@ impl ProgressiveState {
                 return Err(Error::Invalid("live media extent"));
             }
             // Reserve both owners before committing either a source row
-            // or the separate native clock. Retry keeps the exact head.
+            // or the separate demux clock. Retry keeps the exact head.
             if !engine.plan.demux_order_replay {
                 engine.plan.source_rows.try_reserve_exact(1)?;
             }
@@ -843,7 +843,7 @@ impl ProgressiveState {
                     .iter()
                     .position(|t| t.snapshot.track_id == row.source.track_id)
                     .ok_or(Error::Invalid("front continuation track"))?;
-                let head = row.native.as_ref().ok_or(Error::Invalid(
+                let head = row.front.as_ref().ok_or(Error::Invalid(
                     "front demux continuation is missing its next occurrence",
                 ))?;
                 let duration = engine
@@ -855,17 +855,17 @@ impl ProgressiveState {
                 } else {
                     head.read_boundary_in_media(self.row + 1 < self.rows.len())?
                 };
-                let (next, native) = engine.plan.front_tracks.as_slice()[at].project(head)?;
-                let next_duration = engine.plan.next_native_empty_duration(
-                    &native,
+                let (next, demux) = engine.plan.front_tracks.as_slice()[at].project(head)?;
+                let next_duration = engine.plan.next_demux_empty_duration(
+                    &demux,
                     boundary.is_none() && head.remaining_in_run() == 0,
                 );
-                let base = native.media_clock.demux_base;
+                let base = demux.media_clock.demux_base;
                 engine.plan.demux_rows.try_reserve_exact(1)?;
                 engine
                     .plan
                     .demux_rows
-                    .try_push(native)
+                    .try_push(demux)
                     .map_err(|e| e.error)?;
                 engine.plan.front_tracks.as_mut_slice()[at] = next;
                 engine.plan.front_boundary = boundary;
