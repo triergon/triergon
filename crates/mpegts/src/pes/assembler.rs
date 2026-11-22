@@ -329,6 +329,7 @@ impl PesAssembler {
     }
 
     /// Commit a carrier after the complete span and work grant were checked.
+    // Returning refused spans measured +1.088607% on one transport workload.
     #[expect(
         clippy::expect_used,
         reason = "handing a refused span back to the caller measured +0.24% (seek split-PES +0.72%): try_push no longer inlines"
