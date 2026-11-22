@@ -8,7 +8,7 @@
   "reference": "ffmpeg-subtitle-views-native",
   "runner": "cargo xtask report",
   "contract": [
-    "Project setting lines before the first id as LF-terminated extradata, each track as id, language and default disposition, and timestamps with delay as millisecond PTS and sub file offsets for entries that admit a program-stream unit in the companion file. Compare the public VobSub demuxer output. Blank and comment counts are read independently from the raw index."
+    "Compare the VobSub demux view of the index and companion stream. Stream ordinals follow the first timestamp for each track number. Keep the written language and default disposition, UTF-8 configuration bytes with LF endings, and the PTS and source position of each admitted packet. Order packets by file position within each track and by PTS across queue heads. Read blank and comment counts independently."
   ],
   "required_profiles": [
     "authored",
@@ -672,83 +672,31 @@
       "cause": "the reference reads the index by opening the idx/sub pair, including its program stream"
     }
   ],
-  "pending_module_requirements": [
-    "The line view retains all tied timestamps and shared offsets; the reference schedules and suppresses entries while reading the subpicture stream.",
-    "The line view keeps every admitted timestamp form in PTS order. The reference queue reads the entries in a different order when positions repeat.",
-    "The line view retains the declared empty track. The reference publishes only the stream with packet entries.",
-    "The line view preserves repeated track declarations. The reference groups both sets of timestamps under one stream.",
-    "Lines retains the written language and no index; the reference recovers the line as language und and id zero.",
-    "The source line parser preserves the documented signed delay fields; the reference demuxer uses a different delay or packet order for the noncanonical forms.",
-    "The authored projection orders timestamps by PTS. The reference emits some out-of-order timestamps in increasing program-stream offset order.",
-    "Lines accepts a leading zero-padded many-digit time field; the public demuxer refuses the index."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "vobsub-extent-ties",
-      "requirement": "The line view retains all tied timestamps and shared offsets; the reference schedules and suppresses entries while reading the subpicture stream.",
+      "reading": "Preserve the written language when a recovered declaration has no index",
+      "clause": "Matroska codec mapping draft \u00a73.5.13 uses the id line for track language; triergon_subtitles::dvd::vobsub::Line::Track preserves the written language and records a missing index",
+      "candidate": "keeps en or invalid from the source declaration while admitting the packets on recovered track zero",
+      "reference": "publishes und on track zero with the same packet sequence",
+      "compat": "compat::dvd::default_incomplete_vobsub_declaration",
+      "cases": [
+        "vobsub-idx-no-index",
+        "missing-index",
+        "malformed-id"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "vobsub-idx-timestamp-forms",
-      "requirement": "The line view keeps every admitted timestamp form in PTS order. The reference queue reads the entries in a different order when positions repeat.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "vobsub-idx-empty-track",
-      "requirement": "The line view retains the declared empty track. The reference publishes only the stream with packet entries.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "vobsub-idx-repeated-track",
-      "requirement": "The line view preserves repeated track declarations. The reference groups both sets of timestamps under one stream.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "vobsub-idx-no-index",
-      "requirement": "Lines retains the written language and no index; the reference recovers the line as language und and id zero.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "vobsub-idx-delay-forms",
-      "requirement": "The source line parser preserves the documented signed delay fields; the reference demuxer uses a different delay or packet order for the noncanonical forms.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fate-vobsub",
-      "requirement": "The authored projection orders timestamps by PTS. The reference emits some out-of-order timestamps in increasing program-stream offset order.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "missing-index",
-      "requirement": "Lines retains the written language and no index; the reference recovers the line as language und and id zero.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "malformed-id",
-      "requirement": "Lines retains the written language and no index; the reference recovers the line as language und and id zero.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "long-timestamp",
-      "requirement": "Lines accepts a leading zero-padded many-digit time field; the public demuxer refuses the index.",
+      "reading": "Leading zeroes in a VobSub time field do not change its value",
+      "clause": "Matroska codec mapping draft \u00a73.5.13 uses each timestamp and filepos line; triergon_subtitles::dvd::vobsub::Line::Timestamp allows any digit width within the numeric range",
+      "candidate": "publishes one packet at 1000 ms and file position zero",
+      "reference": "refuses the index with the 17-digit leading-zero time field",
+      "compat": "compat::dvd::limit_vobsub_timestamp_field_width",
+      "cases": [
+        "long-timestamp"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

@@ -1,7 +1,8 @@
 use std::ffi::OsString;
 
+use std::collections::BTreeMap;
 use triergon_core::{Budget, BudgetVec};
-use triergon_subtitles::compat::dvd::VobSubEntry;
+use triergon_subtitles::compat::dvd::VobSubIndex;
 use triergon_subtitles::dvd::vobsub::{Line, Lines};
 
 use super::protocol::Operation;
@@ -26,11 +27,15 @@ pub(super) fn operation<'a>(
 }
 
 fn index_view(records: &mut Records<'_, '_>, input: &[u8], sub: &[u8]) -> Result<(), String> {
-    let mut header = Vec::new();
-    let mut tracks = Vec::new();
-    let mut packets = Vec::new();
+    let pool = Budget::new(16 * 1024 * 1024).map_err(|error| error.to_string())?;
+    let Ok(index) = VobSubIndex::parse(&pool, input) else {
+        return records.refused();
+    };
+    if index.streams().is_empty() {
+        return records.refused();
+    }
+    let mut languages = BTreeMap::new();
     let mut langidx = 0;
-    let mut delay = 0_i64;
     let (mut comments, mut blanks) = (0, 0);
     for (_, line) in Lines::new(input) {
         match line {
@@ -42,34 +47,16 @@ fn index_view(records: &mut Records<'_, '_>, input: &[u8], sub: &[u8]) -> Result
                 }
             }
             Ok(Line::Track { language, index }) => {
-                tracks.push((index.unwrap_or(0), language));
+                languages.entry(index.unwrap_or(0)).or_insert(language);
             }
-            Ok(Line::Delay(value)) => delay = value,
-            Ok(Line::Timestamp {
-                milliseconds,
-                filepos,
-            }) => {
-                let Some(track) = tracks.len().checked_sub(1) else {
-                    return records.refused();
-                };
-                let Some(pts) = milliseconds.checked_add(delay) else {
-                    return records.refused();
-                };
-                packets.push((pts, filepos, track));
-            }
-            Ok(Line::Setting(line)) if tracks.is_empty() => {
-                header.extend_from_slice(line);
-                header.push(b'\n');
-            }
-            Ok(Line::Setting(_)) => {}
+            Ok(_) => {}
             Err(_) => return records.refused(),
         }
     }
-    if tracks.is_empty() {
-        return records.refused();
-    }
     records.row(3, &[comments, blanks], &[])?;
-    for (ordinal, &(id, language)) in tracks.iter().enumerate() {
+    let header = index.configuration();
+    for (ordinal, &id) in index.streams().iter().enumerate() {
+        let language = languages.get(&id).ok_or("missing indexed track language")?;
         records.row(
             2,
             &[
@@ -80,37 +67,33 @@ fn index_view(records: &mut Records<'_, '_>, input: &[u8], sub: &[u8]) -> Result
             ],
             language,
         )?;
-        records.row(2, &[ordinal as u64, header.len() as u64], &header)?;
+        records.row(2, &[ordinal as u64, header.len() as u64], header)?;
     }
-    // An index entry names a source position. The demuxer only publishes a
-    // packet when a program-stream unit can be read there.
-    packets.sort_by_key(|&(pts, pos, track)| (track, pos, pts));
-    let pool = Budget::new(16 * 1024 * 1024).map_err(|error| error.to_string())?;
     let mut output = BudgetVec::new(&pool);
-    let mut admitted = Vec::new();
-    for (i, &(pts, pos, track)) in packets.iter().enumerate() {
+    let mut queues: Vec<_> = (0..index.streams().len())
+        .map(|track| index.entries(track).peekable())
+        .collect();
+    // Present the earliest queue head while preserving file order within a track.
+    loop {
+        let Some((track, _)) = queues
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(track, entries)| Some((track, entries.peek()?.milliseconds)))
+            .min_by_key(|&(_, pts)| pts)
+        else {
+            break;
+        };
+        let entry = queues[track].next().ok_or("missing index entry")?;
+        let pos = entry.filepos;
         let Some(data) = usize::try_from(pos).ok().and_then(|at| sub.get(at..)) else {
             continue;
-        };
-        let entry = VobSubEntry {
-            milliseconds: pts,
-            filepos: pos,
-            end: packets
-                .get(i + 1)
-                .filter(|next| next.2 == track)
-                .map(|next| next.1),
-            substream: tracks[track].0,
         };
         if entry
             .read(data, &mut output)
             .map_err(|error| error.to_string())?
         {
-            admitted.push((pts, pos, track));
+            records.row(1, &[track as u64, entry.milliseconds as u64, pos], &[])?;
         }
-    }
-    admitted.sort_by_key(|&(pts, pos, track)| (pts, track, pos));
-    for (pts, pos, track) in admitted {
-        records.row(1, &[track as u64, pts as u64, pos], &[])?;
     }
     records.row(7, &[], &[])
 }
