@@ -235,10 +235,7 @@ fn the_intra_probe_counts_the_same_bits_without_reconstructing() {
     let ac_bits = probe.intra_mb::<true>(&input, 0, 0, 0, &mut trial, PictureType::Intra, false);
     final_pass.intra_mb::<false>(&input, 0, 0, 0, &mut coded, PictureType::Intra, false);
     assert!(ac_bits > 0);
-    let (mut measured, mut actual) = (Vec::new(), Vec::new());
-    probe.writer.take_into(&mut measured).unwrap();
-    final_pass.writer.take_into(&mut actual).unwrap();
-    assert_eq!(measured, actual);
+    assert_eq!(probe.writer.bit_len(), final_pass.writer.bit_len());
     assert!(probe.recon.y().iter().all(|&sample| sample == 1));
     assert!(probe.recon.cb().iter().all(|&sample| sample == 2));
     assert!(probe.recon.cr().iter().all(|&sample| sample == 3));

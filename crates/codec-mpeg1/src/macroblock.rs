@@ -200,8 +200,10 @@ impl Encoder {
             s.dc_pred[comp] = dc;
             let mask = if dc_only {
                 0
+            } else if MEASURE {
+                self.quant.intra::<false>(&coeffs, s.q, &mut levels)
             } else {
-                self.quant.intra(&coeffs, s.q, &mut levels)
+                self.quant.intra::<true>(&coeffs, s.q, &mut levels)
             };
             let start = self.writer.bit_len() + END_OF_BLOCK.1 as usize;
             write_coefficients(&mut self.writer, &levels, mask, true);

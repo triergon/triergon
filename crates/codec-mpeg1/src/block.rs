@@ -39,8 +39,14 @@ impl Quantizer {
 
     /// Quantise intra AC coefficients (raster order) into `levels`; DC is
     /// handled separately. Returns the raster mask of non-zero AC levels.
+    /// Refinement can be omitted when only the lengths of the codes are needed.
     #[inline]
-    pub(crate) fn intra(&self, coeffs: &[i32; 64], scale: u32, levels: &mut [i32; 64]) -> u64 {
+    pub(crate) fn intra<const REFINE: bool>(
+        &self,
+        coeffs: &[i32; 64],
+        scale: u32,
+        levels: &mut [i32; 64],
+    ) -> u64 {
         let table = &self.intra[scale as usize];
         for i in 0..64 {
             let c = coeffs[i];
@@ -48,22 +54,24 @@ impl Quantizer {
             levels[i] = if c < 0 { -m } else { m };
         }
         let mask = nonzero(levels) & !1;
-        let mut scan = 0u64;
-        for position in bits(mask) {
-            scan |= SCAN_BIT[position];
-        }
-        let mut next = 1;
-        for index in bits(scan) {
-            let run = index - next;
-            next = index + 1;
-            let position = ZIGZAG[index];
-            levels[position] = refine_intra_same_bits(
-                coeffs[position],
-                levels[position],
-                scale,
-                INTRA_MATRIX[position],
-                run,
-            );
+        if REFINE {
+            let mut scan = 0u64;
+            for position in bits(mask) {
+                scan |= SCAN_BIT[position];
+            }
+            let mut next = 1;
+            for index in bits(scan) {
+                let run = index - next;
+                next = index + 1;
+                let position = ZIGZAG[index];
+                levels[position] = refine_intra_same_bits(
+                    coeffs[position],
+                    levels[position],
+                    scale,
+                    INTRA_MATRIX[position],
+                    run,
+                );
+            }
         }
         mask
     }
@@ -226,7 +234,7 @@ mod tests {
             let mut coefficients = [0; 64];
             coefficients[1] = sign * 22;
             let mut levels = [0; 64];
-            assert_eq!(quant.intra(&coefficients, 2, &mut levels), 2);
+            assert_eq!(quant.intra::<true>(&coefficients, 2, &mut levels), 2);
             assert_eq!(levels[1], sign * 6);
         }
     }
@@ -239,7 +247,7 @@ mod tests {
             let mut coefficients = [0; 64];
             coefficients[1] = sign * 518;
             let mut levels = [0; 64];
-            quant.intra(&coefficients, 2, &mut levels);
+            quant.intra::<true>(&coefficients, 2, &mut levels);
             assert_eq!(levels[1], sign * 130);
         }
     }
@@ -251,7 +259,7 @@ mod tests {
             let mut coefficients = [0; 64];
             coefficients[1] = coefficient;
             let mut levels = [0; 64];
-            let mask = quant.intra(&coefficients, 2, &mut levels);
+            let mask = quant.intra::<true>(&coefficients, 2, &mut levels);
             assert_eq!(levels[1], expected);
             assert_eq!(mask, if expected == 0 { 0 } else { 2 });
         }
@@ -264,7 +272,7 @@ mod tests {
             let mut coefficients = [0; 64];
             coefficients[1] = sign * 510;
             let mut levels = [0; 64];
-            quant.intra(&coefficients, 2, &mut levels);
+            quant.intra::<true>(&coefficients, 2, &mut levels);
             // The closer level 128 would grow the escape from 20 to 28 bits.
             assert_eq!(levels[1], sign * 127);
         }
@@ -314,8 +322,14 @@ mod tests {
                 });
                 let rounded = rounded_levels(&coefficients, q);
                 let mut selected = [0; 64];
-                let mask = quant.intra(&coefficients, q, &mut selected);
+                let mask = quant.intra::<true>(&coefficients, q, &mut selected);
                 let expected_mask = nonzero(&rounded) & !1;
+                let mut trial = [0; 64];
+                assert_eq!(
+                    quant.intra::<false>(&coefficients, q, &mut trial),
+                    expected_mask
+                );
+                assert_eq!(trial, rounded);
                 assert_eq!(mask, expected_mask);
                 let mut before = BitWriter::default();
                 let mut after = BitWriter::default();
@@ -330,7 +344,7 @@ mod tests {
                 coefficients[position] = coefficient;
                 let rounded = rounded_levels(&coefficients, 2);
                 let mut selected = [0; 64];
-                let mask = quant.intra(&coefficients, 2, &mut selected);
+                let mask = quant.intra::<true>(&coefficients, 2, &mut selected);
                 let expected_mask = nonzero(&rounded) & !1;
                 assert_eq!(mask, expected_mask);
                 let mut before = BitWriter::default();
@@ -351,7 +365,7 @@ mod tests {
                     std::array::from_fn(|i| ((i * 131 + seed * 271) % 4096) as i32 - 2048);
                 let rounded = rounded_levels(&coefficients, q);
                 let mut selected = [0; 64];
-                quant.intra(&coefficients, q, &mut selected);
+                quant.intra::<true>(&coefficients, q, &mut selected);
                 for (i, &coefficient) in coefficients.iter().enumerate().skip(1) {
                     let target = i64::from(coefficient);
                     let rounded_error =
@@ -371,7 +385,7 @@ mod tests {
             let mut coefficients = [0; 64];
             coefficients[1] = sign * 21;
             let mut levels = [0; 64];
-            quant.intra(&coefficients, 2, &mut levels);
+            quant.intra::<true>(&coefficients, 2, &mut levels);
             assert_eq!(levels[1], sign * 5);
         }
     }
@@ -383,7 +397,7 @@ mod tests {
         for q in 0..=31 {
             let rounded = rounded_levels(&coefficients, q);
             let mut selected = [0; 64];
-            quant.intra(&coefficients, q, &mut selected);
+            quant.intra::<true>(&coefficients, q, &mut selected);
             assert_eq!(selected[0], rounded[0]);
             let mut inter = [0; 64];
             quant.inter(&coefficients, q, &mut inter);
