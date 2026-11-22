@@ -14,7 +14,8 @@
     "The pinned formats worker opens the selected program with public MPEG-TS AVIO, NOPARSE and NOFILLIN, without stream discovery. It delivers ordinary entities in one AVIO source and flushes at a declared discontinuity.",
     "The packet fold is the mpegts-pes fold: stream index, PID, PTS and DTS in 90 kHz ticks (INT64_MIN for absence), duration, position, flags, size, bytes and every side-data element. Input loading is outside the run. Both sides drain the last entity to logical end.",
     "Every operation in the mpegts-pes corpus runs for each form, retaining its 272 request mappings and the hash of every ordered input.",
-    "Candidate header and payload source ranges are checked against the preloaded entity bytes. Partial progress and the public header flags are traced."
+    "Candidate header and payload source ranges are checked against the preloaded entity bytes. Partial progress and the public header flags are traced.",
+    "The source-clocks profile uses the public demux clock reduced to 33 bits, encoded timestamp presence from the PES start on the original carrier grid, and the physical start carrier offset for M2TS."
   ],
   "required_profiles": [
     "ts188-basic",
@@ -1598,1537 +1599,259 @@
     }
   ],
   "pin_note": "Reference folds are recorded from the formats views worker and match the mpegts-pes pins for the same ordered inputs.",
-  "pending_module_requirements": [
-    "Review the DTS projection of PTS-only PES",
-    "Review the origin coordinate of prefixed M2TS carriers",
-    "Review period-zero source timestamps against signed demux clocks",
-    "Review PES packet delivery after duplicate transport carriers",
-    "Review incomplete PES delivery after transport continuity loss",
-    "Review PES output from carriers with invalid PCR or OPCR",
-    "Review PES output from damaged or scrambled carriers",
-    "Review rejected PES timing syntax",
-    "Review strict PES length validation versus demux recovery"
-  ],
-  "open_cases": [
-    {
-      "id": "ts188-basic-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "ts188-basic-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "ts188-basic-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "ts188-basic-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "ts188-basic-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-header-every-byte-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-header-every-byte-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-header-every-byte-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-header-every-byte-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-header-every-byte-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "psi-header-every-byte-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "psi-header-every-byte-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "psi-header-every-byte-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "psi-header-every-byte-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "psi-header-every-byte-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-multiple-ts-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-multiple-ts-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-multiple-ts-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-multiple-ts-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-multiple-ts-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-next-pusi-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-next-pusi-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-next-pusi-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-next-pusi-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-next-pusi-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-definitive-eof-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-definitive-eof-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-definitive-eof-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-definitive-eof-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-definitive-eof-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-reorder-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-reorder-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-reorder-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-reorder-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-reorder-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-half-wrap-ambiguous-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-half-wrap-ambiguous-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-half-wrap-ambiguous-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-half-wrap-ambiguous-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-half-wrap-ambiguous-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-wrap-15-to-zero-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-wrap-15-to-zero-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-wrap-15-to-zero-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-wrap-15-to-zero-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-wrap-15-to-zero-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-same-counter-changed-payload-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-same-counter-changed-payload-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-same-counter-changed-payload-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-same-counter-changed-payload-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-same-counter-changed-payload-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-adaptation-only-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-adaptation-only-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-adaptation-only-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-adaptation-only-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-adaptation-only-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-loss-clean-pusi-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-loss-clean-pusi-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-loss-clean-pusi-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-loss-clean-pusi-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-loss-clean-pusi-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-timeline-discontinuity-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-timeline-discontinuity-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-timeline-discontinuity-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-timeline-discontinuity-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-timeline-discontinuity-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-extension-preserved-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-extension-preserved-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-extension-preserved-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-extension-preserved-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-extension-preserved-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-null-pid-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-null-pid-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-null-pid-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-null-pid-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-null-pid-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-partial-final-packet-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-partial-final-packet-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-partial-final-packet-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-partial-final-packet-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-partial-final-packet-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-sync-loss-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-sync-loss-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-sync-loss-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-sync-loss-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-sync-loss-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-dvb-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-dvb-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-dvb-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-dvb-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-dvb-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-dvb-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-dvb-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-dvb-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-dvb-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-dvb-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-direct-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-direct-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-direct-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-direct-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-direct-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-direct-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-direct-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-direct-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-direct-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-direct-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-adts-direct-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-adts-direct-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-adts-direct-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-adts-direct-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-adts-direct-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-latm-direct-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-latm-direct-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-latm-direct-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-latm-direct-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-latm-direct-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-hevc-direct-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-hevc-direct-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-hevc-direct-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-hevc-direct-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-hevc-direct-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "elementary-bytes-cross-pes-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "elementary-bytes-cross-pes-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "elementary-bytes-cross-pes-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "elementary-bytes-cross-pes-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "elementary-bytes-cross-pes-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-contiguous-pes-carry-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-contiguous-pes-carry-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-contiguous-pes-carry-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-contiguous-pes-carry-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-contiguous-pes-carry-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-external-map-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-external-map-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-external-map-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-external-map-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-external-map-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-explicit-discontinuity-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-explicit-discontinuity-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-explicit-discontinuity-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-explicit-discontinuity-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-explicit-discontinuity-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb2-literals-fields-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb2-literals-fields-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb2-literals-fields-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb2-literals-fields-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb2-literals-fields-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-ancillary-pages-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-ancillary-pages-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-ancillary-pages-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-ancillary-pages-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-ancillary-pages-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-default-clut2-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-default-clut2-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-default-clut2-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-default-clut2-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-default-clut2-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-nonmodifying-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-nonmodifying-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-nonmodifying-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-nonmodifying-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-nonmodifying-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-partial-alpha-projection-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-partial-alpha-projection-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-partial-alpha-projection-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-partial-alpha-projection-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-partial-alpha-projection-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-truncated-segment-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-truncated-segment-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-truncated-segment-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-truncated-segment-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-truncated-segment-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pat-pointer-then-clean-pusi-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pat-pointer-then-clean-pusi-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pat-pointer-then-clean-pusi-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pat-pointer-then-clean-pusi-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pat-pointer-then-clean-pusi-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pmt-pointer-then-clean-pusi-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pmt-pointer-then-clean-pusi-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pmt-pointer-then-clean-pusi-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pmt-pointer-then-clean-pusi-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pmt-pointer-then-clean-pusi-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-payload-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-payload-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-payload-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-payload-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-payload-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-header-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-header-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-header-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-header-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-header-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-adaptation-only-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-adaptation-only-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-adaptation-only-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-adaptation-only-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-adaptation-only-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pat-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pat-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pat-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pat-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pat-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pmt-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pmt-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pmt-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pmt-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pmt-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "same-content-new-counters-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "same-content-new-counters-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "same-content-new-counters-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "same-content-new-counters-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "same-content-new-counters-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "opcr-change-is-not-duplicate-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "opcr-change-is-not-duplicate-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "opcr-change-is-not-duplicate-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "opcr-change-is-not-duplicate-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "opcr-change-is-not-duplicate-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "finite-continuation-body-400-poll",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "finite-continuation-body-400-feed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "finite-continuation-body-400-feed-carriers",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "finite-continuation-body-400-compact",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "finite-continuation-body-400-compact-observed",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "m2ts192-opaque-prefix-poll",
-      "requirement": "Review the origin coordinate of prefixed M2TS carriers"
-    },
-    {
-      "id": "m2ts192-opaque-prefix-feed",
-      "requirement": "Review the origin coordinate of prefixed M2TS carriers"
-    },
-    {
-      "id": "m2ts192-opaque-prefix-feed-carriers",
-      "requirement": "Review the origin coordinate of prefixed M2TS carriers"
-    },
-    {
-      "id": "m2ts192-opaque-prefix-compact",
-      "requirement": "Review the origin coordinate of prefixed M2TS carriers"
-    },
-    {
-      "id": "m2ts192-opaque-prefix-compact-observed",
-      "requirement": "Review the origin coordinate of prefixed M2TS carriers"
-    },
-    {
-      "id": "pts-wrap-forward-poll",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-wrap-forward-feed",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-wrap-forward-feed-carriers",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-wrap-forward-compact",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-wrap-forward-compact-observed",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-dts-common-epoch-poll",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-dts-common-epoch-feed",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-dts-common-epoch-feed-carriers",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-dts-common-epoch-compact",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-dts-common-epoch-compact-observed",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "cc-one-duplicate-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-one-duplicate-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-one-duplicate-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-one-duplicate-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-one-duplicate-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-third-copy-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-third-copy-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-third-copy-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-third-copy-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-third-copy-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-duplicate-pcr-update-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-duplicate-pcr-update-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-duplicate-pcr-update-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-duplicate-pcr-update-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-duplicate-pcr-update-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-complete-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-complete-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-complete-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-complete-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-complete-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-start-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-start-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-start-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-start-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-start-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-start-duplicate-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-start-duplicate-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-start-duplicate-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-start-duplicate-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-start-duplicate-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-middle-duplicate-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-middle-duplicate-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-middle-duplicate-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-middle-duplicate-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-middle-duplicate-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "interleaved-other-pid-duplicate-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "interleaved-other-pid-duplicate-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "interleaved-other-pid-duplicate-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "interleaved-other-pid-duplicate-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "interleaved-other-pid-duplicate-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "m2ts-prefix-only-duplicate-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "m2ts-prefix-only-duplicate-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "m2ts-prefix-only-duplicate-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "m2ts-prefix-only-duplicate-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "m2ts-prefix-only-duplicate-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "third-middle-copy-then-clean-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "third-middle-copy-then-clean-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "third-middle-copy-then-clean-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "third-middle-copy-then-clean-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "third-middle-copy-then-clean-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-finite-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-finite-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-finite-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-finite-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-finite-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-unbounded-poll",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-unbounded-feed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-unbounded-feed-carriers",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-unbounded-compact",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-unbounded-compact-observed",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-loss-mid-pes-poll",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "cc-loss-mid-pes-feed",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "cc-loss-mid-pes-feed-carriers",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "cc-loss-mid-pes-compact",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "cc-loss-mid-pes-compact-observed",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-then-clean-pusi-poll",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-then-clean-pusi-feed",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-then-clean-pusi-feed-carriers",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-then-clean-pusi-compact",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-then-clean-pusi-compact-observed",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-at-clean-pusi-poll",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-at-clean-pusi-feed",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-at-clean-pusi-feed-carriers",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-at-clean-pusi-compact",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-at-clean-pusi-compact-observed",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "pcr-extension-invalid-poll",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "pcr-extension-invalid-feed",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "pcr-extension-invalid-feed-carriers",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "pcr-extension-invalid-compact",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "pcr-extension-invalid-compact-observed",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "opcr-without-pcr-invalid-poll",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "opcr-without-pcr-invalid-feed",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "opcr-without-pcr-invalid-feed-carriers",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "opcr-without-pcr-invalid-compact",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "opcr-without-pcr-invalid-compact-observed",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "transport-tei-poll",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-tei-feed",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-tei-feed-carriers",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-tei-compact",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-tei-compact-observed",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-poll",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-feed",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-feed-carriers",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-compact",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-compact-observed",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "pes-timestamp-marker-poll",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-timestamp-marker-feed",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-timestamp-marker-feed-carriers",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-timestamp-marker-compact",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-timestamp-marker-compact-observed",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-poll",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-feed",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-feed-carriers",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-compact",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-compact-observed",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-finite-truncated-eof-poll",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-truncated-eof-feed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-truncated-eof-feed-carriers",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-truncated-eof-compact",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-truncated-eof-compact-observed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-extra-payload-poll",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-extra-payload-feed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-extra-payload-feed-carriers",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-extra-payload-compact",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-extra-payload-compact-observed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-audio-zero-length-invalid-poll",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-audio-zero-length-invalid-feed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-audio-zero-length-invalid-feed-carriers",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-audio-zero-length-invalid-compact",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-audio-zero-length-invalid-compact-observed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-401-poll",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-401-feed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-401-feed-carriers",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-401-compact",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-401-compact-observed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-408-poll",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-408-feed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-408-feed-carriers",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-408-compact",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-408-compact-observed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-409-poll",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-409-feed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-409-feed-carriers",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-409-compact",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-409-compact-observed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-414-poll",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-414-feed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-414-feed-carriers",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-414-compact",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-414-compact-observed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-415-poll",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-415-feed",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-415-feed-carriers",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-415-compact",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-415-compact-observed",
-      "requirement": "Review strict PES length validation versus demux recovery"
+  "open_deviations": [
+    {
+      "reading": "Duplicate payload is delivered once",
+      "clause": "H.222.0 \u00a72.4.3.3: one consecutive identical copy on the same PID is permitted, with PCR the only permitted byte change.",
+      "candidate": "Drops the legal duplicate, preserving each original PES payload and position.",
+      "reference": "Repeats the PES or includes duplicate elementary bytes, sometimes splitting the PES.",
+      "compat": "compat::pes::DuplicatePayloadDelivery",
+      "cases": [
+        "cc-one-duplicate-poll",
+        "cc-one-duplicate-feed",
+        "cc-one-duplicate-feed-carriers",
+        "cc-one-duplicate-compact",
+        "cc-one-duplicate-compact-observed",
+        "cc-duplicate-pcr-update-poll",
+        "cc-duplicate-pcr-update-feed",
+        "cc-duplicate-pcr-update-feed-carriers",
+        "cc-duplicate-pcr-update-compact",
+        "cc-duplicate-pcr-update-compact-observed",
+        "di-duplicate-complete-poll",
+        "di-duplicate-complete-feed",
+        "di-duplicate-complete-feed-carriers",
+        "di-duplicate-complete-compact",
+        "di-duplicate-complete-compact-observed",
+        "di-duplicate-start-poll",
+        "di-duplicate-start-feed",
+        "di-duplicate-start-feed-carriers",
+        "di-duplicate-start-compact",
+        "di-duplicate-start-compact-observed",
+        "partial-start-duplicate-poll",
+        "partial-start-duplicate-feed",
+        "partial-start-duplicate-feed-carriers",
+        "partial-start-duplicate-compact",
+        "partial-start-duplicate-compact-observed",
+        "partial-middle-duplicate-poll",
+        "partial-middle-duplicate-feed",
+        "partial-middle-duplicate-feed-carriers",
+        "partial-middle-duplicate-compact",
+        "partial-middle-duplicate-compact-observed",
+        "interleaved-other-pid-duplicate-poll",
+        "interleaved-other-pid-duplicate-feed",
+        "interleaved-other-pid-duplicate-feed-carriers",
+        "interleaved-other-pid-duplicate-compact",
+        "interleaved-other-pid-duplicate-compact-observed",
+        "m2ts-prefix-only-duplicate-poll",
+        "m2ts-prefix-only-duplicate-feed",
+        "m2ts-prefix-only-duplicate-feed-carriers",
+        "m2ts-prefix-only-duplicate-compact",
+        "m2ts-prefix-only-duplicate-compact-observed",
+        "duplicate-middle-low-occupancy-finite-poll",
+        "duplicate-middle-low-occupancy-finite-feed",
+        "duplicate-middle-low-occupancy-finite-feed-carriers",
+        "duplicate-middle-low-occupancy-finite-compact",
+        "duplicate-middle-low-occupancy-finite-compact-observed",
+        "duplicate-middle-low-occupancy-unbounded-poll",
+        "duplicate-middle-low-occupancy-unbounded-feed",
+        "duplicate-middle-low-occupancy-unbounded-feed-carriers",
+        "duplicate-middle-low-occupancy-unbounded-compact",
+        "duplicate-middle-low-occupancy-unbounded-compact-observed"
+      ]
+    },
+    {
+      "reading": "A third copy is a continuity fault",
+      "clause": "H.222.0 \u00a72.4.3.3 permits only two consecutive identical packets of the same PID.",
+      "candidate": "Discards the excess copy and the pending assembly it interrupts. An already published PES stays delivered, and the next admissible start can resume assembly.",
+      "reference": "Delivers payload from excess copies or merges it into the affected PES.",
+      "compat": "compat::pes::DuplicatePayloadDelivery",
+      "cases": [
+        "cc-third-copy-poll",
+        "cc-third-copy-feed",
+        "cc-third-copy-feed-carriers",
+        "cc-third-copy-compact",
+        "cc-third-copy-compact-observed",
+        "third-middle-copy-then-clean-poll",
+        "third-middle-copy-then-clean-feed",
+        "third-middle-copy-then-clean-feed-carriers",
+        "third-middle-copy-then-clean-compact",
+        "third-middle-copy-then-clean-compact-observed"
+      ]
+    },
+    {
+      "reading": "Missing transport continuity breaks pending PES assembly",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.6 define continuity on each PID and the declared PES extent.",
+      "candidate": "Drops the affected partial PES and publishes the next complete packet if present.",
+      "reference": "Publishes the available bytes with the corrupt flag and continues on the next start if present.",
+      "compat": "compat::pes::DeliverCorruptPrefix",
+      "cases": [
+        "cc-loss-mid-pes-poll",
+        "cc-loss-mid-pes-feed",
+        "cc-loss-mid-pes-feed-carriers",
+        "cc-loss-mid-pes-compact",
+        "cc-loss-mid-pes-compact-observed",
+        "loss-then-clean-pusi-poll",
+        "loss-then-clean-pusi-feed",
+        "loss-then-clean-pusi-feed-carriers",
+        "loss-then-clean-pusi-compact",
+        "loss-then-clean-pusi-compact-observed",
+        "loss-at-clean-pusi-poll",
+        "loss-at-clean-pusi-feed",
+        "loss-at-clean-pusi-feed-carriers",
+        "loss-at-clean-pusi-compact",
+        "loss-at-clean-pusi-compact-observed"
+      ]
+    },
+    {
+      "reading": "PCR extension outside its modulus",
+      "clause": "H.222.0 \u00a72.4.3.5 defines PCR extension as the system-clock count modulo 300.",
+      "candidate": "Rejects the affected carrier and emits no PES from it.",
+      "reference": "Returns the 27-byte PES payload at PTS 90000.",
+      "compat": "compat::pes::IgnoreInvalidPcrExtension",
+      "cases": [
+        "pcr-extension-invalid-poll",
+        "pcr-extension-invalid-feed",
+        "pcr-extension-invalid-feed-carriers",
+        "pcr-extension-invalid-compact",
+        "pcr-extension-invalid-compact-observed"
+      ]
+    },
+    {
+      "reading": "OPCR is signalled without PCR",
+      "clause": "H.222.0 \u00a72.4.3.5 permits OPCR only in a transport packet containing PCR.",
+      "candidate": "Rejects the carrier with unpaired OPCR and publishes no PES on this input.",
+      "reference": "Returns both 27-byte packets.",
+      "compat": "compat::pes::IgnoreUnpairedOpcr",
+      "cases": [
+        "opcr-without-pcr-invalid-poll",
+        "opcr-without-pcr-invalid-feed",
+        "opcr-without-pcr-invalid-feed-carriers",
+        "opcr-without-pcr-invalid-compact",
+        "opcr-without-pcr-invalid-compact-observed"
+      ]
+    },
+    {
+      "reading": "Transport error indication marks untrustworthy payload",
+      "clause": "H.222.0 \u00a72.4.3.3 defines TEI as at least one uncorrectable error in the transport packet.",
+      "candidate": "Does not publish a PES from the errored carrier.",
+      "reference": "Returns 27 bytes at PTS 90000 without a corrupt flag.",
+      "compat": "compat::pes::DeliverTeiPayload",
+      "cases": [
+        "transport-tei-poll",
+        "transport-tei-feed",
+        "transport-tei-feed-carriers",
+        "transport-tei-compact",
+        "transport-tei-compact-observed"
+      ]
+    },
+    {
+      "reading": "User-defined scrambling flag requires an interpretation before clear payload delivery",
+      "clause": "H.222.0 \u00a72.4.3.3 Table 2-4 distinguishes scrambling from clear payload.",
+      "candidate": "Does not publish a PES from the scrambled carrier.",
+      "reference": "Returns the 27 bytes and PTS 90000 as a packet.",
+      "compat": "compat::pes::DeliverScrambledPayload",
+      "cases": [
+        "transport-scrambled-poll",
+        "transport-scrambled-feed",
+        "transport-scrambled-feed-carriers",
+        "transport-scrambled-compact",
+        "transport-scrambled-compact-observed"
+      ]
+    },
+    {
+      "reading": "A zero PTS marker bit violates the PES header grammar",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.6\u20132.4.3.7 Table 2-21 requires the timestamp marker bits.",
+      "candidate": "Rejects the malformed header and emits no PES.",
+      "reference": "Returns 27 bytes with PTS and DTS 90000.",
+      "compat": "compat::pes::IgnoreTimestampMarkers",
+      "cases": [
+        "pes-timestamp-marker-poll",
+        "pes-timestamp-marker-feed",
+        "pes-timestamp-marker-feed-carriers",
+        "pes-timestamp-marker-compact",
+        "pes-timestamp-marker-compact-observed"
+      ]
+    },
+    {
+      "reading": "PES timestamp flag value 01 is forbidden",
+      "clause": "H.222.0 \u00a72.4.3.7 forbids PTS_DTS_flags 01.",
+      "candidate": "Rejects the malformed header and emits no PES.",
+      "reference": "Returns 27 bytes with both clocks absent.",
+      "compat": "compat::pes::IgnoreForbiddenTimeFlags",
+      "cases": [
+        "pes-forbidden-time-flags-poll",
+        "pes-forbidden-time-flags-feed",
+        "pes-forbidden-time-flags-feed-carriers",
+        "pes-forbidden-time-flags-compact",
+        "pes-forbidden-time-flags-compact-observed"
+      ]
+    },
+    {
+      "reading": "EOF inside a finite PES",
+      "clause": "H.222.0 \u00a72.4.3.7 gives the number of bytes after PES_packet_length.",
+      "candidate": "Emits no incomplete PES.",
+      "reference": "Emits the 24 available payload bytes with the corrupt flag.",
+      "compat": "compat::pes::DeliverCorruptPrefix",
+      "cases": [
+        "pes-finite-truncated-eof-poll",
+        "pes-finite-truncated-eof-feed",
+        "pes-finite-truncated-eof-feed-carriers",
+        "pes-finite-truncated-eof-compact",
+        "pes-finite-truncated-eof-compact-observed"
+      ]
+    },
+    {
+      "reading": "An audio PES declares an unbounded length",
+      "clause": "H.222.0 \u00a72.4.3.7 allows zero PES_packet_length only for video elementary payload in TS.",
+      "candidate": "Rejects the audio packet.",
+      "reference": "Returns 27 bytes at PTS 90000.",
+      "compat": "compat::pes::AllowUnboundedAudio",
+      "cases": [
+        "pes-audio-zero-length-invalid-poll",
+        "pes-audio-zero-length-invalid-feed",
+        "pes-audio-zero-length-invalid-feed-carriers",
+        "pes-audio-zero-length-invalid-compact",
+        "pes-audio-zero-length-invalid-compact-observed"
+      ]
+    },
+    {
+      "reading": "Continuation payload exceeds the finite PES extent",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.7 define one PES start per PUSI carrier and the length through the last PES byte.",
+      "candidate": "Does not publish the PES when a carrier supplies extra payload past its declared extent.",
+      "reference": "Publishes a 27-byte declared prefix or returns 401\u2013415 bytes in split PES packets.",
+      "compat": "compat::pes::RecoverFiniteSurplus",
+      "cases": [
+        "pes-finite-extra-payload-poll",
+        "pes-finite-extra-payload-feed",
+        "pes-finite-extra-payload-feed-carriers",
+        "pes-finite-extra-payload-compact",
+        "pes-finite-extra-payload-compact-observed",
+        "finite-continuation-body-401-poll",
+        "finite-continuation-body-401-feed",
+        "finite-continuation-body-401-feed-carriers",
+        "finite-continuation-body-401-compact",
+        "finite-continuation-body-401-compact-observed",
+        "finite-continuation-body-408-poll",
+        "finite-continuation-body-408-feed",
+        "finite-continuation-body-408-feed-carriers",
+        "finite-continuation-body-408-compact",
+        "finite-continuation-body-408-compact-observed",
+        "finite-continuation-body-409-poll",
+        "finite-continuation-body-409-feed",
+        "finite-continuation-body-409-feed-carriers",
+        "finite-continuation-body-409-compact",
+        "finite-continuation-body-409-compact-observed",
+        "finite-continuation-body-414-poll",
+        "finite-continuation-body-414-feed",
+        "finite-continuation-body-414-feed-carriers",
+        "finite-continuation-body-414-compact",
+        "finite-continuation-body-414-compact-observed",
+        "finite-continuation-body-415-poll",
+        "finite-continuation-body-415-feed",
+        "finite-continuation-body-415-feed-carriers",
+        "finite-continuation-body-415-compact",
+        "finite-continuation-body-415-compact-observed"
+      ]
     }
   ]
 }

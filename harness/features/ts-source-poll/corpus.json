@@ -11,7 +11,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -33,7 +34,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -45,7 +46,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -67,7 +69,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -79,7 +81,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -101,7 +104,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -113,7 +116,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -135,7 +139,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -147,7 +151,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -169,7 +174,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -181,7 +186,8 @@
       "arguments": [
         "192",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -203,7 +209,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 8637207689052002347
+        "digest": 17917616526418940223
       }
     },
     {
@@ -215,7 +221,8 @@
       "arguments": [
         "192",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -237,7 +244,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 8637207689052002347
+        "digest": 17917616526418940223
       }
     },
     {
@@ -249,7 +256,8 @@
       "arguments": [
         "192",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -271,7 +279,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 8637207689052002347
+        "digest": 17917616526418940223
       }
     },
     {
@@ -283,7 +291,8 @@
       "arguments": [
         "192",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -305,7 +314,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 8637207689052002347
+        "digest": 17917616526418940223
       }
     },
     {
@@ -317,7 +326,8 @@
       "arguments": [
         "192",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -339,7 +349,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 8637207689052002347
+        "digest": 17917616526418940223
       }
     },
     {
@@ -351,7 +361,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -373,7 +384,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -385,7 +396,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -407,7 +419,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -419,7 +431,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -441,7 +454,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -453,7 +466,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -475,7 +489,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -487,7 +501,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -509,7 +524,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -521,7 +536,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -543,7 +559,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 9921810301599277183
+        "digest": 13295533139809593871
       }
     },
     {
@@ -555,7 +571,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -577,7 +594,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 9921810301599277183
+        "digest": 13295533139809593871
       }
     },
     {
@@ -589,7 +606,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -611,7 +629,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 9921810301599277183
+        "digest": 13295533139809593871
       }
     },
     {
@@ -623,7 +641,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -645,7 +664,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 9921810301599277183
+        "digest": 13295533139809593871
       }
     },
     {
@@ -657,7 +676,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -679,7 +699,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 9921810301599277183
+        "digest": 13295533139809593871
       }
     },
     {
@@ -691,7 +711,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -713,7 +734,7 @@
       "expected": {
         "packets": 1,
         "bytes": 512,
-        "digest": 15463357684512389673
+        "digest": 5516350760291281561
       }
     },
     {
@@ -725,7 +746,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -747,7 +769,7 @@
       "expected": {
         "packets": 1,
         "bytes": 512,
-        "digest": 15463357684512389673
+        "digest": 5516350760291281561
       }
     },
     {
@@ -759,7 +781,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -781,7 +804,7 @@
       "expected": {
         "packets": 1,
         "bytes": 512,
-        "digest": 15463357684512389673
+        "digest": 5516350760291281561
       }
     },
     {
@@ -793,7 +816,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -815,7 +839,7 @@
       "expected": {
         "packets": 1,
         "bytes": 512,
-        "digest": 15463357684512389673
+        "digest": 5516350760291281561
       }
     },
     {
@@ -827,7 +851,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -849,7 +874,7 @@
       "expected": {
         "packets": 1,
         "bytes": 512,
-        "digest": 15463357684512389673
+        "digest": 5516350760291281561
       }
     },
     {
@@ -861,7 +886,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -883,7 +909,7 @@
       "expected": {
         "packets": 2,
         "bytes": 31,
-        "digest": 436018825596069395
+        "digest": 2841619645863530587
       }
     },
     {
@@ -895,7 +921,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -917,7 +944,7 @@
       "expected": {
         "packets": 2,
         "bytes": 31,
-        "digest": 436018825596069395
+        "digest": 2841619645863530587
       }
     },
     {
@@ -929,7 +956,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -951,7 +979,7 @@
       "expected": {
         "packets": 2,
         "bytes": 31,
-        "digest": 436018825596069395
+        "digest": 2841619645863530587
       }
     },
     {
@@ -963,7 +991,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -985,7 +1014,7 @@
       "expected": {
         "packets": 2,
         "bytes": 31,
-        "digest": 436018825596069395
+        "digest": 2841619645863530587
       }
     },
     {
@@ -997,7 +1026,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1019,7 +1049,7 @@
       "expected": {
         "packets": 2,
         "bytes": 31,
-        "digest": 436018825596069395
+        "digest": 2841619645863530587
       }
     },
     {
@@ -1031,7 +1061,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1053,7 +1084,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -1065,7 +1096,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1087,7 +1119,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -1099,7 +1131,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1121,7 +1154,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -1133,7 +1166,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1155,7 +1189,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -1167,7 +1201,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1189,7 +1224,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -1371,7 +1406,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1393,7 +1429,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 6200689355858187909
+        "digest": 2190288344484578000
       }
     },
     {
@@ -1405,7 +1441,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1427,7 +1464,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 6200689355858187909
+        "digest": 2190288344484578000
       }
     },
     {
@@ -1439,7 +1476,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1461,7 +1499,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 6200689355858187909
+        "digest": 2190288344484578000
       }
     },
     {
@@ -1473,7 +1511,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1495,7 +1534,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 6200689355858187909
+        "digest": 2190288344484578000
       }
     },
     {
@@ -1507,7 +1546,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1529,7 +1569,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 6200689355858187909
+        "digest": 2190288344484578000
       }
     },
     {
@@ -1541,7 +1581,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1563,7 +1604,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 10107309188949538533
+        "digest": 4244566924070429741
       }
     },
     {
@@ -1575,7 +1616,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1597,7 +1639,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 10107309188949538533
+        "digest": 4244566924070429741
       }
     },
     {
@@ -1609,7 +1651,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1631,7 +1674,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 10107309188949538533
+        "digest": 4244566924070429741
       }
     },
     {
@@ -1643,7 +1686,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1665,7 +1709,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 10107309188949538533
+        "digest": 4244566924070429741
       }
     },
     {
@@ -1677,7 +1721,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1699,7 +1744,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 10107309188949538533
+        "digest": 4244566924070429741
       }
     },
     {
@@ -1711,7 +1756,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1733,7 +1779,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 16388609295066684609
+        "digest": 8634310695591959745
       }
     },
     {
@@ -1745,7 +1791,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1767,7 +1814,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 16388609295066684609
+        "digest": 8634310695591959745
       }
     },
     {
@@ -1779,7 +1826,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1801,7 +1849,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 16388609295066684609
+        "digest": 8634310695591959745
       }
     },
     {
@@ -1813,7 +1861,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1835,7 +1884,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 16388609295066684609
+        "digest": 8634310695591959745
       }
     },
     {
@@ -1847,7 +1896,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -1869,7 +1919,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 16388609295066684609
+        "digest": 8634310695591959745
       }
     },
     {
@@ -2051,7 +2101,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2073,7 +2124,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 16851875127018037221
+        "digest": 17695894204215369701
       }
     },
     {
@@ -2085,7 +2136,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2107,7 +2159,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 16851875127018037221
+        "digest": 17695894204215369701
       }
     },
     {
@@ -2119,7 +2171,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2141,7 +2194,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 16851875127018037221
+        "digest": 17695894204215369701
       }
     },
     {
@@ -2153,7 +2206,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2175,7 +2229,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 16851875127018037221
+        "digest": 17695894204215369701
       }
     },
     {
@@ -2187,7 +2241,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2209,7 +2264,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 16851875127018037221
+        "digest": 17695894204215369701
       }
     },
     {
@@ -2221,7 +2276,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2243,7 +2299,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 15183716643798370533
+        "digest": 9162336645955235741
       }
     },
     {
@@ -2255,7 +2311,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2277,7 +2334,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 15183716643798370533
+        "digest": 9162336645955235741
       }
     },
     {
@@ -2289,7 +2346,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2311,7 +2369,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 15183716643798370533
+        "digest": 9162336645955235741
       }
     },
     {
@@ -2323,7 +2381,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2345,7 +2404,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 15183716643798370533
+        "digest": 9162336645955235741
       }
     },
     {
@@ -2357,7 +2416,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2379,7 +2439,7 @@
       "expected": {
         "packets": 2,
         "bytes": 2,
-        "digest": 15183716643798370533
+        "digest": 9162336645955235741
       }
     },
     {
@@ -2831,7 +2891,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2853,7 +2914,7 @@
       "expected": {
         "packets": 2,
         "bytes": 36,
-        "digest": 5715045152852057334
+        "digest": 12932120327887747830
       }
     },
     {
@@ -2865,7 +2926,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2887,7 +2949,7 @@
       "expected": {
         "packets": 2,
         "bytes": 36,
-        "digest": 5715045152852057334
+        "digest": 12932120327887747830
       }
     },
     {
@@ -2899,7 +2961,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2921,7 +2984,7 @@
       "expected": {
         "packets": 2,
         "bytes": 36,
-        "digest": 5715045152852057334
+        "digest": 12932120327887747830
       }
     },
     {
@@ -2933,7 +2996,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2955,7 +3019,7 @@
       "expected": {
         "packets": 2,
         "bytes": 36,
-        "digest": 5715045152852057334
+        "digest": 12932120327887747830
       }
     },
     {
@@ -2967,7 +3031,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -2989,7 +3054,7 @@
       "expected": {
         "packets": 2,
         "bytes": 36,
-        "digest": 5715045152852057334
+        "digest": 12932120327887747830
       }
     },
     {
@@ -3001,7 +3066,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3023,7 +3089,7 @@
       "expected": {
         "packets": 2,
         "bytes": 28,
-        "digest": 6734414936258022251
+        "digest": 3815003449675180395
       }
     },
     {
@@ -3035,7 +3101,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3057,7 +3124,7 @@
       "expected": {
         "packets": 2,
         "bytes": 28,
-        "digest": 6734414936258022251
+        "digest": 3815003449675180395
       }
     },
     {
@@ -3069,7 +3136,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3091,7 +3159,7 @@
       "expected": {
         "packets": 2,
         "bytes": 28,
-        "digest": 6734414936258022251
+        "digest": 3815003449675180395
       }
     },
     {
@@ -3103,7 +3171,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3125,7 +3194,7 @@
       "expected": {
         "packets": 2,
         "bytes": 28,
-        "digest": 6734414936258022251
+        "digest": 3815003449675180395
       }
     },
     {
@@ -3137,7 +3206,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3159,7 +3229,7 @@
       "expected": {
         "packets": 2,
         "bytes": 28,
-        "digest": 6734414936258022251
+        "digest": 3815003449675180395
       }
     },
     {
@@ -3611,7 +3681,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3633,7 +3704,7 @@
       "expected": {
         "packets": 2,
         "bytes": 28,
-        "digest": 6734409763886569383
+        "digest": 3814998277303727527
       }
     },
     {
@@ -3645,7 +3716,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3667,7 +3739,7 @@
       "expected": {
         "packets": 2,
         "bytes": 28,
-        "digest": 6734409763886569383
+        "digest": 3814998277303727527
       }
     },
     {
@@ -3679,7 +3751,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3701,7 +3774,7 @@
       "expected": {
         "packets": 2,
         "bytes": 28,
-        "digest": 6734409763886569383
+        "digest": 3814998277303727527
       }
     },
     {
@@ -3713,7 +3786,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3735,7 +3809,7 @@
       "expected": {
         "packets": 2,
         "bytes": 28,
-        "digest": 6734409763886569383
+        "digest": 3814998277303727527
       }
     },
     {
@@ -3747,7 +3821,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3769,7 +3844,7 @@
       "expected": {
         "packets": 2,
         "bytes": 28,
-        "digest": 6734409763886569383
+        "digest": 3814998277303727527
       }
     },
     {
@@ -3781,7 +3856,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3803,7 +3879,7 @@
       "expected": {
         "packets": 2,
         "bytes": 30,
-        "digest": 6911604658298429283
+        "digest": 4374836023525592605
       }
     },
     {
@@ -3815,7 +3891,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3837,7 +3914,7 @@
       "expected": {
         "packets": 2,
         "bytes": 30,
-        "digest": 6911604658298429283
+        "digest": 4374836023525592605
       }
     },
     {
@@ -3849,7 +3926,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3871,7 +3949,7 @@
       "expected": {
         "packets": 2,
         "bytes": 30,
-        "digest": 6911604658298429283
+        "digest": 4374836023525592605
       }
     },
     {
@@ -3883,7 +3961,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3905,7 +3984,7 @@
       "expected": {
         "packets": 2,
         "bytes": 30,
-        "digest": 6911604658298429283
+        "digest": 4374836023525592605
       }
     },
     {
@@ -3917,7 +3996,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3939,7 +4019,7 @@
       "expected": {
         "packets": 2,
         "bytes": 30,
-        "digest": 6911604658298429283
+        "digest": 4374836023525592605
       }
     },
     {
@@ -3951,7 +4031,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -3973,7 +4054,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -3985,7 +4066,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -4007,7 +4089,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -4019,7 +4101,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -4041,7 +4124,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -4053,7 +4136,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -4075,7 +4159,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -4087,7 +4171,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -4109,7 +4194,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -4971,7 +5056,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -4993,7 +5079,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5005,7 +5091,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5027,7 +5114,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5039,7 +5126,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5061,7 +5149,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5073,7 +5161,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5095,7 +5184,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5107,7 +5196,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5129,7 +5219,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5141,7 +5231,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5163,7 +5254,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5175,7 +5266,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5197,7 +5289,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5209,7 +5301,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5231,7 +5324,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5243,7 +5336,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5265,7 +5359,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5277,7 +5371,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5299,7 +5394,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5311,7 +5406,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5333,7 +5429,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5345,7 +5441,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5367,7 +5464,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5379,7 +5476,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5401,7 +5499,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5413,7 +5511,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5435,7 +5534,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -5447,7 +5546,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -5469,7 +5569,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -8031,7 +8131,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8053,7 +8154,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8065,7 +8166,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8087,7 +8189,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8099,7 +8201,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8121,7 +8224,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8133,7 +8236,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8155,7 +8259,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8167,7 +8271,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8189,7 +8294,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8201,7 +8306,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8223,7 +8329,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8235,7 +8341,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8257,7 +8364,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8269,7 +8376,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8291,7 +8399,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8303,7 +8411,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8325,7 +8434,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8337,7 +8446,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8359,7 +8469,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8371,7 +8481,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8393,7 +8504,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8405,7 +8516,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8427,7 +8539,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8439,7 +8551,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8461,7 +8574,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8473,7 +8586,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8495,7 +8609,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8507,7 +8621,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8529,7 +8644,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8541,7 +8656,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8563,7 +8679,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8575,7 +8691,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8597,7 +8714,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8609,7 +8726,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8631,7 +8749,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8643,7 +8761,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8665,7 +8784,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8677,7 +8796,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8699,7 +8819,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529075
+        "digest": 9651654888692845763
       }
     },
     {
@@ -8711,7 +8831,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8743,7 +8864,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529078
+        "digest": 9651654888692845766
       }
     },
     {
@@ -8755,7 +8876,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8787,7 +8909,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529078
+        "digest": 9651654888692845766
       }
     },
     {
@@ -8799,7 +8921,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8831,7 +8954,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529078
+        "digest": 9651654888692845766
       }
     },
     {
@@ -8843,7 +8966,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8875,7 +8999,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529078
+        "digest": 9651654888692845766
       }
     },
     {
@@ -8887,7 +9011,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8919,7 +9044,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529078
+        "digest": 9651654888692845766
       }
     },
     {
@@ -8931,7 +9056,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -8963,7 +9089,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529078
+        "digest": 9651654888692845766
       }
     },
     {
@@ -8975,7 +9101,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -9007,7 +9134,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529078
+        "digest": 9651654888692845766
       }
     },
     {
@@ -9019,7 +9146,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -9051,7 +9179,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529078
+        "digest": 9651654888692845766
       }
     },
     {
@@ -9063,7 +9191,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -9095,7 +9224,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529078
+        "digest": 9651654888692845766
       }
     },
     {
@@ -9107,7 +9236,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -9139,7 +9269,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529078
+        "digest": 9651654888692845766
       }
     },
     {
@@ -9151,7 +9281,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -9183,7 +9314,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529110
+        "digest": 9651654888692845798
       }
     },
     {
@@ -9195,7 +9326,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -9227,7 +9359,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529110
+        "digest": 9651654888692845798
       }
     },
     {
@@ -9239,7 +9371,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -9271,7 +9404,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529110
+        "digest": 9651654888692845798
       }
     },
     {
@@ -9283,7 +9416,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -9315,7 +9449,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529110
+        "digest": 9651654888692845798
       }
     },
     {
@@ -9327,7 +9461,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -9359,7 +9494,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6277932050482529110
+        "digest": 9651654888692845798
       }
     },
     {
@@ -10561,7 +10696,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -10583,7 +10719,7 @@
       "expected": {
         "packets": 2,
         "bytes": 5,
-        "digest": 18309441819078415191
+        "digest": 9086069782223639383
       }
     },
     {
@@ -10595,7 +10731,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -10617,7 +10754,7 @@
       "expected": {
         "packets": 2,
         "bytes": 5,
-        "digest": 18309441819078415191
+        "digest": 9086069782223639383
       }
     },
     {
@@ -10629,7 +10766,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -10651,7 +10789,7 @@
       "expected": {
         "packets": 2,
         "bytes": 5,
-        "digest": 18309441819078415191
+        "digest": 9086069782223639383
       }
     },
     {
@@ -10663,7 +10801,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -10685,7 +10824,7 @@
       "expected": {
         "packets": 2,
         "bytes": 5,
-        "digest": 18309441819078415191
+        "digest": 9086069782223639383
       }
     },
     {
@@ -10697,7 +10836,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -10719,7 +10859,7 @@
       "expected": {
         "packets": 2,
         "bytes": 5,
-        "digest": 18309441819078415191
+        "digest": 9086069782223639383
       }
     },
     {
@@ -10738,6 +10878,7 @@
         "188",
         "1",
         "poll",
+        "--source-clocks",
         "crates/mpegts/tests/data/hls-contiguous-part-b.ts"
       ],
       "requests": [
@@ -10760,7 +10901,7 @@
       "expected": {
         "packets": 1,
         "bytes": 512,
-        "digest": 15463357684512389673
+        "digest": 5516350760291281561
       }
     },
     {
@@ -10779,6 +10920,7 @@
         "188",
         "1",
         "feed",
+        "--source-clocks",
         "crates/mpegts/tests/data/hls-contiguous-part-b.ts"
       ],
       "requests": [
@@ -10801,7 +10943,7 @@
       "expected": {
         "packets": 1,
         "bytes": 512,
-        "digest": 15463357684512389673
+        "digest": 5516350760291281561
       }
     },
     {
@@ -10820,6 +10962,7 @@
         "188",
         "1",
         "feed-carriers",
+        "--source-clocks",
         "crates/mpegts/tests/data/hls-contiguous-part-b.ts"
       ],
       "requests": [
@@ -10842,7 +10985,7 @@
       "expected": {
         "packets": 1,
         "bytes": 512,
-        "digest": 15463357684512389673
+        "digest": 5516350760291281561
       }
     },
     {
@@ -10861,6 +11004,7 @@
         "188",
         "1",
         "compact",
+        "--source-clocks",
         "crates/mpegts/tests/data/hls-contiguous-part-b.ts"
       ],
       "requests": [
@@ -10883,7 +11027,7 @@
       "expected": {
         "packets": 1,
         "bytes": 512,
-        "digest": 15463357684512389673
+        "digest": 5516350760291281561
       }
     },
     {
@@ -10902,6 +11046,7 @@
         "188",
         "1",
         "compact-observed",
+        "--source-clocks",
         "crates/mpegts/tests/data/hls-contiguous-part-b.ts"
       ],
       "requests": [
@@ -10924,7 +11069,7 @@
       "expected": {
         "packets": 1,
         "bytes": 512,
-        "digest": 15463357684512389673
+        "digest": 5516350760291281561
       }
     },
     {
@@ -10943,6 +11088,7 @@
         "188",
         "1",
         "poll",
+        "--source-clocks",
         "crates/mpegts/tests/data/hls-map-media.ts"
       ],
       "requests": [
@@ -10965,7 +11111,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -10984,6 +11130,7 @@
         "188",
         "1",
         "feed",
+        "--source-clocks",
         "crates/mpegts/tests/data/hls-map-media.ts"
       ],
       "requests": [
@@ -11006,7 +11153,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -11025,6 +11172,7 @@
         "188",
         "1",
         "feed-carriers",
+        "--source-clocks",
         "crates/mpegts/tests/data/hls-map-media.ts"
       ],
       "requests": [
@@ -11047,7 +11195,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -11066,6 +11214,7 @@
         "188",
         "1",
         "compact",
+        "--source-clocks",
         "crates/mpegts/tests/data/hls-map-media.ts"
       ],
       "requests": [
@@ -11088,7 +11237,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -11107,6 +11256,7 @@
         "188",
         "1",
         "compact-observed",
+        "--source-clocks",
         "crates/mpegts/tests/data/hls-map-media.ts"
       ],
       "requests": [
@@ -11129,7 +11279,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -11148,6 +11298,7 @@
         "188",
         "1",
         "poll",
+        "--source-clocks",
         "--discontinuity",
         "crates/mpegts/tests/data/hls-new-timeline.ts"
       ],
@@ -11171,7 +11322,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 2150793539127356716
+        "digest": 2399957376323374566
       }
     },
     {
@@ -11190,6 +11341,7 @@
         "188",
         "1",
         "feed",
+        "--source-clocks",
         "--discontinuity",
         "crates/mpegts/tests/data/hls-new-timeline.ts"
       ],
@@ -11213,7 +11365,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 2150793539127356716
+        "digest": 2399957376323374566
       }
     },
     {
@@ -11232,6 +11384,7 @@
         "188",
         "1",
         "feed-carriers",
+        "--source-clocks",
         "--discontinuity",
         "crates/mpegts/tests/data/hls-new-timeline.ts"
       ],
@@ -11255,7 +11408,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 2150793539127356716
+        "digest": 2399957376323374566
       }
     },
     {
@@ -11274,6 +11427,7 @@
         "188",
         "1",
         "compact",
+        "--source-clocks",
         "--discontinuity",
         "crates/mpegts/tests/data/hls-new-timeline.ts"
       ],
@@ -11297,7 +11451,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 2150793539127356716
+        "digest": 2399957376323374566
       }
     },
     {
@@ -11316,6 +11470,7 @@
         "188",
         "1",
         "compact-observed",
+        "--source-clocks",
         "--discontinuity",
         "crates/mpegts/tests/data/hls-new-timeline.ts"
       ],
@@ -11339,7 +11494,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 2150793539127356716
+        "digest": 2399957376323374566
       }
     },
     {
@@ -11352,6 +11507,7 @@
         "188",
         "1",
         "poll",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11369,7 +11525,7 @@
       "expected": {
         "packets": 1,
         "bytes": 126,
-        "digest": 10721616146549570842
+        "digest": 16430567587705227658
       }
     },
     {
@@ -11382,6 +11538,7 @@
         "188",
         "1",
         "feed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11399,7 +11556,7 @@
       "expected": {
         "packets": 1,
         "bytes": 126,
-        "digest": 10721616146549570842
+        "digest": 16430567587705227658
       }
     },
     {
@@ -11412,6 +11569,7 @@
         "188",
         "1",
         "feed-carriers",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11429,7 +11587,7 @@
       "expected": {
         "packets": 1,
         "bytes": 126,
-        "digest": 10721616146549570842
+        "digest": 16430567587705227658
       }
     },
     {
@@ -11442,6 +11600,7 @@
         "188",
         "1",
         "compact",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11459,7 +11618,7 @@
       "expected": {
         "packets": 1,
         "bytes": 126,
-        "digest": 10721616146549570842
+        "digest": 16430567587705227658
       }
     },
     {
@@ -11472,6 +11631,7 @@
         "188",
         "1",
         "compact-observed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11489,7 +11649,7 @@
       "expected": {
         "packets": 1,
         "bytes": 126,
-        "digest": 10721616146549570842
+        "digest": 16430567587705227658
       }
     },
     {
@@ -11502,6 +11662,7 @@
         "188",
         "1",
         "poll",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11519,7 +11680,7 @@
       "expected": {
         "packets": 1,
         "bytes": 110,
-        "digest": 1540312472768044640
+        "digest": 3123051394165230288
       }
     },
     {
@@ -11532,6 +11693,7 @@
         "188",
         "1",
         "feed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11549,7 +11711,7 @@
       "expected": {
         "packets": 1,
         "bytes": 110,
-        "digest": 1540312472768044640
+        "digest": 3123051394165230288
       }
     },
     {
@@ -11562,6 +11724,7 @@
         "188",
         "1",
         "feed-carriers",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11579,7 +11742,7 @@
       "expected": {
         "packets": 1,
         "bytes": 110,
-        "digest": 1540312472768044640
+        "digest": 3123051394165230288
       }
     },
     {
@@ -11592,6 +11755,7 @@
         "188",
         "1",
         "compact",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11609,7 +11773,7 @@
       "expected": {
         "packets": 1,
         "bytes": 110,
-        "digest": 1540312472768044640
+        "digest": 3123051394165230288
       }
     },
     {
@@ -11622,6 +11786,7 @@
         "188",
         "1",
         "compact-observed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11639,7 +11804,7 @@
       "expected": {
         "packets": 1,
         "bytes": 110,
-        "digest": 1540312472768044640
+        "digest": 3123051394165230288
       }
     },
     {
@@ -11652,6 +11817,7 @@
         "188",
         "1",
         "poll",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11669,7 +11835,7 @@
       "expected": {
         "packets": 1,
         "bytes": 67,
-        "digest": 859282433217685188
+        "digest": 11329529024426647636
       }
     },
     {
@@ -11682,6 +11848,7 @@
         "188",
         "1",
         "feed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11699,7 +11866,7 @@
       "expected": {
         "packets": 1,
         "bytes": 67,
-        "digest": 859282433217685188
+        "digest": 11329529024426647636
       }
     },
     {
@@ -11712,6 +11879,7 @@
         "188",
         "1",
         "feed-carriers",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11729,7 +11897,7 @@
       "expected": {
         "packets": 1,
         "bytes": 67,
-        "digest": 859282433217685188
+        "digest": 11329529024426647636
       }
     },
     {
@@ -11742,6 +11910,7 @@
         "188",
         "1",
         "compact",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11759,7 +11928,7 @@
       "expected": {
         "packets": 1,
         "bytes": 67,
-        "digest": 859282433217685188
+        "digest": 11329529024426647636
       }
     },
     {
@@ -11772,6 +11941,7 @@
         "188",
         "1",
         "compact-observed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11789,7 +11959,7 @@
       "expected": {
         "packets": 1,
         "bytes": 67,
-        "digest": 859282433217685188
+        "digest": 11329529024426647636
       }
     },
     {
@@ -11802,6 +11972,7 @@
         "188",
         "1",
         "poll",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11819,7 +11990,7 @@
       "expected": {
         "packets": 1,
         "bytes": 112,
-        "digest": 12568845423716213062
+        "digest": 2501190768518836662
       }
     },
     {
@@ -11832,6 +12003,7 @@
         "188",
         "1",
         "feed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11849,7 +12021,7 @@
       "expected": {
         "packets": 1,
         "bytes": 112,
-        "digest": 12568845423716213062
+        "digest": 2501190768518836662
       }
     },
     {
@@ -11862,6 +12034,7 @@
         "188",
         "1",
         "feed-carriers",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11879,7 +12052,7 @@
       "expected": {
         "packets": 1,
         "bytes": 112,
-        "digest": 12568845423716213062
+        "digest": 2501190768518836662
       }
     },
     {
@@ -11892,6 +12065,7 @@
         "188",
         "1",
         "compact",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11909,7 +12083,7 @@
       "expected": {
         "packets": 1,
         "bytes": 112,
-        "digest": 12568845423716213062
+        "digest": 2501190768518836662
       }
     },
     {
@@ -11922,6 +12096,7 @@
         "188",
         "1",
         "compact-observed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11939,7 +12114,7 @@
       "expected": {
         "packets": 1,
         "bytes": 112,
-        "digest": 12568845423716213062
+        "digest": 2501190768518836662
       }
     },
     {
@@ -11952,6 +12127,7 @@
         "188",
         "1",
         "poll",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11969,7 +12145,7 @@
       "expected": {
         "packets": 1,
         "bytes": 110,
-        "digest": 1168696234672648935
+        "digest": 2751435156069834583
       }
     },
     {
@@ -11982,6 +12158,7 @@
         "188",
         "1",
         "feed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -11999,7 +12176,7 @@
       "expected": {
         "packets": 1,
         "bytes": 110,
-        "digest": 1168696234672648935
+        "digest": 2751435156069834583
       }
     },
     {
@@ -12012,6 +12189,7 @@
         "188",
         "1",
         "feed-carriers",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -12029,7 +12207,7 @@
       "expected": {
         "packets": 1,
         "bytes": 110,
-        "digest": 1168696234672648935
+        "digest": 2751435156069834583
       }
     },
     {
@@ -12042,6 +12220,7 @@
         "188",
         "1",
         "compact",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -12059,7 +12238,7 @@
       "expected": {
         "packets": 1,
         "bytes": 110,
-        "digest": 1168696234672648935
+        "digest": 2751435156069834583
       }
     },
     {
@@ -12072,6 +12251,7 @@
         "188",
         "1",
         "compact-observed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -12089,7 +12269,7 @@
       "expected": {
         "packets": 1,
         "bytes": 110,
-        "digest": 1168696234672648935
+        "digest": 2751435156069834583
       }
     },
     {
@@ -12102,6 +12282,7 @@
         "188",
         "1",
         "poll",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -12119,7 +12300,7 @@
       "expected": {
         "packets": 1,
         "bytes": 109,
-        "digest": 2346727682652398649
+        "digest": 7158233860428966345
       }
     },
     {
@@ -12132,6 +12313,7 @@
         "188",
         "1",
         "feed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -12149,7 +12331,7 @@
       "expected": {
         "packets": 1,
         "bytes": 109,
-        "digest": 2346727682652398649
+        "digest": 7158233860428966345
       }
     },
     {
@@ -12162,6 +12344,7 @@
         "188",
         "1",
         "feed-carriers",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -12179,7 +12362,7 @@
       "expected": {
         "packets": 1,
         "bytes": 109,
-        "digest": 2346727682652398649
+        "digest": 7158233860428966345
       }
     },
     {
@@ -12192,6 +12375,7 @@
         "188",
         "1",
         "compact",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -12209,7 +12393,7 @@
       "expected": {
         "packets": 1,
         "bytes": 109,
-        "digest": 2346727682652398649
+        "digest": 7158233860428966345
       }
     },
     {
@@ -12222,6 +12406,7 @@
         "188",
         "1",
         "compact-observed",
+        "--source-clocks",
         "--dvb"
       ],
       "requests": [
@@ -12239,7 +12424,7 @@
       "expected": {
         "packets": 1,
         "bytes": 109,
-        "digest": 2346727682652398649
+        "digest": 7158233860428966345
       }
     },
     {
@@ -12251,7 +12436,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12268,7 +12454,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -12280,7 +12466,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12297,7 +12484,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -12309,7 +12496,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12326,7 +12514,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -12338,7 +12526,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12355,7 +12544,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -12367,7 +12556,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12384,7 +12574,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -12396,7 +12586,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12413,7 +12604,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -12425,7 +12616,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12442,7 +12634,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -12454,7 +12646,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12471,7 +12664,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -12483,7 +12676,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12500,7 +12694,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -12512,7 +12706,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12529,7 +12724,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -12541,7 +12736,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12558,7 +12754,7 @@
       "expected": {
         "packets": 1,
         "bytes": 240,
-        "digest": 13839270040222557329
+        "digest": 16624529997861483777
       }
     },
     {
@@ -12570,7 +12766,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12587,7 +12784,7 @@
       "expected": {
         "packets": 1,
         "bytes": 240,
-        "digest": 13839270040222557329
+        "digest": 16624529997861483777
       }
     },
     {
@@ -12599,7 +12796,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12616,7 +12814,7 @@
       "expected": {
         "packets": 1,
         "bytes": 240,
-        "digest": 13839270040222557329
+        "digest": 16624529997861483777
       }
     },
     {
@@ -12628,7 +12826,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12645,7 +12844,7 @@
       "expected": {
         "packets": 1,
         "bytes": 240,
-        "digest": 13839270040222557329
+        "digest": 16624529997861483777
       }
     },
     {
@@ -12657,7 +12856,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12674,7 +12874,7 @@
       "expected": {
         "packets": 1,
         "bytes": 240,
-        "digest": 13839270040222557329
+        "digest": 16624529997861483777
       }
     },
     {
@@ -12686,7 +12886,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12703,7 +12904,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -12715,7 +12916,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12732,7 +12934,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -12744,7 +12946,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12761,7 +12964,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -12773,7 +12976,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12790,7 +12994,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -12802,7 +13006,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12819,7 +13024,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 7910521612812314295
+        "digest": 11284244451022630983
       }
     },
     {
@@ -12831,7 +13036,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12848,7 +13054,7 @@
       "expected": {
         "packets": 1,
         "bytes": 240,
-        "digest": 13839270040222557329
+        "digest": 16624529997861483777
       }
     },
     {
@@ -12860,7 +13066,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12877,7 +13084,7 @@
       "expected": {
         "packets": 1,
         "bytes": 240,
-        "digest": 13839270040222557329
+        "digest": 16624529997861483777
       }
     },
     {
@@ -12889,7 +13096,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12906,7 +13114,7 @@
       "expected": {
         "packets": 1,
         "bytes": 240,
-        "digest": 13839270040222557329
+        "digest": 16624529997861483777
       }
     },
     {
@@ -12918,7 +13126,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12935,7 +13144,7 @@
       "expected": {
         "packets": 1,
         "bytes": 240,
-        "digest": 13839270040222557329
+        "digest": 16624529997861483777
       }
     },
     {
@@ -12947,7 +13156,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -12964,7 +13174,7 @@
       "expected": {
         "packets": 1,
         "bytes": 240,
-        "digest": 13839270040222557329
+        "digest": 16624529997861483777
       }
     },
     {
@@ -13266,7 +13476,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -13283,7 +13494,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -13295,7 +13506,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -13312,7 +13524,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -13324,7 +13536,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -13341,7 +13554,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -13353,7 +13566,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -13370,7 +13584,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -13382,7 +13596,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -13399,7 +13614,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -13411,7 +13626,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -13428,7 +13644,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -13440,7 +13656,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -13457,7 +13674,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -13469,7 +13686,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -13486,7 +13704,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -13498,7 +13716,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -13515,7 +13734,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -13527,7 +13746,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -13544,7 +13764,7 @@
       "expected": {
         "packets": 1,
         "bytes": 27,
-        "digest": 6997440758094392699
+        "digest": 10371163596304709387
       }
     },
     {
@@ -14136,7 +14356,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -14153,7 +14374,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 9219041521095177956
+        "digest": 7575007905364301028
       }
     },
     {
@@ -14165,7 +14386,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -14182,7 +14404,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 9219041521095177956
+        "digest": 7575007905364301028
       }
     },
     {
@@ -14194,7 +14416,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -14211,7 +14434,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 9219041521095177956
+        "digest": 7575007905364301028
       }
     },
     {
@@ -14223,7 +14446,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -14240,7 +14464,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 9219041521095177956
+        "digest": 7575007905364301028
       }
     },
     {
@@ -14252,7 +14476,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -14269,7 +14494,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 9219041521095177956
+        "digest": 7575007905364301028
       }
     },
     {
@@ -14571,7 +14796,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -14588,7 +14814,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 9219041521095177956
+        "digest": 7575007905364301028
       }
     },
     {
@@ -14600,7 +14826,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -14617,7 +14844,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 9219041521095177956
+        "digest": 7575007905364301028
       }
     },
     {
@@ -14629,7 +14856,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -14646,7 +14874,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 9219041521095177956
+        "digest": 7575007905364301028
       }
     },
     {
@@ -14658,7 +14886,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -14675,7 +14904,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 9219041521095177956
+        "digest": 7575007905364301028
       }
     },
     {
@@ -14687,7 +14916,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -14704,7 +14934,7 @@
       "expected": {
         "packets": 2,
         "bytes": 54,
-        "digest": 9219041521095177956
+        "digest": 7575007905364301028
       }
     },
     {
@@ -15296,7 +15526,8 @@
       "arguments": [
         "188",
         "1",
-        "poll"
+        "poll",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -15313,7 +15544,7 @@
       "expected": {
         "packets": 1,
         "bytes": 400,
-        "digest": 16869101003598167857
+        "digest": 13530724236905336737
       }
     },
     {
@@ -15325,7 +15556,8 @@
       "arguments": [
         "188",
         "1",
-        "feed"
+        "feed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -15342,7 +15574,7 @@
       "expected": {
         "packets": 1,
         "bytes": 400,
-        "digest": 16869101003598167857
+        "digest": 13530724236905336737
       }
     },
     {
@@ -15354,7 +15586,8 @@
       "arguments": [
         "188",
         "1",
-        "feed-carriers"
+        "feed-carriers",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -15371,7 +15604,7 @@
       "expected": {
         "packets": 1,
         "bytes": 400,
-        "digest": 16869101003598167857
+        "digest": 13530724236905336737
       }
     },
     {
@@ -15383,7 +15616,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -15400,7 +15634,7 @@
       "expected": {
         "packets": 1,
         "bytes": 400,
-        "digest": 16869101003598167857
+        "digest": 13530724236905336737
       }
     },
     {
@@ -15412,7 +15646,8 @@
       "arguments": [
         "188",
         "1",
-        "compact-observed"
+        "compact-observed",
+        "--source-clocks"
       ],
       "requests": [
         {
@@ -15429,7 +15664,7 @@
       "expected": {
         "packets": 1,
         "bytes": 400,
-        "digest": 16869101003598167857
+        "digest": 13530724236905336737
       }
     },
     {

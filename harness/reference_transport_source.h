@@ -24,6 +24,63 @@ typedef struct {
     int waiting;
 } TsViewsEntityInput;
 
+/* Return the timing flags at the PES start associated with the public packet
+ * position. A header may occupy several carriers or contiguous entities. */
+static int ts_views_wire_start(const TsViewsEntities *source, int width, int pid,
+                               int64_t *position)
+{
+    if (*position < 0)
+        return -1;
+    size_t entity = 0;
+    size_t start = (size_t)*position;
+    while (entity < source->count &&
+           start >= source->entities[entity].base + source->entities[entity].size)
+        ++entity;
+    if (entity == source->count)
+        return -1;
+    const size_t prefix = (size_t)width - 188;
+    size_t offset = start - source->entities[entity].base;
+    if (offset % (size_t)width != 0 && offset % (size_t)width != prefix)
+        return -1;
+    offset -= offset % (size_t)width;
+    *position = (int64_t)(source->entities[entity].base + offset);
+    uint8_t header[8];
+    size_t have = 0;
+    int started = 0;
+    for (; entity < source->count; ++entity, offset = 0) {
+        const TsViewsEntity *part = &source->entities[entity];
+        if (started && part->discontinuity)
+            return -1;
+        for (; part->size - offset >= (size_t)width; offset += (size_t)width) {
+            const uint8_t *ts = part->bytes + offset + prefix;
+            if (ts[0] != 0x47)
+                return -1;
+            if (((ts[1] & 0x1f) * 256 + ts[2]) != pid) {
+                if (!started)
+                    return -1;
+                continue;
+            }
+            if (!!(ts[1] & 0x40) == started)
+                return -1;
+            started = 1;
+            if (!(ts[3] & 0x10))
+                continue;
+            size_t payload = ts[3] & 0x20 ? 5u + ts[4] : 4u;
+            if (payload >= 188)
+                return -1;
+            size_t take = 188 - payload;
+            if (take > sizeof(header) - have)
+                take = sizeof(header) - have;
+            memcpy(header + have, ts + payload, take);
+            have += take;
+            if (have == sizeof(header))
+                return !header[0] && !header[1] && header[2] == 1
+                    ? header[7] >> 6 : -1;
+        }
+    }
+    return -1;
+}
+
 static void ts_views_entities_free(TsViewsEntities *source)
 {
     for (size_t i = 0; i < source->count; ++i)
@@ -44,15 +101,30 @@ static int ts_views_in_program(const AVFormatContext *format, int index, int pro
     return 0;
 }
 
-static void ts_views_fold_packet(const AVFormatContext *format, const AVPacket *packet,
-                                 int program, ViewWork *work)
+static int ts_views_fold_packet(const AVFormatContext *format, const AVPacket *packet,
+                                int program, const TsViewsEntities *source, int width,
+                                ViewWork *work)
 {
     if (!ts_views_in_program(format, packet->stream_index, program))
-        return;
+        return 0;
     const AVStream *stream = format->streams[packet->stream_index];
+    int64_t pts = packet->pts, dts = packet->dts, position = packet->pos;
+    if (width) {
+        int flags = ts_views_wire_start(source, width, stream->id, &position);
+        if (flags < 0 || flags == 1 || (flags == 0 && pts != AV_NOPTS_VALUE) ||
+            (flags != 0 && pts == AV_NOPTS_VALUE) || (flags == 3 && dts == AV_NOPTS_VALUE))
+            return AVERROR_INVALIDDATA;
+        const uint64_t mask = (UINT64_C(1) << 33) - 1;
+        if (pts != AV_NOPTS_VALUE)
+            pts = (int64_t)((uint64_t)pts & mask);
+        if (flags == 3)
+            dts = (int64_t)((uint64_t)dts & mask);
+        else
+            dts = AV_NOPTS_VALUE;
+    }
     uint64_t fields[] = {
-        (uint64_t)packet->stream_index, (uint64_t)stream->id, (uint64_t)packet->pts,
-        (uint64_t)packet->dts, (uint64_t)packet->duration, (uint64_t)packet->pos,
+        (uint64_t)packet->stream_index, (uint64_t)stream->id, (uint64_t)pts,
+        (uint64_t)dts, (uint64_t)packet->duration, (uint64_t)position,
         (uint64_t)packet->flags, (uint64_t)packet->size,
     };
     if (work->trace) {
@@ -60,7 +132,7 @@ static void ts_views_fold_packet(const AVFormatContext *format, const AVPacket *
         fold_bytes(&payload, packet->data, (size_t)packet->size);
         printf("packet %d %d %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64
                " %d %d %" PRIu64, packet->stream_index, stream->id,
-               packet->pts, packet->dts, packet->duration, packet->pos,
+               pts, dts, packet->duration, position,
                packet->flags, packet->size, payload);
         for (int i = 0; i < packet->side_data_elems; ++i) {
             const AVPacketSideData *side = &packet->side_data[i];
@@ -82,6 +154,7 @@ static void ts_views_fold_packet(const AVFormatContext *format, const AVPacket *
     }
     work->packets++;
     work->bytes += (uint64_t)packet->size;
+    return 0;
 }
 
 static size_t ts_views_next_boundary(const TsViewsEntities *source, size_t index)
@@ -175,7 +248,25 @@ static int ts_views_entity_resume(AVFormatContext *format, AVIOContext **io,
     return 0;
 }
 
-static int ts_views_entities_operation(const TsViewsEntities *source, int program, ViewWork *work)
+enum { TS_SCOPE_ALL, TS_SCOPE_AVC, TS_SCOPE_COMPACT };
+
+static int ts_views_scope_refused(const AVFormatContext *format, int program, int scope)
+{
+    for (unsigned i = 0; i < format->nb_programs; ++i) {
+        const AVProgram *item = format->programs[i];
+        if (item->program_num != program || item->nb_stream_indexes != 1)
+            continue;
+        const AVCodecParameters *codec = format->streams[item->stream_index[0]]->codecpar;
+        if (scope == TS_SCOPE_AVC)
+            return codec->codec_tag && codec->codec_tag != 0x1b;
+        return codec->codec_id == AV_CODEC_ID_AC3 || codec->codec_id == AV_CODEC_ID_EAC3 ||
+               codec->codec_id == AV_CODEC_ID_DVB_SUBTITLE;
+    }
+    return 0;
+}
+
+static int ts_views_entities_operation(const TsViewsEntities *source, int program, int width,
+                                       int scope, ViewWork *work)
 {
     TsViewsEntityInput input = {source, 0, 0, ts_views_next_boundary(source, 1), 0};
     AVFormatContext *format = avformat_alloc_context();
@@ -214,13 +305,24 @@ static int ts_views_entities_operation(const TsViewsEntities *source, int progra
         }
         if (rc < 0)
             break;
-        ts_views_fold_packet(format, packet, program, work);
+        if (scope == TS_SCOPE_ALL)
+            rc = ts_views_fold_packet(format, packet, program, source, width, work);
         av_packet_unref(packet);
+        if (rc < 0)
+            break;
     }
-    if (rc == AVERROR_EOF && input.at == source->size && input.boundary == source->count)
+    if (rc == AVERROR_EOF && input.at == source->size && input.boundary == source->count) {
+        if (scope != TS_SCOPE_ALL) {
+            if (!ts_views_scope_refused(format, program, scope)) {
+                rc = AVERROR_INVALIDDATA;
+                goto done;
+            }
+            transport_view_row(work, 8, NULL, 0, NULL, 0);
+        }
         rc = 1;
-    else if (rc == AVERROR_EOF)
+    } else if (rc == AVERROR_EOF) {
         rc = AVERROR(EIO);
+    }
 done:
     av_packet_free(&packet);
     avformat_close_input(&format);
@@ -233,7 +335,7 @@ done:
 
 typedef struct {
     TsViewsEntities source;
-    int program;
+    int program, wire_clock_width, scope;
 } TsViewsSourceRequest;
 
 static void ts_views_release(void *opaque)
@@ -246,7 +348,8 @@ static void ts_views_release(void *opaque)
 static int ts_views_run(const ViewCase *input, ViewWork *work)
 {
     const TsViewsSourceRequest *request = input->prepared;
-    int rc = ts_views_entities_operation(&request->source, request->program, work);
+    int rc = ts_views_entities_operation(&request->source, request->program,
+                                        request->wire_clock_width, request->scope, work);
     if (rc == 1)
         return 0;
     char error[AV_ERROR_MAX_STRING_SIZE];
@@ -306,6 +409,23 @@ static int transport_source_prepare(ViewCase *input)
     source->count = 1;
     source->size = input->size;
     int index = 3;
+    if (index < input->argc && !strcmp(input->argv[index], "--source-clocks")) {
+        if (!strcmp(input->prefix, "ts-observer-"))
+            return 2;
+        request->wire_clock_width = atoi(input->argv[0]);
+        ++index;
+    }
+    if (index < input->argc && !strcmp(input->argv[index], "--scope-refusal")) {
+        if (strcmp(input->prefix, "ts-observer-"))
+            return 2;
+        if (!strcmp(input->argv[2], "unregistered"))
+            request->scope = TS_SCOPE_AVC;
+        else if (!strcmp(input->argv[2], "compact"))
+            request->scope = TS_SCOPE_COMPACT;
+        else
+            return 2;
+        ++index;
+    }
     if (index < input->argc
         && (!strcmp(input->argv[index], "--dvb") || !strcmp(input->argv[index], "--atsc")))
         ++index;

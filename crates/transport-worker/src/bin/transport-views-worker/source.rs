@@ -64,6 +64,7 @@ struct Request {
     format: PacketFormat,
     program: u16,
     namespace: DescriptorNamespace,
+    scope_refusal: bool,
 }
 
 pub(super) fn operation<'a>(
@@ -119,6 +120,26 @@ pub(super) fn operation<'a>(
         ),
         _ => return Err(format!("unknown source operation {prefix}")),
     };
+    let tail = match tail {
+        [option, rest @ ..]
+            if option == "--source-clocks" && !matches!(mode, Mode::Observer(_)) =>
+        {
+            rest
+        }
+        _ => tail,
+    };
+    let (scope_refusal, tail) = match tail {
+        [option, rest @ ..]
+            if option == "--scope-refusal"
+                && matches!(
+                    mode,
+                    Mode::Observer(ObserverForm::Unregistered | ObserverForm::Compact)
+                ) =>
+        {
+            (true, rest)
+        }
+        _ => (false, tail),
+    };
     let (namespace, paths) = match tail {
         [option, rest @ ..] if option == "--dvb" => (
             DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile),
@@ -169,6 +190,7 @@ pub(super) fn operation<'a>(
         format,
         program,
         namespace,
+        scope_refusal,
     };
     Ok(Operation {
         name,
@@ -391,7 +413,7 @@ impl Assembly {
         &mut self,
         packet: TransportPacket,
         epochs: SourceEpochs,
-        split: usize,
+        quantum: usize,
         request: &Request,
         output: &mut Output<'_, '_>,
     ) -> Result<(), String> {
@@ -411,23 +433,15 @@ impl Assembly {
             return Ok(());
         };
         let entity = packet.source_id.ok_or("carrier without an entity")?;
-        let split = split.min(bytes.len().max(1));
-        for start in (0..bytes.len()).step_by(split) {
-            let offset = packet.payload_source_offset + start as u64;
-            let chunk = bytes
-                .slice(start..bytes.len().min(start + split))
-                .map_err(err)?;
-            self.pes
-                .push(
-                    chunk,
-                    start == 0 && packet.payload_unit_start,
-                    entity,
-                    offset,
-                )
-                .map_err(|refusal| err(refusal.error))?;
-            self.drain(request, output, epochs)?;
-        }
-        Ok(())
+        self.pes
+            .push(
+                bytes,
+                packet.payload_unit_start,
+                entity,
+                packet.payload_source_offset,
+            )
+            .map_err(|refusal| err(refusal.error))?;
+        self.drain(request, output, epochs, quantum)
     }
 
     fn drain(
@@ -435,13 +449,17 @@ impl Assembly {
         request: &Request,
         output: &mut Output<'_, '_>,
         epochs: SourceEpochs,
+        quantum: usize,
     ) -> Result<(), String> {
         loop {
             if output.trace.is_some() {
                 let partial = self.pes.partial_header();
                 output.note(format_args!("partial-header {} {partial:02x?}", self.pid))?;
             }
-            match self.pes.poll(&mut WorkBudget::new(GRANT), &CANCEL) {
+            match self
+                .pes
+                .poll(&mut WorkBudget::new((quantum as u64).min(GRANT)), &CANCEL)
+            {
                 Ok(AssemblyStep::Output(pes)) => {
                     source_packet(&pes, request, output)?;
                 }
@@ -551,9 +569,11 @@ impl Observer {
         input: &InputCursor,
         context: Option<&InputContext>,
         epochs: SourceEpochs,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, Error> {
         let [stream] = map.streams.as_slice() else {
-            return Err("demux observer requires one elementary stream".into());
+            return Err(Error::Invalid(
+                "demux observer requires one elementary stream",
+            ));
         };
         let registered = match stream.stream_type {
             0x1b => Some(RegisteredCarriage::Avc),
@@ -610,8 +630,7 @@ impl Observer {
                         stream.stream_type,
                         descriptors,
                         limits,
-                    )
-                    .map_err(err)?;
+                    )?;
                     DemuxObserver::new_private_audio(
                         profile,
                         scope,
@@ -622,13 +641,12 @@ impl Observer {
                     )
                 }
             }
-        }
-        .map_err(err)?;
+        }?;
         if let Some(context) = context {
-            demux.bind_input(context, input).map_err(err)?;
+            demux.bind_input(context, input)?;
         }
         if form == ObserverForm::Compact {
-            demux.enable_compact_payloads().map_err(err)?;
+            demux.enable_compact_payloads()?;
         }
         Ok(Self {
             demux,
@@ -821,25 +839,49 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
                             )?);
                         }
                         if let Mode::Observer(form) = request.mode {
-                            observer = Some(Observer::new(
+                            let opened = Observer::new(
                                 form,
                                 request,
                                 &map,
                                 &input,
                                 context.as_ref(),
                                 epochs,
-                            )?);
+                            );
+                            match opened {
+                                Err(Error::Unsupported(reason))
+                                    if request.scope_refusal
+                                        && matches!(
+                                            (form, reason),
+                                            (
+                                                ObserverForm::Unregistered,
+                                                "AVC PES requires PMT stream type 0x1b and PES stream ID 0xe0"
+                                            ) | (
+                                                ObserverForm::Compact,
+                                                "compact private PES payload"
+                                            )
+                                        ) =>
+                                {
+                                    return super::packets::record(
+                                        output.work,
+                                        &mut output.trace,
+                                        8,
+                                        &[],
+                                        &[],
+                                    );
+                                }
+                                result => observer = Some(result.map_err(err)?),
+                            }
                         }
                     }
                     TraceEvent::Pes(pes) if matches!(request.mode, Mode::Source(_)) => {
                         source_packet(&pes, request, output)?;
                     }
                     TraceEvent::Transport(packet) => {
-                        if let (Mode::Assembler(split), Some(assembly)) =
+                        if let (Mode::Assembler(quantum), Some(assembly)) =
                             (request.mode, &mut assembly)
                             && packet.pid == assembly.pid
                         {
-                            assembly.push(packet, epochs, split, request, output)?;
+                            assembly.push(packet, epochs, quantum, request, output)?;
                         } else if let Some(observer) = &mut observer
                             && packet.pid == observer.demux.scope().pid
                         {
@@ -883,9 +925,11 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
                         }
                     }
                     TraceEvent::Finished => {
-                        if let Some(assembly) = &mut assembly {
+                        if let (Mode::Assembler(quantum), Some(assembly)) =
+                            (request.mode, &mut assembly)
+                        {
                             assembly.pes.end_of_source();
-                            assembly.drain(request, output, epochs)?;
+                            assembly.drain(request, output, epochs, quantum)?;
                         }
                         if let Some(observer) = &mut observer {
                             observer.demux.end_of_source().map_err(err)?;
