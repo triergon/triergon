@@ -154,6 +154,7 @@ on both targets; every other worker stays on stable.
 The [ADTS search comparison](../../harness/features/adts-sync/contract.json) checks
 `adts::find_frame` against the reference AAC parser's offsets, header fields and packet bytes.
 It includes protected headers, junk, false syncwords and truncated final frames.
+An APEv2 tag at the declared frame end confirms the preceding frame.
 The search skips undersized headers, reserved frequency indices and nonzero
 layer codes that the reference parser can emit as packets.
 

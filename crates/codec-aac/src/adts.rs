@@ -66,7 +66,7 @@ impl AdtsHeader {
 
 /// The next plausible ADTS frame in `data` at or after `from`, as its offset and header:
 /// a valid header with a defined sampling frequency index that is followed by another
-/// syncword, an ID3 or `TAG` tag, or the end of `data`. A final frame that runs past the
+/// syncword, an ID3 or APEv2 tag, or the end of `data`. A final frame that runs past the
 /// end of `data` is returned too, so that its decoder reports it as truncated.
 pub fn find_frame(data: &[u8], from: usize) -> Option<(usize, AdtsHeader)> {
     let mut i = from;
@@ -80,7 +80,8 @@ pub fn find_frame(data: &[u8], from: usize) -> Option<(usize, AdtsHeader)> {
                 let next_ok = end + 2 > data.len()
                     || (data[end] == 0xff && (data[end + 1] & 0xf6) == 0xf0)
                     || data[end..].starts_with(b"TAG")
-                    || data[end..].starts_with(b"ID3");
+                    || data[end..].starts_with(b"ID3")
+                    || data[end..].starts_with(b"APETAGEX");
                 if next_ok {
                     return Some((i, h));
                 }
@@ -92,4 +93,18 @@ pub fn find_frame(data: &[u8], from: usize) -> Option<(usize, AdtsHeader)> {
         i += 1;
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find_frame;
+
+    #[test]
+    fn finds_the_final_frame_before_an_ape_tag() {
+        let frame = b"\xff\xf1\x50\x80\x01\x1f\xfc\x00";
+        let data = [frame.as_slice(), b"APETAGEX"].concat();
+        let (at, header) = find_frame(&data, 0).unwrap();
+        assert_eq!((at, header.frame_length), (0, frame.len()));
+        assert!(find_frame(&data, at + header.frame_length).is_none());
+    }
 }
