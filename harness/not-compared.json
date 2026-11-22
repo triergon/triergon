@@ -78,14 +78,7 @@
         "needs": "The dither-stripped stream pins exercise the trace product. Exact AC-3 PCM and complete reference decoding of all stripped inputs remain open."
       }
     ],
-    "triergon-codec-dca": [
-      {
-        "name": "packed-input",
-        "entry_points": ["Packing", "Packing::detect", "Packing::is_14bit"],
-        "degree": "unit-tests",
-        "needs": "14-bit and little-endian DTS streams in the dts lane, against the reference decoding the same streams; every dts vector is 16-bit big-endian"
-      }
-    ],
+    "triergon-codec-dca": [],
     "triergon-codec-flac": [
       {
         "name": "integer-output",
