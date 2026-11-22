@@ -234,7 +234,11 @@ Limits of the reader:
   source seek planners and default physical cursors require exact coverage.
 - **Payload ranges.** `SampleReader::new` requires the sample inside the caller's
   `mdat` payload extent; `PhysicalSampleCursor::new_with_media_extents` checks every
-  track first and returns `Unsupported` for valid backward-ordered layouts.
+  track first and returns `Unsupported` for valid backward-ordered layouts. Physical
+  order and per-track decode order cannot both be maintained in such a track. After
+  this refusal, `resume_in_track_order` can traverse the validated samples in track
+  order; payload access may require backward range requests. It cannot resume when
+  media validation was deferred.
 - **Edits.** Source edit lists are parsed and mapped at rate one only; non-unit
   rates and dwell edits are refused. The source view never repeats or shifts
   packets; the FFmpeg-compatible view does, including AAC and Opus trim for range
