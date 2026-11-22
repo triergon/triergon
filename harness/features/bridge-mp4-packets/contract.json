@@ -155,17 +155,24 @@
     }
   ],
   "pending_module_requirements": [
-    "Resolve transport of a channel-configuration-zero program configuration under ISO/IEC 14496-3 ADTS.",
-    "Resolve prefix delivery when a fragmented ISO BMFF sample extends past the source."
+    "Carry the AudioSpecificConfig program configuration in the first MPEG-4 ADTS raw data block when channel configuration is zero. The framing writer needs a budgeted prefix path to insert it without copying the access unit twice."
   ],
   "open_cases": [
     {
       "id": "range-avc-aac-program-1-aac",
-      "requirement": "Resolve transport of a channel-configuration-zero program configuration under ISO/IEC 14496-3 ADTS."
-    },
+      "requirement": "Carry the AudioSpecificConfig program configuration in the first MPEG-4 ADTS raw data block when channel configuration is zero. The framing writer needs a budgeted prefix path to insert it without copying the access unit twice."
+    }
+  ],
+  "open_deviations": [
     {
-      "id": "forward-forward-fragment-aac-short-1-aac",
-      "requirement": "Resolve prefix delivery when a fragmented ISO BMFF sample extends past the source."
+      "reading": "A fragment declares a sample past the available source",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.1.1 and 8.8.8.2–8.8.8.3 define media data and the extent selected by the fragment run. The bridge opens a checked source sample plan before framing.",
+      "candidate": "Rejects the incomplete sample plan before publishing any access unit.",
+      "reference": "Publishes complete earlier packets and logs a partial file at sample offset 0xd25.",
+      "compat": "compat::mov::deliver_complete_fragment_prefix for a consumer recovering the available prefix from incomplete input.",
+      "cases": [
+        "forward-forward-fragment-aac-short-1-aac"
+      ]
     }
   ]
 }
