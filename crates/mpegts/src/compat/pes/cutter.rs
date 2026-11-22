@@ -6,7 +6,7 @@
 //! optional fields are not checked. Continuity counters are not checked either:
 //! a repeated or missing transport packet changes the data as it arrives.
 use super::observer::DemuxBoundary;
-use crate::pes::HEADER_MAX;
+use crate::pes::{HEADER_MAX, timestamp_bits};
 use crate::transport::TransportPacket;
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
@@ -223,11 +223,11 @@ impl PesCutter {
         let pts = (flags & 2 != 0)
             .then(|| header.get(9..14))
             .flatten()
-            .map(timestamp);
+            .map(timestamp_bits);
         let dts = (flags == 3)
             .then(|| header.get(14..19))
             .flatten()
-            .map(timestamp);
+            .map(timestamp_bits);
         self.data(header, pts, dts)
     }
 
@@ -284,13 +284,4 @@ fn has_optional_header(stream_id: u8) -> bool {
         stream_id,
         0xbc | 0xbe | 0xbf | 0xf0 | 0xf1 | 0xf2 | 0xf8 | 0xff
     )
-}
-
-/// A 33-bit PTS or DTS field, without its marker bits.
-fn timestamp(field: &[u8]) -> u64 {
-    (u64::from(field[0] >> 1) & 7) << 30
-        | u64::from(field[1]) << 22
-        | u64::from(field[2] >> 1) << 15
-        | u64::from(field[3]) << 7
-        | u64::from(field[4] >> 1)
 }
