@@ -5,7 +5,7 @@
 //! [`InputCursor`]. [`Movie::read_scope`] records whether the open stopped at the
 //! first media box after a front movie or scanned the whole source.
 use crate::{
-    BuildStatus, Limits, Next,
+    Limits, Next,
     boxes::{BoxChildren, BoxEvent, BoxHeader, BoxReader, BoxView},
     fields,
     fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
@@ -531,6 +531,28 @@ struct TrackBuild {
     description_at: usize,
 }
 
+#[derive(Debug)]
+struct MoofWalk {
+    children: BoxChildren,
+    previous_traf: Option<u64>,
+    traf: TrafStage,
+}
+
+#[derive(Debug)]
+#[repr(u8)]
+#[allow(clippy::large_enum_variant)] // Keep the builder inline without a per-fragment allocation.
+enum TrafStage {
+    Next,
+    Scan {
+        raw: BoxView,
+        children: BoxChildren,
+    },
+    Build {
+        track: usize,
+        builder: FragmentBuilder,
+    },
+}
+
 /// The resumable opener over a caller-driven [`InputCursor`]: it walks the root
 /// boxes, the movie and every fragment, and validates each track.
 #[derive(Debug)]
@@ -561,13 +583,7 @@ pub struct MovieOpen {
     track_build: Option<TrackBuild>,
     references: BudgetVec<bool>,
     fragment_moof: usize,
-    fragment_children: Option<BoxChildren>,
-    fragment_raw: Option<BoxView>,
-    fragment_scan: Option<BoxChildren>,
-    fragment_track: Option<usize>,
-    fragment_job: Option<FragmentBuilder>,
-    pending_fragment: Option<FragmentIndex>,
-    previous_traf: Option<u64>,
+    fragment_walk: Option<MoofWalk>,
     ready: bool,
 }
 impl MovieOpen {
@@ -637,13 +653,7 @@ impl MovieOpen {
             track_build: None,
             references: BudgetVec::new(&pool),
             fragment_moof: 0,
-            fragment_children: None,
-            fragment_raw: None,
-            fragment_scan: None,
-            fragment_track: None,
-            fragment_job: None,
-            pending_fragment: None,
-            previous_traf: None,
+            fragment_walk: None,
             ready: false,
         })
     }
@@ -1020,53 +1030,40 @@ impl MovieOpen {
     }
     fn fragment(&mut self, w: &mut WorkBudget) -> Result<OpenStep> {
         let moof = &self.moofs.as_slice()[self.fragment_moof];
-        if let Some(index) = self.pending_fragment.as_ref() {
-            if !w.try_charge(1) {
-                return Ok(OpenStep::Yield);
-            }
-            let end = index.implicit_data_end()?;
-            let at = self
-                .fragment_track
-                .ok_or(Error::Invalid("fragment track missing"))?;
-            let track = &mut self.tracks.as_mut_slice()[at];
-            let next = track
-                .next_ordinal
-                .checked_add(index.sample_count())
-                .ok_or(Error::Overflow)?;
-            track.fragments.try_reserve_exact(1)?;
-            if let Some(index) = self.pending_fragment.take() {
-                push(&mut track.fragments, index)?;
-            }
-            track.next_ordinal = next;
-            self.previous_traf = Some(end);
-            self.fragment_track = None;
-            self.fragment_raw = None;
-            return Ok(OpenStep::Yield);
-        }
-        if let Some(job) = self.fragment_job.as_mut() {
-            if job.poll(w)? == BuildStatus::Yield {
-                return Ok(OpenStep::Yield);
-            }
-            let index = self
-                .fragment_job
-                .take()
-                .ok_or(Error::Invalid("fragment job missing"))?
-                .finish()?;
-            self.pending_fragment = Some(index);
-            return Ok(OpenStep::Yield);
-        }
-        if let Some(scan) = self.fragment_scan.as_mut() {
-            match scan.poll(w)? {
-                Next::Yield => return Ok(OpenStep::Yield),
-                Next::Item(raw) if raw.header().kind == *b"tfhd" => {
-                    let id = fields::u32_at(raw.payload(), 4)?;
-                    let at = self
+        let walk = match &mut self.fragment_walk {
+            Some(walk) => walk,
+            None => self.fragment_walk.insert(MoofWalk {
+                children: moof.children(0, self.limits.format)?,
+                previous_traf: None,
+                traf: TrafStage::Next,
+            }),
+        };
+        match &mut walk.traf {
+            TrafStage::Next => match walk.children.poll(w)? {
+                Next::Yield => {}
+                Next::Item(raw) if raw.header().kind == *b"traf" => {
+                    walk.traf = TrafStage::Scan {
+                        children: raw.children(0, self.limits.format)?,
+                        raw,
+                    };
+                }
+                Next::Item(_) => {}
+                Next::End => {
+                    self.fragment_walk = None;
+                    self.fragment_moof += 1;
+                }
+            },
+            TrafStage::Scan { raw, children } => match children.poll(w)? {
+                Next::Yield => {}
+                Next::Item(header) if header.header().kind == *b"tfhd" => {
+                    let id = fields::u32_at(header.payload(), 4)?;
+                    let track = self
                         .tracks
                         .as_slice()
                         .iter()
                         .position(|t| t.header.track_id == id)
                         .ok_or(Error::Invalid("fragment unknown source track"))?;
-                    let t = &self.tracks.as_slice()[at];
+                    let t = &self.tracks.as_slice()[track];
                     let defaults = *self
                         .walk
                         .as_ref()
@@ -1079,7 +1076,7 @@ impl MovieOpen {
                     let first = t.next_ordinal;
                     let context = FragmentContext {
                         moof_start: moof.header().start,
-                        implicit_base: self
+                        implicit_base: walk
                             .previous_traf
                             .map_or(ImplicitBase::FirstTraf, ImplicitBase::PreviousTraf),
                         decode_origin: None,
@@ -1087,50 +1084,47 @@ impl MovieOpen {
                         description_count: u32::try_from(t.table.descriptions().len())
                             .map_err(|_| Error::Overflow)?,
                     };
-                    let raw = self
-                        .fragment_raw
-                        .as_ref()
-                        .ok_or(Error::Invalid("traf missing"))?
-                        .clone();
                     let build = if self.native_recovery {
                         FragmentBuilder::new_header_open
                     } else {
                         FragmentBuilder::new
                     };
-                    self.fragment_job = Some(build(
-                        raw,
-                        defaults,
-                        context,
-                        self.pool.clone(),
-                        self.limits.format,
-                    )?);
-                    self.fragment_track = Some(at);
-                    self.fragment_scan = None;
+                    walk.traf = TrafStage::Build {
+                        track,
+                        builder: build(
+                            raw.clone(),
+                            defaults,
+                            context,
+                            self.pool.clone(),
+                            self.limits.format,
+                        )?,
+                    };
+                }
+                Next::Item(_) => {}
+                Next::End => return Err(Error::Invalid("traf missing tfhd")),
+            },
+            TrafStage::Build { track, builder } => {
+                if !builder.is_ready() {
+                    builder.poll(w)?;
                     return Ok(OpenStep::Yield);
                 }
-                Next::Item(_) => return Ok(OpenStep::Yield),
-                Next::End => return Err(Error::Invalid("traf missing tfhd")),
-            }
-        }
-        if self.fragment_children.is_none() {
-            self.fragment_children = Some(moof.children(0, self.limits.format)?);
-            self.previous_traf = None;
-        }
-        match self
-            .fragment_children
-            .as_mut()
-            .ok_or(Error::Invalid("fragment children missing"))?
-            .poll(w)?
-        {
-            Next::Yield => {}
-            Next::Item(raw) if raw.header().kind == *b"traf" => {
-                self.fragment_scan = Some(raw.children(0, self.limits.format)?);
-                self.fragment_raw = Some(raw);
-            }
-            Next::Item(_) => {}
-            Next::End => {
-                self.fragment_children = None;
-                self.fragment_moof += 1;
+                if !w.try_charge(1) {
+                    return Ok(OpenStep::Yield);
+                }
+                let (count, end) = builder.opening_extent()?;
+                let track = &mut self.tracks.as_mut_slice()[*track];
+                let next = track
+                    .next_ordinal
+                    .checked_add(count)
+                    .ok_or(Error::Overflow)?;
+                track.fragments.try_reserve_exact(1)?;
+                if let TrafStage::Build { builder, .. } =
+                    std::mem::replace(&mut walk.traf, TrafStage::Next)
+                {
+                    push(&mut track.fragments, builder.finish()?)?;
+                }
+                track.next_ordinal = next;
+                walk.previous_traf = Some(end);
             }
         }
         Ok(OpenStep::Yield)

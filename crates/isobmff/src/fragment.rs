@@ -331,12 +331,7 @@ impl FragmentIndex {
     /// `moof`. `Error::Unsupported` when the fragment has no samples, an empty run, or a
     /// run that starts before the previous one ends, since that end is then ambiguous.
     pub fn implicit_data_end(&self) -> Result<u64> {
-        if !self.implicit_safe || self.count == 0 {
-            return Err(Error::Unsupported(
-                "implicit predecessor with empty/backward/overlapping runs",
-            ));
-        }
-        Ok(self.data_end)
+        implicit_data_end(self.implicit_safe, self.count, self.data_end)
     }
     /// Decode time just after the last sample, in media ticks; `None` when the fragment's
     /// times are unknown.
@@ -716,6 +711,18 @@ impl FragmentBuilder {
                 }
             }
         }
+    }
+    pub(crate) fn is_ready(&self) -> bool {
+        self.phase == Phase::Ready
+    }
+    /// Sample count and implicit base after the builder is ready.
+    pub(crate) fn opening_extent(&self) -> Result<(u64, u64)> {
+        let count = self
+            .ordinal
+            .checked_sub(self.context.first_ordinal)
+            .ok_or(Error::Overflow)?;
+        let end = implicit_data_end(self.implicit_safe, count, self.byte)?;
+        Ok((count, end))
     }
     /// The index; the error that stopped the build, or `Error::Invalid` before
     /// [`BuildStatus::Ready`].
@@ -1222,6 +1229,15 @@ impl FragmentCursor<'_> {
             decode: self.decode,
         }
     }
+}
+
+fn implicit_data_end(implicit_safe: bool, count: u64, end: u64) -> Result<u64> {
+    if !implicit_safe || count == 0 {
+        return Err(Error::Unsupported(
+            "implicit predecessor with empty/backward/overlapping runs",
+        ));
+    }
+    Ok(end)
 }
 
 fn add_offset(base: u64, delta: i32) -> Result<u64> {
