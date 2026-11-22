@@ -237,6 +237,8 @@ convention asks:
   coordinate therefore discards the drawing. A coordinate landing exactly on
   `INT_MIN`, which libass built with GCC accepts through `abs(INT_MIN)`
   overflow, is rejected.
+  The [target-specific parsing comparison](../../harness/features/ass-parse-host/contract.json)
+  checks the fixed drawing-coordinate bounds.
 - Collision handling sorts the placed boxes as libass does on glibc (`qsort`
   with `cmp_rect_y0`, a stable merge sort), including the order its overflowing
   comparison gives for tops 2³¹ or more apart; another C library may order such
