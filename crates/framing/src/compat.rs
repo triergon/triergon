@@ -35,3 +35,20 @@ pub mod nal {
         ReceiverHevcConfigParser, ReceiverHevcConfiguration,
     };
 }
+
+/// VVC Annex B picture framing with three-byte prefixes at embedded headers.
+///
+/// FFprobe 9.0.2 recognizes a subsequent picture from an embedded picture
+/// header even when its access-unit prefix omits the extra zero byte required
+/// by H.266 Annex B. The returned ranges retain the original prefix and
+/// payload bytes. A standalone picture header still requires the strict
+/// access-unit prefix.
+pub mod vvc {
+    use crate::VvcAccessUnits;
+    use triergon_core::Result;
+
+    /// Group a complete, bounded layer zero stream into borrowed access units.
+    pub fn access_units(data: &[u8], maximum_bytes: usize) -> Result<VvcAccessUnits<'_>> {
+        VvcAccessUnits::allow_short_embedded_prefix(data, maximum_bytes)
+    }
+}
