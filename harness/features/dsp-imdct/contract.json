@@ -20,139 +20,18 @@
   "iterations": 1,
   "reference": "ffmpeg-codec-views-native",
   "runner": "cargo xtask codecs dsp",
-  "pending_module_requirements": [
-    "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "n-0004",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-0012",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-0020",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-0036",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-0060",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-0180",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-0300",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-0360",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-0540",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-0720",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-0900",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-1440",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-1500",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-1620",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-2880",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-4500",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-4860",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-5760",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "n-7500",
-      "requirement": "The public av_tx output differs from the cosine definition at these AArch64 lengths. The independent definition comparison remains required.",
+      "reading": "The public av_tx inverse MDCT at lengths whose output departs from the transform's definition",
+      "clause": "The inverse MDCT the AAC, Vorbis and Opus specifications define: x[n] is a scale times the sum over the N/2 coefficients of X[k] cos(2 pi (n + 1/2 + N/4)(k + 1/2) / N), with the DCT-IV it reduces to",
+      "candidate": "agrees with the float64 cosine definitions of both transforms at every length and input, within 4.27e-8 normalized",
+      "reference": "after the documented sign and symmetry projection, differs from the definition at these 19 lengths by 0.024 to 0.72 normalized (largest at N 4, 7500 and 300); the 91 other lengths agree within 1.6e-8",
+      "cases": [
+        "n-0004", "n-0012", "n-0020", "n-0036", "n-0060", "n-0180",
+        "n-0300", "n-0360", "n-0540", "n-0720", "n-0900", "n-1440",
+        "n-1500", "n-1620", "n-2880", "n-4500", "n-4860", "n-5760",
+        "n-7500"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
