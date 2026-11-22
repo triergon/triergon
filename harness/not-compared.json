@@ -119,9 +119,9 @@
     "triergon-codec-hevc": [
       {
         "name": "picture-properties",
-        "entry_points": ["ColourDescription::colour_description_present"],
+        "entry_points": ["ColourDescription::colour_description_present", "ColourDescription::video_signal_type_present"],
         "degree": "no-reference",
-        "needs": "The frame reference exposes the three CICP values but no independent bit for presence of the description. The picture-properties contract compares the values, range, aspect ratio and visible planes."
+        "needs": "Picture properties compare decoded CICP, effective range, aspect ratio and visible planes. The frame reference does not expose the two coded VUI presence bits."
       }
     ],
     "triergon-codec-mp3": [],
@@ -140,7 +140,7 @@
         "name": "source-signatures",
         "entry_points": ["signature"],
         "degree": "step",
-        "needs": "media-probe compares the facade signature policy against the installed demuxer probe. The independent opening-box policies, competing transport spacings and exact Need lengths still need a direct comparison."
+        "needs": "Media, facade and playback probes compare their selected policies, transport width and replay where exposed. The generic selector still needs a direct comparison over caller-supplied box sets, Ogg enablement, both tie policies and exact Need lengths."
       },
       {
         "name": "reader-protocol",
@@ -173,26 +173,7 @@
     "triergon-framing": [],
     "triergon-harness-protocol": [],
     "triergon-harness-runner": [],
-    "triergon-hls": [
-      {
-        "name": "unit-packet-views",
-        "entry_points": ["packet::UnitPacket", "progressive::TsProgressiveReader::packet", "segment::HlsSegment::packet"],
-        "degree": "unit-tests",
-        "needs": "hls-unit-packets compares both PacketInfo views. The legal duplicate carrier case remains open."
-      },
-      {
-        "name": "aac-segment-clocks",
-        "entry_points": ["clock::resolve_hls_aac_clocks", "clock::HlsAacClock"],
-        "degree": "unit-tests",
-        "needs": "hls-aac-clocks compares the exact AAC clock and its 90 kHz projection. The legal duplicate carrier case remains open."
-      },
-      {
-        "name": "standalone-access-unit-readers",
-        "entry_points": ["avc::AvcTsReader", "aac::HlsAac", "avc::AvcTsReader::push_compact", "aac::HlsAac::push_compact", "avc::AvcTsAccessUnit::source_bytes"],
-        "degree": "step",
-        "needs": "hls-compact-push uses both public compact push methods and folds the video source bytes. The reference duplicate refusal and the standalone AVC initial delimiter requirement remain open."
-      }
-    ],
+    "triergon-hls": [],
     "triergon-isobmff": [],
     "triergon-matroska": [],
     "triergon-mpegts": [
@@ -301,25 +282,19 @@
         "name": "demux-view-entry-points-outside-the-gated-operations",
         "entry_points": ["compat::mov::index", "compat::mov::index_encoded_range", "compat::pes::open_private_audio", "compat::pes::open_segment", "compat::pes::startup::Startup::new"],
         "degree": "recorded",
-        "needs": "Resolve the MOV index and terminal read differences in playback-mov-index and the finite startup and DVB subtitle differences in playback-ts-open."
+        "needs": "Resolve the reordered-edit admission in playback-mov-index. The finite startup and independent segment packet gates are in playback-ts-open."
       },
       {
         "name": "player-mp4-seeks",
         "entry_points": ["Player::prepare_mp4_sync_seek", "Player::apply_mp4_sync_seek", "Player::prepare_mp4_demux_seek", "Player::apply_mp4_demux_seek", "Player::prepare_mp4_progressive_sync_seek", "Player::prepare_mp4_progressive_demux_seek", "mp4::PreparedMp4::movie_seek", "Player::apply_movie_seek"],
         "degree": "recorded",
-        "needs": "Resolve the open landing, duration, edit and suffix cases in playback-mp4-seek."
+        "needs": "Resolve edit-aware demux seek admission, encoded preroll and terminal trim in playback-mp4-seek."
       },
       {
         "name": "fifo-delivery-and-pump",
         "entry_points": ["Player::advance", "Player::advance_ready", "Player::pop", "Player::may_deliver", "Player::pause", "Player::stop", "pump::Pump", "pump::Sink", "pump::CatalogueSink", "pump::Feed"],
         "degree": "no-reference",
-        "needs": "Resolve the Matroska clock and preroll cases in playback-delivery. The queue and sink lifecycle is exercised by the library tests."
-      },
-      {
-        "name": "track-selection",
-        "entry_points": ["Selection::Tracks", "TrackKey", "Player::seek_and_select"],
-        "degree": "unit-tests",
-        "needs": "Resolve the Matroska clock and post-seek delivery cases in playback-track-selection."
+        "needs": "Playback-delivery compares the delivered packet sequence and the Matroska Cluster prefix. Queue and sink lifecycle has no reference counterpart and is exercised by the library tests."
       },
       {
         "name": "neutral-views",
