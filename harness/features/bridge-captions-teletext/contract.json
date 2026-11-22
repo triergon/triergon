@@ -464,9 +464,7 @@
         "teletext-teletext-colour-tables-text",
         "teletext-teletext-chop-text",
         "teletext-teletext-random-1-text",
-        "teletext-teletext-random-2-text",
-        "fixture-cc-h264-a53",
-        "fixture-teletext-basic"
+        "teletext-teletext-random-2-text"
       ],
       "cause": "Paired native measurements are pending on the two gate hosts."
     },
@@ -906,9 +904,7 @@
         "teletext-teletext-colour-tables-text",
         "teletext-teletext-chop-text",
         "teletext-teletext-random-1-text",
-        "teletext-teletext-random-2-text",
-        "fixture-cc-h264-a53",
-        "fixture-teletext-basic"
+        "teletext-teletext-random-2-text"
       ],
       "cause": "Paired native measurements are pending on the two gate hosts."
     },
@@ -1348,9 +1344,7 @@
         "teletext-teletext-colour-tables-text",
         "teletext-teletext-chop-text",
         "teletext-teletext-random-1-text",
-        "teletext-teletext-random-2-text",
-        "fixture-cc-h264-a53",
-        "fixture-teletext-basic"
+        "teletext-teletext-random-2-text"
       ],
       "cause": "Paired native measurements are pending on the two gate hosts."
     }

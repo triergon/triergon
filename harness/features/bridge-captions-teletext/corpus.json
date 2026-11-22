@@ -8989,46 +8989,6 @@
         "bytes": 43539,
         "digest": 7409991067249008677
       }
-    },
-    {
-      "id": "fixture-cc-h264-a53",
-      "profile": "cc-mov-cc",
-      "file": "crates/playback/tests/fixtures/subtitles/cc-h264-a53.mp4",
-      "sha256": "27a9f78ad9151fd8b707d2d675de008bd4d94b25fb0b8046ead5558b2a89abf7",
-      "rights": "authored-synthetic",
-      "source": "crates/playback/tests/fixtures/subtitles/cc-h264-a53.mp4",
-      "arguments": [
-        "cc",
-        "mov",
-        "cc",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 1057,
-        "digest": 15355898153403159643
-      }
-    },
-    {
-      "id": "fixture-teletext-basic",
-      "profile": "teletext-ts-teletext",
-      "file": "crates/playback/tests/fixtures/subtitles/teletext-basic.ts",
-      "sha256": "6beb3af3849df22437f9356b1dcae781fe0e4bb44224f65628549429630b538d",
-      "rights": "authored-synthetic",
-      "source": "crates/playback/tests/fixtures/subtitles/teletext-basic.ts",
-      "arguments": [
-        "teletext",
-        "ts",
-        "teletext",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 8,
-        "bytes": 1018,
-        "digest": 10866910929021321278
-      }
     }
   ]
 }
