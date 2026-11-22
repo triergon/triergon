@@ -71,11 +71,10 @@ pub struct HvcDecoderConfigWriter {
 
 #[derive(Debug)]
 enum State {
-    /// The record's arrays are checked.
-    Checking(HvcConfiguration),
+    /// The record whose arrays are checked, or none once the output was returned.
+    Source(Option<HvcConfiguration>),
     /// The record is converted.
     Writing(HvcAnnexBWriter),
-    Complete,
     Failed(Error),
 }
 
@@ -90,7 +89,7 @@ impl HvcDecoderConfigWriter {
             pool: pool.clone(),
             maximum,
             array: 0,
-            state: State::Checking(input),
+            state: State::Source(Some(input)),
         })
     }
     /// Advances by at most the units in `work` and returns the output once; a refusal
@@ -117,14 +116,13 @@ impl HvcDecoderConfigWriter {
         loop {
             match &mut self.state {
                 &mut State::Failed(error) => return Err(error),
-                State::Complete => return Ok(BuildStep::Complete),
                 State::Writing(writer) => {
                     if cancel.load(Ordering::Relaxed) {
                         return Err(Error::Cancelled);
                     }
                     let result = writer.step(work, cancel);
                     if let Ok(BuildStep::Ready(_) | BuildStep::Complete) = result {
-                        self.state = State::Complete;
+                        self.state = State::Source(None);
                     }
                     return result.map(|step| match step {
                         BuildStep::Ready(o) => {
@@ -134,7 +132,10 @@ impl HvcDecoderConfigWriter {
                         BuildStep::Complete => BuildStep::Complete,
                     });
                 }
-                State::Checking(input) => {
+                State::Source(source) => {
+                    let Some(input) = source.as_ref() else {
+                        return Ok(BuildStep::Complete);
+                    };
                     if cancel.load(Ordering::Relaxed) {
                         return Err(Error::Cancelled);
                     }
@@ -146,10 +147,8 @@ impl HvcDecoderConfigWriter {
                         self.array += 1;
                         continue;
                     }
-                    let State::Checking(input) =
-                        std::mem::replace(&mut self.state, State::Complete)
-                    else {
-                        unreachable!("the writer is checking")
+                    let Some(input) = source.take() else {
+                        return Ok(BuildStep::Complete);
                     };
                     match declared {
                         Some(declared_nal_type) => {

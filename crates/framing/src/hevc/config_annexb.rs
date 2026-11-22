@@ -33,18 +33,6 @@ enum Phase {
     Freeze,
 }
 
-/// Where a conversion stands. The record and the output are held only while it is
-/// written.
-#[expect(
-    clippy::large_enum_variant,
-    reason = "one write per writer; boxing it would allocate outside the pool"
-)]
-enum State {
-    Writing(Writing),
-    Complete,
-    Failed(Error),
-}
-
 struct Writing {
     input: HvcConfiguration,
     output: BudgetVec<u8>,
@@ -60,14 +48,11 @@ pub struct HvcAnnexBWriter {
     index: usize,
     nal_offset: usize,
     phase: Phase,
-    state: State,
+    writing: Result<Option<Writing>>,
 }
 impl std::fmt::Debug for HvcAnnexBWriter {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let failure = match self.state {
-            State::Failed(error) => Some(error),
-            State::Writing(_) | State::Complete => None,
-        };
+        let failure = self.writing.as_ref().err().copied();
         formatter
             .debug_struct("HvcAnnexBWriter")
             .field("maximum", &self.maximum)
@@ -96,10 +81,10 @@ impl HvcAnnexBWriter {
             index: 0,
             nal_offset: 0,
             phase: Phase::Count,
-            state: State::Writing(Writing {
+            writing: Ok(Some(Writing {
                 input,
                 output: BudgetVec::new(pool),
-            }),
+            })),
         })
     }
     /// Advances by at most the units in `work` and returns the output once. Sizing
@@ -119,7 +104,7 @@ impl HvcAnnexBWriter {
         if let Err(error) = result
             && !retryable(error)
         {
-            self.state = State::Failed(error);
+            self.writing = Err(error);
         }
         result
     }
@@ -130,10 +115,9 @@ impl HvcAnnexBWriter {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<HvcAnnexBOutput>> {
-        let Writing { input, output } = match &mut self.state {
-            State::Writing(writing) => writing,
-            State::Complete => return Ok(BuildStep::Complete),
-            State::Failed(error) => return Err(*error),
+        let writing = self.writing.as_mut().map_err(|error| *error)?;
+        let Some(Writing { input, output }) = writing.as_mut() else {
+            return Ok(BuildStep::Complete);
         };
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -228,24 +212,13 @@ impl HvcAnnexBWriter {
                     if output.len() != self.total {
                         return Err(Error::Invalid("hvcC framing byte count"));
                     }
-                    let State::Writing(Writing { input, output }) =
-                        std::mem::replace(&mut self.state, State::Complete)
-                    else {
-                        unreachable!("the writer is writing")
-                    };
-                    return match output.freeze() {
-                        Ok(bytes) => Ok(BuildStep::Ready(HvcAnnexBOutput {
+                    let bytes = crate::freeze_whole(output)?;
+                    return Ok(writing.take().map_or(BuildStep::Complete, |writing| {
+                        BuildStep::Ready(HvcAnnexBOutput {
                             bytes,
-                            configuration: input,
-                        })),
-                        Err(refused) => {
-                            self.state = State::Writing(Writing {
-                                input,
-                                output: refused.value,
-                            });
-                            Err(refused.error)
-                        }
-                    };
+                            configuration: writing.input,
+                        })
+                    }));
                 }
             }
         }
