@@ -58,7 +58,7 @@ impl Default for SourceSeekLimits {
 pub struct SourceSeekLanding {
     /// `track_ID` of the track; never zero.
     pub track_id: u32,
-    /// The request's [`target_ordinal`](SourceSeekRequest::target_ordinal).
+    /// The requested 1-based ordinal.
     pub requested_ordinal: u64,
     /// The sample at the requested ordinal.
     pub target: Sample,
@@ -67,7 +67,7 @@ pub struct SourceSeekLanding {
     /// The first sample to decode: the earliest preroll sample, or the sync sample
     /// when no preroll is taken.
     pub decode_start: Sample,
-    /// The request's [`preroll_samples`](SourceSeekRequest::preroll_samples).
+    /// Number of samples requested before the sync sample.
     pub requested_preroll_samples: u16,
     /// Preroll samples taken: the requested count, or fewer where the track starts
     /// closer to the sync sample.

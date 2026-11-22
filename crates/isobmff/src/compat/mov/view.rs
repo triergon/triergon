@@ -1,7 +1,5 @@
-//! Single packets and stream entries as FFmpeg's MOV demuxer reports them:
-//! `PacketView` is one packet, `PacketProjector` projects one source sample to it, and
-//! `StreamView` is a track as the demuxer lists it. Which samples become packets, and
-//! how often, is the packet and edit cursors' work. Source samples are never changed.
+//! Describes streams and translates individual samples to FFmpeg MOV packet fields.
+//! The packet and edit cursors select and order the samples.
 use crate::{
     Access, Sample,
     compat::mov::clocks::{ClockField, MediaClock},
@@ -56,23 +54,22 @@ pub struct PacketView {
     pub flags: u32,
 }
 
-/// A track as FFmpeg's MOV demuxer lists it as a stream, for raw video (`raw `) and
-/// `tx3g` text; [`PcmStream`](crate::compat::mov::pcm::PcmStream) builds one for
-/// QuickTime PCM. The source header and descriptions are kept unchanged.
+/// Stream fields as FFmpeg's MOV demuxer reports them. [`Self::new`] reads `raw ` and
+/// `tx3g` entries. The PCM and encoded admission jobs also return this record.
 #[derive(Clone, Debug)]
 pub struct StreamView {
     /// `track_ID` of the `tkhd` box.
     pub track_id: u32,
-    /// FFmpeg's codec name: `rawvideo`, `mov_text`, `pcm_u8` or `pcm_s16be`.
+    /// FFmpeg's codec name, such as `rawvideo`, `mov_text`, `pcm_u8` or `hevc`.
     pub codec: &'static str,
     /// FFmpeg's media type number: 0 video, 1 audio, 3 subtitle.
     pub media_type: u8,
     /// The stream time base; equal to `clock.demux_base`.
     pub time_base: TimeBase,
-    /// The stream clock and why it is what it is.
+    /// The source time base and the rule used to obtain the demux time base.
     pub clock: MediaClock,
-    /// Codec private data: a `tx3g` entry's bytes after its sample entry fields;
-    /// empty for raw video and PCM.
+    /// Decoder configuration. For `tx3g` this is the entry payload after the eight
+    /// common sample-entry bytes. Raw video and PCM have no extradata.
     pub extradata: Bytes,
     /// ISO 639-2/T language code from `mdhd`, three lowercase letters.
     pub language: [u8; 3],
@@ -157,8 +154,9 @@ impl StreamView {
         }
         Ok(view)
     }
-    /// The stream for description `entry` alone, in the track's media time base.
-    /// [`for_sample_table`](Self::for_sample_table) also handles an empty table.
+    /// The stream for one `raw ` or `tx3g` description. Requires a supported media
+    /// time base, ISO language and handler fields, and a zero raw-video vendor.
+    /// The handler-name field is limited to 256 bytes.
     pub fn new(header: &TrackHeader, entry: &SampleDescription) -> Result<Self> {
         Self::with_projection_base(header, entry, header.time_base()?)
     }
@@ -258,7 +256,6 @@ fn demux_field(time: Option<Time>, base: TimeBase) -> Result<ClockField> {
         .to_ticks(base, Rounding::NearestAway)?;
     ClockField::from_exact_ticks(ticks)
 }
-/// The demux clock a packet projection reads.
 #[derive(Clone, Copy)]
 enum Clock {
     /// The sample's own clocks, mapped through an edit when there is one.

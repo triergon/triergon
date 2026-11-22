@@ -27,17 +27,17 @@ pub struct BoxHeader {
 /// The result of [`BoxHeader::parse`] on a prefix that may be too short.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HeaderRead {
-    /// The prefix must hold at least this many bytes (8 or 16).
+    /// Supply at least this many bytes from the same start offset (8 or 16).
     Need(usize),
     /// The header is complete.
     Ready(BoxHeader),
 }
 
 impl BoxHeader {
-    /// Reads the header at absolute offset `start` from `prefix`, the bytes from there on.
-    /// A box crossing the known `parent_end` is truncated. A declared size below the
-    /// header length is invalid. Size zero is supported only for a top-level `mdat`
-    /// and extends to `parent_end` when known.
+    /// Reads bytes at absolute offset `start`, bounded by the exclusive `parent_end`
+    /// when present. A box that crosses the bound is truncated. A start beyond the
+    /// bound or a declared size smaller than the header is invalid. Size zero is
+    /// supported only for a top-level `mdat` and extends to the bound when known.
     pub fn parse(
         prefix: &[u8],
         start: u64,

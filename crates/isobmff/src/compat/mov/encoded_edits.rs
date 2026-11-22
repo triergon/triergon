@@ -1269,7 +1269,6 @@ impl<'a> EncodedEditJob<'a> {
         }
         Ok(true)
     }
-    /// The plan of a completed scan.
     fn build_plan(&mut self) -> Result<EncodedEditPlan> {
         let presentation_end = self.end;
         // A short edit can overlap a single sync sample without

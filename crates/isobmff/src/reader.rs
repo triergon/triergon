@@ -23,8 +23,7 @@ use triergon_core::{
     TimeBase, WorkBudget,
 };
 
-/// Classify an `hdlr` handler code without copying or allocating.
-/// Unrecognized handlers remain [`MediaKind::Unknown`].
+/// The media kind of an `hdlr` handler code, or [`MediaKind::Unknown`].
 pub fn media_kind(handler: &[u8; 4]) -> MediaKind {
     match handler {
         b"vide" => MediaKind::Video,
@@ -62,7 +61,7 @@ fn packed_language(mdhd: &[u8]) -> Result<Option<[u8; 3]>> {
 pub struct ReaderLimits {
     /// Bounds of the movie open: root boxes, retained metadata and tables.
     pub open: OpenLimits,
-    /// Largest sample.
+    /// Maximum sample payload in bytes. The default is 64 MiB.
     pub packet_bytes: usize,
     /// Bounds of reading each codec configuration from its sample entry.
     pub configuration: ConfigurationLimits,
@@ -89,7 +88,7 @@ pub struct Packet {
     payload: Bytes,
 }
 impl Packet {
-    /// The sample's wire facts: ordinal, sample entry, byte range, flags.
+    /// The sample's source ordinal, description, range, clocks and flags.
     pub fn sample(&self) -> &Sample {
         &self.sample
     }

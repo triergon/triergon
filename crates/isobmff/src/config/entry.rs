@@ -77,11 +77,9 @@ enum EntryScan {
     Record(BoxChildren, [u8; 4]),
 }
 
-/// Identifies a track's first sample entry as [`Track`](crate::Track) reports it through
-/// `TrackInfo`: the object type an `mp4a` or `mp4s` entry's `esds` states, the codec
-/// [`codec_id`] gives with it, and the decoder configuration bytes. Poll until
-/// [`BuildStatus::Ready`]. An entry that cannot be read keeps the identity and
-/// configuration its code alone gives.
+/// Resolves a sample entry's codec and decoder configuration for [`crate::Track`].
+/// Poll until [`BuildStatus::Ready`]. If a configuration cannot be read, the result
+/// uses the codec and configuration implied by the entry code alone.
 #[derive(Debug)]
 pub struct EntryConfiguration {
     handler: [u8; 4],
@@ -91,9 +89,8 @@ pub struct EntryConfiguration {
     configuration: Configuration,
 }
 impl EntryConfiguration {
-    /// Starts identifying `entry`, a sample entry of a track whose `hdlr` handler type
-    /// is `handler`. `limits` bounds the `esds` read; `format` bounds the walk over the
-    /// entry's children, with at most `limits.max_child_boxes` of them.
+    /// Starts identifying `entry` under the track's `hdlr` code. `limits` bounds
+    /// the `esds` read and supplies the child-box cap.
     pub fn new(
         handler: [u8; 4],
         entry: &SampleDescription,
@@ -119,7 +116,7 @@ impl EntryConfiguration {
         }
         Ok(BuildStatus::Ready)
     }
-    /// The object type the entry's `esds` states, for `mp4a` and `mp4s`.
+    /// The `esds` object type for `mp4a` or `mp4s`, if the scan found one.
     pub fn object_type(&self) -> Option<u8> {
         self.object_type
     }
@@ -127,8 +124,10 @@ impl EntryConfiguration {
     pub fn codec(&self) -> CodecId {
         codec_id(&self.handler, &self.format, self.object_type)
     }
-    /// The configuration record's payload (AudioSpecificConfig for AAC), empty when it is
-    /// absent, or `entry`'s whole payload when the entry has no known record.
+    /// Configuration record payload (AudioSpecificConfig for AAC), or an empty
+    /// slice when a known record is absent.
+    /// Pass the same `entry` as at construction. Its payload is the fallback
+    /// for an unrecognized entry.
     pub fn bytes<'a>(&'a self, entry: &'a SampleDescription) -> &'a [u8] {
         match &self.configuration {
             Configuration::Record(bytes) => bytes.as_ref(),
@@ -176,8 +175,6 @@ fn entry_scan(
     )
 }
 
-/// Advance the scan. `true` means the work is spent. A sample entry that cannot
-/// be read keeps the identity and configuration its code alone gives.
 impl EntryConfiguration {
     fn step(&mut self, work: &mut WorkBudget) -> Result<bool> {
         let active = &mut self.scan;

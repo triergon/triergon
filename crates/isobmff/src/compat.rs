@@ -1,24 +1,10 @@
-//! Reference-compatible policies.
-//!
-//! The types at the crate root follow the specifications and report every source
-//! fact. Where FFmpeg's MOV demuxer orders, times or recovers packets differently and
-//! a consumer needs FFmpeg's result, the policies here reproduce that demuxer for the
-//! input. They read the same parsed tables and never rewrite source facts. Each
-//! module is one policy family; its documentation names the FFmpeg build it
-//! reproduces.
-//!
-//! Projections that exist only to compare traces with FFmpeg are not policies. They
-//! are compiled only with the `reference-trace` feature.
+//! Opt-in policies that reproduce how FFmpeg orders, times and recovers MOV packets.
+//! They work over the parsed tables and preserve source samples. Trace projections
+//! are available with the `reference-trace` feature.
 
 pub mod mov {
-    //! FFmpeg's MOV demuxer.
-    //!
-    //! Each occurrence pairs the untouched source sample with the packet the demuxer
-    //! emits for it. [`packets`] walks tracks in the demuxer's order, [`clock`] holds
-    //! its signed clocks, [`edits`] applies edit lists, [`seek`] builds its index and
-    //! seeks, [`front`] reads a forward-only input, [`encoded`] admits encoded sample
-    //! entries, [`recovery`] keeps malformed files readable and [`pcm`] groups
-    //! QuickTime PCM samples into packets.
+    //! FFmpeg MOV packet, seek and stream metadata policies. Each packet occurrence
+    //! pairs the source sample with the demuxer's packet fields.
     //!
     //! Reference: the `mov` demuxer with `+noparse+nofillin`, FFmpeg git revision
     //! `d32b387f` on the 9.0 branch.
@@ -42,14 +28,8 @@ pub mod mov {
     pub(crate) mod view;
 
     pub mod clock {
-        //! The demuxer's signed clocks.
-        //!
-        //! [`ClockField`] is a packet time as the demuxer stores it, including its
-        //! null sentinel, beside the exact source tick. [`MediaClock`] is a track's
-        //! stream clock, with [`MediaClockCause`] saying why it differs from the
-        //! declared timescale. [`ClockOrigin`] says where a packet's decode time came
-        //! from and [`SchedulingClock`] orders heads across tracks;
-        //! [`seekable_head_precedes`] compares two heads as the demuxer does.
+        //! Exact and stored packet times, track time bases and the clocks used
+        //! by [`seekable_head_precedes`] to compare packets across tracks.
         pub use super::clocks::{
             ClockField, MediaClock, MediaClockCause, SchedulingClock, SourceTimeBase,
         };
@@ -57,13 +37,8 @@ pub mod mov {
     }
 
     pub mod packets {
-        //! The demuxer's packet sequence.
-        //!
-        //! [`PacketCursor`] walks the selected [`DemuxTrack`]s in the order the demuxer
-        //! emits them and yields a [`PacketOccurrence`] for each packet: the source
-        //! sample, the [`PacketView`] the demuxer reports and their clocks. A
-        //! [`StreamView`] is a track's catalogue entry and [`PacketProjector`] projects
-        //! one source sample on its own.
+        //! [`PacketCursor`] reproduces the demuxer's packet order across tracks.
+        //! Use [`PacketProjector`] for a single sample and [`StreamView`] for stream metadata.
         pub use super::cursor::{
             DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence, ResumePoint,
         };
@@ -88,12 +63,8 @@ pub mod mov {
     }
 
     pub mod seek {
-        //! The demuxer's index and seek.
-        //!
-        //! [`IndexCursor`] builds one track's index. [`SeekJob`] seeks one track and
-        //! [`GlobalSeekJob`] all of them; both return a plan whose [`SeekLanding`] says
-        //! which entry was selected. [`RangeSeekJob`] does the same from a packet
-        //! cursor that recorded checkpoints.
+        //! Demux index entries and seek plans for one track or all tracks.
+        //! [`RangeSeekJob`] starts from a packet cursor's recorded checkpoints.
         pub use super::cursor::RangeSeekJob;
         pub use super::index::{
             GlobalSeekJob, GlobalSeekPlan, IndexCursor, IndexEntry, IndexLimits, SeekCursor,
@@ -191,12 +162,8 @@ pub mod mov {
     }
 
     pub mod pcm {
-        //! QuickTime PCM packets.
-        //!
-        //! [`PcmStream`] admits one track of [`SoundDescriptionV0`](crate::quicktime::SoundDescriptionV0)
-        //! samples. [`PcmCursor`] groups them into the [`PcmPacket`]s the demuxer emits,
-        //! which do not match the source samples, and [`PcmReader`] reads one packet's
-        //! bytes as a [`PcmPayload`].
+        //! [`PcmCursor`] groups QuickTime version 0 PCM samples into demux packets.
+        //! [`PcmReader`] reads the grouped payloads.
         pub use super::pcm_packets::{
             PcmCursor, PcmLimits, PcmPacket, PcmPayload, PcmProfile, PcmReader, PcmStream,
         };

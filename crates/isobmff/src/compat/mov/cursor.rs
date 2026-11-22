@@ -1955,6 +1955,7 @@ impl<'a> PacketCursor<'a> {
                     self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
                     count(self.generated, self.limits.max_occurrences)?;
                     if let Some(duration) = &mut self.checked_duration_us {
+                        // Returning the head from fill costs 1.72% on a regular seek.
                         let row = slot
                             .head
                             .as_ref()

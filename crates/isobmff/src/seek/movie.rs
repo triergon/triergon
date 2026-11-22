@@ -61,7 +61,7 @@ pub struct MovieEmptyEdit {
     pub requested_movie_time: Time,
     /// 1-based `elst` row of the empty edit.
     pub edit_ordinal: u32,
-    /// The empty edit.
+    /// The `elst` entry whose `media_time` is −1.
     pub entry: EditEntry,
     /// The movie times the empty edit covers.
     pub movie_range: Range<Time>,
@@ -251,7 +251,7 @@ impl<'a> MovieEditLocator<'a> {
 /// The sample a media time selects: the one presented latest at or before it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CompositionTarget {
-    /// The selected sample.
+    /// The unique sample whose presentation time is closest at or before the request.
     Target(Sample),
     /// Every sample is presented after the time, or the track has no samples.
     BeforeFirst,

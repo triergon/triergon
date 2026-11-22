@@ -355,7 +355,6 @@ enum Check {
     Done,
 }
 
-/// Where the row checks of a built table stand.
 #[derive(Clone, Copy, Debug)]
 struct RowCheck {
     check: Check,
@@ -374,7 +373,6 @@ impl RowCheck {
     }
 }
 
-/// What run recovery found while checking the rows.
 #[derive(Clone, Copy, Debug, Default)]
 struct Findings {
     coverage: [Option<RunCoverage>; 2],
@@ -403,7 +401,6 @@ enum Stage {
     Failed(Error),
 }
 
-/// The children a collecting [`SampleTableBuilder`] reads.
 #[derive(Debug)]
 enum Children {
     /// The `stbl` children.
@@ -1137,8 +1134,6 @@ impl<'a> SampleCursor<'a> {
             size,
         })
     }
-    /// Loads the time runs and the chunk that hold the next sample, and returns
-    /// its ordinal.
     fn enter(&mut self) -> Result<u64> {
         if self.at.stts_left == 0 {
             self.at.stts_left = self.table.stts.word(self.at.stts_run, 0)?;
@@ -1155,7 +1150,6 @@ impl<'a> SampleCursor<'a> {
         self.at.chunks.enter(self.table)?;
         self.at.ordinal.checked_add(1).ok_or(Error::Overflow)
     }
-    /// Steps past sample `ordinal`, which ends at byte `end`.
     fn leave(&mut self, ordinal: u64, end: u64) -> Result<()> {
         self.at.dts = self
             .at

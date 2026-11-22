@@ -1,7 +1,6 @@
-//! Track fragments. [`Trex`] holds a track's fragment defaults, [`FragmentBuilder`] indexes
-//! one `traf` into a [`FragmentIndex`] without reading media, and [`FragmentCursor`],
-//! [`OwnedFragmentCursor`] and [`FragmentLocator`] read its samples back. Signed `trun`
-//! version 1 composition offsets follow draft text and are read experimentally.
+//! Indexes a `traf` from its run metadata and [`Trex`] defaults without reading media.
+//! The index supports sequential and ordinal lookup. Version 1 `trun` composition
+//! offsets are signed.
 //!
 //! Specification: Adobe F4V 10.1 §§2.9, 2.12; ETSI TS 126 244 V18.0.0 §13.5 (`tfdt`);
 //! ISO/IEC 14496-12:2008/FDAmd2 §8.8.7.1 (moof-relative base); FDAM3 §8.8.8.2 and MPEG
@@ -944,7 +943,6 @@ impl<I: Borrow<FragmentIndex>> FragmentPosition<I> {
     }
 }
 
-/// The sample a [`FragmentCursor`] produces next.
 struct NextSample {
     ordinal: u64,
     start: u64,

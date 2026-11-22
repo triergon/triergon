@@ -21,11 +21,9 @@ pub struct SegmentReference {
     /// after the `sidx` box, each later one where the previous ends, and each spans its
     /// 31-bit `referenced_size`.
     pub range: Range<u64>,
-    /// Earliest presentation time of the referenced material: the box's
-    /// `earliest_presentation_time` plus the durations of the references before it. A
-    /// presentation time, not a decode time.
+    /// The box's `earliest_presentation_time` plus the preceding references' durations.
     pub earliest_presentation: Time,
-    /// `subsegment_duration`, in the index timescale.
+    /// `subsegment_duration` converted from index ticks to an exact duration.
     pub presentation_duration: Time,
     /// `starts_with_SAP`: the file states that the referenced material starts with a
     /// stream access point.

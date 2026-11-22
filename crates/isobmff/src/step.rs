@@ -2,11 +2,10 @@
 //! [`BuildStatus`] for builders that are finished separately, and [`CursorStatus`] for
 //! cursors whose items are taken separately.
 
-/// One step of a walk over parsed boxes, table rows or descriptors: the next
-/// item, a pause because the work budget is spent, or the end of the walk.
+/// One step of a walk that hands out each item directly.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Next<T> {
-    /// The next item.
+    /// An item consumed from the walk.
     Item(T),
     /// The work budget is spent: poll again with a new one.
     Yield,
@@ -28,8 +27,8 @@ pub enum BuildStatus {
 pub enum CursorStatus {
     /// The work budget is spent: poll again with a new one.
     Yield,
-    /// An item is ready: take it before polling again.
+    /// An item is ready to take. A cursor may also report readiness after setup.
     Ready,
-    /// The cursor's sources have no more items. This is not an end of input.
+    /// The cursor has exhausted its items under the current source scope.
     End,
 }

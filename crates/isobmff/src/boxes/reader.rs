@@ -41,10 +41,9 @@ enum Phase {
     Skipped,
 }
 
-/// A resumable walk over the root boxes of one source, from the input cursor's position
-/// when it was built. It is bound to that cursor's input transaction, so a poll after
-/// anything else moved the cursor is `Error::Invalid`: build a new reader after a reset or
-/// a source continuation. A failure other than backpressure is kept for later polls.
+/// Walks root boxes from the input cursor's starting position. A reset, source
+/// continuation or unrelated cursor movement invalidates the reader. Poll failures
+/// stay latched, except for backpressure.
 #[derive(Debug)]
 pub struct BoxReader {
     source: SourceId,
@@ -227,7 +226,6 @@ impl BoxReader {
         let step = self.poll_inner(input, work, cancel);
         self.record(step)
     }
-    /// The input is the one this reader last saw, and no poll has failed.
     #[inline(always)]
     fn check(&self, input: &InputCursor) -> Result<()> {
         self.binding(input)?;

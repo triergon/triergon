@@ -24,7 +24,7 @@ pub struct MovieHeader {
     pub raw: BoxView,
 }
 impl MovieHeader {
-    /// The movie time base, `1/timescale` seconds.
+    /// The movie clock, `1/timescale` seconds per tick. A zero timescale is invalid.
     pub fn time_base(&self) -> Result<TimeBase> {
         TimeBase::new(1, u64::from(self.timescale))
     }
@@ -100,7 +100,7 @@ pub struct TrackHeader {
     pub raw_hdlr: BoxView,
 }
 impl TrackHeader {
-    /// The media time base, `1/timescale` seconds.
+    /// The media clock, `1/timescale` seconds per tick. A zero timescale is invalid.
     pub fn time_base(&self) -> Result<TimeBase> {
         TimeBase::new(1, u64::from(self.timescale))
     }

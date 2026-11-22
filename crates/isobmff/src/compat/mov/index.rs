@@ -29,7 +29,7 @@ mod plain_scan;
 pub struct IndexLimits {
     /// Limits of the packet cursor the index reads.
     pub packets: PacketLimits,
-    /// Entries the index may hold.
+    /// Total entries the cursor may produce.
     pub max_entries: u64,
 }
 impl Default for IndexLimits {
@@ -434,7 +434,6 @@ impl<'a> IndexCursor<'a> {
         })
     }
 
-    /// The ready entry, before it is taken or skipped.
     fn ready_entry(&self) -> Result<(EntryFields, &PacketOccurrence)> {
         // Returning the fields from poll instead costs 1.38% on a regular seek.
         let fields = self.ready.ok_or(Error::Invalid("no ready index entry"))?;

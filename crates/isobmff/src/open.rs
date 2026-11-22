@@ -68,8 +68,7 @@ fn validate_quicktime_data_handler(raw: &BoxView) -> Result<()> {
     }
     Ok(())
 }
-/// Bounds of one [`MovieOpen`]; memory is bounded separately, by the input cursor's
-/// budget.
+/// Limits for one [`MovieOpen`], in addition to the input cursor's memory budget.
 #[derive(Clone, Copy, Debug)]
 pub struct OpenLimits {
     /// Largest root box read into memory (`ftyp`, `moov`, `moof`), in bytes; default
@@ -389,7 +388,7 @@ impl PendingMedia {
 }
 
 /// An opened movie: its tracks, the `mdat` extents and the retained root boxes; from
-/// [`MovieOpen::finish`].
+/// Opened movie metadata, track indexes and media extents within [`Self::read_scope`].
 #[derive(Debug)]
 pub struct Movie {
     pub(crate) read_scope: MetadataReadScope,
@@ -412,11 +411,11 @@ impl Movie {
     pub fn major_brand(&self) -> Option<[u8; 4]> {
         self.major_brand
     }
-    /// How much of the source the open read.
+    /// Whether the open indexed the whole source or stopped at the first media header.
     pub fn read_scope(&self) -> MetadataReadScope {
         self.read_scope
     }
-    /// The size-zero `mdat` the open stopped at, after a movie that came first.
+    /// The terminal size-zero `mdat` of a metadata-first open, if one was encountered.
     pub fn terminal_mdat(&self) -> Option<TerminalMdat> {
         self.terminal_mdat
     }
@@ -436,7 +435,7 @@ impl Movie {
     pub fn source(&self) -> triergon_core::SourceId {
         self.source
     }
-    /// Input generation at [`MovieOpen::finish`].
+    /// Source generation captured by [`MovieOpen::finish`], for matching later reads.
     pub fn generation(&self) -> u64 {
         self.generation
     }
@@ -577,20 +576,19 @@ impl MovieOpen {
         Self::new_inner(input, limits, false, false)
     }
 
-    /// Choose how the opener validates surplus sample timing.
-    /// Inspect each track's sample table for the declared surplus counts.
+    /// Sets the surplus timing policy for tables whose build has yet to start.
     pub fn set_timing_policy(&mut self, policy: TimingRunPolicy) {
         self.timing_policy = policy;
     }
 
-    /// Stop at the first media header after a front movie, even when the
-    /// transport offers ranges. The caller parses later fragments.
+    /// Opens a metadata-first movie through the first media header, even on a
+    /// seekable source. The caller reads later fragments. Limits are as in [`Self::new`].
     pub fn new_progressive(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
         Self::new_inner(input, limits, false, true)
     }
 
-    /// Preserve terminal media declarations and admit the supported legacy
-    /// QuickTime metadata in the recovery view.
+    /// Opens with terminal media declarations preserved and legacy QuickTime
+    /// data handlers and dependency flags admitted. Limits are as in [`Self::new`].
     pub fn new_recovery(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
         Self::new_inner(input, limits, true, false)
     }
@@ -862,7 +860,7 @@ impl MovieOpen {
                     table: build.builder.finish()?,
                     edits,
                     fragments: BudgetVec::new(&self.pool),
-                    // Keeping the child walk through publication costs 0.31% on a playback open.
+                    // Moving the reference into the child walk costs 0.15% on a playback open.
                     raw_dref: required(p.dref.take(), "missing dref")?,
                 },
             )?;
@@ -1114,8 +1112,8 @@ impl MovieOpen {
         }
         Ok(OpenStep::Yield)
     }
-    /// The opened movie; `Error::Invalid` before [`OpenStep::Ready`]. It takes the
-    /// opener's parts, so a second call fails too.
+    /// Takes the opened movie from the opener. Returns `Error::Invalid` before
+    /// [`OpenStep::Ready`] or after the movie has been taken.
     pub fn finish(&mut self, input: &InputCursor) -> Result<Movie> {
         if !self.ready {
             return Err(Error::Invalid("movie not ready"));

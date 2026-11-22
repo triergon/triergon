@@ -45,7 +45,7 @@ pub struct PcmLayout {
     sample_rate_16_16: u32,
 }
 impl PcmLayout {
-    /// The sample format.
+    /// Byte encoding of each channel sample in an interleaved frame.
     pub fn encoding(self) -> PcmEncoding {
         self.encoding
     }
@@ -179,11 +179,11 @@ impl PcmSourcePacket {
     pub fn packet(&self) -> &SourcePacket {
         &self.packet
     }
-    /// The sound description.
+    /// The version 0 description selected by this sample's `stsd` index.
     pub fn description(&self) -> &SoundDescriptionV0 {
         &self.description
     }
-    /// The PCM layout.
+    /// Channel and byte layout for the complete frames in this payload.
     pub fn layout(&self) -> PcmLayout {
         self.layout
     }
