@@ -365,6 +365,34 @@ fn seek_cases_name_decimal_targets_and_their_reference_target() {
 }
 
 #[test]
+fn a_seek_deviation_requires_its_frozen_observation() {
+    let expected = "0123456789abcdef".repeat(4);
+    let manifest = |observations: &str| {
+        json::parse(&format!(
+            r#"{{"schema": "{SEEKS_SCHEMA}", "contract": "c",
+                "cases": [{{"name": "n", "input": "a.flac", "track": 0,
+                    "seconds": "1", "policy": "exact", "reference_seconds": "1"}}],
+                "open_deviations": [{{"reading": "r", "clause": "c",
+                    "candidate": "p", "reference": "q", "cases": ["n"],
+                    "expected_by_case": {{{observations}}}}}]}}"#
+        ))
+        .unwrap()
+    };
+    let cases = SeekCase::parse(&manifest(&format!(
+        r#""n": {{"difference_sha256": "{expected}"}}"#
+    )))
+    .unwrap();
+    assert!(cases[0].open.as_ref().unwrap().declared);
+    assert!(SeekCase::parse(&manifest("")).is_err());
+    assert!(
+        SeekCase::parse(&manifest(&format!(
+            r#""unknown": {{"difference_sha256": "{expected}"}}"#
+        )))
+        .is_err()
+    );
+}
+
+#[test]
 fn a_seek_must_land_at_or_before_its_target() {
     let seek = SeekCase {
         name: "n".into(),

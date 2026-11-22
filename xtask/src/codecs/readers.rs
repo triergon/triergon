@@ -556,6 +556,7 @@ pub struct SeekCase {
 struct OpenSeek {
     reason: String,
     expected: Value,
+    declared: bool,
 }
 
 /// A decimal number of seconds as `codec-worker seek` and `ffprobe` take it.
@@ -623,39 +624,84 @@ impl SeekCase {
             }
             cases.push(case);
         }
+        let mut attach = |name: &str, reason: &str, expected: Option<&Value>, declared| {
+            let case = cases
+                .iter_mut()
+                .find(|case| case.name == name)
+                .ok_or_else(|| format!("open seek {name}: no such case"))?;
+            let expected = expected
+                .filter(|expected| {
+                    expected
+                        .get("difference_sha256")
+                        .and_then(Value::as_str)
+                        .is_some_and(|sha| {
+                            sha.len() == 64 && sha.bytes().all(|byte| byte.is_ascii_hexdigit())
+                        })
+                })
+                .ok_or_else(|| format!("open seek {name}: no pinned difference"))?;
+            if case.open.is_some() {
+                return Err(format!("open seek {name}: listed twice"));
+            }
+            case.open = Some(OpenSeek {
+                reason: reason.to_owned(),
+                expected: expected.clone(),
+                declared,
+            });
+            Ok(())
+        };
         if let Some(open) = document.get("open_cases") {
             for row in open.as_array().ok_or("open_cases is not an array")? {
                 let name = row
                     .get("name")
                     .and_then(Value::as_str)
                     .ok_or("open seek without name")?;
-                let case = cases
-                    .iter_mut()
-                    .find(|case| case.name == name)
-                    .ok_or_else(|| format!("open seek {name}: no such case"))?;
-                let cause = row
+                let reason = row
                     .get("reason")
                     .and_then(Value::as_str)
-                    .filter(|reason| !reason.is_empty())
+                    .filter(|reason| !reason.trim().is_empty())
                     .ok_or_else(|| format!("open seek {name}: missing reason"))?;
-                let expected = row
-                    .get("expected")
-                    .filter(|expected| {
-                        expected
-                            .get("difference_sha256")
-                            .and_then(Value::as_str)
-                            .is_some_and(|sha| {
-                                sha.len() == 64 && sha.bytes().all(|byte| byte.is_ascii_hexdigit())
-                            })
-                    })
-                    .ok_or_else(|| format!("open seek {name}: no pinned difference"))?;
-                if case.open.is_some() {
-                    return Err(format!("open seek {name}: listed twice"));
+                attach(name, reason, row.get("expected"), false)?;
+            }
+        }
+        if let Some(deviations) = document.get("open_deviations") {
+            for row in deviations
+                .as_array()
+                .ok_or("open_deviations is not an array")?
+            {
+                if row.get("targets").is_some() {
+                    return Err("seek deviations apply to all gate targets".into());
                 }
-                case.open = Some(OpenSeek {
-                    reason: cause.to_owned(),
-                    expected: expected.clone(),
-                });
+                let line = |key| {
+                    row.get(key)
+                        .and_then(Value::as_str)
+                        .filter(|text| !text.trim().is_empty() && !text.contains('\n'))
+                        .ok_or_else(|| format!("seek deviation needs a one-line {key}"))
+                };
+                let reason = format!(
+                    "{} ({}). Candidate: {}. Reference: {}.",
+                    line("reading")?,
+                    line("clause")?,
+                    line("candidate")?,
+                    line("reference")?
+                );
+                if row.get("compat").is_some() {
+                    line("compat")?;
+                }
+                let ids = row
+                    .get("cases")
+                    .and_then(Value::as_array)
+                    .ok_or("missing seek case IDs")?;
+                let Some(expected @ Value::Object(observations)) = row.get("expected_by_case")
+                else {
+                    return Err("missing seek deviation observations".into());
+                };
+                if ids.is_empty() || ids.len() != observations.len() {
+                    return Err("seek deviation needs one observation per case".into());
+                }
+                for id in ids {
+                    let name = id.as_str().ok_or("invalid seek case ID")?;
+                    attach(name, &reason, expected.get(name), true)?;
+                }
             }
         }
         Ok(cases)
@@ -2159,6 +2205,7 @@ pub fn run(options: &Options) -> Result<(), String> {
     let mut proposals = Vec::new();
     let mut failed = 0;
     let mut known_open = 0;
+    let mut declared_deviations = 0;
     let text = |v: &Value, key: &str| -> Result<String, String> {
         v.get(key)
             .and_then(Value::as_str)
@@ -2256,8 +2303,13 @@ pub fn run(options: &Options) -> Result<(), String> {
                 && !row.iter().any(|(key, _)| key == "preroll_frames_error")
                 && seek_observation(&Value::Object(row.clone())) == open.expected
             {
-                known_open += 1;
-                row.push(("open_case_reason".into(), Value::str(&open.reason)));
+                if open.declared {
+                    declared_deviations += 1;
+                    row.push(("declared_deviation".into(), Value::str(&open.reason)));
+                } else {
+                    known_open += 1;
+                    row.push(("open_case_reason".into(), Value::str(&open.reason)));
+                }
             } else {
                 failed += 1;
                 row.push(("open_case_changed".into(), Value::Bool(true)));
@@ -2315,6 +2367,11 @@ pub fn run(options: &Options) -> Result<(), String> {
     }
     if known_open > 0 {
         println!("{known_open} open seek cases reproduced their pinned differences");
+    }
+    if declared_deviations > 0 {
+        println!(
+            "{declared_deviations} declared seek deviations reproduced their pinned differences"
+        );
     }
     println!("DONE");
     if failed > 0 {
