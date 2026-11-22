@@ -738,3 +738,231 @@ fn backpressure_resumes_once_output_is_released() {
     assert_eq!(pressured, 1);
     assert_samples(case, &packets);
 }
+
+fn hdr_box(kind: &[u8; 4], payload: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
+    out.extend_from_slice(&u32::try_from(payload.len() + 8).unwrap().to_be_bytes());
+    out.extend_from_slice(kind);
+    out.extend_from_slice(payload);
+    out
+}
+
+#[test]
+fn static_hdr_preserves_encoded_values_and_rejects_truncation() {
+    let pool = Budget::new(4096).unwrap();
+    for (kind, len) in [(b"mdcv", 24), (b"clli", 4)] {
+        for n in 0..len {
+            let raw = hdr_box(kind, &vec![0xff; n]);
+            let view = BoxView::new(Bytes::copy_from_slice(&pool, &raw).unwrap(), 0).unwrap();
+            assert!(view.mastering_display_colour_volume().is_none());
+            assert!(view.content_light_level().is_none());
+        }
+    }
+    let raw = hdr_box(
+        b"mdcv",
+        &[
+            0, 0, 0xff, 0xff, 0, 5, 0xa4, 0x10, 0x90, 0x88, 0, 4, 0, 1, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0, 0, 0, 0,
+        ],
+    );
+    let view = BoxView::new(Bytes::copy_from_slice(&pool, &raw).unwrap(), 0).unwrap();
+    let value = view.mastering_display_colour_volume().unwrap();
+    assert_eq!(
+        value.display_primaries,
+        [[0, 65535], [5, 42000], [37000, 4]]
+    );
+    assert_eq!(value.white_point, [1, 65535]);
+    assert_eq!(value.max_display_mastering_luminance, u32::MAX);
+    assert_eq!(value.min_display_mastering_luminance, 0);
+    assert!(view.content_light_level().is_none());
+    let raw = hdr_box(b"clli", &[0, 0, 0xff, 0xff]);
+    let view = BoxView::new(Bytes::copy_from_slice(&pool, &raw).unwrap(), 0).unwrap();
+    let value = view.content_light_level().unwrap();
+    assert_eq!(
+        (
+            value.max_content_light_level,
+            value.max_pic_average_light_level
+        ),
+        (0, u16::MAX)
+    );
+    assert!(view.mastering_display_colour_volume().is_none());
+}
+
+fn static_hdr_movie(description_index: usize) -> Vec<u8> {
+    let mut file = include_bytes!("fixtures/r-colour-config-change.mov").to_vec();
+    let mut mastering: Vec<u8> = [
+        10_000u16, 20_000, 15_000, 30_000, 7500, 3000, 15_635, 16_450,
+    ]
+    .into_iter()
+    .flat_map(u16::to_be_bytes)
+    .collect();
+    mastering.extend(10_000_000u32.to_be_bytes());
+    mastering.extend(50u32.to_be_bytes());
+    let mut hdr = hdr_box(b"mdcv", &mastering);
+    hdr.extend(hdr_box(b"clli", &[3, 232, 1, 144]));
+    let added = u32::try_from(hdr.len()).unwrap();
+    // The authored movie stores both visual descriptions before the media data.
+    let stsd = file.windows(4).position(|v| v == b"stsd").unwrap() - 4;
+    let first = stsd + 16;
+    let second = first + u32::from_be_bytes(file[first..first + 4].try_into().unwrap()) as usize;
+    let entry = [first, second][description_index];
+    let size = u32::from_be_bytes(file[entry..entry + 4].try_into().unwrap());
+    let end = entry + size as usize;
+    for kind in [b"moov", b"trak", b"mdia", b"minf", b"stbl", b"stsd"] {
+        let at = file.windows(4).position(|v| v == kind).unwrap() - 4;
+        let size = u32::from_be_bytes(file[at..at + 4].try_into().unwrap());
+        file[at..at + 4].copy_from_slice(&(size + added).to_be_bytes());
+    }
+    file[entry..entry + 4].copy_from_slice(&(size + added).to_be_bytes());
+    let stco = file.windows(4).position(|v| v == b"stco").unwrap() - 4;
+    let count = u32::from_be_bytes(file[stco + 12..stco + 16].try_into().unwrap()) as usize;
+    for at in (stco + 16..stco + 16 + count * 4).step_by(4) {
+        let offset = u32::from_be_bytes(file[at..at + 4].try_into().unwrap());
+        file[at..at + 4].copy_from_slice(&(offset + added).to_be_bytes());
+    }
+    file.splice(end..end, hdr);
+    file
+}
+
+#[test]
+fn selected_description_exposes_both_static_hdr_boxes() {
+    let file = static_hdr_movie(1);
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open(&pool, &file);
+    let reading = read(&mut reader, &pool, &file, 3, 5).unwrap();
+    let selected = reading.packets.last().unwrap().sample().description_index;
+    assert_eq!(selected, 2);
+    let description = reader.tracks()[0]
+        .descriptions()
+        .iter()
+        .find(|d| d.index == selected)
+        .unwrap();
+    let first_description = &reader.tracks()[0].descriptions()[0];
+    let mut first_children = first_description
+        .extensions(EntryLayout::Visual, Limits::default())
+        .unwrap();
+    loop {
+        match first_children.poll(&mut WorkBudget::new(1)).unwrap() {
+            BoxStep::Box(child) => {
+                assert!(child.mastering_display_colour_volume().is_none());
+                assert!(child.content_light_level().is_none());
+            }
+            BoxStep::End => break,
+            BoxStep::Yield => panic!("one unit admits a child"),
+        }
+    }
+    let mut limited = description
+        .extensions(
+            EntryLayout::Visual,
+            Limits {
+                max_boxes: 0,
+                ..Limits::default()
+            },
+        )
+        .unwrap();
+    assert!(limited.poll(&mut WorkBudget::new(1)).is_err());
+    let mut children = description
+        .extensions(EntryLayout::Visual, Limits::default())
+        .unwrap();
+    assert!(matches!(
+        children.poll(&mut WorkBudget::new(0)).unwrap(),
+        BoxStep::Yield
+    ));
+    let (mut mastering, mut light) = (None, None);
+    loop {
+        match children.poll(&mut WorkBudget::new(1)).unwrap() {
+            BoxStep::Box(child) => {
+                if let Some(value) = child.mastering_display_colour_volume() {
+                    assert!(mastering.replace(value).is_none());
+                }
+                if let Some(value) = child.content_light_level() {
+                    assert!(light.replace(value).is_none());
+                }
+            }
+            BoxStep::End => break,
+            BoxStep::Yield => panic!("one unit admits a child"),
+        }
+    }
+    let mastering = mastering.unwrap();
+    assert_eq!(
+        mastering.display_primaries,
+        [[10_000, 20_000], [15_000, 30_000], [7500, 3000]]
+    );
+    assert_eq!(mastering.white_point, [15_635, 16_450]);
+    assert_eq!(
+        (
+            mastering.max_display_mastering_luminance,
+            mastering.min_display_mastering_luminance
+        ),
+        (10_000_000, 50)
+    );
+    let light = light.unwrap();
+    assert_eq!(
+        (
+            light.max_content_light_level,
+            light.max_pic_average_light_level
+        ),
+        (1000, 400)
+    );
+    assert!(reader.tracks()[0].colour().is_none());
+}
+
+#[test]
+#[ignore = "requires the prepared formats ffprobe"]
+fn static_hdr_matches_stream_side_data_for_either_description() {
+    let reference = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../.research/reference-formats/install/bin/ffprobe");
+    for description_index in 0..2 {
+        let directory = std::env::temp_dir().join(format!(
+            "triergon-isobmff-hdr-{}-{description_index}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("hdr.mov");
+        std::fs::write(&path, static_hdr_movie(description_index)).unwrap();
+        let output = std::process::Command::new(&reference)
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "packet=stream_index:packet_side_data=side_data_type:stream=codec_type:stream_side_data",
+                "-of",
+                "compact=p=1:nk=0",
+            ])
+            .arg(&path)
+            .output();
+        std::fs::remove_file(&path).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+        let output = output.expect("prepare the pinned formats ffprobe");
+        assert!(output.status.success(), "{:?}", output.stderr);
+        let output = String::from_utf8(output.stdout).unwrap();
+        let mut lines = output.lines().filter(|line| !line.is_empty());
+        // No packet carries either static HDR box as side data.
+        for _ in 0..6 {
+            assert_eq!(lines.next(), Some("packet|stream_index=0"));
+        }
+        let stream = lines.next().unwrap();
+        assert!(stream.starts_with("stream|codec_type=video|"));
+        assert_eq!(lines.next(), None);
+        let fields: std::collections::BTreeMap<_, _> = stream
+            .split('|')
+            .filter_map(|field| field.rsplit(':').next()?.split_once('='))
+            .collect();
+        for (field, expected) in [
+            ("green_x", "10000/50000"),
+            ("green_y", "20000/50000"),
+            ("blue_x", "15000/50000"),
+            ("blue_y", "30000/50000"),
+            ("red_x", "7500/50000"),
+            ("red_y", "3000/50000"),
+            ("white_point_x", "15635/50000"),
+            ("white_point_y", "16450/50000"),
+            ("max_luminance", "10000000/10000"),
+            ("min_luminance", "50/10000"),
+            ("max_content", "1000"),
+            ("max_average", "400"),
+        ] {
+            assert_eq!(fields[field], expected, "{field}");
+        }
+    }
+}

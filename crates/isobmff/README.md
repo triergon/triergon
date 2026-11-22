@@ -189,7 +189,12 @@ Limits of the reader:
   walk `extensions(EntryLayout::Visual, ...)` with `BoxChildren::poll` and use
   `BoxView::colour_parameter` to interpret each supported `colr` child on demand.
   Unsupported or malformed colour parameters yield `None`. The descriptions
-  retain their raw boxes. Chapters and other metadata are on `Reader::movie_box`.
+  retain their raw boxes. The same walk exposes `mdcv` and `clli` through
+  `BoxView::mastering_display_colour_volume` and `BoxView::content_light_level`.
+  They preserve encoded integers, including out-of-range values and primary order;
+  a short payload yields `None`. A zero content-light value signals no bound.
+  HDR metadata is not added to track colour or packets. Chapters and other
+  metadata are on `Reader::movie_box`.
 - External data references and media outside an `mdat` are refused; only a `url `
   entry flagged self-contained counts as this file. An empty `traf` fails the open.
 - A fragment without `tfdt` has `None` times and cannot be a seek landing. Times
@@ -273,6 +278,9 @@ Specification basis:
   `roll`/`prol`. These are draft sources: the code treats them as
   experimental and refuses fields they leave open.
 - ETSI TS 102 366 Annex F (AC-3/E-AC-3 in ISO media).
+- [AV1-ISOBMFF v1.3.0 §2.3.4](https://aomediacodec.github.io/av1-isobmff/v1.3.0.html)
+  (static HDR box syntax and AV1 carriage); [ITU-T H.274 V3 §§8.9–8.10](https://www.itu.int/epublications/publication/itu-t-h-274-v3-2023-09-versatile-supplemental-enhancement-information-messages-for-coded-video-bitstreams)
+  (mastering and content-light semantics).
 
 Fixture hashes and provenance are in `tests/fixtures/PROVENANCE.json`;
 FFmpeg-generated fixtures document their commands (for example
@@ -283,4 +291,10 @@ Verification: the FFmpeg comparisons are defined in
 [isobmff-seek](../../harness/features/isobmff-seek); results are in
 [docs/status.md](../../docs/status.md). The reader comparison includes first-entry
 source colour on the `nclc` and `nclx` fixtures. It excludes colour on the
-configuration-change fixture because ffprobe aggregates a later entry.
+configuration-change fixture because ffprobe aggregates a later entry. The
+[static HDR test](tests/container_reader.rs) compares both boxes in either
+description with the pinned formats ffprobe's stream metadata. The sample-level
+test checks that callers can read HDR from the description selected by a sample.
+To run the reference comparison, prepare the formats build with
+`cargo xtask prepare-ffmpeg --profile formats`, then run
+`cargo test -p triergon-isobmff static_hdr -- --include-ignored`.
