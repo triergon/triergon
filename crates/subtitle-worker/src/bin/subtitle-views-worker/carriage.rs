@@ -2,6 +2,7 @@ use std::ffi::OsString;
 use std::io::Cursor;
 use std::sync::atomic::AtomicBool;
 
+use triergon::matroska::BlockGroupSource;
 use triergon::{
     AnyPacket, Budget, Bytes, ContainerReader, Error, PacketInfo, SourceId, WorkBudget,
 };
@@ -10,7 +11,7 @@ use triergon_subtitles::reference_trace::carriage::{
     CallerClock, Discovery, DocumentInput, Limits, Operation as Read, ProgressKind, Session,
     Snapshot, Source, Status,
 };
-use triergon_subtitles::text::{Addition, Format, RawClock, Timing};
+use triergon_subtitles::text::{Format, RawClock, Timing};
 
 use super::protocol::Operation;
 use super::text::{Records, packet_input};
@@ -129,6 +130,39 @@ fn stream_record(
     )
 }
 
+// A demux packet position points to the Block body, before the TrackNumber.
+fn group_block_position(group: &BlockGroupSource) -> Result<i64, String> {
+    let position = group
+        .position()
+        .map_err(|error| error.to_string())?
+        .ok_or("missing BlockGroup position")?;
+    let mut children = group.raw_body();
+    while let Some(&first) = children.first() {
+        let id_width = first.leading_zeros() as usize + 1;
+        let size = children
+            .get(id_width..)
+            .ok_or("short BlockGroup child ID")?;
+        let &first_size = size.first().ok_or("missing BlockGroup child size")?;
+        let width = first_size.leading_zeros() as usize + 1;
+        if id_width > 4 || width > 8 {
+            return Err("invalid BlockGroup child header".into());
+        }
+        let mut length = u64::from(first_size) & (0xff >> width);
+        for &byte in size.get(1..width).ok_or("short BlockGroup child size")? {
+            length = (length << 8) | u64::from(byte);
+        }
+        let body = size.get(width..).ok_or("short BlockGroup child")?;
+        let length = usize::try_from(length).map_err(|error| error.to_string())?;
+        let remainder = body.get(length..).ok_or("short BlockGroup child body")?;
+        if first == 0xa1 {
+            let offset = (group.raw_body().len() - body.len()) as u64;
+            return i64::try_from(position.data + offset).map_err(|error| error.to_string());
+        }
+        children = remainder;
+    }
+    Err("missing Block in BlockGroup".into())
+}
+
 fn packet_record(
     records: &mut Records<'_, '_>,
     ordinal: u64,
@@ -201,16 +235,6 @@ fn container(records: &mut Records<'_, '_>, input: &[u8], pool: &Budget) -> Resu
             dts = dts.map(|ticks| ticks.div_euclid(n));
             duration = duration.map(|ticks| ticks.div_euclid(n));
         }
-        if let AnyPacket::Matroska(packet) = &packet
-            && let Some(group) = &packet.group
-            && let Some(addition) = group.additions().find(|addition| addition.id() == 1)
-        {
-            source.addition = Some(Addition {
-                id: addition.id(),
-                bytes: Bytes::copy_from_slice(pool, addition.data())
-                    .map_err(|error| error.to_string())?,
-            });
-        }
         let clock = CallerClock {
             numerator: i32::try_from(base.numerator()).map_err(|error| error.to_string())?,
             denominator: i32::try_from(base.denominator()).map_err(|error| error.to_string())?,
@@ -228,6 +252,13 @@ fn container(records: &mut Records<'_, '_>, input: &[u8], pool: &Budget) -> Resu
         .map_err(|error| error.to_string())?;
         let mut snapshot = snapshot(pool, Source::Sample(source), Read::Sample(clock))
             .map_err(|error| error.to_string())?;
+        if let AnyPacket::Matroska(mkv) = &packet {
+            let position = mkv.group.as_ref().map(group_block_position).transpose()?;
+            for projected in snapshot.packets.iter_mut() {
+                projected.position_raw = position.unwrap_or(-1);
+                projected.flags = i32::from(mkv.packet.keyframe);
+            }
+        }
         let mov = if let AnyPacket::Isobmff(packet) = &packet {
             let sample = packet.sample();
             let position = i64::try_from(sample.range.start).map_err(|error| error.to_string())?;
@@ -244,8 +275,15 @@ fn container(records: &mut Records<'_, '_>, input: &[u8], pool: &Budget) -> Resu
         {
             stream_record(records, stream, mov)?;
         }
-        for packet in snapshot.packets.iter() {
-            packet_record(records, ordinal, packet)?;
+        for projected in snapshot.packets.iter() {
+            packet_record(records, ordinal, projected)?;
+            if let AnyPacket::Matroska(mkv) = &packet
+                && let Some(group) = &mkv.group
+                && let Some(addition) = group.additions().find(|addition| addition.id() == 1)
+            {
+                let bytes = [&addition.id().to_be_bytes(), addition.data()].concat();
+                records.row(3, &[2, 15, bytes.len() as u64], &bytes)?;
+            }
             ordinal += 1;
         }
     }

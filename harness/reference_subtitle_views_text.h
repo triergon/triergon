@@ -499,6 +499,9 @@ static int subtitle_view_carriage(const ViewCase *input, ViewWork *work)
         subtitle_view_close(&demux);
         return 0;
     }
+    const int matroska = !strcmp(mode, "mkv");
+    if (matroska)
+        demux.format->flags |= AVFMT_FLAG_NOFILLIN;
     if (!strcmp(input->argv[1], "streaminfo")) {
         status = avformat_find_stream_info(demux.format, NULL);
         const uint64_t discover[] = {1, status};
@@ -514,7 +517,9 @@ static int subtitle_view_carriage(const ViewCase *input, ViewWork *work)
     }
     if (track) {
         const AVCodecParameters *p = track->codecpar;
-        const uint64_t words[] = {p->codec_id, track->time_base.num, track->time_base.den,
+        const enum AVCodecID codec = matroska && p->codec_id == AV_CODEC_ID_SUBRIP
+            ? AV_CODEC_ID_TEXT : p->codec_id;
+        const uint64_t words[] = {codec, track->time_base.num, track->time_base.den,
                                   (uint64_t)p->extradata_size};
         SUBTITLE_ROW(work, 2, words, p->extradata, words[3]);
     }

@@ -8,7 +8,7 @@
   "reference": "ffmpeg-subtitle-views-native",
   "runner": "cargo xtask report",
   "contract": [
-    "Compare FFmpeg format-open and terminal return codes, stream codec, time base and private data, then packet ordinal, position, PTS, DTS, duration, flags, payload and ordered side data. The candidate uses document snapshots or demuxed sample snapshots from the carriage session. For ISO BMFF, it adds the sample offset and sync flag and compares the tx3g description after the SampleEntry base fields."
+    "Compare FFmpeg format-open and terminal return codes, stream codec, time base and private data, then packet ordinal, position, PTS, DTS, duration, flags, payload and ordered side data. The candidate uses document snapshots or demuxed sample snapshots from the carriage session. For ISO BMFF, it adds the sample offset and sync flag and compares the tx3g description after the SampleEntry base fields. For Matroska, compare BlockGroup positions and key flags, use the reference demuxer without inferred clocks, and treat the two decoder names for UTF-8 plain text as the same codec. Compare exported type-1 BlockAdditional bytes before interpreting any WebVTT fields."
   ],
   "required_profiles": [
     "mkv",
@@ -878,166 +878,50 @@
       "cause": "the carriage snapshot is a comparison-only projection"
     }
   ],
-  "pending_module_requirements": [
-    "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts."
-  ],
-  "open_cases": [
-    {
-      "id": "utf8-packet-markup",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "utf8-packet-unknown-time",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "utf8-packet-known-zero-duration",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "utf8-packet-negative-start",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "utf8-packet-raw-clock",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "utf8-packet-bom-nul-content",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "utf8-packet-too-large-scalar",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "utf8-packet-input-limit",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-vtt-no-addition",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-vtt-settings-id-comments",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-vtt-present-empty-fields",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-vtt-relative-inline-time",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-vtt-unknown-addition-opaque",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-vtt-truncated-addition",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ass-raw-order-overrides",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ass-ssa-empty-layer",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ass-private-verbatim",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ass-unknown-charset-opaque",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ass-empty-not-clear",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ass-known-duration-unknown-start",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ass-private-present-empty",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ass-invalid-utf8-unvalidated",
-      "requirement": "The Matroska caller-owned snapshot still lacks the container packet position and flags and supplies source clocks and codec/addition identities. It must be compared with a demux projection that provides equivalent facts.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    }
-  ],
   "open_deviations": [
+    {
+      "reading": "A zero-byte ASS Block is retained as opaque source data",
+      "clause": "RFC 9559 \u00a710.1 and Matroska codec mapping draft \u00a7\u00a73.5.7 and 5.3: Block framing and ASS event syntax are separate",
+      "candidate": "returns a packet at offset 121 with zero bytes and a key flag",
+      "reference": "ends after opening the ASS stream without publishing the packet",
+      "compat": "compat::matroska::omit_empty_ass_blocks",
+      "cases": [
+        "ass-empty-not-clear"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "Preserve a signed Matroska Block timestamp",
+      "clause": "RFC 9559 \u00a711.2: the signed Block timestamp and Cluster timestamp determine PTS; a negative result is discouraged",
+      "candidate": "reports -715 ms with an absent DTS",
+      "reference": "reports no PTS or DTS when inferred timestamps are disabled",
+      "compat": "compat::matroska::suppress_negative_block_pts",
+      "cases": [
+        "utf8-packet-negative-start"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "Recognize S_TEXT/WEBVTT as WebVTT",
+      "clause": "Matroska codec mapping draft \u00a7\u00a73.5.12 and 5.4.1: S_TEXT/WEBVTT identifies WebVTT, with global blocks in CodecPrivate",
+      "candidate": "reports WebVTT, preserving the exact private bytes, packets and exported type-1 additions",
+      "reference": "reports an unknown codec while returning the same private bytes, packets and exported type-1 additions",
+      "cases": [
+        "mkv-vtt-no-addition",
+        "mkv-vtt-settings-id-comments",
+        "mkv-vtt-present-empty-fields",
+        "mkv-vtt-relative-inline-time",
+        "mkv-vtt-unknown-addition-opaque",
+        "mkv-vtt-truncated-addition"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
     {
       "reading": "An unsigned stts sample delta of 4294967295",
       "clause": "ISO/IEC 14496-12:2015 \u00a78.6.1.2, stts sample_delta is unsigned 32-bit",
