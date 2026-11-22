@@ -88,8 +88,11 @@ consumed. Longer elementary probes use one buffer. The sequential adapter
 releases its retained capacity after replaying the last byte.
 
 The [facade probe comparison](../../harness/features/facade-probe/contract.json)
-checks prefix verdicts and the format selected by both adapters. It also
-checks every supplied byte, through EOF, after a rewind or sequential replay.
+checks prefix verdicts and the format selected by both adapters. ISO BMFF
+signature selection works on a pipe. Constructing the facade's ISO BMFF reader
+requires random access and returns `Unsupported` on a pipe before reading movie
+metadata. For admitted inputs the comparison checks every supplied byte through
+EOF after a rewind or sequential replay.
 
 ## Features and lower-level crates
 

@@ -79,6 +79,7 @@ fn run(
         high_water: &high_water,
         window,
     };
+    let mut needs_random_access = false;
     let (verdict, width, replay) = match mode {
         Mode::Bytes => {
             let (verdict, width) = format(triergon::probe(input));
@@ -108,6 +109,17 @@ fn run(
                 )?;
                 (verdict, 0, Some(input.len()))
             }
+            Err(Error::Unsupported("ISO BMFF reader needs random access")) => {
+                let consumed = high_water.get();
+                if consumed != 8 || triergon::probe(&input[..consumed]) != Probe::Isobmff {
+                    return Err("ISO BMFF refusal did not follow its fixed signature".into());
+                }
+                if trace.is_some() {
+                    eprintln!("probe consumed {consumed} bytes and requires random access");
+                }
+                needs_random_access = true;
+                (6, 0, None)
+            }
             Err(error) => refusal(error, trace.is_some())?,
         },
     };
@@ -115,9 +127,13 @@ fn run(
         verdict,
         width,
         u64::from(replay.is_some()),
-        replay.unwrap_or(0) as u64,
+        replay.map_or(u64::from(needs_random_access), |length| length as u64),
     ];
-    let words = &words[..if replay.is_some() { 4 } else { 3 }];
+    let words = &words[..if replay.is_some() || needs_random_access {
+        4
+    } else {
+        3
+    }];
     work.record(3, words, &[]);
     if let Some(trace) = trace {
         write!(trace, "3").map_err(|error| error.to_string())?;

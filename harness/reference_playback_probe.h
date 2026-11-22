@@ -99,7 +99,7 @@ static int64_t playback_probe_seek(void *opaque, int64_t offset, int whence)
 }
 
 static int playback_probe_avio(PlaybackProbeInput *source, PlaybackProbeMode mode,
-                               const AVInputFormat **format, int trace)
+                               const AVInputFormat **format, int *can_seek, int trace)
 {
     int buffer_size = 4096;
     uint8_t *buffer = av_malloc(buffer_size);
@@ -112,6 +112,7 @@ static int playback_probe_avio(PlaybackProbeInput *source, PlaybackProbeMode mod
         av_free(buffer);
         return AVERROR(ENOMEM);
     }
+    *can_seek = (io->seekable & AVIO_SEEKABLE_NORMAL) != 0;
     int score = av_probe_input_buffer2(io, format, "", NULL, 0, 65536);
     if (trace)
         fprintf(stderr, "probe consumed %zu bytes before handoff\n", source->offset);
@@ -142,9 +143,10 @@ static int playback_probe_run(const ViewCase *input, ViewWork *work)
     const AVInputFormat *format = NULL;
     int score = 0;
     size_t replay_length = 0;
+    int can_seek = 0;
     if (probe->mode >= PROBE_BLOCKING) {
         PlaybackProbeInput source = {input->data, probe->length, 0, probe->window};
-        score = playback_probe_avio(&source, probe->mode, &format, work->trace);
+        score = playback_probe_avio(&source, probe->mode, &format, &can_seek, work->trace);
         if (score < 0 && score != AVERROR_INVALIDDATA && score != AVERROR_EOF)
             return 2;
         replay_length = source.size;
@@ -163,7 +165,13 @@ static int playback_probe_run(const ViewCase *input, ViewWork *work)
     const uint64_t verdict = playback_probe_verdict(name, probe->mode);
     const int adapter = probe->mode >= PROBE_BLOCKING;
     const uint64_t width = !adapter ? playback_probe_width(input->data, probe->length) : 0;
-    const int replay = verdict && (adapter || (probe->mode < PROBE_BYTES && verdict < 9));
+    /* For these ISO BMFF opening boxes, compare the facade reader's capability
+     * requirement separately from the AVIO probe and validated AVIO replay. */
+    const int needs_random_access = probe->mode == PROBE_SEQUENTIAL && !can_seek &&
+        verdict == 6 && probe->length >= 8 &&
+        (!memcmp(input->data + 4, "ftyp", 4) || !memcmp(input->data + 4, "moof", 4));
+    const int replay = verdict && !needs_random_access &&
+        (adapter || (probe->mode < PROBE_BYTES && verdict < 9));
     uint8_t hash[16];
     size_t hash_size = 0;
     if (replay && !adapter) {
@@ -171,12 +179,18 @@ static int playback_probe_run(const ViewCase *input, ViewWork *work)
         av_md5_sum(hash, input->data, replay_length);
         hash_size = sizeof(hash);
     }
-    const uint64_t words[] = {verdict, width, (uint64_t)replay, replay_length};
-    view_record(work, 3, words, replay ? 4 : 3, hash, hash_size);
+    const uint64_t words[] = {verdict, width, (uint64_t)replay,
+                              needs_random_access ? 1 : replay_length};
+    view_record(work, 3, words, replay || needs_random_access ? 4 : 3, hash, hash_size);
     if (work->trace) {
         printf("3 %" PRIu64 " %" PRIu64 " %d", verdict, width, replay);
         if (replay)
             printf(" %zu", replay_length);
+        if (needs_random_access) {
+            printf(" 1");
+            fprintf(stderr, "AVIO replay verified %zu bytes; facade requires random access\n",
+                    replay_length);
+        }
         if (hash_size) {
             putchar(' ');
             for (size_t i = 0; i < hash_size; ++i)
