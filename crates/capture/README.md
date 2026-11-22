@@ -60,15 +60,6 @@ does on Linux AArch64.
 
 - The session's buffers and the encoder's budgeted storage are reused across frames.
 
-### Differences from FFmpeg
-
-| Item | FFmpeg 9.0.2 | This crate | Reason |
-|---|---|---|---|
-| Latency | frame k's bytes are written at call k+1; the last frame is never written | frame k at call k | lower latency, same timestamps |
-
-Multiplex differences (PMT stream type, SDT provider) are listed under
-[Writing TS](../mpegts/README.md#writing-ts).
-
 ## Conformance
 
 The reference is FFmpeg 9.0.2 (`swscale` with `SWS_BILINEAR`, `mpeg1video` with an I/P
@@ -76,3 +67,10 @@ GOP of 30, `mpegts`). The comparison rules are in
 [harness/capture](../../harness/capture/README.md) and the results in
 [docs/status.md](../../docs/status.md). [capture-worker](../capture-worker/README.md) runs
 a session from the harness command line.
+
+| Difference | FFmpeg 9.0.2 | This crate | Reason |
+|---|---|---|---|
+| Latency | frame k's bytes are written at call k+1; the last frame is never written | frame k at call k | lower latency, same timestamps |
+
+The multiplex differences (PMT stream type, SDT provider) are listed under
+[Writing TS](../mpegts/README.md#writing-ts).

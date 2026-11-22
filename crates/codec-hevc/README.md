@@ -64,9 +64,11 @@ identical output.
 - `Picture` carries cropped `width`/`height`, `bit_depth`, `chroma`, three `Plane`s
   sharing the decoder's frame buffers, `pts`, `poc`, `sar` and `colour`. Each picture
   keeps the timestamp of the access unit that carried it through reordering.
-- Errors are typed: `Unsupported(&str)` names the tool, `InvalidData(&str)`,
-  `ResourceLimit(&str)`, `MissingParameterSet(&str)`, `Budget(StorageError)`. The decoder
-  does not panic on malformed input.
+- Errors are the crate's `DecodeError`: `Unsupported(&str)` names the tool,
+  `Invalid(&str)` the failed check, `Policy(&str)` the exceeded cap,
+  `MissingParameterSet(&str)` the parameter set a slice refers to, and
+  `Budget(StorageError)` a refused storage charge. It converts to
+  `triergon_core::Error`. The decoder does not panic on malformed input.
 - Refused with `Unsupported`: monochrome, 4:2:2, 4:4:4, separate colour planes, bit depth
   above 10, unequal luma and chroma bit depth, every SPS range-extension tool, PPS
   range-extension tools under RExt profiles, SCC extensions.
@@ -92,11 +94,12 @@ identical output.
 
 ## Conformance
 
-The [conformance gate](../../harness/codecs/correctness-manifest.json) checks
-the exact reported refusal and picture counts for the registered chroma,
-bit-depth, transform-skip rotation and malformed extension cases.
-
 Rec. ITU-T H.265 (V11, 01/2026). Tables are transcribed or regenerated from the text with
-the table or equation number in a comment. The comparison commands are in
-[harness/codecs/hevc](../../harness/codecs/hevc/STATUS.md); results in
+the table or equation number in a comment.
+
+The decoder is compared with FFmpeg's on the conformance streams; the commands are in
+[harness/codecs/hevc](../../harness/codecs/hevc/STATUS.md). The
+[correctness manifest](../../harness/codecs/correctness-manifest.json) registers the
+chroma, bit-depth, transform-skip rotation and malformed extension streams it refuses,
+with the exact refusal and the pictures both sides produce before it. Results are in
 [docs/status.md](../../docs/status.md).

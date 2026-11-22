@@ -1,12 +1,13 @@
 # triergon-session
 
-A decode-session layer for desktop playback. It takes AVC/HEVC Annex B access units and
+A decode-session layer for playback. It takes AVC/HEVC Annex B access units and
 AC-3, E-AC-3, ADTS AAC, DTS core, FLAC, Opus, Vorbis or MPEG audio frames, drives the
 pure-Rust codec crates through the [triergon-codec](../codec/README.md) traits, and
-publishes clock-gated 1920×1080 RGBA pictures and interleaved stereo s16 PCM. It is a
-composition-layer crate over triergon-codec and [triergon-pixel](../pixel/README.md). The
-caller owns the clock, packet framing, output devices and GPU upload. Nothing here spawns
-a process or links a native library.
+publishes clock-gated RGBA pictures letterboxed into a canvas (1920×1080 by default) and
+PCM (by default interleaved stereo s16). It is a composition-layer crate over
+triergon-codec and [triergon-pixel](../pixel/README.md). The caller owns the clock,
+packet framing, output devices and GPU upload. Nothing here spawns a process or links a
+native library.
 
 ## Usage
 
@@ -40,13 +41,23 @@ fn play(
 }
 ```
 
-`video_decoder`, `audio_decoder` and `StreamSelection::load` need the `codecs` feature,
-which adds the nine decoder crates. `audio_decoder(codec, configuration)` takes the
-canonical configuration of FLAC, Opus and Vorbis (see `audio_configuration`) and ignores
-it for the others. Without it, implement `VideoDecoder` and `AudioDecoder` (re-exported
-from triergon-codec) yourself. The `simd` feature forwards to the HEVC decoder's
-nightly-only SIMD kernels, and `aac-simd` to the [AAC
-decoder's](../codec-aac/README.md#features).
+`VideoSession::with_canvas(limits, canvas)` letterboxes into another `Canvas`, and
+`AudioSession::with_form(limits, form)` delivers another `PcmForm`: `Planar` keeps the
+decoder's `f32` planes. `on_refusal(OnRefusal::Skip)` makes either lane drop and count an
+access unit its decoder refuses instead of failing.
+
+`audio_decoder(codec, configuration)` takes the canonical configuration of FLAC, Opus
+and Vorbis (see `audio_configuration`) and ignores it for the others. Without the
+`codecs` feature, implement `VideoDecoder` and `AudioDecoder` (re-exported from
+triergon-codec) yourself.
+
+## Features
+
+| Feature | Default | Effect |
+|---|---|---|
+| `codecs` | off | The nine decoder crates behind `video_decoder`, `audio_decoder`, `StreamSelection::load`, `TrackDecoder` and `compat::aac` |
+| `hevc-simd` | off | The HEVC decoder's nightly-only `std::simd` kernels; identical output |
+| `aac-simd` | off | The [AAC decoder's](../codec-aac/README.md#features) nightly-only `std::simd` SBR QMF banks |
 
 For ADTS packets carrying an explicit container priming edit, use
 `compat::aac::adts_decoder(PrimingPolicy::Container)` and apply the edit to
@@ -64,8 +75,8 @@ one directly.
 
 | Stream | Input | Output |
 |---|---|---|
-| Video | H.264, HEVC Annex B access units with optional PTS | 1920×1080 RGBA, letterboxed, 8- and 10-bit 4:2:0 sources |
-| Audio | AC-3, E-AC-3, AAC (ADTS or configured raw LC), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | interleaved stereo s16 at the decoder's rate |
+| Video | H.264, HEVC Annex B access units with optional PTS | RGBA letterboxed into the lane's canvas, from 8- and 10-bit 4:2:0 sources |
+| Audio | AC-3, E-AC-3, AAC (ADTS or configured raw LC), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | the lane's `PcmForm` at the decoder's rate: interleaved stereo s16, or `f32` planes |
 | Container track | any `TrackInfo` of a supported codec, its packets | `TrackDecoder`: decoded frames with the container's trims applied |
 
 `TrackDecoder::new(track)` picks the decoder from a track's codec (`audio_codec`) and
@@ -100,10 +111,11 @@ input).
 - **Lifecycle.** `load` starts a new stream; video `flush` restarts the timeline
   but keeps the last picture; `stop` clears everything. Each of these advances
   `generation()`. `end_of_stream` drains the decoder; the state then becomes
-  `SessionState::Ended`. A decoder error is `SessionState::Failed` until the
-  next load, flush or stop.
+  `SessionState::Ended`. A decoder refusal is `SessionState::Failed` until the
+  next load, flush or stop, or under `OnRefusal::Skip` drops that unit; `refusals`
+  and `last_refusal` count and name the refusals of the current stream.
 - **Letterbox.** Each picture goes through one `triergon_pixel::letterbox::Scaler`
-  into a 1920×1080 RGBA canvas; the fit, padding and conversion rules are in
+  into the lane's `Canvas`; the fit, padding and conversion rules are in
   [triergon-pixel](../pixel/README.md).
 - **Downmix.** `mix::Downmix`: front pair at unity, centre and surrounds at −3 dB,
   LFE dropped, normalised so no output exceeds full scale; mono goes to both sides
@@ -136,5 +148,5 @@ addition to the native codec session comparisons.
 The letterbox and downmix rules are native observations of FFmpeg 9.0.2, recorded in
 [rgba-contract.json](../../harness/codecs/rgba-contract.json) and
 [downmix-contract.json](../../harness/codecs/downmix-contract.json). Codec conformance
-lives in the codec crates; verification: [harness/codecs](../../harness/codecs/STATUS.md);
-results in [docs/status.md](../../docs/status.md).
+lives in the codec crates and [harness/codecs](../../harness/codecs/STATUS.md); results
+are in [docs/status.md](../../docs/status.md).

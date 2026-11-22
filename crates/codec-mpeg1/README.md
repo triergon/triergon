@@ -51,9 +51,10 @@ charges a caller's `Budget`.
 
 ## Behaviour and limits
 
-- `Encoder::new` refuses `gop == 0` (`Error::Gop`) and a zero `bit_rate`, `max_rate`
-  or `vbv_bits`, or a `max_rate` beyond the 18-bit sequence-header field in
-  400 bit/s units (`Error::BitRate`). Geometry limits (even, 2–4094) are enforced by
+- `Encoder::new` refuses `gop == 0` (`Error::Gop`), a zero `bit_rate` or `max_rate`
+  or a `max_rate` beyond the 18-bit sequence-header field in 400 bit/s units
+  (`Error::BitRate`), and a zero `vbv_bits` or one beyond the 10-bit vbv_buffer_size
+  field in 16 kbit units (`Error::VbvBuffer`). Geometry limits (even, 2–4094) are enforced by
   `Geometry::new`.
 - `encode` refuses a picture whose geometry differs from the configuration
   (`Error::PictureGeometry`) before changing any state. A successful encode replaces the

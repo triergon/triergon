@@ -113,6 +113,13 @@ then keeps the element order of the PCE, and so does the AAC decoder.
   `triergon_core::Error` to keep its class and detail across decoder kinds.
   Typed errors are available from each codec crate's own `decode`/`send`.
 
-Speaker ids and names follow FFmpeg's channel layout API (`AV_CHAN_*`, `AV_CH_*`).
-Verification: [harness/codecs](../../harness/codecs/STATUS.md); results in
+## Conformance
+
+Speaker ids and names follow FFmpeg's channel layout API (`AV_CHAN_*`, `AV_CH_*`). The
+[inverse transforms](../../harness/features/dsp-imdct/contract.json) are compared with
+the cosine definitions and with FFmpeg's, the
+[windows](../../harness/features/dsp-windows/contract.json) and
+[divisions](../../harness/features/dsp-divide/contract.json) with their exact
+definitions, and the decoders through these traits in
+[harness/codecs](../../harness/codecs/STATUS.md); results are in
 [docs/status.md](../../docs/status.md).
