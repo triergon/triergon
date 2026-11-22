@@ -7,8 +7,8 @@ use triergon_core::container::{
 };
 use triergon_core::{Budget, Error, Step, Time, WorkBudget};
 use triergon_elementary::{
-    Ac3, Adts, BlockingReader, Flac, FlacBlockKind, Format, Limits, MpegAudio, Reader, SeekBasis,
-    TagKind,
+    Ac3, Adts, BlockingReader, Flac, FlacBlockKind, Format, Kind, Limits, MpegAudio, Reader,
+    SeekBasis, TagKind, probe,
 };
 
 /// The same packets whatever the window size and step work, for a known and for an
@@ -504,6 +504,29 @@ fn the_blocking_reader_reads_and_seeks() {
         triergon_core::container::PacketInfo::pts(&next),
         Some(15 * 1536)
     );
+}
+
+#[test]
+fn adts_and_ac3_after_other_bytes_are_recognised_by_three_frames() {
+    let adts: Vec<u8> = (0..3).flat_map(|i| adts_frame(i, 300)).collect();
+    let ac3: Vec<u8> = (0..3).flat_map(ac3_frame).collect();
+    let eac3: Vec<u8> = (0..3).flat_map(|i| eac3_frame(i, false)).collect();
+    for (frames, len, kind) in [
+        (adts, 300, Kind::Adts),
+        (ac3, 512, Kind::Ac3),
+        (eac3, 256, Kind::Ac3),
+    ] {
+        for junk in [1, 7, 32, 1024] {
+            let mut file = vec![0x5a; junk];
+            file.extend(&frames);
+            assert_eq!(probe(&file), Some(kind), "{kind:?} after {junk} bytes");
+            assert_eq!(probe(&file[..junk + 2 * len]), None, "two {kind:?} frames");
+        }
+    }
+    // The readers read what the probe recognises.
+    let mut file = vec![0x5a; 7];
+    file.extend((0..3).flat_map(|i| adts_frame(i, 300)));
+    assert_eq!(invariant::<Adts>(&file).packets.len(), 3);
 }
 
 #[test]

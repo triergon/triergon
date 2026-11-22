@@ -22,21 +22,23 @@ pub enum Kind {
 /// The elementary stream `bytes` holds, after any ID3v2 tag: native FLAC by its marker,
 /// MPEG audio, ADTS and AC-3 by two frames that follow each other from the first byte,
 /// and FLAC without its marker by a frame header the next header numbers on from.
-/// MPEG audio and marker-less FLAC may also start later, as FFmpeg's probe allows: MPEG
-/// audio then needs three frames, FLAC a first frame its CRC-16 confirms. `None` when
-/// `bytes` is too short to tell, including an ID3v2 tag that does not fit in it.
+/// Every format may also start after other bytes, as FFmpeg's probe allows: MPEG audio,
+/// ADTS and AC-3 then need three frames that agree on the stream (MPEG audio its
+/// version, layer and rate; ADTS its MPEG version and rate; AC-3 its rate), FLAC a
+/// first frame its CRC-16 confirms. `None` when `bytes` is too short to tell, including
+/// an ID3v2 tag that does not fit in it and a second frame header cut short.
 pub fn probe(bytes: &[u8]) -> Option<Kind> {
     let bytes = bytes.get(id3v2_len(bytes).unwrap_or(0)..)?;
     if bytes.starts_with(b"fLaC") {
         return Some(Kind::Flac);
     }
-    if consecutive(bytes, 2, adts_frame, |(), ()| true) {
+    if consecutive(bytes, 2, adts_frame, |_, _| true) {
         return Some(Kind::Adts);
     }
     if consecutive(bytes, 2, mpeg_frame, MpegAudioHeader::same_stream) {
         return Some(Kind::MpegAudio);
     }
-    if consecutive(bytes, 2, ac3_frame, |(), ()| true) {
+    if consecutive(bytes, 2, ac3_frame, |_, _| true) {
         return Some(Kind::Ac3);
     }
     if flac_frames(bytes, false) {
@@ -48,10 +50,21 @@ pub fn probe(bytes: &[u8]) -> Option<Kind> {
             return Some(Kind::MpegAudio);
         }
     }
-    later
+    if later
         .filter(|&at| bytes.get(at + 1).is_some_and(|&b| b & 0xfe == 0xf8))
         .any(|at| flac_frames(&bytes[at..], true))
-        .then_some(Kind::Flac)
+    {
+        return Some(Kind::Flac);
+    }
+    for at in 1..bytes.len() {
+        let rest = &bytes[at..];
+        match rest[0] {
+            0xff if consecutive(rest, 3, adts_frame, PartialEq::eq) => return Some(Kind::Adts),
+            0x0b if consecutive(rest, 3, ac3_frame, PartialEq::eq) => return Some(Kind::Ac3),
+            _ => {}
+        }
+    }
+    None
 }
 
 /// Whether `bytes` starts with a FLAC frame header (sync, reserved values, CRC-8) and
@@ -98,14 +111,14 @@ fn consecutive<H>(
     true
 }
 
-/// An ADTS header and its frame length; ADTS sets the two layer bits MPEG audio
-/// reserves.
-fn adts_frame(b: &[u8]) -> Option<((), usize)> {
+/// An ADTS header's MPEG version and sampling frequency index, and its frame length;
+/// ADTS sets the two layer bits MPEG audio reserves.
+fn adts_frame(b: &[u8]) -> Option<((u8, u8), usize)> {
     if b.len() < 7 || b[0] != 0xff || b[1] & 0xf6 != 0xf0 {
         return None;
     }
     let len = (usize::from(b[3] & 3) << 11) | (usize::from(b[4]) << 3) | usize::from(b[5] >> 5);
-    (len >= 7).then_some(((), len))
+    (len >= 7).then_some(((b[1] & 0x08, b[2] & 0x3c), len))
 }
 
 fn mpeg_frame(b: &[u8]) -> Option<(MpegAudioHeader, usize)> {
@@ -113,9 +126,10 @@ fn mpeg_frame(b: &[u8]) -> Option<(MpegAudioHeader, usize)> {
     Some((header, header.frame_bytes()?))
 }
 
-fn ac3_frame(b: &[u8]) -> Option<((), usize)> {
+/// An AC-3 or E-AC-3 syncframe's sample rate and length.
+fn ac3_frame(b: &[u8]) -> Option<(u32, usize)> {
     let header = ac3::probe_header(b).ok()?;
-    (header.frame_bytes > 0).then_some(((), header.frame_bytes))
+    (header.frame_bytes > 0).then_some((header.sample_rate_hz, header.frame_bytes))
 }
 
 /// Bytes of an ID3v2 tag at the start of `bytes`, footer included.
