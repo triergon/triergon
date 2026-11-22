@@ -319,7 +319,7 @@ const MEDIA_WORKER: Candidate = Candidate {
 
 /// Measurement workers a contract may name as its candidate besides
 /// `media-worker`.
-const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 15] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -422,6 +422,13 @@ const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
         package: "triergon-framing",
         example: Some("framing_worker"),
         features: &["reference-trace"],
+        nightly: false,
+    },
+    Candidate {
+        name: "vvc-access-units-worker",
+        package: "triergon-framing",
+        example: Some("vvc_access_units_worker"),
+        features: &[],
         nightly: false,
     },
 ];
@@ -793,7 +800,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 20] = [
+const PROFILE_REFERENCES: [ProfileReference; 21] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -936,6 +943,18 @@ const PROFILE_REFERENCES: [ProfileReference; 20] = [
             "libavutil",
         ],
         options: RELEASE_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-vvc-worker",
+        source: "harness/reference_vvc.c",
+        record: "ffmpeg-vvc",
+        kind: "FFmpeg VVC parser over complete Annex B inputs",
+        libraries: "vvc_parser_reference",
+        packages: &["libavcodec", "libavutil"],
+        options: CONTAINER_OPTIONS,
+        identity: true,
         ..REFERENCE
     },
     ProfileReference {

@@ -76,6 +76,7 @@ pub fn shared_inputs(root: &Path) -> Result<Vec<String>, String> {
         "harness/reference_mp4_forward.h",
         "harness/reference_ts_program.h",
         "harness/reference_raw_video.h",
+        "harness/reference_vvc.c",
         "harness/reference_ts.h",
         "harness/reference_ts_input.h",
         "harness/reference_ts_matched.c",

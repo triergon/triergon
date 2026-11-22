@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "id": "vvc-access-units",
+  "runner": "cargo xtask report",
+  "operation": "vvc-annex-b-access-units",
+  "candidate": "vvc-access-units-worker",
+  "worker_operation": "vvc-au-",
+  "reference": "ffmpeg-vvc",
+  "fetch_fate_cases": true,
+  "contract": [
+    "Group a preloaded, complete VVC Annex B byte stream into layer-zero access units using the VVC compatibility policy. The reference uses the public VVC parser and flushes it at the end of the input.",
+    "Fold each access unit's original byte offset, length and bytes, in emission order. Both workers require that the access units cover the complete input.",
+    "The corpus uses the original FATE assets without remuxing or rewriting bytes. The strict API's missing-zero-byte refusal remains covered by the framing tests."
+  ],
+  "required_profiles": [
+    "hierarchical",
+    "curr-ltrp-alias",
+    "frame-packing-nested",
+    "frame-packing-not-output",
+    "frame-packing-reorder",
+    "frame-packing-sequence",
+    "frame-packing-temporal",
+    "frame-packing-upsampled",
+    "mv-clip-wrap",
+    "rpr-weighted-pred",
+    "vvc-16bit-mc",
+    "vvc-frames-with-ltr",
+    "wpp-single-slice-pic"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}
