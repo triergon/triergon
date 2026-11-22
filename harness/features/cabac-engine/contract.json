@@ -6,7 +6,7 @@
   "gate": "required",
   "contract": [
     "Serial arithmetic decoding from ITU-T H.264 9.3.3.2 and H.265 9.3.4.3, with authored bin strings encoded by dyadic interval selection.",
-    "Compare every decision, context transition, bypass value, termination, restart, refusal and input byte. Compare the logical bit cursor, aligned byte position and target-dependent look-ahead cursor after each call. A capped unary read stops at its limit without consuming a following bin."
+    "Compare every decision, context transition, bypass value, termination, restart, refusal and input byte. Compare the logical bit cursor, aligned byte position and target-dependent look-ahead cursor after each call. A capped unary read stops at its limit without consuming a following bin (ITU-T H.264 section 9.3.2.2 and H.265 section 9.3.3.2 with a Rice parameter of zero)."
   ],
   "required_profiles": [
     "plain",
@@ -21,25 +21,6 @@
   "worker_operation": "cabac-",
   "oracle": "cabac-engine",
   "pinned_per_target": true,
-  "pending_module_requirements": ["A capped unary read leaves the bins after the requested limit for the next call."],
-  "open_cases": [
-    {
-      "id": "unary-cap-plain",
-      "requirement": "A capped unary read leaves the bins after the requested limit for the next call."
-    },
-    {
-      "id": "unary-cap-headroom",
-      "requirement": "A capped unary read leaves the bins after the requested limit for the next call."
-    },
-    {
-      "id": "unary-early-zero-past-cap-plain",
-      "requirement": "A capped unary read leaves the bins after the requested limit for the next call."
-    },
-    {
-      "id": "unary-early-zero-past-cap-headroom",
-      "requirement": "A capped unary read leaves the bins after the requested limit for the next call."
-    }
-  ],
   "open_unmeasured": [
     {
       "bound": "runtime",
