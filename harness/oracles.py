@@ -34,6 +34,7 @@ TRACE_ORACLES = {
     "vpcc": ("harness.codec_config_oracle", "vpcc"),
     "eac3-bsi": ("harness.codec_config_oracle", "eac3_bsi"),
     "av1-obu": ("harness.codec_stream_oracle", "av1_obu"),
+    "av1-low-overhead": ("harness.av1_bridge_oracle", "trace"),
     "adts": ("harness.codec_stream_oracle", "adts"),
     "pgs-segments": ("harness.pgs_segment_oracle", "trace"),
     "text-extraction": ("harness.text_extraction_oracle", "trace"),
