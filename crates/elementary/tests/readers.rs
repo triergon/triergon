@@ -343,6 +343,31 @@ fn an_mpeg_audio_seek_says_what_its_landing_rests_on() {
 }
 
 #[test]
+fn a_bitrate_seek_across_junk_lands_on_the_packet_the_junk_starts() {
+    // 128 kbit/s at 44.1 kHz: frame k starts at byte k * 18432000 / 44100, padded as an
+    // encoder pads; 500 bytes of junk sit where frame 50 would start.
+    let start = |k: u32| u64::from(k) * 18_432_000 / 44_100;
+    let frame = |k: u32| mp3_frame(k, start(k + 1) - start(k) == 418);
+    let mut file: Vec<u8> = (0..50).flat_map(frame).collect();
+    file.extend(vec![0x55; 500]);
+    file.extend((50..100).flat_map(frame));
+    let linear = read_file::<MpegAudio>(&file, 1 << 30, usize::MAX, true).unwrap();
+    assert_eq!(linear.packets[50].offset, start(50));
+    let requested = Time::new(1_319_183, 1_000_000).unwrap();
+    let (reading, detail) = seek::<MpegAudio>(
+        &file,
+        (1_319_183, 1_000_000),
+        SeekPolicy::PreviousRandomAccess,
+    );
+    // The estimate past the junk would land on frame 51; the packet the junk starts holds
+    // frame 50, which the estimate at the jump names.
+    assert_eq!(detail.basis, SeekBasis::Bitrate);
+    assert_eq!(detail.receipt.landing, Time::new(50 * 1152, 44100).unwrap());
+    assert!(detail.receipt.landing <= requested);
+    assert_eq!(reading.packets, linear.packets[50..]);
+}
+
+#[test]
 fn a_seek_to_zero_starts_after_the_mpeg_information_frame() {
     let audio = mp3_stream(20);
     let mut source = mp3_info(20, (audio.len() + 417) as u32, 576, 1260);

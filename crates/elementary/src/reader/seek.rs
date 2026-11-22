@@ -1,7 +1,7 @@
 //! Seeking: plan, jump, and land on the unit that holds the target.
 use super::{Cut, Flow, Format, Next, Phase, Reader, Wait};
 use crate::stream::{SeekDetail, TRACK, Track};
-use crate::syntax::{Plan, SeekBasis, SeekContext};
+use crate::syntax::{Gap, Plan, SeekBasis, SeekContext};
 
 use triergon_core::container::{Event, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest};
 use triergon_core::{Error, InputRequest, Result, Rounding, Step, Time};
@@ -108,9 +108,25 @@ impl<F: Format> Reader<F> {
             }
             Plan::Estimate { basis, .. } => {
                 let context = self.seek_context()?;
-                let sample = self.format.estimate(offset, context, basis);
+                let mut sample = self.format.estimate(offset, context, basis);
+                let mut cut = Cut::found(header);
+                // An estimate past the target counted bytes before this sync that are no
+                // frame. They are the gap before it, which belongs to its packet: land on
+                // that packet, at the jump, whose estimate the plan put at or before the
+                // target.
+                if sample > seeking.target
+                    && F::GAP == Gap::PrependToNext
+                    && let Some(lead) = offset
+                        .checked_sub(seeking.probe)
+                        .and_then(|lead| usize::try_from(lead).ok())
+                        .filter(|&lead| lead > 0)
+                {
+                    sample = self.format.estimate(seeking.probe, context, basis);
+                    self.input.reset(seeking.probe)?;
+                    cut = Cut::at(lead);
+                }
                 self.next_pts = i64::try_from(sample).map_err(|_| Error::Overflow)?;
-                self.phase = Phase::Frame(Cut::found(header));
+                self.phase = Phase::Frame(cut);
                 Ok(Flow::Ready(Some(Event::Seek(self.land(self.next_pts)?))))
             }
             Plan::Scan => Err(Error::Invalid("restart seek lost its direction")),

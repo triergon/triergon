@@ -82,7 +82,7 @@
       "harness/features/elementary-metadata/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 846, "thumbv7neon-unknown-linux-gnueabihf": 846}, "open_deviations": {"aarch64-unknown-linux-gnu": 10, "thumbv7neon-unknown-linux-gnueabihf": 10}},
       "harness/features/elementary-metadata-wire/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 66, "thumbv7neon-unknown-linux-gnueabihf": 66}},
       "harness/features/media-probe/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 27492, "thumbv7neon-unknown-linux-gnueabihf": 27492}, "open_deviations": {"aarch64-unknown-linux-gnu": 1831, "thumbv7neon-unknown-linux-gnueabihf": 1831}},
-      "harness/codecs/reader-seeks.json": {"open_cases": {"aarch64-unknown-linux-gnu": 1, "thumbv7neon-unknown-linux-gnueabihf": 1}, "open_deviations": {"aarch64-unknown-linux-gnu": 30, "thumbv7neon-unknown-linux-gnueabihf": 30}},
+      "harness/codecs/reader-seeks.json": {"open_cases": {"aarch64-unknown-linux-gnu": 0, "thumbv7neon-unknown-linux-gnueabihf": 0}, "open_deviations": {"aarch64-unknown-linux-gnu": 30, "thumbv7neon-unknown-linux-gnueabihf": 30}},
       "harness/codecs/reader-differences.json": {"elementary_deviations": {"aarch64-unknown-linux-gnu": 16, "thumbv7neon-unknown-linux-gnueabihf": 16}},
       "harness/features/codec-config-views/contract.json": {"open_deviations": {"aarch64-unknown-linux-gnu": 19, "thumbv7neon-unknown-linux-gnueabihf": 19}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 507, "thumbv7neon-unknown-linux-gnueabihf": 507}},
       "harness/features/hevc-hvcc-prefix/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 477, "thumbv7neon-unknown-linux-gnueabihf": 477}},
@@ -137,8 +137,8 @@
       "harness/codecs/gate-lanes.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 99, "thumbv7neon-unknown-linux-gnueabihf": 99}},
       "harness/codecs/aac/ps-open-manifest.json": {
         "open_cases": {
-          "aarch64-unknown-linux-gnu": 3,
-          "thumbv7neon-unknown-linux-gnueabihf": 3
+          "aarch64-unknown-linux-gnu": 2,
+          "thumbv7neon-unknown-linux-gnueabihf": 2
         }
       },
       "harness/features/ass-parse-host/contract.json": {
