@@ -275,6 +275,7 @@
     {"area": "MPEG-TS video descriptors", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-video-descriptors"},
     {"area": "MPEG-TS carrier boundaries", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-packets"},
     {"area": "MPEG-TS carrier fields", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-packet-fields"},
+    {"area": "MPEG-TS mux read-back", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-mux-readback"},
     {
       "area": "MPEG-TS access units",
       "targets": [
