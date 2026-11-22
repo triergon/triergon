@@ -217,6 +217,7 @@ impl Incomplete {
         Ok(true)
     }
 
+    // Keeping audit cursors and the buffer live across copying measured +0.137280% on one transport workload.
     #[expect(
         clippy::expect_used,
         reason = "typing the fragment copy measured +0.04 to +0.26% more instructions (lane notes)"
