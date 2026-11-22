@@ -54,7 +54,7 @@ static int codec_dolby_header(const uint8_t *data, size_t count, DolbyHeader *he
     if (header->bsid > 10) {
         header->acmod = (data[4] >> 1) & 7u;
         header->lfe = data[4] & 1u;
-        header->dialnorm = data[6] >> 3;
+        header->dialnorm = ((data[5] & 7u) << 2) | (data[6] >> 6);
     } else {
         const unsigned acmod = data[6] >> 5;
         const unsigned mix_bits = 2u * ((acmod == 2) + (acmod >= 4) +
