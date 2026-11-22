@@ -154,19 +154,19 @@
         "name": "seeking",
         "entry_points": ["BlockingReader::seek", "Reader::last_seek", "SeekDetail", "SeekBasis", "Format::PREROLL"],
         "degree": "unit-tests",
-        "needs": "The elementary seek lanes compare the landing and packet suffix. Open cases retain different frame positions, clocks and damaged-stream recovery, including Xing and bitrate estimates."
+        "needs": "The elementary seek lane compares the landing and packet suffix. It retains thirty declared frame-position and clock differences and one open MPEG audio recovery landing."
       },
       {
         "name": "stream-metadata",
         "entry_points": ["Flac::metadata", "Flac::seek_points", "Flac::stream_info", "MpegAudio::info_frame", "Reader::tags", "Track::channels", "Track::sample_rate", "Track::duration"],
         "degree": "unit-tests",
-        "needs": "elementary-metadata compares the demuxer view and elementary-metadata-wire compares the authored syntax and tag envelopes. Open cases retain distinct FLAC declarations, free-format refusal and tag dictionary results."
+        "needs": "The elementary metadata and wire comparisons cover declared FLAC fields and tag envelopes. Ten declared deviations cover metadata retention, free-format admission and tag dictionary policy. The paired bounds remain due."
       },
       {
         "name": "format-probe",
         "entry_points": ["probe", "Kind"],
         "degree": "step",
-        "needs": "media-probe compares the elementary Kind over four prefix lengths. Open cases retain distinct demuxer scores and recognition policies for short prefixes and leading junk."
+        "needs": "Media probe compares the elementary Kind over four prefix lengths. The contract declares its score and recognition differences for short prefixes and leading junk. The paired bounds remain due."
       }
     ],
     "triergon-font": [],
@@ -255,13 +255,13 @@
         "name": "track-properties",
         "entry_points": ["Track::channels", "Track::comments", "Track::end", "Track::frame_rate", "Track::header_error", "TrackInfo::configuration"],
         "degree": "unit-tests",
-        "needs": "ogg-tracks compares identification, setup, comments, timing, configuration state and header errors. Open cases retain different end clocks, dictionary projections and malformed-header handling."
+        "needs": "Ogg tracks compare identification, setup, comments, timing, configuration and header errors. The contract declares twelve differences in source end clocks, dictionaries and malformed-header handling. The paired bounds remain due."
       },
       {
         "name": "page-codec",
         "entry_points": ["page::PageHeader::parse", "page::write_page"],
         "degree": "unit-tests",
-        "needs": "ogg-pages compares the parser and writer with the bitexact muxer and independent wire controls. Open cases retain three remux differences and a muxer refusal for Skeleton."
+        "needs": "The Ogg page comparison verifies exact parsed and written pages against an independent page and CRC reader on the same source bytes. The paired bounds remain due."
       }
     ],
     "triergon-pixel": [],
