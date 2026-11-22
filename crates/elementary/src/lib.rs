@@ -26,7 +26,7 @@ pub use ac3::Ac3;
 pub use adts::Adts;
 pub use blocking::BlockingReader;
 pub use flac::{Flac, FlacBlockKind, FlacMetadata, FlacSeekPoint};
-pub use mpeg::{Gapless, InfoFrame, MpegAudio};
+pub use mpeg::{InfoFrame, MpegAudio};
 pub use probe::{Kind, probe};
 pub use reader::{Format, Reader};
 pub use stream::{Limits, Packet, ReaderEvent, SeekDetail, TRACK, Track};

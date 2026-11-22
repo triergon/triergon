@@ -29,6 +29,7 @@ assert_eq!((track.codec_tag(), track.sample_rate()), (b"mp3".as_slice(), 44100))
 `MpegAudio::header`, `Adts::header` and `Ac3::header` expose the first confirmed
 audio frame's header. `MpegAudio::lame` gives the encoder identifier and the
 coded encoder delay and padding when an information frame carries them.
+`PacketInfo::trim` gives the samples to discard at the ends of each packet.
 
 ## Behaviour
 

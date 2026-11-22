@@ -278,14 +278,6 @@ impl<F: Format> Reader<F> {
     pub fn tags(&self) -> &[Tag] {
         &self.tags
     }
-    /// Offset of the first audio frame, once known.
-    pub fn audio_start(&self) -> Option<u64> {
-        self.audio_start
-    }
-    /// Offset where the trailing tags start, once reached.
-    pub fn audio_end(&self) -> Option<u64> {
-        self.audio_end
-    }
     /// What the last completed seek did.
     pub fn last_seek(&self) -> Option<SeekDetail> {
         self.last_seek

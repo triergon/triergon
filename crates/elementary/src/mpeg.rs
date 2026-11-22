@@ -43,12 +43,12 @@ pub struct InfoFrame {
 
 /// Samples the stream's LAME tag removes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Gapless {
+struct Gapless {
     /// Samples dropped from the first packet.
-    pub start: u32,
+    start: u32,
     /// The packet (frame index from the first audio frame) and samples dropped from its
     /// end.
-    pub end: Option<(u64, u32)>,
+    end: Option<(u64, u32)>,
 }
 
 /// MPEG audio elementary stream facts.
@@ -72,11 +72,6 @@ impl MpegAudio {
     pub fn lame(&self) -> Option<LameTag> {
         self.info.and_then(|info| info.frame.lame)
     }
-    /// The trim the stream's LAME tag implies.
-    pub fn gapless(&self) -> Option<Gapless> {
-        self.gapless
-    }
-
     fn samples_per_frame(&self) -> u32 {
         self.first.map_or(1152, |h| h.samples_per_frame())
     }

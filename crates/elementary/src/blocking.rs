@@ -37,11 +37,6 @@ impl<F: Format, S: Read + Seek> BlockingReader<F, S> {
         self.driver.reader()
     }
 
-    /// The source, at whatever offset the last read left it.
-    pub fn into_inner(self) -> S {
-        self.driver.into_inner()
-    }
-
     /// The next event, `None` at the end of the stream. Fails with
     /// [`Error::Cancelled`] once `cancel` is set.
     pub fn next_event(
