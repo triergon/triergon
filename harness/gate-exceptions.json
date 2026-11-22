@@ -281,7 +281,7 @@
       "triergon-bridge": 3,
       "triergon-capture": 1,
       "triergon-codec": 0,
-      "triergon-codec-aac": 1,
+      "triergon-codec-aac": 0,
       "triergon-codec-ac3": 4,
       "triergon-codec-dca": 0,
       "triergon-codec-flac": 2,
