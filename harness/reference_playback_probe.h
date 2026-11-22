@@ -99,7 +99,7 @@ static int64_t playback_probe_seek(void *opaque, int64_t offset, int whence)
 }
 
 static int playback_probe_avio(PlaybackProbeInput *source, PlaybackProbeMode mode,
-                               const AVInputFormat **format)
+                               const AVInputFormat **format, int trace)
 {
     int buffer_size = 4096;
     uint8_t *buffer = av_malloc(buffer_size);
@@ -113,12 +113,13 @@ static int playback_probe_avio(PlaybackProbeInput *source, PlaybackProbeMode mod
         return AVERROR(ENOMEM);
     }
     int score = av_probe_input_buffer2(io, format, "", NULL, 0, 65536);
-    size_t consumed = source->offset;
-    if (score >= 0) {
-        /* The public AVIO must return its buffered prefix again after probing. */
+    if (trace)
+        fprintf(stderr, "probe consumed %zu bytes before handoff\n", source->offset);
+    if (score >= 0 && *format && playback_probe_verdict((*format)->name, mode)) {
+        /* Verify both the buffered bytes and all bytes following that buffer. */
         uint8_t replay[4096];
-        for (size_t at = 0; at < consumed;) {
-            size_t remaining = consumed - at;
+        for (size_t at = 0; at < source->size;) {
+            size_t remaining = source->size - at;
             int requested = remaining < sizeof(replay) ? (int)remaining : (int)sizeof(replay);
             int count = avio_read(io, replay, requested);
             if (count <= 0 || memcmp(replay, source->data + at, (size_t)count)) {
@@ -127,8 +128,9 @@ static int playback_probe_avio(PlaybackProbeInput *source, PlaybackProbeMode mod
             }
             at += (size_t)count;
         }
+        if (score >= 0 && avio_read(io, replay, 1) != AVERROR_EOF)
+            score = AVERROR(EIO);
     }
-    source->offset = consumed;
     av_freep(&io->buffer);
     avio_context_free(&io);
     return score;
@@ -142,10 +144,10 @@ static int playback_probe_run(const ViewCase *input, ViewWork *work)
     size_t replay_length = 0;
     if (probe->mode >= PROBE_BLOCKING) {
         PlaybackProbeInput source = {input->data, probe->length, 0, probe->window};
-        score = playback_probe_avio(&source, probe->mode, &format);
+        score = playback_probe_avio(&source, probe->mode, &format, work->trace);
         if (score < 0 && score != AVERROR_INVALIDDATA && score != AVERROR_EOF)
             return 2;
-        replay_length = source.offset;
+        replay_length = source.size;
     } else {
         uint8_t *buffer = av_mallocz(probe->length + AVPROBE_PADDING_SIZE);
         if (!buffer)

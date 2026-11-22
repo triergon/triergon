@@ -87,18 +87,26 @@ fn run(
         Mode::Blocking => match open_blocking(source, pool) {
             Ok(opened) => {
                 let verdict = reader_format(opened.reader());
-                let consumed = high_water.get();
-                check_replay(opened.into_inner(), &input[..consumed])?;
-                (verdict, 0, Some(consumed))
+                check_replay(
+                    opened.into_inner(),
+                    input,
+                    high_water.get(),
+                    trace.is_some(),
+                )?;
+                (verdict, 0, Some(input.len()))
             }
             Err(error) => refusal(error, trace.is_some())?,
         },
         Mode::Sequential => match open_sequential(source, pool) {
             Ok(opened) => {
                 let verdict = reader_format(opened.reader());
-                let consumed = high_water.get();
-                check_replay(opened.into_inner(), &input[..consumed])?;
-                (verdict, 0, Some(consumed))
+                check_replay(
+                    opened.into_inner(),
+                    input,
+                    high_water.get(),
+                    trace.is_some(),
+                )?;
+                (verdict, 0, Some(input.len()))
             }
             Err(error) => refusal(error, trace.is_some())?,
         },
@@ -121,7 +129,15 @@ fn run(
     Ok(())
 }
 
-fn check_replay(mut source: impl Read, mut expected: &[u8]) -> Result<(), String> {
+fn check_replay(
+    mut source: impl Read,
+    mut expected: &[u8],
+    consumed: usize,
+    trace: bool,
+) -> Result<(), String> {
+    if trace {
+        eprintln!("probe consumed {consumed} bytes before handoff");
+    }
     let mut buffer = [0; 4096];
     while !expected.is_empty() {
         let count = expected.len().min(buffer.len());
@@ -132,6 +148,13 @@ fn check_replay(mut source: impl Read, mut expected: &[u8]) -> Result<(), String
             return Err("probe handoff changed the source prefix".into());
         }
         expected = &expected[count..];
+    }
+    if source
+        .read(&mut buffer)
+        .map_err(|error| error.to_string())?
+        != 0
+    {
+        return Err("probe handoff extended the source prefix".into());
     }
     Ok(())
 }

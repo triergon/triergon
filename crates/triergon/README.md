@@ -88,8 +88,8 @@ consumed. Longer elementary probes use one buffer. The sequential adapter
 releases its retained capacity after replaying the last byte.
 
 The [facade probe comparison](../../harness/features/facade-probe/contract.json)
-checks prefix verdicts, the format selected by both adapters and the bytes
-available again after rewinding or replay.
+checks prefix verdicts and the format selected by both adapters. It also
+checks every supplied byte, through EOF, after a rewind or sequential replay.
 
 ## Features and lower-level crates
 
