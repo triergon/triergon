@@ -89,7 +89,7 @@
       },
       {
         "name": "matroska-discovery-views",
-        "entry_points": ["matroska::MatroskaDiscovery", "matroska::MatroskaCompactDiscovery::for_av_feed", "matroska::MatroskaCompactDiscovery::buffered_events", "matroska::MatroskaCompactDiscovery::confirm_stream_ready", "matroska::MatroskaDiscoveryCutoff", "matroska::MatroskaFeedPayload::segments", "matroska::MatroskaVideoSeekGate::landed"],
+        "entry_points": ["matroska::MatroskaDiscovery", "matroska::MatroskaCompactDiscovery::for_av_feed", "matroska::MatroskaCompactDiscovery::buffered_events", "matroska::MatroskaCompactDiscovery::confirm_stream_ready", "matroska::MatroskaDiscoveryCutoff", "matroska::MatroskaFeedPayload::segments", "matroska::MatroskaHevcDolbyPacket::demux_duration_ns", "matroska::MatroskaVideoSeekGate::landed"],
         "degree": "step",
         "needs": "an operation folding discovery's readiness per track (the PGS cutoff, composition width and height, segment kind and length) and the feed payload segments against the reference's avformat_find_stream_info results and packets; matroska-startup-seek folds the video packets only"
       }
@@ -447,7 +447,7 @@
       },
       {
         "name": "fifo-delivery-and-pump",
-        "entry_points": ["Player::advance", "Player::advance_ready", "Player::pop", "Player::pause", "Player::stop", "pump::Pump", "pump::Sink", "pump::CatalogueSink", "pump::Feed"],
+        "entry_points": ["Player::advance", "Player::advance_ready", "Player::pop", "Player::may_deliver", "Player::pause", "Player::stop", "pump::Pump", "pump::Sink", "pump::CatalogueSink", "pump::Feed"],
         "degree": "no-reference",
         "needs": "the playback corpus delivered through advance and pop and through Pump with a recording Sink, each required to fold the packets read_output folds against the same reference; the queue and sink protocol has no reference"
       },
