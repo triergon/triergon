@@ -126,6 +126,13 @@ impl AllocationTable {
         if header.version != MpegVersion::Mpeg1 {
             return &LSF;
         }
+        if header.bitrate_kbps == 0 {
+            return if header.sample_rate == 48_000 {
+                &B2A
+            } else {
+                &B2B
+            };
+        }
         match u32::from(header.bitrate_kbps) / u32::from(header.channels()) {
             0..=48 if header.sample_rate == 32_000 => &B2D,
             0..=48 => &B2C,

@@ -1,6 +1,6 @@
 //! MPEG-1, MPEG-2 and MPEG-2.5 audio, Layer I, II and III (ISO/IEC 11172-3, 13818-3).
 //!
-//! Frames follow the header length. Free-format Layer I and III can infer an unpadded
+//! Frames follow the header length. Free-format Layers I–III can infer an unpadded
 //! frame length from three consecutive headers. A first Layer III frame carrying
 //! a Xing, Info or VBRI description is not delivered. Bytes between frames go
 //! into the packet of the frame after them. Bytes after the last frame form a
@@ -89,7 +89,7 @@ impl FreeFormatProbe {
         let Some(first) = MpegAudioHeader::from_bytes(bytes) else {
             return Prelude::Done;
         };
-        if first.bitrate_kbps != 0 || first.layer == MpegLayer::II {
+        if first.bitrate_kbps != 0 {
             return Prelude::Done;
         }
         let prefix_bytes = |h: &MpegAudioHeader| {
@@ -245,14 +245,10 @@ impl Syntax for MpegAudio {
     fn length(&self, header: &MpegAudioHeader) -> Length {
         match header.frame_bytes() {
             Some(len) => Length::Known(len),
-            None if header.layer != MpegLayer::II
-                && let Some(base) = self.free_format.base() =>
-            {
-                Length::Known(
-                    base + usize::from(header.padding)
-                        * if header.layer == MpegLayer::I { 4 } else { 1 },
-                )
-            }
+            None if let Some(base) = self.free_format.base() => Length::Known(
+                base + usize::from(header.padding)
+                    * if header.layer == MpegLayer::I { 4 } else { 1 },
+            ),
             None => Length::Search {
                 minimum: 4 + usize::from(header.crc) * 2,
             },

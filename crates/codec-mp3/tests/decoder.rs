@@ -244,10 +244,8 @@ fn framed_free_format_rejects_bad_extents_and_preserves_controls() {
     assert_eq!(out.samples_per_channel, 0);
     let mut layer2 = silent_frame(LAYER2);
     layer2[2] &= 0x0f;
-    assert_eq!(
-        decoder.decode_framed(&layer2, &mut out),
-        Err(DecodeError::Unsupported("free-format frame"))
-    );
+    decoder.decode_framed(&layer2, &mut out).unwrap();
+    assert_eq!(out.samples_per_channel, 1152);
     let ordinary = signal_frame(0);
     let mut expected = AudioFrame::default();
     Decoder::new()
@@ -281,6 +279,138 @@ fn framed_free_format_bounds_crc_lsf_and_backpressure() {
         decoder.decode_framed(&frame, &mut out),
         Err(DecodeError::Invalid(_))
     ));
+}
+
+// One mono subband with twelve grouped triplets. All other allocations are zero.
+const LAYER_TWO_SIGNALS: [(u32, usize); 4] = [
+    (0xfffd_a4c0, 88), // MPEG-1 48 kHz, B.2a
+    (0xfffd_a0c0, 94), // MPEG-1 44.1 kHz, B.2b
+    (0xfffd_a8c0, 94), // MPEG-1 32 kHz, B.2b
+    (0xfff5_80c0, 75), // MPEG-2 22.05 kHz, B.1
+];
+
+fn layer_two_signal(header: u32, allocation_bits: usize) -> Vec<u8> {
+    let mut frame = silent_frame(header);
+    frame[4] = 0x10; // allocation 1 in subband 0
+    let mut bit = 32 + allocation_bits;
+    for (value, width) in [(2_u32, 2), (0, 6)]
+        .into_iter()
+        .chain(std::iter::repeat_n((26, 5), 12))
+    {
+        for shift in (0..width).rev() {
+            frame[bit / 8] |= (((value >> shift) & 1) as u8) << (7 - bit % 8);
+            bit += 1;
+        }
+    }
+    frame
+}
+
+#[test]
+fn free_layer_two_source_delivery_and_signal() {
+    use triergon::PacketInfo;
+
+    for (header, allocation_bits) in LAYER_TWO_SIGNALS {
+        let ordinary = layer_two_signal(header, allocation_bits);
+        let mut free = ordinary.clone();
+        free[2] &= 0x0f;
+        let stream = free.repeat(3);
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader = triergon::open_blocking(std::io::Cursor::new(&stream), &pool).unwrap();
+        let mut decoder = Decoder::new_in(&pool);
+        let mut control = Decoder::new();
+        let mut out = AudioFrame::default();
+        let mut expected = AudioFrame::default();
+        for _ in 0..3 {
+            let packet = reader.next_packet().unwrap().unwrap();
+            assert_eq!(packet.payload(), free);
+            decoder.decode(packet.payload(), &mut out).unwrap();
+            control.decode_frame(&ordinary, &mut expected).unwrap();
+            assert_eq!(out.planes, expected.planes);
+            assert!(out.planes[0].iter().any(|&s| s != 0.0));
+        }
+        assert!(reader.next_packet().unwrap().is_none());
+    }
+}
+
+#[test]
+fn free_layer_two_checks_header_crc_and_padding_extent() {
+    let mut decoder = Decoder::new();
+    let mut out = AudioFrame::default();
+    let mut frame = vec![0xff, 0xfc, 0x06, 0xc0, 0, 0, 0]; // CRC and padding
+    assert!(matches!(
+        decoder.decode_framed(&frame[..6], &mut out),
+        Err(DecodeError::Invalid("free-format Layer II frame extent"))
+    ));
+    decoder.decode_framed(&frame, &mut out).unwrap();
+    frame[2] &= !2;
+    decoder.decode_framed(&frame[..6], &mut out).unwrap();
+}
+
+#[test]
+#[ignore = "requires mpg123 1.33.7; two original-header cases currently differ"]
+fn free_layer_two_matches_mpg123() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    use triergon::PacketInfo;
+
+    let program = std::env::var_os("TRIERGON_MPG123").unwrap();
+    let version = Command::new(&program).arg("--version").output().unwrap();
+    assert!(version.status.success());
+    assert!(String::from_utf8_lossy(&version.stdout).contains("mpg123 1.33.7"));
+    let mut differences = Vec::new();
+    for (header, allocation_bits) in LAYER_TWO_SIGNALS {
+        let mut free_headers = Vec::new();
+        let mut declared_headers = Vec::new();
+        for index in 0..6 {
+            let padded = u32::from(index % 2 == 1) << 9;
+            let mut frame = layer_two_signal(header | padded, allocation_bits);
+            declared_headers.extend_from_slice(&frame);
+            frame[2] &= 0x0f;
+            free_headers.extend_from_slice(&frame);
+        }
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader =
+            triergon::open_blocking(std::io::Cursor::new(&free_headers), &pool).unwrap();
+        let mut decoder = Decoder::new_in(&pool);
+        let mut output = AudioFrame::default();
+        let mut candidate = Vec::new();
+        while let Some(packet) = reader.next_packet().unwrap() {
+            decoder.decode(packet.payload(), &mut output).unwrap();
+            candidate.extend_from_slice(&output.planes[0]);
+        }
+        assert_eq!(candidate.len(), 6 * 1152, "{header:08x}");
+
+        for (view, input) in [
+            ("declared bitrate", &declared_headers),
+            ("original headers", &free_headers),
+        ] {
+            let mut child = Command::new(&program)
+                .args(["--no-gapless", "--float", "-q", "-s", "-"])
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn()
+                .unwrap();
+            child.stdin.take().unwrap().write_all(input).unwrap();
+            let reference = child.wait_with_output().unwrap();
+            assert!(reference.status.success(), "{header:08x}");
+            assert_eq!(reference.stdout.len(), candidate.len() * 4, "{header:08x}");
+            let mut peak = 0.0_f64;
+            let mut squared = 0.0_f64;
+            for (&value, bytes) in candidate.iter().zip(reference.stdout.chunks_exact(4)) {
+                let expected = f32::from_ne_bytes(bytes.try_into().unwrap());
+                let difference = f64::from(value) - f64::from(expected);
+                assert!(difference.is_finite());
+                peak = peak.max(difference.abs());
+                squared += difference * difference;
+            }
+            let rms = (squared / candidate.len() as f64).sqrt();
+            println!("{header:08x} {view}: 6 frames, RMS {rms:.3e}, peak {peak:.3e}");
+            if rms > 1e-6 || peak > 1e-5 {
+                differences.push(format!("{header:08x} {view}"));
+            }
+        }
+    }
+    assert!(differences.is_empty(), "PCM differences: {differences:?}");
 }
 
 // One allocated mono subband, with twelve nonzero samples; the rest is ancillary.
