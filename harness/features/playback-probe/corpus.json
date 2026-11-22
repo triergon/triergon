@@ -82829,7 +82829,7 @@
     {
       "id": "playback-349-moof-first-mp4-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -82846,7 +82846,7 @@
     {
       "id": "raw-349-moof-first-mp4-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -82863,7 +82863,7 @@
     {
       "id": "playback-349-moof-first-mp4-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -82880,7 +82880,7 @@
     {
       "id": "raw-349-moof-first-mp4-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -82897,7 +82897,7 @@
     {
       "id": "playback-349-moof-first-mp4-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -82914,7 +82914,7 @@
     {
       "id": "raw-349-moof-first-mp4-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -82931,7 +82931,7 @@
     {
       "id": "playback-349-moof-first-mp4-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -82948,7 +82948,7 @@
     {
       "id": "raw-349-moof-first-mp4-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -82965,7 +82965,7 @@
     {
       "id": "playback-349-moof-first-mp4-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -82982,7 +82982,7 @@
     {
       "id": "raw-349-moof-first-mp4-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -82999,7 +82999,7 @@
     {
       "id": "playback-349-moof-first-mp4-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83016,7 +83016,7 @@
     {
       "id": "raw-349-moof-first-mp4-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83033,7 +83033,7 @@
     {
       "id": "playback-349-moof-first-mp4-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83050,7 +83050,7 @@
     {
       "id": "raw-349-moof-first-mp4-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/moof-first.mp4",
+      "file": "harness/features/playback-probe/controls/moof-first.mp4",
       "sha256": "ca296e7d6815f3c66833737d39903684de39240ab776fde86fd1a6fede5e0cfe",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83067,7 +83067,7 @@
     {
       "id": "playback-350-ts188-junk-1-ts-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83084,7 +83084,7 @@
     {
       "id": "raw-350-ts188-junk-1-ts-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83101,7 +83101,7 @@
     {
       "id": "playback-350-ts188-junk-1-ts-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83118,7 +83118,7 @@
     {
       "id": "raw-350-ts188-junk-1-ts-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83135,7 +83135,7 @@
     {
       "id": "playback-350-ts188-junk-1-ts-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83152,7 +83152,7 @@
     {
       "id": "raw-350-ts188-junk-1-ts-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83169,7 +83169,7 @@
     {
       "id": "playback-350-ts188-junk-1-ts-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83186,7 +83186,7 @@
     {
       "id": "raw-350-ts188-junk-1-ts-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83203,7 +83203,7 @@
     {
       "id": "playback-350-ts188-junk-1-ts-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83220,7 +83220,7 @@
     {
       "id": "raw-350-ts188-junk-1-ts-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83237,7 +83237,7 @@
     {
       "id": "playback-350-ts188-junk-1-ts-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83254,7 +83254,7 @@
     {
       "id": "raw-350-ts188-junk-1-ts-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83271,7 +83271,7 @@
     {
       "id": "playback-350-ts188-junk-1-ts-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83288,7 +83288,7 @@
     {
       "id": "raw-350-ts188-junk-1-ts-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1.ts",
       "sha256": "1409bc984b7da4b7826c7eb96ae7ee4c4a8242d0c6e4853ff6d0d6c93064fc5f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83305,7 +83305,7 @@
     {
       "id": "playback-351-ts188-junk-1024-ts-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83322,7 +83322,7 @@
     {
       "id": "raw-351-ts188-junk-1024-ts-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83339,7 +83339,7 @@
     {
       "id": "playback-351-ts188-junk-1024-ts-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83356,7 +83356,7 @@
     {
       "id": "raw-351-ts188-junk-1024-ts-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83373,7 +83373,7 @@
     {
       "id": "playback-351-ts188-junk-1024-ts-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83390,7 +83390,7 @@
     {
       "id": "raw-351-ts188-junk-1024-ts-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83407,7 +83407,7 @@
     {
       "id": "playback-351-ts188-junk-1024-ts-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83424,7 +83424,7 @@
     {
       "id": "raw-351-ts188-junk-1024-ts-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83441,7 +83441,7 @@
     {
       "id": "playback-351-ts188-junk-1024-ts-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83458,7 +83458,7 @@
     {
       "id": "raw-351-ts188-junk-1024-ts-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83475,7 +83475,7 @@
     {
       "id": "playback-351-ts188-junk-1024-ts-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83492,7 +83492,7 @@
     {
       "id": "raw-351-ts188-junk-1024-ts-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83509,7 +83509,7 @@
     {
       "id": "playback-351-ts188-junk-1024-ts-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83526,7 +83526,7 @@
     {
       "id": "raw-351-ts188-junk-1024-ts-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-1024.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-1024.ts",
       "sha256": "a14dc02ea7b886d2116673cf4f71e3137c56566e584a314ae9945045a6306c51",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83543,7 +83543,7 @@
     {
       "id": "playback-352-ts188-junk-128-ts-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83560,7 +83560,7 @@
     {
       "id": "raw-352-ts188-junk-128-ts-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83577,7 +83577,7 @@
     {
       "id": "playback-352-ts188-junk-128-ts-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83594,7 +83594,7 @@
     {
       "id": "raw-352-ts188-junk-128-ts-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83611,7 +83611,7 @@
     {
       "id": "playback-352-ts188-junk-128-ts-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83628,7 +83628,7 @@
     {
       "id": "raw-352-ts188-junk-128-ts-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83645,7 +83645,7 @@
     {
       "id": "playback-352-ts188-junk-128-ts-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83662,7 +83662,7 @@
     {
       "id": "raw-352-ts188-junk-128-ts-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83679,7 +83679,7 @@
     {
       "id": "playback-352-ts188-junk-128-ts-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83696,7 +83696,7 @@
     {
       "id": "raw-352-ts188-junk-128-ts-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83713,7 +83713,7 @@
     {
       "id": "playback-352-ts188-junk-128-ts-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83730,7 +83730,7 @@
     {
       "id": "raw-352-ts188-junk-128-ts-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83747,7 +83747,7 @@
     {
       "id": "playback-352-ts188-junk-128-ts-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83764,7 +83764,7 @@
     {
       "id": "raw-352-ts188-junk-128-ts-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-128.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-128.ts",
       "sha256": "29bfeae5b6408beb05f4f49eca35e75a0a1beb59966e23f1ef5ff7779cad97a7",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83781,7 +83781,7 @@
     {
       "id": "playback-353-ts188-junk-188-ts-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83798,7 +83798,7 @@
     {
       "id": "raw-353-ts188-junk-188-ts-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83815,7 +83815,7 @@
     {
       "id": "playback-353-ts188-junk-188-ts-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83832,7 +83832,7 @@
     {
       "id": "raw-353-ts188-junk-188-ts-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83849,7 +83849,7 @@
     {
       "id": "playback-353-ts188-junk-188-ts-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83866,7 +83866,7 @@
     {
       "id": "raw-353-ts188-junk-188-ts-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83883,7 +83883,7 @@
     {
       "id": "playback-353-ts188-junk-188-ts-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83900,7 +83900,7 @@
     {
       "id": "raw-353-ts188-junk-188-ts-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83917,7 +83917,7 @@
     {
       "id": "playback-353-ts188-junk-188-ts-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83934,7 +83934,7 @@
     {
       "id": "raw-353-ts188-junk-188-ts-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83951,7 +83951,7 @@
     {
       "id": "playback-353-ts188-junk-188-ts-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83968,7 +83968,7 @@
     {
       "id": "raw-353-ts188-junk-188-ts-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -83985,7 +83985,7 @@
     {
       "id": "playback-353-ts188-junk-188-ts-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84002,7 +84002,7 @@
     {
       "id": "raw-353-ts188-junk-188-ts-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-188.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-188.ts",
       "sha256": "6e6bf616fa85c5068876450bfff3d066510574e85dc7e77b67ad7b6a1f6effca",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84019,7 +84019,7 @@
     {
       "id": "playback-354-ts188-junk-192-ts-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84036,7 +84036,7 @@
     {
       "id": "raw-354-ts188-junk-192-ts-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84053,7 +84053,7 @@
     {
       "id": "playback-354-ts188-junk-192-ts-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84070,7 +84070,7 @@
     {
       "id": "raw-354-ts188-junk-192-ts-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84087,7 +84087,7 @@
     {
       "id": "playback-354-ts188-junk-192-ts-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84104,7 +84104,7 @@
     {
       "id": "raw-354-ts188-junk-192-ts-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84121,7 +84121,7 @@
     {
       "id": "playback-354-ts188-junk-192-ts-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84138,7 +84138,7 @@
     {
       "id": "raw-354-ts188-junk-192-ts-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84155,7 +84155,7 @@
     {
       "id": "playback-354-ts188-junk-192-ts-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84172,7 +84172,7 @@
     {
       "id": "raw-354-ts188-junk-192-ts-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84189,7 +84189,7 @@
     {
       "id": "playback-354-ts188-junk-192-ts-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84206,7 +84206,7 @@
     {
       "id": "raw-354-ts188-junk-192-ts-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84223,7 +84223,7 @@
     {
       "id": "playback-354-ts188-junk-192-ts-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84240,7 +84240,7 @@
     {
       "id": "raw-354-ts188-junk-192-ts-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-192.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-192.ts",
       "sha256": "51eb630a5f65965b9bb937f6427c0c7e953224a9f874f4588038b91264e47c30",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84257,7 +84257,7 @@
     {
       "id": "playback-355-ts188-junk-32-ts-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84274,7 +84274,7 @@
     {
       "id": "raw-355-ts188-junk-32-ts-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84291,7 +84291,7 @@
     {
       "id": "playback-355-ts188-junk-32-ts-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84308,7 +84308,7 @@
     {
       "id": "raw-355-ts188-junk-32-ts-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84325,7 +84325,7 @@
     {
       "id": "playback-355-ts188-junk-32-ts-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84342,7 +84342,7 @@
     {
       "id": "raw-355-ts188-junk-32-ts-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84359,7 +84359,7 @@
     {
       "id": "playback-355-ts188-junk-32-ts-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84376,7 +84376,7 @@
     {
       "id": "raw-355-ts188-junk-32-ts-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84393,7 +84393,7 @@
     {
       "id": "playback-355-ts188-junk-32-ts-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84410,7 +84410,7 @@
     {
       "id": "raw-355-ts188-junk-32-ts-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84427,7 +84427,7 @@
     {
       "id": "playback-355-ts188-junk-32-ts-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84444,7 +84444,7 @@
     {
       "id": "raw-355-ts188-junk-32-ts-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84461,7 +84461,7 @@
     {
       "id": "playback-355-ts188-junk-32-ts-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84478,7 +84478,7 @@
     {
       "id": "raw-355-ts188-junk-32-ts-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-32.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-32.ts",
       "sha256": "bbebd14b5e49d55ab5b72cb7f0ff6774dadf3951889b2637f06438844d99ddd4",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84495,7 +84495,7 @@
     {
       "id": "playback-356-ts188-junk-376-ts-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84512,7 +84512,7 @@
     {
       "id": "raw-356-ts188-junk-376-ts-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84529,7 +84529,7 @@
     {
       "id": "playback-356-ts188-junk-376-ts-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84546,7 +84546,7 @@
     {
       "id": "raw-356-ts188-junk-376-ts-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84563,7 +84563,7 @@
     {
       "id": "playback-356-ts188-junk-376-ts-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84580,7 +84580,7 @@
     {
       "id": "raw-356-ts188-junk-376-ts-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84597,7 +84597,7 @@
     {
       "id": "playback-356-ts188-junk-376-ts-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84614,7 +84614,7 @@
     {
       "id": "raw-356-ts188-junk-376-ts-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84631,7 +84631,7 @@
     {
       "id": "playback-356-ts188-junk-376-ts-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84648,7 +84648,7 @@
     {
       "id": "raw-356-ts188-junk-376-ts-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84665,7 +84665,7 @@
     {
       "id": "playback-356-ts188-junk-376-ts-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84682,7 +84682,7 @@
     {
       "id": "raw-356-ts188-junk-376-ts-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84699,7 +84699,7 @@
     {
       "id": "playback-356-ts188-junk-376-ts-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84716,7 +84716,7 @@
     {
       "id": "raw-356-ts188-junk-376-ts-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-376.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-376.ts",
       "sha256": "9a1104753f67fc0c227bdd33c288097d11d2d515a5e4cd1d13e3ebc6559cafb9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84733,7 +84733,7 @@
     {
       "id": "playback-357-ts188-junk-389-ts-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84750,7 +84750,7 @@
     {
       "id": "raw-357-ts188-junk-389-ts-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84767,7 +84767,7 @@
     {
       "id": "playback-357-ts188-junk-389-ts-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84784,7 +84784,7 @@
     {
       "id": "raw-357-ts188-junk-389-ts-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84801,7 +84801,7 @@
     {
       "id": "playback-357-ts188-junk-389-ts-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84818,7 +84818,7 @@
     {
       "id": "raw-357-ts188-junk-389-ts-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84835,7 +84835,7 @@
     {
       "id": "playback-357-ts188-junk-389-ts-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84852,7 +84852,7 @@
     {
       "id": "raw-357-ts188-junk-389-ts-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84869,7 +84869,7 @@
     {
       "id": "playback-357-ts188-junk-389-ts-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84886,7 +84886,7 @@
     {
       "id": "raw-357-ts188-junk-389-ts-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84903,7 +84903,7 @@
     {
       "id": "playback-357-ts188-junk-389-ts-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84920,7 +84920,7 @@
     {
       "id": "raw-357-ts188-junk-389-ts-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84937,7 +84937,7 @@
     {
       "id": "playback-357-ts188-junk-389-ts-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84954,7 +84954,7 @@
     {
       "id": "raw-357-ts188-junk-389-ts-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-389.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-389.ts",
       "sha256": "11179515479882d6887ed9d0ba7fb3d2224436215556c67b1fba6d0f112465f9",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84971,7 +84971,7 @@
     {
       "id": "playback-358-ts188-junk-4096-ts-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -84988,7 +84988,7 @@
     {
       "id": "raw-358-ts188-junk-4096-ts-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85005,7 +85005,7 @@
     {
       "id": "playback-358-ts188-junk-4096-ts-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85022,7 +85022,7 @@
     {
       "id": "raw-358-ts188-junk-4096-ts-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85039,7 +85039,7 @@
     {
       "id": "playback-358-ts188-junk-4096-ts-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85056,7 +85056,7 @@
     {
       "id": "raw-358-ts188-junk-4096-ts-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85073,7 +85073,7 @@
     {
       "id": "playback-358-ts188-junk-4096-ts-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85090,7 +85090,7 @@
     {
       "id": "raw-358-ts188-junk-4096-ts-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85107,7 +85107,7 @@
     {
       "id": "playback-358-ts188-junk-4096-ts-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85124,7 +85124,7 @@
     {
       "id": "raw-358-ts188-junk-4096-ts-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85141,7 +85141,7 @@
     {
       "id": "playback-358-ts188-junk-4096-ts-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85158,7 +85158,7 @@
     {
       "id": "raw-358-ts188-junk-4096-ts-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85175,7 +85175,7 @@
     {
       "id": "playback-358-ts188-junk-4096-ts-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85192,7 +85192,7 @@
     {
       "id": "raw-358-ts188-junk-4096-ts-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-4096.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-4096.ts",
       "sha256": "39f1d7ebf251ed4a97a0661764c315a2c02d412aabdb470b0666101b97c0d2d2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85209,7 +85209,7 @@
     {
       "id": "playback-359-ts188-junk-7-ts-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85226,7 +85226,7 @@
     {
       "id": "raw-359-ts188-junk-7-ts-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85243,7 +85243,7 @@
     {
       "id": "playback-359-ts188-junk-7-ts-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85260,7 +85260,7 @@
     {
       "id": "raw-359-ts188-junk-7-ts-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85277,7 +85277,7 @@
     {
       "id": "playback-359-ts188-junk-7-ts-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85294,7 +85294,7 @@
     {
       "id": "raw-359-ts188-junk-7-ts-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85311,7 +85311,7 @@
     {
       "id": "playback-359-ts188-junk-7-ts-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85328,7 +85328,7 @@
     {
       "id": "raw-359-ts188-junk-7-ts-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85345,7 +85345,7 @@
     {
       "id": "playback-359-ts188-junk-7-ts-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85362,7 +85362,7 @@
     {
       "id": "raw-359-ts188-junk-7-ts-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85379,7 +85379,7 @@
     {
       "id": "playback-359-ts188-junk-7-ts-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85396,7 +85396,7 @@
     {
       "id": "raw-359-ts188-junk-7-ts-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85413,7 +85413,7 @@
     {
       "id": "playback-359-ts188-junk-7-ts-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85430,7 +85430,7 @@
     {
       "id": "raw-359-ts188-junk-7-ts-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-junk-7.ts",
+      "file": "harness/features/playback-probe/controls/ts188-junk-7.ts",
       "sha256": "b13aefe1180ed9b45d2ecfc666cf9b7eaec0839a69315a44ce2a8ee6defa8425",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85447,7 +85447,7 @@
     {
       "id": "playback-360-ts188-m2ts192-tie-bin-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85464,7 +85464,7 @@
     {
       "id": "raw-360-ts188-m2ts192-tie-bin-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85481,7 +85481,7 @@
     {
       "id": "playback-360-ts188-m2ts192-tie-bin-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85498,7 +85498,7 @@
     {
       "id": "raw-360-ts188-m2ts192-tie-bin-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85515,7 +85515,7 @@
     {
       "id": "playback-360-ts188-m2ts192-tie-bin-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85532,7 +85532,7 @@
     {
       "id": "raw-360-ts188-m2ts192-tie-bin-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85549,7 +85549,7 @@
     {
       "id": "playback-360-ts188-m2ts192-tie-bin-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85566,7 +85566,7 @@
     {
       "id": "raw-360-ts188-m2ts192-tie-bin-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85583,7 +85583,7 @@
     {
       "id": "playback-360-ts188-m2ts192-tie-bin-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85600,7 +85600,7 @@
     {
       "id": "raw-360-ts188-m2ts192-tie-bin-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85617,7 +85617,7 @@
     {
       "id": "playback-360-ts188-m2ts192-tie-bin-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85634,7 +85634,7 @@
     {
       "id": "raw-360-ts188-m2ts192-tie-bin-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85651,7 +85651,7 @@
     {
       "id": "playback-360-ts188-m2ts192-tie-bin-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85668,7 +85668,7 @@
     {
       "id": "raw-360-ts188-m2ts192-tie-bin-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-m2ts192-tie.bin",
+      "file": "harness/features/playback-probe/controls/ts188-m2ts192-tie.bin",
       "sha256": "782847d7e33efde011be559981579bd1aa14eb627fc9218830fce71b9e6dddcf",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85685,7 +85685,7 @@
     {
       "id": "playback-361-ts188-two-carriers-ts-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85702,7 +85702,7 @@
     {
       "id": "raw-361-ts188-two-carriers-ts-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85719,7 +85719,7 @@
     {
       "id": "playback-361-ts188-two-carriers-ts-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85736,7 +85736,7 @@
     {
       "id": "raw-361-ts188-two-carriers-ts-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85753,7 +85753,7 @@
     {
       "id": "playback-361-ts188-two-carriers-ts-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85770,7 +85770,7 @@
     {
       "id": "raw-361-ts188-two-carriers-ts-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85787,7 +85787,7 @@
     {
       "id": "playback-361-ts188-two-carriers-ts-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85804,7 +85804,7 @@
     {
       "id": "raw-361-ts188-two-carriers-ts-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85821,7 +85821,7 @@
     {
       "id": "playback-361-ts188-two-carriers-ts-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85838,7 +85838,7 @@
     {
       "id": "raw-361-ts188-two-carriers-ts-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85855,7 +85855,7 @@
     {
       "id": "playback-361-ts188-two-carriers-ts-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85872,7 +85872,7 @@
     {
       "id": "raw-361-ts188-two-carriers-ts-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85889,7 +85889,7 @@
     {
       "id": "playback-361-ts188-two-carriers-ts-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85906,7 +85906,7 @@
     {
       "id": "raw-361-ts188-two-carriers-ts-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/ts188-two-carriers.ts",
+      "file": "harness/features/playback-probe/controls/ts188-two-carriers.ts",
       "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85923,7 +85923,7 @@
     {
       "id": "playback-362-wide-first-mov-4",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85940,7 +85940,7 @@
     {
       "id": "raw-362-wide-first-mov-4",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85957,7 +85957,7 @@
     {
       "id": "playback-362-wide-first-mov-8",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85974,7 +85974,7 @@
     {
       "id": "raw-362-wide-first-mov-8",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -85991,7 +85991,7 @@
     {
       "id": "playback-362-wide-first-mov-188",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -86008,7 +86008,7 @@
     {
       "id": "raw-362-wide-first-mov-188",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -86025,7 +86025,7 @@
     {
       "id": "playback-362-wide-first-mov-377",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -86042,7 +86042,7 @@
     {
       "id": "raw-362-wide-first-mov-377",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -86059,7 +86059,7 @@
     {
       "id": "playback-362-wide-first-mov-389",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -86076,7 +86076,7 @@
     {
       "id": "raw-362-wide-first-mov-389",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -86093,7 +86093,7 @@
     {
       "id": "playback-362-wide-first-mov-2048",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -86110,7 +86110,7 @@
     {
       "id": "raw-362-wide-first-mov-2048",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -86127,7 +86127,7 @@
     {
       "id": "playback-362-wide-first-mov-whole",
       "profile": "playback",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [
@@ -86144,7 +86144,7 @@
     {
       "id": "raw-362-wide-first-mov-whole",
       "profile": "raw",
-      "file": "harness/features/playback-probe/inputs/wide-first.mov",
+      "file": "harness/features/playback-probe/controls/wide-first.mov",
       "sha256": "fa55b74ce6bccd23d949d9f4684dd4a4de9f273f1c0cddcd74a19f0c471a1b0b",
       "rights": "authored-synthetic",
       "arguments": [

@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-const INPUTS: &str = "harness/features/playback-probe/inputs";
+const INPUTS: &str = "harness/features/playback-probe/controls";
 const TS: &str = "crates/playback/tests/fixtures/ts/ts188-basic.ts";
 const MOV: &str = "crates/playback/tests/fixtures/mp4/r-front-stco.mov";
 
