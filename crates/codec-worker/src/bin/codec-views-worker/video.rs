@@ -364,7 +364,10 @@ fn send_avc_chunks(
             chunk_end = end;
         }
         if chunk_end > start {
-            record_first_error(error, decoder.send_nals(&input[start..chunk_end], chunk_pts));
+            record_first_error(
+                error,
+                decoder.send_nals(&input[start..chunk_end], chunk_pts),
+            );
             start = chunk_end;
         }
     }
@@ -401,7 +404,10 @@ fn decode(
                         } else {
                             None
                         };
-                        record_first_error(&mut error, decoder.send_nal(nal.bytes().as_ref(), nal_pts));
+                        record_first_error(
+                            &mut error,
+                            decoder.send_nal(nal.bytes().as_ref(), nal_pts),
+                        );
                     }
                 }
                 Feed::Split => {

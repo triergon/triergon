@@ -62,10 +62,8 @@ impl Tree {
         for (source, files) in crate::fonts::corpus(root)? {
             if source.get("generator").is_none() {
                 for file in files {
-                    tree.fetched.insert(
-                        format!(".research/fonts/files/{}", file.path),
-                        file.sha256,
-                    );
+                    tree.fetched
+                        .insert(format!(".research/fonts/files/{}", file.path), file.sha256);
                 }
             }
         }

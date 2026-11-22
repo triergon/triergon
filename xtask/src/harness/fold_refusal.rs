@@ -61,19 +61,32 @@ pub(super) fn read<'a>(
             .filter(|cases| !cases.is_empty())
             .ok_or("registered fold refusal needs cases")?;
         for case in cases {
-            let id = text(case, "id").filter(|id| !id.is_empty()).ok_or("missing refusal id")?;
+            let id = text(case, "id")
+                .filter(|id| !id.is_empty())
+                .ok_or("missing refusal id")?;
             let sha256 = super::validation::hash(case, "sha256")?;
-            let candidate = case.get("candidate").ok_or("missing candidate refusal fold")?;
+            let candidate = case
+                .get("candidate")
+                .ok_or("missing candidate refusal fold")?;
             if !diff::equal(candidate, &comparison::work_summary(candidate, &fields)?) {
-                return Err(format!("{id}: candidate refusal fold has unexpected fields"));
+                return Err(format!(
+                    "{id}: candidate refusal fold has unexpected fields"
+                ));
             }
-            let entry = Refusal { sha256, detail, candidate };
+            let entry = Refusal {
+                sha256,
+                detail,
+                candidate,
+            };
             if all.insert(id, active.then_some(entry)).is_some() {
                 return Err(format!("{id}: duplicate registered fold refusal"));
             }
         }
     }
-    Ok(all.into_iter().filter_map(|(id, entry)| Some((id, entry?))).collect())
+    Ok(all
+        .into_iter()
+        .filter_map(|(id, entry)| Some((id, entry?)))
+        .collect())
 }
 
 impl Refusal<'_> {
@@ -93,12 +106,22 @@ impl Refusal<'_> {
         }
         let candidate = worker::data(left);
         let reference = worker::data(right);
-        self.matches(candidate, reference, expected, fields).then(|| {
-            Value::object([("candidate", candidate.clone()), ("reference", reference.clone())])
-        })
+        self.matches(candidate, reference, expected, fields)
+            .then(|| {
+                Value::object([
+                    ("candidate", candidate.clone()),
+                    ("reference", reference.clone()),
+                ])
+            })
     }
 
-    fn matches(&self, candidate: &Value, reference: &Value, expected: &Value, fields: &[String]) -> bool {
+    fn matches(
+        &self,
+        candidate: &Value,
+        reference: &Value,
+        expected: &Value,
+        fields: &[String],
+    ) -> bool {
         let fold = |observed: &Value, pin: &Value| {
             observed.get("eof") == Some(&Value::Bool(true))
                 && comparison::work_summary(observed, fields)
@@ -146,9 +169,12 @@ mod tests {
             candidate: &candidate,
         };
         let outcome = |data| Value::object([("status", Value::str("ok")), ("data", data)]);
-        let left = outcome(parse(
-            r#"{"packets":2,"bytes":11,"digest":22,"unsupported":"slice groups","eof":true}"#,
-        ).unwrap());
+        let left = outcome(
+            parse(
+                r#"{"packets":2,"bytes":11,"digest":22,"unsupported":"slice groups","eof":true}"#,
+            )
+            .unwrap(),
+        );
         let right = outcome(parse(r#"{"packets":4,"bytes":19,"digest":42,"eof":true}"#).unwrap());
         assert!(refusal.proof(&left, &right, &expected, &[]).is_some());
         for (side, key, value) in [
@@ -161,7 +187,11 @@ mod tests {
             let mut data = worker::data(if side { &left } else { &right }).clone();
             super::super::validation::put(&mut data, key, value).unwrap();
             let changed = outcome(data);
-            let (a, b) = if side { (&changed, &right) } else { (&left, &changed) };
+            let (a, b) = if side {
+                (&changed, &right)
+            } else {
+                (&left, &changed)
+            };
             assert!(refusal.proof(a, b, &expected, &[]).is_none(), "{key}");
         }
         assert!(refusal.proof(&left, &Value::Null, &expected, &[]).is_none());

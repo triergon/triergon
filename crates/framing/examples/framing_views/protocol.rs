@@ -86,7 +86,10 @@ fn execute(
         marker(&mut output, b"TRIERGON_END_V1\n")?;
     }
     let refusal = total.unsupported.map_or_else(String::new, |detail| {
-        format!(",\"unsupported\":{}", triergon_harness_protocol::quoted(detail))
+        format!(
+            ",\"unsupported\":{}",
+            triergon_harness_protocol::quoted(detail)
+        )
     });
     writeln!(
         output,

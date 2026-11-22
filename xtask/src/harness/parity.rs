@@ -750,12 +750,24 @@ pub(super) fn feed_parity(
     if let Some(refusal) = refusal {
         let proof = refusal.proof(&left, &right, expected, work_fields);
         set(&mut result, "status", status_of(proof.is_some()));
-        set(&mut result, "source_timing_status", status_of(proof.is_some()));
+        set(
+            &mut result,
+            "source_timing_status",
+            status_of(proof.is_some()),
+        );
         if let Some(proof) = proof {
-            set(&mut result, "comparison", Value::str(super::fold_refusal::COMPARISON));
+            set(
+                &mut result,
+                "comparison",
+                Value::str(super::fold_refusal::COMPARISON),
+            );
             set(&mut result, "refusal_proof", proof);
         } else {
-            set(&mut result, "reason", Value::str("registered refusal evidence changed"));
+            set(
+                &mut result,
+                "reason",
+                Value::str("registered refusal evidence changed"),
+            );
         }
     }
     run.write(

@@ -1195,7 +1195,9 @@ pub(crate) fn collect(
         if open.iter().any(|open_id| open_id == id)
             || !refusal.binds_input(case.and_then(|case| s(case, "sha256")))
         {
-            return Err(format!("{id}: registered refusal overlaps an open case or has no pinned input"));
+            return Err(format!(
+                "{id}: registered refusal overlaps an open case or has no pinned input"
+            ));
         }
     }
     reserve_case_outputs(&options.output, cases)?;
@@ -1711,10 +1713,7 @@ pub(crate) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
                 == Some(super::fold_refusal::COMPARISON)
     });
     let passing = rows.iter().filter(|row| passed(row)).count() - refused.len();
-    println!(
-        "{label}: {passing} of {} cases pass",
-        rows.len()
-    );
+    println!("{label}: {passing} of {} cases pass", rows.len());
     if !refused.is_empty() {
         println!(
             "{label}: {} registered refusals: {}",

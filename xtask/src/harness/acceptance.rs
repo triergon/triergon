@@ -627,7 +627,9 @@ pub(crate) fn acceptance_iter(
                     passed.insert(profile.to_owned());
                 }
             } else {
-                reasons.push(format!("{id}: registered fold refusal proof missing or invalid"));
+                reasons.push(format!(
+                    "{id}: registered fold refusal proof missing or invalid"
+                ));
             }
             if let Err(error) = validate_case_evidence(&row, identity, s(contract, "id")) {
                 reasons.push(format!("{id}: {error}"));

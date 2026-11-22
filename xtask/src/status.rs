@@ -231,8 +231,10 @@ impl<'a> Rows<'a> {
                 if let Value::Object(entries) = value {
                     for (target, cell) in entries {
                         match cell.as_str() {
-                            Some(cell) if row_targets.contains(&target.as_str())
-                                && !cell.is_empty() && !cell.contains(['|', '\n']) =>
+                            Some(cell)
+                                if row_targets.contains(&target.as_str())
+                                    && !cell.is_empty()
+                                    && !cell.contains(['|', '\n']) =>
                             {
                                 parity.insert(target.as_str(), cell);
                             }
@@ -580,11 +582,17 @@ impl RenderedRow {
             .as_ref()
             .into_iter()
             .flat_map(move |(runtime, memory)| {
-                [(r, runtime.as_str(), "Runtime"), (m, memory.as_str(), "Memory")]
+                [
+                    (r, runtime.as_str(), "Runtime"),
+                    (m, memory.as_str(), "Memory"),
+                ]
             })
-            .chain(table.parity.zip(self.parity.as_deref()).map(|(index, cell)| {
-                (index, cell, "Verified against the reference")
-            }))
+            .chain(
+                table
+                    .parity
+                    .zip(self.parity.as_deref())
+                    .map(|(index, cell)| (index, cell, "Verified against the reference")),
+            )
     }
 }
 

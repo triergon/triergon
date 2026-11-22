@@ -1090,14 +1090,20 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
         let clock = expanded_case(&timed, &options.timing, timed_rows[id])?;
         let measured = expanded_case(&memory, &options.memory, memory_rows[id])?;
         if let Some(refusal) = fold_refusals.get(id) {
-            require_same(&joined_fields(&clock)?, &joined_fields(&measured)?, "case fields/parity")?;
+            require_same(
+                &joined_fields(&clock)?,
+                &joined_fields(&measured)?,
+                "case fields/parity",
+            )?;
             selected(&clock, spec, &contract, identity)?;
             if !super::acceptance::parity_passes(&clock)
                 || has_measurement(&measured)
                 || !super::report::expected_for(spec, target)
                     .is_some_and(|pin| refusal.matches_row(&clock, pin, &fold_fields))
             {
-                return Err(format!("{id}: registered fold refusal proof missing or invalid"));
+                return Err(format!(
+                    "{id}: registered fold refusal proof missing or invalid"
+                ));
             }
             return Ok(clock);
         }
