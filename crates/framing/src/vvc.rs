@@ -1,5 +1,8 @@
 //! Fixed VVC header facts and conservative access-unit framing.
 
+mod stream;
+pub use stream::{VvcAnnexBReader, VvcStreamAccessUnit};
+
 use crate::AnnexBUnits;
 use triergon_core::{Error, Result};
 
@@ -158,10 +161,7 @@ impl<'a> VvcAccessUnits<'a> {
             first
         };
         let mut header = VvcNalHeader::inspect(&self.data[prefix + 3..])?;
-        let mut vcl = false;
-        let mut suffix = false;
-        let mut picture_header = false;
-        let mut first = true;
+        let mut picture = PictureState::default();
         loop {
             let nal_start = prefix + 3;
             let next = crate::start_code(self.data, nal_start);
@@ -174,65 +174,16 @@ impl<'a> VvcAccessUnits<'a> {
             if nal.windows(3).any(|w| w[0] == 0 && w[1] == 0 && w[2] <= 2) {
                 return Err(Error::Invalid("invalid VVC Annex B payload"));
             }
-            if nal.len() < 2 {
-                return Err(Error::Truncated);
-            }
-            if header.forbidden_zero_bit
-                || header.requires_discard()
-                || header.temporal_id_plus_one == 0
-            {
-                return Err(Error::Invalid("invalid VVC NAL header"));
-            }
-            if header.layer_id != 0 {
-                return Err(Error::Invalid("unsupported VVC layer"));
-            }
-            let kind = header.nal_unit_type;
-            // H.266 Annex B also requires zero_byte for DCI through suffix APS.
-            if matches!(kind, 12..=18) && (prefix == 0 || self.data[prefix - 1] != 0) {
-                return Err(Error::Invalid("VVC NAL without the required zero byte"));
-            }
-            if first && (self.require_aud || kind == 20) {
-                if kind != 20 || nal.len() != 3 || nal[2] & 0x0f != 8 || (nal[2] >> 4) & 7 > 2 {
-                    return Err(Error::Invalid("missing or malformed VVC AUD"));
-                }
-                first = false;
-            } else {
-                first = false;
-                if kind == 20 {
-                    return Err(Error::Invalid("unexpected VVC AUD"));
-                }
-                match kind {
-                    0..=3 | 7..=10 => {
-                        if nal.len() < 3 || (vcl && (self.require_aud || !picture_header || suffix))
-                        {
-                            return Err(Error::Invalid("ambiguous VVC picture boundary"));
-                        }
-                        if !self.require_aud && ((nal[2] & 0x80 != 0) == picture_header) {
-                            return Err(Error::Invalid(
-                                "missing or conflicting VVC picture header",
-                            ));
-                        }
-                        vcl = true;
-                    }
-                    19 if !self.require_aud && !vcl => {
-                        if picture_header || nal.len() < 3 {
-                            return Err(Error::Invalid("duplicate or empty VVC picture header"));
-                        }
-                        picture_header = true;
-                    }
-                    12..=17 | 19 | 23 | 26 | 28..=29 if vcl => {
-                        return Err(Error::Invalid("missing VVC AUD before prefix NAL"));
-                    }
-                    18 | 21..=22 | 24..=25 | 27 | 30..=31 if !vcl => {
-                        return Err(Error::Invalid("VVC suffix before picture"));
-                    }
-                    4..=6 | 11 => return Err(Error::Unsupported("reserved VVC VCL type")),
-                    22 if next.is_some() => return Err(Error::Invalid("NAL after VVC end marker")),
-                    _ => suffix = vcl,
-                }
-            }
+            picture.check(
+                prefix != 0 && self.data[prefix - 1] == 0,
+                nal.len(),
+                nal.get(2).copied(),
+                header,
+                self.require_aud,
+                next.is_some(),
+            )?;
             let Some(next_prefix) = next else {
-                if !vcl {
+                if !picture.vcl {
                     return Err(Error::Invalid("VVC access unit without a slice"));
                 }
                 self.at = self.data.len();
@@ -244,18 +195,11 @@ impl<'a> VvcAccessUnits<'a> {
             // Check the next NAL for a boundary without consuming it.
             let next_header = VvcNalHeader::inspect(&self.data[next_prefix + 3..])?;
             let next_kind = next_header.nal_unit_type;
-            let embedded = matches!(next_kind, 0..=3 | 7..=10)
-                && self
-                    .data
-                    .get(next_prefix + 5)
-                    .is_some_and(|byte| byte & 0x80 != 0);
-            let boundary = next_kind == 20
-                || (!self.require_aud
-                    && vcl
-                    && (matches!(next_kind, 12..=17 | 19 | 23 | 26 | 28..=29) || embedded));
+            let embedded = embedded_header(next_kind, self.data.get(next_prefix + 5).copied());
+            let boundary = picture.boundary(next_kind, embedded, self.require_aud);
             if boundary {
                 let zero_byte = self.data[next_prefix - 1] == 0;
-                if !vcl || !(zero_byte || (embedded && self.allow_short_embedded_prefix)) {
+                if !picture.vcl || !(zero_byte || (embedded && self.allow_short_embedded_prefix)) {
                     return Err(Error::Invalid("ambiguous VVC access-unit boundary"));
                 }
                 self.at = next_prefix - usize::from(zero_byte);
@@ -283,5 +227,113 @@ impl<'a> Iterator for VvcAccessUnits<'a> {
             self.failed = true;
         }
         Some(result)
+    }
+}
+
+fn slice_kind(kind: u8) -> bool {
+    matches!(kind, 0..=3 | 7..=10)
+}
+
+fn embedded_header(kind: u8, first_payload: Option<u8>) -> bool {
+    slice_kind(kind) && first_payload.is_some_and(|byte| byte & 0x80 != 0)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PictureState {
+    vcl: bool,
+    suffix: bool,
+    picture_header: bool,
+    first: bool,
+}
+
+impl Default for PictureState {
+    fn default() -> Self {
+        Self {
+            vcl: false,
+            suffix: false,
+            picture_header: false,
+            first: true,
+        }
+    }
+}
+
+impl PictureState {
+    fn boundary(&self, kind: u8, embedded: bool, require_aud: bool) -> bool {
+        kind == 20
+            || (!require_aud
+                && self.vcl
+                && (matches!(kind, 12..=17 | 19 | 23 | 26 | 28..=29) || embedded))
+    }
+
+    fn check(
+        &mut self,
+        zero_byte: bool,
+        nal_len: usize,
+        first_payload: Option<u8>,
+        header: VvcNalHeader,
+        require_aud: bool,
+        has_next: bool,
+    ) -> Result<()> {
+        if nal_len < 2 {
+            return Err(Error::Truncated);
+        }
+        if header.forbidden_zero_bit
+            || header.requires_discard()
+            || header.temporal_id_plus_one == 0
+        {
+            return Err(Error::Invalid("invalid VVC NAL header"));
+        }
+        if header.layer_id != 0 {
+            return Err(Error::Invalid("unsupported VVC layer"));
+        }
+        let kind = header.nal_unit_type;
+        // H.266 Annex B also requires zero_byte for DCI through suffix APS.
+        if matches!(kind, 12..=18) && !zero_byte {
+            return Err(Error::Invalid("VVC NAL without the required zero byte"));
+        }
+        if self.first && (require_aud || kind == 20) {
+            if kind != 20
+                || nal_len != 3
+                || first_payload.is_none_or(|byte| byte & 0x0f != 8 || (byte >> 4) & 7 > 2)
+            {
+                return Err(Error::Invalid("missing or malformed VVC AUD"));
+            }
+            self.first = false;
+        } else {
+            self.first = false;
+            if kind == 20 {
+                return Err(Error::Invalid("unexpected VVC AUD"));
+            }
+            match kind {
+                0..=3 | 7..=10 => {
+                    if nal_len < 3
+                        || (self.vcl && (require_aud || !self.picture_header || self.suffix))
+                    {
+                        return Err(Error::Invalid("ambiguous VVC picture boundary"));
+                    }
+                    if !require_aud && (embedded_header(kind, first_payload) == self.picture_header)
+                    {
+                        return Err(Error::Invalid("missing or conflicting VVC picture header"));
+                    }
+                    self.vcl = true;
+                }
+                19 if !require_aud && !self.vcl => {
+                    if self.picture_header || nal_len < 3 {
+                        return Err(Error::Invalid("duplicate or empty VVC picture header"));
+                    }
+                    self.picture_header = true;
+                }
+                12..=17 | 19 | 23 | 26 | 28..=29 if self.vcl => {
+                    return Err(Error::Invalid("missing VVC AUD before prefix NAL"));
+                }
+                18 | 21..=22 | 24..=25 | 27 | 30..=31 if !self.vcl => {
+                    return Err(Error::Invalid("VVC suffix before picture"));
+                }
+                4..=6 | 11 => return Err(Error::Unsupported("reserved VVC VCL type")),
+                22 if has_next => return Err(Error::Invalid("NAL after VVC end marker")),
+                _ => self.suffix = self.vcl,
+            }
+        }
+        Ok(())
     }
 }

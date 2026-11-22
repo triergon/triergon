@@ -393,6 +393,7 @@ impl DtsExtensionFrame {
 #[derive(Debug)]
 pub enum AccessUnit {
     Video(RawAccessUnit),
+    Vvc(triergon_framing::VvcStreamAccessUnit),
     Adts(AacAdtsFrame),
     Loas(LoasFrame),
     MpegAudio(MpegAudioFrame),
@@ -422,6 +423,7 @@ impl AccessUnit {
             Self::Ac3(frame) => frame.bytes(),
             Self::DvbSubtitle(unit) => unit.bytes(),
             Self::IncompleteAudio { bytes, .. } => bytes,
+            Self::Vvc(unit) => &unit.bytes,
             Self::Video(_) => unreachable!("video access units use assembled bytes"),
         }
     }
@@ -429,6 +431,7 @@ impl AccessUnit {
     pub(super) fn range(&self) -> Range<u64> {
         match self {
             Self::Video(unit) => unit.range.clone(),
+            Self::Vvc(unit) => unit.range.clone(),
             Self::Adts(frame) => {
                 frame.source().offset..frame.source().offset + frame.source_bytes().len() as u64
             }
@@ -459,12 +462,15 @@ impl AccessUnit {
                         }
                     })
             }
+            // VVC's first byte includes the access-unit zero byte even when
+            // the remaining three-byte code starts in the next PES.
             _ => self.range().start,
         }
     }
     pub(super) fn duration(&self) -> Result<Option<Time>> {
         match self {
             Self::Video(_)
+            | Self::Vvc(_)
             | Self::Loas(_)
             | Self::DvbSubtitle(_)
             | Self::IncompleteAudio { .. }

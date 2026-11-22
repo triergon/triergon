@@ -426,6 +426,10 @@ fn original_fate_vvc_packet_comparison() {
                     units,
                     Err(Error::Invalid("ambiguous VVC access-unit boundary"))
                 ));
+                assert_eq!(
+                    stream_folds(&data, false),
+                    Err(Error::Invalid("ambiguous VVC access-unit boundary"))
+                );
                 println!("{name} strict: refuses a boundary without the required zero byte");
                 continue;
             }
@@ -443,6 +447,9 @@ fn original_fate_vvc_packet_comparison() {
                         })
                         .collect();
                     if actual.iter().map(String::as_str).eq(reference.lines()) {
+                        let streamed = stream_folds(&data, label == "compatible")
+                            .unwrap_or_else(|error| panic!("{name} {label}: {error}"));
+                        assert_eq!(streamed, actual, "{name} {label}");
                         println!("{name} {label}: {packets} complete packets match");
                     } else {
                         differences.push(format!(
@@ -455,4 +462,55 @@ fn original_fate_vvc_packet_comparison() {
         }
     }
     assert!(differences.is_empty(), "open comparisons: {differences:#?}");
+}
+
+fn stream_folds(data: &[u8], compatible: bool) -> Result<Vec<String>, Error> {
+    use std::sync::atomic::AtomicBool;
+    use triergon_core::{
+        Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
+    };
+    use triergon_framing::{RawAnnexBLimits, VvcAnnexBReader, compat};
+
+    let pool = Budget::new(data.len() * 3 + 4096)?;
+    let caps = SourceCapabilities {
+        length: Some(data.len() as u64),
+        random_access: false,
+    };
+    let source = SourceId(1);
+    let limits = RawAnnexBLimits::default();
+    let mut reader = if compatible {
+        compat::vvc::access_unit_reader(&pool, source, caps, limits)?
+    } else {
+        VvcAnnexBReader::new(&pool, source, caps, limits)?
+    };
+    let mut rows = Vec::new();
+    let cancel = AtomicBool::new(false);
+    loop {
+        match reader.step(&mut WorkBudget::new(131), &cancel)? {
+            Step::NeedInput(request) => {
+                let at = request.offset as usize;
+                if at == data.len() {
+                    reader.finish(source, request.token)?;
+                } else {
+                    let end = (at + request.maximum.min(257)).min(data.len());
+                    let bytes = Bytes::copy_from_slice(&pool, &data[at..end])?;
+                    reader.provide_owned(InputWindow::new(
+                        source,
+                        request.token,
+                        request.offset,
+                        bytes,
+                    )?)?;
+                }
+            }
+            Step::Ready(unit) => rows.push(format!(
+                "size={}|pos={}|data_hash=SHA256:{}",
+                unit.bytes.len(),
+                unit.range.start,
+                sha256::hex(unit.bytes.as_ref())
+            )),
+            Step::Yield => {}
+            Step::End(_) => return Ok(rows),
+            Step::Backpressure(never) => match never {},
+        }
+    }
 }

@@ -110,6 +110,7 @@ every stream.
 | Carriage | Signalling | Access unit |
 | --- | --- | --- |
 | AVC, HEVC | stream types `0x1b`, `0x24` | Annex B access unit |
+| VVC | stream type `0x33` | Layer zero Annex B access unit with explicit picture headers |
 | MPEG-1/2 audio Layer I–III | stream types `0x03`, `0x04`, PES IDs `0xc0`–`0xdf` | `MpegAudioFrame` |
 | AAC-LC in ADTS | stream type `0x0f` | single-block ADTS frame |
 | LATM in LOAS | stream type `0x11`, PES IDs `0xc0`–`0xdf` | `LoasFrame` (multiplex element opaque) |
@@ -142,7 +143,19 @@ route as unsupported and later PES cannot rescue it.
 
 An MPEG-TS stream with type `0x33` identifies VVC video. The source reader
 accepts finite PES and unbounded video PES for that stream and retains the
-original carrier ranges, clocks and payload bytes.
+original carrier ranges, clocks and payload bytes. The access-unit reader groups
+layer zero pictures with explicit headers across PES and carrier boundaries.
+It preserves original bytes, clocks and PES extents and leaves random-access
+status unknown. A source discontinuity discards an unfinished picture.
+
+With the original inputs and prepared probe described in the
+[framing comparison](../framing/README.md#behaviour-and-limits), verify clocks
+and bytes of the original VVC sample in six finite PES layouts by running:
+
+```sh
+CARGO_INCREMENTAL=0 TRIERGON_VVC_FATE=/path/to/vvc TRIERGON_VVC_FFPROBE=/path/to/ffprobe \
+  cargo test -p triergon-mpegts --test container_reader original_vvc_pictures_wrapped_in_transport_match_the_reference -- --ignored
+```
 
 ### Packets, events and timing
 

@@ -222,7 +222,7 @@ impl<'a> From<&'a Packet> for PacketProjection<'a> {
                 u64::from(unit.random_access),
                 PositionSource::AlignedPayload,
             ),
-            AccessUnit::Loas(_) => (0, PositionSource::AlignedPayload),
+            AccessUnit::Vvc(_) | AccessUnit::Loas(_) => (0, PositionSource::AlignedPayload),
             // DVB subtitle bytes start after the two-byte PES wrapper.
             AccessUnit::DvbSubtitle(_) => (1, PositionSource::FirstPes),
             // A PES beginning inside an aligned audio frame stamps the next

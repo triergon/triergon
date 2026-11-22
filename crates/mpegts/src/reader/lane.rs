@@ -32,7 +32,7 @@ use triergon_core::{
 };
 use triergon_framing::{
     AacAdtsCarrierLimits, AacAdtsCarrierReader, AacAdtsStreamLimits, AacAdtsStreamReader,
-    Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, RawAnnexBReader,
+    Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, RawAnnexBReader, VvcAnnexBReader,
     probe_dts_core_header,
 };
 
@@ -40,6 +40,7 @@ use triergon_framing::{
 #[allow(clippy::large_enum_variant)]
 enum Framer {
     Video(RawAnnexBReader),
+    Vvc(VvcAnnexBReader),
     Adts(AacAdtsStreamReader),
     AdtsFragments(AacAdtsCarrierReader),
     Loas(aligned_audio::Reader<3, ()>),
@@ -57,6 +58,7 @@ impl Framer {
     fn input_wait_storage(&self) -> Result<usize> {
         Ok(match self {
             Self::Video(reader) => reader.input_wait_storage()?.0,
+            Self::Vvc(reader) => reader.input_wait_buffer_capacity(),
             Self::Adts(reader) => reader.input_wait_buffer_capacity(),
             Self::AdtsFragments(reader) => reader.input_wait_buffer_capacity(),
             Self::Loas(reader) => reader.input_wait_buffer_capacity(),
@@ -113,6 +115,12 @@ impl Framer {
                 } else {
                     Codec::Hevc
                 },
+                source,
+                caps,
+                limits.video,
+            )?)),
+            0x33 => Ok(Self::Vvc(VvcAnnexBReader::new(
+                pool,
                 source,
                 caps,
                 limits.video,
@@ -257,6 +265,7 @@ impl Framer {
         }
         Ok(match self {
             Self::Video(reader) => map(reader.step(work, cancel)?, AccessUnit::Video),
+            Self::Vvc(reader) => map(reader.step(work, cancel)?, AccessUnit::Vvc),
             Self::Adts(reader) => map(reader.step(work, cancel)?, AccessUnit::Adts),
             Self::Loas(reader) => map(reader.step(work, cancel, loas::parse)?, |frame| {
                 AccessUnit::Loas(LoasFrame {
@@ -297,6 +306,7 @@ impl Framer {
     fn provide(&mut self, window: InputWindow) -> Result<()> {
         match self {
             Self::Video(reader) => reader.provide_owned(window),
+            Self::Vvc(reader) => reader.provide_owned(window),
             Self::Adts(reader) => reader.provide_owned(window),
             Self::Loas(reader) => reader.provide(window),
             Self::MpegAudio(reader) => reader.provide(window),
@@ -312,6 +322,7 @@ impl Framer {
     fn finish(&mut self, request: InputRequest) -> Result<()> {
         match self {
             Self::Video(reader) => reader.finish(request.source, request.token),
+            Self::Vvc(reader) => reader.finish(request.source, request.token),
             Self::Adts(reader) => reader.finish(request.source, request.token),
             Self::Loas(reader) => reader.finish(request),
             Self::MpegAudio(reader) => reader.finish(request),

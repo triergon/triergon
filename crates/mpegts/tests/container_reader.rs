@@ -27,8 +27,12 @@ mod opaque_video;
 mod physical_seek;
 #[path = "container_reader/seek.rs"]
 mod seek;
+#[path = "../../../xtask/src/sha256.rs"]
+mod sha256;
 #[path = "container_reader/unframed_audio.rs"]
 mod unframed_audio;
+#[path = "container_reader/vvc_stream.rs"]
+mod vvc_stream;
 
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
