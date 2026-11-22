@@ -48,7 +48,14 @@ impl InitialVorbis {
     fn observe(&mut self, event: &Event<Packet, ReaderEvent>) {
         match event {
             Event::Other(ReaderEvent::Link { .. }) => self.abandon(),
-            Event::Other(ReaderEvent::Lost { .. } | ReaderEvent::Resync { .. }) => {
+            Event::Other(ReaderEvent::Lost { track, .. }) => {
+                if self.states.get(*track) == Some(&Initial::Pending) {
+                    self.states[*track] = Initial::Done;
+                    self.remaining -= 1;
+                    self.pending -= 1;
+                }
+            }
+            Event::Other(ReaderEvent::Resync { .. }) => {
                 for state in self.states.as_mut_slice() {
                     if *state == Initial::Pending {
                         *state = Initial::Done;

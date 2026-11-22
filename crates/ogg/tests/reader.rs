@@ -574,8 +574,7 @@ fn blocking_initial_vorbis_recovery_and_limit() {
     }
 }
 
-#[test]
-fn blocking_recovery_keeps_interleaved_tracks_in_order() {
+fn initial_interleaved_vorbis(lost_page: bool) -> Vec<u8> {
     let mut file = Vec::new();
     let mut a = Muxer::new(3);
     let mut b = Muxer::new(4);
@@ -592,10 +591,19 @@ fn blocking_recovery_keeps_interleaved_tracks_in_order() {
         mux.packet(&[0], 0, &mut file);
         mux.flush(false, &mut file);
     }
+    if lost_page {
+        b.sequence += 1;
+    }
     for mux in [&mut b, &mut a] {
         mux.packet(&[0], 128, &mut file);
         mux.flush(false, &mut file);
     }
+    file
+}
+
+#[test]
+fn blocking_recovery_keeps_interleaved_tracks_in_order() {
+    let file = initial_interleaved_vorbis(false);
     let cancel = AtomicBool::new(false);
     let mut reader =
         triergon_ogg::BlockingReader::open_stream(&file[..], Limits::default()).unwrap();
@@ -619,6 +627,31 @@ fn blocking_recovery_keeps_interleaved_tracks_in_order() {
             (0, Some(0), Some(0))
         ]
     );
+}
+
+#[test]
+fn blocking_recovery_keeps_the_other_tracks_anchor_after_loss() {
+    let file = initial_interleaved_vorbis(true);
+    let cancel = AtomicBool::new(false);
+    let mut reader =
+        triergon_ogg::BlockingReader::open_stream(&file[..], Limits::default()).unwrap();
+    reader
+        .recover_initial_vorbis(triergon_ogg::compat::clock::InitialVorbis { max_events: 16 })
+        .unwrap();
+    let mut packets = Vec::new();
+    let mut loss = Vec::new();
+    while let Some(event) = reader.next_event(&cancel).unwrap() {
+        match event {
+            Event::Packet(packet) => {
+                packets.push((packet.track_index(), packet_timing(&packet).pts));
+            }
+            Event::Other(ReaderEvent::Lost { track, .. }) => loss.push((track, packets.len())),
+            _ => {}
+        }
+    }
+    assert_eq!(loss, [(1, 2)]);
+    assert_eq!(packets[0..2], [(0, Some(-128)), (1, None)]);
+    assert_eq!(packets.last(), Some(&(0, Some(0))));
 }
 
 #[test]

@@ -87,8 +87,9 @@ lookahead before event delivery. It holds the ordered event prefix while initial
 Vorbis packets ending on zero-granule pages have unknown compatibility PTS, and
 backfills those times from the next known compatibility PTS and their signed
 durations. Packet source times stay unchanged. The event slots and packet storage
-are charged to the reader's budget. A discontinuity, missing duration, end of
-input or the event limit releases unresolved packets with their original times;
+are charged to the reader's budget. Missing pages stop recovery on their own
+track. Resynchronization, a missing duration, end of input or the event limit
+also releases the affected unresolved packets with their original times;
 seeking discards retained packets and disables further initial recovery. The
 default reader does not look ahead for this policy.
 The calculation also applies to audio-only input when explicitly enabled; FFmpeg
