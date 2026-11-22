@@ -109,12 +109,6 @@
         "needs": "ts-source-poll compares the PES output of all five poll forms and checks their source spans. Table, continuity, timeline and diagnostic events have no equivalent full reference trace."
       },
       {
-        "name": "fault-and-completion-facts",
-        "entry_points": ["compat::pes::PesFaultHeader", "compat::pes::TransportFaultHeader", "compat::pes::TransportTailConfirmation", "compat::pes::PacketCompletion", "compat::pes::NoMediaConfirmation", "compat::pes::MalformedInputCompletion::new", "compat::pes::MalformedInputFact", "compat::pes::NoPacketsConfirmation", "compat::opaque_video::RecoveredOpaque", "compat::UnboundedPes", "compat::PesPacket"],
-        "degree": "step",
-        "needs": "ts-fault-facts compares raw PES headers and the packet consequences of the recovery and completion policies. Physical-end witnesses and malformed-carrier details remain candidate trace facts."
-      },
-      {
         "name": "reference-trace-recovery",
         "entry_points": ["reference_trace::recovery::RecoveryObserver", "reference_trace::recovery::RecoveredPacket", "reference_trace::recovery::EncodedHeader", "reference_trace::recovery::PatSelection", "reference_trace::recovery::PmtBindingJob", "reference_trace::recovery::DiagnosticPacket"],
         "degree": "unit-tests",

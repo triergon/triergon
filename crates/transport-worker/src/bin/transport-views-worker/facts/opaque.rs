@@ -19,14 +19,14 @@ pub(super) fn run(
     let mut source = TransportStream::new(pool.clone(), PacketFormat::Ts188, limits, program)
         .map_err(explain)?;
     let mut cursor = InputCursor::new(pool, SOURCE, caps, 32 * 1024).map_err(explain)?;
-    let trigger = loop {
+    let (trigger, original_fault) = loop {
         match source
             .poll(&mut cursor, &mut WorkBudget::new(WORK), &cancel)
             .map_err(explain)?
         {
             Step::Ready(TraceEvent::Diagnostic(fault)) => {
                 if let Some(trigger) = RecoveryTrigger::from_fault(&fault) {
-                    break trigger;
+                    break (trigger, fault);
                 }
             }
             Step::Ready(TraceEvent::Finished) => {
@@ -52,7 +52,50 @@ pub(super) fn run(
             .poll(&mut cursor, &mut WorkBudget::new(WORK), &cancel)
             .map_err(explain)?
         {
-            Step::Ready(recovered) => return packet(&recovered, program, pid, &cancel, out),
+            Step::Ready(recovered) => {
+                let end = recovered.physical_end().location();
+                let fault = recovered.source_fault();
+                if end.source != SOURCE
+                    || end.offset != bytes.len() as u64
+                    || fault.kind != original_fault.kind
+                    || fault.error != original_fault.error
+                    || fault.location != original_fault.location
+                    || fault.location.offset > end.offset
+                    || fault.pid != original_fault.pid
+                    || recovered.diagnostic_context().source_event_ordinal
+                        >= recovered.source_finished().source_event_ordinal
+                {
+                    return Err(format!(
+                        "opaque recovery fault {fault:?}, original {original_fault:?}, end {end:?}, input length {}, contexts {:?} and {:?}",
+                        bytes.len(),
+                        recovered.diagnostic_context(),
+                        recovered.source_finished()
+                    ));
+                }
+                let mut count = 0;
+                for observation in recovered.observations() {
+                    let spans = match observation {
+                        RecoveredPes::Accepted(packet) => packet.spans.as_slice(),
+                        RecoveredPes::Faulted(packet) => packet.spans.as_slice(),
+                        RecoveredPes::PesFault(packet) => packet.spans.as_slice(),
+                    };
+                    for span in spans {
+                        let source = span.source;
+                        let start = usize::try_from(source.offset).map_err(explain)?;
+                        if source.entity != SOURCE
+                            || bytes.get(start..start.saturating_add(source.bytes))
+                                != Some(span.as_ref())
+                        {
+                            return Err("opaque recovery changed its original source span".into());
+                        }
+                        count += source.bytes;
+                    }
+                }
+                if count != recovered.payload_len() {
+                    return Err("opaque recovery changed its payload extent".into());
+                }
+                return packet(&recovered, program, pid, &cancel, out);
+            }
             Step::NeedInput(request) => provide(&mut cursor, bytes, request).map_err(explain)?,
             Step::Yield => {}
             Step::End(_) => return Err("opaque recovery ended before publication".into()),

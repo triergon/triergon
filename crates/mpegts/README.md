@@ -307,6 +307,10 @@ The [reader view comparison](../../harness/features/ts-reader-views/contract.jso
 checks track signalling against PMT carrier bytes and reconstructs the reported
 opaque or incomplete elementary ranges from the retained PES payload.
 
+The [fault and completion comparison](../../harness/features/ts-fault-facts/contract.json)
+checks physical ends, discarded carrier syntax and recovered source spans
+alongside the paired packet and terminal results.
+
 ## Writing TS
 
 `mux::Muxer` writes 188-byte packets for one video elementary stream, one PES per

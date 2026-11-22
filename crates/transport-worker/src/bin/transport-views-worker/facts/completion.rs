@@ -1,6 +1,7 @@
 use triergon_mpegts::compat::pes::{
-    DemuxObserver, MalformedInputCompletion, MalformedSourceDisposition, PacketCompletion,
-    PesFaultPolicy, RecoveredPes, TransportFaultRecovery,
+    DemuxObserver, MalformedInputCompletion, MalformedInputFact, MalformedInputKind,
+    MalformedSourceDisposition, PacketCompletion, PesFaultPolicy, RecoveredPes,
+    TransportFaultRecovery,
 };
 use triergon_mpegts::stream::FaultKind;
 
@@ -30,6 +31,7 @@ pub(super) fn run(
     let mut clock = DemuxClock::new(program).map_err(explain)?;
     let mut recovery = None;
     let mut packets = 0;
+    let mut discards = 0;
     loop {
         match completion
             .poll_source(&mut cursor, &mut WorkBudget::new(WORK), &cancel)
@@ -45,6 +47,8 @@ pub(super) fn run(
                     .ok_or("malformed completion yielded")?
                 {
                     MalformedSourceDisposition::Reported(fact) => {
+                        check_discard(&fact, bytes)?;
+                        discards += 1;
                         if let Some(trace) = &mut out.trace {
                             writeln!(
                                 trace,
@@ -164,6 +168,25 @@ pub(super) fn run(
                             let tail = observer
                                 .terminal_confirmation()
                                 .ok_or("missing tail confirmation")?;
+                            let end = tail.physical_end();
+                            let fault = tail.source_fault();
+                            if end.source != SOURCE
+                                || end.offset != bytes.len() as u64
+                                || fault.location.source != SOURCE
+                                || fault.location.offset >= end.offset
+                                || fault.kind != FaultKind::Transport
+                                || tail.source_finished() != context
+                                || tail.diagnostic_context().source_event_ordinal
+                                    >= context.source_event_ordinal
+                                || !matches!(
+                                    fault.error,
+                                    Error::Truncated | Error::Invalid("TS sync byte")
+                                )
+                            {
+                                return Err(
+                                    "tail confirmation differs from the physical input".into()
+                                );
+                            }
                             if let Some(trace) = &mut out.trace {
                                 writeln!(trace, "# tail end {}", tail.physical_end().offset)
                                     .map_err(explain)?;
@@ -179,6 +202,17 @@ pub(super) fn run(
                                 )
                                 .map_err(explain)?
                                 .ok_or("no-packets confirmation yielded")?;
+                            let end = confirmation.physical_end();
+                            if end.source != SOURCE
+                                || end.offset != bytes.len() as u64
+                                || confirmation.physical_carriers() != (bytes.len() / 188) as u64
+                                || confirmation.discarded_carriers() != discards
+                                || confirmation.source_finished() != context
+                            {
+                                return Err(
+                                    "no-packets confirmation differs from the checked input".into(),
+                                );
+                            }
                             if let Some(trace) = &mut out.trace {
                                 writeln!(
                                     trace,
@@ -221,6 +255,59 @@ pub(super) fn run(
             Step::Backpressure(never) => match never {},
         }
     }
+}
+
+fn check_discard(fact: &MalformedInputFact, input: &Bytes) -> Result<(), String> {
+    let fault = fact.source_fault();
+    let transport = fact.accepted_transport();
+    let start =
+        usize::try_from(transport.map_or(fault.location.offset, |packet| packet.source_offset))
+            .map_err(explain)?;
+    let carrier = fact.source_bytes().as_ref();
+    if fault.location.source != SOURCE
+        || carrier.len() != 188
+        || input.get(start..start.saturating_add(carrier.len())) != Some(carrier)
+        || fact.input_context().source_event_ordinal
+            > fact.diagnostic_context().source_event_ordinal
+    {
+        return Err("discarded carrier differs from the original input".into());
+    }
+    let control = (carrier[3] >> 4) & 3;
+    let adaptation_length = usize::from(carrier[4]);
+    let transport_fault = if control == 0 {
+        Some(MalformedInputKind::ReservedAdaptationControl)
+    } else if (control == 2 && adaptation_length != 183)
+        || (control == 3 && adaptation_length >= 183)
+    {
+        Some(MalformedInputKind::AdaptationLengthOverrun)
+    } else {
+        None
+    };
+    let malformed = if let Some(kind) = transport_fault {
+        (transport.is_none() && fault.kind == FaultKind::Transport).then_some(kind)
+    } else if transport.is_some() && fault.kind == FaultKind::Pes {
+        let offset = if control == 3 {
+            5 + adaptation_length
+        } else {
+            4
+        };
+        let payload = &carrier[offset..];
+        if !payload.starts_with(&[0, 0, 1]) {
+            Some(MalformedInputKind::PesStartCode)
+        } else if let [_, _, _, _, high, low, _, _, header_length, ..] = *payload {
+            let pes_length = u16::from_be_bytes([high, low]);
+            (pes_length != 0 && u16::from(header_length) + 3 > pes_length)
+                .then_some(MalformedInputKind::PesHeaderLength)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    if malformed != Some(fact.kind()) {
+        return Err("malformed carrier classification disagrees with its wire bytes".into());
+    }
+    Ok(())
 }
 
 fn drain(
@@ -350,6 +437,15 @@ fn control_only(
                         .confirm_no_media(cursor, &mut WorkBudget::new(grant), cancel)
                         .map_err(explain)?
                         .ok_or("no media confirmation yielded")?;
+                    if confirmation.source() != SOURCE
+                        || confirmation.source_bytes() != bytes.len() as u64
+                        || confirmation.physical_carriers() != bytes.len() / 188
+                        || confirmation.source_finished() != context
+                    {
+                        return Err(
+                            "control-only confirmation differs from the checked input".into()
+                        );
+                    }
                     if let Some(trace) = &mut out.trace {
                         writeln!(
                             trace,

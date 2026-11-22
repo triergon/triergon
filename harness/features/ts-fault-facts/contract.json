@@ -9,10 +9,10 @@
   "reference": "ffmpeg-transport-views-native",
   "contract": [
     "Read the selected TS188 stream through the transport and PES fault policies, malformed-input completion or the control-only completion path, and compare their packet consequences and terminal outcomes with parser-disabled FFmpeg.",
-    "For each emitted packet, fold source header bytes at its physical carrier position, timing flags and applicable raw PTS, then PID, projected PTS and DTS, carrier position, corrupt flag and original payload bytes. Compare clean EOF, including genuinely empty input outcomes. The confirmation witness extents and malformed-carrier details are printed in the candidate trace.",
+    "For each emitted packet, fold source header bytes at its physical carrier position, timing flags and applicable raw PTS, then PID, projected PTS and DTS, carrier position, corrupt flag and original payload bytes. Compare clean EOF, including genuinely empty input outcomes. Check confirmation counts and physical ends against the observed carriers and original entity length. Check discarded carriers against the original bytes, malformed wire field and typed source fault.",
     "Header syntax is read directly from the source carrier on the reference side. FFmpeg supplies the packet and its projected fields.",
     "Input geometry controls probe the original TS188 or M2TS192 entity and compare the resulting packet positions or refusal.",
-    "Opaque recovery replays the diagnosed AVC source on a new cursor, publishes the original bytes and clock, and proves physical end. The reference enables its codec parser for the same stream."
+    "Opaque recovery replays the diagnosed AVC source on a new cursor, publishes the original bytes and clock, and proves physical end. Compare the fault type and location against the original diagnostic, require it to precede logical completion, and recover the total payload extent from original carrier ranges. The reference enables its codec parser for the same stream."
   ],
   "required_profiles": [
     "forbidden-five",
