@@ -8,7 +8,7 @@
   "contract": [
     "Run the incremental container probe and the combined container and Annex B probe over the supplied prefix with the declared read window. The formats build scores every compiled demuxer with av_probe_input_format3 on the same padded prefix and requires a score above AVPROBE_SCORE_RETRY.",
     "Fold kind 3 followed by the verdict (0 unknown, 5 Matroska, 6 ISO BMFF, 8 MPEG-TS, 9 AVC, 10 HEVC), carrier-width evidence and replay presence. The reference checks the three H.222.0 sync positions at each carrier spacing, including the four-byte M2TS prefix, and assigns 0 if neither or both match. On the candidate, compare the selected width for MPEG-TS and the same independent prefix fact when no transport width is selected.",
-    "For a selected container, fold the supplied prefix length and MD5 of the byte stream delivered by the returned source. The reference hashes the original input prefix. Raw selection exercises PlaybackProbe::finish and compares its returned codec. The raw source has no byte-level replay consumer in its public interface.",
+    "Require the format or codec from the probe step to equal the format or codec returned by finish. For a selected container, fold the supplied prefix length and MD5 of the byte stream delivered by the returned source. The reference hashes the original input prefix. The raw source exposes frame delivery through the separate raw-annex-b comparison.",
     "Load and truncate the input before the operation. The reference performs additional format scoring for every compiled demuxer."
   ],
   "required_profiles": [

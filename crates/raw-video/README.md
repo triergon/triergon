@@ -26,8 +26,8 @@ the caller's cadence. Borrow the NAL slices in order with
 - AVC/HEVC Annex B and parameter sets: ITU-T H.264 §7.3 and Annex B, ITU-T H.265.
 
 The [probe comparison](../../harness/features/playback-probe/contract.json)
-checks the combined probe's container and raw-video choices, and checks transport
-sync spacing independently of the chosen format. The
+checks that the combined probe's detection and handoff agree for containers
+and raw video, and checks transport sync spacing independently. The
 [raw source views](../../harness/features/playback-source-view/contract.json)
 compare the initial SPS-derived frame rate and the default unstamped queue timestamps.
 The [raw Annex B comparison](../../harness/features/raw-annex-b/contract.json)

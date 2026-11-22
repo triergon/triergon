@@ -16,7 +16,9 @@ use triergon_playback::{
     ByteSource, Format, Source, SourceOwner,
     probe::{Probe, ProbeProgress, SelectedInput},
 };
-use triergon_raw_video::{PlaybackInput, PlaybackProbe, PlaybackProbeStep, RawVideoProbeLimits};
+use triergon_raw_video::{
+    PlaybackInput, PlaybackInputKind, PlaybackProbe, PlaybackProbeStep, RawVideoProbeLimits,
+};
 
 const ID: SourceId = SourceId(1);
 const WORK: u64 = 1 << 16;
@@ -73,27 +75,40 @@ fn compare(pool: &Budget, data: &Bytes, window: usize, raw: bool, trace: bool) -
         if trace {
             eprintln!("probe detection: {detection:?}");
         }
-        match probe.finish(RawAnnexBLimits::default())? {
-            PlaybackInput::Container(selected) => handoff(selected, &cancel)?,
-            PlaybackInput::RawVideo { codec, .. } => (
-                match codec {
-                    Codec::Avc => 9,
-                    Codec::Hevc => 10,
-                },
-                0,
-                None,
-            ),
+        match (detection, probe.finish(RawAnnexBLimits::default())?) {
+            (PlaybackInputKind::Container(format), PlaybackInput::Container(selected))
+                if format == selected.format =>
+            {
+                handoff(selected, &cancel)?
+            }
+            (PlaybackInputKind::RawVideo(detected), PlaybackInput::RawVideo { codec, .. })
+                if detected == codec =>
+            {
+                (
+                    match codec {
+                        Codec::Avc => 9,
+                        Codec::Hevc => 10,
+                    },
+                    0,
+                    None,
+                )
+            }
+            _ => return Err("combined probe detection differs from its handoff".into()),
         }
     } else {
         let mut probe = Probe::new(pool, ID, caps, window, source)?;
-        loop {
+        let format = loop {
             match probe.advance(&mut WorkBudget::new(WORK), &cancel) {
-                Ok(ProbeProgress::Selected(_)) => break,
+                Ok(ProbeProgress::Selected(format)) => break format,
                 Ok(ProbeProgress::NeedInput(_) | ProbeProgress::Yield) => {}
                 Err(error) => return refused(error, data, trace),
             }
+        };
+        let selected = probe.finish()?;
+        if format != selected.format {
+            return Err("container probe selection differs from its handoff".into());
         }
-        handoff(probe.finish()?, &cancel)?
+        handoff(selected, &cancel)?
     };
     let width = if verdict == 8 {
         width
