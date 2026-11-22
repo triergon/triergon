@@ -222,7 +222,7 @@ fn ambisonic_counts_and_direct_mapping() {
     }
     assert!(matches!(
         Decoder::new(&head(4, 3, 2, 2, &[0, 1, 2, 3], 0)),
-        Err(DecodeError::Unsupported(_))
+        Err(DecodeError::Invalid(_))
     ));
 }
 
@@ -395,4 +395,70 @@ fn malformed_packets_never_panic_and_the_decoder_recovers() {
         decoder.decode(&packet, &mut frame).unwrap();
         assert_eq!(frame.samples_per_channel, 960);
     }
+}
+
+#[test]
+fn projection_mixes_coded_channels_before_gain_and_preserves_state() {
+    // Four ACN outputs from one coupled and one mono stream; the last row is silent.
+    let columns: [[i16; 4]; 3] = [
+        [16384, -32768, 0, 0],
+        [-8192, 4096, 32767, 0],
+        [32767, 8192, -16384, 0],
+    ];
+    let mut matrix = Vec::new();
+    for column in columns {
+        for coefficient in column {
+            matrix.extend_from_slice(&coefficient.to_le_bytes());
+        }
+    }
+    let projected = head(4, 3, 2, 1, &matrix, 384);
+    let direct = head(3, 255, 2, 1, &[0, 1, 2], 0);
+    let mut projection = Decoder::new(&projected).unwrap();
+    let mut coded = Decoder::new(&direct).unwrap();
+    assert_eq!(
+        projection.layout(),
+        Decoder::new(&head(4, 2, 2, 1, &[0, 1, 2, 255], 0))
+            .unwrap()
+            .layout()
+    );
+    let mut seed = 7;
+    let packets: Vec<_> = (0..3)
+        .map(|_| {
+            let mut packet = delimited(&celt_packet(true, 90, &mut seed));
+            packet.extend(celt_packet(false, 80, &mut seed));
+            packet
+        })
+        .collect();
+    let mut output = AudioFrame::default();
+    let mut input = AudioFrame::default();
+    let gain = 10f64.powf(384.0 / (20.0 * 256.0)) as f32;
+    for packet in &packets {
+        projection.decode(packet, &mut output).unwrap();
+        coded.decode(packet, &mut input).unwrap();
+        for row in 0..4 {
+            for sample in 0..output.samples_per_channel {
+                let mut expected = 0.0f32;
+                for column in 0..3 {
+                    expected +=
+                        f32::from(columns[column][row]) / 32768.0 * input.planes[column][sample];
+                }
+                expected *= gain;
+                assert_eq!(
+                    output.planes[row][sample].to_bits(),
+                    expected.to_bits(),
+                    "row {row} sample {sample}"
+                );
+            }
+        }
+    }
+    assert_refusal_keeps_state(
+        &projected,
+        &[&packets[0]],
+        &[0xff],
+        &[&packets[1], &packets[2]],
+    );
+    assert!(Decoder::new(&projected[..projected.len() - 1]).is_err());
+    let mut invalid = projected.clone();
+    invalid[20] = 3;
+    assert!(Decoder::new(&invalid).is_err());
 }

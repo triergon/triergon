@@ -3,22 +3,44 @@
 
 use crate::DecodeError;
 use triergon_codec::layout::{native_order, vorbis_order};
-use triergon_codec::{BudgetVec, ChannelLayout};
-use triergon_framing::OpusHead;
+use triergon_codec::{Budget, BudgetVec, ChannelLayout};
+use triergon_framing::{OpusHead, OpusProjection};
 
 /// No stream feeds this channel: it is silent.
 const SILENT: u8 = 255;
 
 /// The channel mapping of one decoder.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct Mapping {
     streams: usize,
     coupled: usize,
-    /// Per output plane, the stream channel it takes (`SILENT` for none), in plane order.
-    source: [u8; ChannelLayout::CAPACITY],
+    /// Direct sources or column-major projection coefficients.
+    routing: Routing,
     layout: ChannelLayout,
     /// Linear output gain, `None` at 0 dB.
     gain: Option<f32>,
+}
+
+#[derive(Debug)]
+enum Routing {
+    Direct([u8; ChannelLayout::CAPACITY]),
+    Projection(BudgetVec<i16>),
+}
+
+fn ambisonic(channels: usize) -> Result<ChannelLayout, DecodeError> {
+    let side = channels.isqrt();
+    let base = side * side;
+    let stereo = channels == base + 2;
+    let order = side.saturating_sub(1) as u8;
+    if channels != base && !stereo {
+        return Err(DecodeError::Invalid("Opus Ambisonic channel count"));
+    }
+    ChannelLayout::ambisonic(order, stereo)
+        .ok_or(DecodeError::Invalid("Opus Ambisonic channel count"))
+}
+
+fn gain(value: i16) -> Option<f32> {
+    (value != 0).then(|| 10f64.powf(f64::from(value) / (20.0 * 256.0)) as f32)
 }
 
 /// Channels in coded order without speaker positions (FFmpeg's unspecified order),
@@ -43,17 +65,7 @@ impl Mapping {
                 .ok_or(DecodeError::Invalid(
                     "Vorbis channel mapping beyond 8 channels",
                 ))?,
-            2 => {
-                let layout = (0..=8)
-                    .find_map(|order| {
-                        [false, true].into_iter().find_map(|stereo| {
-                            let layout = ChannelLayout::ambisonic(order, stereo)?;
-                            (layout.channels() == channels).then_some(layout)
-                        })
-                    })
-                    .ok_or(DecodeError::Invalid("Opus Ambisonic channel count"))?;
-                (layout, core::array::from_fn(|i| i as u8))
-            }
+            2 => (ambisonic(channels)?, core::array::from_fn(|i| i as u8)),
             255 => unordered(channels),
             _ => return Err(DecodeError::Unsupported("Opus channel mapping family")),
         };
@@ -61,15 +73,51 @@ impl Mapping {
         for (coded, &stream_channel) in head.mapping().iter().enumerate() {
             source[usize::from(plane[coded])] = stream_channel;
         }
-        let gain = (head.output_gain != 0)
-            .then(|| 10f64.powf(f64::from(head.output_gain) / (20.0 * 256.0)) as f32);
+        let gain = gain(head.output_gain);
         Ok(Mapping {
             streams: usize::from(head.streams),
             coupled: usize::from(head.coupled_streams),
-            source,
+            routing: Routing::Direct(source),
             layout,
             gain,
         })
+    }
+
+    pub(crate) fn projection(
+        head: &OpusProjection<'_>,
+        budget: &Budget,
+    ) -> Result<Self, DecodeError> {
+        let channels = usize::from(head.channels);
+        if channels > ChannelLayout::CAPACITY {
+            return Err(DecodeError::Unsupported("more than 93 output channels"));
+        }
+        let layout = ambisonic(channels)?;
+        let mut coefficients = BudgetVec::new(budget);
+        coefficients.try_reserve_exact(head.coefficients().len())?;
+        for coefficient in head.coefficients() {
+            coefficients
+                .try_push(coefficient)
+                .map_err(|error| error.error)?;
+        }
+        Ok(Self {
+            streams: usize::from(head.streams),
+            coupled: usize::from(head.coupled_streams),
+            routing: Routing::Projection(coefficients),
+            layout,
+            gain: gain(head.output_gain),
+        })
+    }
+
+    pub(crate) fn is_projection(&self) -> bool {
+        matches!(self.routing, Routing::Projection(_))
+    }
+
+    pub(crate) fn prepare(&self, samples: usize, planes: &mut [Vec<f32>]) {
+        if self.is_projection() {
+            for plane in planes {
+                plane[..samples].fill(0.0);
+            }
+        }
     }
 
     pub(crate) fn streams(&self) -> usize {
@@ -101,8 +149,7 @@ impl Mapping {
         }
     }
 
-    /// Copy the decoded channels of `stream` (`pcm[channel][..samples]`) to the planes
-    /// that take them.
+    /// Route or mix the decoded channels of `stream` into the output planes.
     pub(crate) fn distribute(
         &self,
         stream: usize,
@@ -110,9 +157,35 @@ impl Mapping {
         samples: usize,
         planes: &mut [Vec<f32>],
     ) {
-        for (plane, &index) in planes.iter_mut().zip(&self.source) {
-            if let Some((_, channel)) = self.locate(index).filter(|&(s, _)| s == stream) {
-                plane[..samples].copy_from_slice(&pcm[channel][..samples]);
+        match &self.routing {
+            Routing::Direct(source) => {
+                for (plane, &index) in planes.iter_mut().zip(source) {
+                    if let Some((_, channel)) = self.locate(index).filter(|&(s, _)| s == stream) {
+                        plane[..samples].copy_from_slice(&pcm[channel][..samples]);
+                    }
+                }
+            }
+            Routing::Projection(matrix) => {
+                let first = if stream < self.coupled {
+                    2 * stream
+                } else {
+                    stream + self.coupled
+                };
+                let channels = self.channels();
+                for (channel, input) in pcm.iter().enumerate().take(self.stream_channels(stream)) {
+                    let start = (first + channel) * channels;
+                    let column = &matrix[start..start + channels];
+                    for (plane, &coefficient) in planes.iter_mut().zip(column) {
+                        if coefficient == 0 {
+                            continue;
+                        }
+                        let coefficient = f32::from(coefficient) * (1.0 / 32768.0);
+                        for (output, &sample) in plane[..samples].iter_mut().zip(&input[..samples])
+                        {
+                            *output += coefficient * sample;
+                        }
+                    }
+                }
             }
         }
     }
@@ -120,23 +193,38 @@ impl Mapping {
     /// The stream and channel within it that each output plane takes, `None` for a
     /// silent plane, in plane order.
     pub(crate) fn sources(&self) -> impl Iterator<Item = Option<(usize, usize)>> + '_ {
-        self.source[..self.channels()]
-            .iter()
-            .map(|&index| self.locate(index))
+        let source = match &self.routing {
+            Routing::Direct(source) => &source[..self.channels()],
+            Routing::Projection(_) => &[],
+        };
+        source.iter().map(|&index| self.locate(index))
     }
 
     /// Apply the output gain to the planes the streams fed, and silence the others.
     pub(crate) fn finish(&self, samples: usize, planes: &mut [Vec<f32>]) {
-        for (plane, &index) in planes.iter_mut().zip(&self.source) {
-            let plane = &mut plane[..samples];
-            match (self.locate(index), self.gain) {
-                (None, _) => plane.fill(0.0),
-                (Some(_), Some(gain)) => {
-                    for v in plane {
-                        *v *= gain;
+        match &self.routing {
+            Routing::Direct(source) => {
+                for (plane, &index) in planes.iter_mut().zip(source) {
+                    let plane = &mut plane[..samples];
+                    match (self.locate(index), self.gain) {
+                        (None, _) => plane.fill(0.0),
+                        (Some(_), Some(gain)) => {
+                            for value in plane {
+                                *value *= gain;
+                            }
+                        }
+                        (Some(_), None) => {}
                     }
                 }
-                (Some(_), None) => {}
+            }
+            Routing::Projection(_) => {
+                if let Some(gain) = self.gain {
+                    for plane in planes {
+                        for value in &mut plane[..samples] {
+                            *value *= gain;
+                        }
+                    }
+                }
             }
         }
     }

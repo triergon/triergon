@@ -25,7 +25,7 @@ use triergon_codec::{
     AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, Charged, DecodeFailure,
     DownmixLevels, Reservation, StorageError,
 };
-use triergon_framing::{OPUS_RATE, OpusHead};
+use triergon_framing::{OPUS_RATE, OpusHead, OpusProjection};
 
 /// Bounds of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -104,9 +104,15 @@ impl Decoder {
 
     /// As [`Decoder::new`], charging the caller's pool.
     pub fn new_in(configuration: &[u8], budget: &Budget) -> Result<Decoder, DecodeError> {
-        let head = OpusHead::parse(configuration)
+        let projection = OpusProjection::parse(configuration)
             .map_err(|_| DecodeError::Invalid("Opus identification header"))?;
-        let mapping = Mapping::new(&head)?;
+        let (mapping, pre_skip) = if let Some(head) = projection {
+            (Mapping::projection(&head, budget)?, head.pre_skip)
+        } else {
+            let head = OpusHead::parse(configuration)
+                .map_err(|_| DecodeError::Invalid("Opus identification header"))?;
+            (Mapping::new(&head)?, head.pre_skip)
+        };
         let mut streams = BudgetVec::new(budget);
         streams.try_reserve_exact(mapping.streams())?;
         for stream in 0..mapping.streams() {
@@ -116,7 +122,7 @@ impl Decoder {
         }
         Ok(Decoder {
             mapping,
-            pre_skip: head.pre_skip,
+            pre_skip,
             staging: Staging::new(streams.len(), budget)?,
             streams,
             work: Charged::boxed(budget, Workspace::new(budget)?)?,
@@ -152,6 +158,7 @@ impl Decoder {
             return Err(DecodeError::Invalid("streams of unequal duration"));
         }
         out.try_resize(self.mapping.channels(), samples, &mut self.output_charge)?;
+        self.mapping.prepare(samples, &mut out.planes);
         for (index, stream) in self.streams.iter_mut().enumerate() {
             let produced = stream.flush(&mut self.work);
             debug_assert_eq!(produced, samples);
@@ -169,6 +176,7 @@ impl Decoder {
         out.samples_per_channel = 0;
         let (samples, emphasis) = self.check(au)?;
         out.try_resize(self.mapping.channels(), samples, &mut self.output_charge)?;
+        self.mapping.prepare(samples, &mut out.planes);
         // `check` parsed every sub-packet.
         let packets = sub_packets(au, self.streams.len()).map_while(Result::ok);
         for (index, (stream, packet)) in self.streams.iter_mut().zip(packets).enumerate() {
@@ -215,7 +223,11 @@ impl Decoder {
     /// streams are decoded when every stream decodes CELT frames alone.
     fn check(&mut self, au: &[u8]) -> Result<(usize, Emphasis), DecodeError> {
         let mut samples = None;
-        let mut emphasis = Emphasis::Defer;
+        let mut emphasis = if self.mapping.is_projection() {
+            Emphasis::Apply
+        } else {
+            Emphasis::Defer
+        };
         let packets = sub_packets(au, self.streams.len());
         for (index, (stream, packet)) in self.streams.iter().zip(packets).enumerate() {
             let packet = packet?;
@@ -223,7 +235,7 @@ impl Decoder {
             if *samples.get_or_insert(len) != len {
                 return Err(DecodeError::Invalid("streams of unequal duration"));
             }
-            if !stream.can_defer_emphasis(&packet) {
+            if emphasis == Emphasis::Defer && !stream.can_defer_emphasis(&packet) {
                 emphasis = Emphasis::Apply;
             }
         }

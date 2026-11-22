@@ -100,7 +100,7 @@ assert_eq!(decoder_input, [
 | DTS packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14SyncReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
 | MPEG audio | `MpegAudioHeader`, `mpeg_info_frame`, `mpeg_audio_crc_ok` | ISO/IEC 11172-3 and 13818-3 frame headers, including MPEG-2.5 rates; Xing, Info (with LAME tag) and VBRI information frames; frame CRC check |
 | FLAC | `flac_stream_info`, `flac_metadata_blocks`, `flac_configuration_from_dfla`, `flac_configuration_from_ogg`, `FlacFrameHeader` | STREAMINFO and metadata blocks; the `fLaC` configuration rebuilt from a `dfLa` payload or the first Ogg FLAC packet; frame headers with their CRC-8 |
-| Opus | `OpusHead`, `opus_packet_samples` | Identification header, also from a `dOps` payload; packet duration from the TOC |
+| Opus | `OpusHead`, `OpusProjection`, `opus_packet_samples` | Conventional identification headers and `dOps` payloads, borrowed family 3 projection matrices, and packet duration from the TOC |
 | Vorbis | `VorbisIdentification`, `VorbisModes`, `vorbis_packet_blocksize`, `xiph_split`, `xiph_join` | Identification header, setup-header modes and each audio packet's block size without decoding; Xiph lacing |
 | Audio configuration | `canonical_flac_configuration`, `canonical_opus_configuration`, `canonical_vorbis_configuration` | One canonical decoder configuration per codec, whichever container carried it |
 | DTS parser comparison | `reference_trace::dts::ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
@@ -170,7 +170,7 @@ Implemented from these specifications:
 | AC-3 / E-AC-3 | ATSC A/52:2018 §§5.3–5.4, Table 5.18, Annex E Tables E1.2, E1.5, E1.6 and §E2.3; ETSI TS 102 366 V1.4.1 Annex F.4/F.6 (dac3/dec3) |
 | DTS | ETSI TS 102 114 V1.6.1 §§3.4, 5.3, 5.4.2, Tables 5-1 to 5-20; V1.2.1 §5.3 (14-bit packing) |
 | MPEG audio | ISO/IEC 11172-3 §2.4.2.3, §2.4.3.1; ISO/IEC 13818-3 |
-| FLAC, Opus, Vorbis | RFC 9639; RFC 7845 §5.1 and RFC 6716 §§3.1–3.2; Vorbis I §§4.2–4.3 |
+| FLAC, Opus, Vorbis | RFC 9639; RFC 7845 §5.1, RFC 6716 §§3.1–3.2 and RFC 8486 §§3.2–3.3; Vorbis I §§4.2–4.3 |
 
 Test fixtures: `fixtures/*.tsv` are bit-authored corpora with expected values from an
 independent whole-buffer oracle. `fixtures/raw-annex-b/*.packets` hold the packet extents

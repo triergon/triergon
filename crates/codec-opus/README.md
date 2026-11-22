@@ -54,18 +54,28 @@ the pre-skip or other container trims.
 - Mode switching (section 4.5): redundant CELT frames in both directions with their
   cross-fades, layer resets on mode changes, and bandwidth and channel-count changes
   between packets.
-- Channel mapping families 0 and 1 (Vorbis order, reported in FFmpeg's native layouts:
-  mono, stereo, 3.0, quad, 5.0, 5.1, 6.1, 7.1) and 255 (coded order without speaker
-  positions, `ChannelLayout::mask() == 0`), and 2 (SN3D Ambisonic components in ACN
-  order, optionally followed by non-diegetic left and right). Family 2 exposes its
-  order and stereo flag through `ChannelLayout::ambisonic_order()`; it does not provide
-  a speaker mask or a stereo downmix. The session downmixer treats layouts without a
-  speaker mask as default speaker layouts; the stereo audio session refuses Ambisonic frames. Coupled and uncoupled streams, stream
-  channels used by several outputs, and silent outputs (mapping index 255). Other
-  families are `Unsupported`, and so are headers of more than 93 output channels (RFC
-  7845 allows 255): 93 is the most a `ChannelLayout` holds.
+- Channel mapping families 0 and 1 (Vorbis order in the header and native
+  speaker order on output), 255 (coded order without speaker positions), and
+  2 and 3 (SN3D Ambisonic planes in ACN order, with optional non-diegetic stereo).
+  `ChannelLayout::ambisonic_order()` reports the order and stereo pair. The
+  stereo audio session refuses Ambisonic input.
+- Family 2 distributes coded planes by index. Family 3 reads the signed
+  little-endian Q15 matrix from `OpusHead` and mixes coded planes into the
+  budgeted output after de-emphasis. The matrix can be rectangular. A zero
+  row gives silence. The decoder accepts Ambisonic orders zero to eight
+  within the `ChannelLayout` capacity. The family 3 configuration can come
+  from Ogg or an `OpusHead` in Matroska. The ISO BMFF `dOps` path accepts
+  conventional mapping tables.
+- Coupled and uncoupled streams share the packet decoder. Direct mappings
+  support a coded plane used by several outputs and silence via index 255.
 
 ## Behaviour and limits
+
+Family 3 uses [RFC 8486 §§3.2 and 3.3](https://www.rfc-editor.org/rfc/rfc8486#section-3.2).
+Tests cover signed and rectangular matrices, coupled channel order, zero rows,
+gain and rejected input. The full native parity, runtime and memory comparisons
+remain open. Stock FFmpeg 9.0.2 refuses the family 3 inputs, and the rectangular
+and six-channel cases need a complete equivalent reference comparison.
 
 - The header's output gain is applied after de-emphasis, once per packet. Its pre-skip
   is not: the decoder reports it as its start delay (`AudioDecoder::delay`), which a

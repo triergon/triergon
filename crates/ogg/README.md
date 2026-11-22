@@ -5,6 +5,9 @@ mappings, implementing the core `ContainerReader`. It reads multiplexed and chai
 physical streams from incremental input, times packets from granule positions, and seeks
 by bisection.
 
+Opus family 3 identification retains the complete Q15 demixing matrix in the
+codec configuration and uses the header's original channel count and pre-skip.
+
 ## Usage
 
 ```rust
