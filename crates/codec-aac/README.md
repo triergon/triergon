@@ -48,6 +48,15 @@ That program stays in effect when a packet carries its own PCE. The configuratio
 use 1024-sample frames; a packet carrying SBR is refused (`Feature::RawSbr`). The raw
 decoder synthesizes directly into the caller's reserved planes and reuses them.
 
+`RawSbrDecoder` accepts fixed stereo AAC-LC raw blocks with 2× SBR and an indexed
+core rate at or below 48 kHz. The first block must carry an SBR extension; output is
+2048 samples per channel at twice the core rate. It uses the same SBR synthesis as the
+ADTS decoder. The pinned FATE stereo access-unit comparison is available through
+`cargo xtask codecs aac-access-units --sbr --out DIR`; the [worker instructions](../codec-worker/README.md) describe its separate timing and memory collections. Native performance and broader qualification remain open.
+Reset clears the SBR header, so SBR data cannot be applied until a new
+header arrives. It does not configure mono or Parametric
+Stereo, other layouts, or 960-sample core frames.
+
 ## Features
 
 | Feature | Default | Effect |

@@ -3,7 +3,7 @@
 use std::fs::File;
 use std::io::{Read, Write};
 use triergon::Budget;
-use triergon_codec::{AudioFrame, SampleFormat};
+use triergon_codec::{AudioDecoder, AudioFrame, SampleFormat};
 use triergon_session::TrackDecoder;
 use triergon_session::compat::aac::Policy;
 
@@ -14,6 +14,7 @@ const SAMPLES: usize = 1024;
 const MAX_PACKET: usize = 64 << 10;
 const MAX_INPUT: u64 = 64 << 20;
 pub const OPERATION: &str = "audio-aac-access-units";
+pub const SBR_OPERATION: &str = "audio-aac-access-units-sbr";
 pub const COMPAT_OPERATION: &str = "audio-aac-access-units-compat";
 
 pub fn load(path: &str) -> Result<Vec<u8>, String> {
@@ -41,7 +42,11 @@ fn read_u32(data: &mut &[u8]) -> Result<u32, String> {
     Ok(u32::from_le_bytes(*word))
 }
 
-pub fn decode(mut data: &[u8], layout: Policy, out: &mut Output) -> Result<(), String> {
+pub fn decode<const SBR: bool>(
+    mut data: &[u8],
+    layout: Policy,
+    out: &mut Output,
+) -> Result<(), String> {
     let rate = read_u32(&mut data)?;
     let channels = read_u32(&mut data)? as usize;
     let packets = read_u32(&mut data)?;
@@ -59,9 +64,35 @@ pub fn decode(mut data: &[u8], layout: Policy, out: &mut Output) -> Result<(), S
     data = rest;
     let pool =
         Budget::new(TrackDecoder::DEFAULT_STORAGE_BYTES).map_err(|error| format!("{error:?}"))?;
-    let mut decoder = TrackDecoder::aac_access_units_with_layout_in(config, layout, &pool)
-        .map_err(|error| error.0)?
-        .into_decoder();
+    if SBR {
+        if config.len() < 2
+            || channels != 2
+            || rate != 48000
+            || config[0] != 0x13
+            || config[1] & 0xf8 != 0x10
+        {
+            return Err("unsupported AAC SBR configuration".into());
+        }
+        let mut decoder = TrackDecoder::aac_access_units_in(config, &pool)
+            .map_err(|error| error.0)?
+            .into_decoder();
+        decode_packets::<2048>(data, rate, channels, packets, decoder.as_mut(), out)
+    } else {
+        let mut decoder = TrackDecoder::aac_access_units_with_layout_in(config, layout, &pool)
+            .map_err(|error| error.0)?
+            .into_decoder();
+        decode_packets::<SAMPLES>(data, rate, channels, packets, decoder.as_mut(), out)
+    }
+}
+
+fn decode_packets<const N: usize>(
+    mut data: &[u8],
+    rate: u32,
+    channels: usize,
+    packets: u32,
+    decoder: &mut dyn AudioDecoder,
+    out: &mut Output,
+) -> Result<(), String> {
     let mut frame = AudioFrame::default();
     for _ in 0..packets {
         let size = read_u32(&mut data)? as usize;
@@ -81,7 +112,7 @@ pub fn decode(mut data: &[u8], layout: Policy, out: &mut Output) -> Result<(), S
             .map_err(|error| error.0)?;
         if frame.sample_rate != rate
             || frame.planes.len() != channels
-            || frame.samples_per_channel != SAMPLES
+            || frame.samples_per_channel != N
             || frame.sample_format != SampleFormat::Float
         {
             return Err("AAC output shape".into());
@@ -102,7 +133,7 @@ pub fn decode(mut data: &[u8], layout: Policy, out: &mut Output) -> Result<(), S
             }
         }
         for plane in &frame.planes {
-            if plane.len() != SAMPLES {
+            if plane.len() != N {
                 return Err("AAC output plane size".into());
             }
             out.digest.update_f32(plane);
@@ -113,7 +144,7 @@ pub fn decode(mut data: &[u8], layout: Policy, out: &mut Output) -> Result<(), S
                 }
             }
         }
-        out.bytes += (SAMPLES * channels * size_of::<f32>()) as u64;
+        out.bytes += (N * channels * size_of::<f32>()) as u64;
         out.frames += 1;
     }
     if !data.is_empty() {

@@ -273,6 +273,72 @@ impl AudioDecoder for RawLcDecoder {
     }
 }
 
+/// Decoder for raw stereo AAC-LC access units with 2× SBR.
+#[derive(Debug)]
+pub struct RawSbrDecoder {
+    core: decoder::Core,
+}
+
+impl RawSbrDecoder {
+    /// Configure the indexed core rate and stereo channel configuration (2).
+    pub fn new_in(
+        frequency_index: u8,
+        channel_configuration: u8,
+        budget: &Budget,
+    ) -> Result<Self, DecodeError> {
+        if channel_configuration != 2 || !(3..=12).contains(&frequency_index) {
+            return Err(DecodeError::InvalidData("raw SBR configuration"));
+        }
+        let mut core = decoder::Core::new(budget);
+        core.configure(
+            2,
+            frequency_index,
+            2,
+            decoder::FixedLayout::Raw(compat::layout::Policy::Specification),
+        )?;
+        Ok(Self { core })
+    }
+
+    /// Decode one complete raw data block.
+    pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+        decode_with::<false>(&mut self.core, out, |core, out| {
+            if au.len() > RawLcDecoder::MAX_ACCESS_UNIT_BYTES {
+                return Err(DecodeError::ResourceLimit("raw AAC access unit"));
+            }
+            core.reserve_output::<false>(out, 1)?;
+            let mut br = CachedBitReader::new(au);
+            core.decode_block::<true, true>(&mut br, 0, out, 1)?;
+            core.emit_planes(out)?;
+            core.frames_out += 1;
+            out.sample_rate = core.output_rate();
+            out.layout = core.layout;
+            out.samples_per_channel = out.planes.first().map_or(0, Vec::len);
+            Ok(())
+        })
+    }
+
+    /// Reset signal history and SBR configuration after a discontinuity. SBR data
+    /// cannot be applied until a new SBR header arrives.
+    pub fn reset(&mut self) {
+        self.core.reset_raw_sbr();
+    }
+}
+
+impl AudioDecoder for RawSbrDecoder {
+    fn decode(
+        &mut self,
+        au: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
+        RawSbrDecoder::decode(self, au, out).map_err(DecodeFailure::from_error)?;
+        Ok(None)
+    }
+
+    fn reset(&mut self) {
+        RawSbrDecoder::reset(self);
+    }
+}
+
 fn decode_with<const RAW: bool>(
     core: &mut decoder::Core,
     out: &mut AudioFrame,
@@ -344,7 +410,7 @@ fn decode_blocks<const RAW: bool>(
     core.reserve_output::<RAW>(out, usize::from(blocks))?;
     for block in 0..blocks {
         let start = br.position();
-        core.decode_block::<RAW>(&mut br, start, out, usize::from(blocks - block))?;
+        core.decode_block::<RAW, false>(&mut br, start, out, usize::from(blocks - block))?;
         if !RAW {
             core.emit_planes(out)?;
         }

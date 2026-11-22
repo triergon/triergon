@@ -363,14 +363,14 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
 }
 
 static int configured_aac_operation(const char *name, int video) {
-    return !video && (!strcmp(name, "aac-access-units") || !strcmp(name, "aac-access-units-compat"));
+    return !video && (!strcmp(name, "aac-access-units") || !strcmp(name, "aac-access-units-compat") || !strcmp(name, "aac-access-units-sbr"));
 }
 
 static void pass(const char *name, const AVCodecParameters *par, const uint8_t *data, size_t size, int video,
                  struct out *o) {
     const char *demuxer;
     if (configured_aac_operation(name, video))
-        aac_access_units(data, size, o);
+        aac_access_units(data, size, o, !strcmp(name, "aac-access-units-sbr") ? 2048 : AAC_SAMPLES);
     else if (!video && file_lane(name, &demuxer))
         demux_pass(demuxer, data, size, o);
     else

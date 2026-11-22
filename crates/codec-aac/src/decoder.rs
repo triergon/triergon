@@ -258,6 +258,17 @@ impl Core {
         }
     }
 
+    pub(crate) fn reset_raw_sbr(&mut self) {
+        self.reset_history();
+        for element in &mut self.elements {
+            if let Some(sbr) = &mut element.sbr {
+                sbr.renew();
+            }
+        }
+        self.sbr_active = false;
+        self.frames_out = 0;
+    }
+
     pub(crate) fn output_rate(&self) -> u32 {
         let r = SAMPLE_RATES[self.sf_index];
         if self.sbr_active { r * 2 } else { r }
@@ -528,7 +539,7 @@ impl Core {
     /// Decode one raw_data_block(); appends `frame_len()` samples per plane to `planes`.
     /// Decode one raw_data_block() of the `blocks` (this one included) the access unit has
     /// left; `out` gets room for an in-band reconfiguration before it applies.
-    pub(crate) fn decode_block<const RAW: bool>(
+    pub(crate) fn decode_block<const RAW: bool, const RAW_SBR: bool>(
         &mut self,
         br: &mut CachedBitReader<'_>,
         block_start: usize,
@@ -654,7 +665,7 @@ impl Core {
                             return Err(DecodeError::InvalidData("fill element overrun"));
                         }
                         let ext = br.read(4);
-                        if RAW && matches!(ext, EXT_SBR_DATA | EXT_SBR_DATA_CRC) {
+                        if RAW && !RAW_SBR && matches!(ext, EXT_SBR_DATA | EXT_SBR_DATA_CRC) {
                             return Err(DecodeError::Unsupported(Feature::RawSbr));
                         }
                         if !RAW
@@ -724,7 +735,14 @@ impl Core {
                 "no channel configuration (missing PCE)",
             ));
         }
-        self.finish_frame::<RAW>(out);
+        if RAW && RAW_SBR {
+            if !self.sbr_active {
+                return Err(DecodeError::InvalidData("missing initial raw SBR"));
+            }
+            self.finish_frame::<false>(out);
+        } else {
+            self.finish_frame::<RAW>(out);
+        }
         Ok(layout_changed)
     }
 

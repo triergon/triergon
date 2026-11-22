@@ -14,7 +14,8 @@
     "preload the same bounded input with zero padding on both sides, then time decoder setup, packet decode, planar float output fold, flush and teardown",
     "compare every sample in every 1024-sample PCM plane using the AAC numeric rules, with exact block count, rate and ordered speakers",
     "in the specification mapping used by the original QuickTime comparison, allow the back and side labels of the single surround pair in fixed configurations 5 and 6 to differ while preserving the same plane positions",
-    "require matching parity and worker identities for the timing and memory comparisons"
+    "require matching parity and worker identities for the timing and memory comparisons",
+    "the separate SBR parity profile fetches its pinned FATE source and passes the original AudioSpecificConfig and every raw packet to both workers. It compares all samples of each 2048-sample stereo plane without edit-list trimming"
   ],
   "required_targets": ["aarch64-unknown-linux-gnu"],
   "iterations": 4,
