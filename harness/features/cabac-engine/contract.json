@@ -21,22 +21,23 @@
   "worker_operation": "cabac-",
   "oracle": "cabac-engine",
   "pinned_per_target": true,
+  "pending_module_requirements": ["A capped unary read leaves the bins after the requested limit for the next call."],
   "open_cases": [
     {
       "id": "unary-cap-plain",
-      "requirement": "A limit of three must advance three bypass bins. The candidate consumes 8 bins, changing the cursor and the next bypass value."
+      "requirement": "A capped unary read leaves the bins after the requested limit for the next call."
     },
     {
       "id": "unary-cap-headroom",
-      "requirement": "A limit of three must advance three bypass bins. The candidate consumes 8 bins, changing the cursor and the next bypass value."
+      "requirement": "A capped unary read leaves the bins after the requested limit for the next call."
     },
     {
       "id": "unary-early-zero-past-cap-plain",
-      "requirement": "A limit of three must advance three bypass bins. The candidate consumes 6 bins, changing the cursor and the next bypass value."
+      "requirement": "A capped unary read leaves the bins after the requested limit for the next call."
     },
     {
       "id": "unary-early-zero-past-cap-headroom",
-      "requirement": "A limit of three must advance three bypass bins. The candidate consumes 6 bins, changing the cursor and the next bypass value."
+      "requirement": "A capped unary read leaves the bins after the requested limit for the next call."
     }
   ],
   "open_unmeasured": [
