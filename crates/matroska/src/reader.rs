@@ -92,23 +92,46 @@ fn packet_replay_prefix(
     }
 }
 
-#[derive(Debug)]
+/// Where the admission of a level-one leaf stands; `maximum` bounds its payload
+/// in bytes.
+// An explicit tag byte: kept in a niche of `Admit`'s option, the demux step ran up
+// to 0.12% more instructions.
+#[derive(Clone, Copy, Debug)]
+#[repr(u8)]
 enum AdmitPhase {
-    Lookup,
+    /// Comparing the header with loaded metadata element `at`; an element loaded
+    /// before is passed over.
+    Lookup { at: usize },
+    /// Reserving the slot that records the element as loaded.
     Reserve,
+    /// Waiting for that reservation.
     WaitReserve,
-    Catalogue,
-    Admit,
+    /// Making room in the catalogue for the document.
+    Catalogue { maximum: usize },
+    /// Handing the leaf to the envelope; `None` keeps the envelope's own bound.
+    Admit { maximum: Option<usize> },
 }
-// Flat fields, each read by some phases only: with the lookup index, the bound and
-// the catalogue job inside the phases, every workload ran 0.2 to 0.3% more instructions.
 #[derive(Debug)]
 struct Admission {
     header: ElementHeader,
-    at: usize,
     phase: AdmitPhase,
-    maximum: Option<usize>,
-    prepare: Option<CataloguePrepareJob>,
+    // The job the Catalogue phase steps. Inside that variant it cost the demux step
+    // 48 bytes of stack frame and a drop at every phase change.
+    catalogue: CataloguePrepareJob,
+}
+
+/// The payload bytes a level-one leaf `id` may hold: the unused metadata allowance
+/// `left`, and for Attachments also the unused attachment payload allowance.
+#[inline(always)]
+fn leaf_allowance(limits: &Limits, catalogue: &Catalogue, id: u64, left: usize) -> Result<usize> {
+    if id != crate::metadata::ATTACHMENTS {
+        return Ok(left);
+    }
+    let attachments = limits
+        .attachment_bytes
+        .checked_sub(catalogue.attachment_bytes())
+        .ok_or(Error::Policy("attachment payload bytes"))?;
+    left.checked_add(attachments).ok_or(Error::Overflow)
 }
 // Exactly one transaction is live. A union keeps the maximum fixed workspace,
 // rather than the sum, and adds no per-packet heap allocation/pressure seam.
@@ -501,7 +524,8 @@ impl Reader {
             } else {
                 match &result {
                     Ok(ParseStep::Event(Event::Packet(packet))) => {
-                        if packet.configuration.tracks()[packet.packet.track].kind == 1
+                        if packet.configuration.tracks()[packet.packet.track].kind
+                            == crate::track::Track::VIDEO
                             && let Some(location) = &self.last_location
                         {
                             index.observe(packet, location.cluster_offset(), work);
@@ -1043,10 +1067,8 @@ impl Reader {
                             if !work.try_charge(1) {
                                 self.state = State::Admission(Admission {
                                     header,
-                                    at: 0,
-                                    phase: AdmitPhase::Admit,
-                                    maximum: None,
-                                    prepare: None,
+                                    phase: AdmitPhase::Admit { maximum: None },
+                                    catalogue: CataloguePrepareJob::new(),
                                 });
                                 return Ok(ParseStep::Yield);
                             }
@@ -1066,10 +1088,8 @@ impl Reader {
                         EnvelopeProgress::Header(header) => {
                             self.state = State::Admission(Admission {
                                 header,
-                                at: 0,
-                                phase: AdmitPhase::Lookup,
-                                maximum: None,
-                                prepare: None,
+                                phase: AdmitPhase::Lookup { at: 0 },
+                                catalogue: CataloguePrepareJob::new(),
                             });
                         }
                         EnvelopeProgress::Step(ParseStep::Event(event)) => match event {
@@ -1291,110 +1311,81 @@ impl Reader {
         stop: Option<u64>,
         scan_prefix: bool,
     ) -> Result<Option<ParseStep<Infallible>>> {
-        let State::Admission(admission) = &mut self.state else {
+        let State::Admission(Admission {
+            header,
+            phase,
+            catalogue,
+        }) = &mut self.state
+        else {
             return Err(Error::Invalid("admission outside its state"));
         };
-        match admission.phase {
-            AdmitPhase::Lookup => {
-                if !is_segment_metadata(admission.header.id) {
-                    admission.phase = AdmitPhase::Admit;
-                    return Ok(None);
-                }
-                if admission.at == self.loaded.len() {
-                    let maximum = if admission.header.id == crate::metadata::ATTACHMENTS {
-                        left.checked_add(
-                            self.limits
-                                .attachment_bytes
-                                .checked_sub(self.catalogue.attachment_bytes())
-                                .ok_or(Error::Policy("attachment payload bytes"))?,
-                        )
-                        .ok_or(Error::Overflow)?
-                    } else {
-                        left
-                    };
-                    if admission
-                        .header
-                        .size
-                        .is_some_and(|size| size > maximum as u64)
-                    {
+        match phase {
+            AdmitPhase::Lookup { at } => {
+                if *at == self.loaded.len() {
+                    let maximum = leaf_allowance(&self.limits, &self.catalogue, header.id, left)?;
+                    if header.size.is_some_and(|size| size > maximum as u64) {
                         return Err(Error::Policy("element bytes"));
                     }
-                    admission.phase = AdmitPhase::Reserve;
+                    *phase = AdmitPhase::Reserve;
                     return Ok(None);
                 }
                 if !work.try_charge(1) {
                     return Ok(Some(ParseStep::Yield));
                 }
-                let (position, id) = self.loaded.as_slice()[admission.at];
-                admission.at += 1;
-                if position == admission.header.start {
-                    if id != admission.header.id {
+                let (position, id) = self.loaded.as_slice()[*at];
+                *at += 1;
+                if position == header.start {
+                    if id != header.id {
                         return Err(Error::Invalid("cached metadata identity changed"));
                     }
-                    self.envelope
-                        .admit_typed_leaf(admission.header, None, true)?;
+                    self.envelope.admit_typed_leaf(*header, None, true)?;
                     self.state = State::Envelope;
                 }
             }
             AdmitPhase::Reserve => {
                 self.loaded.reserve(1)?;
-                admission.phase = AdmitPhase::WaitReserve;
+                *phase = AdmitPhase::WaitReserve;
             }
             AdmitPhase::WaitReserve => match self.loaded.step(work, cancel)? {
                 ParseStep::Event(()) => {
-                    let max = if admission.header.id == crate::metadata::ATTACHMENTS {
-                        left.checked_add(
-                            self.limits
-                                .attachment_bytes
-                                .checked_sub(self.catalogue.attachment_bytes())
-                                .ok_or(Error::Policy("attachment payload bytes"))?,
-                        )
-                        .ok_or(Error::Overflow)?
+                    let maximum = leaf_allowance(&self.limits, &self.catalogue, header.id, left)?;
+                    *phase = if document(header.id) {
+                        AdmitPhase::Catalogue { maximum }
                     } else {
-                        left
+                        AdmitPhase::Admit {
+                            maximum: Some(maximum),
+                        }
                     };
-                    admission.maximum = Some(max);
-                    if document(admission.header.id) {
-                        admission.prepare = Some(CataloguePrepareJob::new());
-                        admission.phase = AdmitPhase::Catalogue;
-                    } else {
-                        admission.phase = AdmitPhase::Admit;
+                }
+                other => return crate::step::pending(other).map(Some),
+            },
+            AdmitPhase::Catalogue { maximum } => {
+                match catalogue.step(&mut self.catalogue, self.limits, work, cancel)? {
+                    ParseStep::Event(available) => {
+                        *phase = AdmitPhase::Admit {
+                            maximum: Some((*maximum).min(available)),
+                        };
                     }
+                    other => return crate::step::pending(other).map(Some),
                 }
-                other => return crate::step::pending(other).map(Some),
-            },
-            AdmitPhase::Catalogue => match admission
-                .prepare
-                .as_mut()
-                .required("missing catalogue admission")?
-                .step(&mut self.catalogue, self.limits, work, cancel)?
-            {
-                ParseStep::Event(available) => {
-                    admission.maximum = Some(admission.maximum.unwrap_or(available).min(available));
-                    admission.prepare = None;
-                    admission.phase = AdmitPhase::Admit;
-                }
-                other => return crate::step::pending(other).map(Some),
-            },
-            AdmitPhase::Admit => {
+            }
+            AdmitPhase::Admit { maximum } => {
                 if !work.try_charge(1) {
                     return Ok(Some(ParseStep::Yield));
                 }
-                self.envelope
-                    .admit_typed_leaf(admission.header, admission.maximum, false)?;
+                self.envelope.admit_typed_leaf(*header, *maximum, false)?;
                 // A block touching a finite scan stop keeps the old
                 // body/stop scheduling, including work-boundary cases.
                 if scan_prefix
-                    && admission.header.id == SIMPLE_BLOCK
+                    && header.id == SIMPLE_BLOCK
                     && stop.is_none_or(|stop| {
-                        admission
-                            .header
+                        header
                             .size
-                            .and_then(|size| admission.header.data.checked_add(size))
+                            .and_then(|size| header.data.checked_add(size))
                             .is_some_and(|end| end < stop)
                     })
                 {
-                    self.envelope.arm_scan_prefix(admission.header)?;
+                    self.envelope.arm_scan_prefix(*header)?;
                 }
                 self.state = State::Envelope;
             }
@@ -1529,7 +1520,7 @@ impl Reader {
     }
 }
 
-crate::storage::usage::storage!(Admission, |s| [s.prepare]);
+crate::storage::usage::storage!(Admission, |s| [s.catalogue]);
 impl crate::storage::usage::Storage for State {
     fn storage_slots(&self) -> Result<usize> {
         use crate::storage::usage::{Storage, slots};
