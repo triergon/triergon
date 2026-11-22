@@ -10,6 +10,7 @@
     "gated_by_another_command": 44,
     "not_gated": 3,
     "open": {
+      "harness/codecs/session-cases.json": {"open_cases": {"aarch64-unknown-linux-gnu": 321, "thumbv7neon-unknown-linux-gnueabihf": 321}},
       "harness/codecs/packed-dts.json": {"open_cases": {"aarch64-unknown-linux-gnu": 3, "thumbv7neon-unknown-linux-gnueabihf": 3}},
       "harness/codecs/nodither-streams.json": {"open_cases": {"aarch64-unknown-linux-gnu": 7, "thumbv7neon-unknown-linux-gnueabihf": 7}},
       "harness/codecs/crc-damage.json": {"open_cases": {"aarch64-unknown-linux-gnu": 189, "thumbv7neon-unknown-linux-gnueabihf": 189}},
