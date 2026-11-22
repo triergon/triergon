@@ -700,8 +700,8 @@ impl Direct<'_> {
                 self.state.lookup = None;
             }
         }
-        let mut source = self.source;
-        let declaration = match source.poll(work)? {
+        // The outer cursor latches failures, so a failed projection cannot be retried.
+        let declaration = match self.source.poll(work)? {
             Next::Yield => return Ok(None),
             Next::End => return Ok(None),
             Next::Item(s) => s,
@@ -788,7 +788,6 @@ impl Direct<'_> {
         self.state.ordinal += 1;
         self.state.distance = distance;
         self.state.demux_started |= !suppressed;
-        self.source = source;
         Ok(Some(event))
     }
 }
