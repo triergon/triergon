@@ -13,6 +13,8 @@ read outputs from a `playback::Player`. Look up the packet's track with
 and step `AccessUnits::for_track` once per selected track to obtain its framer.
 For indexed MP4, finish `PreparedMp4::identify_tracks` before selecting tracks
 or creating framers so their codec identities and sample descriptions are available.
+On the source media clock, the playback pipeline caps AAC output at the sample's
+declared duration before publishing PCM.
 Here `ready` supplies a fresh work budget when the framing job yields.
 
 ```rust,no_run

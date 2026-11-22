@@ -5,7 +5,7 @@ use std::{
     sync::atomic::AtomicBool,
 };
 use triergon::{
-    AnyReader, Backpressure, Blocking, Budget, BudgetVec, Bytes, ContainerReader, Error,
+    AnyReader, Backpressure, Blocking, Budget, BudgetVec, Bytes, CodecId, ContainerReader, Error,
     PacketInfo, Result, Rounding, SourceCapabilities, SourceId, TimeBase, TrackInfo, WorkBudget,
     bridge::access::{AccessUnitLimits, AccessUnits},
     framing::BuildStep,
@@ -160,6 +160,7 @@ fn next_output(player: &mut Player<impl Source>, cancel: &AtomicBool) -> Result<
 struct Decode<'a, O> {
     pool: &'a Budget,
     opts: Options,
+    format: Format,
     video: VideoSession,
     audio: AudioSession,
     observer: &'a mut O,
@@ -217,12 +218,12 @@ impl<O: Observer> Decode<'_, O> {
         packet: &impl PacketInfo,
         cancel: &AtomicBool,
     ) -> ExampleResult<()> {
-        let (index, _) = tracks
+        let (index, track) = tracks
             .clone()
             .find(|(_, track)| info(track).id() == packet.track())
             .ok_or(Error::Invalid("packet track is absent"))?;
         if self.framer.is_none() {
-            self.framer = Some(self.start(tracks, info, cancel)?);
+            self.framer = Some(self.start(tracks, &info, cancel)?);
         }
         self.observer.packet(index, packet)?;
         let Some(framers) = &mut self.framer else {
@@ -253,7 +254,12 @@ impl<O: Observer> Decode<'_, O> {
         } else {
             self.audio
                 .feed_discarding(unit.payload(), pts, Discard::of(&unit))?;
-            self.pull_audio()?;
+            let duration = if self.format == Format::Mp4 && info(&track).codec() == CodecId::Aac {
+                unit.duration().map(|ticks| (unit.time_base(), ticks))
+            } else {
+                None
+            };
+            self.pull_audio(duration)?;
         }
         Ok(())
     }
@@ -267,9 +273,17 @@ impl<O: Observer> Decode<'_, O> {
         Ok(())
     }
 
-    fn pull_audio(&mut self) -> Result<()> {
+    fn pull_audio(&mut self, duration: Option<(TimeBase, i64)>) -> Result<()> {
         let mut block = PcmBlock::default();
         self.audio.pull(None, 0, &mut block);
+        if let Some((base, ticks)) = duration
+            && !block.samples.is_empty()
+        {
+            let sample_base = TimeBase::new(1, u64::from(block.sample_rate))?;
+            let frames = base.rescale(ticks, sample_base, Rounding::Floor)?;
+            let frames = usize::try_from(frames.max(0)).unwrap_or(usize::MAX);
+            block.samples.truncate(frames.saturating_mul(2));
+        }
         if !block.samples.is_empty() {
             self.observer.pcm(&block)?;
         }
@@ -284,7 +298,7 @@ impl<O: Observer> Decode<'_, O> {
         self.step_video()?;
         self.audio.end_of_stream();
         while self.audio.state() == SessionState::Running {
-            self.pull_audio()?;
+            self.pull_audio(None)?;
         }
         for state in [self.video.state(), self.audio.state()] {
             if let SessionState::Failed(error) = state {
@@ -322,6 +336,7 @@ pub(super) fn play_with(
     }
     let mut decode = Decode {
         pool,
+        format: selected.format,
         video: VideoSession::with_canvas(QueueLimits::VIDEO, opts.canvas),
         audio: AudioSession::new(QueueLimits::AUDIO),
         opts,
