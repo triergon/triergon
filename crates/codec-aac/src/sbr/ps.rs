@@ -45,6 +45,11 @@
 //! - A frame without PS data repeats the last PS frame; a header-less frame uses the last
 //!   header; a header with IID or ICC disabled resets those values to index 0 (t04..t07,
 //!   t12, t17..t19).
+//! - A time-differential envelope reads the values kept per envelope index: each coded
+//!   envelope writes the first entries of its band count into its index's array, and
+//!   envelope 0 reads the array of the previous frame's last coded envelope, whose entries
+//!   above that frame's band count come from the last frame that wrote them at that index
+//!   (t29, o41, o43).
 //! - A frame with an invalid value, a decreasing border, a reserved mode or more data than
 //!   its extension holds outputs the mono signal on both channels, keeps the signal state
 //!   and resets the values, IPD/OPD to index 0 with the last extension's enable bit kept;
@@ -321,10 +326,13 @@ pub(crate) struct Ps {
     /// Some header enabled IID; the band count of the last IID mode.
     seen_iid: bool,
     iid_bands: usize,
-    /// Values of the last envelope read (dt reference and num_env 0): a frame writes the
-    /// first entries of its band count, the entries above keep older values.
-    last_iid: [i8; MAX_PAR],
-    last_icc: [i8; MAX_PAR],
+    /// Values per envelope index, the time-differential reference: a frame writes the first
+    /// entries of its band count in the array of each envelope it codes, the entries above
+    /// keep older values; envelope 0 reads the array of the previous frame's last coded
+    /// envelope, `kept_env`, which a frame without coded envelopes also reads (o41, o43).
+    kept_iid: Values,
+    kept_icc: Values,
+    kept_env: usize,
     last_ipd: [[u8; 17]; 2],
     /// IPD/OPD: enabled by the last extension; values per envelope index as coded, with
     /// their band count (mapped onto the configuration each frame); smoothing history by
@@ -388,8 +396,9 @@ impl Ps {
             active: false,
             seen_iid: false,
             iid_bands: 10,
-            last_iid: [0; MAX_PAR],
-            last_icc: [0; MAX_PAR],
+            kept_iid: [[0; MAX_PAR]; 4],
+            kept_icc: [[0; MAX_PAR]; 4],
+            kept_env: 0,
             last_ipd: [[0; 17]; 2],
             phase_on: false,
             phase: [[[0; MAX_PAR]; 2]; MAX_ENV],
@@ -433,8 +442,9 @@ impl Ps {
         self.active = false;
         self.seen_iid = false;
         self.iid_bands = 10;
-        self.last_iid = [0; MAX_PAR];
-        self.last_icc = [0; MAX_PAR];
+        self.kept_iid = [[0; MAX_PAR]; 4];
+        self.kept_icc = [[0; MAX_PAR]; 4];
+        self.kept_env = 0;
         self.last_ipd = [[0; 17]; 2];
         self.phase_on = false;
         self.phase = [[[0; MAX_PAR]; 2]; MAX_ENV];
@@ -659,16 +669,21 @@ impl Ps {
         self.big = Some(big);
     }
 
-    /// Keep the last envelope's values: the first entries of the frame's band counts.
-    fn keep(&mut self, h: Header, iid: &[i8; MAX_PAR], icc: &[i8; MAX_PAR]) {
-        if let Some(m) = h.iid {
-            let n = band_count(m);
-            self.last_iid[..n].copy_from_slice(&iid[..n]);
+    /// Keep the values of the `coded` (at least one) envelopes read: the first entries of
+    /// the frame's band counts in each envelope's array.
+    fn keep(&mut self, h: Header, iid: &Values, icc: &Values, coded: usize) {
+        for (kept, values, mode) in [
+            (&mut self.kept_iid, iid, h.iid),
+            (&mut self.kept_icc, icc, h.icc),
+        ] {
+            if let Some(m) = mode {
+                let n = band_count(m);
+                for (kept, values) in kept.iter_mut().zip(values).take(coded) {
+                    kept[..n].copy_from_slice(&values[..n]);
+                }
+            }
         }
-        if let Some(m) = h.icc {
-            let n = band_count(m);
-            self.last_icc[..n].copy_from_slice(&icc[..n]);
-        }
+        self.kept_env = coded - 1;
     }
 
     /// An error frame: mono output, values reset (IPD/OPD to index 0 with their enable bit
@@ -686,8 +701,8 @@ impl Ps {
             }
             None => {}
         }
-        self.last_iid = [0; MAX_PAR];
-        self.last_icc = [0; MAX_PAR];
+        self.kept_iid = [[0; MAX_PAR]; 4];
+        self.kept_icc = [[0; MAX_PAR]; 4];
         self.last_ipd = [[0; 17]; 2];
         self.phase = [[[0; MAX_PAR]; 2]; MAX_ENV];
         self.active = false;
@@ -701,10 +716,12 @@ impl Ps {
         let mut icc = [[0; MAX_PAR]; 4];
         if let Some(m) = h.iid {
             let lim = if m >= 3 { 15 } else { 7 };
-            iid = Self::resolve(&raw.iid, n, band_count(m), &self.last_iid, -lim, lim)?;
+            let last = &self.kept_iid[self.kept_env];
+            iid = Self::resolve(&raw.iid, n, band_count(m), last, -lim, lim)?;
         }
         if let Some(m) = h.icc {
-            icc = Self::resolve(&raw.icc, n, band_count(m), &self.last_icc, 0, 7)?;
+            let last = &self.kept_icc[self.kept_env];
+            icc = Self::resolve(&raw.icc, n, band_count(m), last, 0, 7)?;
         }
         Some((iid, icc))
     }
@@ -723,11 +740,7 @@ impl Ps {
                 return;
             };
             if !overrun {
-                self.keep(
-                    self.header,
-                    &iid[raw.coded_env - 1],
-                    &icc[raw.coded_env - 1],
-                );
+                self.keep(self.header, &iid, &icc, raw.coded_env);
             }
         }
         if overrun {
@@ -757,23 +770,23 @@ impl Ps {
         };
         let big = self.config(h);
         if h.iid.is_none() {
-            self.last_iid = [0; MAX_PAR];
+            self.kept_iid = [[0; MAX_PAR]; 4];
         }
         if h.icc.is_none() {
-            self.last_icc = [0; MAX_PAR];
+            self.kept_icc = [[0; MAX_PAR]; 4];
         }
         let n = raw.coded_env;
         let (iid, icc) = if n == 0 {
             // one envelope holding the last values; kept fine values on the coarse grid fail
-            let kept = &self.last_iid[..h.iid.map_or(0, band_count)];
+            let kept = &self.kept_iid[self.kept_env][..h.iid.map_or(0, band_count)];
             if h.iid.is_some_and(|m| m < 3) && kept.iter().any(|v| v.abs() > 7) {
                 self.fault(Some(Fault::Read(n)));
                 return false;
             }
             let mut a = [[0; MAX_PAR]; 4];
             let mut c = [[0; MAX_PAR]; 4];
-            a[0] = self.last_iid;
-            c[0] = self.last_icc;
+            a[0] = self.kept_iid[self.kept_env];
+            c[0] = self.kept_icc[self.kept_env];
             (a, c)
         } else {
             let Some(v) = self.values(raw, h) else {
@@ -804,7 +817,10 @@ impl Ps {
                 to_config(&icc[src], band_count(m), big, &mut f.icc[e]);
             }
         }
-        self.keep(h, &iid[coded - 1], &icc[coded - 1]);
+        // a frame without coded envelopes repeats the kept values and writes none
+        if n > 0 {
+            self.keep(h, &iid, &icc, n);
+        }
         if let Some((on, env)) = &raw.ipd {
             self.phase_on = *on;
             if *on {

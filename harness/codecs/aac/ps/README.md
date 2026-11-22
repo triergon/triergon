@@ -188,26 +188,24 @@ a frame that overran its extension.
   it reads index 0 (o42: bit-identical to the same values coded frequency-differentially;
   against the values before the error 1.3e-2). This path's stream is
   `ps-open-noext-after-error` of [../ps-open-manifest.json](../ps-open-manifest.json).
+- **The time-differential reference per envelope index.** IID and ICC values are kept in
+  one array of 34 per envelope index; a frame writes the first entries of its band count
+  into the array of each envelope it codes, and its envelope 0 is coded against the array
+  of the previous frame's last coded envelope. Above the previous frame's band count an
+  envelope therefore reads what the last frame with as many bands wrote at that index (0
+  if none did). o41: a 1-envelope 20-band frame, a 4-envelope 10-band frame, then a
+  dt-coded 20-band frame reads 0 above band 10 (envelope 3's array was never written
+  there); o43: a 4-envelope 20-band frame, then a 1- or 2-envelope 10-band frame, then a
+  dt-coded 20-band frame reads the first frame's envelope 0 or 1 above band 10, and its
+  last envelope is rejected at 1.2e-2 to 2.7e-2. With one array per parameter the decoder
+  missed these shapes; `ps-open-dt-envelope-reference` of the open manifest is o40's
+  stream of it (from a random stream).
 
 The crafted streams of the other paths are vectors of the aac lane
 ([../correctness-manifest.json](../../correctness-manifest.json), files in `vectors/`).
 
 ## Not recovered
 
-- A time-differential IID envelope after a frame with more envelopes and fewer coded bands
-  (`ps-open-dt-envelope-reference`, from a random stream; 7.4e-3 rms, and the composed model
-  misses the same way). In the hand-built shape of o41 the frames are:
-  - a 1-envelope 20-band frame;
-  - a 4-envelope 10-band frame;
-  - a dt-coded 20-band frame.
-
-  There the reference's output is bit-identical to the following rule. The dt reference is
-  kept per envelope index: one array of 34 per envelope, of which a frame writes the first
-  n entries of each of its envelopes. Envelope 0 is coded against the array of the previous
-  frame's last envelope. Entries 10..19 of envelope 3's array were never written, so they
-  are 0. The decoder keeps one array per parameter and takes entries 10..19 from the
-  20-band frame's last envelope. With a 4-envelope 20-band frame first, both agree. Only
-  this shape is checked.
 - SBR, with and without PS: the frame after a missing SBR element, when the frame before
   the missing one had an envelope ending after the frame border (FIXVAR, 3 time slots), in
   `ps-open-sbr-after-missing` (HE-AAC v1). The missing frame itself matches since the

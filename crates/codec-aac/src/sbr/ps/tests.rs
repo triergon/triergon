@@ -149,3 +149,34 @@ fn an_error_frame_resets_the_phases_and_keeps_them_enabled() {
     assert!(ps.phase.iter().flatten().flatten().all(|&v| v == 0));
     assert_eq!(ps.last_ipd, [[0; 17]; 2]);
 }
+
+#[test]
+fn a_time_differential_envelope_reads_the_values_of_its_envelope_index() {
+    // probes o41 and o43: a 4-envelope 20-band frame, a 1-envelope 10-band frame, then a
+    // 20-band envelope coded time-differentially with steps of 0: above band 10 it reads
+    // what the first frame's envelope 0 wrote, not its last envelope
+    let header = |mode| Header {
+        iid: Some(mode),
+        icc: None,
+        ext: false,
+    };
+    let coded = |dt: bool, first: i8| {
+        let mut steps = [0i8; MAX_PAR];
+        steps[0] = first;
+        (dt, steps)
+    };
+    let mut ps = Ps::new();
+    let mut four = frame_with(Some(header(1)), 4, None);
+    for (e, envelope) in four.iid.iter_mut().enumerate() {
+        *envelope = coded(false, e as i8);
+    }
+    assert!(ps.apply_raw(&four, false));
+    let mut ten = frame_with(Some(header(0)), 1, None);
+    ten.iid[0] = coded(false, -1);
+    assert!(ps.apply_raw(&ten, false));
+    let mut twenty = frame_with(Some(header(1)), 1, None);
+    twenty.iid[0] = coded(true, 0);
+    assert!(ps.apply_raw(&twenty, false));
+    assert_eq!(ps.frame.iid[0][..10], [-1; 10]);
+    assert_eq!(ps.frame.iid[0][10..20], [0; 10]);
+}
