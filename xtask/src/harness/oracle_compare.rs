@@ -85,13 +85,23 @@ pub fn record(root: &Path, contract: &Value, listing: &mut Value) -> R<()> {
     let Some((_, Value::Array(cases))) = members.iter_mut().find(|(key, _)| key == "cases") else {
         return Err("manifest needs cases".into());
     };
+    let target = crate::generators::pinned_per_target(contract)
+        .then(report::gate_target)
+        .transpose()?;
     for case in cases {
         let trace = oracle_trace(root, contract, &corpus, case)?;
-        validation::put(
-            case,
-            "expected",
-            Value::object([(PIN, Value::str(sha256::hex(trace.as_bytes())))]),
-        )?;
+        let pin = Value::object([(PIN, Value::str(sha256::hex(trace.as_bytes())))]);
+        if let Some(target) = &target {
+            let key = crate::generators::EXPECTED_BY_TARGET;
+            let mut by_target = case
+                .get(key)
+                .cloned()
+                .unwrap_or_else(|| Value::Object(Vec::new()));
+            validation::put(&mut by_target, target, pin)?;
+            validation::put(case, key, by_target)?;
+        } else {
+            validation::put(case, "expected", pin)?;
+        }
     }
     Ok(())
 }
@@ -110,12 +120,17 @@ pub(super) struct TraceOracle<'a> {
     operation: &'a str,
     fields: Vec<String>,
     timeout: Duration,
+    target: String,
 }
 
 impl<'a> TraceOracle<'a> {
     pub(super) fn new(contract: &'a Value) -> R<Self> {
         Ok(Self {
             contract,
+            target: crate::generators::pinned_per_target(contract)
+                .then(report::gate_target)
+                .transpose()?
+                .unwrap_or_default(),
             oracle: kind(contract)?,
             mode: format!("{}trace", validation::text(contract, "worker_operation")?),
             operation: validation::text(contract, "operation")?,
@@ -168,7 +183,7 @@ impl<'a> TraceOracle<'a> {
                 })),
             ),
         };
-        let expected = pin(case)?;
+        let expected = pin(case, &self.target)?;
         let reference = oracle::trace(root, self.oracle, &input, &arguments, self.timeout)?;
         let observed = sha256::hex(reference.as_bytes());
         if let Some(path) = files {
@@ -288,8 +303,10 @@ pub fn compare(root: &Path, file: &Path, output: &Path) -> R<i32> {
     Ok(i32::from(!passed))
 }
 
-pub(super) fn pin(case: &Value) -> R<&str> {
-    validation::hash(validation::field(case, "expected")?, PIN)
+pub(super) fn pin<'a>(case: &'a Value, target: &str) -> R<&'a str> {
+    let expected = report::expected_for(case, target)
+        .ok_or_else(|| format!("missing oracle trace pin for {target}"))?;
+    validation::hash(expected, PIN)
 }
 
 pub fn main(root: &Path, args: &[String]) -> R<i32> {
@@ -360,7 +377,7 @@ mod tests {
             "expected",
             Value::object([(PIN, Value::str("a".repeat(64)))]),
         )]);
-        assert!(pin(&valid).is_ok());
-        assert!(pin(&Value::Null).is_err());
+        assert!(pin(&valid, "").is_ok());
+        assert!(pin(&Value::Null, "").is_err());
     }
 }

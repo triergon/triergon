@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "id": "cabac-engine",
+  "candidate": "codec-views-worker",
+  "operation": "cabac-engine",
+  "gate": "required",
+  "contract": [
+    "Serial arithmetic decoding from ITU-T H.264 9.3.3.2 and H.265 9.3.4.3, with authored bin strings encoded by dyadic interval selection.",
+    "Compare every decision, context transition, bypass value, termination, restart, refusal and input byte. Compare the logical bit cursor, aligned byte position and target-dependent look-ahead cursor after each call. A capped unary read stops at its limit without consuming a following bin."
+  ],
+  "required_profiles": [
+    "plain",
+    "headroom"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "parity_timeout_seconds": 45,
+  "iterations": 1,
+  "worker_operation": "cabac-",
+  "oracle": "cabac-engine",
+  "pinned_per_target": true,
+  "open_cases": [
+    {
+      "id": "unary-cap-plain",
+      "requirement": "A limit of three must advance three bypass bins. The candidate consumes 8 bins, changing the cursor and the next bypass value."
+    },
+    {
+      "id": "unary-cap-headroom",
+      "requirement": "A limit of three must advance three bypass bins. The candidate consumes 8 bins, changing the cursor and the next bypass value."
+    },
+    {
+      "id": "unary-early-zero-past-cap-plain",
+      "requirement": "A limit of three must advance three bypass bins. The candidate consumes 6 bins, changing the cursor and the next bypass value."
+    },
+    {
+      "id": "unary-early-zero-past-cap-headroom",
+      "requirement": "A limit of three must advance three bypass bins. The candidate consumes 6 bins, changing the cursor and the next bypass value."
+    }
+  ],
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "mixed-plain",
+        "mixed-headroom",
+        "bypass-widths-plain",
+        "bypass-widths-headroom",
+        "unary-stop-plain",
+        "unary-stop-headroom",
+        "unary-boundary-plain",
+        "unary-boundary-headroom",
+        "unary-cap-plain",
+        "unary-cap-headroom",
+        "unary-early-zero-past-cap-plain",
+        "unary-early-zero-past-cap-headroom",
+        "refusals-plain",
+        "refusals-headroom",
+        "empty-input-plain",
+        "empty-input-headroom"
+      ],
+      "cause": "The CABAC specification oracle is serial. The H.264 and HEVC workloads measure CABAC as part of picture decoding."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "mixed-plain",
+        "mixed-headroom",
+        "bypass-widths-plain",
+        "bypass-widths-headroom",
+        "unary-stop-plain",
+        "unary-stop-headroom",
+        "unary-boundary-plain",
+        "unary-boundary-headroom",
+        "unary-cap-plain",
+        "unary-cap-headroom",
+        "unary-early-zero-past-cap-plain",
+        "unary-early-zero-past-cap-headroom",
+        "refusals-plain",
+        "refusals-headroom",
+        "empty-input-plain",
+        "empty-input-headroom"
+      ],
+      "cause": "The CABAC specification oracle is serial. The H.264 and HEVC workloads measure CABAC as part of picture decoding."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "mixed-plain",
+        "mixed-headroom",
+        "bypass-widths-plain",
+        "bypass-widths-headroom",
+        "unary-stop-plain",
+        "unary-stop-headroom",
+        "unary-boundary-plain",
+        "unary-boundary-headroom",
+        "unary-cap-plain",
+        "unary-cap-headroom",
+        "unary-early-zero-past-cap-plain",
+        "unary-early-zero-past-cap-headroom",
+        "refusals-plain",
+        "refusals-headroom",
+        "empty-input-plain",
+        "empty-input-headroom"
+      ],
+      "cause": "The CABAC specification oracle is serial. The H.264 and HEVC workloads measure CABAC as part of picture decoding."
+    }
+  ]
+}

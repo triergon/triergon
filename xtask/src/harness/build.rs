@@ -630,6 +630,9 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             "harness/reference_codec_video.h",
             "harness/reference_codec_audio.h",
             "harness/reference_codec_blocks.h",
+            "harness/cabac_oracle.py",
+            "harness/palette_oracle.py",
+            "harness/reference_codec_rotations.c",
         ],
         "matroska-views-worker" => &[
             "crates/worker-entry/src/lib.rs",
@@ -1003,7 +1006,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 32] = [
+const PROFILE_REFERENCES: [ProfileReference; 33] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -1364,6 +1367,16 @@ const PROFILE_REFERENCES: [ProfileReference; 32] = [
         libraries: "libass_ass_reference",
         generated: Some(crate::ass::observed_sources),
         instrumented: true,
+        ..LIBASS
+    },
+    ProfileReference {
+        binary: "libass-rotations-worker",
+        source: "harness/reference_codec_rotations.c",
+        record: "libass-rotations-native",
+        kind: "libass rendered rotation controls and FreeType glyph metrics",
+        libraries: "libass_rotations_reference",
+        packages: &["libass", "freetype2"],
+        options: RELEASE_OPTIONS,
         ..LIBASS
     },
     ProfileReference {

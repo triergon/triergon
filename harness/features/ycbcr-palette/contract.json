@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "id": "ycbcr-palette",
+  "candidate": "codec-views-worker",
+  "operation": "ycbcr-palette",
+  "gate": "required",
+  "contract": [
+    "Compare every RGB and alpha-packed result on the single-axis rails and 17-code cube grid for each matrix and rounding mode.",
+    "The oracle inverts the BT.601-7 and BT.709-6 matrices, quantizes the resulting coefficients to 1/1024 and applies the documented channel rounding and clamp."
+  ],
+  "required_profiles": [
+    "bt601-nearest",
+    "bt601-half-down",
+    "bt709-nearest",
+    "bt709-half-down"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "parity_timeout_seconds": 45,
+  "iterations": 1,
+  "worker_operation": "palette-",
+  "oracle": "ycbcr-palette",
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "bt601-nearest-rails",
+        "bt601-half-down-rails",
+        "bt709-nearest-rails",
+        "bt709-half-down-rails",
+        "bt601-nearest-cube",
+        "bt601-half-down-cube",
+        "bt709-nearest-cube",
+        "bt709-half-down-cube"
+      ],
+      "cause": "The specification oracle computes the palette conversion directly. Subtitle decoding workloads measure the selected conversions."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "bt601-nearest-rails",
+        "bt601-half-down-rails",
+        "bt709-nearest-rails",
+        "bt709-half-down-rails",
+        "bt601-nearest-cube",
+        "bt601-half-down-cube",
+        "bt709-nearest-cube",
+        "bt709-half-down-cube"
+      ],
+      "cause": "The specification oracle computes the palette conversion directly. Subtitle decoding workloads measure the selected conversions."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "bt601-nearest-rails",
+        "bt601-half-down-rails",
+        "bt709-nearest-rails",
+        "bt709-half-down-rails",
+        "bt601-nearest-cube",
+        "bt601-half-down-cube",
+        "bt709-nearest-cube",
+        "bt709-half-down-cube"
+      ],
+      "cause": "The specification oracle computes the palette conversion directly. Subtitle decoding workloads measure the selected conversions."
+    }
+  ]
+}

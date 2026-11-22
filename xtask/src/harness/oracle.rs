@@ -26,6 +26,8 @@ impl Kind {
     pub fn trace(name: &str) -> Result<Self, String> {
         [
             "bit-readers",
+            "cabac-engine",
+            "ycbcr-palette",
             "rbsp",
             "windows",
             "divide",

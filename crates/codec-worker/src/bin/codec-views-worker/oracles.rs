@@ -14,6 +14,9 @@ use triergon_codec::{
 
 use super::protocol::{Operation, Work};
 
+mod cabac;
+mod palette;
+mod rotations;
 mod storage;
 
 fn text(input: &[u8]) -> Result<&str, String> {
@@ -68,6 +71,9 @@ pub(super) fn operation<'a>(
 ) -> Result<Operation<'a>, String> {
     match prefix {
         "bits-" => prepare_bits(input, arguments),
+        "cabac-" => cabac::prepare(input, arguments),
+        "palette-" => palette::prepare(input, arguments),
+        "rotations-" => rotations::prepare(input, arguments),
         "opus-range-" => opus(input, arguments),
         _ => {
             no_arguments(arguments)?;

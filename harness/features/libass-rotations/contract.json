@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "id": "libass-rotations",
+  "candidate": "codec-views-worker",
+  "operation": "libass-rotations",
+  "gate": "required",
+  "runner": "cargo xtask report",
+  "reference": "libass-rotations-native",
+  "worker_operation": "rotations-",
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "required_profiles": [
+    "lower",
+    "upper",
+    "advance",
+    "extents"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "contract": [
+    "Call rotation classification, character lookup, advance and extents directly for the two Arimo alias pairs of ass-render at its effective 54- and 81-pixel sizes.",
+    "Read exact glyph IDs, advances and extents from the pinned FreeType default load. Public libass frames identify whether the selected advance is horizontal or vertical when a character loads the glyph first. Allow one output pixel for the marker origin when distinguishing the two advances, and compare the chosen 26.6 metric exactly.",
+    "The documented first-lookup rule gives the horizontal advance to a glyph first loaded by ID for an advance or extents. Repeated lookups and new handles to the same key retain the first decision; a second key decides independently."
+  ],
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "lower-capital-54",
+        "upper-capital-54",
+        "advance-capital-54",
+        "extents-capital-54",
+        "lower-small-54",
+        "upper-small-54",
+        "advance-small-54",
+        "extents-small-54",
+        "lower-capital-81",
+        "upper-capital-81",
+        "advance-capital-81",
+        "extents-capital-81",
+        "lower-small-81",
+        "upper-small-81",
+        "advance-small-81",
+        "extents-small-81"
+      ],
+      "cause": "The direct lookup comparison uses rendered images to select the reference advance. The ASS renderer workloads measure the rendering path."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "lower-capital-54",
+        "upper-capital-54",
+        "advance-capital-54",
+        "extents-capital-54",
+        "lower-small-54",
+        "upper-small-54",
+        "advance-small-54",
+        "extents-small-54",
+        "lower-capital-81",
+        "upper-capital-81",
+        "advance-capital-81",
+        "extents-capital-81",
+        "lower-small-81",
+        "upper-small-81",
+        "advance-small-81",
+        "extents-small-81"
+      ],
+      "cause": "The direct lookup comparison uses rendered images to select the reference advance. The ASS renderer workloads measure the rendering path."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "lower-capital-54",
+        "upper-capital-54",
+        "advance-capital-54",
+        "extents-capital-54",
+        "lower-small-54",
+        "upper-small-54",
+        "advance-small-54",
+        "extents-small-54",
+        "lower-capital-81",
+        "upper-capital-81",
+        "advance-capital-81",
+        "extents-capital-81",
+        "lower-small-81",
+        "upper-small-81",
+        "advance-small-81",
+        "extents-small-81"
+      ],
+      "cause": "The direct lookup comparison uses rendered images to select the reference advance. The ASS renderer workloads measure the rendering path."
+    }
+  ]
+}

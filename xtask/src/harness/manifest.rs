@@ -90,7 +90,22 @@ pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), Strin
             profiles.insert(profile.to_owned());
         }
         if contract.get("oracle").is_some() {
-            super::oracle_compare::pin(case)?;
+            if per_target {
+                if case.get("expected").is_some() {
+                    return Err(format!("{id}: expected must use per-target oracle pins"));
+                }
+                for target in targets {
+                    let target = target.as_str().ok_or("invalid required target")?;
+                    super::oracle_compare::pin(case, target)?;
+                }
+            } else {
+                if case.get(crate::generators::EXPECTED_BY_TARGET).is_some() {
+                    return Err(format!(
+                        "{id}: per-target oracle pins require pinned_per_target"
+                    ));
+                }
+                super::oracle_compare::pin(case, "")?;
+            }
             continue;
         }
         let Some(fields) = &work_fields else {
@@ -240,6 +255,28 @@ mod tests {
             validate_required(&allowed, &shadowed).unwrap_err(),
             "one: expected must use per-target folds"
         );
+    }
+
+    #[test]
+    fn target_specific_oracle_pins_are_required_for_each_target() {
+        let contract = json::parse(
+            r#"{"oracle":"cabac-engine","worker_operation":"cabac-",
+                "pinned_per_target":true,"required_targets":["first","second"]}"#,
+        )
+        .unwrap();
+        let hash = "a".repeat(64);
+        let case =
+            |pins: &str| json::parse(&format!(r#"{{"cases":[{{"id":"one",{pins}}}]}}"#)).unwrap();
+        let first = format!(r#""first":{{"trace_sha256":"{hash}"}}"#);
+        let second = format!(r#""second":{{"trace_sha256":"{hash}"}}"#);
+        let incomplete = case(&format!(r#""expected_by_target":{{{first}}}"#));
+        assert!(
+            validate_required(&contract, &incomplete)
+                .unwrap_err()
+                .contains("missing oracle trace pin for second")
+        );
+        let complete = case(&format!(r#""expected_by_target":{{{first},{second}}}"#));
+        validate_required(&contract, &complete).unwrap();
     }
 
     #[test]

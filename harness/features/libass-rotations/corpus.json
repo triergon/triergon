@@ -1,0 +1,278 @@
+{
+  "schema": 1,
+  "directory": ".research/fonts/files",
+  "cases": [
+    {
+      "id": "lower-capital-54",
+      "profile": "lower",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "54",
+        "capital",
+        "lower"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 7318514204751427090
+      }
+    },
+    {
+      "id": "upper-capital-54",
+      "profile": "upper",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "54",
+        "capital",
+        "upper"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 14065630458007653787
+      }
+    },
+    {
+      "id": "advance-capital-54",
+      "profile": "advance",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "54",
+        "capital",
+        "advance"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 13389663800433811965
+      }
+    },
+    {
+      "id": "extents-capital-54",
+      "profile": "extents",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "54",
+        "capital",
+        "extents"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 13795786865479103325
+      }
+    },
+    {
+      "id": "lower-small-54",
+      "profile": "lower",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "54",
+        "small",
+        "lower"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 16086852203634435791
+      }
+    },
+    {
+      "id": "upper-small-54",
+      "profile": "upper",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "54",
+        "small",
+        "upper"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 3010246215454583119
+      }
+    },
+    {
+      "id": "advance-small-54",
+      "profile": "advance",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "54",
+        "small",
+        "advance"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 2933922124151930587
+      }
+    },
+    {
+      "id": "extents-small-54",
+      "profile": "extents",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "54",
+        "small",
+        "extents"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 6730286211059421499
+      }
+    },
+    {
+      "id": "lower-capital-81",
+      "profile": "lower",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "81",
+        "capital",
+        "lower"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 5179592717616871122
+      }
+    },
+    {
+      "id": "upper-capital-81",
+      "profile": "upper",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "81",
+        "capital",
+        "upper"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 9270644773788884571
+      }
+    },
+    {
+      "id": "advance-capital-81",
+      "profile": "advance",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "81",
+        "capital",
+        "advance"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 193395561929135613
+      }
+    },
+    {
+      "id": "extents-capital-81",
+      "profile": "extents",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "81",
+        "capital",
+        "extents"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 5256582932430356701
+      }
+    },
+    {
+      "id": "lower-small-81",
+      "profile": "lower",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "81",
+        "small",
+        "lower"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 2216510240433536591
+      }
+    },
+    {
+      "id": "upper-small-81",
+      "profile": "upper",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "81",
+        "small",
+        "upper"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 2274519931794809039
+      }
+    },
+    {
+      "id": "advance-small-81",
+      "profile": "advance",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "81",
+        "small",
+        "advance"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 14896905848353800923
+      }
+    },
+    {
+      "id": "extents-small-81",
+      "profile": "extents",
+      "file": "croscorefonts-1.31.0/Arimo-Regular.ttf",
+      "sha256": "a5cb71302ce735698dfc756943c5bbcfbcc734e117ad452ccb3cb036e07dbd36",
+      "rights": "Apache-2.0",
+      "arguments": [
+        "81",
+        "small",
+        "extents"
+      ],
+      "expected": {
+        "packets": 28,
+        "bytes": 0,
+        "digest": 2656654667329446971
+      }
+    }
+  ]
+}
