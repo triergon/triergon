@@ -1220,20 +1220,16 @@ impl<S: Source> Player<S> {
         self.drive::<false>(w, c, None, None)
     }
 
-    /// Publish a ready backend event in this call when its queue charge fits.
-    /// If work or queue space runs out, retain the original event for retry.
-    /// This is the same FIFO and delivery policy as [Self::advance].
+    /// Queues a ready event in this call if its work and FIFO charges fit.
+    /// Otherwise the event is retained for retry.
     pub fn advance_ready(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<Progress> {
         self.drive::<true>(w, c, None, None)
     }
 
-    /// Drive toward one output in the supplied empty slot. An older queued
-    /// output is transferred first. Otherwise, ready events pass directly
-    /// through the same work, byte, event and delivery checks as the FIFO.
-    /// Queued means the caller's slot received the output. Borrow the slot
-    /// when the consumer only reads the event. Pending input is
-    /// reported once the source is waiting, so a slow source is not polled
-    /// repeatedly in this call.
+    /// Fills an empty slot, transferring the oldest queued output first.
+    /// Returns `Queued` once the slot is filled, `Backpressure` for an occupied
+    /// slot, or `NeedInput` when the source is waiting. Direct reads use the
+    /// FIFO's work, payload and event limits.
     pub fn read_output(
         &mut self,
         slot: &mut Option<Output>,

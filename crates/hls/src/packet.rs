@@ -10,8 +10,8 @@ use triergon_core::{Error, Result, Rounding, Time, TimeBase};
 const TS_CLOCK_RATE: u64 = 90_000;
 
 /// One AVC access unit or AAC frame with its track and times, borrowed from the unit.
-/// Video times are ticks of the 90 kHz clock. Audio times are ticks of the finest
-/// clock both the 90 kHz PES times and the frame's sample duration count exactly in.
+/// AVC uses 90 kHz ticks. AAC uses the lowest tick rate that represents both
+/// 90 kHz PES times and the frame's exact sample duration.
 #[derive(Clone, Copy, Debug)]
 pub struct UnitPacket<'a> {
     track: TrackId,

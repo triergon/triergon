@@ -271,7 +271,6 @@ impl ProgressiveState {
         Ok(EngineStep::Yield)
     }
 
-    /// Reads a terminal `mdat` to the source end.
     fn drain_terminal(
         &mut self,
         engine: &mut Continuation<'_>,
@@ -296,7 +295,6 @@ impl ProgressiveState {
         Ok(EngineStep::Yield)
     }
 
-    /// Reads the next root box: a fragment `moof`, its `mdat`, or another root.
     fn read_root(
         &mut self,
         engine: &mut Continuation<'_>,
@@ -758,7 +756,6 @@ impl ProgressiveState {
         Ok(EngineStep::Yield)
     }
 
-    /// Starts reading the media a demux-order replay serves from memory.
     fn prepare_replay(&mut self, engine: &mut Continuation<'_>) -> Result<EngineStep> {
         *engine.media_cache_fill = Some(prepare_media_replay(engine.input, engine.plan)?);
         self.phase = Phase::CopySource;
@@ -816,7 +813,6 @@ impl ProgressiveState {
         Ok(EngineStep::Yield)
     }
 
-    /// Admits the next fragment row for playback.
     #[inline(always)]
     fn admit(&mut self, engine: &mut Continuation<'_>, w: &mut WorkBudget) -> Result<EngineStep> {
         if !w.try_charge(1) {

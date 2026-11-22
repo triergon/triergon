@@ -1,10 +1,8 @@
 # triergon-raw-video
 
-Raw AVC and HEVC Annex B input over the source protocol of
-[`triergon-playback`](../playback/README.md): a probe that tells raw video from the
-containers playback opens, a source that replays the probed prefix and keeps reading,
-the active parameter-set configuration, and a feed of timed access units. It does not
-decode media.
+Probes and reads raw AVC and HEVC Annex B over the
+[`triergon-playback`](../playback/README.md) source protocol, delivering access
+units with their active parameter sets and an optional submission clock.
 
 | Area | Entry points |
 |---|---|
@@ -16,17 +14,12 @@ decode media.
 
 ## Behaviour and limits
 
-`PlaybackProbe` holds a `SelectedInput` or a `RawVideoSource` that replays the probed
-prefix and then continues reading. It accepts the MP4 opening boxes `ftyp`, `styp`,
-`moov`, `free`, `wide` and `mdat`. For transport streams it examines a 389-byte prefix
-and requires exactly one of the TS188 and M2TS192 three-sync patterns to match.
-The raw Annex B probe selects AVC or HEVC at the first slice after its
-parameter sets. It reads each NAL's first five bytes and skips the rest of the
-NAL body in word-sized steps, charging one work unit per byte either way.
-Raw Annex B carries no container clock: the feed's duration is the active SPS
-picture period, derived again whenever the configuration changes. A feed packet's
-access unit aliases several NAL owners, so it has no single payload slice and no
-`PacketInfo` view; `RawAccessUnit::segments` reads it in order.
+`PlaybackProbe` shares the [container signatures](../playback/README.md) and
+replays the read prefix. The raw Annex B probe selects AVC or HEVC at the
+first slice after its parameter sets, charging one work unit per scanned byte.
+The packet carries its active SPS timing. An optional submission clock uses
+the caller's cadence. Borrow the NAL slices in order with
+`RawAccessUnit::segments`.
 
 ## Conformance
 

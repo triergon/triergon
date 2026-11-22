@@ -134,11 +134,8 @@ impl Engine {
             engine.reuse_pes_lists(pid, lists);
         }
     }
-    /// Play an unstarted Matroska reader configured by the caller, for example
-    /// with `Reader::new`, `Reader::new_with_payload_ownership`,
-    /// `Reader::new_with_immutable_seek_index` or
-    /// `compat::block_additions::new_reader`. A player refuses the engine if
-    /// the reader has already read or repositioned its input.
+    /// Takes a configured Matroska reader. A player refuses it once it has read
+    /// or repositioned the input.
     pub fn matroska(reader: Reader) -> Self {
         let source = reader.source();
         Self::Matroska(MkvEngine { reader, source })

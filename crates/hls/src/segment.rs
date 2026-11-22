@@ -207,9 +207,6 @@ enum Unit<V, A> {
     Audio(A),
 }
 
-type AssembledSegment<C, V, A> =
-    HlsSegment<C, <V as LaneAssembler>::Unit, <A as LaneAssembler>::Unit>;
-
 /// Acquire one independent media segment. Completed units stay private until
 /// the transport has reported EOF and both assemblers have drained. A failed
 /// attempt releases its source and staged output. To retry the transport,
@@ -513,7 +510,7 @@ where
         &mut self,
         cancel: &AtomicBool,
         resolve: impl FnOnce(&Self) -> Result<BudgetVec<C>>,
-    ) -> Result<Option<AssembledSegment<C, V, A>>> {
+    ) -> Result<Option<HlsSegment<C, V::Unit, A::Unit>>> {
         if cancel.load(Ordering::Relaxed) {
             self.fail();
             return Err(Error::Cancelled);

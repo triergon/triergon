@@ -1,10 +1,7 @@
 # triergon-playback
 
-Composes the Matroska, MP4 and MPEG-TS readers into a player-facing packet
-feed: caller-owned sources, format probing, bounded container events, track
-selection, seeking, and a producer/sink pump. It sits above
-`triergon-matroska`, `triergon-isobmff` and `triergon-mpegts`. It does not fetch
-over HTTP, parse playlists, retry transports, decode media or render.
+Bounded Matroska, MP4 and MPEG-TS packet feeds with caller-owned sources,
+format detection, track selection, seeking and a sink adapter.
 
 ## Usage
 
@@ -122,16 +119,12 @@ packets before the target arrive as `Delivery::DecodeOnly`.
 **Names.** *Source* is what the container carries, unchanged. *Demux* is the
 packet view FFmpeg's demuxer gives of the same bytes, reproduced by the
 `compat` modules: `compat::mov` (MP4 packet order and edit clocks) and
-`compat::pes` (PES of selected PIDs, cut and timed). `pes_feed` is the engine
-seam [`triergon-hls`](../hls/README.md) reads from, not a consumer entry point.
+`compat::pes` (PES of selected PIDs, with demux boundaries and clocks).
 
-Implement `Source` for real transports. `ByteSource` serves immutable local
-bytes. `probe::Probe` accepts the MP4 opening boxes `ftyp`, `styp`, `moov`,
-`free`, `wide` and `mdat`. For transport streams it examines a 389-byte prefix
-and requires exactly one of the TS188 and M2TS192 three-sync patterns to match.
-Its `SelectedInput` replays the probed prefix and then continues reading.
-Raw AVC and HEVC Annex B input is told apart from these containers by
-`triergon-raw-video`'s `PlaybackProbe`.
+`probe::Probe` accepts MP4 opening boxes `ftyp`, `styp`, `moov`, `free`, `wide`
+and `mdat`. For TS, exactly one three-sync pattern must match in the
+389-byte prefix. `SelectedInput` replays the prefix before reading more.
+`triergon_raw_video::PlaybackProbe` also detects AVC and HEVC Annex B.
 
 ## Supported
 
@@ -153,27 +146,19 @@ Matroska feeds, packet bridges and subtitle receivers over these outputs are in
 
 ## Behaviour and limits
 
-**Source protocol.** `Source::poll` must return promptly. `Pending` and empty
-data never mean end of stream; only `SourceReply::End` does, and transport
-failure is a separate reply. `abort` wakes and quiesces any I/O producer
-before `close`. HTTP, authentication and retry policy belong to the caller.
-A player takes a `Source`, whose `poll` answers at once (data, the end, a
-failure, or `Pending` to be asked again), so it can run on an event loop: serve
-a local file's bytes from a `ByteSource`, or implement `Source` over your own I/O.
-`triergon_core::blocking::{Blocking, Feed}` read a `std::io` source inside the
-call instead, for a `ContainerReader` or a parser's `InputCursor` on a thread
-that may block; they cannot serve a player.
+**Source protocol.** `Source::poll` returns promptly with data, pending,
+failure or definitive EOF. Retry pending and empty replies. `abort` wakes and
+quiesces any producer before `close`. Use `ByteSource` for immutable local
+bytes. `triergon_core::blocking::{Blocking, Feed}` drive a `ContainerReader` or
+`InputCursor` on a thread that can block in `std::io`.
 
 **Bounded work.** Every call takes a `WorkBudget` and a cancel flag, and all
 retained memory is charged to a `triergon_core::Budget`. `Backpressure` is
 retryable and keeps the pending request, packet and buffers. `PlayerPolicy`
 defaults to 16 FIFO slots (at most 64), 32 MiB queued payload, 128 MiB seek
 input and 10,000,000 events. `Player::new_direct` skips the FIFO for callers
-that use `Player::read_output` with one caller-owned slot. The player matches
-each engine step where the engine wrote it, so a step without an event moves no
-event-sized value (an MP4 packet event is 640 bytes on 32-bit ARM).
-Transport carrier, section and PES outputs use the budget of their retained
-storage for pool identity.
+that use `Player::read_output` with one caller-owned slot. Transport carrier,
+section and PES outputs get their pool identity from their retained storage.
 
 **Clocks.** Every packet keeps its exact source timestamps. FFmpeg-compatible
 packet clocks are explicit opt-in views (`ClockChoice::Demux`, the MOV demux
@@ -181,9 +166,6 @@ plans of `compat::mov`, the demux clocks of the Matroska feeds and the
 `compat::pes` TS engines); they never overwrite source facts. Demux views can
 emit events the source view does not, such as `Mp4Event::ShortPacket`,
 `EmptyPacket`, `MissingSample` and `Event::PesRefusal`.
-MP4 refusal details refer to the demux plan or packet occurrence when a check
-concerns that view. TS playback reports PID selection and startup failures in
-terms of the PES feed.
 
 **Generations.** A seek, track switch or configuration change starts a new
 generation. Check outputs with `Player::may_deliver`. `Delivery::DecodeOnly`
@@ -286,17 +268,12 @@ is imposed.
 - MPEG-TS: ITU-T H.222.0.
 - AVC/HEVC parameter sets: ITU-T H.264 §7.3 and Annex B, ITU-T H.265.
 
-Integration tests in `tests/it/`, one module per behaviour, replay authored and
-FFmpeg-generated fixtures and compare packet order, bytes, flags, PTS, DTS and
-duration with pinned FFprobe records. `tests/it/native_terminal_matrix.rs` reads 39 terminal-media
-inputs through the MOV demux view in 13 source geometries: 12
-nonseekable (known and unknown length, read sizes 1, 7 and 4096, work quanta
-1 and 4096) for every input, and one seekable read of known length for each
-of the 31 original inputs, 499 rows in all, run in debug and release. It compares every packet object
-with FFprobe 9.0.2, and where FFprobe refused the header it requires the run
-to refuse while opening, before any packet. With `Mp4Open::new_recovery`
-499/499 rows pass: 497 identical packet lists and 2 matching header refusals.
-With `Mp4Open::new` 446/499 pass; the test pins the other 53 outcomes.
+Integration tests in `tests/it/` compare packet order, bytes, flags, PTS, DTS and
+duration with pinned FFprobe records. The terminal-media matrix covers 39
+inputs at up to 13 combinations of seekability, length, read size and work
+budget. `Mp4Open::new_recovery` matches all 499 rows (497 packet lists and two
+header refusals). `Mp4Open::new` matches 446 rows, with the 53 strict outcomes
+pinned separately.
 
 The MP4 range comparison includes two upstream samples, one with an initial
 non-sync AVC prefix and one with tracks shorter than the declared movie.

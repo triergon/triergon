@@ -30,11 +30,9 @@ struct SubmissionClock {
     picture_duration: Time,
 }
 
-/// One access unit of a raw Annex B input with the configuration it decodes under.
-/// The unit's bytes stay in the reader's NAL allocations, several slices that
-/// `RawAccessUnit::segments` reads in order, so the packet has no `PacketInfo`
-/// view: a decoder that takes one slice needs the segments copied together. The
-/// configuration belongs to this packet and stays valid across later updates.
+/// A raw Annex B access unit with its decoder configuration, retained across
+/// later updates. Borrow its NAL slices through `RawAccessUnit::segments` and
+/// join them for decoders that take contiguous input.
 #[derive(Debug)]
 pub struct RawVideoFeedPacket {
     /// The access unit, aliasing the reader's NAL owners.

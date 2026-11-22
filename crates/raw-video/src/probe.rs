@@ -99,7 +99,8 @@ impl<S: Source> RawVideoProbe<S> {
         })
     }
 
-    /// Allocation pressure leaves the retained prefix and source retryable.
+    /// Replays the prefix into the selected reader. Fails with `Invalid` before
+    /// detection. Allocation pressure leaves the prefix and source retryable.
     pub fn finish(&mut self) -> Result<RawVideoSource<ProbeReplay<S>>> {
         let Some(PlaybackInputKind::RawVideo(codec)) = self.driver.detected else {
             return Err(Error::Invalid("raw video probe not ready"));
@@ -146,8 +147,7 @@ pub enum PlaybackInput<S: Source> {
     },
 }
 
-/// Common selector for the existing container signatures and the bounded raw
-/// Annex B probe. It keeps the actual prefix when the transport cannot rewind.
+/// Detects container or Annex B input within a retained prefix.
 #[derive(Debug)]
 pub struct PlaybackProbe<S: Source> {
     driver: ProbeDriver<S>,

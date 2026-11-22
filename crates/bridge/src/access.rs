@@ -1,16 +1,6 @@
-//! The access units a decoder takes, framed from a container's packets through the
-//! neutral views: Annex B for AVC and HEVC, ADTS for AAC with a configuration
-//! record, and the packet itself for every other codec.
-//!
-//! [`AccessUnits::for_track`] reads the track's [`TrackInfo`] configuration record;
-//! [`AccessUnits::packet`] frames one packet of the track. Every step is bounded by
-//! the caller's [`WorkBudget`], and every buffer is charged to the pool.
-//!
-//! This is for packets a container stores in its own framing: Matroska frames and
-//! MP4 samples. The units of `triergon-hls` and `triergon-raw-video` are Annex B and
-//! ADTS already and go to a decoder as they are; where such a unit is several
-//! slices (an HEVC picture of a media segment, a raw Annex B unit), its reader's
-//! `contiguous_feed` or `segments` gives the bytes.
+//! Frames container packets for decoders using [`TrackInfo`] and [`PacketInfo`].
+//! AVC and HEVC become Annex B, AAC with a configuration record becomes ADTS,
+//! and other codecs pass through. Work and storage use the caller's budgets.
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{CodecId, PacketInfo, RandomAccess, TrackId, TrackInfo, Trim};
 use triergon_core::{Budget, Bytes, Error, Result, SourceId, SourceLocation, TimeBase, WorkBudget};
@@ -99,12 +89,10 @@ pub struct AccessUnitsSetup {
 }
 
 impl AccessUnits {
-    /// Starts framing the packets of `track`, with buffers charged to `pool`, from its
-    /// configuration record: the AVC or HEVC decoder configuration record, or the AAC
-    /// AudioSpecificConfig. A track without a record is taken to carry Annex B or ADTS
-    /// already, as an MPEG-TS track does. Fails with `Limit` for a record above
-    /// `limits`, as the record's parser does, and as [`Self::with_record`] does for a
-    /// Matroska AAC track without one.
+    /// Uses the track's configuration record and charges buffers to `pool`.
+    /// Fails with `Limit` if the record exceeds `limits`, and with `Unsupported`
+    /// for a Matroska AAC track without a record. Annex B and ADTS tracks can
+    /// pass through with an empty record.
     pub fn for_track(
         pool: &Budget,
         track: &dyn TrackInfo,
