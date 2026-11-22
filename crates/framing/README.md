@@ -276,7 +276,9 @@ requires the pinned gate build on native AArch64 Linux.
 The framing views harness compares incremental AVC and HEVC length-prefixed
 units, Annex B configuration and caller-declared record layouts, and both
 hvcC-to-Annex-B writers. The reader comparison covers one- through four-byte
-length fields at three window sizes. The configuration comparison checks
+length fields at three window sizes. It compares each unit returned by the
+reference converter with the corresponding length-delimited source span.
+The configuration comparison checks
 ordered unit types and bytes, retained opaque source bytes, and four-byte
 start codes from `AnnexBWriter`. The HEVC writer comparison also checks the
 decoder writer's refusal type.
@@ -286,11 +288,14 @@ Prepare the inputs with `cargo xtask framing-views fixtures nal`. The
 contracts and describe the open differences and measurement coverage.
 
 The framing views harness also compares AV1 OBUs returned by FFmpeg's
-`filter_units` and ADTS frame boundaries, ASC and payloads returned by the
-raw AAC demuxer and `aac_adtstoasc`. The AV1 comparison covers low-overhead
-and externally sized OBUs at three input window sizes. Independent wire
+`filter_units` and ADTS frames returned by the raw AAC demuxer. The ADTS
+comparison uses `aac_adtstoasc` for configured frames and the demuxed payload
+for in-band program configurations and empty frame bodies. The AV1 comparison
+covers low-overhead and externally sized OBUs, including complete OBUs before
+a truncated size field. Independent wire
 oracles check AV1 offsets and exact LEB128 spellings, and all ADTS header
-fields, optional CRC words and original payloads.
+fields, optional CRC words and original payloads. The AV1 wire oracle uses
+three input window sizes for every case.
 
 Prepare these inputs with `cargo xtask framing-views fixtures streams`.
 The [stream parser results](../../docs/status.md#linux-aarch64) link both
@@ -302,7 +307,9 @@ check the range and CICP values a VP9 movie publishes, the HEVC profile, level
 and pixel format from the first packet of a muxed stream, AAC channel decisions
 at both ASC extents, and E-AC-3 packet geometry, layout and decoder side data.
 The AAC cases also check the bytes MOV supplies from a decoder descriptor and
-the rate, channels and sample count from a first access unit.
+the rate, channels and sample count from a first access unit. A two-byte LC
+configuration describes the core clock, so the comparison expresses a decoded
+dual-rate SBR frame in core samples at the signalled rate.
 
 Prepare the inputs with `cargo xtask framing-views fixtures config`. The
 [configuration comparisons](../../docs/status.md#linux-aarch64) list the
