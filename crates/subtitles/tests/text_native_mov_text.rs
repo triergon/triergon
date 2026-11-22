@@ -1,6 +1,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, TimeBase, WorkBudget};
-use triergon_subtitles::compat::mov_text::{Clock, Decoder, Limits, Options, Output, Status};
+use triergon_subtitles::compat::mov_text::{
+    Clock, Decoded, Decoder, Limits, Options, Output, Status, Subtitle,
+};
 use triergon_subtitles::text::{Encoding, Format, Input, Timing};
 
 fn input(pool: &Budget, bytes: &[u8]) -> Input {
@@ -37,6 +39,20 @@ fn finish(decoder: &mut Decoder, quantum: u64) -> Output {
     }
     panic!("native progress bound")
 }
+/// The subtitle of `output`; `None` for nothing or a refusal.
+fn subtitle(output: Output) -> Option<Subtitle> {
+    match output.decoded {
+        Decoded::Subtitle(subtitle) => Some(subtitle),
+        Decoded::Nothing | Decoded::Refused => None,
+    }
+}
+/// The ASS text of `output`'s subtitle.
+fn ass(output: &Output) -> &[u8] {
+    match &output.decoded {
+        Decoded::Subtitle(subtitle) => subtitle.ass.as_ref(),
+        decoded => panic!("no subtitle: {decoded:?}"),
+    }
+}
 fn run(bytes: &[u8], quantum: u64) -> Output {
     let pool = Budget::new(16 * 1024 * 1024).unwrap();
     let mut d = context(&pool);
@@ -63,10 +79,7 @@ fn box_bytes(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
 fn native_plain_literal_and_source_identity_at_work_one_seven_and_large() {
     for q in [1, 7, 4096] {
         let out = run(&sample("Å水e\u{301}😀".as_bytes(), &[]), q);
-        assert_eq!(
-            out.subtitle.as_ref().unwrap().ass.as_ref(),
-            "0,0,Default,,0,0,0,,Å水e\u{301}😀".as_bytes()
-        );
+        assert_eq!(ass(&out), "0,0,Default,,0,0,0,,Å水e\u{301}😀".as_bytes());
         assert_eq!(
             (
                 out.input.source_id,
@@ -86,17 +99,14 @@ fn native_plain_literal_and_source_identity_at_work_one_seven_and_large() {
 fn native_newlines_and_ass_markup_are_distinct_from_original_source() {
     let bytes = sample(b"A\r\n{\\b1}B\\NC\n", &[]);
     let out = run(&bytes, 1);
-    assert_eq!(
-        out.subtitle.unwrap().ass.as_ref(),
-        b"0,0,Default,,0,0,0,,A\\N{\\b1}B\\NC\\N"
-    );
+    assert_eq!(ass(&out), b"0,0,Default,,0,0,0,,A\\N{\\b1}B\\NC\\N");
     assert_eq!(out.input.payload.as_ref(), bytes);
 }
 #[test]
 fn native_nul_boundary_retains_whole_source_and_ignores_invalid_suffix_only_in_view() {
     let bytes = sample(b"a\0\xffb", &[]);
     let out = run(&bytes, 1);
-    assert_eq!(out.subtitle.unwrap().ass.as_ref(), b"0,0,Default,,0,0,0,,a");
+    assert_eq!(ass(&out), b"0,0,Default,,0,0,0,,a");
     assert_eq!(out.input.payload.as_ref(), bytes);
 }
 #[test]
@@ -107,30 +117,32 @@ fn utf16_and_invalid_utf8_are_explicit_native_refusals_without_rewriting_source(
         &[0, 3, 0xef, 0xbf, 0xbe][..],
     ] {
         let out = run(b, 1);
-        assert_eq!(out.returned, -1094995529);
-        assert!(out.subtitle.is_none());
+        assert!(matches!(out.decoded, Decoded::Refused));
         assert_eq!(out.input.payload.as_ref(), b);
     }
 }
 #[test]
 fn clear_empty_and_short_invalid_calls_do_not_fabricate_subtitles() {
-    for (b, rc) in [
-        (&[][..], 0),
-        (&[0, 0][..], 0),
-        (&[0][..], -1094995529),
-        (&[0, 1][..], -1094995529),
+    for (b, refused) in [
+        (&[][..], false),
+        (&[0, 0][..], false),
+        (&[0][..], true),
+        (&[0, 1][..], true),
     ] {
         let out = run(b, 1);
-        assert_eq!(out.returned, rc);
-        assert!(out.subtitle.is_none());
+        if refused {
+            assert!(matches!(out.decoded, Decoded::Refused));
+        } else {
+            assert!(matches!(out.decoded, Decoded::Nothing));
+        }
     }
 }
 #[test]
 fn native_length_clamp_and_bad_box_refusal_leave_source_grammar_unchanged() {
     let out = run(&[0, 9, b'A'], 1);
-    assert_eq!(out.subtitle.unwrap().ass.as_ref(), b"0,0,Default,,0,0,0,,A");
+    assert_eq!(ass(&out), b"0,0,Default,,0,0,0,,A");
     let bad = sample(b"a", &[0, 0, 0, 0, b't', b'w', b'r', b'p']);
-    assert_eq!(run(&bad, 1).returned, -1094995529);
+    assert!(matches!(run(&bad, 1).decoded, Decoded::Refused));
 }
 #[test]
 fn wrap_and_unknown_modifier_are_native_selected_views_of_complete_owned_input() {
@@ -139,20 +151,14 @@ fn wrap_and_unknown_modifier_are_native_selected_views_of_complete_owned_input()
     boxes.extend(box_bytes(b"twrp", &[1]));
     let bytes = sample(b"ab", &boxes);
     let out = run(&bytes, 1);
-    assert_eq!(
-        out.subtitle.unwrap().ass.as_ref(),
-        b"0,0,Default,,0,0,0,,{\\q1}ab"
-    );
+    assert_eq!(ass(&out), b"0,0,Default,,0,0,0,,{\\q1}ab");
     assert_eq!(out.input.payload.as_ref(), bytes);
 }
 #[test]
 fn style_ranges_count_unicode_scalars_and_reset_before_next_character() {
     let body = [0, 1, 0, 1, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0];
     let out = run(&sample("Å水z".as_bytes(), &box_bytes(b"styl", &body)), 1);
-    assert_eq!(
-        out.subtitle.unwrap().ass.as_ref(),
-        "0,0,Default,,0,0,0,,Å{\\b1}水{\\r}z".as_bytes()
-    );
+    assert_eq!(ass(&out), "0,0,Default,,0,0,0,,Å{\\b1}水{\\r}z".as_bytes());
 }
 #[test]
 fn read_order_tracks_success_post_decode_utf8_failure_and_pre_decode_failure() {
@@ -167,9 +173,9 @@ fn read_order_tracks_success_post_decode_utf8_failure_and_pre_decode_failure() {
         d.provide(input(&pool, &bytes), Clock::default()).unwrap();
         let o = finish(&mut d, 1);
         if let Some(expected) = expected {
-            assert_eq!(o.subtitle.unwrap().ass.as_ref(), expected);
+            assert_eq!(ass(&o), expected);
         } else {
-            assert!(o.subtitle.is_none());
+            assert!(subtitle(o).is_none());
         }
     }
 }
@@ -198,7 +204,7 @@ fn unset_context_clock_never_invents_time_from_exact_source_timing() {
     .unwrap();
     let o = finish(&mut d, 1);
     assert_eq!(o.input.timing, original);
-    let s = o.subtitle.unwrap();
+    let s = subtitle(o).unwrap();
     assert_eq!(s.pts_microseconds, None);
     assert_eq!(s.end_display_ms, 0);
 }
@@ -219,19 +225,9 @@ fn known_clock_uses_nearest_away_and_explicit_native_duration_wrapping() {
         },
     )
     .unwrap();
-    let s = finish(&mut d, 1).subtitle.unwrap();
+    let s = subtitle(finish(&mut d, 1)).unwrap();
     assert_eq!(s.pts_microseconds, Some(-500));
     assert_eq!(s.end_display_ms, u32::MAX);
-    assert_eq!(
-        (
-            s.format(),
-            s.rectangle_type(),
-            s.geometry(),
-            s.flags(),
-            s.palette_entries()
-        ),
-        (1, 3, [0; 4], 0, 0)
-    );
 }
 #[test]
 fn work_zero_and_cancel_preserve_cursors_funding_and_allocation_state() {
@@ -258,10 +254,7 @@ fn work_zero_and_cancel_preserve_cursors_funding_and_allocation_state() {
     assert_eq!(d.work_spent(), spent);
     assert_eq!(pool.used(), used);
     cancel.store(false, Ordering::Relaxed);
-    assert_eq!(
-        finish(&mut d, 1).subtitle.unwrap().ass.as_ref(),
-        b"0,0,Default,,0,0,0,,a"
-    );
+    assert_eq!(ass(&finish(&mut d, 1)), b"0,0,Default,,0,0,0,,a");
 }
 #[test]
 fn pressure_resumes_without_recharging_a_fully_funded_allocation() {
@@ -283,7 +276,7 @@ fn pressure_resumes_without_recharging_a_fully_funded_allocation() {
     assert_eq!(d.work_spent(), spent);
     drop(block);
     let o = finish(&mut d, 1);
-    assert!(o.subtitle.is_some());
+    assert!(matches!(o.decoded, Decoded::Subtitle(_)));
     let total = d.work_spent();
     let other = Budget::new(65536).unwrap();
     let mut fresh = context(&other);
@@ -329,10 +322,7 @@ fn take_cancel_reset_and_context_drop_preserve_retained_output_owners() {
     d.reset(7, &cancel).unwrap();
     drop(d);
     assert_eq!(old.input.payload.as_ref(), &sample(b"a", &[]));
-    assert_eq!(
-        old.subtitle.as_ref().unwrap().ass.as_ref(),
-        b"0,0,Default,,0,0,0,,a"
-    );
+    assert_eq!(ass(&old), b"0,0,Default,,0,0,0,,a");
     assert!(pool.used() > Budget::control_storage_bytes());
     drop(old);
     assert_eq!(pool.used(), Budget::control_storage_bytes());
@@ -383,11 +373,11 @@ fn complete_u16_text_length_is_not_clamped_to_the_2048_recommendation() {
     let text = vec![b'x'; 65535];
     let bytes = sample(&text, &[]);
     let o = run(&bytes, 4096);
-    let s = o.subtitle.unwrap();
+    assert_eq!(o.input.payload.as_ref(), bytes);
+    let s = subtitle(o).unwrap();
     let prefix = b"0,0,Default,,0,0,0,,";
     assert_eq!(s.ass.len(), prefix.len() + 65535);
     assert_eq!(&s.ass.as_ref()[prefix.len()..], text);
-    assert_eq!(o.input.payload.as_ref(), bytes);
 }
 
 // The captured inputs; the reference's recorded outputs beside them are
@@ -543,15 +533,7 @@ fn cancellation_at_each_funded_emission_step_never_duplicates_style_output() {
         assert_eq!((d.work_spent(), pool.used()), (spent, used));
         cancel.store(false, Ordering::Relaxed);
     }
-    assert_eq!(
-        d.take_output(&cancel)
-            .unwrap()
-            .subtitle
-            .unwrap()
-            .ass
-            .as_ref(),
-        expected.ass
-    );
+    assert_eq!(ass(&d.take_output(&cancel).unwrap()), expected.ass);
 }
 
 // The override tags written where a style record or the highlight starts or
@@ -641,15 +623,12 @@ fn session(config: Option<&[u8]>, samples: &[Vec<u8>]) -> Vec<Option<String>> {
         for (read, bytes) in samples.iter().enumerate() {
             d.provide(input(&pool, bytes), Clock::default()).unwrap();
             let out = finish(&mut d, quantum);
-            let refused = out.subtitle.is_none();
-            texts.push(out.subtitle.map(|s| {
+            assert!(!matches!(out.decoded, Decoded::Nothing));
+            texts.push(subtitle(out).map(|s| {
                 let ass = String::from_utf8(s.ass.as_ref().to_vec()).unwrap();
                 let prefix = format!("{read},0,Default,,0,0,0,,");
                 ass.strip_prefix(&prefix).unwrap().to_owned()
             }));
-            if refused {
-                assert_eq!(out.returned, -1094995529);
-            }
         }
         texts
     };
@@ -830,8 +809,7 @@ fn font_lookups_cost_work_in_the_entries_written_not_the_table_size() {
     while d.poll(&mut WorkBudget::new(1 << 20), &cancel).unwrap() != Status::NeedInput {}
     let configured = d.work_spent();
     d.provide(input(&pool, &bytes), Clock::default()).unwrap();
-    let ass = finish(&mut d, 1 << 20).subtitle.unwrap().ass;
-    let text = String::from_utf8(ass.as_ref().to_vec()).unwrap();
+    let text = String::from_utf8(ass(&finish(&mut d, 1 << 20)).to_vec()).unwrap();
     assert_eq!(text.matches(r"{\fnf}").count(), 1000);
     assert!(text.ends_with(r"{\fnf}a{\r}a"));
     // Linear in the sample and its output: each style start finds its entry

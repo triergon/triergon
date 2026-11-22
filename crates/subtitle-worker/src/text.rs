@@ -25,6 +25,12 @@ const MAX_INPUT: u64 = 16 * 1024 * 1024;
 const MAX_POLLS: usize = 4_000_000;
 /// The work each decoder call gets when measured.
 const QUANTUM: u64 = 1 << 20;
+/// FFmpeg's `AVERROR_INVALIDDATA`, the decode call's return for a refused packet.
+const INVALID_DATA: i32 = -1_094_995_529;
+/// The `AVSubtitle` of a decoded text subtitle: format 1 (text) and one
+/// `SUBTITLE_ASS` (3) rectangle with zero geometry, flags and palette entries.
+const TEXT_FORMAT: u32 = 1;
+const ASS_RECTANGLE: u32 = 3;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Codec {
@@ -323,20 +329,28 @@ fn mov_text_packet(
             mov_text::Status::Pending => {}
             mov_text::Status::OutputReady => {
                 let output = decoder.take_output(cancel).map_err(drop)?;
-                work.data(&output.returned.to_le_bytes());
-                let Some(subtitle) = output.subtitle else {
+                // The decode call returns the packet size for a subtitle.
+                let returned = match &output.decoded {
+                    mov_text::Decoded::Subtitle(_) => {
+                        i32::try_from(output.input.payload.len()).map_err(drop)?
+                    }
+                    mov_text::Decoded::Nothing => 0,
+                    mov_text::Decoded::Refused => INVALID_DATA,
+                };
+                work.data(&returned.to_le_bytes());
+                let mov_text::Decoded::Subtitle(subtitle) = output.decoded else {
                     work.byte(0);
                     return Ok(());
                 };
                 work.byte(1);
-                work.u32(u32::from(subtitle.format()));
+                work.u32(TEXT_FORMAT);
                 fold_clock(work, &subtitle);
-                work.u32(u32::from(subtitle.rectangle_type()));
-                for value in subtitle.geometry() {
+                work.u32(ASS_RECTANGLE);
+                for value in [0_i32; 4] {
                     work.data(&value.to_le_bytes());
                 }
-                work.u32(subtitle.flags());
-                work.u32(subtitle.palette_entries());
+                work.u32(0);
+                work.u32(0);
                 work.text(subtitle.ass.as_ref());
                 return Ok(());
             }

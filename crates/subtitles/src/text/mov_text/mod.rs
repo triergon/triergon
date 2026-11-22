@@ -65,21 +65,32 @@ impl Default for Limits {
     }
 }
 
-/// One decoded packet as FFmpeg's decode call returns it: a subtitle, none,
-/// or a refusal of the packet. Resource, generation and cancellation
-/// failures are errors instead.
+/// One decoded packet: its input and clock, and what FFmpeg's decode call
+/// gives for it. Resource, generation and cancellation failures are errors
+/// instead.
 #[derive(Debug)]
 pub struct Output {
     /// The packet, unchanged.
     pub input: Input,
     /// The clock the packet was provided with.
     pub clock: Clock,
-    /// What the decode call returns: the packet size in bytes when it gives
-    /// a subtitle, 0 for an empty packet or a bare zero text length, or
-    /// AVERROR_INVALIDDATA (-1094995529) for a packet it refuses.
-    pub returned: i32,
-    /// The subtitle; present exactly when `returned` is positive.
-    pub subtitle: Option<Subtitle>,
+    /// The subtitle, none, or the packet's refusal.
+    pub decoded: Decoded,
+}
+
+/// What the decode call gives for one packet.
+#[derive(Debug)]
+pub enum Decoded {
+    /// The packet's subtitle.
+    Subtitle(Subtitle),
+    /// No subtitle: an empty packet, or a zero text length and nothing after
+    /// it.
+    Nothing,
+    /// The packet is refused as invalid data: shorter than its text length
+    /// field, a two-byte packet with a nonzero length, a modifier box smaller
+    /// than its header, or visible text or a font name it would write that is
+    /// not UTF-8 or holds U+FFFE.
+    Refused,
 }
 
 /// What [`Decoder::poll`] reports.

@@ -1,6 +1,7 @@
-//! Incremental native-view box selection and forward ASS emission.
+//! One tx3g sample decoded as the `mov_text` decoder decodes it: the modifier
+//! boxes it reads, then the ASS event written forward from the text.
 use super::{
-    Clock, Funding, Limits, Options, Output, Subtitle,
+    Clock, Decoded, Funding, Limits, Options, Output, Subtitle,
     config::{Configuration, Style, until_nul},
     write::{Fixed, Writer},
 };
@@ -8,7 +9,6 @@ use crate::text::{Input, unicode::cancelled};
 use std::{fmt::Write, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
-const INVALID_DATA: i32 = -1094995529;
 /// Room for the event prefix: the read order, at most ten digits, the fixed
 /// fields and a wrap tag.
 const PREFIX_BYTES: usize = 64;
@@ -50,7 +50,7 @@ pub(super) struct PacketJob {
     input: Input,
     clock: Clock,
     phase: Phase,
-    returned: i32,
+    refused: bool,
     advance: bool,
     text_end: usize,
     visible_end: usize,
@@ -78,7 +78,7 @@ impl PacketJob {
             input,
             clock,
             phase: Phase::Begin,
-            returned: 0,
+            refused: false,
             advance: false,
             text_end: 0,
             visible_end: 0,
@@ -111,7 +111,7 @@ impl PacketJob {
         self.input.payload.as_ref()
     }
     fn refuse(&mut self, advance: bool) {
-        self.returned = INVALID_DATA;
+        self.refused = true;
         self.advance = advance;
         self.phase = Phase::Ready;
     }
@@ -158,7 +158,6 @@ impl PacketJob {
                                 self.refuse(false);
                             }
                         } else {
-                            self.returned = i32::try_from(size).map_err(|_| Error::Overflow)?;
                             self.text_end = (length + 2).min(size);
                             self.at = self.text_end;
                             self.phase = Phase::BoxHeader;
@@ -503,8 +502,8 @@ impl PacketJob {
     /// - The character itself, unless it is the NUL that ends the visible
     ///   text, where the rendering ends.
     ///
-    /// A font name that is not UTF-8 or holds U+FFFE refuses the sample with
-    /// -1094995529, as such text does; the call still takes a read order.
+    /// A font name that is not UTF-8 or holds U+FFFE refuses the sample as
+    /// such text does; the call still takes a read order.
     /// U+FFFF is written. Each stage, and each font table entry it writes, is
     /// funded on its own: one unit and one per byte it writes.
     fn render_transition(
@@ -654,22 +653,25 @@ impl PacketJob {
             }
         }
     }
+    /// The output: refused, or a subtitle once the text passed validation
+    /// (which takes a read order), or nothing for an empty sample.
     pub(super) fn take_output(mut self, options: Options) -> Result<Output> {
-        let subtitle = if self.returned > 0 && self.advance {
+        let decoded = if self.refused {
+            Decoded::Refused
+        } else if self.advance {
             let ass = self
                 .writer
                 .frozen
                 .take()
-                .ok_or(Error::Invalid("native ASS missing owner"))?;
-            Some(Subtitle::at(ass, self.clock, options.packet_timebase)?)
+                .ok_or(Error::Invalid("mov_text event not written"))?;
+            Decoded::Subtitle(Subtitle::at(ass, self.clock, options.packet_timebase)?)
         } else {
-            None
+            Decoded::Nothing
         };
         Ok(Output {
             input: self.input,
             clock: self.clock,
-            returned: self.returned,
-            subtitle,
+            decoded,
         })
     }
 }

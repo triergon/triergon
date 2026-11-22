@@ -127,7 +127,9 @@ pub mod mov_text {
     //! unchanged.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-    pub use crate::text::mov_text::{Clock, Decoder, Limits, Options, Output, Status, Subtitle};
+    pub use crate::text::mov_text::{
+        Clock, Decoded, Decoder, Limits, Options, Output, Status, Subtitle,
+    };
 }
 
 pub mod cc {

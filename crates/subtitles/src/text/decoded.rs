@@ -57,27 +57,6 @@ impl Subtitle {
             ass,
         })
     }
-
-    /// The subtitle format: text.
-    pub const fn format(&self) -> u16 {
-        1
-    }
-    /// The rectangle type: ASS.
-    pub const fn rectangle_type(&self) -> u8 {
-        3
-    }
-    /// The rectangle's x, y, width and height: all zero.
-    pub const fn geometry(&self) -> [i32; 4] {
-        [0; 4]
-    }
-    /// The rectangle's flags: none.
-    pub const fn flags(&self) -> u32 {
-        0
-    }
-    /// The rectangle's palette entries: none.
-    pub const fn palette_entries(&self) -> u32 {
-        0
-    }
 }
 
 /// `ticks` in `base` as whole `1/denominator` units, rounded to nearest with
