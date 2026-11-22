@@ -34,11 +34,10 @@ use segment::{Segment, Tolerances};
 /// in outline units.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Pen {
-    /// The border's half widths along x and y (libass's `xbord` and `ybord`);
-    /// the larger must lie in `tolerance..=OUTLINE_MAX`.
+    /// The border's half widths along x and y; the larger must lie in
+    /// `tolerance..=OUTLINE_MAX`.
     pub width: Vector,
-    /// The largest error the offset curves may have (libass's `eps`), at
-    /// least 1.
+    /// The largest error the offset curves may have, at least 1.
     pub tolerance: i32,
 }
 
