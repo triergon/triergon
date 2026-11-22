@@ -6,8 +6,8 @@
   "candidate": "codec-views-worker",
   "worker_operation": "elementary-metadata-",
   "contract": [
-    "Force the same elementary format on both sides over a preloaded seekable source. Read the first audio packet and fold codec, sample rate, channels, declared duration in samples, and start trim in samples. For FLAC with STREAMINFO, compare its original bytes and read its source declarations independently of the reference demuxer’s first-packet context. AAC rate and channels and E-AC-3 channels are compared by the wire oracle.",
-    "For MPEG audio, read through the footer in the candidate to include ID3v1 and APEv2 tags. Compare the sorted dictionary projection with the reference format dictionary. The projection includes the shared title, artist, album_artist, album, date, track, disc, composer, copyright, encoded_by, publisher, encoder and comment keys. Decode ID3v2 text frames by their encoding and ID3v1 fields as Latin-1. Compare the FLAC comment through the same key set.",
+    "Force the same elementary format on both sides over a preloaded seekable source. Read the first packet carrying audio, skipping complete leading ID3 envelopes, then fold codec, sample rate, channels, declared duration in samples, and start trim in samples. For FLAC with STREAMINFO, compare its original bytes and read its source declarations independently of the reference demuxer’s first-packet context. AAC rate and channels and E-AC-3 channels are compared by the wire oracle.",
+    "For MPEG audio, read through the footer in the candidate to include ID3v1 and APEv2 tags. Compare the sorted dictionary projection with the reference format dictionary. The projection includes the shared title, artist, album_artist, album, date, track, disc, composer, copyright, encoded_by, publisher, encoder and comment keys. Decode ID3v2 text frames by their encoding and ID3v1 fields as Latin-1. Compare the FLAC comment through the same key set. The FLAC display dictionary joins repeated values in source order with a semicolon.",
     "The separate wire comparison covers physical metadata and tag layout, SEEKTABLE points that lack a public reference index view, first frame headers, Xing/Info fields and the LAME view. The reference's skip-sample side data is a decoder trim and is compared to candidate packet trim."
   ],
   "required_profiles": [
@@ -892,45 +892,10 @@
       "cause": "Paired runtime, heap and total RSS collection remains due on the gate hosts."
     }
   ],
-  "open_cases": [
-    {
-      "id": "54---1000x-repeating-vorbiscomment.flac",
-      "requirement": "The candidate retains bounded FLAC metadata and exposes the kept comment entries. The reference retains large comments and concatenates repeated dictionary values."
-    },
-    {
-      "id": "mp3-tags-tail.mp3",
-      "requirement": "The candidate preserves the tag envelope and exposes its mapped text. The reference open publishes a different dictionary after its tag precedence and demuxer policy."
-    },
-    {
-      "id": "adts-tags.aac",
-      "requirement": "The candidate preserves the tag envelope and exposes its mapped text. The reference open publishes a different dictionary after its tag precedence and demuxer policy."
-    },
-    {
-      "id": "ac3-tags.ac3",
-      "requirement": "The candidate preserves the tag envelope and exposes its mapped text. The reference open publishes a different dictionary after its tag precedence and demuxer policy."
-    },
-    {
-      "id": "apev2",
-      "requirement": "The candidate preserves the tag envelope and exposes its mapped text. The reference open publishes a different dictionary after its tag precedence and demuxer policy."
-    },
-    {
-      "id": "ac3-id3v2",
-      "requirement": "The candidate skips the leading ID3v2 tag and confirms the first syncframe. The forced demuxer does not set the sample rate from its first returned packet."
-    },
-    {
-      "id": "eac3-id3v2",
-      "requirement": "The candidate skips the leading ID3v2 tag and confirms the first syncframe. The forced demuxer does not set the sample rate from its first returned packet."
-    }
-  ],
-  "pending_module_requirements": [
-    "The candidate preserves the tag envelope and exposes its mapped text. The reference open publishes a different dictionary after its tag precedence and demuxer policy.",
-    "The candidate retains bounded FLAC metadata and exposes the kept comment entries. The reference retains large comments and concatenates repeated dictionary values.",
-    "The candidate skips the leading ID3v2 tag and confirms the first syncframe. The forced demuxer does not set the sample rate from its first returned packet."
-  ],
   "open_deviations": [
     {
       "reading": "The metadata retention limit bounds large FLAC comment blocks",
-      "clause": "RFC 9639 sections 8.1 and 8.6.1 define block and comment lengths. The elementary reader’s Limits bounds retained tags and metadata to 4 MiB by default.",
+      "clause": "RFC 9639 sections 8.1 and 8.6 define block and comment lengths. The elementary reader’s Limits bounds retained tags and metadata to 4 MiB by default.",
       "candidate": "returns the track without the unretained comment dictionary",
       "reference": "publishes the 16770684-byte comment or concatenates album values into a 59999-byte value",
       "compat": "compat::flac::retain_large_metadata",
@@ -955,6 +920,39 @@
       "reference": "refuses the forced MP3 demux operation",
       "cases": [
         "he-free.bit"
+      ]
+    },
+    {
+      "reading": "Leading ID3v2 text accompanying Dolby syncframes",
+      "clause": "ID3v2.4 Main Structure section 3.1 and Native Frames section 4.2 define the leading envelope and text frames. The elementary reader documents leading envelopes independent of the audio format.",
+      "candidate": "reports the live syncframe rate and the written text, including TITLE Hello in the short tag and the mapped native text fields in the longer tags",
+      "reference": "reports the same syncframe properties after the complete tag packet, with an empty format dictionary",
+      "compat": "compat::tags::demux_dictionary",
+      "cases": [
+        "ac3-tags.ac3",
+        "ac3-id3v2",
+        "eac3-id3v2"
+      ]
+    },
+    {
+      "reading": "Include APEv2 title fields from the retained trailer",
+      "clause": "APEv2 specification, Layout of APE tags and APE tag items, defines the APETAGEX header/footer and text item. Reader::tags exposes the trailing envelope.",
+      "candidate": "adds title Test in the tagged MPEG audio file or title Hello in the standalone APEv2 case",
+      "reference": "keeps the existing encoder key in the first file and omits both APEv2 titles",
+      "compat": "compat::tags::demux_dictionary",
+      "cases": [
+        "mp3-tags-tail.mp3",
+        "apev2"
+      ]
+    },
+    {
+      "reading": "Use the leading ID3v2 text from the first-packet metadata view",
+      "clause": "ID3v2.4 Main Structure section 3.1 and Native Frames section 4.2 describe TIT2 in the leading envelope; ID3v1 defines a separate 128-byte trailer. ADTS ISO/IEC 13818-7 section 6.2 defines neither an ID3 ordering rule nor a dictionary.",
+      "candidate": "publishes the leading title Hello when the first ADTS packet is read",
+      "reference": "publishes the trailing title Title, artist Artist and date 2026 at the same point",
+      "compat": "compat::tags::demux_dictionary",
+      "cases": [
+        "adts-tags.aac"
       ]
     }
   ]

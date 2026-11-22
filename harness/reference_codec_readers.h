@@ -216,6 +216,18 @@ static uint64_t reader_codec(enum AVCodecID codec)
 
 static int reader_tags(ViewWork *work, const AVDictionary *dict, int elementary);
 
+static int reader_id3_packet(const AVPacket *packet)
+{
+    const uint8_t *data = packet->data;
+    if (packet->size < 10 || memcmp(data, "ID3", 3) ||
+        ((data[6] | data[7] | data[8] | data[9]) & 0x80))
+        return 0;
+    const unsigned size = ((unsigned)data[6] << 21) | ((unsigned)data[7] << 14) |
+                          ((unsigned)data[8] << 7) | data[9];
+    const unsigned footer = data[3] == 4 && (data[5] & 0x10) ? 10 : 0;
+    return (unsigned)packet->size == 10 + size + footer;
+}
+
 static int reader_elementary_metadata(const ViewCase *input, ViewWork *work)
 {
     ReaderInput reader = {0};
@@ -229,7 +241,8 @@ static int reader_elementary_metadata(const ViewCase *input, ViewWork *work)
         do {
             av_packet_unref(pkt);
             status = av_read_frame(reader.format, pkt);
-        } while (status >= 0 && reader.format->streams[pkt->stream_index]->codecpar->codec_type != AVMEDIA_TYPE_AUDIO);
+        } while (status >= 0 && (reader.format->streams[pkt->stream_index]->codecpar->codec_type != AVMEDIA_TYPE_AUDIO ||
+                                reader_id3_packet(pkt)));
     }
     int result = 0;
     if (status >= 0) {

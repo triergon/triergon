@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use std::io::{Cursor, Write};
 use std::sync::atomic::AtomicBool;
 
@@ -85,7 +87,6 @@ fn comments(mut data: &[u8]) -> Vec<(Vec<u8>, Vec<u8>)> {
         };
         entries.push((key, value.to_vec()));
     }
-    entries.sort();
     entries
 }
 
@@ -196,6 +197,7 @@ pub(super) fn ogg_tracks(
             .comments()
             .and_then(|data| data.strip_prefix(prefix))
             .map_or_else(Vec::new, comments);
+        pairs.sort();
         pairs.retain(|(key, value)| {
             if key == b"metadata_block_picture" {
                 if let Some(image) = cover_art(value) {
@@ -299,12 +301,23 @@ fn elementary_fields<F: Format>(
         {
             let len = u32::from_be_bytes([0, header[1], header[2], header[3]]) as usize;
             if let Some(body) = config.get(46..46 + len) {
-                let flac_comments: Vec<_> = comments(body)
+                let mut flac_comments: BTreeMap<_, Vec<u8>> = BTreeMap::new();
+                for (key, value) in comments(body)
                     .into_iter()
                     .filter(|(key, _)| tags::selected(key))
-                    .collect();
+                {
+                    match flac_comments.entry(key) {
+                        Entry::Occupied(mut entry) => {
+                            entry.get_mut().push(b';');
+                            entry.get_mut().extend(value);
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert(value);
+                        }
+                    }
+                }
                 if !flac_comments.is_empty() {
-                    pairs = flac_comments.into_iter().collect();
+                    pairs = flac_comments;
                 }
             }
         }
