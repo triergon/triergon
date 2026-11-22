@@ -320,9 +320,6 @@
         "hls-map-media",
         "inactive-pat-then-unrouted-pes",
         "unknown-pid-pes-after-pat-control"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -333,9 +330,6 @@
       "compat": "compat::psi::IncompletePatSection",
       "cases": [
         "pat-incomplete-version"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -346,9 +340,6 @@
       "compat": "compat::psi::DescriptorOverrun",
       "cases": [
         "pmt-descriptor-overrun"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -359,9 +350,6 @@
       "compat": "compat::psi::NonzeroPmtSection",
       "cases": [
         "pmt-multi-section-forbidden"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
