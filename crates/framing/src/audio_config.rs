@@ -9,7 +9,7 @@
 //! Each accepted form is recognised by its own leading bytes, never by guessing from the
 //! container.
 use crate::flac_config::FLAC_MARKER;
-use crate::{OpusHead, VorbisHeaders, flac_stream_info};
+use crate::{OpusHead, OpusProjection, VorbisHeaders, flac_stream_info};
 use triergon_core::{BudgetVec, Error, Result};
 
 /// Replace `out` with the concatenation of `parts`, charging their whole length before
@@ -51,6 +51,9 @@ pub fn canonical_flac_configuration(configuration: &[u8], out: &mut BudgetVec<u8
 
 /// Write the canonical Opus configuration (an `OpusHead` packet) of `configuration`.
 pub fn canonical_opus_configuration(configuration: &[u8], out: &mut BudgetVec<u8>) -> Result<()> {
+    if let Some(projection) = OpusProjection::parse(configuration)? {
+        return fill(out, &[projection.packet()]);
+    }
     let head = if configuration.starts_with(b"OpusHead") {
         OpusHead::parse(configuration)?
     } else {
@@ -70,6 +73,17 @@ pub fn canonical_vorbis_configuration(configuration: &[u8], out: &mut BudgetVec<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn opus_projection_canonicalisation_copies_the_matrix() {
+        let budget = triergon_core::Budget::new(128).unwrap();
+        let mut out = BudgetVec::new(&budget);
+        let packet = b"OpusHead\x01\x01\0\0\x80\xbb\0\0\0\0\x03\x01\0\0\x40";
+        canonical_opus_configuration(packet, &mut out).unwrap();
+        assert_eq!(out.as_slice(), packet);
+        assert!(canonical_opus_configuration(&packet[..22], &mut out).is_err());
+        assert_eq!(out.as_slice(), packet);
+    }
 
     #[test]
     fn a_flac_stream_without_a_header_keeps_an_empty_configuration() {

@@ -108,12 +108,9 @@ impl OpusHead {
         mapping_family: u8,
         table: &[u8],
     ) -> Result<OpusHead> {
-        // RFC 7845: major version 0 (values 0-15) is the only one a decoder may accept.
-        if version > 15 {
-            return Err(Error::Unsupported("Opus identification header version"));
-        }
-        if channels == 0 {
-            return Err(Error::Invalid("Opus channel count"));
+        validate_identification(version, channels)?;
+        if mapping_family == 3 {
+            return Err(Error::Unsupported("Opus projection mapping table"));
         }
         let mut mapping = [0u8; 255];
         let (streams, coupled_streams) = if mapping_family == 0 {
@@ -124,11 +121,7 @@ impl OpusHead {
             mapping[1] = 1;
             (1, channels - 1)
         } else {
-            let streams = *table.first().ok_or(Error::Truncated)?;
-            let coupled = *table.get(1).ok_or(Error::Truncated)?;
-            if streams == 0 || coupled > streams || u16::from(streams) + u16::from(coupled) > 255 {
-                return Err(Error::Invalid("Opus stream counts"));
-            }
+            let (streams, coupled) = stream_counts(table)?;
             let table = table
                 .get(2..2 + usize::from(channels))
                 .ok_or(Error::Truncated)?;
@@ -189,6 +182,87 @@ impl OpusHead {
         let len = self.write(&mut packet);
         out.extend_from_slice(&packet[..len]);
     }
+}
+
+/// Borrowed RFC 8486 family 3 identification header. The demixing coefficients
+/// stay in their original column-major order and occupy two bytes each.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OpusProjection<'a> {
+    packet: &'a [u8],
+    pub channels: u8,
+    pub streams: u8,
+    pub coupled_streams: u8,
+    pub pre_skip: u16,
+    pub output_gain: i16,
+}
+
+impl<'a> OpusProjection<'a> {
+    /// The largest Opus identification packet fits in one Ogg page.
+    pub const MAX_BYTES: usize = 65_025;
+
+    /// Read a family 3 identification header. Other mappings return `None`
+    /// for normal parsing through `OpusHead`.
+    pub fn parse(bytes: &'a [u8]) -> Result<Option<Self>> {
+        if bytes.get(18) != Some(&3) || !bytes.starts_with(b"OpusHead") {
+            return Ok(None);
+        }
+        let channels = bytes[9];
+        validate_identification(bytes[8], channels)?;
+        let count = u16::from(channels);
+        let side = count.isqrt();
+        let base = side * side;
+        if side > 15 || (count != base && count != base + 2) {
+            return Err(Error::Invalid("Opus Ambisonic channel count"));
+        }
+        let table = &bytes[19..];
+        let (streams, coupled_streams) = stream_counts(table)?;
+        let coded = usize::from(streams) + usize::from(coupled_streams);
+        let extent = 21 + 2 * usize::from(channels) * coded;
+        if extent > Self::MAX_BYTES || bytes.len() > Self::MAX_BYTES {
+            return Err(Error::Invalid("Opus projection header exceeds one page"));
+        }
+        let packet = bytes.get(..extent).ok_or(Error::Truncated)?;
+        Ok(Some(Self {
+            packet,
+            channels,
+            streams,
+            coupled_streams,
+            pre_skip: u16::from_le_bytes([bytes[10], bytes[11]]),
+            output_gain: i16::from_le_bytes([bytes[16], bytes[17]]),
+        }))
+    }
+
+    /// The canonical identification packet through the end of the matrix.
+    pub fn packet(&self) -> &'a [u8] {
+        self.packet
+    }
+
+    /// Signed Q15 coefficients, in coded-channel columns of `channels` rows.
+    pub fn coefficients(&self) -> impl ExactSizeIterator<Item = i16> + '_ {
+        self.packet[21..]
+            .chunks_exact(2)
+            .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
+    }
+}
+
+fn validate_identification(version: u8, channels: u8) -> Result<()> {
+    // RFC 7845 accepts only major version zero (values 0–15).
+    if version > 15 {
+        return Err(Error::Unsupported("Opus identification header version"));
+    }
+    if channels == 0 {
+        return Err(Error::Invalid("Opus channel count"));
+    }
+    Ok(())
+}
+
+fn stream_counts(table: &[u8]) -> Result<(u8, u8)> {
+    let streams = *table.first().ok_or(Error::Truncated)?;
+    let coupled = *table.get(1).ok_or(Error::Truncated)?;
+    if streams == 0 || coupled > streams || u16::from(streams) + u16::from(coupled) > 255 {
+        return Err(Error::Invalid("Opus stream counts"));
+    }
+    Ok((streams, coupled))
 }
 
 /// Samples per frame at 48 kHz for a TOC byte's configuration (RFC 6716 Table 2).
@@ -260,6 +334,41 @@ mod tests {
         head[9] = 3;
         head[18] = 0;
         assert!(OpusHead::parse(&head).is_err());
+    }
+
+    #[test]
+    fn projection_header_borrows_signed_columns_and_bounds_dimensions() {
+        let mut packet = b"OpusHead\x01\x04\x38\x01\x80\xbb\x00\x00\x00\x06\x03\x02\x01".to_vec();
+        let matrix = [
+            16384_i16, -8192, 4096, 0, -4096, 16384, 0, 0, 0, 0, -32768, 8192,
+        ];
+        packet.extend(matrix.into_iter().flat_map(i16::to_le_bytes));
+        let head = OpusProjection::parse(&packet).unwrap().unwrap();
+        assert_eq!(
+            (head.channels, head.streams, head.coupled_streams),
+            (4, 2, 1)
+        );
+        assert_eq!((head.pre_skip, head.output_gain), (312, 1536));
+        assert_eq!(head.coefficients().collect::<Vec<_>>(), matrix);
+        assert_eq!(head.packet().as_ptr(), packet.as_ptr());
+        assert_eq!(head.packet().len(), 45);
+        assert!(OpusProjection::parse(&packet[..44]).is_err());
+        assert!(OpusHead::parse(&packet).is_err());
+
+        let mut invalid = packet.clone();
+        invalid[9] = 5;
+        assert!(OpusProjection::parse(&invalid).is_err());
+        invalid[9] = 227;
+        invalid[19] = 255;
+        invalid[20] = 0;
+        assert!(OpusProjection::parse(&invalid).is_err());
+        invalid[9] = 4;
+        invalid[19] = 2;
+        invalid[20] = 3;
+        assert!(OpusProjection::parse(&invalid).is_err());
+
+        packet[18] = 2;
+        assert!(OpusProjection::parse(&packet).unwrap().is_none());
     }
 
     #[test]

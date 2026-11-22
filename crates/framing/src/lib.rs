@@ -131,7 +131,8 @@ pub use nal_syntax::{
 };
 pub use nal_units::{AnnexBUnits, split_length_prefixed, start_code};
 pub use opus_config::{
-    OPUS_RATE, OpusHead, opus_frame_samples, opus_packet_frames, opus_packet_samples,
+    OPUS_RATE, OpusHead, OpusProjection, opus_frame_samples, opus_packet_frames,
+    opus_packet_samples,
 };
 pub use reader::{Framing, LengthSize, NalFacts, NalFraming, NalReader, NalUnit, ReaderLimits};
 pub use vorbis_config::{

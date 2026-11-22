@@ -211,8 +211,7 @@ fn decode_container(path: &str, out: &mut Output) -> Result<Decoder, String> {
             else {
                 continue;
             };
-            let pool = Budget::new(triergon_framing::OpusHead::MAX_BYTES)
-                .map_err(|e| format!("configuration: {e}"))?;
+            let pool = Budget::new(1 << 17).map_err(|e| format!("configuration: {e}"))?;
             let mut head = triergon_codec::BudgetVec::new(&pool);
             triergon_framing::canonical_opus_configuration(track.configuration(), &mut head)
                 .map_err(|e| format!("configuration: {e}"))?;

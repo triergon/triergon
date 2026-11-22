@@ -17,8 +17,8 @@ use core::ops::Range;
 use triergon_core::container::{CodecId, MediaKind, RandomAccess};
 use triergon_core::{Budget, BudgetVec, Error, Result, TimeBase};
 use triergon_framing::{
-    FlacFrameHeader, FlacStreamInfo, OPUS_RATE, OpusHead, VorbisIdentification, VorbisModes,
-    opus_packet_samples, vorbis_header_type,
+    FlacFrameHeader, FlacStreamInfo, OPUS_RATE, OpusHead, OpusProjection, VorbisIdentification,
+    VorbisModes, opus_packet_samples, vorbis_header_type,
 };
 
 /// The mapping a logical stream's first packet identifies.
@@ -360,14 +360,18 @@ impl Configuration {
                 config.pending = 0..packet.len();
             }
             Mapping::Opus => {
-                let head = OpusHead::parse(packet)?;
+                let (channels, pre_skip) = if let Some(projection) = OpusProjection::parse(packet)?
+                {
+                    (projection.channels, projection.pre_skip)
+                } else {
+                    let head = OpusHead::parse(packet)?;
+                    (head.channels, head.pre_skip)
+                };
                 config.sample_rate = Some(OPUS_RATE);
-                config.channels = Some(head.channels);
+                config.channels = Some(channels);
                 config.append(packet)?;
                 config.configuration = 0..packet.len();
-                config.timeline = Timeline::Opus {
-                    pre_skip: head.pre_skip,
-                };
+                config.timeline = Timeline::Opus { pre_skip };
             }
             Mapping::Flac => {
                 let (native, _) = ogg_flac_first(packet)?;
@@ -749,6 +753,18 @@ mod tests {
             (Mapping::Other(MediaKind::Unknown), &b"abcdefgh"[..])
         );
         assert_eq!(Mapping::identify(b"").1, b"");
+    }
+
+    #[test]
+    fn ogg_opus_keeps_projection_identification_bytes() {
+        let packet = b"OpusHead\x01\x01\x38\x01\x80\xbb\0\0\0\0\x03\x01\0\0\x40";
+        let budget = Budget::new(128).unwrap();
+        let config = Configuration::first(&budget, Mapping::Opus, packet, 64).unwrap();
+        assert_eq!(config.channels, Some(1));
+        assert_eq!(config.sample_rate, Some(OPUS_RATE));
+        assert_eq!(&config.bytes[config.configuration], packet);
+        assert!(matches!(config.timeline, Timeline::Opus { pre_skip: 312 }));
+        assert!(Configuration::first(&budget, Mapping::Opus, &packet[..22], 64).is_err());
     }
 
     /// A Theora identification header: version 3.2.`revision`, `rate` frames per
