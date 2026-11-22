@@ -32,6 +32,9 @@ HEVC the returned source also delivers the same access units and terminal
 result as a fresh reader, with every unit checked against the input bytes. The
 [raw source views](../../harness/features/playback-source-view/contract.json)
 compare the initial SPS-derived frame rate and the default unstamped queue timestamps.
+The [raw configuration comparison](../../harness/features/raw-video-configuration/contract.json)
+checks the active parameter-set bytes, configuration revisions, cropped dimensions,
+coded AVC and HEVC timing fields and the initial HEVC picture's startup chain.
 The [raw Annex B comparison](../../harness/features/raw-annex-b/contract.json)
 checks the active SPS picture period. HLS HEVC feeds use the tracked
 parameter sets, and the [Matroska startup comparison](../../harness/features/matroska-startup-seek/contract.json)

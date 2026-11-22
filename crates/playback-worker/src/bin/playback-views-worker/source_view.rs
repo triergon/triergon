@@ -33,6 +33,7 @@ mod worker {
 
     use triergon_raw_video::{
         RawFeedClock, RawVideoConfiguration, RawVideoProbe, RawVideoProbeLimits, RawVideoProbeStep,
+        hevc_startup::{self, StartupNal},
     };
 
     use super::super::packet_fold::{Packet as PacketRow, Work};
@@ -79,7 +80,7 @@ mod worker {
         let invocation = Invocation::parse(
             args,
             "source-view-",
-            " OPENER [clock | ENTITY-DIR NEXT-ENTITY]",
+            " OPENER [clock | configuration | ENTITY-DIR NEXT-ENTITY]",
             1..=3,
             true,
         )?;
@@ -87,6 +88,8 @@ mod worker {
         let pool = Budget::new(256 << 20)?;
         let data = load(&pool, invocation.input(MAX_INPUT)?)?;
         let mut pids = Vec::new();
+        let raw_config = matches!((layout, &invocation.arguments[1..]), (Layout::Raw(_), [mode])
+            if mode == "configuration");
         let (clock_only, next) = match (layout, &invocation.arguments[1..]) {
             (Layout::Entities, [dir, file]) => {
                 let file = Path::new(dir).join(file);
@@ -110,6 +113,7 @@ mod worker {
                 }
                 (false, None)
             }
+            (Layout::Raw(_), [_]) if raw_config => (false, None),
             (Layout::Entities, _) | (_, [_, ..]) => {
                 return Err("invalid source-view arguments".into());
             }
@@ -118,13 +122,15 @@ mod worker {
         let trace = invocation.mode == Mode::Trace;
         let name = if clock_only {
             "mp4-source-clock"
+        } else if raw_config {
+            "raw-video-configuration"
         } else {
             "playback-source-view"
         };
         measure(&invocation, name, Some(&pool), || {
             let mut views = Views::new(trace, clock_only, &pids);
             let result = match layout {
-                Layout::Raw(codec) => raw_views(&pool, &data, codec, &mut views),
+                Layout::Raw(codec) => raw_views(&pool, &data, codec, &mut views, raw_config),
                 _ => play(&pool, &data, next.as_ref(), layout, &mut views),
             };
             match result {
@@ -407,6 +413,7 @@ mod worker {
         data: &Bytes,
         codec: Codec,
         views: &mut Views<'_>,
+        raw_config: bool,
     ) -> triergon_core::Result<()> {
         let cancel = AtomicBool::new(false);
         let work = || WorkBudget::new(1 << 16);
@@ -431,6 +438,13 @@ mod worker {
         loop {
             match feed.poll(&mut work(), &cancel)? {
                 Step::Ready(packet) => {
+                    if raw_config {
+                        if packet.configuration_changed {
+                            config_record(&packet, views)?;
+                            first = false;
+                        }
+                        continue;
+                    }
                     if first {
                         let rate = match &packet.configuration {
                             Some(config) => frame_rate(config, views.trace)?,
@@ -443,10 +457,119 @@ mod worker {
                     }
                     views.field(&[3, signed(packet.queue_timestamp_ns())]);
                 }
+                Step::End(_) if raw_config && first => {
+                    return Err(Error::Invalid("no active raw configuration"));
+                }
                 Step::End(_) => return Ok(()),
                 Step::NeedInput(_) | Step::Yield => {}
             }
         }
+    }
+
+    fn config_record(
+        packet: &triergon_raw_video::RawVideoFeedPacket,
+        views: &mut Views<'_>,
+    ) -> triergon_core::Result<()> {
+        let config = packet
+            .configuration
+            .as_ref()
+            .ok_or(Error::Invalid("configuration change has no value"))?;
+        let revision = packet
+            .configuration_revision
+            .ok_or(Error::Invalid("configuration change has no revision"))?;
+        let (codec, timing) = match config.codec {
+            Codec::Avc => (
+                0,
+                config.avc_timing.map(|timing| {
+                    [
+                        1,
+                        u64::from(timing.num_units_in_tick),
+                        u64::from(timing.time_scale),
+                        u64::from(timing.fixed_frame_rate_flag),
+                        0,
+                    ]
+                }),
+            ),
+            Codec::Hevc => (
+                1,
+                config.hevc_timing()?.map(|timing| {
+                    [
+                        1,
+                        u64::from(timing.num_units_in_tick),
+                        u64::from(timing.time_scale),
+                        u64::from(timing.poc_proportional_to_timing_flag),
+                        timing
+                            .num_ticks_poc_diff_one_minus1
+                            .map_or(0, |ticks| u64::from(ticks) + 1),
+                    ]
+                }),
+            ),
+        };
+        let [present, units, scale, flag, ticks] = timing.unwrap_or([0; 5]);
+        views.field(&[
+            4,
+            codec,
+            revision,
+            u64::from(config.width),
+            u64::from(config.height),
+            present,
+            units,
+            scale,
+            flag,
+            ticks,
+        ]);
+        for (slot, nal) in config.parameter_sets().enumerate() {
+            views.field(&[5, slot as u64]);
+            views.string(nal);
+            if views.trace {
+                println!("{}", triergon_harness_protocol::hex(nal));
+            }
+        }
+        if config.codec == Codec::Hevc {
+            let chain = hevc_startup::startup_chain(config.parameter_sets().map(AsRef::as_ref))?;
+            let mut complete = false;
+            for nal in packet.unit.nals() {
+                let header = nal.facts().header;
+                if let Some((slot, payload)) = hevc_startup::parameter_set_payload(nal.bytes())
+                    && [chain.vps, chain.sps, chain.pps][slot] != payload
+                {
+                    return Err(Error::Invalid("startup parameter-set payload changed"));
+                }
+                if !matches!(
+                    header,
+                    triergon_framing::nal::NalHeader::Hevc {
+                        nal_unit_type: 0..=31,
+                        ..
+                    }
+                ) {
+                    continue;
+                }
+                if let StartupNal::Picture {
+                    first: true,
+                    random_access,
+                    pps,
+                } = hevc_startup::startup_nal(nal.bytes(), header)?
+                {
+                    if pps != chain.pps_id {
+                        return Err(Error::Invalid("startup slice selects another PPS"));
+                    }
+                    views.field(&[
+                        6,
+                        u64::from(pps),
+                        u64::from(chain.reorder),
+                        u64::from(random_access),
+                    ]);
+                    complete = true;
+                    break;
+                }
+            }
+            if !complete {
+                return Err(Error::Invalid(
+                    "configuration change has no HEVC base picture",
+                ));
+            }
+        }
+        Ok(())
     }
 
     fn frame_rate(

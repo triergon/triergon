@@ -67,6 +67,7 @@ impl Kind {
             "ddts",
             "isobmff-index",
             "mp4-source-clock",
+            "raw-video-configuration",
             "store",
         ]
         .into_iter()

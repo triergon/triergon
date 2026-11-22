@@ -61,6 +61,7 @@ TRACE_ORACLES = {
     "ddts": ("harness.isobmff_entry_oracle", "ddts"),
     "isobmff-index": ("harness.isobmff_index_oracle", "index_trace"),
     "mp4-source-clock": ("harness.mp4_source_clock_oracle", "trace"),
+    "raw-video-configuration": ("harness.raw_video_config_oracle", "trace"),
     "dts-header": ("harness.dts_oracle", "header"),
     "dts-unpack": ("harness.dts_oracle", "unpack"),
     "store": ("harness.store_oracle", "store_trace"),

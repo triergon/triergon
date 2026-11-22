@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "raw-video-configuration",
+  "gate": "required",
+  "operation": "raw-video-configuration",
+  "candidate": "playback-views-worker",
+  "worker_operation": "source-view-",
+  "oracle": "raw-video-configuration",
+  "contract": [
+    "Compare the active AVC SPS/PPS and HEVC VPS/SPS/PPS in source order. Retain and compare original parameter-set bytes, the revision and cropped dimensions. An AVC parameter-set ID is reused with a changed raster and timing.",
+    "Compare the raw SPS timing fields through the pinned FFmpeg trace_headers interface independently of its frame-rate projection. Exercise timing absent and present, both AVC fixed-rate flags, and both HEVC POC proportionality flags including a physically present interval.",
+    "Use H.264 (08/2024) §§7.3.2.1.1, 7.4.2.1.1, E.1.1 and E.2.1 and H.265 (04/2013) §§7.3.2.2, 7.4.3.2, E.2.1 and E.3.1. Compare the HEVC initial slice's PPS, random access and sequence reorder depth through the startup chain."
+  ],
+  "required_profiles": ["raw-avc", "raw-hevc"],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["avc-fixed", "avc-no-timing", "avc-reconfigure", "hevc-no-timing", "hevc-proportional", "hevc-ordinary"], "cause": "The SPS syntax comparison does not time a corresponding workload."},
+    {"bound": "heap", "cases": ["avc-fixed", "avc-no-timing", "avc-reconfigure", "hevc-no-timing", "hevc-proportional", "hevc-ordinary"], "cause": "The SPS syntax comparison does not measure the two heaps."},
+    {"bound": "total_rss", "cases": ["avc-fixed", "avc-no-timing", "avc-reconfigure", "hevc-no-timing", "hevc-proportional", "hevc-ordinary"], "cause": "The SPS syntax comparison does not measure the two processes' resident memory."}
+  ]
+}

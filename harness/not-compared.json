@@ -104,14 +104,7 @@
       }
     ],
     "triergon-raster": [],
-    "triergon-raw-video": [
-      {
-        "name": "configuration-tracking-on-its-own",
-        "entry_points": ["RawVideoConfigTracker", "RawVideoConfiguration", "AvcVuiTiming", "HevcVuiTiming", "hevc_startup"],
-        "degree": "step",
-        "needs": "raw-annex-b, hls-segments and matroska-startup-seek reach the tracker and HEVC startup APIs; playback-source-view compares the initial SPS-derived frame rate. The sample aspect ratio and additional VUI fields are diagnostic only."
-      }
-    ],
+    "triergon-raw-video": [],
     "triergon-session": [
       {
         "name": "track-decoding",
