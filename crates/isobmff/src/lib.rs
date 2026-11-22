@@ -51,6 +51,7 @@ mod qt_sound;
 pub mod reference_trace;
 mod regular;
 mod sidx;
+mod static_hdr;
 mod tables;
 #[cfg(feature = "reference-trace")]
 mod transport_window;
@@ -89,6 +90,7 @@ pub use regular::{
     TimingRunPolicy, TimingRunSurplus,
 };
 pub use sidx::{IndexStep, SegmentIndex};
+pub use static_hdr::{ContentLightLevel, MasteringDisplayColourVolume};
 use std::ops::Range;
 use triergon_core::{Error, Result, Time, TimeBase};
 
