@@ -47,7 +47,7 @@ pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N] [--target TAR
              steps, then timing on CPU 1) or memory (memory on CPUs 1 to the last,
              then the grades); each step's output goes under DIR, its log to
              DIR/logs and its record to DIR/steps; --full measures what a kept
-             evidence set holds; --no-early-stop collects every planned report or progressive pair
+             evidence set holds; --no-early-stop collects every planned report, progressive or codec pair
   summary    join the outputs of every shard of a run into FILE: each step's
              status and time, with a failure if a planned step did not run, a
              step failed, or the shards measured different sources or workers
@@ -1635,6 +1635,17 @@ fn append(path: &Path, line: &str) -> R<()> {
     writeln!(file, "{} {line}", crate::python::utc_now()).map_err(|e| e.to_string())
 }
 
+fn collect_all_pairs(command: &mut Vec<String>) {
+    let subcommand = command.get(1).map(String::as_str);
+    let operation = command.get(2).map(String::as_str);
+    if matches!(
+        (subcommand, operation),
+        (Some("report" | "progressive"), _) | (Some("codecs"), Some("time" | "memory"))
+    ) {
+        command.push("--no-early-stop".into());
+    }
+}
+
 /// Runs the steps of one stage of a shard; returns 1 if any failed.
 fn run(
     root: &Path,
@@ -1653,12 +1664,7 @@ fn run(
     let mut items = shard_items(root, &out, full, shard, selection)?;
     if no_early_stop {
         for step in items.iter_mut().flat_map(|item| &mut item.steps) {
-            if matches!(
-                step.command.get(1).map(String::as_str),
-                Some("report" | "progressive")
-            ) {
-                step.command.push("--no-early-stop".into());
-            }
+            collect_all_pairs(&mut step.command);
         }
     }
     // A stage's records describe this run of it alone: the timing stage starts a
@@ -3251,6 +3257,19 @@ done
             Placement::Timed,
             xtask(args),
         )
+    }
+
+    #[test]
+    fn full_pair_count_reaches_codec_collections_only() {
+        for operation in ["time", "memory", "grade", "readers", "summarize"] {
+            let mut command = xtask(&["codecs", operation]);
+            collect_all_pairs(&mut command);
+            assert_eq!(
+                command.last().unwrap() == "--no-early-stop",
+                matches!(operation, "time" | "memory"),
+                "{operation}"
+            );
+        }
     }
 
     fn parsed(raw: &str) -> Value {

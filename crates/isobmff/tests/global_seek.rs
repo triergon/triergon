@@ -216,6 +216,73 @@ fn global_fragment_seek_reconstructs_prefix_state_and_keeps_actual_global_order(
         ]
     );
 }
+
+#[test]
+fn fragmented_multitrack_seek_retains_exact_source_ranges_and_payloads() {
+    // The authored fragment runs place three video samples followed by three
+    // text samples in each mdat. The second fragment starts at 3000 ticks.
+    let case = common::fixtures::CASES
+        .iter()
+        .find(|case| case.name == "f-multitrack")
+        .unwrap();
+    let expected = [
+        (1, 4, 1647..1659, 3000),
+        (1, 5, 1659..1671, 4000),
+        (2, 4, 1683..1688, 3000),
+        (1, 6, 1671..1683, 5000),
+        (2, 5, 1688..1694, 4000),
+        (2, 6, 1694..1700, 5000),
+    ];
+    for quantum in [1, 4096] {
+        let pool = Budget::new(4 * 1024 * 1024).unwrap();
+        let movie = support::parse(&pool, case.bytes);
+        let plan = global(&pool, &movie, 2, 3500);
+        assert_eq!(plan.landing().selected.timestamp, 3000);
+        let mut cursor = plan.cursor().unwrap();
+        let mut rows = Vec::new();
+        let mut ended = false;
+        for _ in 0..8192 {
+            match cursor
+                .poll(&mut WorkBudget::new(quantum), &AtomicBool::new(false))
+                .unwrap()
+            {
+                CursorStatus::Yield => {}
+                CursorStatus::End => {
+                    ended = true;
+                    break;
+                }
+                CursorStatus::Ready => {
+                    let occurrence = cursor.take_occurrence().unwrap();
+                    let range = occurrence.source.range.clone();
+                    let source = case
+                        .samples
+                        .iter()
+                        .find(|sample| {
+                            sample.track == occurrence.track_id
+                                && sample.ordinal == occurrence.source.ordinal
+                        })
+                        .unwrap();
+                    assert_eq!(
+                        &case.bytes[usize::try_from(range.start).unwrap()
+                            ..usize::try_from(range.end).unwrap()],
+                        source.payload
+                    );
+                    rows.push((
+                        occurrence.track_id,
+                        occurrence.source.ordinal,
+                        range,
+                        occurrence.demux.dts_field.signed_ticks(),
+                    ));
+                }
+            }
+        }
+        assert!(
+            ended,
+            "seek replay did not reach the end within the work bound"
+        );
+        assert_eq!(rows, expected);
+    }
+}
 #[test]
 fn unsupported_rescale_and_overlapping_query_never_guess_a_demux_time() {
     let pool = Budget::new(4 * 1024 * 1024).unwrap();
