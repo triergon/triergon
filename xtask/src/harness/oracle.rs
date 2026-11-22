@@ -32,6 +32,8 @@ impl Kind {
             "core-budgets",
             "elementary-metadata",
             "opus-final-range",
+            "ts-video-descriptors",
+            "ts-packets",
             "views-smoke",
             "pgs-segments",
             "text-extraction",
