@@ -30,16 +30,6 @@ pub struct PrivateAudioDescriptors<'a> {
 }
 
 impl PrivateAudioCarriage {
-    /// The carriage's name in reference traces.
-    #[cfg(feature = "reference-trace")]
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::DvbAc3Tag => "dvb-ac3-descriptor",
-            Self::DvbEac3Tag => "dvb-eac3-descriptor",
-            Self::PrivateType81Ac3 => "private-stream-type-0x81-ac3",
-            Self::PrivateType87Eac3 => "private-stream-type-0x87-eac3",
-        }
-    }
     fn stream_type(self) -> u8 {
         match self {
             Self::DvbAc3Tag | Self::DvbEac3Tag => 6,

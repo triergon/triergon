@@ -7,7 +7,6 @@
 //! build and its options, and these are also available:
 //! [`DemuxObserver::profile`](crate::compat::pes::DemuxObserver::profile),
 //! [`DemuxObserver::operation`](crate::compat::pes::DemuxObserver::operation),
-//! [`PrivateAudioCarriage::label`](crate::compat::pes::PrivateAudioCarriage::label),
 //! [`DemuxClock::project_encoded_header`](crate::compat::pes::DemuxClock::project_encoded_header),
 //! [`DemuxClock::project_diagnostic_header`](crate::compat::pes::DemuxClock::project_diagnostic_header),
 //! [`InputContext::basis`](crate::compat::input::InputContext::basis) and
