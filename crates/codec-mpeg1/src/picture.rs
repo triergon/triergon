@@ -56,7 +56,12 @@ impl Encoder {
         let header_bits = self.writer.bit_len();
         let hard_limit = self
             .rc
-            .begin(picture_type, activity, header_bits)
+            .begin(
+                picture_type,
+                activity,
+                header_bits,
+                repetition == Repetition::Picture,
+            )
             .hard_limit;
         let g = self.cfg.geometry;
         // The least one macroblock row can cost: DC-only intra or skipped macroblocks.

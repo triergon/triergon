@@ -150,7 +150,15 @@ impl RateControl {
 
     /// Plan a complete picture, debiting the actual headers already emitted
     /// before applying the learned texture-bit model to the remaining budget.
-    pub(crate) fn begin(&mut self, kind: PictureType, activity: f64, header_bits: usize) -> Plan {
+    /// `repeated` is a P picture whose source repeats the previous one in every
+    /// plane.
+    pub(crate) fn begin(
+        &mut self,
+        kind: PictureType,
+        activity: f64,
+        header_bits: usize,
+        repeated: bool,
+    ) -> Plan {
         if kind == PictureType::Intra {
             self.left_p = self.gop - 1;
         }
@@ -165,7 +173,18 @@ impl RateControl {
                     + (remaining - self.side_i).max(0.0)
                         / (1.0 + self.left_p as f64 * self.x_p / (self.x_i * KP))
             }
-            PictureType::Predicted => remaining / self.left_p.max(1) as f64,
+            PictureType::Predicted => {
+                let share = remaining / self.left_p.max(1) as f64;
+                if repeated {
+                    // A repeated picture only refines the reference, and the rest
+                    // of the GOP keeps what it refines while the scene stays: it
+                    // is planned as the I picture of the rest of the GOP.
+                    let rest = self.left_p.saturating_sub(1) as f64;
+                    share.max(remaining / (1.0 + rest * self.x_p / (self.x_i * KP)))
+                } else {
+                    share
+                }
+            }
         };
         let hard_limit = self.fullness;
         let target = target
@@ -191,9 +210,10 @@ impl RateControl {
         .clamp(2.0, 31.0);
         // The first P picture after an I picture predicts from a reference
         // quantised at the intra step; refining it far below that step
-        // re-spends bits the next I picture discards anyway.
+        // re-spends bits the next I picture discards anyway. A repeated picture
+        // codes nothing but that refinement, which the pictures after it keep.
         let q_exact = match (kind, self.intra_q) {
-            (PictureType::Predicted, Some(intra_q)) => {
+            (PictureType::Predicted, Some(intra_q)) if !repeated => {
                 q_exact.max(FIRST_P_RATIO * intra_q).min(31.0)
             }
             _ => q_exact,
