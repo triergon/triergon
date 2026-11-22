@@ -1,8 +1,11 @@
 //! Small authored variants of the ISO BMFF packet fixtures.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::ops::Range;
 use std::path::Path;
+
+use crate::json::{self, Value};
 
 const FIXTURES: &str = "crates/isobmff/tests/fixtures";
 const PCM: &str = "harness/features/quicktime-pcm-samples/variants";
@@ -58,7 +61,72 @@ pub(super) fn author(root: &Path, out: &Path) -> Result<()> {
         fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
         fs::write(directory.join(format!("{name}.mov")), bytes).map_err(|e| e.to_string())?;
     }
-    Ok(())
+    recovery_corpus(root, out)
+}
+
+fn recovery_corpus(root: &Path, out: &Path) -> Result<()> {
+    let mut cases = Vec::new();
+    let mut seen = BTreeSet::new();
+    let mut add = |prefix: &str, name: &str, mode: &str, base: &Path| -> Result<()> {
+        let file = format!("{prefix}/{name}");
+        let hash = crate::harness::linux::file_sha(&base.join(&file))?;
+        let stem = name.trim_end_matches(".mov");
+        for (schedule, window, quantum) in [("ordinary", "65536", "4096"), ("tiny", "1", "3")] {
+            if seen.insert((hash.clone(), mode.to_owned(), schedule)) {
+                cases.push(Value::object([
+                    ("id", Value::str(format!("{stem}-{schedule}"))),
+                    ("profile", Value::str(format!("{mode}-{schedule}"))),
+                    ("file", Value::str(&file)),
+                    ("sha256", Value::str(&hash)),
+                    ("rights", Value::str("authored-synthetic")),
+                    ("arguments", Value::strings([window, quantum, mode])),
+                ]));
+            }
+        }
+        Ok(())
+    };
+    for (directory, mode) in [
+        ("run-recovery", "run"),
+        ("field-recovery", "run"),
+        ("direct-recovery", "direct"),
+        ("field-recovery", "physical"),
+    ] {
+        let prefix = format!("{FIXTURES}/{directory}");
+        let mut names = fs::read_dir(root.join(&prefix))
+            .map_err(|error| error.to_string())?
+            .map(|entry| {
+                entry
+                    .map(|entry| entry.file_name())
+                    .map_err(|error| error.to_string())
+            })
+            .collect::<Result<Vec<_>>>()?;
+        names.sort_unstable();
+        for name in &names {
+            let name = name.to_str().ok_or("non-UTF-8 recovery fixture name")?;
+            if name.ends_with(".mov") && name.starts_with("tail-") == (mode == "physical") {
+                add(&prefix, name, mode, root)?;
+            }
+        }
+    }
+    for name in [
+        "physical-after-mdat",
+        "physical-base",
+        "physical-large-short",
+        "physical-short",
+    ] {
+        add(RECOVERY, &format!("{name}.mov"), "physical", out)?;
+    }
+    // This generated input also exercises the direct profile at physical EOF.
+    // The byte-identical offset-747 case already covers it in both schedules.
+    add(RECOVERY, "physical-missing.mov", "direct", out)?;
+    json::write(
+        &out.join(RECOVERY).with_file_name("corpus.json"),
+        &Value::object([
+            ("schema", Value::int(1)),
+            ("directory", Value::str(".")),
+            ("cases", Value::Array(cases)),
+        ]),
+    )
 }
 
 type Variants = Vec<(&'static str, String, Vec<u8>)>;

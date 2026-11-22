@@ -547,40 +547,6 @@
       }
     },
     {
-      "id": "stss-1-4-ordinary",
-      "profile": "run-ordinary",
-      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-1-4.mov",
-      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "65536",
-        "4096",
-        "run"
-      ],
-      "expected": {
-        "packets": 7,
-        "bytes": 72,
-        "digest": 6913188555895928242
-      }
-    },
-    {
-      "id": "stss-1-4-tiny",
-      "profile": "run-tiny",
-      "file": "crates/isobmff/tests/fixtures/field-recovery/stss-1-4.mov",
-      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "1",
-        "3",
-        "run"
-      ],
-      "expected": {
-        "packets": 7,
-        "bytes": 72,
-        "digest": 6913188555895928242
-      }
-    },
-    {
       "id": "stss-100-4-ordinary",
       "profile": "run-ordinary",
       "file": "crates/isobmff/tests/fixtures/field-recovery/stss-100-4.mov",
@@ -1771,108 +1737,6 @@
       }
     },
     {
-      "id": "offset-33442-ordinary",
-      "profile": "direct-ordinary",
-      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33442.mov",
-      "sha256": "1b566fda352d7f2b4f4c7a4d5aca7a1f6c0b0f67604f51c003a80f469a6a990f",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "65536",
-        "4096",
-        "direct"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 18446744073168073108
-      }
-    },
-    {
-      "id": "offset-33442-tiny",
-      "profile": "direct-tiny",
-      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33442.mov",
-      "sha256": "1b566fda352d7f2b4f4c7a4d5aca7a1f6c0b0f67604f51c003a80f469a6a990f",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "1",
-        "3",
-        "direct"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 18446744073168073108
-      }
-    },
-    {
-      "id": "offset-33443-ordinary",
-      "profile": "direct-ordinary",
-      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33443.mov",
-      "sha256": "785b94b917eea73f3d3aa7e75d82eb3a60e004f42db0b9d7bc0e745d0aaab745",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "65536",
-        "4096",
-        "direct"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 18446744073168073108
-      }
-    },
-    {
-      "id": "offset-33443-tiny",
-      "profile": "direct-tiny",
-      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33443.mov",
-      "sha256": "785b94b917eea73f3d3aa7e75d82eb3a60e004f42db0b9d7bc0e745d0aaab745",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "1",
-        "3",
-        "direct"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 18446744073168073108
-      }
-    },
-    {
-      "id": "offset-33444-ordinary",
-      "profile": "direct-ordinary",
-      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33444.mov",
-      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "65536",
-        "4096",
-        "direct"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 18446744073168073108
-      }
-    },
-    {
-      "id": "offset-33444-tiny",
-      "profile": "direct-tiny",
-      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-33444.mov",
-      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "1",
-        "3",
-        "direct"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 18446744072614556335
-      }
-    },
-    {
       "id": "offset-4294967295-ordinary",
       "profile": "direct-ordinary",
       "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-4294967295.mov",
@@ -2278,40 +2142,6 @@
         "packets": 1,
         "bytes": 0,
         "digest": 18446744072614556335
-      }
-    },
-    {
-      "id": "physical-missing-ordinary",
-      "profile": "direct-ordinary",
-      "file": "harness/features/mov-run-recovery/variants/physical-missing.mov",
-      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "65536",
-        "4096",
-        "direct"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 18446744073168073108
-      }
-    },
-    {
-      "id": "physical-missing-tiny",
-      "profile": "direct-tiny",
-      "file": "harness/features/mov-run-recovery/variants/physical-missing.mov",
-      "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "1",
-        "3",
-        "direct"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 18446744073168073108
       }
     },
     {
