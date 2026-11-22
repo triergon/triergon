@@ -910,8 +910,7 @@ fn selected_description_exposes_both_static_hdr_boxes() {
 #[test]
 #[ignore = "requires the prepared formats ffprobe"]
 fn static_hdr_matches_stream_side_data_for_either_description() {
-    let reference = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../.research/reference-formats/install/bin/ffprobe");
+    let reference = formats_ffprobe();
     for description_index in 0..2 {
         let directory = std::env::temp_dir().join(format!(
             "triergon-isobmff-hdr-{}-{description_index}",
@@ -963,6 +962,184 @@ fn static_hdr_matches_stream_side_data_for_either_description() {
             ("max_average", "400"),
         ] {
             assert_eq!(fields[field], expected, "{field}");
+        }
+    }
+}
+
+fn formats_ffprobe() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../.research/reference-formats/install/bin/ffprobe")
+}
+
+// ffprobe's default -show_data output is a hex dump with an ASCII column.
+fn probe_extradata(
+    probe: &std::path::Path,
+    file: &std::path::Path,
+    codec: &str,
+    tag: &str,
+) -> Vec<u8> {
+    let output = std::process::Command::new(probe)
+        .args([
+            "-v",
+            "error",
+            "-fflags",
+            "+noparse+nofillin",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=codec_name,codec_tag_string,extradata",
+            "-show_data",
+            "-of",
+            "default=noprint_wrappers=1",
+        ])
+        .arg(file)
+        .output()
+        .expect("prepare the pinned formats ffprobe");
+    assert!(output.status.success(), "{:?}", output.stderr);
+    let output = String::from_utf8(output.stdout).unwrap();
+    let mut lines = output.lines();
+    assert_eq!(lines.next(), Some(format!("codec_name={codec}").as_str()));
+    assert_eq!(
+        lines.next(),
+        Some(format!("codec_tag_string={tag}").as_str())
+    );
+    assert_eq!(lines.next(), Some("extradata="));
+    let mut bytes = Vec::new();
+    for line in lines.filter(|line| !line.is_empty()) {
+        let (offset, rest) = line.split_once(": ").unwrap();
+        assert_eq!(usize::from_str_radix(offset, 16).unwrap(), bytes.len());
+        let hex = rest.split_once("  ").unwrap().0;
+        for group in hex.split_whitespace() {
+            for pair in group.as_bytes().chunks(2) {
+                bytes.push(u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap());
+            }
+        }
+    }
+    bytes
+}
+
+#[test]
+fn selected_video_configuration_matches_known_records() {
+    check_video_configuration(None);
+}
+
+#[test]
+#[ignore = "requires the prepared formats ffprobe"]
+fn selected_video_configuration_matches_ffprobe() {
+    check_video_configuration(Some(&formats_ffprobe()));
+}
+
+fn check_video_configuration(probe: Option<&std::path::Path>) {
+    struct Case {
+        path: &'static str,
+        codec: &'static str,
+        tag: &'static str,
+        kind: &'static [u8; 4],
+        initial: u32,
+        syntax: &'static [u8],
+    }
+    let cases = [
+        Case {
+            path: "tests/fixtures/encoded-v1/control-avc-aac-front.mp4",
+            codec: "h264",
+            tag: "avc1",
+            kind: b"avcC",
+            initial: 1,
+            syntax: &[1, 100, 0, 10, 255, 225],
+        },
+        Case {
+            path: "tests/fixtures/encoded-v1/control-hevc-aac-front.mp4",
+            codec: "hevc",
+            tag: "hvc1",
+            kind: b"hvcC",
+            initial: 1,
+            syntax: &[1, 1, 0x60, 0, 0, 0],
+        },
+        Case {
+            path: "../playback/tests/fixtures/av1/six-frames.mp4",
+            codec: "av1",
+            tag: "av01",
+            kind: b"av1C",
+            initial: 1,
+            syntax: &[0x81, 0, 0x0c, 0],
+        },
+        Case {
+            path: "tests/fixtures/encoded-config-v3/initial21.mp4",
+            codec: "h264",
+            tag: "avc1",
+            kind: b"avcC",
+            initial: 2,
+            syntax: &[1, 66, 0, 10, 255, 225],
+        },
+    ];
+    for Case {
+        path,
+        codec,
+        tag,
+        kind,
+        initial,
+        syntax,
+    } in cases
+    {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
+        let file = std::fs::read(&path).unwrap();
+        let reference = probe.map(|probe| probe_extradata(probe, &path, codec, tag));
+        for (work, most) in [(4096, 65536), (3, 5)] {
+            let pool = Budget::new(16 << 20).unwrap();
+            let mut reader = open(&pool, &file);
+            let reading = read(&mut reader, &pool, &file, work, most).unwrap();
+            let track = reader
+                .tracks()
+                .iter()
+                .find(|track| track.kind() == MediaKind::Video)
+                .unwrap();
+            let packets: Vec<_> = reading
+                .packets
+                .iter()
+                .filter(|packet| packet.track() == track.id())
+                .collect();
+            let selected = packets.first().unwrap().sample().description_index;
+            assert_eq!(selected, initial, "{tag}");
+            let description = track
+                .descriptions()
+                .iter()
+                .find(|entry| entry.index == selected)
+                .unwrap();
+            assert_eq!(description.format.as_slice(), tag.as_bytes());
+            let mut children = description
+                .extensions(EntryLayout::Visual, Limits::default())
+                .unwrap();
+            let mut record = None;
+            loop {
+                match children.poll(&mut WorkBudget::new(1)).unwrap() {
+                    BoxStep::Box(child) if child.header().kind == *kind => {
+                        assert!(record.replace(child).is_none());
+                    }
+                    BoxStep::Box(_) => {}
+                    BoxStep::End => break,
+                    BoxStep::Yield => panic!("one unit should admit a child"),
+                }
+            }
+            let record = record.unwrap();
+            assert!(record.payload().starts_with(syntax), "{tag}");
+            if let Some(reference) = &reference {
+                assert_eq!(record.payload(), reference, "{tag}");
+            }
+            if initial == 2 {
+                assert!(
+                    packets
+                        .iter()
+                        .any(|packet| packet.sample().description_index == 1)
+                );
+                assert_ne!(track.configuration(), record.payload());
+            } else {
+                assert!(
+                    packets
+                        .iter()
+                        .all(|packet| packet.sample().description_index == 1)
+                );
+                assert_eq!(track.configuration(), record.payload());
+            }
         }
     }
 }
