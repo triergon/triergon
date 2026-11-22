@@ -126,6 +126,15 @@ The `mix` module holds the stereo downmix (`mix::Downmix`) and the s16 conversio
   one instead; a refused end-of-stream drain then ends the lane. Either way
   `refusals()` counts the refusals since the lane last restarted and `last_refusal()`
   holds the latest.
+- **Damaged audio.** Both refusal policies act on errors returned by the decoder.
+  Audio already delivered before an error stays delivered. `Skip` emits no substitute
+  samples for a refused unit. Decoding continues from the next queued unit using its
+  supplied time, subject to any buffered output from earlier units. Source or framing
+  errors that prevent the caller from supplying a unit are handled by the caller.
+- The default FLAC decoder ignores the frame footer CRC. The default AC-3 and E-AC-3
+  decoder can return audio from a syncframe with a failed CRC. Both refusal policies
+  accept successful decoder output. To treat CRC failure as a refusal, load a decoder
+  configured with its `CrcPolicy::Reject`.
 - **Letterbox.** Each picture goes through one `triergon_pixel::letterbox::Scaler`
   into the lane's RGBA canvas: 1920×1080 for `VideoSession::new`, any `Canvas` for
   `VideoSession::with_canvas`. The fit, padding and conversion rules are in
@@ -165,6 +174,9 @@ prefix and refusal when FLAC changes bit depth or declares blocks above its
 STREAMINFO maximum. The [session contract](../../harness/codecs/session-cases.json)
 records where a fresh AAC or AC-3 signal state differs from flushing the
 reference decoder and where the reference repeats a packet clock on Opus drain.
+Video inputs that use documented unsupported AVC or HEVC tools are checked for
+the exact refusal and the matching decoded prefix. The damaged FLAC and E-AC-3
+cases retain comparisons of block timing, native PCM and stereo output.
 
 The letterbox and downmix rules are native observations of FFmpeg 9.0.2,
 recorded as `RGBA-CONTRACT.json` and `DOWNMIX-CONTRACT.json` in the research

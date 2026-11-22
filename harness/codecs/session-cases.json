@@ -1,32 +1,6 @@
 {
  "schema": "triergon.codecs.correctness-manifest.v1",
  "note": "Additional session operations over pinned inputs. Reset indices are zero-based within the selected track. Skip cases reuse every CRC-policy damage input.",
- "open_cases": [
-  "skip-flip-03 - blocksize 16.flac",
-  "skip-flip-04 - blocksize 192.flac",
-  "skip-flip-05 - blocksize 254.flac",
-  "skip-flip-06 - blocksize 512.flac",
-  "skip-flip-07 - blocksize 725.flac",
-  "skip-flip-14 - wasted bits.flac",
-  "skip-flip-15 - only verbatim subframes.flac",
-  "skip-flip-24 - variable blocksize file created with flake revision 264.flac",
-  "skip-flip-25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac",
-  "skip-flip-53 - CUESHEET with very many indexes.flac",
-  "skip-flip-55 - file 48-53 combined.flac",
-  "skip-flip-60 - mono audio.flac",
-  "skip-flip-64 - rice partitions with escape code zero.flac",
-  "skip-flip-06 - samplerate 768kHz.flac",
-  "skip-flip-ff_s16_block16.flac",
-  "skip-flip-ff_s16_block192.flac",
-  "skip-flip-ff_s16_block576.flac",
-  "skip-flip-flac_s16_block16.flac",
-  "skip-flip-csi_miami_5.1_256_spx_small.eac3",
-  "skip-flip-csi_miami_stereo_128_spx.eac3",
-  "skip-flip-csi_miami_stereo_128_spx_small.eac3",
-  "skip-flip-matrix2_commentary1_stereo_192_small.eac3",
-  "skip-flip-serenity_english_5.1_1536_small.eac3",
-  "skip-flip-the_great_wall_7.1.eac3"
- ],
  "vectors": [
   {
    "lane": "session-flac",
@@ -2561,32 +2535,6 @@
    "reset_at": "12,24"
   }
  ],
- "open_case_readings": {
-  "skip-flip-03 - blocksize 16.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-04 - blocksize 192.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-05 - blocksize 254.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-06 - blocksize 512.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-07 - blocksize 725.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-14 - wasted bits.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-15 - only verbatim subframes.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-24 - variable blocksize file created with flake revision 264.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-53 - CUESHEET with very many indexes.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-55 - file 48-53 combined.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-60 - mono audio.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-64 - rice partitions with escape code zero.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-06 - samplerate 768kHz.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-ff_s16_block16.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-ff_s16_block192.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-ff_s16_block576.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-flac_s16_block16.flac": "The elementary reader can admit CRC-invalid numbered packets and the default FLAC decoder ignores the footer CRC. The codec and reader owners must define the checked recovery operation and verify admitted coded extents and retained PCM independently under RFC 9639 §§9.1, 9.1.8 and 9.3.",
-  "skip-flip-csi_miami_5.1_256_spx_small.eac3": "The codec-ac3 owner must qualify CRC-first concealment for independent and dependent syncframes under ATSC A/52:2018 Annex E §3.2 and state which concealment outputs and original packet clocks the session route should promise.",
-  "skip-flip-csi_miami_stereo_128_spx.eac3": "The codec-ac3 owner must qualify CRC-first concealment for independent and dependent syncframes under ATSC A/52:2018 Annex E §3.2 and state which concealment outputs and original packet clocks the session route should promise.",
-  "skip-flip-csi_miami_stereo_128_spx_small.eac3": "The codec-ac3 owner must qualify CRC-first concealment for independent and dependent syncframes under ATSC A/52:2018 Annex E §3.2 and state which concealment outputs and original packet clocks the session route should promise.",
-  "skip-flip-matrix2_commentary1_stereo_192_small.eac3": "The codec-ac3 owner must qualify CRC-first concealment for independent and dependent syncframes under ATSC A/52:2018 Annex E §3.2 and state which concealment outputs and original packet clocks the session route should promise.",
-  "skip-flip-serenity_english_5.1_1536_small.eac3": "The codec-ac3 owner must qualify CRC-first concealment for independent and dependent syncframes under ATSC A/52:2018 Annex E §3.2 and state which concealment outputs and original packet clocks the session route should promise.",
-  "skip-flip-the_great_wall_7.1.eac3": "The first compound packet begins with reserved stream type 3 and a declared extent of 2588 bytes, with a second sync at byte 2304. The codec-ac3 owner must qualify the recovered independent and dependent extents and their CRC-first concealment under ATSC A/52:2018 Annex E §§2.3.1.1–2.3.1.2 and 3.2."
- },
  "open_refusals": [
  {
   "reason": "Flexible macroblock ordering (more than one slice group)",
@@ -2670,6 +2618,84 @@
  }
  ],
  "open_deviations": [
+  {
+   "reading": "Best-effort FLAC recovery preserves the admitted frame clock after CRC damage",
+   "clause": "RFC 9639 §§5, 9.1.5, 9.1.8 and 9.3 define the frame clock and CRCs and leave decoding of invalid data unspecified.",
+   "candidate": "Keeps the source clock of frames admitted by the numbered-header reader and skips decoder refusals. Device decode finishes with 27576 to 5033984 samples per channel across these inputs.",
+   "reference": "Native output admits a different damaged packet sequence, with the first differing frame clock earlier, later or absent. The device command terminates with an error after 80 to 86016 samples per channel.",
+   "compat": "compat::flac::damaged_stream_recovery",
+   "cases": [
+    "skip-flip-03 - blocksize 16.flac",
+    "skip-flip-04 - blocksize 192.flac",
+    "skip-flip-05 - blocksize 254.flac",
+    "skip-flip-06 - blocksize 512.flac",
+    "skip-flip-07 - blocksize 725.flac",
+    "skip-flip-14 - wasted bits.flac",
+    "skip-flip-24 - variable blocksize file created with flake revision 264.flac",
+    "skip-flip-53 - CUESHEET with very many indexes.flac",
+    "skip-flip-55 - file 48-53 combined.flac",
+    "skip-flip-60 - mono audio.flac",
+    "skip-flip-64 - rice partitions with escape code zero.flac",
+    "skip-flip-06 - samplerate 768kHz.flac",
+    "skip-flip-ff_s16_block16.flac",
+    "skip-flip-ff_s16_block192.flac",
+    "skip-flip-ff_s16_block576.flac",
+    "skip-flip-flac_s16_block16.flac"
+   ]
+  },
+  {
+   "reading": "A terminal source error is distinct from a refused FLAC access unit",
+   "clause": "RFC 9639 §§5, 9.1.5, 9.1.8 and 9.3 define the frame clock and CRCs and leave decoding of invalid data unspecified.",
+   "candidate": "Delivers 93056 samples per channel before the reader fails Invalid. The second block starts at 1451247 ns.",
+   "reference": "Native decode emits 1014345 samples per channel with the second block untimestamped. The device command gives 3904 samples per channel before terminating with an error.",
+   "compat": "compat::flac::damaged_stream_recovery",
+   "cases": [
+    "skip-flip-25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac"
+   ]
+  },
+  {
+   "reading": "FLAC recovery admits only the numbered extents confirmed by the reader",
+   "clause": "RFC 9639 §§5, 9.1.5, 9.1.8 and 9.3 define the frame clock and CRCs and leave decoding of invalid data unspecified.",
+   "candidate": "Emits 191582 samples per channel, with the first admitted 4096-sample block at 650158730 ns.",
+   "reference": "Emits 224350 samples per channel and starts the first 4096-sample block at zero. Both device paths finish.",
+   "compat": "compat::flac::damaged_stream_recovery",
+   "cases": [
+    "skip-flip-15 - only verbatim subframes.flac"
+   ]
+  },
+  {
+   "reading": "Report-only E-AC-3 recovery forwards the decoded block clock",
+   "clause": "ATSC A/52:2018 Annex E §3.2 requires checked concealment after a failed syncframe CRC. These sessions use the decoder's separately documented report-only CRC policy and preserve caller packet time.",
+   "candidate": "Emits the report-only decoder output with the first 1536-sample block at zero and equal total device sample counts.",
+   "reference": "Leaves the first block untimestamped. The device reports syntax errors while emitting audio, with maximum device differences of 17957 to 49597 LSB.",
+   "compat": "compat::eac3::damaged_stream_recovery",
+   "cases": [
+    "skip-flip-csi_miami_5.1_256_spx_small.eac3",
+    "skip-flip-csi_miami_stereo_128_spx.eac3",
+    "skip-flip-csi_miami_stereo_128_spx_small.eac3",
+    "skip-flip-matrix2_commentary1_stereo_192_small.eac3"
+   ]
+  },
+  {
+   "reading": "Report-only E-AC-3 recovery retains decoded one-block units",
+   "clause": "ATSC A/52:2018 Annex E §3.2 requires checked concealment after a failed syncframe CRC. These sessions use the decoder's separately documented report-only CRC policy and preserve caller packet time.",
+   "candidate": "Emits a 256-sample block at zero and 24832 samples per channel on both output paths.",
+   "reference": "Leaves the first block untimestamped. Native output also emits 24832 samples per channel, while the device path emits 24576.",
+   "compat": "compat::eac3::damaged_stream_recovery",
+   "cases": [
+    "skip-flip-serenity_english_5.1_1536_small.eac3"
+   ]
+  },
+  {
+   "reading": "Recovery after a reserved E-AC-3 stream type in a compound packet",
+   "clause": "ATSC A/52:2018 Annex E §§2.3.1.1–2.3.1.3 reserve stream type 3, require independent substream 0 first, and define each syncframe extent. Section 3.2 defines checked CRC concealment.",
+   "candidate": "Recovers from a reserved leading header with a 2588-byte extent crossing the next sync at offset 2304. Delivers 241152 samples per channel.",
+   "reference": "Delivers 241152 samples per channel with the same block clock sequence and reports damaged block syntax. Device PCM differs by up to 185 LSB.",
+   "compat": "compat::eac3::damaged_stream_recovery",
+   "cases": [
+    "skip-flip-the_great_wall_7.1.eac3"
+   ]
+  },
  {
   "reading": "The Opus drain tail has no independent caller packet timestamp",
   "clause": "RFC 7845 §§4.3–4.4 describe the 48 kHz PCM position and end trimming; AudioSession timestamps output from the first input unit",
