@@ -2,6 +2,7 @@
 //!
 //! Assembly uses actual carrier starts, declared lengths and logical EOF.
 //! Each packet retains those boundaries and the source extents of its payload.
+use crate::compat::pes::clock::DemuxProfile;
 use crate::pes::HEADER_MAX;
 use crate::pes::PesHeader;
 use crate::psi::ElementaryStream;
@@ -191,6 +192,8 @@ impl DemuxSpan {
 /// PES-start sync even when the physical payload starts in a later packet.
 #[derive(Debug)]
 pub struct DemuxPacket {
+    /// The demux profile the packet was cut under.
+    pub profile: DemuxProfile,
     /// The program number of the observed scope.
     pub program: u16,
     /// The 13-bit PID of the observed scope.
@@ -240,6 +243,8 @@ impl DemuxPacket {
 /// carrier facts as `DemuxPacket`. Its payload exposes borrowed range views.
 #[derive(Debug)]
 pub struct CompactDemuxPacket {
+    /// The demux profile the packet was cut under.
+    pub profile: DemuxProfile,
     /// The program number of the observed scope.
     pub program: u16,
     /// The 13-bit PID of the observed scope.
@@ -281,6 +286,7 @@ impl CompactDemuxPacket {
     }
     fn into_owned(self) -> Result<DemuxPacket> {
         Ok(DemuxPacket {
+            profile: self.profile,
             program: self.program,
             pid: self.pid,
             source_origin: self.source_origin,
@@ -414,6 +420,7 @@ const _: () = assert!(size_of::<PayloadFormat>() == size_of::<bool>());
 /// operation and causal events; this observer cannot replace or suppress them.
 #[derive(Debug)]
 pub struct DemuxObserver {
+    profile: DemuxProfile,
     scope: DemuxScope,
     // No source storage or auxiliary queue; only selects a bounded demux view.
     private_audio: Option<PrivateAudioCarriage>,
@@ -500,6 +507,7 @@ impl DemuxObserver {
     /// Program zero, an invalid PID or limits, and a mismatched PMT stream type are invalid.
     /// An unsupported PES stream ID returns `Unsupported`.
     pub fn new_registered(
+        profile: DemuxProfile,
         scope: DemuxScope,
         carriage: RegisteredCarriage,
         budget: Budget,
@@ -523,14 +531,19 @@ impl DemuxObserver {
                 "PES stream ID is unsupported for the registered carriage",
             ));
         }
-        Self::admitted(scope, budget, limits)
+        Self::admitted(profile, scope, budget, limits)
     }
 
     /// An observer of AVC video on the scope's PID: stream type 0x1B with stream ID 0xE0.
     ///
     /// Fails with `Invalid` for program 0, a PID above 0x1FFE or invalid `limits`, and with
     /// `Unsupported` for another stream type or stream ID.
-    pub fn new(scope: DemuxScope, budget: Budget, limits: ParseLimits) -> Result<Self> {
+    pub fn new(
+        profile: DemuxProfile,
+        scope: DemuxScope,
+        budget: Budget,
+        limits: ParseLimits,
+    ) -> Result<Self> {
         if scope.program == 0 {
             return Err(Error::Invalid(
                 "PES observer requires a nonzero program number",
@@ -543,10 +556,16 @@ impl DemuxObserver {
             ));
         }
         limits.validate()?;
-        Self::admitted(scope, budget, limits)
+        Self::admitted(profile, scope, budget, limits)
     }
-    fn admitted(scope: DemuxScope, budget: Budget, limits: ParseLimits) -> Result<Self> {
+    fn admitted(
+        profile: DemuxProfile,
+        scope: DemuxScope,
+        budget: Budget,
+        limits: ParseLimits,
+    ) -> Result<Self> {
         Ok(Self {
+            profile,
             scope,
             private_audio: None,
             demux_input: None,
@@ -884,6 +903,7 @@ mod tests {
             reason = "field layout fixes the ordinary observer's charged inline footprint"
         )]
         struct OwnedObserverLayout {
+            profile: DemuxProfile,
             scope: DemuxScope,
             private_audio: Option<PrivateAudioCarriage>,
             demux_input: Option<crate::compat::input::InputBinding>,
@@ -960,6 +980,7 @@ mod tests {
             clock: 0,
         };
         let observer = DemuxObserver::new(
+            DemuxProfile::PesPackets,
             DemuxScope {
                 program: 1,
                 pid: 256,
@@ -1432,6 +1453,7 @@ mod tests {
             clock: 0,
         };
         let mut observer = DemuxObserver::new(
+            DemuxProfile::PesPackets,
             DemuxScope {
                 program: 1,
                 pid: 256,

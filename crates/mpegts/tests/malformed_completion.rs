@@ -5,9 +5,9 @@ use triergon_core::{
     Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{
-    DemuxObserver, DemuxPacket, DemuxScope, MalformedInputCompletion, MalformedInputFact,
-    MalformedInputKind, MalformedSourceDisposition, NoPacketsConfirmation, RecoveredPes,
-    TransportFaultRecovery,
+    DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, MalformedInputCompletion,
+    MalformedInputFact, MalformedInputKind, MalformedSourceDisposition, NoPacketsConfirmation,
+    RecoveredPes, TransportFaultRecovery,
 };
 use triergon_mpegts::stream::{MediaEntityEnd, TraceEvent};
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits};
@@ -199,8 +199,13 @@ impl Run {
                                     epochs: context.epochs,
                                 };
                                 let mut observer = TransportFaultRecovery::new(
-                                    DemuxObserver::new(scope, pool.clone(), ParseLimits::default())
-                                        .unwrap(),
+                                    DemuxObserver::new(
+                                        DemuxProfile::PesPackets,
+                                        scope,
+                                        pool.clone(),
+                                        ParseLimits::default(),
+                                    )
+                                    .unwrap(),
                                 )
                                 .unwrap();
                                 observer.bind_source_input(observed.input()).unwrap();

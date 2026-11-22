@@ -225,6 +225,7 @@ impl DemuxObserver {
         .ok_or(Error::Invalid("PES emission is missing its source header"))?;
         let span_count = self.span_count();
         let packet = CompactDemuxPacket {
+            profile: self.profile,
             program: self.scope.program,
             pid: self.scope.pid,
             source_origin: origin,

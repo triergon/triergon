@@ -3,7 +3,7 @@ use super::tables::PsiWork;
 use super::*;
 use crate::AssemblyStep;
 use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
-use crate::compat::pes::{DemuxScope, DemuxSpan, RegisteredCarriage};
+use crate::compat::pes::{DemuxProfile, DemuxScope, DemuxSpan, RegisteredCarriage};
 use crate::psi::POINTER_FIELD;
 use crate::transport::SYNC_BYTE;
 use crate::transport::carrier::TS188_BYTES;
@@ -352,6 +352,7 @@ impl PayloadFeed {
             AssemblyStep::NeedPayload
         ));
         let mut observer = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
             DemuxScope {
                 program: 1,
                 pid: PID,

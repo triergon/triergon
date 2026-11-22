@@ -22,6 +22,7 @@ pub(crate) fn clock_describes(
 ) -> bool {
     clock.program == packet.program
         && clock.pid == packet.pid
+        && clock.profile == packet.profile
         && clock.source_epochs == packet.source_epochs
         && clock.source_pts_raw33 == pts_raw33
         && clock.source_dts_raw33 == dts_raw33

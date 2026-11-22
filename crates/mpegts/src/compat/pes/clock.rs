@@ -7,6 +7,45 @@ use crate::pes::{Pes, PesHeader};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
+/// The demuxer operation these views reproduce, distinct from the default
+/// parser operation and from any diagnostic correct_ts_overflow=0 observation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DemuxProfile {
+    /// The demuxer's PES packet output, one packet per PES as it cuts them.
+    PesPackets,
+}
+#[cfg(feature = "reference-trace")]
+impl DemuxProfile {
+    /// The profile's name in reference traces.
+    pub fn label(self) -> &'static str {
+        "demux-pes"
+    }
+    /// The revision of the reference demuxer this profile reproduces.
+    pub fn reference_revision(self) -> &'static str {
+        "d32b387f2b0a484599d4587d651891f0c63c4238"
+    }
+    /// SHA-256 digest, in hex, of the reference worker that recorded the profile's traces.
+    pub fn worker_sha256(self) -> &'static str {
+        "19c06e53c62852b409eec9771cb11d9d7f5164b4618545a449d7e993f99346df"
+    }
+    /// The operation name the profile is recorded under in comparison traces.
+    pub fn operation(self) -> &'static str {
+        "mpegts-demux-pes-observation"
+    }
+    /// The demuxer's format flags in the reference run.
+    pub fn flags(self) -> u32 {
+        48
+    }
+    /// Whether the reference run kept the demuxer's default timestamp overflow correction.
+    pub fn default_overflow_correction(self) -> bool {
+        true
+    }
+    /// Whether the reference run probed stream information before reading packets.
+    pub fn find_stream_info(self) -> bool {
+        false
+    }
+}
+
 /// Whether a demux timestamp comes from an encoded field, a PTS-only fallback or absence.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TimestampOrigin {
@@ -33,6 +72,8 @@ pub struct ClockOrigin {
 /// Raw source timestamps and their optional positions in the demuxer’s 90 kHz interval.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DemuxTimeView {
+    /// The demux profile the time was placed under.
+    pub profile: DemuxProfile,
     /// The program number of the clock.
     pub program: u16,
     /// The 13-bit PID of the PES.
@@ -279,6 +320,7 @@ impl DemuxClock {
         };
         let (next_origin, pts90, dts90) = self.placed(pts, dts)?;
         let result = DemuxTimeView {
+            profile: DemuxProfile::PesPackets,
             program: self.program,
             pid,
             source_epochs: epochs,

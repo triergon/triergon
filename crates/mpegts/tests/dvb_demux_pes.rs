@@ -4,8 +4,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_core::{InputCursor, InputWindow, SourceCapabilities, Step};
 use triergon_mpegts::compat::pes::{
-    DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope,
-    DvbSubtitlesDescriptors, SourceContext,
+    DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxProfile,
+    DemuxScope, DvbSubtitlesDescriptors, SourceContext,
 };
 use triergon_mpegts::psi::{
     CodecIdentification, DescriptorNamespace, Descriptors, DvbNamespaceEvidence,
@@ -52,8 +52,15 @@ fn context(n: u64) -> SourceContext {
     }
 }
 fn make(b: &Budget, limits: ParseLimits) -> DemuxObserver {
-    DemuxObserver::new_dvb_subtitles(scope(), NS, desc(DS), b.clone(), limits)
-        .expect("expected a DVB subtitle PES observer")
+    DemuxObserver::new_dvb_subtitles(
+        DemuxProfile::PesPackets,
+        scope(),
+        NS,
+        desc(DS),
+        b.clone(),
+        limits,
+    )
+    .expect("expected a DVB subtitle PES observer")
 }
 fn packet(b: &Budget, raw: &[u8], offset: u64) -> TransportPacket {
     let mut p = parse_transport(
@@ -180,6 +187,7 @@ fn check(p: &DemuxPacket, body: &[u8], offset: u64, pts: Option<u64>, dts: Optio
 fn original(raw: &[u8], body: &[u8], descriptor: &[u8]) {
     let b = Budget::new(32768).unwrap();
     let mut o = DemuxObserver::new_dvb_subtitles(
+        DemuxProfile::PesPackets,
         scope(),
         NS,
         desc(descriptor),
@@ -240,6 +248,7 @@ fn dvb_namespace_scope_preflight_before_stub() {
     let n = b.used();
     assert_eq!(
         DemuxObserver::new_dvb_subtitles(
+            DemuxProfile::PesPackets,
             scope(),
             DescriptorNamespace::Unspecified,
             desc(DS),
@@ -264,8 +273,15 @@ fn dvb_namespace_scope_preflight_before_stub() {
         },
     ] {
         assert!(
-            DemuxObserver::new_dvb_subtitles(s, NS, desc(DS), b.clone(), ParseLimits::default())
-                .is_err()
+            DemuxObserver::new_dvb_subtitles(
+                DemuxProfile::PesPackets,
+                s,
+                NS,
+                desc(DS),
+                b.clone(),
+                ParseLimits::default()
+            )
+            .is_err()
         );
     }
     assert_eq!(b.used(), n);
@@ -276,6 +292,7 @@ fn dvb_malformed_tlv_primary_error() {
     for raw in [&[0x59, 8, 1][..], &[0x59, 1, 0][..]] {
         assert!(matches!(
             DemuxObserver::new_dvb_subtitles(
+                DemuxProfile::PesPackets,
                 scope(),
                 NS,
                 desc(raw),
@@ -297,6 +314,7 @@ fn dvb_multiplicity_no_first_service_fallback() {
     for raw in [&[0x59, 0][..], &two, &dup] {
         assert!(matches!(
             DemuxObserver::new_dvb_subtitles(
+                DemuxProfile::PesPackets,
                 scope(),
                 NS,
                 desc(raw),
@@ -320,7 +338,14 @@ fn dvb_program_and_extra_context_are_nonpasses() {
         desc(&extra),
     ] {
         assert!(matches!(
-            DemuxObserver::new_dvb_subtitles(scope(), NS, d, b.clone(), ParseLimits::default()),
+            DemuxObserver::new_dvb_subtitles(
+                DemuxProfile::PesPackets,
+                scope(),
+                NS,
+                d,
+                b.clone(),
+                ParseLimits::default()
+            ),
             Err(Error::Unsupported(_))
         ));
     }
@@ -333,7 +358,15 @@ fn dvb_real_descriptor_limit_before_feature() {
         ..ParseLimits::default()
     };
     assert_eq!(
-        DemuxObserver::new_dvb_subtitles(scope(), NS, desc(DS), b, limits).unwrap_err(),
+        DemuxObserver::new_dvb_subtitles(
+            DemuxProfile::PesPackets,
+            scope(),
+            NS,
+            desc(DS),
+            b,
+            limits
+        )
+        .unwrap_err(),
         Error::Limit {
             requested: 10,
             maximum: 9
@@ -714,6 +747,7 @@ fn dvb_incomplete_overrun_counter_damage_not_repaired() {
 fn dvb_wrapper_accepted_real_carriers_uses_no_rejected_policy() {
     let b = Budget::new(32768).unwrap();
     let mut o = RecoveryObserver::new_dvb_subtitles(
+        DemuxProfile::PesPackets,
         scope(),
         NS,
         desc(DS),

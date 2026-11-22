@@ -7,7 +7,7 @@ use triergon_core::{
     Budget, Error, InputCursor, InputWindow, Result, SourceLocation, Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{
-    DemuxObserver, DemuxScope, MalformedInputCompletion, MalformedSourceDisposition,
+    DemuxObserver, DemuxProfile, DemuxScope, MalformedInputCompletion, MalformedSourceDisposition,
     NoPacketsConfirmation, RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
 use triergon_mpegts::psi::ProgramMap;
@@ -154,6 +154,7 @@ fn bind_observer(
         epochs: context.epochs,
     };
     let observer = DemuxObserver::new_registered(
+        DemuxProfile::PesPackets,
         scope,
         RegisteredCarriage::Avc,
         input.budget().clone(),

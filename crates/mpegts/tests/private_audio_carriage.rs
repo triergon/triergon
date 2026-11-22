@@ -6,8 +6,8 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{
-    DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope,
-    PrivateAudioCarriage, PrivateAudioDescriptors, SourceContext, TimestampOrigin,
+    DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxProfile,
+    DemuxScope, PrivateAudioCarriage, PrivateAudioDescriptors, SourceContext, TimestampOrigin,
 };
 use triergon_mpegts::psi::{CodecIdentification, DescriptorNamespace};
 #[cfg(feature = "reference-trace")]
@@ -86,6 +86,7 @@ fn context(ordinal: u64) -> SourceContext {
 }
 fn observer(case: Case, budget: &Budget) -> DemuxObserver {
     DemuxObserver::new_private_audio(
+        DemuxProfile::PesPackets,
         scope(case),
         case.carriage,
         descriptors(case),
@@ -347,7 +348,13 @@ fn audio_legacy_new_remains_h264_only() {
         let budget = Budget::new(4096).unwrap();
         let used = budget.used();
         assert_eq!(
-            DemuxObserver::new(scope(case), budget.clone(), ParseLimits::default()).unwrap_err(),
+            DemuxObserver::new(
+                DemuxProfile::PesPackets,
+                scope(case),
+                budget.clone(),
+                ParseLimits::default()
+            )
+            .unwrap_err(),
             Error::Unsupported("AVC PES requires PMT stream type 0x1b and PES stream ID 0xe0")
         );
         assert_eq!(budget.used(), used);
@@ -360,8 +367,15 @@ fn audio_bad_scope_kind_id_and_limits_precede_feature_stub_without_charge() {
         let budget = Budget::new(4096).unwrap();
         let used = budget.used();
         let call = |value, kind, limits| {
-            DemuxObserver::new_private_audio(value, kind, descriptors(case), budget.clone(), limits)
-                .unwrap_err()
+            DemuxObserver::new_private_audio(
+                DemuxProfile::PesPackets,
+                value,
+                kind,
+                descriptors(case),
+                budget.clone(),
+                limits,
+            )
+            .unwrap_err()
         };
         let mut bad = scope(case);
         bad.program = 0;
@@ -835,6 +849,7 @@ fn audio_source_entity_epoch_and_foreign_pool_rejection_do_not_poison_valid_back
 fn audio_finite_pes_policy_limit_is_real_and_has_no_partial_output() {
     let budget = Budget::new(16_384).unwrap();
     let mut observer = DemuxObserver::new_private_audio(
+        DemuxProfile::PesPackets,
         scope(AC3_DVB),
         AC3_DVB.carriage,
         descriptors(AC3_DVB),
@@ -983,6 +998,7 @@ fn audio_counter_damage_unbounded_length_and_finite_overrun_are_not_h264_recover
 fn audio_composed_wrapper_explicit_policy_uses_real_accepted_packets_only() {
     let budget = Budget::new(16_384).unwrap();
     let mut observer = RecoveryObserver::new_private_audio(
+        DemuxProfile::PesPackets,
         scope(AC3_DVB),
         AC3_DVB.carriage,
         descriptors(AC3_DVB),
@@ -1016,6 +1032,7 @@ fn audio_composed_wrapper_explicit_policy_uses_real_accepted_packets_only() {
 fn audio_rejected_carrier_stays_original_invalid_source_and_does_not_advance_demux_input() {
     let budget = Budget::new(16_384).unwrap();
     let mut observer = RecoveryObserver::new_private_audio(
+        DemuxProfile::PesPackets,
         scope(AC3_DVB),
         AC3_DVB.carriage,
         descriptors(AC3_DVB),

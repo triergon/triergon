@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_mpegts::compat::pes::{DemuxClock, DemuxScope, SourceContext};
+use triergon_mpegts::compat::pes::{DemuxClock, DemuxProfile, DemuxScope, SourceContext};
 use triergon_mpegts::psi::{DescriptorNamespace, PatTable, ProgramMap, TableStep};
 use triergon_mpegts::reference_trace::recovery::{
     DemuxObservation, PatRoute, PatSelection, PmtBinding, RecoveryObserver,
@@ -296,8 +296,13 @@ fn bind(events: &Events, b: &Budget) -> (RecoveryObserver, PatRoute) {
         entity: r.entity(),
         epochs: c,
     };
-    let mut o = RecoveryObserver::new_selected_avc_faults(scope, b.clone(), ParseLimits::default())
-        .unwrap();
+    let mut o = RecoveryObserver::new_selected_avc_faults(
+        DemuxProfile::PesPackets,
+        scope,
+        b.clone(),
+        ParseLimits::default(),
+    )
+    .unwrap();
     {
         let mut job = o.bind_selected_pmt(r, m, context(n, c)).unwrap();
         let mut done = false;
@@ -632,8 +637,13 @@ fn initial_binding_is_allocation_free_and_drop_cancel_is_atomic() {
         entity: SourceId(1),
         epochs: c,
     };
-    let mut o = RecoveryObserver::new_selected_avc_faults(scope, b.clone(), ParseLimits::default())
-        .unwrap();
+    let mut o = RecoveryObserver::new_selected_avc_faults(
+        DemuxProfile::PesPackets,
+        scope,
+        b.clone(),
+        ParseLimits::default(),
+    )
+    .unwrap();
     let used = b.used();
     {
         let mut job = o.bind_selected_pmt(r, m, context(n, c)).unwrap();

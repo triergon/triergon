@@ -38,7 +38,8 @@ pub(crate) mod fault;
 pub(crate) mod observer;
 
 pub use clock::{
-    ClockOrigin, DemuxClock, DemuxTimeView, DiagnosticTimeView, EncodedTimeView, TimestampOrigin,
+    ClockOrigin, DemuxClock, DemuxProfile, DemuxTimeView, DiagnosticTimeView, EncodedTimeView,
+    TimestampOrigin,
 };
 /// Control-only completion from complete physical carrier coverage and
 /// actual source EOF. The confirmation never creates a validated PES scope

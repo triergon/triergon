@@ -1052,7 +1052,7 @@ impl TsEngine {
 mod projection_tests {
     use super::*;
     use crate::event::{EngineStep, Event};
-    use ts::compat::pes::DemuxTimeView;
+    use ts::compat::pes::{DemuxProfile, DemuxTimeView};
     use ts::{
         SourceEpochs,
         clock::SourceTimePolicy,
@@ -1077,6 +1077,7 @@ mod projection_tests {
             ),
             source_dts: Some(source_timestamp(None, key, SourceTimePolicy::Unanchored).unwrap()),
             demux_clock: Some(DemuxTimeView {
+                profile: DemuxProfile::PesPackets,
                 program: key.program,
                 pid: 257,
                 source_epochs: SourceEpochs {

@@ -1025,7 +1025,9 @@ mod tests {
 
     #[test]
     fn progressive_continuation_moves_charged_payload_storage() {
-        use crate::compat::pes::{DemuxObserver, DemuxScope, ReadyContinuation, SourceContext};
+        use crate::compat::pes::{
+            DemuxObserver, DemuxProfile, DemuxScope, ReadyContinuation, SourceContext,
+        };
         use crate::{ParseLimits, SourceEpochs, SourceRange};
 
         let pool = Budget::new(8192).unwrap();
@@ -1074,6 +1076,7 @@ mod tests {
             byte_run_epoch: None,
         };
         let mut observer = DemuxObserver::new(
+            DemuxProfile::PesPackets,
             DemuxScope {
                 program: 1,
                 pid: 256,

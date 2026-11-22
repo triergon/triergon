@@ -4,7 +4,7 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, WorkBudget,
 };
 use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep};
-use triergon_mpegts::compat::pes::{DemuxObserver, DemuxScope, SourceContext};
+use triergon_mpegts::compat::pes::{DemuxObserver, DemuxProfile, DemuxScope, SourceContext};
 #[cfg(feature = "reference-trace")]
 use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::transport::parse_transport;
@@ -52,6 +52,7 @@ fn complete(i: &InputCursor, w: &InputWindow, format: PacketFormat) -> InputCont
 }
 fn observer(b: &Budget) -> DemuxObserver {
     DemuxObserver::new(
+        DemuxProfile::PesPackets,
         DemuxScope {
             program: 1,
             pid: 256,
@@ -351,6 +352,7 @@ fn selected_transport_fault_admission_keeps_the_validated_input_cursor() {
         let (budget, mut input, window) = setup(data, true);
         let context = complete(&input, &window, PacketFormat::Ts188);
         let mut recovery = RecoveryObserver::new_selected_avc_faults(
+            DemuxProfile::PesPackets,
             observer(&budget).scope(),
             budget.clone(),
             ParseLimits::default(),

@@ -31,7 +31,7 @@ use triergon_core::{
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::pes::{
-    DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, DvbSubtitlesDescriptors,
+    DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, DvbSubtitlesDescriptors,
     MalformedInputCompletion, MalformedSourceDisposition, NoMediaConfirmation, PacketCompletion,
     PesFaultPolicy, PrivateAudioCarriage, PrivateAudioDescriptors, RecoveredPes,
     RegisteredCarriage, SourceContext, TransportFaultRecovery,
@@ -46,6 +46,7 @@ pub(crate) mod au_recovery;
 
 pub const PREFIX: &str = "ts-";
 const OPERATION: &str = "mpegts-pes-packets";
+const PROFILE: DemuxProfile = DemuxProfile::PesPackets;
 const WINDOW: usize = 64 * 1024;
 const WORK: u64 = 4096;
 /// FFmpeg's `AV_NOPTS_VALUE`, folded for an absent timestamp on both sides.
@@ -257,9 +258,10 @@ fn observer(
     };
     let (budget, limits) = (pool.clone(), ParseLimits::default());
     let observer = if let Some(carriage) = registered {
-        DemuxObserver::new_registered(scope, carriage, budget, limits)
+        DemuxObserver::new_registered(PROFILE, scope, carriage, budget, limits)
     } else if dvb_subtitles {
         DemuxObserver::new_dvb_subtitles(
+            PROFILE,
             scope,
             map.descriptor_namespace,
             DvbSubtitlesDescriptors {
@@ -272,7 +274,7 @@ fn observer(
     } else if private_audio {
         let carriage =
             PrivateAudioCarriage::from_observed_pmt(stream.stream_type, descriptors, limits)?;
-        DemuxObserver::new_private_audio(scope, carriage, descriptors, budget, limits)
+        DemuxObserver::new_private_audio(PROFILE, scope, carriage, descriptors, budget, limits)
     } else {
         Err(unrouted)
     }?;

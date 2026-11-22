@@ -7,7 +7,7 @@ use crate::engine::ts::{Delivery, TsEngine};
 use triergon_core::{BudgetVec, Error};
 use triergon_mpegts::{self as ts};
 use ts::compat::pes::{
-    DemuxObserver, DemuxScope, DvbSubtitlesDescriptors, PrivateAudioCarriage,
+    DemuxObserver, DemuxProfile, DemuxScope, DvbSubtitlesDescriptors, PrivateAudioCarriage,
     PrivateAudioDescriptors, RegisteredCarriage,
 };
 use ts::psi::{DescriptorNamespace, ProgramMap};
@@ -169,6 +169,7 @@ impl TsEngine {
             },
             fixed => fixed,
         };
+        let profile = DemuxProfile::PesPackets;
         let pool = self.input.budget().clone();
         let mut observer = match carriage {
             Carriage::Registered(carriage) => {
@@ -182,19 +183,26 @@ impl TsEngine {
                     return Err(mismatch);
                 }
                 scope.stream_id = stream_id;
-                DemuxObserver::new_registered(scope, carriage, pool, self.limits)
+                DemuxObserver::new_registered(profile, scope, carriage, pool, self.limits)
             }
             Carriage::PrivateAudio(carriage) if hls_audio => DemuxObserver::new_hls_private_audio(
+                profile,
                 scope,
                 carriage,
                 private_audio,
                 pool,
                 self.limits,
             ),
-            Carriage::PrivateAudio(carriage) => {
-                DemuxObserver::new_private_audio(scope, carriage, private_audio, pool, self.limits)
-            }
+            Carriage::PrivateAudio(carriage) => DemuxObserver::new_private_audio(
+                profile,
+                scope,
+                carriage,
+                private_audio,
+                pool,
+                self.limits,
+            ),
             Carriage::DvbSubtitles => DemuxObserver::new_dvb_subtitles(
+                profile,
                 scope,
                 map.descriptor_namespace,
                 DvbSubtitlesDescriptors {

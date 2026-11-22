@@ -3,8 +3,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_mpegts::compat::pes::{
-    DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope,
-    RegisteredCarriage, SourceContext, TimestampOrigin,
+    DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxProfile,
+    DemuxScope, RegisteredCarriage, SourceContext, TimestampOrigin,
 };
 use triergon_mpegts::transport::{TransportPacket, parse_transport};
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, SourceRange};
@@ -77,6 +77,7 @@ fn context() -> SourceContext {
 }
 fn observer(case: Case, budget: &Budget) -> DemuxObserver {
     DemuxObserver::new_registered(
+        DemuxProfile::PesPackets,
         scope(case),
         case.carriage,
         budget.clone(),
@@ -329,6 +330,7 @@ fn registered_wrong_kind_is_rejected_without_charging() {
         let mut wrong = scope(case);
         wrong.stream_type ^= 1;
         let error = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
             wrong,
             case.carriage,
             budget.clone(),
@@ -351,6 +353,7 @@ fn registered_unobserved_stream_id_is_not_silently_substituted() {
         let mut wrong = scope(case);
         wrong.stream_id ^= 1;
         let error = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
             wrong,
             case.carriage,
             budget.clone(),
@@ -373,6 +376,7 @@ fn registered_invalid_program_and_null_pid_are_rejected_before_feature_stub() {
         let mut wrong = scope(case);
         wrong.program = 0;
         let error = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
             wrong,
             case.carriage,
             budget.clone(),
@@ -386,6 +390,7 @@ fn registered_invalid_program_and_null_pid_are_rejected_before_feature_stub() {
         wrong = scope(case);
         wrong.pid = 0x1fff;
         let error = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
             wrong,
             case.carriage,
             budget.clone(),
@@ -405,9 +410,14 @@ fn registered_bad_limits_do_not_hide_behind_missing_feature() {
             pes_bytes: 5,
             ..ParseLimits::default()
         };
-        let error =
-            DemuxObserver::new_registered(scope(case), case.carriage, budget.clone(), limits)
-                .unwrap_err();
+        let error = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
+            scope(case),
+            case.carriage,
+            budget.clone(),
+            limits,
+        )
+        .unwrap_err();
         assert_eq!(error, Error::Invalid("TS parser limits"));
         assert_eq!(budget.used(), before);
     }

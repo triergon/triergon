@@ -5,7 +5,7 @@ use triergon_core::{
     Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{
-    DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, PesFaultPolicy, RecoveredPes,
+    DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, PesFaultPolicy, RecoveredPes,
     SourceContext, TransportFaultRecovery,
 };
 use triergon_mpegts::stream::{MediaEntityEnd, ObservedTrace, TraceEvent, TransportStream};
@@ -26,6 +26,7 @@ static CANCEL: AtomicBool = AtomicBool::new(true);
 fn policy(pool: &Budget, options: PesFaultPolicy) -> TransportFaultRecovery {
     TransportFaultRecovery::with_policy(
         DemuxObserver::new(
+            DemuxProfile::PesPackets,
             DemuxScope {
                 program: 1,
                 pid: 256,
