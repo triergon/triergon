@@ -119,10 +119,6 @@ pub struct DtsNormalSourceFrame {
     facts: DtsNormalFacts,
 }
 impl DtsNormalSourceFrame {
-    /// The frame's payload, which also maps each payload bit to its source byte.
-    pub fn payload(&self) -> &DtsPackedPayload {
-        &self.payload
-    }
     /// The frame as the source stores it.
     pub fn source_bytes(&self) -> &Bytes {
         self.payload.source_bytes()

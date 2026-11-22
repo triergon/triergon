@@ -138,7 +138,7 @@ impl DeclaredConfiguration {
     pub const fn source_id(&self) -> SourceId {
         self.source
     }
-    /// The coding standard the caller declared.
+    /// The coding standard the caller declared, even when the record has no arrays.
     pub const fn codec(&self) -> Codec {
         self.codec
     }

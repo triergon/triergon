@@ -154,10 +154,6 @@ impl DtsPackedPayload {
     pub const fn identity(&self) -> DtsSourceIdentity {
         self.identity
     }
-    /// The packing the record was read in.
-    pub const fn packing(&self) -> DtsPacking {
-        self.packing
-    }
     /// Number of payload bits in `storage_bytes()`, counted from its first bit.
     pub const fn valid_bits(&self) -> usize {
         self.valid_bits

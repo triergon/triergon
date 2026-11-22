@@ -837,12 +837,6 @@ impl LateOutput {
         self.last.is_some_and(|last| poc < last)
     }
 
-    /// The order count of the last picture admitted.
-    #[must_use]
-    pub fn last(&self) -> Option<i32> {
-        self.last
-    }
-
     /// A new output order begins.
     pub fn restart(&mut self) {
         self.last = None;

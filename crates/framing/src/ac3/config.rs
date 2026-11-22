@@ -1,7 +1,7 @@
 //! AC3SpecificBox / EC3SpecificBox payloads, ETSI TS 102 366 V1.4.1 Annex F.
 //! The caller supplies the box kind and exact payload; box headers and later
 //! reserved-tail extensions are not guessed. Source fields are not repaired.
-use crate::{BuildStep, ac3::frame::BIT_RATES_KBPS, record_input};
+use crate::{BuildStep, record_input};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, InputCursor, Result, SourceId, Step, WorkBudget};
 
@@ -94,16 +94,6 @@ impl Dac3Fields {
         [48000, 44100, 32000]
             .get(usize::from(self.fscod()))
             .copied()
-    }
-    /// The nominal bit rate that `bit_rate_code` names, in bits per second: 32000
-    /// to 640000. `None` for a reserved code and for a `bsid` above 8.
-    pub fn nominal_bit_rate_bps(self) -> Option<u32> {
-        if self.bsid() > 8 {
-            return None;
-        }
-        BIT_RATES_KBPS
-            .get(usize::from(self.bit_rate_code()))
-            .map(|value| u32::from(*value) * 1000)
     }
     /// The reserved and unsupported values among the fields, as
     /// [`Ac3ConfigIssues`] bits.

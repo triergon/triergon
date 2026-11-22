@@ -84,10 +84,6 @@ impl Vp9ConfigSyntaxIssues {
     pub const fn bits(self) -> u8 {
         self.0
     }
-    /// True when none of the listed issues was found.
-    pub const fn is_empty(self) -> bool {
-        self.0 == 0
-    }
 }
 
 /// A parsed `vpcC` record with the `FullBox` header it came with, sharing the

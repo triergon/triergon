@@ -111,10 +111,6 @@ impl Ac3HeaderIssues {
     pub const fn bits(self) -> u8 {
         self.0
     }
-    /// Whether no issue was found.
-    pub const fn is_empty(self) -> bool {
-        self.0 == 0
-    }
 }
 
 /// The start of a syncframe as [`probe_header`] reads it: what both families
@@ -198,17 +194,6 @@ impl Ac3FrameHeader {
             return Err(Error::Invalid("zero coded audio blocks"));
         }
         Ok((numerator, denominator))
-    }
-    /// The nominal bit rate that an AC-3 frame's `frmsizecod` names (Table 5.18),
-    /// in bits per second: 32000 to 640000. `None` for E-AC-3, which codes no
-    /// nominal rate, and for a reserved code.
-    pub fn nominal_bit_rate_bps(self) -> Option<u32> {
-        match self.details {
-            Ac3FrameDetails::Ac3 { frmsizecod, .. } => BIT_RATES_KBPS
-                .get(usize::from(frmsizecod / 2))
-                .map(|rate| u32::from(*rate) * 1000),
-            Ac3FrameDetails::Eac3 { .. } => None,
-        }
     }
     /// acmod's full-bandwidth count, not aggregate programme/channel-map layout.
     pub fn acmod_full_bandwidth_channels(self) -> Option<u8> {

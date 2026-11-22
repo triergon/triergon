@@ -69,10 +69,6 @@ impl NalPacketConfigRejection {
     pub fn source_bytes(&self) -> &Bytes {
         &self.source
     }
-    /// The error [`NalPacketConfigWriter::step`] returned for the array.
-    pub fn source_error(&self) -> Error {
-        self.error
-    }
     /// The NAL unit type the first such array declares, 0 to 63.
     pub fn declared_array_type(&self) -> u8 {
         self.declared_array_type
