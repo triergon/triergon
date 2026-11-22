@@ -1,6 +1,34 @@
 {
   "about": "Public features of each library crate that no gated comparison compares directly with its reference, by crate: each by a short stable name, the public items it is reached through, how near it comes to a direct comparison and what a comparison would need. `degree` is one of `step` (compared only as a step inside a larger compared operation), `recorded` (checked against reference output recorded once, which no worker re-runs), `outside-gate` (compared with the reference by an opt-in test or a command the gate does not run), `unit-tests` (unit tests only), `untested` (no tests) and `no-reference` (no reference implements it). A crate listed with no features was reviewed and has none; a crate not listed is not reviewed yet. A feature leaves its list when a gated comparison compares it directly. `cargo xtask check-design` checks the list and holds the count per crate to harness/gate-exceptions.json, so a feature left uncompared is recorded as visibly as a loosened gate.",
   "crates": {
+    "codec-worker": [],
+    "playback-worker": [],
+    "triergon": [
+      {
+        "name": "play-pipeline",
+        "entry_points": ["playback::Player::read_output", "playback::Output::packet", "playback::Engine::track", "bridge::access::AccessUnits::for_track", "session::audio_configuration", "session::video_codec", "session::AudioSession::feed_discarding", "session::VideoSession::feed", "render::ass::Renderer::render"],
+        "degree": "unit-tests",
+        "needs": "a worker operation running examples/play/pipeline.rs over Matroska, MP4 and TS inputs, its packets, RGBA pictures and stereo PCM graded against the reference's demux and decode of the same file by the h264, hevc and audio lane rules; tests/play.rs checks counts only"
+      },
+      {
+        "name": "any-reader-mpegts",
+        "entry_points": ["AnyReader::MpegTs", "AnyPacket::MpegTs", "AnyOther::MpegTs"],
+        "degree": "unit-tests",
+        "needs": "mpegts-access-units cases read through AnyReader::open and folded as that contract folds; no gated operation opens a transport stream through the facade"
+      },
+      {
+        "name": "any-reader-seek-and-control",
+        "entry_points": ["AnyReader::request_seek", "AnyReader::reset", "AnyReader::fail", "AnyReader::capabilities", "AnyPacket::random_access", "Blocking::seek"],
+        "degree": "unit-tests",
+        "needs": "seek and reset cases of matroska-cues-preroll, isobmff-seek and mpegts-previous-picture run through AnyReader and Blocking and folded as those contracts fold, with each packet's random-access flag"
+      },
+      {
+        "name": "blocking-probe",
+        "entry_points": ["probe", "Probe", "open_blocking", "open_sequential", "Replayed"],
+        "degree": "step",
+        "needs": "every Probe verdict (TS188 apart from M2TS192, ID3- and junk-prefixed elementary input) and the adapters' format choice and replayed prefix compared with the reference's av_probe_input_format3 and demuxer choice; compared today only through codecs-files reading the files they open"
+      }
+    ],
     "triergon-ass": [],
     "triergon-bitstream": [
       {
@@ -14,6 +42,56 @@
         "entry_points": ["crc", "crc::Crc32Mpeg", "crc::Crc32Ieee"],
         "degree": "step",
         "needs": "each polynomial's values over a corpus against the reference's av_crc; compared only through the readers and decoders that check Ogg pages, MPEG-TS sections, Matroska elements and audio frames"
+      }
+    ],
+    "triergon-bridge": [
+      {
+        "name": "access-units",
+        "entry_points": ["access::AccessUnits", "access::AccessUnits::for_track", "access::AccessUnits::with_record", "access::AccessUnits::packet", "access::AccessUnitsSetup", "access::AccessUnitJob", "access::AccessUnit"],
+        "degree": "unit-tests",
+        "needs": "a worker operation framing each track through AccessUnits and folding the units against the reference's bitstream-filtered packets"
+      },
+      {
+        "name": "mp4-packet-bridges",
+        "entry_points": ["aac::AacBridge", "av1::Av1Bridge", "av1::Av1BridgeSetup"],
+        "degree": "unit-tests",
+        "needs": "mp4-range cases folded after the ADTS and temporal-unit bridges against the reference's aac_adtstoasc inverse and av1_frame_merge output"
+      },
+      {
+        "name": "text-subtitle-bridge",
+        "entry_points": ["text::TextBridge", "text::TextSource"],
+        "degree": "unit-tests",
+        "needs": "a worker operation playing Matroska and MP4 text tracks through TextBridge, folding each cue against the reference's decoded subtitles of the same track"
+      },
+      {
+        "name": "bitmap-subtitle-bridges",
+        "entry_points": ["bitmap::PgsBridge", "bitmap::DvdReceiver", "matroska::MatroskaBitmapTrack", "matroska::MatroskaBitmapClockProbe", "mp4_dvd::Mp4DvdSetup", "mp4_dvd::Mp4DvdTrack", "ts::dvb::DvbTsBridge", "ts::pgs::PgsTsTrack"],
+        "degree": "unit-tests",
+        "needs": "worker operations playing a container through each bridge, folding its pictures and clocks against the reference's avcodec_decode_subtitle2 output for the demuxer's packets; the subtitle contracts compare the receivers on extracted packets, not the playback handoff"
+      },
+      {
+        "name": "caption-and-teletext-bridges",
+        "entry_points": ["caption::CaptionBridge", "ts::teletext::TeletextTsBridge"],
+        "degree": "unit-tests",
+        "needs": "worker operations playing video with captions and TS teletext through each bridge, folding cues and pages against the reference's cc_dec and libzvbi decode of the same packets"
+      },
+      {
+        "name": "legacy-aac-initialization",
+        "entry_points": ["compat::matroska::legacy_aac_lc_initialization"],
+        "degree": "unit-tests",
+        "needs": "matroska-legacy-aac's feed setup built through this function, its parameters folded against the reference's codec parameters; the gated feed derives them without calling it"
+      },
+      {
+        "name": "compact-replay-prefix",
+        "entry_points": ["matroska::MatroskaReplayPrefix", "matroska::MatroskaReplayPrefix::feed_packet"],
+        "degree": "step",
+        "needs": "a coverage run showing matroska-audio-clocks executing feed_packet on every case with a buffered prefix, and startup cases whose buffered prefix holds video"
+      },
+      {
+        "name": "matroska-discovery-views",
+        "entry_points": ["matroska::MatroskaDiscovery", "matroska::MatroskaCompactDiscovery::for_av_feed", "matroska::MatroskaCompactDiscovery::buffered_events", "matroska::MatroskaCompactDiscovery::confirm_stream_ready", "matroska::MatroskaDiscoveryCutoff", "matroska::MatroskaFeedPayload::segments", "matroska::MatroskaVideoSeekGate::landed"],
+        "degree": "step",
+        "needs": "an operation folding discovery's readiness per track (the PGS cutoff, composition width and height, segment kind and length) and the feed payload segments against the reference's avformat_find_stream_info results and packets; matroska-startup-seek folds the video packets only"
       }
     ],
     "triergon-capture": [
@@ -155,13 +233,13 @@
         "name": "source-signatures",
         "entry_points": ["signature"],
         "degree": "step",
-        "needs": "a corpus of file prefixes with the format the reference's probe picks for each; compared only through the readers and probes built on them"
+        "needs": "media-probe compares the facade signature policy against the installed demuxer probe. The independent opening-box policies, competing transport spacings and exact Need lengths still need a direct comparison."
       },
       {
         "name": "reader-protocol",
         "entry_points": ["InputCursor", "container::ContainerReader", "blocking::Blocking", "blocking::Feed"],
         "degree": "step",
-        "needs": "every compared reader fed windows of every size and resumed after each Yield and Backpressure, folded against the same reference output; compared only as the protocol the compared readers run on"
+        "needs": "Push comparisons exercise request windows, Yield and Backpressure resume against the blocking rows. Coverage does not establish every ContainerReader, InputCursor, Blocking and Feed entry point or the full failure and reset domain."
       }
     ],
     "triergon-elementary": [
@@ -169,87 +247,163 @@
         "name": "seeking",
         "entry_points": ["BlockingReader::seek", "Reader::last_seek", "SeekDetail", "SeekBasis", "Format::PREROLL"],
         "degree": "unit-tests",
-        "needs": "seek cases for FLAC, MPEG audio, ADTS and AC-3 files through codec-worker seek, against ffprobe -read_intervals"
+        "needs": "The elementary seek lanes compare the landing and packet suffix. Open cases retain different frame positions, clocks and damaged-stream recovery, including Xing and bitrate estimates."
       },
       {
         "name": "stream-metadata",
         "entry_points": ["Flac::metadata", "Flac::seek_points", "Flac::stream_info", "MpegAudio::info_frame", "Reader::tags", "Track::channels", "Track::sample_rate", "Track::duration"],
         "degree": "unit-tests",
-        "needs": "a reference view of each stream's properties, tags and FLAC metadata blocks (ffprobe -show_streams -show_format), folded per file"
+        "needs": "elementary-metadata compares the demuxer view and elementary-metadata-wire compares the authored syntax and tag envelopes. Open cases retain distinct FLAC declarations, free-format refusal and tag dictionary results."
       },
       {
         "name": "format-probe",
         "entry_points": ["probe", "Kind"],
         "degree": "step",
-        "needs": "a corpus of files with the format the reference's probe picks for each; compared only inside the file workloads, which require equal work, not equal output"
+        "needs": "media-probe compares the elementary Kind over four prefix lengths. Open cases retain distinct demuxer scores and recognition policies for short prefixes and leading junk."
       }
     ],
     "triergon-font": [],
-    "triergon-framing": [
+    "triergon-framing": [],
+    "triergon-harness-protocol": [],
+    "triergon-harness-runner": [],
+    "triergon-hls": [
       {
-        "name": "hevc-hvcc-prefix-inspection",
-        "entry_points": ["hevc::inspect_config_prefix"],
+        "name": "unit-packet-views",
+        "entry_points": ["packet::UnitPacket", "progressive::TsProgressiveReader::packet", "segment::HlsSegment::packet"],
         "degree": "unit-tests",
-        "needs": "a corpus of whole and truncated hvcC records with a reference view of the fields the prefix inspection reports"
+        "needs": "the hls-segments and progressive-ts188 folds read through PacketInfo"
       },
       {
-        "name": "vp9-configuration",
-        "entry_points": ["vp9::Vp9ConfigParser"],
+        "name": "aac-segment-clocks",
+        "entry_points": ["clock::resolve_hls_aac_clocks", "clock::HlsAacClock"],
         "degree": "unit-tests",
-        "needs": "a VP9 corpus with a reference view of the configuration the parser reads"
+        "needs": "an hls-segments operation folding the resolved AAC clocks; the gated operation folds take_with_ns_clocks only"
       },
       {
-        "name": "aac-configuration-views",
-        "entry_points": ["aac::AacAscScopeParser", "aac::decoder_configuration_view", "aac::decoder_channel_view"],
-        "degree": "unit-tests",
-        "needs": "a reference view of AudioSpecificConfig at both extents and of the decoder configuration and channel views it gives"
-      },
-      {
-        "name": "eac3-bsi",
-        "entry_points": ["ac3::Eac3BsiParser"],
-        "degree": "unit-tests",
-        "needs": "an E-AC-3 corpus with a reference view of every bitstream information field"
-      }
-    ],
-    "triergon-isobmff": [
-      {
-        "name": "segment-indexes",
-        "entry_points": ["index::SegmentIndex", "index::TrackFragmentRandomAccess", "index::MovieFragmentRandomAccessTail"],
-        "degree": "unit-tests",
-        "needs": "a worker operation reading sidx, tfra and mfro boxes, compared with the reference's segment and fragment index entries"
-      },
-      {
-        "name": "mov-reference-trace",
-        "entry_points": ["reference_trace::mov::receiver::ReceiverClock", "reference_trace::mov::diagnostics::PrivateDiagnosticJob", "reference_trace::mov::operation::InitialOperationJob", "reference_trace::mov::sample_entry::PrivateConfigurationJob", "reference_trace::mov::sample_entry::SampleEntryHeaderJob", "reference_trace::mov::transport::RootWalkTransportBuilder"],
-        "degree": "recorded",
-        "needs": "a worker operation that runs these comparison projections against the reference; tests check recorded reference output only"
-      }
-    ],
-    "triergon-matroska": [],
-    "triergon-ogg": [
-      {
-        "name": "push-reader-windows",
-        "entry_points": ["Reader"],
+        "name": "standalone-access-unit-readers",
+        "entry_points": ["avc::AvcTsReader", "aac::HlsAac", "avc::AvcTsReader::push_compact", "aac::HlsAac::push_compact", "avc::AvcTsAccessUnit::source_bytes"],
         "degree": "step",
-        "needs": "a worker operation feeding Reader windows of varied sizes down to one byte under a small budget, folded against the same reference packets; compared only through BlockingReader"
+        "needs": "hls-segments and progressive-ts188 cases fed through push_compact with each unit's source bytes folded; the gated readers run both types through push only"
       },
+      {
+        "name": "segment-push-input-and-tails",
+        "entry_points": ["segment::HlsSegmentReader::provide", "segment::HlsMediaSegmentReader::provide", "segment::HlsSegment::audio_tail90", "segment::HlsMediaVideoUnit::feed_spans"],
+        "degree": "unit-tests",
+        "needs": "hls-segments cases fed through provide in varied windows, folding the 90 kHz audio tail and each video unit's feed spans beside the existing fold"
+      }
+    ],
+    "triergon-isobmff": [],
+    "triergon-matroska": [],
+    "triergon-mpegts": [
+      {
+        "name": "transport-packets",
+        "entry_points": ["transport::parse_transport", "transport::TransportFramer::push", "transport::TransportFramer::finish", "transport::NullCarrierRun", "transport::Pcr::ticks_27mhz", "transport::Pcr::raw_time", "transport::Adaptation::pcr_reserved_bits", "transport::TransportObservation::to_packet", "transport::RejectedTransport::source_range"],
+        "degree": "step",
+        "needs": "a worker operation framing each corpus file with TransportFramer and parse_transport at 1-, 7- and 4096-byte windows, folding every packet's offset and bytes against the reference's mpegtsraw packets and its header, adaptation and PCR fields against an H.222.0 2.4.3 oracle; compared today only inside TransportStream and Reader"
+      },
+      {
+        "name": "psi-catalogue",
+        "entry_points": ["psi::PatReader", "psi::PmtReader::new", "psi::PatCollector", "psi::SectionAssembler", "psi::ElementaryStream", "psi::Descriptor::languages", "psi::DvbSubtitling::services", "psi::DvbSubtitlingService::has_dvb_subtitling_type"],
+        "degree": "step",
+        "needs": "a catalogue operation folding each accepted PAT and PMT (program number, PMT PID, PCR PID, stream PID, stream type, codec, language, DVB subtitling services) against the reference's AVProgram and AVStream fields; compared today only through the packets the readers select by them"
+      },
+      {
+        "name": "psi-video-descriptors",
+        "entry_points": ["psi::Descriptor::avc_video", "psi::Descriptor::hevc_video"],
+        "degree": "unit-tests",
+        "needs": "the AVC and HEVC video descriptor fields of each PMT compared with an H.222.0 2.6.64 and 2.6.95 oracle; no reference reports them"
+      },
+      {
+        "name": "source-stream-polling",
+        "entry_points": ["stream::TransportStream::new", "stream::TransportStream::poll_feed", "stream::TransportStream::poll_feed_carriers", "stream::TransportStream::poll_compact", "stream::TransportStream::poll_compact_observed", "stream::TransportStream::active_program", "stream::ActiveProgram", "stream::ProgramStream", "stream::ObservedTrace::into_event"],
+        "degree": "unit-tests",
+        "needs": "TransportStream driven through poll, poll_feed, poll_feed_carriers and poll_compact over the mpegts-pes corpus, every TraceEvent folded (PES raw PTS and DTS, source ranges, tables, timelines, diagnostics) against the reference's per-PID packets, each form required to fold as poll does"
+      },
+      {
+        "name": "pes-assembler",
+        "entry_points": ["pes::PesAssembler::poll", "pes::PesAssembler::partial_header", "pes::PesHeader::raw_pts_time", "pes::PesHeader::raw_dts_time", "pes::Pes::source_ranges"],
+        "degree": "unit-tests",
+        "needs": "PesAssembler fed each PID's transport payloads at varied splits, folding header fields, raw times and source ranges against the reference's packets of that PID (pts, dts, pos, bytes)"
+      },
+      {
+        "name": "demux-observer-forms",
+        "entry_points": ["compat::pes::DemuxObserver::new", "compat::pes::DemuxObserver::push_with_input", "compat::pes::DemuxObserver::poll_compact_payload_with_input", "compat::pes::CompactPayload", "compat::pes::PayloadCursor::current", "compat::pes::PayloadCursor::next_span", "compat::pes::DemuxSpanViews", "compat::pes::CompactDemuxPacket::time_header"],
+        "degree": "step",
+        "needs": "mpegts-pes cases run through the unregistered constructor, the input-bound pushes and the compact payload cursor, folding every span's payload, source range and context against the same reference packets; compared today through the owned DemuxPacket form only"
+      },
+      {
+        "name": "fault-and-completion-facts",
+        "entry_points": ["compat::pes::PesFaultHeader", "compat::pes::TransportFaultHeader", "compat::pes::TransportTailConfirmation", "compat::pes::PacketCompletion", "compat::pes::NoMediaConfirmation", "compat::pes::MalformedInputCompletion::new", "compat::pes::MalformedInputFact", "compat::pes::NoPacketsConfirmation", "compat::opaque_video::RecoveredOpaque", "compat::UnboundedPes", "compat::PesPacket"],
+        "degree": "step",
+        "needs": "the facts each recovery and completion policy returns folded beside the packets mpegts-pes and mpegts-access-units compare (header bytes and timing flags against the reference packet's pts and corrupt flag, confirmed ranges against its positions); the policies run there but their facts are not folded"
+      },
+      {
+        "name": "demux-clock-header-projections",
+        "entry_points": ["compat::pes::DemuxClock::project_encoded_header", "compat::pes::DemuxClock::project_diagnostic_header", "compat::pes::DemuxClock::selected_program"],
+        "degree": "unit-tests",
+        "needs": "a PES operation over damaged-header carriers folding the projected times against the pts and dts of the reference's packets for the same carriers"
+      },
+      {
+        "name": "demux-profile-metadata",
+        "entry_points": ["compat::pes::DemuxProfile", "compat::pes::DemuxObserver::profile", "compat::pes::DemuxObserver::operation", "compat::pes::PrivateAudioCarriage::label", "psi::DvbViewProfile::reference_revision"],
+        "degree": "unit-tests",
+        "needs": "a check that each profile's label, revision, operation and flags equal the reference worker identity the harness records for the contract that names it; nothing a consumer runs"
+      },
+      {
+        "name": "reader-views",
+        "entry_points": ["Track", "Track::configuration_epoch", "Packet", "reader::Ac3AccessUnit::syncframes", "reader::Ac3AccessUnit::crc2_word", "reader::DvbSubtitleUnit::segment_count", "reader::DvbSubtitleUnit::truncated_tail", "reader::IncompleteVideo::elementary_range", "reader::UnframedAudio::carriage", "reader::UnframedAudio::elementary_range"],
+        "degree": "step",
+        "needs": "the access-unit fold extended with each track's kind, tag, codec and configuration (against AVStream codec_id, codec_tag and extradata), the packet time base, and each unit's syncframes, DVB segment count and truncated tail (against the reference parser's frame and segment boundaries)"
+      },
+      {
+        "name": "single-entity-epoch-index-seek",
+        "entry_points": ["Reader::request_seek_in_epoch_and_index"],
+        "degree": "unit-tests",
+        "needs": "mpegts-previous-picture's single-entity cases repeated through the indexed epoch seek and folded as that contract folds"
+      },
+      {
+        "name": "continuity-reader-container-view",
+        "entry_points": ["compat::annex_b::ContinuityReader", "compat::annex_b::ContinuityReader::request", "compat::annex_b::ContinuityReader::close", "compat::annex_b::ContinuityResidue::source_end", "compat::annex_b::ContinuityResidue::evidence"],
+        "degree": "step",
+        "needs": "mpegts-access-units cases read through ContinuityReader's ContainerReader implementation with the residue's source end and evidence folded; compared today through step_with_carriers only"
+      },
+      {
+        "name": "bounded-source-time",
+        "entry_points": ["clock::SourceTimePolicy", "clock::SourceClockAnchor", "clock::source_timestamp"],
+        "degree": "unit-tests",
+        "needs": "access-unit cases read under SourceTimePolicy::Bounded with authored wraps, folding lifted times and ambiguity refusals against the reference's unwrapped timestamps; the gated operations select only Unanchored and RelativeEpochZero"
+      },
+      {
+        "name": "reference-trace-catalogue",
+        "entry_points": ["reference_trace::catalogue::Catalogue", "reference_trace::catalogue::CatalogueCodec", "reference_trace::catalogue::PsiCompatibility", "reference_trace::catalogue::PsiCompatibilityPolicies", "reference_trace::catalogue::PsiCompatibilityEvidence"],
+        "degree": "unit-tests",
+        "needs": "a worker operation running the catalogue projection against the reference's program and stream order, PCR PID, codec and language after avformat_open_input; no worker runs it"
+      },
+      {
+        "name": "reference-trace-recovery",
+        "entry_points": ["reference_trace::recovery::RecoveryObserver", "reference_trace::recovery::RecoveredPacket", "reference_trace::recovery::EncodedHeader", "reference_trace::recovery::PatSelection", "reference_trace::recovery::PmtBindingJob", "reference_trace::recovery::DiagnosticPacket"],
+        "degree": "unit-tests",
+        "needs": "a worker operation running the recovery observer over damaged-carrier inputs against the packets the reference emits for them (pts, dts, pos, flags, bytes); no worker runs it"
+      },
+      {
+        "name": "mux-single-program",
+        "entry_points": ["mux::Muxer", "mux::MuxConfig"],
+        "degree": "step",
+        "needs": "a worker operation muxing authored coded pictures with each MuxConfig and folding the reference demuxer's reading of the output (program, PIDs, stream type, service names, packet pts, dts, flags, bytes); compared today through the capture pipeline's independent decode at one configuration"
+      }
+    ],
+    "triergon-ogg": [
       {
         "name": "track-properties",
         "entry_points": ["Track::channels", "Track::comments", "Track::end", "Track::frame_rate", "Track::header_error", "TrackInfo::configuration"],
         "degree": "unit-tests",
-        "needs": "a reference view of each track's channels, comment header, configuration bytes and duration (ffprobe -show_streams), folded per track; the reader comparison folds codec, tag, link, serial and time base only"
+        "needs": "ogg-tracks compares identification, setup, comments, timing, configuration state and header errors. Open cases retain different end clocks, dictionary projections and malformed-header handling."
       },
       {
         "name": "page-codec",
         "entry_points": ["page::PageHeader::parse", "page::write_page"],
         "degree": "unit-tests",
-        "needs": "pages parsed and written compared with the reference's Ogg demuxer and muxer for the same packets"
-      },
-      {
-        "name": "sequential-source",
-        "entry_points": ["BlockingReader::open_stream"],
-        "degree": "untested",
-        "needs": "the reader-ogg lane read through open_stream from a source without Seek, against the same reference packets"
+        "needs": "ogg-pages compares the parser and writer with the bitexact muxer and independent wire controls. Open cases retain three remux differences and a muxer refusal for Skeleton."
       }
     ],
     "triergon-pixel": [
@@ -260,7 +414,71 @@
         "needs": "PGS and DVB folds cover Nearest with BT.601 and BT.709, and subtitle-dvd compares BT.601/HalfDown through MOV palette configuration. BT.709/HalfDown still needs a direct palette operation because no subtitle decoder or demuxer selects it."
       }
     ],
+    "triergon-playback": [
+      {
+        "name": "container-probe",
+        "entry_points": ["probe::Probe", "probe::detect_container", "probe::SELECTION", "probe::CONTAINER_SIGNATURE_BYTES", "probe::ReplaySource", "probe::SelectedInput"],
+        "degree": "unit-tests",
+        "needs": "a worker operation probing each corpus input at several prefix lengths and window sizes, folding the selected format and the replayed bytes against the reference's av_probe_input_format3 over the same prefix"
+      },
+      {
+        "name": "source-view-playback",
+        "entry_points": ["Engine::matroska", "Engine::mp4", "Engine::mp4_progressive", "Engine::ts", "Engine::ts_entities", "mp4::Mp4IndexJob::new", "mp4::Mp4Open::new_progressive", "mp4::Mp4Open::with_timing_policy", "Player::continue_entity", "Player::finish_logical_source", "ClockChoice::Source"],
+        "degree": "recorded",
+        "needs": "worker operations playing each format through Player with the source clock and folding every packet's source times, flags and bytes against the reference's packets; the gated operations reach Engine::matroska and Engine::mp4 with demux clocks only"
+      },
+      {
+        "name": "demux-view-entry-points-outside-the-gated-operations",
+        "entry_points": ["compat::mov::index", "compat::mov::index_encoded_range", "compat::pes::open_private_audio", "compat::pes::open_segment", "compat::pes::startup::Startup::new"],
+        "degree": "recorded",
+        "needs": "mp4-forward cases opened through compat::mov::index and index_encoded_range (the 499-row matrix is pinned FFprobe output no worker re-runs), and ts-program cases through open_segment, open_private_audio and the finite startup"
+      },
+      {
+        "name": "player-mp4-seeks",
+        "entry_points": ["Player::prepare_mp4_sync_seek", "Player::apply_mp4_sync_seek", "Player::prepare_mp4_demux_seek", "Player::apply_mp4_demux_seek", "Player::prepare_mp4_progressive_sync_seek", "Player::prepare_mp4_progressive_demux_seek", "mp4::PreparedMp4::movie_seek", "Player::apply_movie_seek"],
+        "degree": "recorded",
+        "needs": "a seek operation on Player beside mp4-range's, folding the landing and following packets against the reference's av_seek_frame and av_read_frame; mp4-range seeks through Mp4RangePlayer::prepare_seek only"
+      },
+      {
+        "name": "catalogue-replacement",
+        "entry_points": ["mp4::Mp4Catalogue", "Player::prepare_mp4_catalogue", "Player::replace_mp4_catalogue", "mp4::RetiredCatalogue"],
+        "degree": "no-reference",
+        "needs": "an operation that plays one file, replaces the catalogue with a second and folds the packets on both sides of the switch against the reference reading the first file to the same point and then opening the second; the reference has no transactional replacement"
+      },
+      {
+        "name": "fifo-delivery-and-pump",
+        "entry_points": ["Player::advance", "Player::advance_ready", "Player::pop", "Player::pause", "Player::stop", "pump::Pump", "pump::Sink", "pump::CatalogueSink", "pump::Feed"],
+        "degree": "no-reference",
+        "needs": "the playback corpus delivered through advance and pop and through Pump with a recording Sink, each required to fold the packets read_output folds against the same reference; the queue and sink protocol has no reference"
+      },
+      {
+        "name": "track-selection",
+        "entry_points": ["Selection::Tracks", "TrackKey", "Player::seek_and_select"],
+        "degree": "unit-tests",
+        "needs": "cases selecting one track of each kind, folding only the delivered packets against the reference reading with AVDISCARD_ALL on the other streams; every gated operation selects all tracks"
+      },
+      {
+        "name": "neutral-views",
+        "entry_points": ["Packet", "DemuxTimes", "Track", "Track::key", "Engine::track_count", "Engine::track", "Output::packet", "Event::packet", "mp4::PreparedMp4::identify_tracks", "Engine::mp4_plan", "Engine::matroska_reader"],
+        "degree": "unit-tests",
+        "needs": "the packet folds of mp4-forward, matroska-startup-seek and ts-program read through PacketInfo and TrackInfo instead of the format types, with each track's codec, tag, configuration and language against the reference's AVStream"
+      }
+    ],
     "triergon-raster": [],
+    "triergon-raw-video": [
+      {
+        "name": "combined-probe",
+        "entry_points": ["PlaybackProbe", "PlaybackProbeStep", "PlaybackInput", "PlaybackInputKind"],
+        "degree": "unit-tests",
+        "needs": "as playback's container-probe, with raw AVC and HEVC verdicts against the reference's h264 and hevc probe scores; raw-annex-b runs RawVideoProbe alone"
+      },
+      {
+        "name": "configuration-tracking-on-its-own",
+        "entry_points": ["RawVideoConfigTracker", "RawVideoConfiguration", "AvcVuiTiming", "HevcVuiTiming", "hevc_startup"],
+        "degree": "step",
+        "needs": "a README sentence naming raw-annex-b, hls-segments and matroska-startup-seek as the comparisons it runs inside, with a coverage run showing every public method reached; VUI timing beyond the picture period is folded by none"
+      }
+    ],
     "triergon-session": [
       {
         "name": "track-decoding",
@@ -289,6 +507,7 @@
         "needs": "ass-render compares character-first and advance-first rotation through image placement. A direct comparison is needed for GlyphRotations::get, len and is_empty and for an extent-first lookup, since rendering never queries the accessors or loads extents before the advance."
       }
     ],
-    "triergon-subtitles": []
+    "triergon-subtitles": [],
+    "triergon-worker-entry": []
   }
 }
