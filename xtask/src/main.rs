@@ -1140,6 +1140,12 @@ fn prepare_check(part: Option<Part>) -> Task {
             &["prepare-ffmpeg", "--profile", "formats"],
             &["prepare-ffmpeg", "--profile", "framing-views"],
             &["prepare-ffmpeg", "--profile", "decode"],
+            &[
+                "codecs",
+                "derive",
+                "--ffmpeg",
+                ".research/reference-decode/install/bin/ffmpeg",
+            ],
             &["framing-views", "fixtures", "dts"],
             &["framing-views", "fixtures", "streams"],
             &["framing-views", "fixtures", "config"],
