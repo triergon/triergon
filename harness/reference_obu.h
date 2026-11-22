@@ -74,16 +74,16 @@ static size_t obu_complete_prefix(const uint8_t *data, size_t size)
     return 0;
 }
 
-/* Interpret the filter's returned wire bytes using the AV1 OBU header layout. */
+/* Read the OBU envelope independently of the payload syntax (AV1 §§5.2–5.3). */
 static int obu_output(ViewWork *work, uint64_t index,
-                      const uint8_t *data, size_t size, int complete)
+                      const uint8_t *data, size_t size, int complete, int low_overhead)
 {
     uint64_t count = 0;
     while (size) {
         uint8_t header = *data++;
         --size;
         int has_extension = (header & 4) != 0, sized = (header & 2) != 0;
-        if (has_extension && !size)
+        if ((has_extension && !size) || (low_overhead && !sized))
             return AVERROR_INVALIDDATA;
         uint8_t extension = 0;
         if (has_extension) {
@@ -93,8 +93,9 @@ static int obu_output(ViewWork *work, uint64_t index,
         size_t length = size;
         if (sized && obu_leb(&data, &size, &length) < 0)
             return AVERROR_INVALIDDATA;
+        const unsigned type = (header >> 3) & 15;
         const uint64_t words[] = {
-            index, (header >> 3) & 15, has_extension, extension >> 5,
+            index, type, has_extension, extension >> 5,
             (extension >> 3) & 3, sized, length
         };
         stream_record(work, 1, words, 7, data, length);
@@ -105,6 +106,19 @@ static int obu_output(ViewWork *work, uint64_t index,
     if (complete) {
         const uint64_t end[] = {index, count};
         stream_record(work, 7, end, 2, NULL, 0);
+    }
+    return 0;
+}
+
+static int obu_wire_run(const ViewCase *input, ViewWork *work)
+{
+    const ObuCase *source = input->prepared;
+    for (size_t i = 0; i < source->count; ++i) {
+        const ObuTemporalUnit *unit = &source->units[i];
+        if (obu_output(work, i, unit->data, unit->size, 1, 1) < 0) {
+            const uint64_t index = i;
+            stream_record(work, 8, &index, 1, NULL, 0);
+        }
     }
     return 0;
 }
@@ -148,7 +162,7 @@ static int obu_run(const ViewCase *input, ViewWork *work)
         if (status == AVERROR(ENOMEM))
             goto done;
         if (status >= 0)
-            status = obu_output(work, i, packet->data, (size_t)packet->size, 1);
+            status = obu_output(work, i, packet->data, (size_t)packet->size, 1, 0);
         if (status < 0) {
             if (work->trace)
                 fprintf(stderr, "OBU unit %zu: %d\n", i, status);
@@ -161,7 +175,7 @@ static int obu_run(const ViewCase *input, ViewWork *work)
                     if (recovered == AVERROR(ENOMEM))
                         goto done;
                     if (recovered >= 0 &&
-                        obu_output(work, i, packet->data, (size_t)packet->size, 0) < 0)
+                        obu_output(work, i, packet->data, (size_t)packet->size, 0, 0) < 0)
                         goto done;
                 }
             }
@@ -182,7 +196,8 @@ static int obu_prepare(ViewCase *input)
         (strcmp(input->argv[0], "low-overhead") && strcmp(input->argv[0], "single")) ||
         (strcmp(input->argv[1], "1") && strcmp(input->argv[1], "7") &&
          strcmp(input->argv[1], "4096")) ||
-        (strcmp(input->argv[2], "0") && strcmp(input->argv[2], "14")) ||
+        (strcmp(input->argv[2], "0") && strcmp(input->argv[2], "14") &&
+         (strcmp(input->argv[2], "wire") || strcmp(input->argv[0], "low-overhead"))) ||
         input->size < 32 || memcmp(input->data, "DKIF\0\0\x20\0AV01", 12))
         return 2;
     size_t count = 0;
@@ -212,6 +227,6 @@ static int obu_prepare(ViewCase *input)
     input->prepared = source;
     input->release = free;
     input->name = "av1-obu-reading";
-    input->run = obu_run;
+    input->run = !strcmp(input->argv[2], "wire") ? obu_wire_run : obu_run;
     return 0;
 }

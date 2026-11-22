@@ -2846,7 +2846,7 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
+        "wire"
       ],
       "expected": {
         "trace_sha256": "677cebfe407b160517255dfe7741e96bbff4b9a1536c95e855308752cac9f720"
@@ -2861,7 +2861,7 @@
       "arguments": [
         "low-overhead",
         "7",
-        "0"
+        "wire"
       ],
       "expected": {
         "trace_sha256": "677cebfe407b160517255dfe7741e96bbff4b9a1536c95e855308752cac9f720"
@@ -2876,7 +2876,7 @@
       "arguments": [
         "low-overhead",
         "4096",
-        "0"
+        "wire"
       ],
       "expected": {
         "trace_sha256": "677cebfe407b160517255dfe7741e96bbff4b9a1536c95e855308752cac9f720"

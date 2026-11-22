@@ -63,8 +63,12 @@ pub(super) fn authored(paths: &Paths, corpus: &mut StreamCorpus) -> Result<()> {
         };
         let file = format!("{id}.ivf");
         let pin = corpus.write(&file, &ivf(&payload))?;
-        // Each control excludes an OBU type outside its authored payload.
-        let exclude = if id == "type-0" { "14" } else { "0" };
+        let projection = match id {
+            // These three complete OBUs deliberately carry opaque payloads.
+            "three-obu-order" => "wire",
+            "type-0" => "14",
+            _ => "0",
+        };
         cases(
             corpus,
             id,
@@ -72,7 +76,7 @@ pub(super) fn authored(paths: &Paths, corpus: &mut StreamCorpus) -> Result<()> {
             &file,
             &pin,
             "authored-synthetic",
-            [mode, exclude],
+            [mode, projection],
         );
     }
     // A reduced still-picture sequence header, independent of the opaque type matrix.

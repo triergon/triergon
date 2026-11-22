@@ -21,8 +21,8 @@ pub(super) fn operation<'a>(
     arguments: &[OsString],
 ) -> Result<Operation<'a>, String> {
     let wire = prefix == "obu-wire-";
-    let [framing, window, excluded] = arguments else {
-        return Err("OBU needs framing, window, and excluded filter type".into());
+    let [framing, window, projection] = arguments else {
+        return Err("OBU needs framing, window, and reference projection".into());
     };
     let framing = match framing.to_str() {
         Some("low-overhead") => Av1ObuFraming::LowOverhead,
@@ -34,8 +34,13 @@ pub(super) fn operation<'a>(
         .and_then(|value| value.parse().ok())
         .filter(|value| matches!(value, 1 | 7 | 4096))
         .ok_or("invalid OBU window")?;
-    if !matches!(excluded.to_str(), Some("0" | "14")) || input.get(8..12) != Some(b"AV01") {
-        return Err("OBU needs AV1 IVF and an excluded type of 0 or 14".into());
+    let projection = match projection.to_str() {
+        Some("0" | "14") => true,
+        Some("wire") => framing == Av1ObuFraming::LowOverhead,
+        _ => false,
+    };
+    if !projection || input.get(8..12) != Some(b"AV01") {
+        return Err("OBU needs AV1 IVF and a valid reference projection".into());
     }
     let units = envelope::ivf(input)
         .and_then(Iterator::collect::<triergon_core::Result<Vec<_>>>)

@@ -1082,12 +1082,12 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
+        "wire"
       ],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
+        "packets": 4,
+        "bytes": 4,
+        "digest": 7682919053268299078
       }
     },
     {

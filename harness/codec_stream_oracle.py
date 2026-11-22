@@ -72,8 +72,10 @@ def obu_rows(data, index, single):
     yield row(7, [index, count])
 
 
-def av1_obu(path, framing, window, excluded):
-    if framing not in ("low-overhead", "single") or window not in ("1", "7", "4096") or excluded not in ("0", "14"):
+def av1_obu(path, framing, window, projection):
+    if (framing not in ("low-overhead", "single") or window not in ("1", "7", "4096")
+            or projection not in ("0", "14", "wire")
+            or (projection == "wire" and framing != "low-overhead")):
         raise ValueError("invalid OBU arguments")
     result = []
     for index, data in enumerate(ivf(path.read_bytes())):

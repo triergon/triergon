@@ -8,7 +8,7 @@
   "runner": "cargo xtask report",
   "reference": "ffmpeg-framing-views-native",
   "contract": [
-    "Read every temporal unit in its AV1 IVF envelope. The candidate drives the incremental OBU reader at the stated window size. The reference submits the complete temporal unit to filter_units with an excluded type absent from the unit, then reads the public wire syntax of its output. If the filter refuses a low-overhead temporal unit truncated after complete OBUs, submit the complete prefix separately and compare every returned OBU before the refusal. The filter may inspect OBU contents.",
+    "Read every temporal unit in its AV1 IVF envelope. The candidate drives the incremental OBU reader at the stated window size. The reference submits the complete temporal unit to filter_units with an excluded type absent from the unit, then reads the public wire syntax of its output. If the filter refuses a low-overhead temporal unit truncated after complete OBUs, submit the complete prefix separately and compare every returned OBU before the refusal. The wire mode reads the entire low-overhead temporal unit with an independent AV1 envelope parser, preserving all payload bytes before codec interpretation.",
     "Fold kind 1 with temporal unit index, OBU type, extension presence, temporal and spatial IDs (zero when absent), size presence, payload length and every payload byte. Fold kind 7 with the temporal unit index and OBU count on clean end or kind 8 with the index on refusal. An empty low-overhead unit carries zero OBUs.",
     "IVF envelope loading and parsing are outside the operation. Reader or filter construction, all units and teardown are inside."
   ],
@@ -25,15 +25,6 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "The AV1 framing reader exposes the three wire units; the filter also interprets their payload syntax and refuses this opaque sequence header. A like-for-like reference operation needs to expose units before payload interpretation."
-  ],
-  "open_cases": [
-    {
-      "id": "three-obu-order-w1",
-      "requirement": "The AV1 framing reader exposes the three wire units; the filter also interprets their payload syntax and refuses this opaque sequence header. A like-for-like reference operation needs to expose units before payload interpretation."
-    }
-  ],
   "open_deviations": [
     {
       "reading": "Read nonzero forbidden or reserved bits as source diagnostics",
@@ -160,7 +151,8 @@
         "annexb-remux-w4096",
         "still-picture-rgb-w1",
         "still-picture-rgb-w7",
-        "still-picture-rgb-w4096"
+        "still-picture-rgb-w4096",
+        "three-obu-order-w1"
       ],
       "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
     },
@@ -190,12 +182,11 @@
         "zero-bit-issues-0-1-w1",
         "zero-bit-issues-1-1-w1",
         "external-unsized-extension-255-w1",
-        "three-obu-order-w1",
         "low-unsized-w1",
         "second-partial-leb-w1",
         "obu-count-limit-w1"
       ],
-      "cause": "open parity differences require resolution"
+      "cause": "declared differences or a recovered complete prefix"
     },
     {
       "bound": "heap",
@@ -286,7 +277,8 @@
         "annexb-remux-w4096",
         "still-picture-rgb-w1",
         "still-picture-rgb-w7",
-        "still-picture-rgb-w4096"
+        "still-picture-rgb-w4096",
+        "three-obu-order-w1"
       ],
       "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
     },
@@ -316,12 +308,11 @@
         "zero-bit-issues-0-1-w1",
         "zero-bit-issues-1-1-w1",
         "external-unsized-extension-255-w1",
-        "three-obu-order-w1",
         "low-unsized-w1",
         "second-partial-leb-w1",
         "obu-count-limit-w1"
       ],
-      "cause": "open parity differences require resolution"
+      "cause": "declared differences or a recovered complete prefix"
     },
     {
       "bound": "total_rss",
@@ -412,7 +403,8 @@
         "annexb-remux-w4096",
         "still-picture-rgb-w1",
         "still-picture-rgb-w7",
-        "still-picture-rgb-w4096"
+        "still-picture-rgb-w4096",
+        "three-obu-order-w1"
       ],
       "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
     },
@@ -442,12 +434,11 @@
         "zero-bit-issues-0-1-w1",
         "zero-bit-issues-1-1-w1",
         "external-unsized-extension-255-w1",
-        "three-obu-order-w1",
         "low-unsized-w1",
         "second-partial-leb-w1",
         "obu-count-limit-w1"
       ],
-      "cause": "open parity differences require resolution"
+      "cause": "declared differences or a recovered complete prefix"
     }
   ]
 }
