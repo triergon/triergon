@@ -185,16 +185,23 @@ impl CharmapKind {
 
 /// Groups of formats 8, 12 and 13 at `at` ascend without overlapping.
 fn ascending_groups(table: &[u8], at: usize, groups: usize, steps: &mut usize) -> Option<()> {
+    // Counted here and added once, so the count stays in a register.
+    let mut read = 0;
     let mut last = None;
-    for g in 0..groups {
-        *steps += 1;
-        let start = u32_at(table, at + 12 * g)?;
-        let end = u32_at(table, at + 4 + 12 * g)?;
-        (start <= end && last.is_none_or(|last| start > last)).then_some(())?;
+    let ascending = (0..groups).all(|g| {
+        read += 1;
+        let Some((start, end)) = u32_at(table, at + 12 * g).zip(u32_at(table, at + 4 + 12 * g))
+        else {
+            return false;
+        };
+        let ascends = start <= end && last.is_none_or(|last| start > last);
         last = Some(end);
-    }
-    Some(())
+        ascends
+    });
+    *steps += read;
+    ascending.then_some(())
 }
+
 
 /// Validates a format 2 subtable: the keys and the subheaders they reach fit
 /// the table, and each subheader's glyph array lies within the subtable after
