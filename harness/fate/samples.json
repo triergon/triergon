@@ -866,10 +866,5 @@
     {"path": "hevc-conformance/ipcm_C_NEC_2.bit", "sha256": "a9800f093e66e7cb3147323e6ce6adc47620dfa4bbb89f15afb7f82b1e426977", "source": "harness/codecs/correctness-manifest.json", "rights": "fetched-not-redistributed"},
     {"path": "hevc-conformance/ipcm_D_NEC_2.bit", "sha256": "acb72389ebab10574a4821fd0a3329a307f3cf384a9ef67e6d0e761e807d8689", "source": "harness/codecs/correctness-manifest.json", "rights": "fetched-not-redistributed"},
     {"path": "hevc-conformance/ipcm_E_NEC_2.bit", "sha256": "1c0652e89cffbfd45625371cbaca3b2293b09593672c9d81b63b83c6a5b55416", "source": "harness/codecs/correctness-manifest.json", "rights": "fetched-not-redistributed"},
-    {"path": "speex-generated/chain_speex.spx", "sha256": "6688b5492f43b4f5812d8acb91dc426c63f0bbe8a31b4b6c1fed081cddff914d", "source": "harness/features/crc-values/corpus.json", "rights": "fetched-not-redistributed"},
-    {"path": "speex-generated/speex_nb.spx", "sha256": "7a620f8ac4bcc4e8121e802853e731aa34b81e6149cd6cf547dcf4e604d15d87", "source": "harness/features/crc-values/corpus.json", "rights": "fetched-not-redistributed"},
-    {"path": "speex-generated/speex_skeleton.spx", "sha256": "07a5070c8bcc01f545a17acb529879f6cddd06efa0bff9ab53b7befeeafb1e27", "source": "harness/features/crc-values/corpus.json", "rights": "fetched-not-redistributed"},
-    {"path": "speex-generated/speex_uwb_stereo.spx", "sha256": "2cfd837317047e6fb7a81871a99d92f13f8b9c478c2ba75fd76faade89d484ba", "source": "harness/features/crc-values/corpus.json", "rights": "fetched-not-redistributed"},
-    {"path": "speex-generated/speex_wb.spx", "sha256": "e191096259c6e07792e4e9207c58cab205c2e25b495db36b236a49279faa1462", "source": "harness/features/crc-values/corpus.json", "rights": "fetched-not-redistributed"}
   ]
 }
