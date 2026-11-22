@@ -600,6 +600,7 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             "harness/codec_stream_oracle.py",
             "harness/spec_oracle.py",
             "harness/reference_playback_subtitles.h",
+            "harness/reference_subtitles.h",
             "harness/reference_packet_fold.h",
             "harness/reference_subtitles_host.h",
             "harness/reference_views_protocol.h",
