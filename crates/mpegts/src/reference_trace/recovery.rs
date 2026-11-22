@@ -117,11 +117,23 @@ pub enum DemuxObservation {
 }
 
 #[derive(Debug)]
+enum OpcrStage {
+    Prefix,
+    Length,
+    Flags,
+    Timestamp,
+    ReserveHeader { pts: u64 },
+    PushHeader { pts: u64 },
+    ReserveSpan { pts: u64 },
+    PushSpan { pts: u64 },
+    Emit { pts: u64 },
+}
+
+#[derive(Debug)]
 struct Pending {
     rejection: RejectedTransport,
     context: SourceContext,
-    phase: u8,
-    pts: Option<u64>,
+    stage: OpcrStage,
     header_ranges: BudgetVec<SourceRange>,
     spans: BudgetVec<DemuxSpan>,
 }
@@ -488,8 +500,7 @@ impl RecoveryObserver {
         self.pending = Some(RecoveryPending::Opcr(Pending {
             rejection,
             context,
-            phase: 0,
-            pts: None,
+            stage: OpcrStage::Prefix,
             header_ranges: BudgetVec::new(&self.budget),
             spans: BudgetVec::new(&self.budget),
         }));
@@ -595,15 +606,16 @@ impl RecoveryObserver {
             };
             let start = p.rejection.envelope().payload_start;
             let body = &p.rejection.bytes().as_ref()[start..];
-            match p.phase {
-                0 => {
+            match p.stage {
+                OpcrStage::Prefix => {
                     if body.len() < 14 || body[..4] != [0, 0, 1, 0xe0] {
                         return Err(Error::Unsupported(
                             "rejected carrier lacks a complete AVC PES header",
                         ));
                     }
+                    p.stage = OpcrStage::Length;
                 }
-                1 => {
+                OpcrStage::Length => {
                     let total = usize::from(u16::from_be_bytes([body[4], body[5]])) + 6;
                     if total != body.len() || total < 14 {
                         return Err(Error::Unsupported(
@@ -613,21 +625,27 @@ impl RecoveryObserver {
                     if total > self.inner.limits().pes_bytes {
                         return Err(crate::limit(total, self.inner.limits().pes_bytes));
                     }
+                    p.stage = OpcrStage::Flags;
                 }
-                2 => {
+                OpcrStage::Flags => {
                     if body[6..9] != [0x80, 0x80, 5] {
                         return Err(Error::Unsupported(
                             "rejected PES requires an MPEG-2 PTS-only header with no extra flags",
                         ));
                     }
+                    p.stage = OpcrStage::Timestamp;
                 }
-                3 => {
-                    p.pts = Some(crate::pes::timestamp(&body[9..14], 2).map_err(|_| {
+                OpcrStage::Timestamp => {
+                    let pts = crate::pes::timestamp(&body[9..14], 2).map_err(|_| {
                         Error::Invalid("invalid PTS prefix or marker bits in rejected PES")
-                    })?);
+                    })?;
+                    p.stage = OpcrStage::ReserveHeader { pts };
                 }
-                4 => p.header_ranges.try_reserve_exact(1)?,
-                5 => {
+                OpcrStage::ReserveHeader { pts } => {
+                    p.header_ranges.try_reserve_exact(1)?;
+                    p.stage = OpcrStage::PushHeader { pts };
+                }
+                OpcrStage::PushHeader { pts } => {
                     p.header_ranges
                         .try_push(SourceRange {
                             entity: self.inner.scope().entity,
@@ -635,9 +653,13 @@ impl RecoveryObserver {
                             bytes: 14,
                         })
                         .map_err(|e| e.error)?;
+                    p.stage = OpcrStage::ReserveSpan { pts };
                 }
-                6 => p.spans.try_reserve_exact(1)?,
-                7 => {
+                OpcrStage::ReserveSpan { pts } => {
+                    p.spans.try_reserve_exact(1)?;
+                    p.stage = OpcrStage::PushSpan { pts };
+                }
+                OpcrStage::PushSpan { pts } => {
                     if body.len() == 14 {
                         return Err(Error::Unsupported(
                             "rejected carrier has an empty PES payload",
@@ -659,15 +681,14 @@ impl RecoveryObserver {
                             context: p.context,
                         })
                         .map_err(|e| e.error)?;
+                    p.stage = OpcrStage::Emit { pts };
                 }
-                8 => {
+                OpcrStage::Emit { pts } => {
                     let scope = self.inner.scope();
                     let offset = p.rejection.source_offset();
                     let header = EncodedHeader {
                         bytes: p.rejection.bytes().slice(start..start + 14)?,
-                        pts: p
-                            .pts
-                            .ok_or(Error::Invalid("rejected PES is missing its encoded PTS"))?,
+                        pts,
                     };
                     let position = self.inner.media_position(offset)?;
                     let Some(RecoveryPending::Opcr(p)) = self.pending.take() else {
@@ -701,9 +722,7 @@ impl RecoveryObserver {
                         },
                     )));
                 }
-                _ => return Err(Error::Invalid("invalid rejected-carrier recovery stage")),
             }
-            p.phase += 1;
         }
     }
 }
