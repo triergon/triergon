@@ -847,7 +847,7 @@ impl Reader {
             self.storage = Some(storage);
             return Ok(false);
         }
-        self.lanes.as_mut_slice()[index].set_reader_storage(storage.bytes());
+        self.lanes.as_mut_slice()[index].set_reader_storage(storage.bytes())?;
         Ok(true)
     }
 

@@ -475,15 +475,12 @@ impl Lane {
     pub(super) fn has_incomplete(&self) -> bool {
         self.incomplete.is_some()
     }
-    #[expect(
-        clippy::expect_used,
-        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions (lane notes)"
-    )]
-    pub(super) fn set_reader_storage(&mut self, bytes: usize) {
-        self.incomplete
-            .as_mut()
-            .expect("pending fragment")
-            .reader_storage = Some(bytes);
+    pub(super) fn set_reader_storage(&mut self, bytes: usize) -> Result<()> {
+        let Some(incomplete) = &mut self.incomplete else {
+            return Err(Error::Truncated);
+        };
+        incomplete.reader_storage = Some(bytes);
+        Ok(())
     }
     /// Admits the PES of `source`: `Ok(None)` once admitted or ignored, `Ok(Some(source))` when
     /// the work grant is spent; a refusal returns the source with the error.
