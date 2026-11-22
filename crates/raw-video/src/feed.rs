@@ -7,9 +7,7 @@ use triergon_core::{Error, Result, Rounding, SourceLocation, Step, Time, WorkBud
 use triergon_framing::nal::RawAccessUnit;
 use triergon_playback::Source;
 
-/// A caller-supplied cadence is an ordered submission clock for a sink that
-/// wants it, such as a local sample player. It is separate from display order
-/// and the timing information signalled in codec parameter sets.
+/// Caller-supplied submission cadence in coded-picture order.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum RawFeedClock {
     /// No submission clock: packets carry no `submission_time`.
@@ -85,8 +83,7 @@ pub struct RawVideoFeed<S: Source> {
 }
 
 impl<S: Source> RawVideoSource<S> {
-    /// Add the decoder configuration and optional submission clock to this
-    /// forward raw source. Attach before polling for the first access unit.
+    /// Attaches configuration tracking and an optional clock before the first unit.
     pub fn into_feed(
         self,
         maximum_parameter_set_bytes: usize,

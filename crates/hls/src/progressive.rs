@@ -597,11 +597,8 @@ impl<S: Source> TsProgressiveReader<S> {
         }
     }
 
-    /// Takes back a unit the caller has finished with, so its track's reader
-    /// can assemble a later unit in its storage. Handing a video unit back
-    /// right after the next one arrives lets the video reader assemble units
-    /// without allocating; dropping units instead gives the same outputs and
-    /// work.
+    /// Returns storage for reuse. Return a video unit when the next one arrives
+    /// to reuse its buffer without changing outputs or work.
     pub fn reuse_unit(&mut self, unit: TsProgressiveUnit) {
         #[cfg(test)]
         if !self.reuse_storage {

@@ -30,8 +30,7 @@ pub struct AccessUnitLimits {
     pub configuration_nals: usize,
     /// Largest packet, in bytes (1 MiB).
     pub packet_bytes: usize,
-    /// Largest access unit, in bytes, inserted parameter sets and headers included
-    /// (2 MiB).
+    /// Largest access unit in bytes, including inserted sets and headers (2 MiB).
     pub unit_bytes: usize,
     /// Most NAL units in one packet (1,024).
     pub packet_nals: usize,
@@ -101,13 +100,9 @@ impl AccessUnits {
         Self::with_record(pool, track, track.configuration(), limits)
     }
 
-    /// [`Self::for_track`] with `record` in place of the track's own configuration
-    /// record, for a track whose container describes its stream elsewhere. A Matroska
-    /// AAC track named by a codec identifier with a profile suffix (`A_AAC/MPEG4/LC`)
-    /// carries raw frames and no record:
+    /// Overrides the track's record. Empty Matroska AAC records give `Unsupported`.
     /// [`legacy_aac_lc_initialization`](crate::compat::matroska::legacy_aac_lc_initialization)
-    /// derives its AudioSpecificConfig. Fails with `Unsupported` for a Matroska AAC
-    /// track and an empty `record`, whose frames are not ADTS.
+    /// derives one for legacy AAC-LC identifiers such as `A_AAC/MPEG4/LC`.
     pub fn with_record(
         pool: &Budget,
         track: &dyn TrackInfo,
@@ -179,8 +174,7 @@ impl AccessUnits {
         })
     }
 
-    /// Starts framing `packet`, a packet of the track. Fails with `Limit` for a packet
-    /// above the limits, or as the session's framing does.
+    /// Starts framing a packet of the track. Oversized packets fail with `Limit`.
     pub fn packet<'a, P: PacketInfo>(&'a mut self, packet: &'a P) -> Result<AccessUnitJob<'a, P>> {
         let payload = packet.payload();
         if payload.len() > self.limits.packet_bytes {
@@ -322,8 +316,7 @@ enum Unit<'a> {
     Packet(&'a [u8]),
 }
 
-/// One access unit: the bytes a decoder takes, with the track, times and trim of the
-/// packet they were framed from.
+/// Decoder bytes with the original packet's track, times and trim.
 #[derive(Clone, Debug)]
 pub struct AccessUnit<'a, P> {
     packet: &'a P,
@@ -331,8 +324,7 @@ pub struct AccessUnit<'a, P> {
 }
 
 impl<P> AccessUnit<'_, P> {
-    /// The framed bytes, shared with the framing's output; `None` for a packet taken as
-    /// it is, whose bytes are the packet's own.
+    /// Borrow from the packet when framing produces no new bytes.
     pub fn framed(&self) -> Option<&Bytes> {
         match &self.bytes {
             Unit::Framed(bytes) => Some(bytes),

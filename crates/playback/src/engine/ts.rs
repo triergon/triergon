@@ -20,9 +20,8 @@ use triergon_mpegts::{
 };
 use ts::compat::pes::{DemuxClock, ReadyContinuation, SourceContext, selected_track_kind};
 use ts::psi::DescriptorNamespace;
-/// What a TS engine delivers and where its tracks come from. One byte: the
-/// discriminants are the bit patterns the same state had as an
-/// `Option` of the five discovering modes, so every test compiles as before.
+/// TS delivery mode and track discovery policy.
+// Preserve the byte encoding used on the per-carrier path.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub(crate) enum Delivery {

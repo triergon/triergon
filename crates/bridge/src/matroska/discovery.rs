@@ -57,8 +57,7 @@ pub enum MatroskaDiscoveryStep {
     Ready(MatroskaDiscoveryCutoff),
 }
 
-/// The same Source continues with unrestricted playback requests after the
-/// discovery operation. Pending and failed replies keep their usual meanings.
+/// Holds the source through discovery and subsequent unrestricted playback.
 #[derive(Debug)]
 pub struct MatroskaStartupSource<S> {
     source: S,
@@ -212,8 +211,7 @@ impl Readiness {
     }
 }
 
-/// Own the prefix until discovery completes. Outputs move from the player
-/// into a budgeted replay buffer in their original order.
+/// Retains outputs in source order until discovery completes.
 #[derive(Debug)]
 pub struct MatroskaDiscovery<S: Source> {
     player: Player<MatroskaStartupSource<S>>,
@@ -343,8 +341,7 @@ impl<S: Source> MatroskaCompactDiscovery<S> {
         outputs.as_slice().iter().map(|output| &output.event)
     }
 
-    /// Reports that a consumer found the codec of `track` under configuration
-    /// `revision`, as [`MatroskaDiscovery::confirm_stream_ready`] does.
+    /// Confirms a track for a configuration revision. See [`MatroskaDiscovery::confirm_stream_ready`].
     pub fn confirm_stream_ready(&mut self, track: u64, revision: u64) -> Result<()> {
         self.0.confirm_stream_ready(track, revision)
     }

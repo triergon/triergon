@@ -131,8 +131,7 @@ pub enum Delivery {
     /// A packet without a presentation time on the player's clock.
     UnknownTime,
 }
-/// The source, pool, session, epoch and generation an output belongs to, kept
-/// to recognise later outputs of the same playback state.
+/// Matches outputs by source, pool, session, epoch and generation.
 #[derive(Debug)]
 pub struct OutputScope<Pool = Budget> {
     source: triergon_core::SourceId,
@@ -154,8 +153,7 @@ impl OutputScope {
     }
 }
 
-/// One output of a player: an event with its delivery and the playback state it
-/// belongs to.
+/// An event with its delivery decision and playback scope.
 #[derive(Debug)]
 pub struct Output {
     source: triergon_core::SourceId,
@@ -490,8 +488,7 @@ struct PendingEvent {
     source: triergon_core::SourceId,
 }
 
-/// Drives one engine over its source: reads within work budgets, classifies the
-/// delivery of each event, and queues outputs in a bounded FIFO.
+/// Drives an engine over its source and admits events into a bounded FIFO.
 #[derive(Debug)]
 pub struct Player<S: Source> {
     engine: Option<Engine>,
@@ -516,9 +513,8 @@ pub struct Player<S: Source> {
     cancel: AtomicBool,
 }
 impl<S: Source> Player<S> {
-    /// A player of `engine` over `source`, delivering `selection`, with its FIFO
-    /// allocated. Fails with `Invalid` for a policy out of range or a selection the
-    /// engine's tracks do not have, and when the engine cannot start over this source.
+    /// Allocates the FIFO and binds the engine, source and track selection.
+    /// Fails with `Invalid` for invalid bounds, track selection or engine state.
     pub fn new(
         engine: Engine,
         source: SourceOwner<S>,
@@ -528,9 +524,8 @@ impl<S: Source> Player<S> {
         Self::with_queue(engine, source, selection, policy, true)
     }
 
-    /// Start without allocating a FIFO for callers using [Self::read_output].
-    /// The first FIFO advance reserves its configured slots before reading
-    /// the source. Pool pressure at that point is retryable.
+    /// Defers FIFO allocation until the first queued advance, before any queued read.
+    /// Pool pressure is retryable. Direct reads use [`Self::read_output`].
     pub fn new_direct(
         engine: Engine,
         source: SourceOwner<S>,
@@ -597,8 +592,7 @@ impl<S: Source> Player<S> {
         Ok(())
     }
 
-    /// Chooses the clock packets are timed with. Fails with `Invalid` once an event was
-    /// read.
+    /// Chooses the packet clock. Fails with `Invalid` after the first event.
     pub fn set_clock_view(&mut self, clock: ClockChoice) -> Result<()> {
         if self.count != 0 || self.pending.is_some() || self.events != 0 {
             return Err(Error::Invalid("clock view must be frozen before delivery"));
@@ -642,8 +636,7 @@ impl<S: Source> Player<S> {
     pub fn pending_request(&self) -> Option<&InputRequest> {
         self.request.as_ref()
     }
-    /// Whether `o` belongs to the player's current generation and epoch, and the player
-    /// is still running or paused.
+    /// Whether `o` matches the active scope while running or paused.
     pub fn current(&self, o: &Output) -> bool {
         !matches!(
             self.state,
@@ -716,8 +709,7 @@ impl<S: Source> Player<S> {
         }
         self.state = state;
     }
-    /// Aborts and closes the source and drops the queued outputs; the state becomes
-    /// `Stopped`.
+    /// Aborts and closes the source, clears the queue and stops the player.
     pub fn stop(&mut self) {
         self.shutdown(State::Stopped);
     }
@@ -832,9 +824,8 @@ impl<S: Source> Player<S> {
         });
     }
 
-    /// Seeks to the media point `command` maps to, on the player's clock. Fails with
-    /// `Invalid` for an engine other than MP4, and with `ForeignPool` or
-    /// `SourceMismatch` for a command of another plan.
+    /// Seeks to the mapped MP4 point on the player's clock. Other engines give
+    /// `Invalid`. Mismatched commands give `ForeignPool` or `SourceMismatch`.
     pub fn apply_movie_seek(
         &mut self,
         command: &crate::mp4::plan::MovieSeekCommand,
@@ -1159,8 +1150,7 @@ impl<S: Source> Player<S> {
         }
         retired
     }
-    /// Ends a TS entity sequence after its last entity; `false` when `w` had no work
-    /// left.
+    /// Ends a TS sequence after its last entity. Returns `false` when out of work.
     pub fn finish_logical_source(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
         if c.load(Ordering::Relaxed) {
             self.cancel();

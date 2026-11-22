@@ -37,8 +37,7 @@ pub enum HlsSegmentAudio {
     Pid(u16),
 }
 
-/// The tracks an [`HlsSegmentReader`] reads. A program with two candidate tracks
-/// needs their PID.
+/// Track selection, with explicit PIDs for ambiguous programs.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct HlsSegmentTracks {
     /// The PID of the AVC track; `None` takes the program's one AVC track.
@@ -207,10 +206,8 @@ enum Unit<V, A> {
     Audio(A),
 }
 
-/// Acquire one independent media segment. Completed units stay private until
-/// the transport has reported EOF and both assemblers have drained. A failed
-/// attempt releases its source and staged output. To retry the transport,
-/// construct a fresh reader with a new source owner.
+/// Reads an independent segment through EOF and assembler drain.
+/// Failure releases the source and staged units. Retry with a fresh reader.
 #[derive(Debug)]
 pub struct HlsSegmentReader<S: Source> {
     inner: SegmentReader<S, AvcTsReader, HlsAac>,
@@ -304,9 +301,8 @@ impl<S: Source, V: LaneAssembler, A: LaneAssembler> std::fmt::Debug for SegmentR
 }
 
 impl<S: Source> HlsSegmentReader<S> {
-    /// A reader of one segment from `source`. Fails with `Invalid` for a limit below its
-    /// minimum and with `Limit` when the source's known length exceeds
-    /// `maximum_source_bytes`.
+    /// Fails with `Invalid` for invalid limits, or `Limit` for known lengths
+    /// above `maximum_source_bytes`.
     pub fn new(
         input: InputCursor,
         source: S,
@@ -318,8 +314,7 @@ impl<S: Source> HlsSegmentReader<S> {
         })
     }
 
-    /// Supplies a reply to the outstanding request, and returns whether it was the
-    /// reply to that request.
+    /// Applies a source reply. Returns `false` for a stale reply.
     pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         self.inner.provide(reply)
     }
@@ -371,8 +366,7 @@ impl<S: Source> HlsMediaSegmentReader<S> {
         })
     }
 
-    /// Supplies a reply to the outstanding request, and returns whether it was the
-    /// reply to that request.
+    /// Applies a source reply. Returns `false` for a stale reply.
     pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         self.inner.provide(reply)
     }

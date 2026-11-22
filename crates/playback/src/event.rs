@@ -194,10 +194,8 @@ impl EngineStep {
 }
 
 impl Event {
-    /// The format-neutral view of the packet this event delivers, when its
-    /// payload is one contiguous slice: a Matroska frame or an MP4 sample.
-    /// Transport stream PES (spans, not one slice) have none; their access
-    /// units come from the readers of `triergon-hls` or `triergon_mpegts::Reader`.
+    /// Borrows a Matroska frame or MP4 sample. Other events give `None`.
+    /// Get TS access units from `triergon-hls` or `triergon_mpegts::Reader`.
     #[inline]
     pub fn packet(&self) -> Option<Packet<'_>> {
         match self {
@@ -305,9 +303,8 @@ impl Event {
     }
 }
 
-/// The format-neutral view of a delivered packet: a borrow of the event's own
-/// packet, never a copy. Implements [`PacketInfo`] on the source clock; the demux
-/// clock is [`Packet::demux_times`].
+/// A borrowed packet. [`PacketInfo`] uses the source clock and
+/// [`Packet::demux_times`] exposes the demux clock.
 #[derive(Clone, Copy, Debug)]
 pub enum Packet<'a> {
     /// A Matroska frame.
