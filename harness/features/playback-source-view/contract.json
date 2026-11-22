@@ -475,7 +475,9 @@
     }
   ],
   "pending_module_requirements": [
-    "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit."
+    "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
+    "The progressive MP4 source view sorts one track's fragment samples by byte position when a later fragment's data precedes an earlier one's in the media, so it delivers decode times 6000 to 8000 before 3000 to 5000. Packets must keep per-track decode order (ISO/IEC 14496-12 sections 8.8.4.1 and 8.8.8).",
+    "A first fragment without tfdt after an empty stts leaves its decode clocks absent. Its decode time is the sum of the preceding durations, zero here (ISO/IEC 14496-12 sections 8.6.1.2.1 and 8.8.12.1), which the next tfdt of 3000 confirms."
   ],
   "open_cases": [
     {
@@ -489,19 +491,17 @@
     {
       "id": "mp4-forward-progressive-unknown-clock-terminal",
       "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit."
+    },
+    {
+      "id": "mp4-forward-progressive-pending-reverse-ranges",
+      "requirement": "The progressive MP4 source view sorts one track's fragment samples by byte position when a later fragment's data precedes an earlier one's in the media, so it delivers decode times 6000 to 8000 before 3000 to 5000. Packets must keep per-track decode order (ISO/IEC 14496-12 sections 8.8.4.1 and 8.8.8)."
+    },
+    {
+      "id": "mp4-forward-progressive-first-source-clock-unknown",
+      "requirement": "A first fragment without tfdt after an empty stts leaves its decode clocks absent. Its decode time is the sum of the preceding durations, zero here (ISO/IEC 14496-12 sections 8.6.1.2.1 and 8.8.12.1), which the next tfdt of 3000 confirms."
     }
   ],
   "open_deviations": [
-    {
-      "reading": "The progressive MP4 source view traverses reversed fragment ranges in physical order",
-      "clause": "ISO/IEC 14496-12:2015 sections 8.8.4.1, 8.8.7\u20138 and 8.8.12.1 define each run position and the independent decode timeline",
-      "candidate": "Emits all nine samples in physical order. Decode times 6000, 7000 and 8000 at positions 1103, 1115 and 1127 precede times 3000, 4000 and 5000 at positions 1139, 1151 and 1163.",
-      "reference": "Emits the same samples in decode order, including the second range before the first. The sample bytes, clocks, flags, catalogue and terminal status agree.",
-      "compat": "The existing compat::mov front demux view replays a bounded media extent in native order.",
-      "cases": [
-        "mp4-forward-progressive-pending-reverse-ranges"
-      ]
-    },
     {
       "reading": "The MP4 source view retains explicitly declared zero-length fragment samples",
       "clause": "ISO/IEC 14496-12:2015 sections 8.1.1 and 8.8.8 locate and size the declared samples. Section 8.7.3.1 leaves the coding meaning of an empty sample to the sample entry.",
@@ -546,20 +546,14 @@
       ]
     },
     {
-      "reading": "A forward source leaves the initial decode origin absent when no predecessor or explicit origin is known",
-      "clause": "ISO/IEC 14496-12:2015 sections 8.6.1.2 and 8.8.12.1 derive the media decode origin from preceding durations or tfdt",
-      "candidate": "Emits all nine packets with the first three source PTS and DTS absent and the remaining source clocks from 3000 through 8000.",
-      "reference": "Emits the same nine packets, starting the first three PTS and DTS at 0, 1000 and 2000 as for a file with a known beginning.",
-      "compat": "compat::mov::front_source_media_start",
-      "cases": ["mp4-forward-progressive-first-source-clock-unknown"]
-    },
-    {
       "reading": "A fragment source packet requires the complete declared sample extent",
       "clause": "ISO/IEC 14496-12:2015 sections 8.1.1 and 8.8.8 define the media extent and trun sample size",
       "candidate": "Emits both complete video packets and reports data refusal. The first AAC sample starts at byte 3189 and declares 176 bytes. The file ends at byte 3240.",
       "reference": "Emits both video packets and the 51 available bytes of the AAC sample as a corrupt packet, then reports end.",
       "compat": "compat::mov::deliver_truncated_sample",
-      "cases": ["mp4-forward-progressive-fragment-aac-short"]
+      "cases": [
+        "mp4-forward-progressive-fragment-aac-short"
+      ]
     },
     {
       "reading": "DefaultDuration is carried in exact nanoseconds",
