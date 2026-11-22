@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-armv7-0388c42f-20261122-055823-shard-1",
+ "path": "gate-run-armv7-0388c42f-20261122-055823-shard-1",
+ "retention": "retained",
+ "reason": "TS188 discovery and complete PES replay on c6g.4xlarge on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/0388c42f430ffbbb2b1b52a3d8ee5acfa72baf21-armv7-20261122-055823/shard-1/03840a47a99cf328c5cf2a5666e2b775954e10f07828a908f7008d9508ba3fe1.tar.zst",
+ "sha256": "03840a47a99cf328c5cf2a5666e2b775954e10f07828a908f7008d9508ba3fe1",
+ "bytes": 2655760,
+ "results": [
+  {
+   "path": "memory/mpegts-ts188-discovery/gate-result.json",
+   "command": "report --memory",
+   "key": "e6c6fac1fe3ae81f94757eea9cff778077a68996dcedd1b997322a82729da7d7",
+   "status": 0,
+   "report_sha256": "388383ab1f54d9c60e19b1ffd1db2e2c7b958e211f670ab4899581287668ef68",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-ts188-discovery/gate-result.json",
+   "command": "report --benchmark",
+   "key": "8567b121a3ca8706c227a69519cb20b3d18dd4351ef3b759236b751873e9e073",
+   "status": 0,
+   "report_sha256": "f0bd9e452325aa7dd4a194ad6ab0f575e183afa414de9f6ca798522e474a339c",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-ts188-discovery/gate-result.json",
+   "command": "grade",
+   "key": "98e0a56cb2f0b9049efc54aa3fecb9850d482c9deff5ad6dc53c501f103a9f1a",
+   "status": 0,
+   "report_sha256": "0aae06043e2a2a497a40e2343adf6bbde35e81e073a5d375f0c51157adb6b459"
+  }
+ ]
+}
