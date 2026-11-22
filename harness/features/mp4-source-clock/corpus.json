@@ -1,0 +1,328 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "regular-r-ctts-v1",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-ctts-v1.mov",
+      "sha256": "18cab35d9bb30156da26d4048f29ebaffefee98dbb1596b418659f21b6a764f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "68d229e078325c3063471a3a71e56168811661402c331073e7beedd20b42937c"
+      }
+    },
+    {
+      "id": "regular-r-edits-repeat",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-edits-repeat.mov",
+      "sha256": "0837ad805378408e83cb4ab14f8309bfaae258221ecf28e8e03d932282cf3dd4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "8742f1c70755d21a35cd181c592d0f9f67878e79779cbbc82476ae220050a3e9"
+      }
+    },
+    {
+      "id": "regular-r-negative-cts",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-negative-cts.mov",
+      "sha256": "c64279c754f0f581b576a667006cf42276da59b82d5e3b2f3682c7f06912a2f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "426dd1f4bfa96a01152b102523ea0f64a0ceab95d32ea9fca54b4e3a16f75b4e"
+      }
+    },
+    {
+      "id": "regular-f-ctts-v1",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/f-ctts-v1.mp4",
+      "sha256": "6efbc9730675b972c7dbb65dd5cdd3bf296520a6a2b1ddeb5f92a40d9cd61adb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "68d229e078325c3063471a3a71e56168811661402c331073e7beedd20b42937c"
+      }
+    },
+    {
+      "id": "regular-unknown-clock-terminal",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/open-ended/unknown-clock-terminal.mp4",
+      "sha256": "d5a039c57c8ff4a1daa22756ea5a3d404072d2bf7e0cb37893721e9ff2c5d156",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "ae937edd0d85e9716d557d23aab0978fee32b87814a6c79050b883457b3ba442"
+      }
+    },
+    {
+      "id": "progressive-pending-unknown-clock",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-unknown-clock.mp4",
+      "sha256": "156e7b51aa426e891fa12e2fdaa91d6d38072b24238fd225f60d5a61a1b004c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "ae937edd0d85e9716d557d23aab0978fee32b87814a6c79050b883457b3ba442"
+      }
+    },
+    {
+      "id": "progressive-f-ctts-v1",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/f-ctts-v1.mp4",
+      "sha256": "6efbc9730675b972c7dbb65dd5cdd3bf296520a6a2b1ddeb5f92a40d9cd61adb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "68d229e078325c3063471a3a71e56168811661402c331073e7beedd20b42937c"
+      }
+    },
+    {
+      "id": "progressive-unknown-clock-terminal",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/open-ended/unknown-clock-terminal.mp4",
+      "sha256": "d5a039c57c8ff4a1daa22756ea5a3d404072d2bf7e0cb37893721e9ff2c5d156",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "ae937edd0d85e9716d557d23aab0978fee32b87814a6c79050b883457b3ba442"
+      }
+    },
+    {
+      "id": "progressive-aac-priming",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-priming.mp4",
+      "sha256": "d86cda57d99064bd1d4799c02fc9b56248486ee81034532da990004f86725dff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "92b70bb198e87e9a37921d888f5af28089d6faea54054f637d5082eac1fe9e3d"
+      }
+    },
+    {
+      "id": "progressive-aac-tail-trim",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-tail-trim.mp4",
+      "sha256": "05d659762cc522255142aadc28cf55f04caf6946a43dbd60854b6f1c5106c841",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "92b70bb198e87e9a37921d888f5af28089d6faea54054f637d5082eac1fe9e3d"
+      }
+    },
+    {
+      "id": "progressive-aac-fractional-edit",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-fractional-edit.mp4",
+      "sha256": "0d38fe25d769d15aaac29bcc161f531e06c0acaec6e1a5a859ba5f7b373169ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "92b70bb198e87e9a37921d888f5af28089d6faea54054f637d5082eac1fe9e3d"
+      }
+    },
+    {
+      "id": "progressive-fragment-aac-edit",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-edit.mp4",
+      "sha256": "d8990d764a54e21ff908bd2b7074b993b8e785e750907f270940034ed23f4c37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "92b70bb198e87e9a37921d888f5af28089d6faea54054f637d5082eac1fe9e3d"
+      }
+    },
+    {
+      "id": "progressive-fragment-aac-late-track",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-late-track.mp4",
+      "sha256": "d898a74c2ddc7edf2c0d4a435e9b2808e14b611339028131d324cc518a27af4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "92b70bb198e87e9a37921d888f5af28089d6faea54054f637d5082eac1fe9e3d"
+      }
+    },
+    {
+      "id": "progressive-fragment-mp3-edit",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-mp3-edit.mp4",
+      "sha256": "44410be7427716494f36e126ba826b40d3763aa5c65ee932563ec33b385f5f06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "f5a51d05dee3b9f1e86fbefdc8a1048754bcf2d5f440f3b04dba43788af927e3"
+      }
+    },
+    {
+      "id": "progressive-leading-video-edit",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit.mp4",
+      "sha256": "d814d9726aa99e62dc1f83cb069162484defd8397ebbc3aa36972eb57df56b22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "92b70bb198e87e9a37921d888f5af28089d6faea54054f637d5082eac1fe9e3d"
+      }
+    },
+    {
+      "id": "progressive-leading-video-edit-trimmed",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-trimmed.mp4",
+      "sha256": "ef6fd674f8fe63a45ba122ea76bb9a119304b389026d744ee5d0b022a72c446b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "92b70bb198e87e9a37921d888f5af28089d6faea54054f637d5082eac1fe9e3d"
+      }
+    },
+    {
+      "id": "progressive-leading-video-edit-single-sync",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-single-sync.mp4",
+      "sha256": "4ff065b6eb9147d438adc3241a87b3108f5a90e3efc6fee2fdabf812327631a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "92b70bb198e87e9a37921d888f5af28089d6faea54054f637d5082eac1fe9e3d"
+      }
+    },
+    {
+      "id": "progressive-leading-video-edit-rounded-end",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-rounded-end.mp4",
+      "sha256": "3f1811c7373788df7921f0e5210e678af0fbf30240479d7848ccffbc351f8d07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "92b70bb198e87e9a37921d888f5af28089d6faea54054f637d5082eac1fe9e3d"
+      }
+    },
+    {
+      "id": "progressive-leading-video-edit-overlapping-sync",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "92b70bb198e87e9a37921d888f5af28089d6faea54054f637d5082eac1fe9e3d"
+      }
+    },
+    {
+      "id": "mp4-bad-ctts-count-mismatch",
+      "profile": "mp4",
+      "file": "crates/isobmff/tests/fixtures/bad-ctts-count-mismatch.mov",
+      "sha256": "fb888b9ef7a2e2eba2e00fc4e417be33ed690c32b18044cf1ac43fd9d454eb64",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mp4-timing-policy-bad-ctts-count-mismatch",
+      "profile": "mp4-timing-policy",
+      "file": "crates/isobmff/tests/fixtures/bad-ctts-count-mismatch.mov",
+      "sha256": "fb888b9ef7a2e2eba2e00fc4e417be33ed690c32b18044cf1ac43fd9d454eb64",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-timing-policy",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "fa66c5ef1003b3ee63efcfebd49585c9f1e7625a18da8744be0d35315e54a2d9"
+      }
+    },
+    {
+      "id": "mp4-bad-stts-count-mismatch",
+      "profile": "mp4",
+      "file": "crates/isobmff/tests/fixtures/bad-stts-count-mismatch.mov",
+      "sha256": "a73197cdcf9dc89806f8d01899d5c28225a3e981bc139a1d23356491caef057a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "mp4-timing-policy-bad-stts-count-mismatch",
+      "profile": "mp4-timing-policy",
+      "file": "crates/isobmff/tests/fixtures/bad-stts-count-mismatch.mov",
+      "sha256": "a73197cdcf9dc89806f8d01899d5c28225a3e981bc139a1d23356491caef057a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-timing-policy",
+        "clock"
+      ],
+      "expected": {
+        "trace_sha256": "8742f1c70755d21a35cd181c592d0f9f67878e79779cbbc82476ae220050a3e9"
+      }
+    }
+  ]
+}

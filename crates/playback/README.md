@@ -126,6 +126,13 @@ and `mdat`. For TS, exactly one three-sync pattern must match in the
 389-byte prefix. `SelectedInput` replays the prefix before reading more.
 `triergon_raw_video::PlaybackProbe` also detects AVC and HEVC Annex B.
 
+The [probe comparison](../../harness/features/playback-probe/contract.json)
+checks detection over fixed prefixes and checks the bytes delivered after
+container selection. The [source-view comparison](../../harness/features/playback-source-view/contract.json)
+checks direct-player track metadata and complete forward packet streams.
+The [MP4 clock oracle](../../harness/features/mp4-source-clock/contract.json)
+checks sample decode and composition times before the movie's edit list.
+
 ## Supported
 
 | Area | Entry points |

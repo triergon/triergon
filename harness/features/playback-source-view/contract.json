@@ -1,0 +1,1698 @@
+{
+  "schema": 1,
+  "id": "playback-source-view",
+  "gate": "required",
+  "operation": "playback-source-view",
+  "candidate": "playback-views-worker",
+  "worker_operation": "source-view-",
+  "contract": [
+    "Open Matroska, indexed MP4, progressive MP4 and one MPEG-TS program through the direct player. Use source clocks and read every selected packet. For ordered transport entities, continue the same player to the second entity and explicitly finish the logical source. The reference reads the same concatenated byte stream.",
+    "The reference calls avformat_open_input and av_read_frame without stream discovery. Set ignore_editlist=1 for MOV and suppress elementary parsing and filling for MPEG-TS PES. Select the named PIDs of program 1 when the case declares PIDs. Matroska timestamps are in nanoseconds, MP4 in media timescale ticks, and transport in raw 90 kHz PES ticks.",
+    "Fold kind 2 with each initial track ID, media kind, framed codec name, source codec tag, configuration, optional language and tri-state default and forced flags. The reference uses the public stream ID or the one-based stream ordinal if it has no positive ID. A Matroska CodecID string and an unavailable numeric codec_tag remain distinguishable.",
+    "Fold kind 1 with the shared packet row: track ID, optional PTS and DTS, duration, flags, size and every payload byte. Fold 7 on clean end or 8 on data refusal. Trace the candidate demux clock and trim for diagnosis.",
+    "For raw Annex B, fold kind 4 with the stream rate from the active SPS timing and FFmpeg codec parameters. Fold kind 3 per unit with the queue-boundary timestamp in ns, zero for an unstamped packet. Trace any additional source VUI fields and the reference sample aspect ratio. Raw views run for parity only."
+  ],
+  "required_profiles": [
+    "m2ts192",
+    "matroska",
+    "mp4",
+    "mp4-progressive",
+    "mp4-timing-policy",
+    "raw-avc",
+    "raw-hevc",
+    "ts-entities",
+    "ts188"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 20,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-playback-views-native",
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "mp4-forward-regular-r-ctts-v1",
+        "mp4-forward-regular-r-description-change",
+        "mp4-forward-regular-r-edits-repeat",
+        "mp4-forward-regular-r-end-co64",
+        "mp4-forward-regular-r-front-stco",
+        "mp4-forward-regular-unknown-movie-duration",
+        "mp4-forward-regular-r-multiple-mdats",
+        "mp4-forward-regular-r-multitrack",
+        "mp4-forward-regular-r-negative-cts",
+        "mp4-forward-regular-r-subtitle-tx3g",
+        "mp4-forward-regular-f-ctts-v1",
+        "mp4-forward-regular-f-description-change",
+        "mp4-forward-regular-f-explicit",
+        "mp4-forward-regular-f-multitrack",
+        "mp4-forward-regular-f-no-second-tfdt",
+        "mp4-forward-regular-encoded-avc-aac-front",
+        "mp4-forward-regular-encoded-hevc-aac-front",
+        "mp4-forward-regular-encoded-avc-aac-native-seek",
+        "mp4-forward-regular-encoded-avc-aac-indexed-seek",
+        "mp4-forward-regular-opaque-tail-terminal",
+        "mp4-forward-regular-pending-terminal",
+        "mp4-forward-regular-regular-terminal",
+        "mp4-forward-regular-unknown-clock-terminal",
+        "mp4-forward-progressive-pending-description",
+        "mp4-forward-progressive-pending-pair",
+        "mp4-forward-progressive-pending-reverse-ranges",
+        "mp4-forward-progressive-pending-two-mdats",
+        "mp4-forward-progressive-pending-unknown-clock",
+        "mp4-forward-progressive-ten-sequential-batches",
+        "mp4-forward-progressive-encoded-avc-aac-front",
+        "mp4-forward-progressive-encoded-hevc-aac-front",
+        "mp4-forward-progressive-f-ctts-v1",
+        "mp4-forward-progressive-f-description-change",
+        "mp4-forward-progressive-f-explicit",
+        "mp4-forward-progressive-f-multitrack",
+        "mp4-forward-progressive-f-no-second-tfdt",
+        "mp4-forward-progressive-pending-terminal",
+        "mp4-forward-progressive-unknown-clock-terminal",
+        "mp4-forward-progressive-first-source-clock-unknown",
+        "mp4-forward-progressive-aac-priming",
+        "mp4-forward-progressive-aac-tail-trim",
+        "mp4-forward-progressive-aac-fractional-edit",
+        "mp4-forward-progressive-fragment-aac-edit",
+        "mp4-forward-progressive-fragment-aac-late-track",
+        "mp4-forward-progressive-fragment-aac-short",
+        "mp4-forward-progressive-fragment-mp3-edit",
+        "mp4-forward-progressive-leading-video-edit",
+        "mp4-forward-progressive-leading-video-edit-trimmed",
+        "mp4-forward-progressive-leading-video-edit-single-sync",
+        "mp4-forward-progressive-leading-video-edit-rounded-end",
+        "mp4-forward-progressive-leading-video-edit-overlapping-sync",
+        "matroska-startup-seek-startup-avc-eight-pictures",
+        "matroska-startup-seek-startup-avc-high-b",
+        "matroska-startup-seek-startup-avc-high-b0",
+        "matroska-startup-seek-startup-avc-high-b1",
+        "matroska-startup-seek-startup-avc-mixed",
+        "matroska-startup-seek-startup-avc-pgs-early-canvas",
+        "matroska-startup-seek-startup-avc-six-pictures",
+        "matroska-startup-seek-startup-hevc-b0",
+        "matroska-startup-seek-startup-hevc-b1",
+        "matroska-startup-seek-startup-hevc-b3",
+        "matroska-startup-seek-startup-hevc-mixed",
+        "matroska-startup-seek-startup-hevc-no-default-duration",
+        "matroska-startup-seek-startup-hevc-repeated-configuration",
+        "matroska-startup-seek-startup-hevc-vps-timed-no-default",
+        "matroska-startup-seek-seek-avc-seek-0-fresh",
+        "matroska-startup-seek-seek-avc-seek-0-eof",
+        "matroska-startup-seek-seek-avc-seek-700-fresh",
+        "matroska-startup-seek-seek-avc-seek-700-eof",
+        "matroska-startup-seek-seek-avc-seek-1420-fresh",
+        "matroska-startup-seek-seek-avc-seek-1420-eof",
+        "matroska-startup-seek-seek-avc-seek-2700-fresh",
+        "matroska-startup-seek-seek-avc-seek-2700-eof",
+        "matroska-startup-seek-seek-hevc-seek-0-fresh",
+        "matroska-startup-seek-seek-hevc-seek-0-eof",
+        "matroska-startup-seek-seek-hevc-seek-700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-700-eof",
+        "matroska-startup-seek-seek-hevc-seek-1420-fresh",
+        "matroska-startup-seek-seek-hevc-seek-1420-eof",
+        "matroska-startup-seek-seek-hevc-seek-2700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-2700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-0-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-0-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-1420-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-1420-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-2700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-2700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-0-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-eof",
+        "ts-program-ts188-basic",
+        "ts-program-program-eof-avc-aac",
+        "ts-program-program-pmt-retype",
+        "ts-program-program-private-avc-dvb",
+        "ts-program-carriage-aac-adts-direct",
+        "ts-program-carriage-hevc-direct",
+        "ts-program-pts-negative-against-dts",
+        "ts-program-transport-partial-final-packet",
+        "ts-program-pmt-opaque-language-descriptors",
+        "ts-program-replay-avc-aac-00",
+        "ts-program-replay-avc-aac-01",
+        "ts-program-replay-avc-aac-02",
+        "ts-program-replay-avc-aac-03",
+        "ts-program-replay-avc-aac-04",
+        "ts-program-replay-avc-aac-05",
+        "ts-program-replay-avc-aac-06",
+        "ts-program-replay-avc-aac-07",
+        "ts-program-replay-avc-aac-08",
+        "ts-program-replay-avc-aac-09",
+        "ts-program-replay-hevc-aac-00",
+        "ts-program-replay-hevc-aac-01",
+        "ts-program-replay-hevc-aac-02",
+        "ts-program-replay-hevc-aac-03",
+        "ts-program-replay-hevc-aac-04",
+        "ts-program-replay-hevc-aac-05",
+        "ts-program-replay-hevc-aac-06",
+        "ts-program-replay-hevc-aac-07",
+        "ts-program-replay-hevc-aac-08",
+        "ts-program-replay-hevc-aac-09",
+        "ts-program-entry-hevc-aac-44100-00",
+        "ts-program-entry-hevc-aac-44100-01",
+        "ts-program-m2ts-replay-avc-aac-00-video",
+        "ts-program-m2ts-replay-avc-aac-00-audio",
+        "ts-program-m2ts-replay-hevc-aac-00-video",
+        "ts-program-m2ts-entry-hevc-aac-44100-01-video",
+        "progressive-pending-description",
+        "progressive-pending-empty-endpoint",
+        "progressive-pending-pair",
+        "progressive-pending-reverse-ranges",
+        "progressive-pending-two-mdats",
+        "progressive-pending-unknown-clock",
+        "progressive-ten-sequential-batches",
+        "source-carriage-aac-adts-direct",
+        "source-carriage-hevc-direct",
+        "source-hls-contiguous-part-a",
+        "source-hls-contiguous-part-b",
+        "source-m2ts192-opaque-prefix",
+        "source-pes-timestamp-marker",
+        "source-pmt-opaque-language-descriptors",
+        "source-pmt-version-wrap-retypes-pid",
+        "source-program-eof-avc-aac",
+        "source-program-pmt-retype",
+        "source-program-private-avc-dvb",
+        "source-psi-crc-invalid",
+        "source-pts-dts-common-epoch",
+        "source-pts-negative-against-dts",
+        "source-pts-wrap-forward",
+        "source-transport-partial-final-packet",
+        "source-ts188-basic",
+        "ts-contiguous-entities",
+        "mp4-bad-ctts-count-mismatch",
+        "mp4-timing-policy-bad-ctts-count-mismatch",
+        "mp4-bad-stts-count-mismatch",
+        "mp4-timing-policy-bad-stts-count-mismatch"
+      ],
+      "cause": "collect on isolated AArch64 and ARMv7 gate hosts after parity triage"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "mp4-forward-regular-r-ctts-v1",
+        "mp4-forward-regular-r-description-change",
+        "mp4-forward-regular-r-edits-repeat",
+        "mp4-forward-regular-r-end-co64",
+        "mp4-forward-regular-r-front-stco",
+        "mp4-forward-regular-unknown-movie-duration",
+        "mp4-forward-regular-r-multiple-mdats",
+        "mp4-forward-regular-r-multitrack",
+        "mp4-forward-regular-r-negative-cts",
+        "mp4-forward-regular-r-subtitle-tx3g",
+        "mp4-forward-regular-f-ctts-v1",
+        "mp4-forward-regular-f-description-change",
+        "mp4-forward-regular-f-explicit",
+        "mp4-forward-regular-f-multitrack",
+        "mp4-forward-regular-f-no-second-tfdt",
+        "mp4-forward-regular-encoded-avc-aac-front",
+        "mp4-forward-regular-encoded-hevc-aac-front",
+        "mp4-forward-regular-encoded-avc-aac-native-seek",
+        "mp4-forward-regular-encoded-avc-aac-indexed-seek",
+        "mp4-forward-regular-opaque-tail-terminal",
+        "mp4-forward-regular-pending-terminal",
+        "mp4-forward-regular-regular-terminal",
+        "mp4-forward-regular-unknown-clock-terminal",
+        "mp4-forward-progressive-pending-description",
+        "mp4-forward-progressive-pending-pair",
+        "mp4-forward-progressive-pending-reverse-ranges",
+        "mp4-forward-progressive-pending-two-mdats",
+        "mp4-forward-progressive-pending-unknown-clock",
+        "mp4-forward-progressive-ten-sequential-batches",
+        "mp4-forward-progressive-encoded-avc-aac-front",
+        "mp4-forward-progressive-encoded-hevc-aac-front",
+        "mp4-forward-progressive-f-ctts-v1",
+        "mp4-forward-progressive-f-description-change",
+        "mp4-forward-progressive-f-explicit",
+        "mp4-forward-progressive-f-multitrack",
+        "mp4-forward-progressive-f-no-second-tfdt",
+        "mp4-forward-progressive-pending-terminal",
+        "mp4-forward-progressive-unknown-clock-terminal",
+        "mp4-forward-progressive-first-source-clock-unknown",
+        "mp4-forward-progressive-aac-priming",
+        "mp4-forward-progressive-aac-tail-trim",
+        "mp4-forward-progressive-aac-fractional-edit",
+        "mp4-forward-progressive-fragment-aac-edit",
+        "mp4-forward-progressive-fragment-aac-late-track",
+        "mp4-forward-progressive-fragment-aac-short",
+        "mp4-forward-progressive-fragment-mp3-edit",
+        "mp4-forward-progressive-leading-video-edit",
+        "mp4-forward-progressive-leading-video-edit-trimmed",
+        "mp4-forward-progressive-leading-video-edit-single-sync",
+        "mp4-forward-progressive-leading-video-edit-rounded-end",
+        "mp4-forward-progressive-leading-video-edit-overlapping-sync",
+        "matroska-startup-seek-startup-avc-eight-pictures",
+        "matroska-startup-seek-startup-avc-high-b",
+        "matroska-startup-seek-startup-avc-high-b0",
+        "matroska-startup-seek-startup-avc-high-b1",
+        "matroska-startup-seek-startup-avc-mixed",
+        "matroska-startup-seek-startup-avc-pgs-early-canvas",
+        "matroska-startup-seek-startup-avc-six-pictures",
+        "matroska-startup-seek-startup-hevc-b0",
+        "matroska-startup-seek-startup-hevc-b1",
+        "matroska-startup-seek-startup-hevc-b3",
+        "matroska-startup-seek-startup-hevc-mixed",
+        "matroska-startup-seek-startup-hevc-no-default-duration",
+        "matroska-startup-seek-startup-hevc-repeated-configuration",
+        "matroska-startup-seek-startup-hevc-vps-timed-no-default",
+        "matroska-startup-seek-seek-avc-seek-0-fresh",
+        "matroska-startup-seek-seek-avc-seek-0-eof",
+        "matroska-startup-seek-seek-avc-seek-700-fresh",
+        "matroska-startup-seek-seek-avc-seek-700-eof",
+        "matroska-startup-seek-seek-avc-seek-1420-fresh",
+        "matroska-startup-seek-seek-avc-seek-1420-eof",
+        "matroska-startup-seek-seek-avc-seek-2700-fresh",
+        "matroska-startup-seek-seek-avc-seek-2700-eof",
+        "matroska-startup-seek-seek-hevc-seek-0-fresh",
+        "matroska-startup-seek-seek-hevc-seek-0-eof",
+        "matroska-startup-seek-seek-hevc-seek-700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-700-eof",
+        "matroska-startup-seek-seek-hevc-seek-1420-fresh",
+        "matroska-startup-seek-seek-hevc-seek-1420-eof",
+        "matroska-startup-seek-seek-hevc-seek-2700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-2700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-0-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-0-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-1420-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-1420-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-2700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-2700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-0-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-eof",
+        "ts-program-ts188-basic",
+        "ts-program-program-eof-avc-aac",
+        "ts-program-program-pmt-retype",
+        "ts-program-program-private-avc-dvb",
+        "ts-program-carriage-aac-adts-direct",
+        "ts-program-carriage-hevc-direct",
+        "ts-program-pts-negative-against-dts",
+        "ts-program-transport-partial-final-packet",
+        "ts-program-pmt-opaque-language-descriptors",
+        "ts-program-replay-avc-aac-00",
+        "ts-program-replay-avc-aac-01",
+        "ts-program-replay-avc-aac-02",
+        "ts-program-replay-avc-aac-03",
+        "ts-program-replay-avc-aac-04",
+        "ts-program-replay-avc-aac-05",
+        "ts-program-replay-avc-aac-06",
+        "ts-program-replay-avc-aac-07",
+        "ts-program-replay-avc-aac-08",
+        "ts-program-replay-avc-aac-09",
+        "ts-program-replay-hevc-aac-00",
+        "ts-program-replay-hevc-aac-01",
+        "ts-program-replay-hevc-aac-02",
+        "ts-program-replay-hevc-aac-03",
+        "ts-program-replay-hevc-aac-04",
+        "ts-program-replay-hevc-aac-05",
+        "ts-program-replay-hevc-aac-06",
+        "ts-program-replay-hevc-aac-07",
+        "ts-program-replay-hevc-aac-08",
+        "ts-program-replay-hevc-aac-09",
+        "ts-program-entry-hevc-aac-44100-00",
+        "ts-program-entry-hevc-aac-44100-01",
+        "ts-program-m2ts-replay-avc-aac-00-video",
+        "ts-program-m2ts-replay-avc-aac-00-audio",
+        "ts-program-m2ts-replay-hevc-aac-00-video",
+        "ts-program-m2ts-entry-hevc-aac-44100-01-video",
+        "progressive-pending-description",
+        "progressive-pending-empty-endpoint",
+        "progressive-pending-pair",
+        "progressive-pending-reverse-ranges",
+        "progressive-pending-two-mdats",
+        "progressive-pending-unknown-clock",
+        "progressive-ten-sequential-batches",
+        "source-carriage-aac-adts-direct",
+        "source-carriage-hevc-direct",
+        "source-hls-contiguous-part-a",
+        "source-hls-contiguous-part-b",
+        "source-m2ts192-opaque-prefix",
+        "source-pes-timestamp-marker",
+        "source-pmt-opaque-language-descriptors",
+        "source-pmt-version-wrap-retypes-pid",
+        "source-program-eof-avc-aac",
+        "source-program-pmt-retype",
+        "source-program-private-avc-dvb",
+        "source-psi-crc-invalid",
+        "source-pts-dts-common-epoch",
+        "source-pts-negative-against-dts",
+        "source-pts-wrap-forward",
+        "source-transport-partial-final-packet",
+        "source-ts188-basic",
+        "ts-contiguous-entities",
+        "mp4-bad-ctts-count-mismatch",
+        "mp4-timing-policy-bad-ctts-count-mismatch",
+        "mp4-bad-stts-count-mismatch",
+        "mp4-timing-policy-bad-stts-count-mismatch"
+      ],
+      "cause": "collect on isolated AArch64 and ARMv7 gate hosts after parity triage"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "mp4-forward-regular-r-ctts-v1",
+        "mp4-forward-regular-r-description-change",
+        "mp4-forward-regular-r-edits-repeat",
+        "mp4-forward-regular-r-end-co64",
+        "mp4-forward-regular-r-front-stco",
+        "mp4-forward-regular-unknown-movie-duration",
+        "mp4-forward-regular-r-multiple-mdats",
+        "mp4-forward-regular-r-multitrack",
+        "mp4-forward-regular-r-negative-cts",
+        "mp4-forward-regular-r-subtitle-tx3g",
+        "mp4-forward-regular-f-ctts-v1",
+        "mp4-forward-regular-f-description-change",
+        "mp4-forward-regular-f-explicit",
+        "mp4-forward-regular-f-multitrack",
+        "mp4-forward-regular-f-no-second-tfdt",
+        "mp4-forward-regular-encoded-avc-aac-front",
+        "mp4-forward-regular-encoded-hevc-aac-front",
+        "mp4-forward-regular-encoded-avc-aac-native-seek",
+        "mp4-forward-regular-encoded-avc-aac-indexed-seek",
+        "mp4-forward-regular-opaque-tail-terminal",
+        "mp4-forward-regular-pending-terminal",
+        "mp4-forward-regular-regular-terminal",
+        "mp4-forward-regular-unknown-clock-terminal",
+        "mp4-forward-progressive-pending-description",
+        "mp4-forward-progressive-pending-pair",
+        "mp4-forward-progressive-pending-reverse-ranges",
+        "mp4-forward-progressive-pending-two-mdats",
+        "mp4-forward-progressive-pending-unknown-clock",
+        "mp4-forward-progressive-ten-sequential-batches",
+        "mp4-forward-progressive-encoded-avc-aac-front",
+        "mp4-forward-progressive-encoded-hevc-aac-front",
+        "mp4-forward-progressive-f-ctts-v1",
+        "mp4-forward-progressive-f-description-change",
+        "mp4-forward-progressive-f-explicit",
+        "mp4-forward-progressive-f-multitrack",
+        "mp4-forward-progressive-f-no-second-tfdt",
+        "mp4-forward-progressive-pending-terminal",
+        "mp4-forward-progressive-unknown-clock-terminal",
+        "mp4-forward-progressive-first-source-clock-unknown",
+        "mp4-forward-progressive-aac-priming",
+        "mp4-forward-progressive-aac-tail-trim",
+        "mp4-forward-progressive-aac-fractional-edit",
+        "mp4-forward-progressive-fragment-aac-edit",
+        "mp4-forward-progressive-fragment-aac-late-track",
+        "mp4-forward-progressive-fragment-aac-short",
+        "mp4-forward-progressive-fragment-mp3-edit",
+        "mp4-forward-progressive-leading-video-edit",
+        "mp4-forward-progressive-leading-video-edit-trimmed",
+        "mp4-forward-progressive-leading-video-edit-single-sync",
+        "mp4-forward-progressive-leading-video-edit-rounded-end",
+        "mp4-forward-progressive-leading-video-edit-overlapping-sync",
+        "matroska-startup-seek-startup-avc-eight-pictures",
+        "matroska-startup-seek-startup-avc-high-b",
+        "matroska-startup-seek-startup-avc-high-b0",
+        "matroska-startup-seek-startup-avc-high-b1",
+        "matroska-startup-seek-startup-avc-mixed",
+        "matroska-startup-seek-startup-avc-pgs-early-canvas",
+        "matroska-startup-seek-startup-avc-six-pictures",
+        "matroska-startup-seek-startup-hevc-b0",
+        "matroska-startup-seek-startup-hevc-b1",
+        "matroska-startup-seek-startup-hevc-b3",
+        "matroska-startup-seek-startup-hevc-mixed",
+        "matroska-startup-seek-startup-hevc-no-default-duration",
+        "matroska-startup-seek-startup-hevc-repeated-configuration",
+        "matroska-startup-seek-startup-hevc-vps-timed-no-default",
+        "matroska-startup-seek-seek-avc-seek-0-fresh",
+        "matroska-startup-seek-seek-avc-seek-0-eof",
+        "matroska-startup-seek-seek-avc-seek-700-fresh",
+        "matroska-startup-seek-seek-avc-seek-700-eof",
+        "matroska-startup-seek-seek-avc-seek-1420-fresh",
+        "matroska-startup-seek-seek-avc-seek-1420-eof",
+        "matroska-startup-seek-seek-avc-seek-2700-fresh",
+        "matroska-startup-seek-seek-avc-seek-2700-eof",
+        "matroska-startup-seek-seek-hevc-seek-0-fresh",
+        "matroska-startup-seek-seek-hevc-seek-0-eof",
+        "matroska-startup-seek-seek-hevc-seek-700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-700-eof",
+        "matroska-startup-seek-seek-hevc-seek-1420-fresh",
+        "matroska-startup-seek-seek-hevc-seek-1420-eof",
+        "matroska-startup-seek-seek-hevc-seek-2700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-2700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-0-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-0-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-1420-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-1420-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-default-2700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-default-2700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-0-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-700-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-1420-eof",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-2700-eof",
+        "ts-program-ts188-basic",
+        "ts-program-program-eof-avc-aac",
+        "ts-program-program-pmt-retype",
+        "ts-program-program-private-avc-dvb",
+        "ts-program-carriage-aac-adts-direct",
+        "ts-program-carriage-hevc-direct",
+        "ts-program-pts-negative-against-dts",
+        "ts-program-transport-partial-final-packet",
+        "ts-program-pmt-opaque-language-descriptors",
+        "ts-program-replay-avc-aac-00",
+        "ts-program-replay-avc-aac-01",
+        "ts-program-replay-avc-aac-02",
+        "ts-program-replay-avc-aac-03",
+        "ts-program-replay-avc-aac-04",
+        "ts-program-replay-avc-aac-05",
+        "ts-program-replay-avc-aac-06",
+        "ts-program-replay-avc-aac-07",
+        "ts-program-replay-avc-aac-08",
+        "ts-program-replay-avc-aac-09",
+        "ts-program-replay-hevc-aac-00",
+        "ts-program-replay-hevc-aac-01",
+        "ts-program-replay-hevc-aac-02",
+        "ts-program-replay-hevc-aac-03",
+        "ts-program-replay-hevc-aac-04",
+        "ts-program-replay-hevc-aac-05",
+        "ts-program-replay-hevc-aac-06",
+        "ts-program-replay-hevc-aac-07",
+        "ts-program-replay-hevc-aac-08",
+        "ts-program-replay-hevc-aac-09",
+        "ts-program-entry-hevc-aac-44100-00",
+        "ts-program-entry-hevc-aac-44100-01",
+        "ts-program-m2ts-replay-avc-aac-00-video",
+        "ts-program-m2ts-replay-avc-aac-00-audio",
+        "ts-program-m2ts-replay-hevc-aac-00-video",
+        "ts-program-m2ts-entry-hevc-aac-44100-01-video",
+        "progressive-pending-description",
+        "progressive-pending-empty-endpoint",
+        "progressive-pending-pair",
+        "progressive-pending-reverse-ranges",
+        "progressive-pending-two-mdats",
+        "progressive-pending-unknown-clock",
+        "progressive-ten-sequential-batches",
+        "source-carriage-aac-adts-direct",
+        "source-carriage-hevc-direct",
+        "source-hls-contiguous-part-a",
+        "source-hls-contiguous-part-b",
+        "source-m2ts192-opaque-prefix",
+        "source-pes-timestamp-marker",
+        "source-pmt-opaque-language-descriptors",
+        "source-pmt-version-wrap-retypes-pid",
+        "source-program-eof-avc-aac",
+        "source-program-pmt-retype",
+        "source-program-private-avc-dvb",
+        "source-psi-crc-invalid",
+        "source-pts-dts-common-epoch",
+        "source-pts-negative-against-dts",
+        "source-pts-wrap-forward",
+        "source-transport-partial-final-packet",
+        "source-ts188-basic",
+        "ts-contiguous-entities",
+        "mp4-bad-ctts-count-mismatch",
+        "mp4-timing-policy-bad-ctts-count-mismatch",
+        "mp4-bad-stts-count-mismatch",
+        "mp4-timing-policy-bad-stts-count-mismatch"
+      ],
+      "cause": "collect on isolated AArch64 and ARMv7 gate hosts after parity triage"
+    },
+    {
+      "bound": "runtime",
+      "cases": [
+        "raw-avc-80x48",
+        "raw-avc-short",
+        "raw-avc-aud0",
+        "raw-avc-aud1",
+        "raw-hevc-aud0",
+        "raw-hevc-aud1",
+        "raw-hevc-eos"
+      ],
+      "cause": "the VUI view uses full reference stream discovery and times no equivalent workload"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "raw-avc-80x48",
+        "raw-avc-short",
+        "raw-avc-aud0",
+        "raw-avc-aud1",
+        "raw-hevc-aud0",
+        "raw-hevc-aud1",
+        "raw-hevc-eos"
+      ],
+      "cause": "the VUI view uses full reference stream discovery and times no equivalent workload"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "raw-avc-80x48",
+        "raw-avc-short",
+        "raw-avc-aud0",
+        "raw-avc-aud1",
+        "raw-hevc-aud0",
+        "raw-hevc-aud1",
+        "raw-hevc-eos"
+      ],
+      "cause": "the VUI view uses full reference stream discovery and times no equivalent workload"
+    }
+  ],
+  "pending_module_requirements": [
+    "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+    "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+    "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+    "The strict source opener and MOV demuxer disagree on admission of the authored file. Read its box and table extents against ISO/IEC 14496-12; the gate has no recovery rule for this case."
+  ],
+  "open_cases": [
+    {
+      "id": "mp4-forward-regular-r-ctts-v1",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-r-description-change",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-r-edits-repeat",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-r-end-co64",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-r-front-stco",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-unknown-movie-duration",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-r-multiple-mdats",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-r-multitrack",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-r-negative-cts",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-r-subtitle-tx3g",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-f-ctts-v1",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-f-description-change",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-f-explicit",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-f-multitrack",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-f-no-second-tfdt",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-encoded-avc-aac-front",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-encoded-hevc-aac-front",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-encoded-avc-aac-native-seek",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-encoded-avc-aac-indexed-seek",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-opaque-tail-terminal",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-pending-terminal",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-regular-terminal",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-regular-unknown-clock-terminal",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-pending-description",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-pending-pair",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-pending-reverse-ranges",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-pending-two-mdats",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-pending-unknown-clock",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-ten-sequential-batches",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-encoded-avc-aac-front",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-encoded-hevc-aac-front",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-f-ctts-v1",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-f-description-change",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-f-explicit",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-f-multitrack",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-f-no-second-tfdt",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-pending-terminal",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-unknown-clock-terminal",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-first-source-clock-unknown",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-aac-priming",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-aac-tail-trim",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-aac-fractional-edit",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-fragment-aac-edit",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-fragment-aac-late-track",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-fragment-aac-short",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-fragment-mp3-edit",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-leading-video-edit",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-leading-video-edit-trimmed",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-leading-video-edit-single-sync",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-leading-video-edit-rounded-end",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-forward-progressive-leading-video-edit-overlapping-sync",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-eight-pictures",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-high-b",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-high-b0",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-high-b1",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-mixed",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-pgs-early-canvas",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-six-pictures",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-b0",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-b1",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-b3",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-mixed",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-no-default-duration",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-repeated-configuration",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-vps-timed-no-default",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-0-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-0-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-700-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-700-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-1420-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-1420-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-2700-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-2700-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-0-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-0-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-700-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-700-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-1420-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-1420-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-2700-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-2700-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-0-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-0-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-700-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-700-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-1420-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-1420-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-2700-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-2700-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-0-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-700-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-700-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-1420-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-1420-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-2700-fresh",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-2700-eof",
+      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-ts188-basic",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-program-eof-avc-aac",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-program-pmt-retype",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-program-private-avc-dvb",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-carriage-aac-adts-direct",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-carriage-hevc-direct",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-pts-negative-against-dts",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-transport-partial-final-packet",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-pmt-opaque-language-descriptors",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-avc-aac-00",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-avc-aac-01",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-avc-aac-02",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-avc-aac-03",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-avc-aac-04",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-avc-aac-05",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-avc-aac-06",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-avc-aac-07",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-avc-aac-08",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-avc-aac-09",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-00",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-01",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-02",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-03",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-04",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-05",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-06",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-07",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-08",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-09",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-entry-hevc-aac-44100-00",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-entry-hevc-aac-44100-01",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-m2ts-replay-avc-aac-00-video",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-m2ts-replay-avc-aac-00-audio",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-m2ts-replay-hevc-aac-00-video",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-m2ts-entry-hevc-aac-44100-01-video",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "progressive-pending-description",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "progressive-pending-empty-endpoint",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "progressive-pending-pair",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "progressive-pending-reverse-ranges",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "progressive-pending-two-mdats",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "progressive-pending-unknown-clock",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "progressive-ten-sequential-batches",
+      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-carriage-aac-adts-direct",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-carriage-hevc-direct",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-hls-contiguous-part-a",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-m2ts192-opaque-prefix",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-pes-timestamp-marker",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-pmt-opaque-language-descriptors",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-pmt-version-wrap-retypes-pid",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-program-eof-avc-aac",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-program-pmt-retype",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-program-private-avc-dvb",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-pts-dts-common-epoch",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-pts-negative-against-dts",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-pts-wrap-forward",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-transport-partial-final-packet",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-ts188-basic",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-contiguous-entities",
+      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-bad-ctts-count-mismatch",
+      "requirement": "The strict source opener and MOV demuxer disagree on admission of the authored file. Read its box and table extents against ISO/IEC 14496-12; the gate has no recovery rule for this case.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-timing-policy-bad-ctts-count-mismatch",
+      "requirement": "The strict source opener and MOV demuxer disagree on admission of the authored file. Read its box and table extents against ISO/IEC 14496-12; the gate has no recovery rule for this case.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-bad-stts-count-mismatch",
+      "requirement": "The strict source opener and MOV demuxer disagree on admission of the authored file. Read its box and table extents against ISO/IEC 14496-12; the gate has no recovery rule for this case.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-timing-policy-bad-stts-count-mismatch",
+      "requirement": "The strict source opener and MOV demuxer disagree on admission of the authored file. Read its box and table extents against ISO/IEC 14496-12; the gate has no recovery rule for this case.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ]
+}

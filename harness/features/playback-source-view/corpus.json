@@ -1,0 +1,2573 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "mp4-forward-regular-r-ctts-v1",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-ctts-v1.mov",
+      "sha256": "18cab35d9bb30156da26d4048f29ebaffefee98dbb1596b418659f21b6a764f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 16323412292036671644
+      }
+    },
+    {
+      "id": "mp4-forward-regular-r-description-change",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-description-change.mov",
+      "sha256": "8c2fb474eae734d1453a7d3c82a226cdde2ac6fd5489227225dd1d36503e7960",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 99,
+        "digest": 1704062685561686780
+      }
+    },
+    {
+      "id": "mp4-forward-regular-r-edits-repeat",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-edits-repeat.mov",
+      "sha256": "0837ad805378408e83cb4ab14f8309bfaae258221ecf28e8e03d932282cf3dd4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-regular-r-end-co64",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-end-co64.mov",
+      "sha256": "0100ce1a959b5dda456131420ea16f138394d55a836757dedffeef320266fa4c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-regular-r-front-stco",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-front-stco.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-regular-unknown-movie-duration",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-unknown-movie-duration.mov",
+      "sha256": "1688b0dc51fc97be4007b2750d8cb56a8dbdbeb090294e7c028d18a92e2e12f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-regular-r-multiple-mdats",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-multiple-mdats.mov",
+      "sha256": "8e2528da4358cc3909b62b34a2a94171328774acaf6e81e8603aecd457a21724",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-regular-r-multitrack",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-multitrack.mov",
+      "sha256": "221d72b05e73706c99dc97228b15aa4aa7c8761350f642a1e9776d97df7c378c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 182,
+        "digest": 2322205336014058428
+      }
+    },
+    {
+      "id": "mp4-forward-regular-r-negative-cts",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-negative-cts.mov",
+      "sha256": "c64279c754f0f581b576a667006cf42276da59b82d5e3b2f3682c7f06912a2f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 17386262390877999772
+      }
+    },
+    {
+      "id": "mp4-forward-regular-r-subtitle-tx3g",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/r-subtitle-tx3g.mov",
+      "sha256": "133cf97e94036df359ba13f66d95cbd2b22b6c543fbf6520600829b6a06e5b2a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 96,
+        "digest": 17353955837344564826
+      }
+    },
+    {
+      "id": "mp4-forward-regular-f-ctts-v1",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/f-ctts-v1.mp4",
+      "sha256": "6efbc9730675b972c7dbb65dd5cdd3bf296520a6a2b1ddeb5f92a40d9cd61adb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 4568714064668514460
+      }
+    },
+    {
+      "id": "mp4-forward-regular-f-description-change",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/f-description-change.mp4",
+      "sha256": "296bf5f4f95e7e457f0cc451a16a90e97f4ead91476b78b101cac1937e522500",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-regular-f-explicit",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/f-explicit.mp4",
+      "sha256": "a084e104efa43e81b85e12f54e9911b57213f5c3941e9c56ced51054b89728f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-regular-f-multitrack",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/f-multitrack.mp4",
+      "sha256": "4d94b2287d7dc8a55dc629fe23636b66487b286cae35efa60996df24292c8609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 182,
+        "digest": 5686282682597047034
+      }
+    },
+    {
+      "id": "mp4-forward-regular-f-no-second-tfdt",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/f-no-second-tfdt.mp4",
+      "sha256": "c813dcb356c91c96f57d748894724c09edc39e2784804b51b7fe198a8ea85bb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-regular-encoded-avc-aac-front",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-front.mp4",
+      "sha256": "13254b171791057db2f6c88a03a6dc97d5af861fde3517cc3a23c8a62ea17916",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 4809,
+        "digest": 2917646736656175272
+      }
+    },
+    {
+      "id": "mp4-forward-regular-encoded-hevc-aac-front",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 5910,
+        "digest": 5404419236665722727
+      }
+    },
+    {
+      "id": "mp4-forward-regular-encoded-avc-aac-native-seek",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-native-seek.mp4",
+      "sha256": "958a231aa73f32701a3be9835722db29d5cefabfb57dcb3c79148652d1ec6b1a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 142,
+        "bytes": 15028,
+        "digest": 3138410842010631161
+      }
+    },
+    {
+      "id": "mp4-forward-regular-encoded-avc-aac-indexed-seek",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-indexed-seek.mp4",
+      "sha256": "83af34f47b3624425bdc0efe532a71d2e0af82e5e0e93cbe6ef1ea6d507df006",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 142,
+        "bytes": 15028,
+        "digest": 6028528503137286873
+      }
+    },
+    {
+      "id": "mp4-forward-regular-opaque-tail-terminal",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/open-ended/opaque-tail-terminal.mp4",
+      "sha256": "3b7f12ec2f43de2e584eb4944c4e5001543fbb1f6156c2ec6544956f27a91676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-regular-pending-terminal",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/open-ended/pending-terminal.mp4",
+      "sha256": "5012e1c28a2f08f5c3584eb5ed5e7133bb4328d94d8c6bb6072b789e553ea9b0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "mp4-forward-regular-regular-terminal",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/open-ended/regular-terminal.mp4",
+      "sha256": "b735e75d02b8ecc3a968da38b9518f03b9af8a4b026d987767d4d80b0ba37f28",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-regular-unknown-clock-terminal",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/open-ended/unknown-clock-terminal.mp4",
+      "sha256": "d5a039c57c8ff4a1daa22756ea5a3d404072d2bf7e0cb37893721e9ff2c5d156",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-pending-description",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-description.mp4",
+      "sha256": "68ababde0dae59b1b40d3452f0ef6228bb38d8b4c83fc4504eefc0813debe2de",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-pending-pair",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-pair.mp4",
+      "sha256": "88323ad38a78a79a6c5685a8fdb034b1d201923029e6545bc0c42695a535f3b3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-pending-reverse-ranges",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-reverse-ranges.mp4",
+      "sha256": "5c697cef7c0369a88dc76dd463a452df2494f46d46357d1fe7c3205205457676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-pending-two-mdats",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-two-mdats.mp4",
+      "sha256": "26b1b0516c5fc16c07fb492edb3eb4d038a422ce8421a4bae500b92c16b9c215",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-pending-unknown-clock",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-unknown-clock.mp4",
+      "sha256": "156e7b51aa426e891fa12e2fdaa91d6d38072b24238fd225f60d5a61a1b004c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-ten-sequential-batches",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/ten-sequential-batches.mp4",
+      "sha256": "e145a6ab05a84e0a85c7d836d50beaaf352d27c3ef881b109fb288ed973523e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 32,
+        "bytes": 375,
+        "digest": 14828703505596951580
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-encoded-avc-aac-front",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-front.mp4",
+      "sha256": "13254b171791057db2f6c88a03a6dc97d5af861fde3517cc3a23c8a62ea17916",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 4809,
+        "digest": 2917646736656175272
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-encoded-hevc-aac-front",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 5910,
+        "digest": 5404419236665722727
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-f-ctts-v1",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/f-ctts-v1.mp4",
+      "sha256": "6efbc9730675b972c7dbb65dd5cdd3bf296520a6a2b1ddeb5f92a40d9cd61adb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 4568714064668514460
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-f-description-change",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/f-description-change.mp4",
+      "sha256": "296bf5f4f95e7e457f0cc451a16a90e97f4ead91476b78b101cac1937e522500",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-f-explicit",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/f-explicit.mp4",
+      "sha256": "a084e104efa43e81b85e12f54e9911b57213f5c3941e9c56ced51054b89728f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-f-multitrack",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/f-multitrack.mp4",
+      "sha256": "4d94b2287d7dc8a55dc629fe23636b66487b286cae35efa60996df24292c8609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 182,
+        "digest": 3599819933519957422
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-f-no-second-tfdt",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/f-no-second-tfdt.mp4",
+      "sha256": "c813dcb356c91c96f57d748894724c09edc39e2784804b51b7fe198a8ea85bb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-pending-terminal",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/open-ended/pending-terminal.mp4",
+      "sha256": "5012e1c28a2f08f5c3584eb5ed5e7133bb4328d94d8c6bb6072b789e553ea9b0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-unknown-clock-terminal",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/open-ended/unknown-clock-terminal.mp4",
+      "sha256": "d5a039c57c8ff4a1daa22756ea5a3d404072d2bf7e0cb37893721e9ff2c5d156",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-first-source-clock-unknown",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/native-terminal-controls/first-source-clock-unknown.mp4",
+      "sha256": "b2b9ae54e4f1c667c66099bc5e399ddc1c716924cea674051cb6298a6e87b967",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-aac-priming",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-priming.mp4",
+      "sha256": "d86cda57d99064bd1d4799c02fc9b56248486ee81034532da990004f86725dff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4514,
+        "digest": 4711910103843000197
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-aac-tail-trim",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-tail-trim.mp4",
+      "sha256": "05d659762cc522255142aadc28cf55f04caf6946a43dbd60854b6f1c5106c841",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4514,
+        "digest": 4711910103843000197
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-aac-fractional-edit",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-fractional-edit.mp4",
+      "sha256": "0d38fe25d769d15aaac29bcc161f531e06c0acaec6e1a5a859ba5f7b373169ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4514,
+        "digest": 4711910103843000197
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-fragment-aac-edit",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-edit.mp4",
+      "sha256": "d8990d764a54e21ff908bd2b7074b993b8e785e750907f270940034ed23f4c37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4514,
+        "digest": 16939105563531491865
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-fragment-aac-late-track",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-late-track.mp4",
+      "sha256": "d898a74c2ddc7edf2c0d4a435e9b2808e14b611339028131d324cc518a27af4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4514,
+        "digest": 16939105563531491865
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-fragment-aac-short",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-short.mp4",
+      "sha256": "866c763bd24f2f7fb442c152757777cd7456ce422937d19b7ee21eef0aed8d2f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1719,
+        "digest": 10346888706342439174
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-fragment-mp3-edit",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-mp3-edit.mp4",
+      "sha256": "44410be7427716494f36e126ba826b40d3763aa5c65ee932563ec33b385f5f06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 2733,
+        "digest": 5931902558086871051
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-leading-video-edit",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit.mp4",
+      "sha256": "d814d9726aa99e62dc1f83cb069162484defd8397ebbc3aa36972eb57df56b22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4514,
+        "digest": 4711910103843000197
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-leading-video-edit-trimmed",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-trimmed.mp4",
+      "sha256": "ef6fd674f8fe63a45ba122ea76bb9a119304b389026d744ee5d0b022a72c446b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4514,
+        "digest": 4711910103843000197
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-leading-video-edit-single-sync",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-single-sync.mp4",
+      "sha256": "4ff065b6eb9147d438adc3241a87b3108f5a90e3efc6fee2fdabf812327631a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4514,
+        "digest": 4711910103843000197
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-leading-video-edit-rounded-end",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-rounded-end.mp4",
+      "sha256": "3f1811c7373788df7921f0e5210e678af0fbf30240479d7848ccffbc351f8d07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4514,
+        "digest": 4711910103843000197
+      }
+    },
+    {
+      "id": "mp4-forward-progressive-leading-video-edit-overlapping-sync",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4514,
+        "digest": 4711910103843000197
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-eight-pictures",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-eight-pictures.mkv",
+      "sha256": "c4017ec0af03c3e4902d4c2602193b2754096b1c12b70d4d1f50b281acdae73d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 4846,
+        "digest": 17712068132861667904
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-high-b",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-high-b.mkv",
+      "sha256": "9eecf9c54905332e8da7dd31c78f8f3f38098f95cf3eb867d3152a7386931693",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 1911,
+        "digest": 8856173280529415008
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-high-b0",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-high-b0.mkv",
+      "sha256": "8c0ae50e89b9f609390301f6ce720496f5311f262bf1a6462387e083ab09420e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 1884,
+        "digest": 7772145353226586895
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-high-b1",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/avc-reordered-discovery.mkv",
+      "sha256": "4ad06aff1285ddae3f1e4684220a6666a83d150111c37951fd4c6c46efb256bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 1919,
+        "digest": 4345970527339323869
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-mixed",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 105,
+        "bytes": 13054,
+        "digest": 13834744881198313182
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-pgs-early-canvas",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-pgs-early-canvas.mkv",
+      "sha256": "158a661369533103eba91a13192558c472f15da5e2e7b74d3acb4ed222f54a58",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 1972,
+        "digest": 8517411501780770857
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-avc-six-pictures",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-six-pictures.mkv",
+      "sha256": "52a3eb0fcb23f11726f0a3084775503e2c704b44094a6653dddeb2a0308d44c1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 4584,
+        "digest": 17910082794094207682
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-b0",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-b0.mkv",
+      "sha256": "31e1d9527fb997ffc15eb1f58667f7d14997135d1056ae6dfbd5e95ab84647f3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 3486,
+        "digest": 4361853475866540205
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-b1",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-b1.mkv",
+      "sha256": "f70b123a68fb3da0683c5d7d9a9f5a07afbef996e7eb529e4eb7c0c323335f4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 3487,
+        "digest": 5412392788275055121
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-b3",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-b3.mkv",
+      "sha256": "436165ad073c131f99580d69933cc10c5b96c23442aa0c2e21dd7768968fa7b3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 3506,
+        "digest": 1806823797302319090
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-mixed",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-dolby.mkv",
+      "sha256": "319b3ee94fe7c67a6f1cfde4d1f3e0238f9ac51c6c7cda1140acb44f2cdcb39a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 56,
+        "bytes": 42553,
+        "digest": 8780677263041238068
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-no-default-duration",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-no-default-duration-discovery.mkv",
+      "sha256": "ad6fd4d430be9fd7e913893c0eeb7fb0d7ffd884ecd24985019c5e3506c0a118",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 3487,
+        "digest": 883107978045053841
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-repeated-configuration",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-configuration.mkv",
+      "sha256": "903d54e0d60099646f0aea2d84810a3115c2b0ee1d9df6bb8a5bf136d3caa930",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2091,
+        "digest": 7530558182292224108
+      }
+    },
+    {
+      "id": "matroska-startup-seek-startup-hevc-vps-timed-no-default",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-vps-timed-no-default.mkv",
+      "sha256": "1b697518df58ee27bd77b7edb1dde88125095d8aeb4f81a6456c470ae16e12f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 3497,
+        "digest": 15496589462651287181
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-0-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-seek.mkv",
+      "sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 31145,
+        "digest": 8727085865676270982
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-0-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-seek.mkv",
+      "sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 31145,
+        "digest": 8727085865676270982
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-700-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-seek.mkv",
+      "sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 31145,
+        "digest": 8727085865676270982
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-700-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-seek.mkv",
+      "sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 31145,
+        "digest": 8727085865676270982
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-1420-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-seek.mkv",
+      "sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 31145,
+        "digest": 8727085865676270982
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-1420-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-seek.mkv",
+      "sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 31145,
+        "digest": 8727085865676270982
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-2700-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-seek.mkv",
+      "sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 31145,
+        "digest": 8727085865676270982
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-avc-seek-2700-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/avc-seek.mkv",
+      "sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 31145,
+        "digest": 8727085865676270982
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-0-fresh",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-0-eof",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-700-fresh",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-700-eof",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-1420-fresh",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-1420-eof",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-2700-fresh",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-2700-eof",
+      "profile": "matroska",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-0-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 7806402762634712591
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-0-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 7806402762634712591
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-700-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 7806402762634712591
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-700-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 7806402762634712591
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-1420-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 7806402762634712591
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-1420-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 7806402762634712591
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-2700-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 7806402762634712591
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-default-2700-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 7806402762634712591
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-0-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-700-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-700-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-1420-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-1420-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-2700-fresh",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-2700-eof",
+      "profile": "matroska",
+      "file": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25122,
+        "digest": 14691035967074502287
+      }
+    },
+    {
+      "id": "ts-program-ts188-basic",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/ts188-basic.ts",
+      "sha256": "be7ba9883bdb21233577517ffc8a1ada5d8193d32eaf8e6bbf3b25f37e7a8da9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 32,
+        "digest": 6809096518918056999
+      }
+    },
+    {
+      "id": "ts-program-program-eof-avc-aac",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/program-eof-avc-aac.ts",
+      "sha256": "a798ca265cfff06f2fb21051d93aff07adab4dbadb0b46c54117ea615aa6b633",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 63,
+        "digest": 16379498078821457176
+      }
+    },
+    {
+      "id": "ts-program-program-pmt-retype",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/program-pmt-retype.ts",
+      "sha256": "847702e871eb3c3968aeedfedd2ba4cd9f247070fcbcdc62de030cc19e80da43",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 117,
+        "digest": 10301483799146252478
+      }
+    },
+    {
+      "id": "ts-program-program-private-avc-dvb",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/program-private-avc-dvb.ts",
+      "sha256": "f2e7b1c9c2b3a4196e17cd68480adb7cd09e4517178582f250e9f2176ba910c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257,258"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 210,
+        "digest": 2106168442274340711
+      }
+    },
+    {
+      "id": "ts-program-carriage-aac-adts-direct",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/carriage-aac-adts-direct.ts",
+      "sha256": "70f7e7d0f3ebaef7ec7d9e78d516710c0db7991cbd81519222395636be09e012",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "257"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 9195768607149290232
+      }
+    },
+    {
+      "id": "ts-program-carriage-hevc-direct",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/carriage-hevc-direct.ts",
+      "sha256": "1d224472f3587f02cce8f687a11547bfa3b599b31dcaeba3353cda9cf5002b02",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "257"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 32,
+        "digest": 14285806550348396762
+      }
+    },
+    {
+      "id": "ts-program-pts-negative-against-dts",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/pts-negative-against-dts.ts",
+      "sha256": "b789922555c03c8899d4783d3e2afaa1635f944daec67e048102a096a1508c6e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 7030379152995461440
+      }
+    },
+    {
+      "id": "ts-program-transport-partial-final-packet",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/transport-partial-final-packet.ts",
+      "sha256": "819ad792840e42e71aed201bdda145386eab24a5a3b21a0316eb7c8e4146ac33",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 32,
+        "digest": 6809096518918056999
+      }
+    },
+    {
+      "id": "ts-program-pmt-opaque-language-descriptors",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/pmt-opaque-language-descriptors.ts",
+      "sha256": "0d5c791b6ce3a2f796c91de24e4663d1bb3a891e09221bebc57cc658689993a5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 12,
+        "digest": 17886583665050882147
+      }
+    },
+    {
+      "id": "ts-program-replay-avc-aac-00",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-avc-aac-00.ts",
+      "sha256": "a82d7c74de5937692df6ab09c152e822c3b5cb11f7d7cf61cc5e98e9bb633cda",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 26601,
+        "digest": 2411072088024163509
+      }
+    },
+    {
+      "id": "ts-program-replay-avc-aac-01",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-avc-aac-01.ts",
+      "sha256": "4b8837f138cc18185c9f8e44808ddd49be3da53e22bdb06c9c13d2c297dd8686",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 25245,
+        "digest": 7803122236428148212
+      }
+    },
+    {
+      "id": "ts-program-replay-avc-aac-02",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-avc-aac-02.ts",
+      "sha256": "5c2a0dc296a2bc22f5b39a60082870f18fa5c971adc2aed23c9ab26bc3da8f4c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 25204,
+        "digest": 4475191461636971609
+      }
+    },
+    {
+      "id": "ts-program-replay-avc-aac-03",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-avc-aac-03.ts",
+      "sha256": "ba7249f8059dd5afa4d0b89698e01a66a815b1fbce853184474abff940223035",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 24946,
+        "digest": 2495408495686348477
+      }
+    },
+    {
+      "id": "ts-program-replay-avc-aac-04",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-avc-aac-04.ts",
+      "sha256": "82904888e533ceb9b87437bf031fdb72f15aafcea1ad656a92a88bd69707450e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 25276,
+        "digest": 1862599557083369974
+      }
+    },
+    {
+      "id": "ts-program-replay-avc-aac-05",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-avc-aac-05.ts",
+      "sha256": "f3852e2e68a373f3569e892e857db820a319a785204afff9f61f4598e16119a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 25272,
+        "digest": 3384221331189915389
+      }
+    },
+    {
+      "id": "ts-program-replay-avc-aac-06",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-avc-aac-06.ts",
+      "sha256": "f9a0ce0958458bb3b824250fb99593efd35f65c9cff89a72b08a719c61389593",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 25148,
+        "digest": 15958320191885706198
+      }
+    },
+    {
+      "id": "ts-program-replay-avc-aac-07",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-avc-aac-07.ts",
+      "sha256": "1cf2292715bfa3da1a8c95f2696b63c47669355b556ccf8c2f2ecd4d3a4f188f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 25047,
+        "digest": 6336233296051877008
+      }
+    },
+    {
+      "id": "ts-program-replay-avc-aac-08",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-avc-aac-08.ts",
+      "sha256": "aaa82e6d2480d82bf42189ffa138d3b33641650eb269cea3af0f2a5cf91fa171",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 25230,
+        "digest": 18108307512707784806
+      }
+    },
+    {
+      "id": "ts-program-replay-avc-aac-09",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-avc-aac-09.ts",
+      "sha256": "0cd02f5ae6b6254dc8005aeec3af88e8ac1e7ab0c4383722cd323ef48503d233",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 25296,
+        "digest": 8951813805635638716
+      }
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-00",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-hevc-aac-00.ts",
+      "sha256": "828aef3657442bdf2f88064fb41edfc2acdfed5b91dbae5fbc08cfd3d55c569c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 27865,
+        "digest": 3025002540935186196
+      }
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-01",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-hevc-aac-01.ts",
+      "sha256": "d48ca1bd740a159a940d00a28fdb30a81d7620687b03c6f3d0feee62009772e4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 27703,
+        "digest": 2306484851563741834
+      }
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-02",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-hevc-aac-02.ts",
+      "sha256": "208134efac5a5a5494186c85c2bbe5a74527c933157e3780f1fe65f704a3b20a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 27662,
+        "digest": 8181092960023794847
+      }
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-03",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-hevc-aac-03.ts",
+      "sha256": "34b7cb62ef56a3fe8b9639614dbd29e9b37a2ed8adf21fc44e389c798e0868bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 27404,
+        "digest": 7161859926794712261
+      }
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-04",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-hevc-aac-04.ts",
+      "sha256": "255d0cc2420e23a9a636cd011b6694868cfa26ede3480136fee0ca18804dba18",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 27734,
+        "digest": 6710727653810454538
+      }
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-05",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-hevc-aac-05.ts",
+      "sha256": "ada4f5323442eb91d567da0aa2aab2d4fc2e2a53af562f5d465fb6f17b0e7e5b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 27730,
+        "digest": 4991964340652146045
+      }
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-06",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-hevc-aac-06.ts",
+      "sha256": "c728a3d55a0e51bdf268f9a7c95eab534643b66afd42e35c7a29747d53a1e35a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 27605,
+        "digest": 1391222727319178472
+      }
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-07",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-hevc-aac-07.ts",
+      "sha256": "61ab2a22246c4f69a7f417274b1f8e9af5c6e2d17e3f2771ef1e69c4e8d32136",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 27504,
+        "digest": 13281140544624786534
+      }
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-08",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-hevc-aac-08.ts",
+      "sha256": "f084338f4f1c15b0d417d1888698923a62e240b48493c4a3c68ae028fcebc8c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 27687,
+        "digest": 2384966340185520568
+      }
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-09",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/replay-hevc-aac-09.ts",
+      "sha256": "095175f175302c7504a82589084c7a6678c8878538d7a33c09a8dff933057055",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 27753,
+        "digest": 4299738369225488236
+      }
+    },
+    {
+      "id": "ts-program-entry-hevc-aac-44100-00",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/entry-hevc-aac-44100-00.ts",
+      "sha256": "3d93c63efa13a8b068d0eb3f5454703a69f9451953c131bff50ff3d16eca9f78",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 24733,
+        "digest": 4088091132199716179
+      }
+    },
+    {
+      "id": "ts-program-entry-hevc-aac-44100-01",
+      "profile": "ts188",
+      "file": "harness/fixtures/hls/entry-hevc-aac-44100-01.ts",
+      "sha256": "b617cac2231d7d9527e8023f97ffebbe6ab05dc0c620d8787b8d3a955b06901b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "256,257"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 32679,
+        "digest": 12618352685856682019
+      }
+    },
+    {
+      "id": "ts-program-m2ts-replay-avc-aac-00-video",
+      "profile": "m2ts192",
+      "file": "harness/fixtures/ts-program/replay-avc-aac-00.m2ts",
+      "sha256": "c259510f2149db3bb931c3238897e1acf45d62f5bce4b5c3cbd397473cb8f609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "m2ts192",
+        "256"
+      ],
+      "expected": {
+        "packets": 26,
+        "bytes": 1678,
+        "digest": 3031369023607102839
+      }
+    },
+    {
+      "id": "ts-program-m2ts-replay-avc-aac-00-audio",
+      "profile": "m2ts192",
+      "file": "harness/fixtures/ts-program/replay-avc-aac-00.m2ts",
+      "sha256": "c259510f2149db3bb931c3238897e1acf45d62f5bce4b5c3cbd397473cb8f609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "m2ts192",
+        "257"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 24923,
+        "digest": 14985681639882313489
+      }
+    },
+    {
+      "id": "ts-program-m2ts-replay-hevc-aac-00-video",
+      "profile": "m2ts192",
+      "file": "harness/fixtures/ts-program/replay-hevc-aac-00.m2ts",
+      "sha256": "92bcbc9665074e78d5dbbd7e84ace5c8beb8bfcdc277f5c3ad0ca9f2965a5c54",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "m2ts192",
+        "256"
+      ],
+      "expected": {
+        "packets": 26,
+        "bytes": 2942,
+        "digest": 10680399537658273674
+      }
+    },
+    {
+      "id": "ts-program-m2ts-entry-hevc-aac-44100-01-video",
+      "profile": "m2ts192",
+      "file": "harness/fixtures/ts-program/entry-hevc-aac-44100-01.m2ts",
+      "sha256": "2a723565db7523bf01498ceb8e316b82dfb9d99347caf06080c6755979b36c77",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "m2ts192",
+        "256"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 18090,
+        "digest": 2418557663826714190
+      }
+    },
+    {
+      "id": "progressive-pending-description",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-description.mp4",
+      "sha256": "68ababde0dae59b1b40d3452f0ef6228bb38d8b4c83fc4504eefc0813debe2de",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "progressive-pending-empty-endpoint",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-empty-endpoint.mp4",
+      "sha256": "45d0016cc4c0443daf2a306044b112d39feed5fb55f71785aed5943d46b1089d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 51,
+        "digest": 9930698219243595130
+      }
+    },
+    {
+      "id": "progressive-pending-pair",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-pair.mp4",
+      "sha256": "88323ad38a78a79a6c5685a8fdb034b1d201923029e6545bc0c42695a535f3b3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "progressive-pending-reverse-ranges",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-reverse-ranges.mp4",
+      "sha256": "5c697cef7c0369a88dc76dd463a452df2494f46d46357d1fe7c3205205457676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "progressive-pending-two-mdats",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-two-mdats.mp4",
+      "sha256": "26b1b0516c5fc16c07fb492edb3eb4d038a422ce8421a4bae500b92c16b9c215",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "progressive-pending-unknown-clock",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/pending-unknown-clock.mp4",
+      "sha256": "156e7b51aa426e891fa12e2fdaa91d6d38072b24238fd225f60d5a61a1b004c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 123,
+        "digest": 2663447247032378841
+      }
+    },
+    {
+      "id": "progressive-ten-sequential-batches",
+      "profile": "mp4-progressive",
+      "file": "crates/playback/tests/fixtures/progressive/ten-sequential-batches.mp4",
+      "sha256": "e145a6ab05a84e0a85c7d836d50beaaf352d27c3ef881b109fb288ed973523e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-progressive"
+      ],
+      "expected": {
+        "packets": 32,
+        "bytes": 375,
+        "digest": 14828703505596951580
+      }
+    },
+    {
+      "id": "source-carriage-aac-adts-direct",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/carriage-aac-adts-direct.ts",
+      "sha256": "70f7e7d0f3ebaef7ec7d9e78d516710c0db7991cbd81519222395636be09e012",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 9195768607149290232
+      }
+    },
+    {
+      "id": "source-carriage-hevc-direct",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/carriage-hevc-direct.ts",
+      "sha256": "1d224472f3587f02cce8f687a11547bfa3b599b31dcaeba3353cda9cf5002b02",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 32,
+        "digest": 14285806550348396762
+      }
+    },
+    {
+      "id": "source-hls-contiguous-part-a",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/hls-contiguous-part-a.ts",
+      "sha256": "c865084091a692e5b62ca29e13331c843ffad69e30bb5112e759ae535dfd1676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 175,
+        "digest": 391383990773534156
+      }
+    },
+    {
+      "id": "source-hls-contiguous-part-b",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/hls-contiguous-part-b.ts",
+      "sha256": "b2fcd617d1da46d748e8331cb0c0f93b1d0cef0324f1a554896875e3f37a24cf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "source-m2ts192-opaque-prefix",
+      "profile": "m2ts192",
+      "file": "crates/playback/tests/fixtures/ts/m2ts192-opaque-prefix.m2ts",
+      "sha256": "b530a81aced8a1e57049ad1986485297e94393b77b562fe6879d09f0d02f995e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "m2ts192"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 32,
+        "digest": 6809096518918056999
+      }
+    },
+    {
+      "id": "source-pes-timestamp-marker",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/pes-timestamp-marker.ts",
+      "sha256": "d13c6bcf9122c717a80fd66ba87e7058702c961a736ec0cb14fb0f891dcdb264",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 32,
+        "digest": 6809096518918056999
+      }
+    },
+    {
+      "id": "source-pmt-opaque-language-descriptors",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/pmt-opaque-language-descriptors.ts",
+      "sha256": "0d5c791b6ce3a2f796c91de24e4663d1bb3a891e09221bebc57cc658689993a5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 12,
+        "digest": 17886583665050882147
+      }
+    },
+    {
+      "id": "source-pmt-version-wrap-retypes-pid",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/pmt-version-wrap-retypes-pid.ts",
+      "sha256": "fa37cb365078ead09193f8ff28d46eb31a4d3091cfb68a0f2e5751315b8a9900",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 5,
+        "digest": 18123119132272518500
+      }
+    },
+    {
+      "id": "source-program-eof-avc-aac",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/program-eof-avc-aac.ts",
+      "sha256": "a798ca265cfff06f2fb21051d93aff07adab4dbadb0b46c54117ea615aa6b633",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 63,
+        "digest": 16379498078821457176
+      }
+    },
+    {
+      "id": "source-program-pmt-retype",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/program-pmt-retype.ts",
+      "sha256": "847702e871eb3c3968aeedfedd2ba4cd9f247070fcbcdc62de030cc19e80da43",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 264,
+        "digest": 5715805171720595212
+      }
+    },
+    {
+      "id": "source-program-private-avc-dvb",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/program-private-avc-dvb.ts",
+      "sha256": "f2e7b1c9c2b3a4196e17cd68480adb7cd09e4517178582f250e9f2176ba910c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 210,
+        "digest": 2106168442274340711
+      }
+    },
+    {
+      "id": "source-psi-crc-invalid",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/psi-crc-invalid.ts",
+      "sha256": "043ad5751083616d0f98dca7327946e7caa1b82a45e08546ce8a7fdb762a04fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "source-pts-dts-common-epoch",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/pts-dts-common-epoch.ts",
+      "sha256": "6997f0498143ba7b71bc50b58014e5e46556b9ab30eeb6d05bcccbb9ac9bc44f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 7,
+        "digest": 17688055563740248305
+      }
+    },
+    {
+      "id": "source-pts-negative-against-dts",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/pts-negative-against-dts.ts",
+      "sha256": "b789922555c03c8899d4783d3e2afaa1635f944daec67e048102a096a1508c6e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 7030379152995461440
+      }
+    },
+    {
+      "id": "source-pts-wrap-forward",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/pts-wrap-forward.ts",
+      "sha256": "150adc340bb4659189f7a817653196dda5d78592bb6f46e4e98879455a387258",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 7,
+        "digest": 6070399549028538853
+      }
+    },
+    {
+      "id": "source-transport-partial-final-packet",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/transport-partial-final-packet.ts",
+      "sha256": "819ad792840e42e71aed201bdda145386eab24a5a3b21a0316eb7c8e4146ac33",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 32,
+        "digest": 6809096518918056999
+      }
+    },
+    {
+      "id": "source-ts188-basic",
+      "profile": "ts188",
+      "file": "crates/playback/tests/fixtures/ts/ts188-basic.ts",
+      "sha256": "be7ba9883bdb21233577517ffc8a1ada5d8193d32eaf8e6bbf3b25f37e7a8da9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 32,
+        "digest": 6809096518918056999
+      }
+    },
+    {
+      "id": "ts-contiguous-entities",
+      "profile": "ts-entities",
+      "file": "crates/playback/tests/fixtures/ts/hls-contiguous-part-a.ts",
+      "sha256": "c865084091a692e5b62ca29e13331c843ffad69e30bb5112e759ae535dfd1676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts-entities",
+        "crates/playback/tests/fixtures/ts",
+        "hls-contiguous-part-b.ts"
+      ],
+      "entities": [
+        {
+          "file": "crates/playback/tests/fixtures/ts/hls-contiguous-part-a.ts",
+          "sha256": "c865084091a692e5b62ca29e13331c843ffad69e30bb5112e759ae535dfd1676"
+        },
+        {
+          "file": "crates/playback/tests/fixtures/ts/hls-contiguous-part-b.ts",
+          "sha256": "b2fcd617d1da46d748e8331cb0c0f93b1d0cef0324f1a554896875e3f37a24cf"
+        }
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 517,
+        "digest": 7925857205279163625
+      }
+    },
+    {
+      "id": "mp4-bad-ctts-count-mismatch",
+      "profile": "mp4",
+      "file": "crates/isobmff/tests/fixtures/bad-ctts-count-mismatch.mov",
+      "sha256": "fb888b9ef7a2e2eba2e00fc4e417be33ed690c32b18044cf1ac43fd9d454eb64",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 5524516088262274684
+      }
+    },
+    {
+      "id": "mp4-timing-policy-bad-ctts-count-mismatch",
+      "profile": "mp4-timing-policy",
+      "file": "crates/isobmff/tests/fixtures/bad-ctts-count-mismatch.mov",
+      "sha256": "fb888b9ef7a2e2eba2e00fc4e417be33ed690c32b18044cf1ac43fd9d454eb64",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-timing-policy"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 5524516088262274684
+      }
+    },
+    {
+      "id": "mp4-bad-stts-count-mismatch",
+      "profile": "mp4",
+      "file": "crates/isobmff/tests/fixtures/bad-stts-count-mismatch.mov",
+      "sha256": "a73197cdcf9dc89806f8d01899d5c28225a3e981bc139a1d23356491caef057a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "mp4-timing-policy-bad-stts-count-mismatch",
+      "profile": "mp4-timing-policy",
+      "file": "crates/isobmff/tests/fixtures/bad-stts-count-mismatch.mov",
+      "sha256": "a73197cdcf9dc89806f8d01899d5c28225a3e981bc139a1d23356491caef057a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4-timing-policy"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 87,
+        "digest": 8911657617658885532
+      }
+    },
+    {
+      "id": "raw-avc-80x48",
+      "profile": "raw-avc",
+      "file": "crates/playback/tests/fixtures/raw-video/avc-80x48.h264",
+      "sha256": "6226446529abb9659e50f445fbaa5414b64c924f6ae894ea77a6899264286ec3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-avc"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 0,
+        "digest": 117181888496
+      }
+    },
+    {
+      "id": "raw-avc-short",
+      "profile": "raw-avc",
+      "file": "crates/playback/tests/fixtures/raw-video/avc-short.h264",
+      "sha256": "db2b0296e6e3fff980f9d79f201cdec1a9d55b77138c1b07ef0e0b0d7550bd3f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-avc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 115472806
+      }
+    },
+    {
+      "id": "raw-avc-aud0",
+      "profile": "raw-avc",
+      "file": "crates/framing/fixtures/raw-annex-b/avc-aud0.h264",
+      "sha256": "96d3d39385d7a86463410e0e4f00377062a815532134805e2a552549954b6796",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-avc"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 0,
+        "digest": 17883286890808280142
+      }
+    },
+    {
+      "id": "raw-avc-aud1",
+      "profile": "raw-avc",
+      "file": "crates/framing/fixtures/raw-annex-b/avc-aud1.h264",
+      "sha256": "76460acc3bfc5376661ce04417b4a562ad01f3168ab9df8d1023c0fec840e62e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-avc"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 0,
+        "digest": 17883286890808280142
+      }
+    },
+    {
+      "id": "raw-hevc-aud0",
+      "profile": "raw-hevc",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-aud0.hevc",
+      "sha256": "7c076acbe5c6cf3db1939534527b1d52fd7f4c31a2063f537440f51c75b08f70",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-hevc"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 0,
+        "digest": 12616844296046987090
+      }
+    },
+    {
+      "id": "raw-hevc-aud1",
+      "profile": "raw-hevc",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-aud1.hevc",
+      "sha256": "f6ce36d642462840df7347d66305ee05b9716a1417d292d7d58390b5a47f2a56",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-hevc"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 0,
+        "digest": 12616844296046987090
+      }
+    },
+    {
+      "id": "raw-hevc-eos",
+      "profile": "raw-hevc",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-eos.hevc",
+      "sha256": "efa769f8ba786e2a2d85a1fa697742898cc51822e73b81139d0e52164bdef765",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-hevc"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 0,
+        "digest": 12616844296046987090
+      }
+    }
+  ]
+}

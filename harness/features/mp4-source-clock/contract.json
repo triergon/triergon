@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "id": "mp4-source-clock",
+  "gate": "required",
+  "operation": "mp4-source-clock",
+  "candidate": "playback-views-worker",
+  "worker_operation": "source-view-",
+  "contract": [
+    "Compare MP4 media time before movie edits. The independent ISO/IEC 14496-12 oracle expands stts and ctts in decode order, treats ctts and trun offsets according to their box version, reads fragment decode bases and durations, and keeps media times on the mdhd timescale across edits.",
+    "Emit kind 3 with track ID, time-base numerator and denominator, PTS, DTS and duration in per-track decode order by ascending track ID. Emit kind 7 on clean end or kind 8 on refusal. The authored timing-policy controls also compare the explicitly bounded prefix policy."
+  ],
+  "required_profiles": [
+    "mp4",
+    "mp4-progressive",
+    "mp4-timing-policy"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 20,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "oracle": "mp4-source-clock",
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "regular-r-ctts-v1",
+        "regular-r-edits-repeat",
+        "regular-r-negative-cts",
+        "regular-f-ctts-v1",
+        "regular-unknown-clock-terminal",
+        "progressive-pending-unknown-clock",
+        "progressive-f-ctts-v1",
+        "progressive-unknown-clock-terminal",
+        "progressive-aac-priming",
+        "progressive-aac-tail-trim",
+        "progressive-aac-fractional-edit",
+        "progressive-fragment-aac-edit",
+        "progressive-fragment-aac-late-track",
+        "progressive-fragment-mp3-edit",
+        "progressive-leading-video-edit",
+        "progressive-leading-video-edit-trimmed",
+        "progressive-leading-video-edit-single-sync",
+        "progressive-leading-video-edit-rounded-end",
+        "progressive-leading-video-edit-overlapping-sync",
+        "mp4-bad-ctts-count-mismatch",
+        "mp4-timing-policy-bad-ctts-count-mismatch",
+        "mp4-bad-stts-count-mismatch",
+        "mp4-timing-policy-bad-stts-count-mismatch"
+      ],
+      "cause": "the source-clock oracle has no equivalent runtime or memory comparator"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "regular-r-ctts-v1",
+        "regular-r-edits-repeat",
+        "regular-r-negative-cts",
+        "regular-f-ctts-v1",
+        "regular-unknown-clock-terminal",
+        "progressive-pending-unknown-clock",
+        "progressive-f-ctts-v1",
+        "progressive-unknown-clock-terminal",
+        "progressive-aac-priming",
+        "progressive-aac-tail-trim",
+        "progressive-aac-fractional-edit",
+        "progressive-fragment-aac-edit",
+        "progressive-fragment-aac-late-track",
+        "progressive-fragment-mp3-edit",
+        "progressive-leading-video-edit",
+        "progressive-leading-video-edit-trimmed",
+        "progressive-leading-video-edit-single-sync",
+        "progressive-leading-video-edit-rounded-end",
+        "progressive-leading-video-edit-overlapping-sync",
+        "mp4-bad-ctts-count-mismatch",
+        "mp4-timing-policy-bad-ctts-count-mismatch",
+        "mp4-bad-stts-count-mismatch",
+        "mp4-timing-policy-bad-stts-count-mismatch"
+      ],
+      "cause": "the source-clock oracle has no equivalent runtime or memory comparator"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "regular-r-ctts-v1",
+        "regular-r-edits-repeat",
+        "regular-r-negative-cts",
+        "regular-f-ctts-v1",
+        "regular-unknown-clock-terminal",
+        "progressive-pending-unknown-clock",
+        "progressive-f-ctts-v1",
+        "progressive-unknown-clock-terminal",
+        "progressive-aac-priming",
+        "progressive-aac-tail-trim",
+        "progressive-aac-fractional-edit",
+        "progressive-fragment-aac-edit",
+        "progressive-fragment-aac-late-track",
+        "progressive-fragment-mp3-edit",
+        "progressive-leading-video-edit",
+        "progressive-leading-video-edit-trimmed",
+        "progressive-leading-video-edit-single-sync",
+        "progressive-leading-video-edit-rounded-end",
+        "progressive-leading-video-edit-overlapping-sync",
+        "mp4-bad-ctts-count-mismatch",
+        "mp4-timing-policy-bad-ctts-count-mismatch",
+        "mp4-bad-stts-count-mismatch",
+        "mp4-timing-policy-bad-stts-count-mismatch"
+      ],
+      "cause": "the source-clock oracle has no equivalent runtime or memory comparator"
+    }
+  ],
+  "pending_module_requirements": [
+    "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved.",
+    "The timing opener admits surplus runs with BoundedPrefix but source player indexing requires exact coverage. ISO/IEC 14496-12 defines the sample timeline from the declared samples and timing runs; the bounded ingest policy is an extension."
+  ],
+  "open_cases": [
+    {
+      "id": "regular-unknown-clock-terminal",
+      "requirement": "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "progressive-pending-unknown-clock",
+      "requirement": "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "progressive-unknown-clock-terminal",
+      "requirement": "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-timing-policy-bad-ctts-count-mismatch",
+      "requirement": "The timing opener admits surplus runs with BoundedPrefix but source player indexing requires exact coverage. ISO/IEC 14496-12 defines the sample timeline from the declared samples and timing runs; the bounded ingest policy is an extension.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mp4-timing-policy-bad-stts-count-mismatch",
+      "requirement": "The timing opener admits surplus runs with BoundedPrefix but source player indexing requires exact coverage. ISO/IEC 14496-12 defines the sample timeline from the declared samples and timing runs; the bounded ingest policy is an extension.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ]
+}
