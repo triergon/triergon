@@ -81,7 +81,7 @@
         "name": "session-configuration",
         "entry_points": ["SessionConfig::gop", "SessionConfig::max_rate", "SessionConfig::vbv_bits", "SessionConfig::bit_rate", "SessionConfig::mux"],
         "degree": "step",
-        "needs": "the capture qualification cases compare configured GOP, rates, VBV and multiplex settings. The one-bit VBV reference refusal and the 1920x1080 and padded 968x544 encoder quality cases are open"
+        "needs": "the capture qualification cases compare configured GOP, rates, VBV and multiplex settings. The one-bit VBV case, which both encoders refuse at open, stays open until the comparison records a candidate refusal"
       }
     ],
     "triergon-codec": [
@@ -199,7 +199,7 @@
         "name": "encoder",
         "entry_points": ["Encoder", "Encoder::encode", "EncoderConfig"],
         "degree": "step",
-        "needs": "capture qualification compares construction and encoding at additional geometries, rates, VBV sizes and GOP lengths. Encoder quality cases are open and the budget-taking entry points need separate comparison"
+        "needs": "capture qualification compares construction and encoding at additional geometries, rates, VBV sizes and GOP lengths. The budget-taking entry points need separate comparison"
       }
     ],
     "triergon-codec-opus": [],
@@ -365,7 +365,7 @@
         "name": "mux-single-program",
         "entry_points": ["mux::Muxer", "mux::MuxConfig"],
         "degree": "step",
-        "needs": "a worker operation muxing authored coded pictures with each MuxConfig and folding the reference demuxer's reading of the output (program, PIDs, stream type, service names, packet pts, dts, flags, bytes); compared today through the capture pipeline's independent decode at one configuration"
+        "needs": "ts-mux-readback compares the emitted programs, streams, SDT names and PES packets. Open cases retain the difference between the transport random-access indicator and FFmpeg’s key flag, and invalid configurations that produce no TS to demux."
       }
     ],
     "triergon-ogg": [
