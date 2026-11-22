@@ -134,6 +134,7 @@ enum Phase {
     EndScan {
         resume: u64,
         chained: bool,
+        contiguous: bool,
     },
     Ended(SourceLocation),
 }
@@ -718,6 +719,7 @@ impl Reader {
         self.phase = Phase::EndScan {
             resume,
             chained: false,
+            contiguous: from == resume,
         };
         Ok(())
     }
@@ -727,7 +729,12 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<Step<Page>>> {
-        let Phase::EndScan { resume, chained } = &mut self.phase else {
+        let Phase::EndScan {
+            resume,
+            chained,
+            contiguous,
+        } = &mut self.phase
+        else {
             return Ok(None);
         };
         let resume = *resume;
@@ -735,7 +742,7 @@ impl Reader {
             Ok(Step::Ready(page)) => {
                 let header = page.header;
                 if header.begin_of_stream()
-                    && !self.streams.iter().any(|s| s.serial == header.serial)
+                    && (*contiguous || !self.streams.iter().any(|s| s.serial == header.serial))
                 {
                     *chained = true;
                 }
@@ -756,7 +763,9 @@ impl Reader {
             Ok(Step::Backpressure(never)) => match never {},
             Err(error) => return Err(error),
         };
-        if *chained {
+        // A scan that starts after a jump may have begun in a later link.
+        // A contiguous scan already knows which granules preceded the next BOS.
+        if *chained && !*contiguous {
             for track in self.tracks.iter_mut() {
                 track.end = None;
             }

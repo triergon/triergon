@@ -1113,6 +1113,19 @@ fn request_names_the_current_input_after_a_short_window() {
 }
 
 #[test]
+fn open_keeps_the_first_link_end_after_scanning_a_chain() {
+    for second_serial in [5, 6] {
+        let mut source = Vec::new();
+        opus_stream(5, 5, 2, 100, &mut source);
+        opus_stream(second_serial, 3, 2, 0, &mut source);
+        let reader =
+            triergon_ogg::BlockingReader::open(std::io::Cursor::new(source), Limits::default())
+                .unwrap();
+        assert_eq!(reader.tracks()[0].end(), Some(5 * 960 - 100 - 312));
+    }
+}
+
+#[test]
 fn open_stream_configures_opus_without_an_end_scan() {
     let mut source = Vec::new();
     opus_stream(5, 4, 2, 0, &mut source);

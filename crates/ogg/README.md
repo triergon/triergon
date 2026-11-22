@@ -77,7 +77,9 @@ leaves out are the last packets' `Trim::end`, and samples before time zero (Opus
 pre-skip, a start offset) are `Trim::start`. Every audio packet is a random-access
 point; of Theora, the intra frames. DTS equals PTS.
 `Track::end` holds the last granule position, found by reading at most
-`Limits::end_scan_bytes` at the end of a seekable source of known length.
+`Limits::end_scan_bytes` at the end of a seekable source of known length. A scan
+that reaches the next link from the first link's headers keeps the first link's
+end, even if the next link reuses a serial number.
 
 `compat::clock::packet_timing` reports FFmpeg's clock instead (skip samples, discard
 padding and FFmpeg's Vorbis durations); its documentation lists the differences.
