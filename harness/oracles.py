@@ -29,6 +29,12 @@ ORACLES = {
 }
 # Trace oracles return canonical text rows without line endings. Load each on demand.
 TRACE_ORACLES = {
+    "elementary-metadata": ("harness.elementary_oracle", "trace"),
+    "hvcc-prefix": ("harness.codec_config_oracle", "hvcc_prefix"),
+    "vpcc": ("harness.codec_config_oracle", "vpcc"),
+    "eac3-bsi": ("harness.codec_config_oracle", "eac3_bsi"),
+    "av1-obu": ("harness.codec_stream_oracle", "av1_obu"),
+    "adts": ("harness.codec_stream_oracle", "adts"),
     "pgs-segments": ("harness.pgs_segment_oracle", "trace"),
     "text-extraction": ("harness.text_extraction_oracle", "trace"),
     "tx3g-config": ("harness.tx3g_oracle", "trace"),
@@ -41,6 +47,7 @@ TRACE_ORACLES = {
     "bit-readers": ("harness.bitstream_oracle", "bit_readers"),
     "qt-sound-v0": ("harness.isobmff_entry_oracle", "qt_sound"),
     "ddts": ("harness.isobmff_entry_oracle", "ddts"),
+    "isobmff-index": ("harness.isobmff_index_oracle", "index_trace"),
     "dts-header": ("harness.dts_oracle", "header"),
     "dts-unpack": ("harness.dts_oracle", "unpack"),
     "store": ("harness.store_oracle", "store_trace"),
