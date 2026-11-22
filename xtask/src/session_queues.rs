@@ -160,6 +160,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     for row in &rows {
         let operation = timing::Operation {
             prefix: "queue-".into(),
+            reference_prefix: None,
             arguments: vec![row.id.as_str().into(), row.stage.into()],
             candidate_options: vec![],
             work: timing::Work {

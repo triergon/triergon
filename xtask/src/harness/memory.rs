@@ -1945,7 +1945,7 @@ pub(crate) fn collect_selected(
     operation: &Operation,
     selection: Selection,
 ) -> R<Value> {
-    if !operation.candidate_options.is_empty() {
+    if !operation.candidate_options.is_empty() || operation.reference_prefix.is_some() {
         let arguments = |candidate| {
             operation
                 .worker_arguments(candidate, "memory", input, None)

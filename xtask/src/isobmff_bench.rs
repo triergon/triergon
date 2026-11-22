@@ -292,6 +292,7 @@ impl Case {
     fn operation(&self) -> Operation {
         Operation {
             prefix: format!("{}-", self.mode),
+            reference_prefix: None,
             arguments: self.arguments.iter().map(OsString::from).collect(),
             candidate_options: self.candidate_options.iter().map(OsString::from).collect(),
             // A range plan's roles each fold their own digest (harness/features/isobmff-seek).

@@ -249,7 +249,14 @@ fn reference_pins(
         let input = feature.verified_input(&case)?;
         let mut command = vec![
             reference.as_os_str().to_owned(),
-            format!("{}fold", feature.prefix).into(),
+            format!(
+                "{}fold",
+                feature
+                    .reference_prefix
+                    .as_deref()
+                    .unwrap_or(&feature.prefix)
+            )
+            .into(),
             input.into(),
         ];
         command.extend(report::resolved_case_arguments(

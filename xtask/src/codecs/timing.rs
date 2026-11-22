@@ -80,6 +80,7 @@ fn get_str<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
 fn operation(name: &str) -> Operation {
     Operation {
         prefix: format!("{name}-"),
+        reference_prefix: None,
         arguments: vec![],
         candidate_options: vec![],
         work: Work {

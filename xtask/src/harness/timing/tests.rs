@@ -53,6 +53,7 @@ fn a_gate_session_stops_at_the_look_once_settled_below_the_ceiling() {
 fn worker_failure_and_work_mismatch_precede_contamination() {
     let operation = Operation {
         prefix: String::new(),
+        reference_prefix: None,
         arguments: vec![],
         candidate_options: vec![],
         work: Work::default(),
@@ -236,6 +237,7 @@ fn a_worker_whose_own_output_changes_between_pairs_is_refused() {
 fn compatibility_options_apply_only_to_the_candidate() {
     let operation = Operation {
         prefix: "open-".into(),
+        reference_prefix: None,
         arguments: ["1", "0", "memory", "4096"].map(OsString::from).to_vec(),
         candidate_options: vec!["--bounded-timing".into(), "--bounded-sync".into()],
         work: Work::default(),
@@ -260,6 +262,7 @@ fn compatibility_options_apply_only_to_the_candidate() {
 fn ordinary_memory_arguments_keep_the_existing_order() {
     let operation = Operation {
         prefix: "hls-".into(),
+        reference_prefix: None,
         arguments: vec!["avc".into(), "aac".into()],
         candidate_options: vec![],
         work: Work::default(),
@@ -271,6 +274,27 @@ fn ordinary_memory_arguments_keep_the_existing_order() {
             ["hls-memory", "input.ts", "avc", "aac"].map(OsString::from)
         );
     }
+}
+
+#[test]
+fn each_worker_can_use_its_own_operation_prefix() {
+    let operation = Operation {
+        prefix: "ts-epoch-index-seek-".into(),
+        reference_prefix: Some("ts-seek-".into()),
+        arguments: vec!["188".into(), "7".into()],
+        candidate_options: vec![],
+        work: Work::default(),
+        timeout: worker::DEFAULT_TIMEOUT,
+    };
+    let input = Path::new("input.ts");
+    assert_eq!(
+        operation.worker_arguments(true, "memory", input, None),
+        ["ts-epoch-index-seek-memory", "input.ts", "188", "7"].map(OsString::from)
+    );
+    assert_eq!(
+        operation.worker_arguments(false, "memory", input, None),
+        ["ts-seek-memory", "input.ts", "188", "7"].map(OsString::from)
+    );
 }
 
 #[test]

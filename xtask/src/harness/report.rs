@@ -492,12 +492,33 @@ pub fn case_arguments(case: &Value) -> Vec<std::ffi::OsString> {
         .collect()
 }
 
-/// Rebase DVD palette options onto the same corpus used to check companion pins.
+/// Resolve pinned companion and entity paths for workers that preload them.
 pub(crate) fn resolved_case_arguments(
     corpus: &Path,
     case: &Value,
     mut arguments: Vec<std::ffi::OsString>,
 ) -> Result<Vec<std::ffi::OsString>, String> {
+    if case.get("resolve_entity_paths") == Some(&Value::Bool(true)) {
+        if let Some(problem) = entity_input_failure(corpus, case, None)? {
+            return Err(problem.into());
+        }
+        let entities = case
+            .get("entities")
+            .and_then(Value::as_array)
+            .ok_or("missing ordered entities")?;
+        let mut following = entities.iter().skip(1);
+        let namespace = arguments
+            .get(2)
+            .is_some_and(|arg| arg == "--dvb" || arg == "--atsc");
+        for argument in arguments.iter_mut().skip(2 + usize::from(namespace)) {
+            if argument != "--discontinuity" {
+                let entity = following.next().ok_or("missing entity pin")?;
+                *argument = corpus
+                    .join(validation::text(entity, "file")?)
+                    .into_os_string();
+            }
+        }
+    }
     const OPTION: &str = "opt:ifo_palette=";
     for argument in &mut arguments {
         let Some(declared) = argument.to_str().and_then(|text| text.strip_prefix(OPTION)) else {
@@ -544,6 +565,7 @@ pub fn recorded_corpus(root: &Path, manifest: &Value) -> Option<PathBuf> {
 pub struct PrefixFeature {
     pub id: String,
     pub prefix: String,
+    pub reference_prefix: Option<String>,
     pub candidate: String,
     /// The comparison reference's name in the build identity.
     pub reference: Option<String>,
@@ -557,6 +579,19 @@ pub struct PrefixFeature {
     pub timeout: Duration,
     /// Whether the contract pins its cases per target.
     pub per_target: bool,
+}
+
+fn reference_prefix(contract: &Value) -> Result<Option<&str>, String> {
+    if contract.get("reference_worker_operation").is_none() {
+        return Ok(None);
+    }
+    validation::text(contract, "worker_operation")?;
+    validation::text(contract, "reference")?;
+    let prefix = validation::text(contract, "reference_worker_operation")?;
+    if !prefix.ends_with('-') {
+        return Err("reference worker operation must be a prefix ending in '-'".into());
+    }
+    Ok(Some(prefix))
 }
 
 impl PrefixFeature {
@@ -593,6 +628,7 @@ impl PrefixFeature {
             })?;
         Ok(Self {
             prefix: text("worker_operation")?,
+            reference_prefix: reference_prefix(&document)?.map(str::to_owned),
             candidate: text("candidate")?,
             reference: if has_oracle {
                 None
@@ -1064,6 +1100,7 @@ pub(crate) fn collect(
     // Workers that take one input per operation and print one fold: the contract
     // names the mode prefix, and each case may add arguments after the input.
     let worker_operation = s(&contract, "worker_operation").map(str::to_owned);
+    let reference_prefix = reference_prefix(&contract)?;
     let iterations = options.iterations(&contract);
     if (options.require_acceptance || options.require_slice_acceptance)
         && !validation::iterations_valid(&contract, &Value::int(iterations))
@@ -1237,6 +1274,7 @@ pub(crate) fn collect(
                 path.clone(),
                 Operation {
                     prefix: prefix.clone(),
+                    reference_prefix: reference_prefix.map(str::to_owned),
                     arguments: arguments.clone(),
                     candidate_options: vec![],
                     work: Work {
@@ -1250,7 +1288,7 @@ pub(crate) fn collect(
             let expected = expected_for(case, &target);
             let ran = parity::feed_parity(
                 &run,
-                prefix,
+                (prefix, reference_prefix.unwrap_or(prefix)),
                 &arguments,
                 expected.unwrap_or(&Value::Null),
                 &work_fields,
@@ -1303,6 +1341,7 @@ pub(crate) fn collect(
                 path.clone(),
                 Operation {
                     prefix: prefix.into(),
+                    reference_prefix: None,
                     arguments,
                     candidate_options: vec![],
                     work: Work {

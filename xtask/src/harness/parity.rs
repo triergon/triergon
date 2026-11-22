@@ -729,15 +729,16 @@ pub fn seek_parity(
 /// flag; elsewhere the case fails as `host-dependent-reference`.
 pub fn feed_parity(
     run: &Run<'_>,
-    prefix: &str,
+    prefixes: (&str, &str),
     arguments: &[OsString],
     expected: &Value,
     work_fields: &[String],
     per_target: bool,
 ) -> Result<Value, String> {
+    let (prefix, reference_prefix) = prefixes;
     let mode = format!("{prefix}fold");
     let left = run.candidate(&mode, arguments);
-    let right = run.exec(run.reference, &mode, arguments);
+    let right = run.exec(run.reference, &format!("{reference_prefix}fold"), arguments);
     let result = feed_result(&left, &right, expected, work_fields, per_target);
     run.write(
         &mode,

@@ -170,6 +170,7 @@ fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
     ];
     let timed = Operation {
         prefix: "catalogue-".into(),
+        reference_prefix: None,
         arguments: vec![],
         candidate_options: vec![],
         work: Work {
@@ -777,7 +778,13 @@ fn prefix_traces(
             super::worker::record_argument_aliases(&arguments, &declared);
             let result = parity::feed_parity(
                 &run,
-                &feature.prefix,
+                (
+                    &feature.prefix,
+                    feature
+                        .reference_prefix
+                        .as_deref()
+                        .unwrap_or(&feature.prefix),
+                ),
                 &arguments,
                 expected,
                 &feature.work_fields,

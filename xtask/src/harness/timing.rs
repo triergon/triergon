@@ -483,6 +483,7 @@ fn module_state(module: &Path) -> Value {
 #[derive(Clone)]
 pub struct Operation {
     pub prefix: String,
+    pub reference_prefix: Option<String>,
     pub arguments: Vec<OsString>,
     /// Candidate compatibility options before the operation name.
     pub candidate_options: Vec<OsString>,
@@ -504,7 +505,12 @@ impl Operation {
         if candidate {
             arguments.extend(self.candidate_options.iter().cloned());
         }
-        arguments.push(format!("{}{mode}", self.prefix).into());
+        let prefix = if candidate {
+            &self.prefix
+        } else {
+            self.reference_prefix.as_ref().unwrap_or(&self.prefix)
+        };
+        arguments.push(format!("{prefix}{mode}").into());
         arguments.push(input.as_os_str().to_owned());
         if let Some(iterations) = iterations {
             arguments.push(arg(iterations));

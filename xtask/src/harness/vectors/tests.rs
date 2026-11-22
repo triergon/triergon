@@ -37,6 +37,7 @@ fn prefix_traces_require_the_reference_and_secondary_input_pins() {
         let features = [PrefixFeature {
             id: "feature".into(),
             prefix: prefix.into(),
+            reference_prefix: None,
             candidate: "candidate".into(),
             reference: Some("reference".into()),
             contract: root.join("contract.json"),
