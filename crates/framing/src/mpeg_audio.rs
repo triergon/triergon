@@ -73,16 +73,16 @@ pub struct MpegAudioHeader {
     /// `padding_bit`: the frame is one slot longer, four bytes in Layer I and
     /// one byte in the others.
     pub padding: bool,
-    /// `mode`.
+    /// Stereo, joint stereo, dual channel or single channel, as coded in `mode`.
     pub channel_mode: MpegChannelMode,
     /// `mode_extension`, 0 to 3, as coded; it has a meaning in joint stereo
     /// only.
     pub mode_extension: u8,
-    /// `copyright`.
+    /// Whether the bitstream marks its audio as copyright protected.
     pub copyright: bool,
     /// The original bit: set for an original, clear for a copy.
     pub original: bool,
-    /// `emphasis`.
+    /// The de-emphasis the decoder may apply to the reconstructed audio.
     pub emphasis: MpegEmphasis,
 }
 

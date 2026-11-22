@@ -92,7 +92,7 @@ impl Av1ConfigFields {
     pub const fn reserved_three_bits(self) -> u8 {
         self.raw[3] >> 5
     }
-    /// `initial_presentation_delay_present`.
+    /// Whether the low four bits of the fourth byte code a presentation delay.
     pub const fn initial_presentation_delay_present(self) -> bool {
         self.raw[3] & 16 != 0
     }

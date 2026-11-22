@@ -10,7 +10,8 @@ use triergon_core::{BudgetVec, Error, Result};
 /// Opus decodes at 48 kHz whatever the input rate was.
 pub const SAMPLE_RATE: u32 = 48_000;
 
-/// The fields of an Opus identification header.
+/// Decoder parameters from an Opus identification header. Writing the header
+/// also preserves the encoder's informational input sample rate.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct OpusHead {
     /// Version of the header, 0 to 15; 1 for a header read from a `dOps` box.
@@ -19,8 +20,7 @@ pub struct OpusHead {
     pub channels: u8,
     /// Samples at 48 kHz to discard from the start of the decoded stream.
     pub pre_skip: u16,
-    /// The encoder's input rate, informational only; 0 when unspecified.
-    pub input_sample_rate: u32,
+    input_sample_rate: u32,
     /// Output gain in Q7.8 dB.
     pub output_gain: i16,
     /// Channel mapping family: 0 for mono or stereo in one stream, 1 for the

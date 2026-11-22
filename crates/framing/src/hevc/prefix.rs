@@ -13,12 +13,11 @@ use triergon_core::{Error, Result};
 /// What the start of an SPS says about its stream.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HevcSpsPrefix {
-    /// `sps_seq_parameter_set_id`.
+    /// `sps_seq_parameter_set_id`, 0 to 15.
     pub id: u8,
-    /// `sps_video_parameter_set_id`.
+    /// Identifier of the referenced VPS, 0 to 15.
     pub vps_id: u8,
-    /// `sps_max_sub_layers_minus1`, at most 6.
-    pub max_sub_layers_minus1: u8,
+    max_sub_layers_minus1: u8,
     /// Width of the conformance window in luma samples, above 0.
     pub width: u32,
     /// Height of the conformance window in luma samples, above 0.
@@ -193,11 +192,11 @@ pub fn read_sps_reorder(payload: &[u8]) -> Result<(u8, u8, u8)> {
 /// E.2.1) as coded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HevcVuiTiming {
-    /// `vui_num_units_in_tick`.
+    /// Clock units per tick, as coded in `vui_num_units_in_tick`.
     pub num_units_in_tick: u32,
-    /// `vui_time_scale`.
+    /// Clock units per second, as coded in `vui_time_scale`.
     pub time_scale: u32,
-    /// `vui_poc_proportional_to_timing_flag`.
+    /// Whether picture order count increments imply a fixed number of clock ticks.
     pub poc_proportional_to_timing_flag: bool,
     /// `vui_num_ticks_poc_diff_one_minus1`, present with the flag above.
     pub num_ticks_poc_diff_one_minus1: Option<u32>,

@@ -93,7 +93,7 @@ pub struct AacGaSpecific {
     /// `coreCoderDelay` in samples (14 bits) when `dependsOnCoreCoder` is set; `None`
     /// when it is clear.
     pub core_coder_delay: Option<u16>,
-    /// `extensionFlag`.
+    /// Whether the AAC-LC GASpecificConfig carries `extensionFlag3`.
     pub extension_flag: bool,
     /// `extensionFlag3`, coded only when `extensionFlag` is set; `None` when absent.
     /// The parser refuses a record that sets it.
@@ -213,7 +213,7 @@ pub struct AacAscFacts {
     pub sbr: AacExtensionSignal,
     /// How the record signals PS.
     pub ps: AacExtensionSignal,
-    /// The GASpecificConfig.
+    /// The core coder's frame length, delay and extension flags.
     pub ga: AacGaSpecific,
     /// Channels of the core coder: [`fixed_channel_count`] of the channel
     /// configuration, or the program config element's `channel_count`, which may be
@@ -221,9 +221,7 @@ pub struct AacAscFacts {
     pub core_channels: u16,
     /// Bit offset in the record just past the last field read.
     pub understood_end_bit: usize,
-    /// Bits of the record the parser was given: eight per byte, or the caller's bit
-    /// length.
-    pub source_bit_length: usize,
+    source_bit_length: usize,
 }
 
 impl AacAscFacts {

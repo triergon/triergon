@@ -276,6 +276,7 @@ impl AacAscScopeParser {
         match step {
             Ok(BuildStep::Yield) => Ok(None),
             Ok(BuildStep::Ready(o)) => Ok(Some(AacAscScopeOutcome::Parsed(o))),
+            // A completed inner parser can no longer advance the extent.
             Ok(BuildStep::Complete) => Err(Error::Invalid("missing ASC scope output")),
             Err(e)
                 if matches!(

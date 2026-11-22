@@ -87,7 +87,7 @@ pub struct AvcSps {
     pub poc: AvcPocSyntax,
     /// `max_num_ref_frames` as coded.
     pub max_num_ref_frames: u32,
-    /// `gaps_in_frame_num_value_allowed_flag`.
+    /// Whether gaps between successive reference-picture frame numbers are allowed.
     pub gaps_in_frame_num_allowed: bool,
     /// `frame_mbs_only_flag`: every picture is a frame, none a field.
     pub frame_mbs_only: bool,

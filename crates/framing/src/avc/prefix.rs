@@ -67,11 +67,11 @@ pub struct AvcRaster {
 /// establish presentation timestamps.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcVuiTiming {
-    /// `num_units_in_tick`.
+    /// Clock units per tick, as coded in `num_units_in_tick`.
     pub num_units_in_tick: u32,
-    /// `time_scale`.
+    /// Clock units per second, as coded in `time_scale`.
     pub time_scale: u32,
-    /// `fixed_frame_rate_flag`.
+    /// Whether consecutive output pictures have a constrained temporal distance.
     pub fixed_frame_rate_flag: bool,
 }
 
