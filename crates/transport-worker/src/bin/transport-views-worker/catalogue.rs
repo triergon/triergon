@@ -109,7 +109,7 @@ fn block(
 
 struct StreamRow<'a> {
     pid: u16,
-    stream_type: u8,
+    codec_tag: u32,
     codec: &'a str,
     language: &'a [u8],
     hearing_impaired: bool,
@@ -132,7 +132,7 @@ impl StreamRow<'_> {
                 1,
                 program.into(),
                 self.pid.into(),
-                self.stream_type.into(),
+                self.codec_tag.into(),
                 self.hearing_impaired.into(),
                 self.visual_impaired.into(),
             ],
@@ -267,7 +267,7 @@ fn projected(
             for stream in view.streams() {
                 StreamRow {
                     pid: stream.pid,
-                    stream_type: stream.stream_type,
+                    codec_tag: stream.stream_type.into(),
                     codec: stream.codec().name(),
                     language: stream.language.as_slice(),
                     hearing_impaired: false,
@@ -562,7 +562,7 @@ fn source_stream(
     }
     StreamRow {
         pid: stream.pid,
-        stream_type: stream.stream_type,
+        codec_tag: published_codec_tag(stream)?,
         codec,
         language: &language,
         hearing_impaired,
@@ -570,6 +570,22 @@ fn source_stream(
         dvb: (codec == "dvb_subtitle").then_some(pages.as_slice()),
     }
     .write(program, work, out)
+}
+
+pub(super) fn published_codec_tag(stream: &ElementaryStream) -> Result<u32, String> {
+    let mut tag = u32::from(stream.stream_type);
+    for descriptor in stream.descriptors().map_while(Result::ok) {
+        if descriptor.tag == 5 {
+            let registration = descriptor.registration().map_err(|e| e.to_string())?;
+            if matches!(
+                (&registration.format_identifier, stream.codec()),
+                (b"HEVC", Some(CodecId::Hevc)) | (b"EAC3", Some(CodecId::Eac3))
+            ) {
+                tag = u32::from_le_bytes(registration.format_identifier);
+            }
+        }
+    }
+    Ok(tag)
 }
 
 fn append_language(languages: &mut Vec<u8>, code: &[u8; 3]) {

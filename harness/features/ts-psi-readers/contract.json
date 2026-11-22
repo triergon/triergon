@@ -9,7 +9,7 @@
     "Read every carrier via TransportFramer and the PAT and PMT PIDs via SectionAssembler, PatReader, PatCollector and PmtReader. Fold the accepted current PAT and latest current PMTs, in table order, using the declared descriptor namespace.",
     "Drain each physical transport entity independently. Reference FFmpeg formats opens MPEG-TS with a preloaded byte source and calls av_read_frame to EOF with codec parsers and timestamp fill disabled.",
     "Fold kind 5 program rows (subkind 0: program number, PMT PID, PCR PID, signed PMT version), followed by member streams in observable order. The absent PMT has PCR PID zero and version -1. Reference tracks without program membership are reported as program zero.",
-    "Fold kind 5 stream rows (subkind 1: program number, PID, PMT stream type, hearing-impaired flag, visual-impaired flag), then length-prefixed codec name (subkind 2), language bytes (subkind 3) and DVB subtitle initialization (subkind 4, composition and ancillary page words and type for each service). MPEG audio is represented as one codec family because the stream_type does not identify the exact audio layer. Initialization outside DVB subtitle signalling is outside this comparison.",
+    "Fold kind 5 stream rows (subkind 1: program number, PID, codec tag, hearing-impaired flag, visual-impaired flag), then length-prefixed codec name (subkind 2), language bytes (subkind 3) and DVB subtitle initialization (subkind 4, composition and ancillary page words and type for each service). The standalone projection uses a valid HEVC or EAC3 registration identifier as the published codec tag for the corresponding stream. MPEG audio is represented as one codec family because the stream_type does not identify the exact audio layer. Initialization outside DVB subtitle signalling is outside this comparison.",
     "Fold kind 7 for clean end and kind 8 for source refusal."
   ],
   "required_profiles": [
@@ -46,9 +46,8 @@
         "au-avc-one", "au-avc-pts-dts", "au-avc-truncated-final", "au-dvb-ac3-aac-interleaved-eof",
         "au-dvb-ac3-aac-interleaved-lookahead", "au-dvb-ac3-body-across-pes", "au-dvb-ac3-clock-wrap",
         "au-dvb-ac3-discontinuity-single-frame-0", "au-dvb-ac3-discontinuity-single-frame-1",
-        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-discontinuity-two-frames-1",
-        "au-dvb-ac3-final-au-at-eof", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
-        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks", "au-dvb-ac3-multiple-per-pes", "au-dvb-ac3-one",
+        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
+        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks",
         "au-dvb-ac3-pts-dts", "au-dvb-ac3-truncated-final", "au-hevc-body-across-pes", "au-hevc-clock-wrap",
         "au-hevc-final-au-at-eof", "au-hevc-header-across-pes", "au-hevc-header-only-eof", "au-hevc-m2ts192",
         "au-hevc-missing-clocks", "au-hevc-multiple-per-pes", "au-hevc-one", "au-hevc-pts-dts",
@@ -102,14 +101,8 @@
         "scrambling-and-forbidden", "tei-and-marker", "tei-and-scrambling", "tei-incomplete-finite",
         "tei-then-valid", "tei", "valid-control", "wrong-time-prefix", "transport-adaptation-overrun",
         "transport-afc-reserved", "transport-null-pid", "mpegts-transport-partial-final-packet",
-        "transport-scrambled", "transport-sync-loss", "transport-tei", "mpegts-ts188-basic", "media-00",
-        "playback-carriage-aac-adts-direct", "playback-carriage-hevc-direct",
-        "playback-hls-contiguous-part-a", "playback-hls-contiguous-part-b", "playback-m2ts192-opaque-prefix",
-        "playback-pes-timestamp-marker", "playback-pmt-opaque-language-descriptors",
-        "playback-pmt-version-wrap-retypes-pid", "program-eof-avc-aac", "program-pmt-retype",
-        "program-pmt-retype-dvb", "program-private-avc-dvb", "playback-psi-crc-invalid",
-        "playback-pts-dts-common-epoch", "playback-pts-negative-against-dts", "playback-pts-wrap-forward",
-        "playback-transport-partial-final-packet", "playback-ts188-basic", "dvb-hevc-eac3-32000",
+        "transport-scrambled", "transport-sync-loss", "transport-tei", "mpegts-ts188-basic", "media-00", "program-eof-avc-aac", "program-pmt-retype",
+        "program-pmt-retype-dvb", "program-private-avc-dvb", "dvb-hevc-eac3-32000",
         "entry-hevc-aac-44100-00", "hls-entry-hevc-aac-44100-01", "hls-replay-avc-aac-00",
         "replay-avc-aac-01", "replay-avc-aac-02", "replay-avc-aac-03", "replay-avc-aac-04",
         "replay-avc-aac-05", "replay-avc-aac-06", "replay-avc-aac-07", "replay-avc-aac-08",
@@ -142,9 +135,8 @@
         "au-avc-one", "au-avc-pts-dts", "au-avc-truncated-final", "au-dvb-ac3-aac-interleaved-eof",
         "au-dvb-ac3-aac-interleaved-lookahead", "au-dvb-ac3-body-across-pes", "au-dvb-ac3-clock-wrap",
         "au-dvb-ac3-discontinuity-single-frame-0", "au-dvb-ac3-discontinuity-single-frame-1",
-        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-discontinuity-two-frames-1",
-        "au-dvb-ac3-final-au-at-eof", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
-        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks", "au-dvb-ac3-multiple-per-pes", "au-dvb-ac3-one",
+        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
+        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks",
         "au-dvb-ac3-pts-dts", "au-dvb-ac3-truncated-final", "au-hevc-body-across-pes", "au-hevc-clock-wrap",
         "au-hevc-final-au-at-eof", "au-hevc-header-across-pes", "au-hevc-header-only-eof", "au-hevc-m2ts192",
         "au-hevc-missing-clocks", "au-hevc-multiple-per-pes", "au-hevc-one", "au-hevc-pts-dts",
@@ -198,14 +190,8 @@
         "scrambling-and-forbidden", "tei-and-marker", "tei-and-scrambling", "tei-incomplete-finite",
         "tei-then-valid", "tei", "valid-control", "wrong-time-prefix", "transport-adaptation-overrun",
         "transport-afc-reserved", "transport-null-pid", "mpegts-transport-partial-final-packet",
-        "transport-scrambled", "transport-sync-loss", "transport-tei", "mpegts-ts188-basic", "media-00",
-        "playback-carriage-aac-adts-direct", "playback-carriage-hevc-direct",
-        "playback-hls-contiguous-part-a", "playback-hls-contiguous-part-b", "playback-m2ts192-opaque-prefix",
-        "playback-pes-timestamp-marker", "playback-pmt-opaque-language-descriptors",
-        "playback-pmt-version-wrap-retypes-pid", "program-eof-avc-aac", "program-pmt-retype",
-        "program-pmt-retype-dvb", "program-private-avc-dvb", "playback-psi-crc-invalid",
-        "playback-pts-dts-common-epoch", "playback-pts-negative-against-dts", "playback-pts-wrap-forward",
-        "playback-transport-partial-final-packet", "playback-ts188-basic", "dvb-hevc-eac3-32000",
+        "transport-scrambled", "transport-sync-loss", "transport-tei", "mpegts-ts188-basic", "media-00", "program-eof-avc-aac", "program-pmt-retype",
+        "program-pmt-retype-dvb", "program-private-avc-dvb", "dvb-hevc-eac3-32000",
         "entry-hevc-aac-44100-00", "hls-entry-hevc-aac-44100-01", "hls-replay-avc-aac-00",
         "replay-avc-aac-01", "replay-avc-aac-02", "replay-avc-aac-03", "replay-avc-aac-04",
         "replay-avc-aac-05", "replay-avc-aac-06", "replay-avc-aac-07", "replay-avc-aac-08",
@@ -238,9 +224,8 @@
         "au-avc-one", "au-avc-pts-dts", "au-avc-truncated-final", "au-dvb-ac3-aac-interleaved-eof",
         "au-dvb-ac3-aac-interleaved-lookahead", "au-dvb-ac3-body-across-pes", "au-dvb-ac3-clock-wrap",
         "au-dvb-ac3-discontinuity-single-frame-0", "au-dvb-ac3-discontinuity-single-frame-1",
-        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-discontinuity-two-frames-1",
-        "au-dvb-ac3-final-au-at-eof", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
-        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks", "au-dvb-ac3-multiple-per-pes", "au-dvb-ac3-one",
+        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
+        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks",
         "au-dvb-ac3-pts-dts", "au-dvb-ac3-truncated-final", "au-hevc-body-across-pes", "au-hevc-clock-wrap",
         "au-hevc-final-au-at-eof", "au-hevc-header-across-pes", "au-hevc-header-only-eof", "au-hevc-m2ts192",
         "au-hevc-missing-clocks", "au-hevc-multiple-per-pes", "au-hevc-one", "au-hevc-pts-dts",
@@ -294,14 +279,8 @@
         "scrambling-and-forbidden", "tei-and-marker", "tei-and-scrambling", "tei-incomplete-finite",
         "tei-then-valid", "tei", "valid-control", "wrong-time-prefix", "transport-adaptation-overrun",
         "transport-afc-reserved", "transport-null-pid", "mpegts-transport-partial-final-packet",
-        "transport-scrambled", "transport-sync-loss", "transport-tei", "mpegts-ts188-basic", "media-00",
-        "playback-carriage-aac-adts-direct", "playback-carriage-hevc-direct",
-        "playback-hls-contiguous-part-a", "playback-hls-contiguous-part-b", "playback-m2ts192-opaque-prefix",
-        "playback-pes-timestamp-marker", "playback-pmt-opaque-language-descriptors",
-        "playback-pmt-version-wrap-retypes-pid", "program-eof-avc-aac", "program-pmt-retype",
-        "program-pmt-retype-dvb", "program-private-avc-dvb", "playback-psi-crc-invalid",
-        "playback-pts-dts-common-epoch", "playback-pts-negative-against-dts", "playback-pts-wrap-forward",
-        "playback-transport-partial-final-packet", "playback-ts188-basic", "dvb-hevc-eac3-32000",
+        "transport-scrambled", "transport-sync-loss", "transport-tei", "mpegts-ts188-basic", "media-00", "program-eof-avc-aac", "program-pmt-retype",
+        "program-pmt-retype-dvb", "program-private-avc-dvb", "dvb-hevc-eac3-32000",
         "entry-hevc-aac-44100-00", "hls-entry-hevc-aac-44100-01", "hls-replay-avc-aac-00",
         "replay-avc-aac-01", "replay-avc-aac-02", "replay-avc-aac-03", "replay-avc-aac-04",
         "replay-avc-aac-05", "replay-avc-aac-06", "replay-avc-aac-07", "replay-avc-aac-08",
@@ -317,47 +296,105 @@
       "cause": "Runtime and memory bounds await isolated native gate hosts."
     }
   ],
-  "pending_module_requirements": [
-    "Resolve FFmpeg catalogue streams without a current program-map association.",
-    "Resolve codec inference on a private transport stream without a declared namespace.",
-    "Resolve the catalogue terminal result after a partial final carrier.",
-    "Resolve catalogue admission of an incomplete current PAT.",
-    "Resolve catalogue admission of a PMT with an overrunning descriptor.",
-    "Resolve catalogue admission of a PMT with nonzero section numbers.",
-    "Compare the PMT stream type and FFmpeg registration-derived codec tag."
-  ],
-  "open_cases": [
-    {"id": "au-adts-across-entities-1", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-adts-across-entities-2", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-m2ts-initialization-entity-1", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "hls-map-media", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "inactive-pat-then-unrouted-pes", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "unknown-pid-pes-after-pat-control", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "carriage-ac3-direct", "requirement": "Resolve codec inference on a private transport stream without a declared namespace.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "carriage-ac3-dvb", "requirement": "Resolve codec inference on a private transport stream without a declared namespace.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "carriage-eac3-direct", "requirement": "Resolve codec inference on a private transport stream without a declared namespace.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "carriage-eac3-dvb", "requirement": "Resolve codec inference on a private transport stream without a declared namespace.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "program-pmt-retype", "requirement": "Resolve codec inference on a private transport stream without a declared namespace.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "physical-truncated-tail", "requirement": "Resolve the catalogue terminal result after a partial final carrier.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "mpegts-transport-partial-final-packet", "requirement": "Resolve the catalogue terminal result after a partial final carrier.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "playback-transport-partial-final-packet", "requirement": "Resolve the catalogue terminal result after a partial final carrier.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "pat-incomplete-version", "requirement": "Resolve catalogue admission of an incomplete current PAT.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "pmt-descriptor-overrun", "requirement": "Resolve catalogue admission of a PMT with an overrunning descriptor.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "pmt-multi-section-forbidden", "requirement": "Resolve catalogue admission of a PMT with nonzero section numbers.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "dvb-hevc-eac3-32000", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "entry-hevc-aac-44100-00", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "hls-entry-hevc-aac-44100-01", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "hls-replay-hevc-aac-00", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-01", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-02", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-03", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-04", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-05", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-06", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-07", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-08", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-09", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "ts-program-entry-hevc-aac-44100-01", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "ts-program-replay-hevc-aac-00", "requirement": "Compare the PMT stream type and FFmpeg registration-derived codec tag.", "targets": ["aarch64-unknown-linux-gnu"]}
+  "open_deviations": [
+    {
+      "reading": "Unbound PES has no current program membership",
+      "clause": "H.222.0 \u00a7\u00a72.4.4.5\u20132.4.4.6 and 2.4.4.9\u20132.4.4.10 define MPEG program membership through the current PAT and PMT.",
+      "candidate": "Does not add a catalogue stream without a current program map.",
+      "reference": "Publishes an unassociated stream from the observed PES PID.",
+      "compat": "compat::psi::InferUnboundPes",
+      "cases": [
+        "au-adts-across-entities-1",
+        "au-adts-across-entities-2",
+        "au-m2ts-initialization-entity-1",
+        "hls-map-media",
+        "inactive-pat-then-unrouted-pes",
+        "unknown-pid-pes-after-pat-control"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "An incomplete PAT version cannot replace the current table",
+      "clause": "H.222.0 \u00a72.4.4.6 defines the version number for the whole PAT and last_section_number for a complete table.",
+      "candidate": "Waits for all sections of the advertised version before routing that program.",
+      "reference": "Routes the program from the first section even though the remaining section is absent.",
+      "compat": "compat::psi::IncompletePatSection",
+      "cases": [
+        "pat-incomplete-version"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "A PMT descriptor crosses the enclosing loop",
+      "clause": "H.222.0 \u00a72.4.4.10 and \u00a72.6.1 require each descriptor to fit the declared PMT loop and section length.",
+      "candidate": "Rejects the PMT and exposes no stream from it.",
+      "reference": "Publishes the stream from the malformed PMT.",
+      "compat": "compat::psi::DescriptorOverrun",
+      "cases": [
+        "pmt-descriptor-overrun"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "PMT section numbers must both be zero",
+      "clause": "H.222.0 \u00a72.4.4.10 requires section_number and last_section_number to equal zero.",
+      "candidate": "Rejects the PMT and exposes no stream from it.",
+      "reference": "Publishes the stream from the malformed PMT.",
+      "compat": "compat::psi::NonzeroPmtSection",
+      "cases": [
+        "pmt-multi-section-forbidden"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "A final short transport carrier is truncated",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.1\u20132.4.3.2 set the transport packet length at 188 bytes, excluding any external prefix.",
+      "candidate": "Publishes the preceding catalogue and reports a truncated final carrier.",
+      "reference": "Publishes the catalogue and returns clean EOF.",
+      "compat": "compat::input::DiscardPartialCarrier",
+      "cases": [
+        "physical-truncated-tail",
+        "mpegts-transport-partial-final-packet"],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "Private direct signalling with no caller-declared namespace",
+      "clause": "H.222.0 \u00a72.4.4.10 Table 2-34 reserves stream types 0x80\u20130xFF for user-private assignments.",
+      "candidate": "Preserves the coded private fields without selecting the codec in an unspecified namespace.",
+      "reference": "Interprets 0x81 and 0x87 as AC-3 and Enhanced AC-3.",
+      "compat": "compat::psi::InferPrivateNamespace",
+      "cases": [
+        "carriage-ac3-direct",
+        "carriage-eac3-direct"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "Private DVB signalling with no caller-declared namespace",
+      "clause": "H.222.0 \u00a72.4.4.10 Table 2-34 and ETSI TS 101 154 \u00a74.1.2 place AC-3 and Enhanced AC-3 in a declared private-data carriage, with the identifying DVB descriptors in EN 300 468 Annex D.",
+      "candidate": "Preserves the coded private fields without selecting the codec in an unspecified namespace.",
+      "reference": "Interprets the private audio descriptors without a caller-declared namespace.",
+      "compat": "compat::psi::InferPrivateNamespace",
+      "cases": [
+        "carriage-ac3-dvb",
+        "carriage-eac3-dvb",
+        "program-pmt-retype"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
   ]
 }
