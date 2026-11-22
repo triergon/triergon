@@ -2,6 +2,7 @@
 //! binding v1.3.0 §2.4 lets the last OBU of a sample omit its size; a decoder also
 //! needs a temporal delimiter, and the configuration OBUs at random access.
 use crate::av1::obu::push_leb_byte;
+use crate::check_limit;
 use crate::{
     BuildStep,
     av1::{Av1Configuration, Av1Obu, Av1ObuExtension, Av1ObuHeader},
@@ -337,13 +338,6 @@ impl<'a> Av1TemporalUnitJob<'a> {
             length,
         }))
     }
-}
-
-fn check_limit(requested: usize, maximum: usize) -> Result<()> {
-    if requested > maximum {
-        return Err(Error::Limit { requested, maximum });
-    }
-    Ok(())
 }
 
 fn read_header(source: &[u8], start: usize) -> Result<Av1ObuHeader> {

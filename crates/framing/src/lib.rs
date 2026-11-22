@@ -40,6 +40,16 @@ pub(crate) const fn retryable(error: Error) -> bool {
     matches!(error, Error::Backpressure { .. } | Error::Allocation)
 }
 
+/// [`Error::Limit`] when `requested` exceeds `maximum`.
+#[inline]
+pub(crate) fn check_limit(requested: usize, maximum: usize) -> Result<()> {
+    if requested > maximum {
+        Err(Error::Limit { requested, maximum })
+    } else {
+        Ok(())
+    }
+}
+
 /// Freezes `output`, leaving an empty vector on its pool; a refused freeze leaves the
 /// charged bytes in `output` for retry.
 pub(crate) fn freeze_whole(output: &mut BudgetVec<u8>) -> Result<Bytes> {

@@ -2,7 +2,8 @@
 //! 14-bit unpacking follows ETSI TS 102 114 5.3. A packet starts only at the 16-bit
 //! words `1FFF E800 07Fx`, the two unused high bits of each word included; that is
 //! narrower than the frame reader's sync, which accepts any value in those bits.
-use crate::dts::reader::{limit, source_error};
+use crate::check_limit;
+use crate::dts::reader::source_error;
 use crate::dts::sync14::{header_payload, word};
 use crate::dts::{
     Dts14BitPayload, Dts14BitUnpacker, DtsCoreHeader, DtsPackingLimits, DtsSourceIdentity,
@@ -239,7 +240,7 @@ impl Dts14CarrierReader {
             .checked_add(Bytes::owner_overhead_bytes())
             .and_then(|n| n.checked_add(Budget::control_storage_bytes()))
             .ok_or(Error::Overflow)?;
-        limit(minimum, pool.limit())?;
+        check_limit(minimum, pool.limit())?;
         let cursor = InputCursor::new(pool, source, caps, limits.maximum_input_window)?;
         Ok(Self {
             pool: pool.clone(),
@@ -520,7 +521,7 @@ impl Dts14CarrierReader {
                                     .checked_add(target)
                                     .and_then(|n| n.checked_add(Budget::control_storage_bytes()))
                                     .ok_or(Error::Overflow)?;
-                                limit(minimum, self.pool.limit())?;
+                                check_limit(minimum, self.pool.limit())?;
                                 // Only empty storage grows: no copied bytes move inside
                                 // an allocation or any one uncharged operation.
                                 next.try_reserve_exact(target)?;

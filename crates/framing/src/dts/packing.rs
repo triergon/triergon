@@ -1,8 +1,8 @@
 //! The payload of 14-bit DTS words, the low 14 bits of each 16-bit word (ETSI
 //! TS 102 114 V1.2.1 §5.3), in a byte order the caller names. No length is derived
 //! from `FSIZE`.
+use crate::check_limit;
 use crate::dts::DtsSourceIdentity;
-use crate::dts::reader::limit;
 use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
@@ -221,13 +221,13 @@ impl Dts14BitUnpacker {
         if !source.belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
-        limit(source.len(), limits.maximum_source_bytes)?;
+        check_limit(source.len(), limits.maximum_source_bytes)?;
         if !source.len().is_multiple_of(2) {
             return Err(Error::Truncated);
         }
         let payload_bits = (source.len() / 2).checked_mul(14).ok_or(Error::Overflow)?;
         let output_bytes = payload_bits / 8;
-        limit(output_bytes, limits.maximum_output_bytes)?;
+        check_limit(output_bytes, limits.maximum_output_bytes)?;
         let end = identity
             .offset
             .checked_add(u64::try_from(source.len()).map_err(|_| Error::Overflow)?)
@@ -240,7 +240,7 @@ impl Dts14BitUnpacker {
             .and_then(|bytes| bytes.checked_add(Bytes::owner_overhead_bytes()))
             .and_then(|bytes| bytes.checked_add(Budget::control_storage_bytes()))
             .ok_or(Error::Overflow)?;
-        limit(minimum, pool.limit())?;
+        check_limit(minimum, pool.limit())?;
         Ok(Self {
             identity,
             order,

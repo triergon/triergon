@@ -1,6 +1,7 @@
 //! The `hvcC` record of ISO/IEC 14496-15 `configurationVersion` 1: its fixed
 //! fields, arrays and NAL unit headers, within bounded extents. NAL unit payloads
 //! are not read.
+use crate::check_limit;
 use crate::inline_storage::InlineStorage;
 use crate::retryable;
 use crate::{
@@ -654,14 +655,6 @@ impl HvcConfigParser {
 /// Whether both descriptor tables of a record with these counts fit inline.
 const fn tables_fit_inline(array_count: u8, total: usize) -> bool {
     array_count as usize <= INLINE_DESCRIPTORS && total <= INLINE_DESCRIPTORS
-}
-
-fn check_limit(requested: usize, maximum: usize) -> Result<()> {
-    if requested > maximum {
-        Err(Error::Limit { requested, maximum })
-    } else {
-        Ok(())
-    }
 }
 
 #[derive(Clone, Debug)]

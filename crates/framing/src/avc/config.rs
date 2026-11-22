@@ -1,6 +1,7 @@
 //! The `avcC` record grammar of ISO/IEC 14496-15:2010 with the 2006 FRExt
 //! amendment. NAL bodies, sample-entry rules and record/SPS consistency are not
 //! decoded or certified here.
+use crate::check_limit;
 use crate::inline_storage::InlineStorage;
 use crate::retryable;
 use crate::{
@@ -665,14 +666,6 @@ impl AvcConfigParser {
                 }
             }
         }
-    }
-}
-
-fn check_limit(requested: usize, maximum: usize) -> Result<()> {
-    if requested > maximum {
-        Err(Error::Limit { requested, maximum })
-    } else {
-        Ok(())
     }
 }
 

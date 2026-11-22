@@ -1,8 +1,9 @@
 //! Core frames of a DTS stream in any word packing, ETSI TS 102 114 §5.3 and
 //! §5.4.2. A frame is the span from one core sync to the next; how its length
 //! relates to `FSIZE` is reported, and neither shows that the coded audio is valid.
+use crate::check_limit;
 use crate::dts::core_frame::CORE_SYNC;
-use crate::dts::reader::{limit, source_error};
+use crate::dts::reader::source_error;
 use crate::dts::{
     DtsCoreField, DtsPackedHeader, DtsPackedLimits, DtsPackedPayload, DtsPackedPayloadJob,
     DtsPacking, DtsSourceIdentity, inspect_header_bits,
@@ -253,7 +254,7 @@ impl DtsNormalSourceReader {
             .checked_add(Bytes::owner_overhead_bytes())
             .and_then(|v| v.checked_add(Budget::control_storage_bytes()))
             .ok_or(Error::Overflow)?;
-        limit(minimum, pool.limit())?;
+        check_limit(minimum, pool.limit())?;
         let cursor = InputCursor::new(pool, source, capabilities, limits.maximum_input_window)?;
         Ok(Self {
             pool: pool.clone(),
@@ -490,7 +491,7 @@ impl DtsNormalSourceReader {
                         }
                         if copied < count {
                             let next = buffer.len().checked_add(1).ok_or(Error::Overflow)?;
-                            limit(next, self.limits.maximum_source_frame_bytes)?;
+                            check_limit(next, self.limits.maximum_source_frame_bytes)?;
                             if next > buffer.capacity() {
                                 return Err(Error::Invalid("DTS source capacity invariant"));
                             }
@@ -631,7 +632,7 @@ impl DtsNormalSourceReader {
     }
     /// The header in the prefix, with compatible frame type and deficit codes.
     fn probe(&self) -> Result<DtsPackedHeader> {
-        limit(self.prefix_len, self.limits.maximum_source_frame_bytes)?;
+        check_limit(self.prefix_len, self.limits.maximum_source_frame_bytes)?;
         let bits = self.packing.payload_bits(self.prefix_len)?;
         let mut stack = [0_u8; 15];
         for bit in 0..bits.min(120) {

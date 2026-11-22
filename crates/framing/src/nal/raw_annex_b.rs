@@ -1,5 +1,6 @@
 //! Ordered access-unit bytes for an Annex B source, without a container clock.
 
+use crate::check_limit;
 use crate::retryable;
 use crate::{
     avc::picture::AvcPictures,
@@ -530,11 +531,4 @@ impl RawAnnexBReader {
     pub const fn published_bytes(&self) -> u64 {
         self.unit_start
     }
-}
-
-fn check_limit(requested: usize, maximum: usize) -> Result<()> {
-    if requested > maximum {
-        return Err(Error::Limit { requested, maximum });
-    }
-    Ok(())
 }

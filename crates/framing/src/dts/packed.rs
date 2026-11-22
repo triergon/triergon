@@ -1,8 +1,8 @@
 //! The word packings of a DTS stream (ETSI TS 102 114 §3.4, §5.3) and the payload
 //! of a record read in one of them. Every source bit is kept; the zero bits that pad
 //! the payload to whole bytes are marked as not coming from the source.
+use crate::check_limit;
 use crate::dts::core_frame::CORE_SYNC;
-use crate::dts::reader::limit;
 use crate::dts::{DtsPackedBitLocation, DtsSourceIdentity};
 use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -310,10 +310,10 @@ impl DtsPackedPayloadJob {
         if !raw.belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
-        limit(raw.len(), limits.maximum_source_bytes)?;
+        check_limit(raw.len(), limits.maximum_source_bytes)?;
         let valid_bits = packing.payload_bits(raw.len())?;
         let storage_bytes = valid_bits.checked_add(7).ok_or(Error::Overflow)? / 8;
-        limit(storage_bytes, limits.maximum_storage_bytes)?;
+        check_limit(storage_bytes, limits.maximum_storage_bytes)?;
         let end = SourceLocation {
             source: identity.source,
             offset: identity
@@ -333,7 +333,7 @@ impl DtsPackedPayloadJob {
                 .and_then(|v| v.checked_add(Bytes::owner_overhead_bytes()))
                 .and_then(|v| v.checked_add(Budget::control_storage_bytes()))
                 .ok_or(Error::Overflow)?;
-            limit(minimum, pool.limit())?;
+            check_limit(minimum, pool.limit())?;
             State::Unpacking {
                 raw,
                 builder: BudgetVec::new(pool),

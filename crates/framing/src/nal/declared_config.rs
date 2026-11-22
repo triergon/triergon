@@ -4,6 +4,7 @@
 //! Length fields are big-endian integers of the declared widths. Neither field
 //! offsets nor which NAL units belong to an array are read from the bytes. The
 //! whole record, unknown and reserved bytes included, is kept.
+use crate::check_limit;
 use crate::retryable;
 use crate::{
     BuildStep,
@@ -454,14 +455,6 @@ impl<'a> DeclaredConfigParser<'a> {
                 }
             }
         }
-    }
-}
-
-fn check_limit(requested: usize, maximum: usize) -> Result<()> {
-    if requested > maximum {
-        Err(Error::Limit { requested, maximum })
-    } else {
-        Ok(())
     }
 }
 

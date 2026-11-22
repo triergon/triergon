@@ -1,4 +1,5 @@
 //! A four-byte-start-code AVC feed, over complete length-prefixed samples.
+use crate::check_limit;
 use crate::nal::annexb::START_CODE;
 use crate::{
     BuildStep,
@@ -274,11 +275,4 @@ fn next_nal(sample: &[u8], width: usize) -> Result<(&[u8], &[u8])> {
         return Err(Error::Invalid("empty AVC NAL"));
     }
     Ok((nal, rest))
-}
-
-fn check_limit(requested: usize, maximum: usize) -> Result<()> {
-    if requested > maximum {
-        return Err(Error::Limit { requested, maximum });
-    }
-    Ok(())
 }

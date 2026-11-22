@@ -1,6 +1,7 @@
 //! The AudioSpecificConfig of ISO/IEC 14496-3 for AAC LC, alone or under SBR or PS,
 //! with its GASpecificConfig and program config element. Nothing here decodes audio.
 use crate::BuildStep;
+use crate::check_limit;
 use crate::retryable;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::bits_at;
@@ -1085,13 +1086,5 @@ impl PceBuild {
             }
         }
         Ok(None)
-    }
-}
-
-fn check_limit(requested: usize, maximum: usize) -> Result<()> {
-    if requested > maximum {
-        Err(Error::Limit { requested, maximum })
-    } else {
-        Ok(())
     }
 }

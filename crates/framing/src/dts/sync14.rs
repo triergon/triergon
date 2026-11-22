@@ -1,8 +1,9 @@
 //! Normal core frames of a 14-bit DTS stream whose frames fill whole 14-bit words,
 //! found from one sync to the next. Experimental, and not a reader for 14-bit DTS in
 //! general. ETSI TS 102 114 V1.2.1 §5.3 and V1.6.1 §5.3–5.4.2.
+use crate::check_limit;
 use crate::dts::core_frame::CORE_SYNC;
-use crate::dts::reader::{limit, source_error};
+use crate::dts::reader::source_error;
 use crate::dts::{
     Dts14BitPayload, Dts14BitUnpacker, DtsCoreHeader, DtsPackingLimits, DtsSourceIdentity,
     DtsWordOrder, probe_core_header,
@@ -220,7 +221,7 @@ impl Dts14SyncReader {
             .checked_add(Bytes::owner_overhead_bytes())
             .and_then(|v| v.checked_add(Budget::control_storage_bytes()))
             .ok_or(Error::Overflow)?;
-        limit(raw_owner, pool.limit())?;
+        check_limit(raw_owner, pool.limit())?;
         let cursor = InputCursor::new(pool, source, capabilities, limits.maximum_input_window)?;
         Ok(Self {
             pool: pool.clone(),
@@ -396,11 +397,11 @@ impl Dts14SyncReader {
                     if header.frame_bytes % 7 != 0 {
                         return Err(Error::Unsupported("DTS14 unresolved nonzero-tail geometry"));
                     }
-                    limit(
+                    check_limit(
                         header.frame_bytes,
                         self.limits.maximum_canonical_frame_bytes,
                     )?;
-                    limit(self.prefix.len(), self.limits.maximum_physical_frame_bytes)?;
+                    check_limit(self.prefix.len(), self.limits.maximum_physical_frame_bytes)?;
                     self.frame = Frame::Body {
                         header,
                         buffer: BudgetVec::new(&self.pool),
@@ -507,7 +508,7 @@ impl Dts14SyncReader {
                         }
                         if copied < count {
                             let next = buffer.len().checked_add(1).ok_or(Error::Overflow)?;
-                            limit(next, self.limits.maximum_physical_frame_bytes)?;
+                            check_limit(next, self.limits.maximum_physical_frame_bytes)?;
                             if next > buffer.capacity() {
                                 return Err(Error::Invalid("DTS14 body exceeds reserved capacity"));
                             }

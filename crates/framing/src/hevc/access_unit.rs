@@ -1,4 +1,5 @@
 //! A four-byte-start-code HEVC feed over complete length-prefixed samples.
+use crate::check_limit;
 use crate::nal::annexb::START_CODE;
 use crate::{
     BuildStep,
@@ -237,11 +238,4 @@ fn add_nal_bytes(bytes: usize, nal_bytes: usize) -> Result<usize> {
         .checked_add(START_CODE.len())
         .and_then(|n| n.checked_add(nal_bytes))
         .ok_or(Error::Overflow)
-}
-
-fn check_limit(requested: usize, maximum: usize) -> Result<()> {
-    if requested > maximum {
-        return Err(Error::Limit { requested, maximum });
-    }
-    Ok(())
 }
