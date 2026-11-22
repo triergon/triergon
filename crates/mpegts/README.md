@@ -168,6 +168,10 @@ period zero (`RelativeEpochZero`); `Unanchored` and bounded policies are availab
 Missing DTS and unanchored per-frame timestamps stay absent; quarantined source
 clocks keep their raw fields with lifted values unresolved.
 
+The [PES assembler comparison](../../harness/features/ts-pes-assembler/contract.json)
+checks retained partial headers against transport payload bytes and compares
+the assembled packets, timestamps and payload with the demux reference.
+
 Source events arrive in order: `ReaderEvent::Transport` (each complete carrier),
 `Continuity`, `Source` (other trace events) and track catalogue changes with the
 PMT event that publishes them. Other events a caller handles:

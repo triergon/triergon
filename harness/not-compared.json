@@ -122,12 +122,6 @@
         "needs": "ts-source-poll compares the PES output of all five poll forms and checks their source spans. Table, continuity, timeline and diagnostic events have no equivalent full reference trace."
       },
       {
-        "name": "pes-assembler",
-        "entry_points": ["pes::PesAssembler::poll", "pes::PesAssembler::partial_header", "pes::PesHeader::raw_pts_time", "pes::PesHeader::raw_dts_time", "pes::Pes::source_ranges"],
-        "degree": "unit-tests",
-        "needs": "ts-pes-assembler compares complete carrier payloads at four work grants and verifies the assembled PES source ranges. Partial header progress is traced without a corresponding reference observation."
-      },
-      {
         "name": "demux-observer-forms",
         "entry_points": ["compat::pes::DemuxObserver::new", "compat::pes::DemuxObserver::push_with_input", "compat::pes::DemuxObserver::poll_compact_payload_with_input", "compat::pes::CompactPayload", "compat::pes::PayloadCursor::current", "compat::pes::PayloadCursor::next_span", "compat::pes::DemuxSpanViews", "compat::pes::CompactDemuxPacket::time_header"],
         "degree": "step",

@@ -13,7 +13,7 @@
     "The pinned formats worker opens the selected program with public MPEG-TS AVIO, NOPARSE and NOFILLIN, without stream discovery. It delivers ordinary entities in one AVIO source and flushes at a declared discontinuity.",
     "The packet fold is the mpegts-pes fold: stream index, PID, PTS and DTS in 90 kHz ticks (INT64_MIN for absence), duration, position, flags, size, bytes and every side-data element. Input loading is outside the run. Both sides drain the last entity to logical end.",
     "Every operation in the mpegts-pes corpus runs for each form, retaining its 272 request mappings and the hash of every ordered input.",
-    "Candidate header and payload source ranges are checked against the preloaded entity bytes. Partial progress and the public header flags are traced.",
+    "Candidate header and payload source ranges are checked against the preloaded entity bytes. At each carrier boundary cutting a syntactically admitted PES header, check every retained partial header byte against the carrier prefix under H.222.0 §2.4.3.6. The four work grants use the corpus that splits the header after every byte. Trace the public header flags.",
     "The source-clocks profile uses the public demux clock reduced to 33 bits, encoded timestamp presence from the PES start on the original carrier grid, and the physical start carrier offset for M2TS."
   ],
   "required_profiles": [

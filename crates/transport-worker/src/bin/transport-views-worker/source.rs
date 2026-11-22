@@ -432,6 +432,8 @@ impl Assembly {
         let Some(bytes) = packet.payload else {
             return Ok(());
         };
+        let previous = self.pes.partial_header().to_vec();
+        let prefix = incomplete_header(&previous, &bytes, packet.payload_unit_start);
         let entity = packet.source_id.ok_or("carrier without an entity")?;
         self.pes
             .push(
@@ -441,7 +443,7 @@ impl Assembly {
                 packet.payload_source_offset,
             )
             .map_err(|refusal| err(refusal.error))?;
-        self.drain(request, output, epochs, quantum)
+        self.drain(request, output, epochs, quantum, prefix.as_deref())
     }
 
     fn drain(
@@ -450,6 +452,7 @@ impl Assembly {
         output: &mut Output<'_, '_>,
         epochs: SourceEpochs,
         quantum: usize,
+        prefix: Option<&[u8]>,
     ) -> Result<(), String> {
         loop {
             if output.trace.is_some() {
@@ -463,7 +466,12 @@ impl Assembly {
                 Ok(AssemblyStep::Output(pes)) => {
                     source_packet(&pes, request, output)?;
                 }
-                Ok(AssemblyStep::NeedPayload | AssemblyStep::Finished) => return Ok(()),
+                Ok(AssemblyStep::NeedPayload | AssemblyStep::Finished) => {
+                    if prefix.is_some_and(|wire| wire != self.pes.partial_header()) {
+                        return Err("partial PES header differs from the carrier bytes".into());
+                    }
+                    return Ok(());
+                }
                 Ok(AssemblyStep::Yield) => {}
                 Err(error) if matches!(error, Error::Invalid(_) | Error::Truncated) => {
                     output.note(format_args!("assembler-fault {} {error}", self.pid))?;
@@ -474,6 +482,33 @@ impl Assembly {
             }
         }
     }
+}
+
+/// The cut before a complete MPEG-2 PES header, from H.222.0 §2.4.3.6.
+fn incomplete_header(previous: &[u8], payload: &[u8], pusi: bool) -> Option<Vec<u8>> {
+    let preceding = if pusi { &[] } else { previous };
+    if (!pusi && preceding.is_empty()) || preceding.len() + payload.len() >= 264 {
+        return None;
+    }
+    let prefix: Vec<_> = preceding.iter().chain(payload).copied().collect();
+    let start_code = [0, 0, 1];
+    if !prefix.starts_with(&start_code[..prefix.len().min(3)]) {
+        return None;
+    }
+    if prefix.len() > 3 && !matches!(prefix[3], 0xbd | 0xc0..=0xef) {
+        return None;
+    }
+    if prefix.len() > 6 && prefix[6] >> 6 != 0b10 {
+        return None;
+    }
+    let header_len = prefix.get(8).map_or(9, |&length| 9 + usize::from(length));
+    if let Some(word) = prefix.get(4..6) {
+        let packet_len = usize::from(u16::from_be_bytes([word[0], word[1]]));
+        if packet_len != 0 && header_len > 6 + packet_len {
+            return None;
+        }
+    }
+    (prefix.len() < header_len).then_some(prefix)
 }
 
 fn sequence_position(request: &Request, source: SourceId, offset: u64) -> u64 {
@@ -918,7 +953,7 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
                             (request.mode, &mut assembly)
                         {
                             assembly.pes.end_of_source();
-                            assembly.drain(request, output, epochs, quantum)?;
+                            assembly.drain(request, output, epochs, quantum, None)?;
                         }
                         if let Some(observer) = &mut observer {
                             observer.demux.end_of_source().map_err(err)?;
