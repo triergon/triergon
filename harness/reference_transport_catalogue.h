@@ -50,8 +50,8 @@ static void transport_view_close(TransportViewInput *source)
     avio_context_free(&source->io);
 }
 
-static int transport_view_open(TransportViewInput *source, const ViewCase *input,
-                               size_t window, const char *name)
+static int transport_view_open_with_options(TransportViewInput *source, const ViewCase *input,
+                                            size_t window, const char *name, AVDictionary **options)
 {
     *source = (TransportViewInput){.data = input->data, .size = input->size, .window = window};
     const AVInputFormat *demuxer = av_find_input_format(name);
@@ -71,7 +71,13 @@ static int transport_view_open(TransportViewInput *source, const ViewCase *input
         return AVERROR(ENOMEM);
     source->format->pb = source->io;
     source->format->flags |= AVFMT_FLAG_CUSTOM_IO | AVFMT_FLAG_NOPARSE | AVFMT_FLAG_NOFILLIN;
-    return avformat_open_input(&source->format, NULL, demuxer, NULL);
+    return avformat_open_input(&source->format, NULL, demuxer, options);
+}
+
+static int transport_view_open(TransportViewInput *source, const ViewCase *input,
+                               size_t window, const char *name)
+{
+    return transport_view_open_with_options(source, input, window, name, NULL);
 }
 
 static void transport_view_row(ViewWork *work, uint64_t kind, const uint64_t *words,

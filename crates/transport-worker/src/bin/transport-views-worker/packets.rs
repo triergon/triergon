@@ -278,7 +278,7 @@ pub(super) fn operation<'a>(
     arguments: &[OsString],
 ) -> Result<Operation<'a>, String> {
     let [size, window, tail @ ..] = arguments else {
-        return Err("ts-packets requires FORMAT WINDOW [fields|compact]".into());
+        return Err("ts-packets requires FORMAT WINDOW [grid|fields|compact]".into());
     };
     let format = format(size)?;
     let window = match window.to_str() {
@@ -289,9 +289,10 @@ pub(super) fn operation<'a>(
     };
     let view = match tail {
         [] => View::Boundaries,
+        [mode] if mode == "grid" => View::Boundaries,
         [mode] if mode == "fields" => View::Fields,
         [mode] if mode == "compact" => View::Compact,
-        _ => return Err("expected fields or compact packet view".into()),
+        _ => return Err("expected grid, fields or compact packet view".into()),
     };
     Ok(Operation {
         name: "ts-packets",
