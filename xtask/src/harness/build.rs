@@ -775,6 +775,15 @@ struct ProfileReference {
 
 const CONTAINER_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libavutil"];
 const CONTAINER_OPTIONS: &[&str] = &["-O3", "-Wall", "-Wextra", "-Werror"];
+const DECODE_PACKAGES: &[&str] = &[
+    "libavformat",
+    "libavfilter",
+    "libswscale",
+    "libswresample",
+    "libavcodec",
+    "libavutil",
+];
+
 /// The options the decoder and capture comparisons were measured with.
 const RELEASE_OPTIONS: &[&str] = &["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"];
 /// The shaping reference is compiled like its libraries, without contraction.
@@ -983,15 +992,26 @@ const PROFILE_REFERENCES: &[ProfileReference] = &[
         record: "ffmpeg-decode-native",
         kind: "FFmpeg 9.0.2 decoders with the letterbox and downmix filter chains; codec operations",
         libraries: "decode_reference",
-        packages: &[
-            "libavformat",
-            "libavfilter",
-            "libswscale",
-            "libswresample",
-            "libavcodec",
-            "libavutil",
-        ],
+        packages: DECODE_PACKAGES,
         options: RELEASE_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-aac-compact-worker",
+        define: Some("-DTRIERGON_DECODE_REFERENCE=1"),
+        record: "ffmpeg-aac-compact",
+        kind: "FFmpeg raw AAC-LC decoder with a 960-sample plane fold",
+        libraries: "aac_compact_reference",
+        packages: DECODE_PACKAGES,
+        options: &[
+            "-std=c11",
+            "-O2",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-DTRIERGON_AAC_COMPACT_REFERENCE=1",
+        ],
         ..REFERENCE
     },
     ProfileReference {

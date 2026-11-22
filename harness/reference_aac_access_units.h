@@ -1,7 +1,13 @@
 /* Configured AAC-LC decoding through the public libavcodec API. */
 #include <libavutil/intreadwrite.h>
 
-enum { AAC_PADDING = 64, AAC_SAMPLES = 1024, AAC_MAX_INPUT = 64 << 20 };
+#ifdef TRIERGON_AAC_COMPACT_REFERENCE
+#define TRIERGON_AAC_SAMPLES 960
+#else
+#define TRIERGON_AAC_SAMPLES 1024
+#endif
+
+enum { AAC_PADDING = 64, AAC_SAMPLES = TRIERGON_AAC_SAMPLES, AAC_MAX_INPUT = 64 << 20 };
 _Static_assert(AAC_PADDING >= AV_INPUT_BUFFER_PADDING_SIZE, "AAC packet padding");
 
 static void keep_aac_input(void *opaque, uint8_t *data) {

@@ -141,3 +141,26 @@ fn tone_power(samples: &[f32], frequency: f64) -> f64 {
         });
     sin * sin + cos * cos
 }
+
+#[test]
+fn raw_aac_960_track_entry_accepts_only_the_mono_program() {
+    let budget = Budget::new(4 << 20).unwrap();
+    let asc = [0x11, 0x84, 0x04, 0xc4, 0x00, 0x20, 0x01, 0xe0, 0x00];
+    let decoder = TrackDecoder::aac_access_units_in(&asc, &budget).unwrap();
+    let mut decoder = decoder.into_decoder();
+    // A long-window mono SCE with no spectral bands.
+    let packet = [0x00, 0xc8, 0x00, 0x07];
+    let mut frame = AudioFrame::default();
+    decoder.decode(&packet, &mut frame).unwrap();
+    assert_eq!(
+        (frame.sample_rate, frame.samples_per_channel),
+        (48_000, 960)
+    );
+    assert_eq!(frame.layout.speakers(), &[Speaker::FrontCenter]);
+    let fixed_960 = [0x11, 0x8c];
+    assert!(TrackDecoder::aac_access_units_in(&fixed_960, &budget).is_err());
+    let mut other_rate = asc;
+    other_rate[0] = 0x12;
+    other_rate[1] = 0x04;
+    assert!(TrackDecoder::aac_access_units_in(&other_rate, &budget).is_err());
+}

@@ -1,0 +1,9 @@
+{
+  "note": "Original FFmpeg FATE sample; supplied outside git and verified by SHA-256.",
+  "vectors": [
+    {
+      "name": "al04sf_48.mp4",
+      "sha256": "7dc63a8bbf3818af6e771ff359220ab9e0fe63fb0fad8550f55ccadb2df1a40b"
+    }
+  ]
+}

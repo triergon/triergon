@@ -1,0 +1,17 @@
+{
+  "schema": "triergon.codecs.workloads.v1",
+  "workloads": [
+    {
+      "id": "al04sf_48",
+      "path": "al04sf_48.aac-access-units",
+      "sha256": "14a326c9d3d6abf09b259945ec7b29011bc7369eb36efa5c654994991ddd1d3a",
+      "bytes": 92162,
+      "operation": "audio-aac-access-units-compact",
+      "iterations": 4,
+      "packets": 386,
+      "sample_rate": 48000,
+      "channels": 1,
+      "source_sha256": "7dc63a8bbf3818af6e771ff359220ab9e0fe63fb0fad8550f55ccadb2df1a40b"
+    }
+  ]
+}

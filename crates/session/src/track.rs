@@ -1,6 +1,6 @@
 //! Decoding the packets of one container audio track.
 use std::sync::atomic::AtomicBool;
-use triergon_codec::{AudioDecoder, AudioFrame, Budget, DecodeFailure, DownmixLevels};
+use triergon_codec::{AudioDecoder, AudioFrame, Budget, DecodeFailure, DownmixLevels, Reservation};
 use triergon_core::container::{PacketInfo, TrackInfo};
 use triergon_core::{BudgetVec, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
@@ -10,6 +10,25 @@ use triergon_framing::{
 
 use crate::compat::aac::Policy;
 use crate::{AudioCodec, Discard, audio_codec, audio_configuration, audio_decoder_in};
+
+struct CompactDecoder {
+    decoder: triergon_codec_aac::RawCompactLcDecoder,
+    _storage: Reservation,
+}
+
+impl AudioDecoder for CompactDecoder {
+    fn decode(
+        &mut self,
+        au: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
+        AudioDecoder::decode(&mut self.decoder, au, out)
+    }
+
+    fn reset(&mut self) {
+        self.decoder.reset();
+    }
+}
 
 /// The decoder of one container audio track. It chooses the decoder from the track's
 /// codec and configuration, and drops the decoded samples each packet's container marks
@@ -90,13 +109,29 @@ impl TrackDecoder {
                 .as_ref()
                 .get(start..end)
                 .ok_or_else(|| DecodeFailure("raw AAC program extent".into()))?;
-            let decoder = triergon_codec_aac::RawLcDecoder::with_program_config_in(
-                parsed.facts().core_frequency.index,
-                source,
-                budget,
-            )
-            .map_err(DecodeFailure::from_error)?;
-            Box::new(decoder)
+            if parsed.facts().ga.frame_length_flag {
+                let storage = budget
+                    .reserve(size_of::<CompactDecoder>())
+                    .map_err(DecodeFailure::from_error)?;
+                Box::new(CompactDecoder {
+                    decoder: triergon_codec_aac::RawCompactLcDecoder::with_program_config_in(
+                        parsed.facts().core_frequency.index,
+                        source,
+                        budget,
+                    )
+                    .map_err(DecodeFailure::from_error)?,
+                    _storage: storage,
+                })
+            } else {
+                Box::new(
+                    triergon_codec_aac::RawLcDecoder::with_program_config_in(
+                        parsed.facts().core_frequency.index,
+                        source,
+                        budget,
+                    )
+                    .map_err(DecodeFailure::from_error)?,
+                )
+            }
         } else {
             let fixed = AacAccessUnitConfig::from_asc(parsed.facts())?;
             drop(parsed);
@@ -153,6 +188,9 @@ impl AacAccessUnitConfig {
     /// from parsed AudioSpecificConfig facts.
     pub fn from_asc(facts: AacAscFacts) -> Result<Self, DecodeFailure> {
         validate_raw_aac_lc(facts)?;
+        if facts.ga.frame_length_flag {
+            return Err(DecodeFailure("unsupported raw AAC-LC configuration".into()));
+        }
         if aac_fixed_channel_count(facts.channel_configuration).is_none() {
             return Err(DecodeFailure("unsupported raw AAC-LC configuration".into()));
         }
@@ -196,7 +234,7 @@ fn validate_raw_aac_lc(facts: AacAscFacts) -> Result<(), DecodeFailure> {
         || facts.core_object_type.code != 2
         || facts.core_frequency.explicit_hz.is_some()
         || indexed_aac_frequency(facts.core_frequency.index) != Some(facts.core_frequency.hz)
-        || facts.ga.frame_length_flag
+        || (facts.ga.frame_length_flag && facts.ga.extension_flag)
         || facts.ga.core_coder_delay.is_some()
         || facts.ga.extension_flag3 == Some(true)
         || facts.sbr.is_present()
@@ -259,5 +297,35 @@ mod tests {
         drop(decoder);
         let exact = Budget::new(storage).unwrap();
         TrackDecoder::aac_access_units_in(&[0x12, 0x10], &exact).unwrap();
+    }
+
+    #[test]
+    fn compact_session_admission_charges_box_and_releases_on_failure_and_drop() {
+        let asc = [0x11, 0x84, 0x04, 0xc4, 0x00, 0x20, 0x01, 0xe0, 0x00];
+        let wide = Budget::new(4 << 20).unwrap();
+        let decoder = TrackDecoder::aac_access_units_in(&asc, &wide).unwrap();
+        let peak = wide.peak();
+        let used = wide.used();
+        let raw_pool = Budget::new(4 << 20).unwrap();
+        let raw = triergon_codec_aac::RawCompactLcDecoder::with_program_config_in(
+            3,
+            &asc[2..],
+            &raw_pool,
+        )
+        .unwrap();
+        assert_eq!(used - raw_pool.used(), size_of::<CompactDecoder>());
+        drop(raw);
+        drop(decoder);
+        assert_eq!(wide.used(), Budget::control_storage_bytes());
+
+        let short = Budget::new(peak - 1).unwrap();
+        assert!(TrackDecoder::aac_access_units_in(&asc, &short).is_err());
+        assert_eq!(short.used(), Budget::control_storage_bytes());
+        let exact = Budget::new(peak).unwrap();
+        let decoder = TrackDecoder::aac_access_units_in(&asc, &exact).unwrap();
+        assert_eq!(exact.peak(), peak);
+        assert_eq!(exact.used(), used);
+        drop(decoder);
+        assert_eq!(exact.used(), Budget::control_storage_bytes());
     }
 }

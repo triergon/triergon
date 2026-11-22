@@ -166,6 +166,15 @@ pub(crate) fn parse_ics_info(
     common_window: bool,
     info: &mut IcsInfo,
 ) -> Result<()> {
+    parse_ics_info_for::<1024>(br, cfg, common_window, info)
+}
+
+fn parse_ics_info_for<const FRAME: usize>(
+    br: &mut CachedBitReader<'_>,
+    cfg: &CoreCfg,
+    common_window: bool,
+    info: &mut IcsInfo,
+) -> Result<()> {
     if br.bit() {
         // ics_reserved_bit: FFmpeg reports and continues; we treat as invalid like the spec.
         return Err(DecodeError::InvalidData("ics_reserved_bit"));
@@ -191,12 +200,18 @@ pub(crate) fn parse_ics_info(
             }
         }
         info.swb = swb_short(cfg.sf_index);
+        if FRAME == 960 {
+            info.swb = swb_short_960(cfg.sf_index);
+        }
     } else {
         info.max_sfb = br.read(6) as usize;
         info.num_windows = 1;
         info.num_window_groups = 1;
         info.window_group_len = [1, 0, 0, 0, 0, 0, 0, 0];
         info.swb = swb_long(cfg.sf_index);
+        if FRAME == 960 {
+            info.swb = swb_long_960(cfg.sf_index);
+        }
         info.predictor_data_present = br.bit();
         if info.predictor_data_present {
             match cfg.aot {
@@ -253,10 +268,21 @@ pub(crate) fn parse_ics(
     ch: &mut ChannelData,
     random: &mut u32,
 ) -> Result<()> {
+    parse_ics_for::<1024>(br, cfg, common_window, scale_flag, ch, random)
+}
+
+pub(crate) fn parse_ics_for<const FRAME: usize>(
+    br: &mut CachedBitReader<'_>,
+    cfg: &CoreCfg,
+    common_window: bool,
+    scale_flag: bool,
+    ch: &mut ChannelData,
+    random: &mut u32,
+) -> Result<()> {
     ch.global_gain = br.read(8) as u8;
     if !common_window {
         let mut info = ch.info;
-        parse_ics_info(br, cfg, false, &mut info)?;
+        parse_ics_info_for::<FRAME>(br, cfg, false, &mut info)?;
         ch.info = info;
     }
     parse_section_data(br, ch)?;
@@ -277,7 +303,7 @@ pub(crate) fn parse_ics(
             let mut k = ch.info.swb[start] as usize;
             for p in pulse.iter_mut().take(npulse) {
                 k += br.read(5) as usize;
-                if k >= 1024 {
+                if k >= FRAME {
                     return Err(DecodeError::InvalidData("pulse offset"));
                 }
                 *p = (k, br.read(4) as i32);
@@ -299,7 +325,7 @@ pub(crate) fn parse_ics(
             ch.cb_mask |= 1 << ch.band_type[g * MAX_SFB + sfb];
         }
     }
-    decode_spectrum(br, ch, &pulse[..npulse], random)?;
+    decode_spectrum::<FRAME>(br, ch, &pulse[..npulse], random)?;
     if br.overrun() {
         return Err(DecodeError::InvalidData("channel stream overrun"));
     }
@@ -630,7 +656,7 @@ fn band_int(
 
 /// The spectral data of one channel, decoded and inverse quantised into `ch.coef`;
 /// every coefficient no band codes is zero.
-fn decode_spectrum(
+fn decode_spectrum<const FRAME: usize>(
     br: &mut CachedBitReader<'_>,
     ch: &mut ChannelData,
     pulse: &[(usize, i32)],
@@ -639,7 +665,7 @@ fn decode_spectrum(
     // A copy of the reader that no other reference reaches, so that its state can stay in
     // registers through the band loops.
     let mut reader = *br;
-    let decoded = decode_bands(&mut reader, ch, pulse, random);
+    let decoded = decode_bands::<FRAME>(&mut reader, ch, pulse, random);
     *br = reader;
     if decoded.is_err() {
         ch.coef.fill(0.0);
@@ -647,7 +673,7 @@ fn decode_spectrum(
     decoded
 }
 
-fn decode_bands(
+fn decode_bands<const FRAME: usize>(
     br: &mut CachedBitReader<'_>,
     ch: &mut ChannelData,
     pulse: &[(usize, i32)],
@@ -659,7 +685,7 @@ fn decode_bands(
     let quarters = pow2_quarter_table();
     let info = &ch.info;
     let swb = info.swb;
-    let window_len = 1024 / info.num_windows;
+    let window_len = FRAME / info.num_windows;
     let coded_end = swb[info.max_sfb] as usize;
     let coef = &mut ch.coef[..];
     // pulse data modifies the quantised integers: only then keep them before dequantisation
@@ -678,14 +704,14 @@ fn decode_bands(
             match cb {
                 ZERO_HCB | INTENSITY_HCB | INTENSITY_HCB2 => {
                     for w in win..win + glen {
-                        let off = w * 128 + start;
+                        let off = w * (FRAME / 8) + start;
                         coef[off..off + width].fill(0.0);
                     }
                 }
                 NOISE_HCB => {
                     let scale0 = quarter(quarters, ch.sf[bi]);
                     for w in win..win + glen {
-                        let off = w * 128 + start;
+                        let off = w * (FRAME / 8) + start;
                         let band = &mut coef[off..off + width];
                         let mut energy = 0f32;
                         for v in band.iter_mut() {
@@ -703,7 +729,7 @@ fn decode_bands(
                     let book = &bk.spectral[cb as usize - 1];
                     let gain = quarter(quarters, ch.sf[bi] - 100);
                     for w in win..win + glen {
-                        let off = w * 128 + start;
+                        let off = w * (FRAME / 8) + start;
                         if need_int {
                             band_int(br, book, cb == ESC_HCB, &mut qbuf[off..off + width])?;
                             continue;
@@ -725,7 +751,7 @@ fn decode_bands(
             }
         }
         for w in win..win + glen {
-            coef[w * 128 + coded_end..w * 128 + window_len].fill(0.0);
+            coef[w * (FRAME / 8) + coded_end..w * (FRAME / 8) + window_len].fill(0.0);
         }
         win += glen;
     }
@@ -830,6 +856,16 @@ pub(crate) fn tns_filter(
     coef: &mut [f32],
     synthesis: bool,
 ) {
+    tns_filter_for::<1024>(tns, info, cfg, coef, synthesis);
+}
+
+pub(crate) fn tns_filter_for<const FRAME: usize>(
+    tns: &Tns,
+    info: &IcsInfo,
+    cfg: &CoreCfg,
+    coef: &mut [f32],
+    synthesis: bool,
+) {
     let short = info.window_sequence == EIGHT_SHORT;
     let max_bands = if short {
         TNS_MAX_BANDS_SHORT[cfg.sf_index]
@@ -851,7 +887,8 @@ pub(crate) fn tns_filter(
             if end <= start {
                 continue;
             }
-            let spec = &mut coef[w * 128..w * 128 + if short { 128 } else { 1024 }];
+            let spec =
+                &mut coef[w * (FRAME / 8)..w * (FRAME / 8) + if short { FRAME / 8 } else { FRAME }];
             let mut state = [0f32; 20];
             let size = end - start;
             let lpc = &flt.lpc;

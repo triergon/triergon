@@ -149,7 +149,7 @@ const REPORT_WEIGHTS: &[(&str, u32)] = &[
 /// through the command that measures or compares it, or why it is not gated.
 /// `gate plan` and `gate summary` fail on a registered feature that is neither here
 /// nor registered with the report runner.
-const COVERED: [(&str, Coverage); 26] = [
+const COVERED: [(&str, Coverage); 27] = [
     (
         "isobmff-open-index",
         Coverage::Item("isobmff-bench, in parts"),
@@ -190,6 +190,10 @@ const COVERED: [(&str, Coverage); 26] = [
     (
         "aac-access-units",
         Coverage::Excluded("on demand: prepared and compared by codecs aac-access-units"),
+    ),
+    (
+        "aac-compact-access-units",
+        Coverage::Excluded("on demand: prepared and compared by codecs aac-compact-access-units"),
     ),
 ];
 

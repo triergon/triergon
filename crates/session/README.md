@@ -52,7 +52,8 @@ For ADTS packets carrying an explicit container priming edit, use
 the decoded PCM. The default AAC decoder uses the encoder signature.
 
 Use `TrackDecoder::aac_access_units_in` to decode raw AAC-LC from a checked
-AudioSpecificConfig with a fixed layout or a Program Configuration Element.
+AudioSpecificConfig with a fixed layout or a Program Configuration Element. The 960-sample
+profile is limited to 48 kHz mono with one front SCE in an out-of-band PCE.
 `TrackDecoder::aac_access_units_with_layout_in` accepts
 `compat::aac::Policy::ConventionalSurround` for fixed layouts. Call
 `TrackDecoder::into_decoder` to use the configured decoder in an audio session; with

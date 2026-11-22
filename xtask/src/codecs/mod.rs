@@ -3,6 +3,7 @@
 //! against the pinned FFmpeg decoders.
 
 mod aac_access_units;
+mod aac_known_spectrum;
 mod aac_ps_tables;
 mod aac_sources;
 pub mod correctness;
@@ -25,6 +26,10 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
   aac-access-units --out DIR [--record]
                  prepare the configured AAC-LC workloads and compare every native PCM plane
+  aac-compact-access-units --source FILE --out DIR [--record]
+                 compare all original compact AAC access units against the pinned reference
+  aac-known-spectrum --out DIR
+                 compare compact AAC band endpoints against an analytical signal
   aac-ps-tables [--check] [--ffmpeg FF] [--python PY] [--work DIR]
                  rerun the Parametric Stereo table recovery against the pinned FFmpeg 9.0.2
                  decoder and write, or with --check compare, the generated PS tables
@@ -379,6 +384,19 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
         "aac-access-units" => {
             let a = Args::parse(rest, &["out"], &["record"])?;
             aac_access_units::run(root, &a.path("out")?, a.get("record").is_some())?;
+        }
+        "aac-compact-access-units" => {
+            let a = Args::parse(rest, &["out", "source"], &["record"])?;
+            aac_access_units::run_compact(
+                root,
+                &a.path("out")?,
+                a.get("record").is_some(),
+                &a.path("source")?,
+            )?;
+        }
+        "aac-known-spectrum" => {
+            let a = Args::parse(rest, &["out"], &[])?;
+            aac_known_spectrum::run(root, &a.path("out")?)?;
         }
         "aac-ps-tables" => {
             let a = Args::parse(rest, &["ffmpeg", "python", "work"], &["check"])?;

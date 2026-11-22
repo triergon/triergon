@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "aac-compact-access-units",
+  "gate": "on-demand",
+  "operation": "audio-aac-access-units-compact",
+  "candidate": "codec-aac-worker",
+  "reference": "ffmpeg-aac-compact",
+  "runner": "cargo xtask codecs aac-compact-access-units",
+  "source_sha256": "7dc63a8bbf3818af6e771ff359220ab9e0fe63fb0fad8550f55ccadb2df1a40b",
+  "contract": [
+    "verify the original FATE source hash and extract its AudioSpecificConfig and all 386 original AAC packets in decode order without edit-list trimming or remuxing",
+    "preload the same bounded input with zero padding on both sides, then time decoder setup, packet decode, planar float output fold, flush and teardown",
+    "compare every sample in every 960-sample PCM plane using the AAC numeric rules, with exact block count, rate and ordered speakers",
+    "require matching parity and worker identities for the timing and memory comparisons"
+  ],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 4,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}
