@@ -172,11 +172,25 @@ const fn fixed_tree<const SYMBOLS: usize, const QUICK: usize>(
 static FIXED_LITERAL: Tree = fixed_tree(false);
 static FIXED_DISTANCE: DistanceTree = fixed_tree(true);
 
+/// The step of a canonical Huffman table construction (RFC 1951 §3.2.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BuildStage {
+    /// Counting the codes of each length.
+    Count,
+    /// Checking that the lengths form a complete prefix code.
+    Check,
+    /// The first code and symbol offset of each length.
+    Firsts,
+    /// Placing each symbol; a short code also fills quick-table rows.
+    Place,
+    /// Filling the quick-table rows of the last placed short code.
+    Fill,
+}
 /// Small construction cursor for a freshly cleared destination. Its table
 /// stays in that destination and becomes readable only after advance completes.
 #[derive(Debug)]
 struct Build {
-    stage: u8,
+    stage: BuildStage,
     at: usize,
     available: i32,
     code: u16,
@@ -191,7 +205,7 @@ struct Build {
 impl Build {
     fn new(code_lengths: bool) -> Self {
         Self {
-            stage: 0,
+            stage: BuildStage::Count,
             at: 0,
             available: 1,
             code: 0,
@@ -220,7 +234,7 @@ impl Build {
                 return Ok(false);
             }
             match self.stage {
-                0 if self.at < lengths.len() => {
+                BuildStage::Count if self.at < lengths.len() => {
                     let count = (lengths.len() - self.at)
                         .min(work.remaining().saturating_add(1).min(32) as usize);
                     if !work.try_charge((count - 1) as u64) {
@@ -238,18 +252,18 @@ impl Build {
                     }
                     self.at += count;
                 }
-                0 => {
-                    self.stage = 1;
+                BuildStage::Count => {
+                    self.stage = BuildStage::Check;
                     self.at = 1;
                 }
-                1 if self.at <= 15 => {
+                BuildStage::Check if self.at <= 15 => {
                     self.available = self.available * 2 - i32::from(tree.counts[self.at]);
                     if self.available < 0 {
                         return Err(Error::Invalid("oversubscribed Huffman tree"));
                     }
                     self.at += 1;
                 }
-                1 => {
+                BuildStage::Check => {
                     if self.available != 0 && (self.code_lengths || tree.max != 1) && tree.max != 0
                     {
                         return Err(Error::Invalid("incomplete Huffman tree"));
@@ -257,23 +271,23 @@ impl Build {
                     if self.code_lengths && tree.max == 0 {
                         return Err(Error::Invalid("empty code-length tree"));
                     }
-                    self.stage = 2;
+                    self.stage = BuildStage::Firsts;
                     self.at = 1;
                 }
-                2 if self.at <= 15 => {
+                BuildStage::Firsts if self.at <= 15 => {
                     self.code = (self.code + tree.counts[self.at - 1]) << 1;
                     tree.first[self.at] = self.code;
                     tree.offsets[self.at] = self.offset;
                     self.offset += tree.counts[self.at];
                     self.at += 1;
                 }
-                2 => {
+                BuildStage::Firsts => {
                     self.positions = tree.offsets;
                     self.next_codes = tree.first;
-                    self.stage = 3;
+                    self.stage = BuildStage::Place;
                     self.at = 0;
                 }
-                3 if self.at < lengths.len() => {
+                BuildStage::Place if self.at < lengths.len() => {
                     // Scan at most 32 symbols between cancellation checks.
                     // Charge before each read/assignment, stopping at a quick
                     // code so its row fill remains separately resumable.
@@ -295,15 +309,15 @@ impl Build {
                             self.pending_key = reverse_width(self.next_codes[width], width);
                             self.pending_stride = 1_usize << width;
                             self.pending_entry = ((symbol as u16) << 4) | width as u16;
-                            self.stage = 4;
+                            self.stage = BuildStage::Fill;
                         }
                         self.next_codes[width] += 1;
-                        if self.stage == 4 {
+                        if self.stage == BuildStage::Fill {
                             break;
                         }
                     }
                 }
-                4 if self.pending_key < 1 << tree.quick_width() => {
+                BuildStage::Fill if self.pending_key < 1 << tree.quick_width() => {
                     let last = (1 << tree.quick_width()) - 1;
                     let remaining = (last - self.pending_key) / self.pending_stride + 1;
                     let count = remaining.min(work.remaining().saturating_add(1).min(64) as usize);
@@ -315,13 +329,13 @@ impl Build {
                         self.pending_key += self.pending_stride;
                     }
                     if self.pending_key > last {
-                        self.stage = 3;
+                        self.stage = BuildStage::Place;
                     }
                 }
-                4 => {
-                    self.stage = 3;
+                BuildStage::Fill => {
+                    self.stage = BuildStage::Place;
                 }
-                _ => return Ok(true),
+                BuildStage::Place => return Ok(true),
             }
         }
     }
