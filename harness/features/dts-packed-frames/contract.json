@@ -26,36 +26,6 @@
   "confidence": 0.95,
   "reference": "ffmpeg-framing-views-native",
   "runner": "cargo xtask report",
-  "pending_module_requirements": [
-    "Termination frames (FTYPE 0 with SHORT 0 to 30, ETSI TS 102 114 V1.6.1 Tables 5-2 and 5-3) are valid input that the core frame readers refuse until crates/framing reads them",
-    "DtsNormalSourceReader fails with Unsupported, not the documented Truncated, when a 16-bit source ends after SYNC and before FTYPE and SHORT"
-  ],
-  "open_cases": [
-    {
-      "id": "matrix-short-header-cpf-0-bytes-4-be14",
-      "requirement": "Termination frames (FTYPE 0 with SHORT 0 to 30, ETSI TS 102 114 V1.6.1 Tables 5-2 and 5-3) are valid input that the core frame readers refuse until crates/framing reads them"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-4-le14",
-      "requirement": "Termination frames (FTYPE 0 with SHORT 0 to 30, ETSI TS 102 114 V1.6.1 Tables 5-2 and 5-3) are valid input that the core frame readers refuse until crates/framing reads them"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-4-le16",
-      "requirement": "DtsNormalSourceReader fails with Unsupported, not the documented Truncated, when a 16-bit source ends after SYNC and before FTYPE and SHORT"
-    },
-    {
-      "id": "matrix-termination-raw-be14",
-      "requirement": "Termination frames (FTYPE 0 with SHORT 0 to 30, ETSI TS 102 114 V1.6.1 Tables 5-2 and 5-3) are valid input that the core frame readers refuse until crates/framing reads them"
-    },
-    {
-      "id": "matrix-termination-raw-le14",
-      "requirement": "Termination frames (FTYPE 0 with SHORT 0 to 30, ETSI TS 102 114 V1.6.1 Tables 5-2 and 5-3) are valid input that the core frame readers refuse until crates/framing reads them"
-    },
-    {
-      "id": "matrix-termination-raw-le16",
-      "requirement": "Termination frames (FTYPE 0 with SHORT 0 to 30, ETSI TS 102 114 V1.6.1 Tables 5-2 and 5-3) are valid input that the core frame readers refuse until crates/framing reads them"
-    }
-  ],
   "open_deviations": [
     {
       "reading": "A source that ends inside a header or a word",
@@ -64,6 +34,9 @@
       "reference": "the dca parser flushes the remaining bytes as a packet, odd bytes included, with no clock or the header's clock",
       "compat": "a consumer that wants the incomplete tail passed on, as the reference does, would use a compat::dts policy that returns it as an incomplete frame (not built)",
       "cases": [
+        "matrix-short-header-cpf-0-bytes-4-be14",
+        "matrix-short-header-cpf-0-bytes-4-le14",
+        "matrix-short-header-cpf-0-bytes-4-le16",
         "matrix-bad-sync-le16", "matrix-reserved-extension-sync-le16", "matrix-short-header-cpf-0-bytes-1-be14", "matrix-short-header-cpf-0-bytes-1-le14",
         "matrix-short-header-cpf-0-bytes-1-le16", "matrix-short-header-cpf-0-bytes-10-be14", "matrix-short-header-cpf-0-bytes-10-le14", "matrix-short-header-cpf-0-bytes-10-le16",
         "matrix-short-header-cpf-0-bytes-11-be14", "matrix-short-header-cpf-0-bytes-11-le14", "matrix-short-header-cpf-0-bytes-11-le16", "matrix-short-header-cpf-0-bytes-12-be14",
@@ -199,6 +172,17 @@
       "cases": [
         "unresolved-tail-n96-sync", "unresolved-tail-n97-sync", "unresolved-tail-n99-sync", "unresolved-tail-n100-sync",
         "unresolved-tail-n101-sync", "unresolved-tail-n102-sync", "competing-physical-FSIZE-domain-sync", "extra-complete-word-sync"
+      ]
+    },
+    {
+      "reading": "The coded core clock of a termination frame",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2, Tables 5-2 and 5-3 and NBLKS: FTYPE 0 with SHORT 0 to 30 keeps a 32 × (NBLKS + 1) coding window independently of its padding",
+      "candidate": "returns the complete frame with its 48000 Hz clock and a coded window of 192 samples per channel",
+      "reference": "returns the bytes but reports 0 for both rate and duration",
+      "cases": [
+        "matrix-termination-raw-be14",
+        "matrix-termination-raw-le14",
+        "matrix-termination-raw-le16"
       ]
     }
   ],
