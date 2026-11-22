@@ -151,7 +151,9 @@ The `mix` module holds the stereo downmix (`mix::Downmix`) and the s16 conversio
 ## Conformance
 
 The `codecs-files` comparison exercises track selection and packet decoding through
-`TrackDecoder::new` and `decode`. The `aac-access-units` comparison exercises
+`TrackDecoder::new` and `decode`. Its Opus cases compare PCM and sample counts
+with 1,272 and 2,232 samples of pre-skip over 960-sample packets.
+The `aac-access-units` comparison exercises
 `TrackDecoder::aac_access_units_with_layout_in` and compares decoded sample planes and
 speaker order.
 

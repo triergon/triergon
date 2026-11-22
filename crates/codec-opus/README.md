@@ -111,7 +111,8 @@ Constant tables are taken from RFC 6716; see [THIRD-PARTY.md](THIRD-PARTY.md).
 ## Conformance
 
 The `codecs-files` item grades decoded PCM with container trims applied and stereo device
-output, including the three timed Opus inputs.
+output, including the three timed Opus inputs and two Ogg streams with pre-skip
+spanning more than one packet.
 
 - Specifications: RFC 6716 with the RFC 8251 updates, and RFC 7845 for the identification
   header and the channel mappings.
@@ -123,7 +124,7 @@ output, including the three timed Opus inputs.
   through the container readers with its trims applied and compares the result with FFmpeg
   9.0.2's native decoder under the [numeric
   rules](../../harness/codecs/numeric-rules.json).
-- On the gate build 49/49 pass: FATE's `opus` directory (the 12 RFC test vectors and three
-  more files) and 34 generated streams (SILK, CELT and hybrid frames of several sizes and
-  bandwidths, families 1 and 255, a Matroska track). Runtime and memory against the
-  [gates](../../docs/quality.md#gates): [status](../../docs/status.md).
+- All 54 cases match on AArch64. The corpus includes 15 upstream files, 34 generated
+  streams, three workload files and two pre-skip cases. It covers SILK, CELT and
+  hybrid packets, channel mapping families 0, 1 and 255, and Ogg and Matroska
+  containers. See the [runtime and memory results](../../docs/status.md).
