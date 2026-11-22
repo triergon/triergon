@@ -167,10 +167,6 @@ impl MalformedSourceEvent<'_> {
             cancel,
         )
     }
-    /// The issued source event, released from the completion.
-    pub fn into_event(self) -> TraceEvent {
-        self.event
-    }
 }
 
 /// Completion after fully accounted controls/discards, not absence of media.

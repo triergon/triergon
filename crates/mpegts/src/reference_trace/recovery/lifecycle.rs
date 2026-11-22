@@ -20,10 +20,6 @@ impl PatRoute {
     pub fn entity(self) -> SourceId {
         self.entity
     }
-    /// The 16-bit transport stream ID of the PAT.
-    pub fn tsid(self) -> u16 {
-        self.tsid
-    }
     /// The selected program number.
     pub fn program(self) -> u16 {
         self.program
@@ -31,14 +27,6 @@ impl PatRoute {
     /// The 13-bit PID of the selected program's PMT.
     pub fn pmt_pid(self) -> u16 {
         self.pmt_pid
-    }
-    /// The 5-bit PAT version.
-    pub fn version(self) -> u8 {
-        self.version
-    }
-    /// The source context the PAT was issued with.
-    pub fn context(self) -> SourceContext {
-        self.context
     }
     /// Number of programs in the PAT, network entries excluded.
     pub fn program_count(self) -> usize {

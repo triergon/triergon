@@ -243,14 +243,6 @@ impl PacketCompletion {
     pub fn empty_refusal(&self) -> Option<Error> {
         self.no_media_blocker
     }
-    /// Only the exact last admitted physical carrier can bypass a no-scope guard.
-    pub fn is_control_transport(&self, pid: u16, context: SourceContext) -> bool {
-        self.carriers.as_slice().last().is_some_and(|r| {
-            r.packet.pid == pid
-                && r.context == context
-                && r.kind != ControlCarrierKind::RequiresScopedPacketObserver
-        })
-    }
     /// Work units [`observe_issued`](Self::observe_issued) charges to admit `event`; a smaller
     /// grant
     /// leaves the event unconsumed.

@@ -30,10 +30,6 @@ impl<'a> ActiveProgram<'a> {
     pub fn section(self) -> &'a Bytes {
         self.section
     }
-    /// The interpretation applied to private descriptors.
-    pub fn descriptor_namespace(self) -> DescriptorNamespace {
-        self.stream.descriptor_namespace
-    }
     /// The elementary streams in section order; their PIDs are unique.
     pub fn streams(self) -> impl ExactSizeIterator<Item = ProgramStream<'a>> + 'a {
         let namespace = self.stream.descriptor_namespace;

@@ -256,11 +256,6 @@ impl Ac3AccessUnit {
         &self.bytes
     }
 
-    /// Consumes the unit and returns its bytes without copying.
-    pub fn into_bytes(self) -> Bytes {
-        self.bytes
-    }
-
     /// Facts of the primary syncframe, which supplies the unit's sample span.
     pub const fn facts(&self) -> Ac3FrameFacts {
         self.first

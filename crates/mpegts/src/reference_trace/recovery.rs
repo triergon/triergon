@@ -266,50 +266,9 @@ impl RecoveryObserver {
         }
         self.inner.bind_input(context, input)
     }
-    /// Checks that `input` is the source and request the observer is bound to.
-    ///
-    /// Fails with `SourceMismatch` or `Invalid` when it is not, or beyond the bound extent.
-    pub fn validate_input(&self, input: &triergon_core::InputCursor) -> Result<()> {
-        self.inner.validate_input(Some(input))
-    }
-    /// No active assembly/output/fault: required before dropping an unusable
-    /// carrier in the separate complete-object view. Does not alter continuity.
-    pub fn discard_idle(&self) -> bool {
-        self.pending.is_none()
-            && self.pending_timeline.is_none()
-            && self.fault.is_none()
-            && self.inner.recovery_idle()
-    }
     /// The selected program and PID of the wrapped observer.
     pub fn scope(&self) -> DemuxScope {
         self.inner.scope()
-    }
-    /// Continue on the next physical entity after witnessing a contiguous end.
-    /// A short work grant yields `Ok(false)`. Undrained recovery, cursor or
-    /// source mismatches and cancellation are refused.
-    pub fn continue_media_entity(
-        &mut self,
-        end: &crate::stream::MediaEntityEnd,
-        input: &mut triergon_core::InputCursor,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<bool> {
-        if cancel.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled);
-        }
-        if work.remaining() == 0 {
-            return Ok(false);
-        }
-        if self.pending.is_some() || self.pending_timeline.is_some() || self.fault.is_some() {
-            return Err(Error::Invalid(
-                "PES recovery must drain before a media entity transition",
-            ));
-        }
-        if !self.inner.continue_media_entity(end, input, work, cancel)? {
-            return Ok(false);
-        }
-        self.entity_first = true;
-        Ok(true)
     }
     /// The rejected-carrier policy.
     pub fn policy(&self) -> RejectedPolicy {
