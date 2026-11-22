@@ -20,8 +20,7 @@ pub struct MovieHeader {
     /// Duration in ticks of the movie timescale as stored; all ones means unknown (see
     /// [`declared_duration_ticks`](Self::declared_duration_ticks)).
     pub duration: u64,
-    /// The `mvhd` box.
-    pub raw: BoxView,
+    raw: BoxView,
 }
 impl MovieHeader {
     /// The movie clock, `1/timescale` seconds per tick. A zero timescale is invalid.

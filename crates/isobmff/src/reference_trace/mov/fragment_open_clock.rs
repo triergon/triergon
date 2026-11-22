@@ -36,8 +36,7 @@ pub struct FragmentClockResult {
     pub demux_start: i64,
     /// `demux_start` plus every sample duration, or `None` when that sum overflows `i64`.
     pub demux_end: Option<i64>,
-    /// Ordinal of the first sample whose decode end overflows the signed clock, if one does.
-    pub rejected_source_ordinal: Option<u64>,
+    rejected_source_ordinal: Option<u64>,
 }
 impl FragmentClockResult {
     /// FFmpeg's open return code: `Some(-1094995529)` (`AVERROR_INVALIDDATA`) when the

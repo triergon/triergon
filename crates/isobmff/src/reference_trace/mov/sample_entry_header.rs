@@ -58,8 +58,7 @@ pub struct HeaderRejection {
 pub struct SampleEntryHeader {
     /// Complete source entry, including every opaque/private child and reserved bit.
     pub description: SampleDescription,
-    /// Why FFmpeg rejects the entry during open; `None` when it accepts it.
-    pub rejection: Option<HeaderRejection>,
+    rejection: Option<HeaderRejection>,
     /// Number of child boxes walked; every child is walked, also after a rejection.
     pub inspected_children: u32,
     /// The configuration box whose payload FFmpeg installs: the first `dOps`, or an `avcC`,

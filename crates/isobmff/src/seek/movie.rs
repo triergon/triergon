@@ -57,8 +57,7 @@ pub struct MovieSourcePoint {
 /// presents nothing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MovieEmptyEdit {
-    /// The movie time asked for.
-    pub requested_movie_time: Time,
+    requested_movie_time: Time,
     /// 1-based `elst` row of the empty edit.
     pub edit_ordinal: u32,
     /// The `elst` entry whose `media_time` is −1.

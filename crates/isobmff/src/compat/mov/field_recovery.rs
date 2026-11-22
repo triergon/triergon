@@ -103,8 +103,7 @@ pub struct PayloadBounds {
     /// The part of `declared` before the source length; `None` when the sample starts at or
     /// past it, except that an empty sample exactly at the end is available.
     pub available: Option<Range<u64>>,
-    /// The source length the bounds were taken against, in bytes.
-    pub known_source_length: u64,
+    known_source_length: u64,
     /// Whether `declared` ends past the source length.
     pub incomplete_at_known_eof: bool,
 }

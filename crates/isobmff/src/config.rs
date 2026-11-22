@@ -297,8 +297,7 @@ impl EsdsWalk {
 /// Validate the bytes to identify the audio object type before decoding.
 #[derive(Debug)]
 pub struct AacConfiguration {
-    /// Absolute source offset of the first configuration byte.
-    pub offset: u64,
+    pub(crate) offset: u64,
     /// Shared view into the sample description, without copying the payload.
     pub bytes: Bytes,
 }
