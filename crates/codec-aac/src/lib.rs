@@ -30,6 +30,7 @@ mod huffman;
 mod huffman_probed;
 mod huffman_tables;
 mod ics;
+#[cfg(test)]
 mod inspect;
 mod ltp;
 mod pce;
@@ -314,7 +315,6 @@ fn decode_blocks<const RAW: bool>(
     per_block_crc: bool,
     out: &mut AudioFrame,
 ) -> Result<(), DecodeError> {
-    core.inspect.start_access_unit();
     let mut br = CachedBitReader::new(payload);
     core.reserve_output::<RAW>(out, usize::from(blocks))?;
     for block in 0..blocks {

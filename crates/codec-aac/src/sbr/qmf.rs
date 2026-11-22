@@ -2,7 +2,7 @@
 //!
 //! Definitions (ISO/IEC 14496-3 4.6.18.4.1 / 4.6.18.4.2; the ISO text is not available here,
 //! the equations are the implementer's recollection, confirmed exactly against the FFmpeg
-//! 9.0.2 binary with `examples/sbr_mute.rs` and `harness/codecs/aac/tools/qmffit.py`):
+//! 9.0.2 binary with muted SBR payloads and `harness/codecs/aac/tools/qmffit.py`):
 //!
 //! - analysis: x = 320 input samples, newest first; u\[n\] = sum_{j<5} x\[n + 64j\]
 //!   c\[2(n + 64j)\]; X(k) = sum_{n<64} 2 u\[n\] exp(i pi (k + 1/2)(2n - 1/2) / 64), k < 32;

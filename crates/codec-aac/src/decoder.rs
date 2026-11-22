@@ -5,7 +5,6 @@ use crate::compat::layout::Policy;
 use crate::error::{DecodeError, Feature, Result};
 use crate::filterbank::Filterbank;
 use crate::ics::*;
-use crate::inspect::FrameRecord;
 use crate::pce::{Pce, parse_pce};
 use crate::tables::SAMPLE_RATES;
 use crate::{ltp, pred, sbr};
@@ -213,8 +212,6 @@ pub(crate) struct Core {
     pub budget: Budget,
     /// Charge of the output frame the last access unit sized.
     output_charge: Reservation,
-    /// What the `inspect` feature records.
-    pub inspect: FrameRecord,
     /// Output samples (per channel) still to be dropped (FFmpeg skip_samples behaviour).
     pub skip_samples: usize,
     pub priming_policy: crate::compat::priming::Policy,
@@ -243,7 +240,6 @@ impl Core {
             qmf: sbr::Modulation::new(),
             budget: budget.clone(),
             output_charge: Reservation::empty(budget),
-            inspect: FrameRecord::new(),
             skip_samples: 0,
             priming_policy: crate::compat::priming::Policy::default(),
             frames_out: 0,
@@ -685,7 +681,6 @@ impl Core {
         out: &mut AudioFrame,
         blocks: usize,
     ) -> Result<bool> {
-        let fil_start = br.position() - 3;
         let mut count = br.read(4) as usize;
         if count == 15 {
             count += br.read(8) as usize;
@@ -713,7 +708,6 @@ impl Core {
         }
         let mut layout_changed = false;
         if let (EXT_SBR_DATA | EXT_SBR_DATA_CRC, Some(ei)) = (ext, last_elem) {
-            self.inspect.sbr_fill(fil_start, end);
             let saved_end = br.end();
             br.set_end(end);
             let crc = ext == EXT_SBR_DATA_CRC;
@@ -867,7 +861,6 @@ impl Core {
             aot: self.aot,
             sf_index: self.sf_index,
         };
-        self.inspect.block(&self.elements, &self.cce);
         crate::cce::process_cces(self);
         for ei in 0..self.elements.len() {
             let e: &mut ElementState = &mut self.elements[ei];

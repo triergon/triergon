@@ -2,10 +2,9 @@
 
 usage: python3.14 -I qmffit.py CORE.f32 CORE_CH MUTE_REF.f32 CH WINDOW.npy [START_SLOT] [SLOTS]
 
-CORE.f32   core-rate output of the stream with its SBR elements removed (examples/strip_sbr.rs,
-           decoded by this crate; its core output matches FFmpeg to ~1e-7), channel 0 used.
+CORE.f32   core-rate output of the stream with its SBR elements removed, channel 0 used.
 MUTE_REF   FFmpeg's 2x-rate output of the same stream with every SBR payload zeroed
-           (examples/sbr_mute.rs): SBR is signalled but never starts, so the output is the
+           so SBR is signalled but never starts. The output is the
            32-band analysis -> 64-band synthesis of the core signal (6-slot low band delay).
 WINDOW.npy the 640 window values in the order printed by ETSI TS 101 980 V1.1.1 Table I.1
            (np.save of crate table sbr::tables::QMF_WINDOW).

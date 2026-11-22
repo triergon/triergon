@@ -2,7 +2,7 @@
 composed model on one stream, compared per frame and per QMF band.
 
 The decoder under test is the `decode_aac` example (DECODE_AAC, default
-target/release/examples/decode_aac); the PS input comes from `ps_input` as in the other
+target/release/examples/decode_aac); the PS input comes from the unit test as in the other
 parts."""
 import os
 import subprocess

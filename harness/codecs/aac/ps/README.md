@@ -11,8 +11,8 @@ cargo xtask codecs aac-ps-tables           # rerun the recovery, write the table
 cargo xtask codecs aac-ps-tables --check   # rerun every step, compare with the committed tables
 ```
 
-The command builds the `ps_input` example (feature `inspect`, which dumps the QMF slots
-this decoder hands to PS), runs `recover_tables.py` and writes
+The command builds the AAC unit tests to capture the QMF slots this decoder hands
+to PS, runs `recover_tables.py` and writes
 `crates/codec-aac/src/huffman_probed.rs` and `crates/codec-aac/src/sbr/ps/tables.rs`.
 A write reuses the steps whose JSON an earlier run left in the work directory
 (`target/aac-ps-tables`, or `--work DIR`); `--check` empties the step directories and
@@ -34,7 +34,7 @@ needs Python 3 with numpy.
 - **Signal fits** (`signal/pslib.py`): the reference output of each channel is the 64-band
   QMF synthesis (`psmodel.py`, this decoder's synthesis in float64) of the PS output
   slots. Models linear in their unknowns are fitted exactly in the time domain, from the
-  PS input that `ps_input` dumps (with neutral PS the reference output equals its
+  PS input captured by the unit test (with neutral PS the reference output equals its
   synthesis to -134 dB). Fit residuals reach the float32 floor, about 1e-8 rms on 0.03 rms
   signals.
 

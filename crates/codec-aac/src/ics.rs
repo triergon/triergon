@@ -118,7 +118,7 @@ pub(crate) struct Tns {
 /// One decoded channel of a syntactic element for the current frame.
 #[derive(Debug)]
 pub(crate) struct ChannelData {
-    /// The frame carries pulse data (for the `inspect` statistics).
+    /// Whether the decoded channel uses pulse data.
     pub pulse_used: bool,
     pub info: IcsInfo,
     pub global_gain: u8,

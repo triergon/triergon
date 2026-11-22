@@ -23,8 +23,8 @@ binary.
 - Spectral book 1: codeword set rebuilt from the book's structure; symbols 19–80 assigned
   from FFmpeg probes (`tools/probe_cb.py`).
 - QMF banks: the window is used reversed, `c[n] = c_DRM[639 − n]`, with phases
-  `(2n − 1/2)/64` and `(2n − 255)/128`. `examples/sbr_mute.rs` makes FFmpeg output the pure
-  analysis/synthesis of the core; `tools/qmffit.py` fits orientation and phases against it
+  `(2n − 1/2)/64` and `(2n − 255)/128`. With muted SBR payloads, FFmpeg outputs the
+  analysis/synthesis of the core. `tools/qmffit.py` fits orientation and phases against it
   (9.5e-8 max).
 - SBR Huffman books (except SBR_F_ENVBAL30), SBR noise table and SBR constants: from
   knowledge, validated only by the conformance vectors. Tails and books no vector reaches

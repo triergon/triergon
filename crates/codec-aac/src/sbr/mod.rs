@@ -21,7 +21,6 @@ pub(crate) use qmf::Modulation;
 use crate::error::{DecodeError, Result};
 use crate::fft::Cpx;
 use crate::huffman::{Vlc, books};
-use crate::inspect::PsInput;
 use freq::FreqTables;
 use tables::NOISE;
 use triergon_bitstream::CachedBitReader;
@@ -293,8 +292,8 @@ pub(crate) struct Sbr {
     stereo: Option<ps::Stereo>,
     // scratch
     x: BudgetVec<[Cpx; 64]>,
-    /// The QMF slots handed to Parametric Stereo, as the `inspect` feature records them.
-    pub(crate) ps_input: PsInput,
+    #[cfg(test)]
+    pub(crate) ps_input: Vec<f32>,
 }
 
 impl Sbr {
@@ -314,7 +313,8 @@ impl Sbr {
             ps_seen: false,
             stereo: (!pair).then(|| ps::Stereo::new(budget)).transpose()?,
             x: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
-            ps_input: PsInput::new(),
+            #[cfg(test)]
+            ps_input: Vec::new(),
         })
     }
 
@@ -343,7 +343,8 @@ impl Sbr {
             ps_seen,
             stereo,
             x,
-            ps_input: _,
+            #[cfg(test)]
+                ps_input: _,
         } = self; // the core rate, and so fs, is the same for every element of a layout
         *hdr = Header::default();
         *have_header = false;
@@ -663,7 +664,12 @@ impl Sbr {
                         row[k] = ch.xl[k][i + T_HFADJ];
                     }
                 }
-                self.ps_input.capture(&self.x);
+                #[cfg(test)]
+                {
+                    self.ps_input.clear();
+                    self.ps_input
+                        .extend(self.x.iter().flatten().flat_map(|v| [v.re, v.im]));
+                }
                 // Parametric Stereo: the mono QMF matrix becomes the left and right matrices (ps.rs)
                 if self.ps_seen {
                     self.ps.apply(stereo, &mut self.x);
