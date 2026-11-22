@@ -9708,7 +9708,91 @@
         "sequential-461-replay-hevc-aac-00-m2ts-2048",
         "bytes-461-replay-hevc-aac-00-m2ts-whole",
         "blocking-461-replay-hevc-aac-00-m2ts-whole",
-        "sequential-461-replay-hevc-aac-00-m2ts-whole"
+        "sequential-461-replay-hevc-aac-00-m2ts-whole",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-4",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-4",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-4",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-8",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-8",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-8",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-188",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-188",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-188",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-377",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-377",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-377",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-389",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-389",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-389",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-2048",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-2048",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-2048",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-whole",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-whole",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-whole",
+        "bytes-463-aac-mpeg2-lc-mkv-4",
+        "blocking-463-aac-mpeg2-lc-mkv-4",
+        "sequential-463-aac-mpeg2-lc-mkv-4",
+        "bytes-463-aac-mpeg2-lc-mkv-8",
+        "blocking-463-aac-mpeg2-lc-mkv-8",
+        "sequential-463-aac-mpeg2-lc-mkv-8",
+        "bytes-463-aac-mpeg2-lc-mkv-188",
+        "blocking-463-aac-mpeg2-lc-mkv-188",
+        "sequential-463-aac-mpeg2-lc-mkv-188",
+        "bytes-463-aac-mpeg2-lc-mkv-377",
+        "blocking-463-aac-mpeg2-lc-mkv-377",
+        "sequential-463-aac-mpeg2-lc-mkv-377",
+        "bytes-463-aac-mpeg2-lc-mkv-389",
+        "blocking-463-aac-mpeg2-lc-mkv-389",
+        "sequential-463-aac-mpeg2-lc-mkv-389",
+        "bytes-463-aac-mpeg2-lc-mkv-2048",
+        "blocking-463-aac-mpeg2-lc-mkv-2048",
+        "sequential-463-aac-mpeg2-lc-mkv-2048",
+        "bytes-463-aac-mpeg2-lc-mkv-whole",
+        "blocking-463-aac-mpeg2-lc-mkv-whole",
+        "sequential-463-aac-mpeg2-lc-mkv-whole",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-4",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-4",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-4",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-8",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-8",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-8",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-188",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-188",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-188",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-377",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-377",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-377",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-389",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-389",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-389",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-2048",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-2048",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-2048",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-whole",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-whole",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-whole",
+        "bytes-465-aac-mpeg4-lc-mkv-4",
+        "blocking-465-aac-mpeg4-lc-mkv-4",
+        "sequential-465-aac-mpeg4-lc-mkv-4",
+        "bytes-465-aac-mpeg4-lc-mkv-8",
+        "blocking-465-aac-mpeg4-lc-mkv-8",
+        "sequential-465-aac-mpeg4-lc-mkv-8",
+        "bytes-465-aac-mpeg4-lc-mkv-188",
+        "blocking-465-aac-mpeg4-lc-mkv-188",
+        "sequential-465-aac-mpeg4-lc-mkv-188",
+        "bytes-465-aac-mpeg4-lc-mkv-377",
+        "blocking-465-aac-mpeg4-lc-mkv-377",
+        "sequential-465-aac-mpeg4-lc-mkv-377",
+        "bytes-465-aac-mpeg4-lc-mkv-389",
+        "blocking-465-aac-mpeg4-lc-mkv-389",
+        "sequential-465-aac-mpeg4-lc-mkv-389",
+        "bytes-465-aac-mpeg4-lc-mkv-2048",
+        "blocking-465-aac-mpeg4-lc-mkv-2048",
+        "sequential-465-aac-mpeg4-lc-mkv-2048",
+        "bytes-465-aac-mpeg4-lc-mkv-whole",
+        "blocking-465-aac-mpeg4-lc-mkv-whole",
+        "sequential-465-aac-mpeg4-lc-mkv-whole"
       ],
       "cause": "collect on isolated AArch64 and ARMv7 gate hosts after parity triage"
     },
@@ -19395,7 +19479,91 @@
         "sequential-461-replay-hevc-aac-00-m2ts-2048",
         "bytes-461-replay-hevc-aac-00-m2ts-whole",
         "blocking-461-replay-hevc-aac-00-m2ts-whole",
-        "sequential-461-replay-hevc-aac-00-m2ts-whole"
+        "sequential-461-replay-hevc-aac-00-m2ts-whole",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-4",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-4",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-4",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-8",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-8",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-8",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-188",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-188",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-188",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-377",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-377",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-377",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-389",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-389",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-389",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-2048",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-2048",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-2048",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-whole",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-whole",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-whole",
+        "bytes-463-aac-mpeg2-lc-mkv-4",
+        "blocking-463-aac-mpeg2-lc-mkv-4",
+        "sequential-463-aac-mpeg2-lc-mkv-4",
+        "bytes-463-aac-mpeg2-lc-mkv-8",
+        "blocking-463-aac-mpeg2-lc-mkv-8",
+        "sequential-463-aac-mpeg2-lc-mkv-8",
+        "bytes-463-aac-mpeg2-lc-mkv-188",
+        "blocking-463-aac-mpeg2-lc-mkv-188",
+        "sequential-463-aac-mpeg2-lc-mkv-188",
+        "bytes-463-aac-mpeg2-lc-mkv-377",
+        "blocking-463-aac-mpeg2-lc-mkv-377",
+        "sequential-463-aac-mpeg2-lc-mkv-377",
+        "bytes-463-aac-mpeg2-lc-mkv-389",
+        "blocking-463-aac-mpeg2-lc-mkv-389",
+        "sequential-463-aac-mpeg2-lc-mkv-389",
+        "bytes-463-aac-mpeg2-lc-mkv-2048",
+        "blocking-463-aac-mpeg2-lc-mkv-2048",
+        "sequential-463-aac-mpeg2-lc-mkv-2048",
+        "bytes-463-aac-mpeg2-lc-mkv-whole",
+        "blocking-463-aac-mpeg2-lc-mkv-whole",
+        "sequential-463-aac-mpeg2-lc-mkv-whole",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-4",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-4",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-4",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-8",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-8",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-8",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-188",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-188",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-188",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-377",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-377",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-377",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-389",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-389",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-389",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-2048",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-2048",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-2048",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-whole",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-whole",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-whole",
+        "bytes-465-aac-mpeg4-lc-mkv-4",
+        "blocking-465-aac-mpeg4-lc-mkv-4",
+        "sequential-465-aac-mpeg4-lc-mkv-4",
+        "bytes-465-aac-mpeg4-lc-mkv-8",
+        "blocking-465-aac-mpeg4-lc-mkv-8",
+        "sequential-465-aac-mpeg4-lc-mkv-8",
+        "bytes-465-aac-mpeg4-lc-mkv-188",
+        "blocking-465-aac-mpeg4-lc-mkv-188",
+        "sequential-465-aac-mpeg4-lc-mkv-188",
+        "bytes-465-aac-mpeg4-lc-mkv-377",
+        "blocking-465-aac-mpeg4-lc-mkv-377",
+        "sequential-465-aac-mpeg4-lc-mkv-377",
+        "bytes-465-aac-mpeg4-lc-mkv-389",
+        "blocking-465-aac-mpeg4-lc-mkv-389",
+        "sequential-465-aac-mpeg4-lc-mkv-389",
+        "bytes-465-aac-mpeg4-lc-mkv-2048",
+        "blocking-465-aac-mpeg4-lc-mkv-2048",
+        "sequential-465-aac-mpeg4-lc-mkv-2048",
+        "bytes-465-aac-mpeg4-lc-mkv-whole",
+        "blocking-465-aac-mpeg4-lc-mkv-whole",
+        "sequential-465-aac-mpeg4-lc-mkv-whole"
       ],
       "cause": "collect on isolated AArch64 and ARMv7 gate hosts after parity triage"
     },
@@ -29082,7 +29250,91 @@
         "sequential-461-replay-hevc-aac-00-m2ts-2048",
         "bytes-461-replay-hevc-aac-00-m2ts-whole",
         "blocking-461-replay-hevc-aac-00-m2ts-whole",
-        "sequential-461-replay-hevc-aac-00-m2ts-whole"
+        "sequential-461-replay-hevc-aac-00-m2ts-whole",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-4",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-4",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-4",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-8",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-8",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-8",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-188",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-188",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-188",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-377",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-377",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-377",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-389",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-389",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-389",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-2048",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-2048",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-2048",
+        "bytes-462-aac-mpeg2-lc-laced-mkv-whole",
+        "blocking-462-aac-mpeg2-lc-laced-mkv-whole",
+        "sequential-462-aac-mpeg2-lc-laced-mkv-whole",
+        "bytes-463-aac-mpeg2-lc-mkv-4",
+        "blocking-463-aac-mpeg2-lc-mkv-4",
+        "sequential-463-aac-mpeg2-lc-mkv-4",
+        "bytes-463-aac-mpeg2-lc-mkv-8",
+        "blocking-463-aac-mpeg2-lc-mkv-8",
+        "sequential-463-aac-mpeg2-lc-mkv-8",
+        "bytes-463-aac-mpeg2-lc-mkv-188",
+        "blocking-463-aac-mpeg2-lc-mkv-188",
+        "sequential-463-aac-mpeg2-lc-mkv-188",
+        "bytes-463-aac-mpeg2-lc-mkv-377",
+        "blocking-463-aac-mpeg2-lc-mkv-377",
+        "sequential-463-aac-mpeg2-lc-mkv-377",
+        "bytes-463-aac-mpeg2-lc-mkv-389",
+        "blocking-463-aac-mpeg2-lc-mkv-389",
+        "sequential-463-aac-mpeg2-lc-mkv-389",
+        "bytes-463-aac-mpeg2-lc-mkv-2048",
+        "blocking-463-aac-mpeg2-lc-mkv-2048",
+        "sequential-463-aac-mpeg2-lc-mkv-2048",
+        "bytes-463-aac-mpeg2-lc-mkv-whole",
+        "blocking-463-aac-mpeg2-lc-mkv-whole",
+        "sequential-463-aac-mpeg2-lc-mkv-whole",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-4",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-4",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-4",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-8",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-8",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-8",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-188",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-188",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-188",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-377",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-377",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-377",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-389",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-389",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-389",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-2048",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-2048",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-2048",
+        "bytes-464-aac-mpeg4-lc-timed-mkv-whole",
+        "blocking-464-aac-mpeg4-lc-timed-mkv-whole",
+        "sequential-464-aac-mpeg4-lc-timed-mkv-whole",
+        "bytes-465-aac-mpeg4-lc-mkv-4",
+        "blocking-465-aac-mpeg4-lc-mkv-4",
+        "sequential-465-aac-mpeg4-lc-mkv-4",
+        "bytes-465-aac-mpeg4-lc-mkv-8",
+        "blocking-465-aac-mpeg4-lc-mkv-8",
+        "sequential-465-aac-mpeg4-lc-mkv-8",
+        "bytes-465-aac-mpeg4-lc-mkv-188",
+        "blocking-465-aac-mpeg4-lc-mkv-188",
+        "sequential-465-aac-mpeg4-lc-mkv-188",
+        "bytes-465-aac-mpeg4-lc-mkv-377",
+        "blocking-465-aac-mpeg4-lc-mkv-377",
+        "sequential-465-aac-mpeg4-lc-mkv-377",
+        "bytes-465-aac-mpeg4-lc-mkv-389",
+        "blocking-465-aac-mpeg4-lc-mkv-389",
+        "sequential-465-aac-mpeg4-lc-mkv-389",
+        "bytes-465-aac-mpeg4-lc-mkv-2048",
+        "blocking-465-aac-mpeg4-lc-mkv-2048",
+        "sequential-465-aac-mpeg4-lc-mkv-2048",
+        "bytes-465-aac-mpeg4-lc-mkv-whole",
+        "blocking-465-aac-mpeg4-lc-mkv-whole",
+        "sequential-465-aac-mpeg4-lc-mkv-whole"
       ],
       "cause": "collect on isolated AArch64 and ARMv7 gate hosts after parity triage"
     }
@@ -59230,6 +59482,454 @@
     },
     {
       "id": "sequential-461-replay-hevc-aac-00-m2ts-whole",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "bytes-462-aac-mpeg2-lc-laced-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-462-aac-mpeg2-lc-laced-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-462-aac-mpeg2-lc-laced-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "bytes-462-aac-mpeg2-lc-laced-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-462-aac-mpeg2-lc-laced-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-462-aac-mpeg2-lc-laced-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-462-aac-mpeg2-lc-laced-mkv-188",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-462-aac-mpeg2-lc-laced-mkv-188",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-462-aac-mpeg2-lc-laced-mkv-377",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-462-aac-mpeg2-lc-laced-mkv-377",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-462-aac-mpeg2-lc-laced-mkv-389",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-462-aac-mpeg2-lc-laced-mkv-389",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-462-aac-mpeg2-lc-laced-mkv-2048",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-462-aac-mpeg2-lc-laced-mkv-2048",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-462-aac-mpeg2-lc-laced-mkv-whole",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-462-aac-mpeg2-lc-laced-mkv-whole",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "bytes-463-aac-mpeg2-lc-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-463-aac-mpeg2-lc-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-463-aac-mpeg2-lc-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "bytes-463-aac-mpeg2-lc-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-463-aac-mpeg2-lc-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-463-aac-mpeg2-lc-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-463-aac-mpeg2-lc-mkv-188",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-463-aac-mpeg2-lc-mkv-188",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-463-aac-mpeg2-lc-mkv-377",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-463-aac-mpeg2-lc-mkv-377",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-463-aac-mpeg2-lc-mkv-389",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-463-aac-mpeg2-lc-mkv-389",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-463-aac-mpeg2-lc-mkv-2048",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-463-aac-mpeg2-lc-mkv-2048",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-463-aac-mpeg2-lc-mkv-whole",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-463-aac-mpeg2-lc-mkv-whole",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "bytes-464-aac-mpeg4-lc-timed-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-464-aac-mpeg4-lc-timed-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-464-aac-mpeg4-lc-timed-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "bytes-464-aac-mpeg4-lc-timed-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-464-aac-mpeg4-lc-timed-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-464-aac-mpeg4-lc-timed-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-464-aac-mpeg4-lc-timed-mkv-188",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-464-aac-mpeg4-lc-timed-mkv-188",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-464-aac-mpeg4-lc-timed-mkv-377",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-464-aac-mpeg4-lc-timed-mkv-377",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-464-aac-mpeg4-lc-timed-mkv-389",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-464-aac-mpeg4-lc-timed-mkv-389",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-464-aac-mpeg4-lc-timed-mkv-2048",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-464-aac-mpeg4-lc-timed-mkv-2048",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-464-aac-mpeg4-lc-timed-mkv-whole",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-464-aac-mpeg4-lc-timed-mkv-whole",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "bytes-465-aac-mpeg4-lc-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-465-aac-mpeg4-lc-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-465-aac-mpeg4-lc-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "bytes-465-aac-mpeg4-lc-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-465-aac-mpeg4-lc-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-465-aac-mpeg4-lc-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-465-aac-mpeg4-lc-mkv-188",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-465-aac-mpeg4-lc-mkv-188",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-465-aac-mpeg4-lc-mkv-377",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-465-aac-mpeg4-lc-mkv-377",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-465-aac-mpeg4-lc-mkv-389",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-465-aac-mpeg4-lc-mkv-389",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-465-aac-mpeg4-lc-mkv-2048",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-465-aac-mpeg4-lc-mkv-2048",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "blocking-465-aac-mpeg4-lc-mkv-whole",
+      "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "sequential-465-aac-mpeg4-lc-mkv-whole",
       "requirement": "The adapters choose the same demuxer family and replay their prefixes, but consume different lengths. The signature reader can stop before libavformat's buffered score probes.",
       "targets": [
         "aarch64-unknown-linux-gnu"

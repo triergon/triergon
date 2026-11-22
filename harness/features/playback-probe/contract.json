@@ -6481,7 +6481,63 @@
         "playback-461-replay-hevc-aac-00-m2ts-2048",
         "raw-461-replay-hevc-aac-00-m2ts-2048",
         "playback-461-replay-hevc-aac-00-m2ts-whole",
-        "raw-461-replay-hevc-aac-00-m2ts-whole"
+        "raw-461-replay-hevc-aac-00-m2ts-whole",
+        "playback-462-aac-mpeg2-lc-laced-mkv-4",
+        "raw-462-aac-mpeg2-lc-laced-mkv-4",
+        "playback-462-aac-mpeg2-lc-laced-mkv-8",
+        "raw-462-aac-mpeg2-lc-laced-mkv-8",
+        "playback-462-aac-mpeg2-lc-laced-mkv-188",
+        "raw-462-aac-mpeg2-lc-laced-mkv-188",
+        "playback-462-aac-mpeg2-lc-laced-mkv-377",
+        "raw-462-aac-mpeg2-lc-laced-mkv-377",
+        "playback-462-aac-mpeg2-lc-laced-mkv-389",
+        "raw-462-aac-mpeg2-lc-laced-mkv-389",
+        "playback-462-aac-mpeg2-lc-laced-mkv-2048",
+        "raw-462-aac-mpeg2-lc-laced-mkv-2048",
+        "playback-462-aac-mpeg2-lc-laced-mkv-whole",
+        "raw-462-aac-mpeg2-lc-laced-mkv-whole",
+        "playback-463-aac-mpeg2-lc-mkv-4",
+        "raw-463-aac-mpeg2-lc-mkv-4",
+        "playback-463-aac-mpeg2-lc-mkv-8",
+        "raw-463-aac-mpeg2-lc-mkv-8",
+        "playback-463-aac-mpeg2-lc-mkv-188",
+        "raw-463-aac-mpeg2-lc-mkv-188",
+        "playback-463-aac-mpeg2-lc-mkv-377",
+        "raw-463-aac-mpeg2-lc-mkv-377",
+        "playback-463-aac-mpeg2-lc-mkv-389",
+        "raw-463-aac-mpeg2-lc-mkv-389",
+        "playback-463-aac-mpeg2-lc-mkv-2048",
+        "raw-463-aac-mpeg2-lc-mkv-2048",
+        "playback-463-aac-mpeg2-lc-mkv-whole",
+        "raw-463-aac-mpeg2-lc-mkv-whole",
+        "playback-464-aac-mpeg4-lc-timed-mkv-4",
+        "raw-464-aac-mpeg4-lc-timed-mkv-4",
+        "playback-464-aac-mpeg4-lc-timed-mkv-8",
+        "raw-464-aac-mpeg4-lc-timed-mkv-8",
+        "playback-464-aac-mpeg4-lc-timed-mkv-188",
+        "raw-464-aac-mpeg4-lc-timed-mkv-188",
+        "playback-464-aac-mpeg4-lc-timed-mkv-377",
+        "raw-464-aac-mpeg4-lc-timed-mkv-377",
+        "playback-464-aac-mpeg4-lc-timed-mkv-389",
+        "raw-464-aac-mpeg4-lc-timed-mkv-389",
+        "playback-464-aac-mpeg4-lc-timed-mkv-2048",
+        "raw-464-aac-mpeg4-lc-timed-mkv-2048",
+        "playback-464-aac-mpeg4-lc-timed-mkv-whole",
+        "raw-464-aac-mpeg4-lc-timed-mkv-whole",
+        "playback-465-aac-mpeg4-lc-mkv-4",
+        "raw-465-aac-mpeg4-lc-mkv-4",
+        "playback-465-aac-mpeg4-lc-mkv-8",
+        "raw-465-aac-mpeg4-lc-mkv-8",
+        "playback-465-aac-mpeg4-lc-mkv-188",
+        "raw-465-aac-mpeg4-lc-mkv-188",
+        "playback-465-aac-mpeg4-lc-mkv-377",
+        "raw-465-aac-mpeg4-lc-mkv-377",
+        "playback-465-aac-mpeg4-lc-mkv-389",
+        "raw-465-aac-mpeg4-lc-mkv-389",
+        "playback-465-aac-mpeg4-lc-mkv-2048",
+        "raw-465-aac-mpeg4-lc-mkv-2048",
+        "playback-465-aac-mpeg4-lc-mkv-whole",
+        "raw-465-aac-mpeg4-lc-mkv-whole"
       ],
       "cause": "collect on isolated AArch64 and ARMv7 gate hosts after parity triage"
     },
@@ -12941,7 +12997,63 @@
         "playback-461-replay-hevc-aac-00-m2ts-2048",
         "raw-461-replay-hevc-aac-00-m2ts-2048",
         "playback-461-replay-hevc-aac-00-m2ts-whole",
-        "raw-461-replay-hevc-aac-00-m2ts-whole"
+        "raw-461-replay-hevc-aac-00-m2ts-whole",
+        "playback-462-aac-mpeg2-lc-laced-mkv-4",
+        "raw-462-aac-mpeg2-lc-laced-mkv-4",
+        "playback-462-aac-mpeg2-lc-laced-mkv-8",
+        "raw-462-aac-mpeg2-lc-laced-mkv-8",
+        "playback-462-aac-mpeg2-lc-laced-mkv-188",
+        "raw-462-aac-mpeg2-lc-laced-mkv-188",
+        "playback-462-aac-mpeg2-lc-laced-mkv-377",
+        "raw-462-aac-mpeg2-lc-laced-mkv-377",
+        "playback-462-aac-mpeg2-lc-laced-mkv-389",
+        "raw-462-aac-mpeg2-lc-laced-mkv-389",
+        "playback-462-aac-mpeg2-lc-laced-mkv-2048",
+        "raw-462-aac-mpeg2-lc-laced-mkv-2048",
+        "playback-462-aac-mpeg2-lc-laced-mkv-whole",
+        "raw-462-aac-mpeg2-lc-laced-mkv-whole",
+        "playback-463-aac-mpeg2-lc-mkv-4",
+        "raw-463-aac-mpeg2-lc-mkv-4",
+        "playback-463-aac-mpeg2-lc-mkv-8",
+        "raw-463-aac-mpeg2-lc-mkv-8",
+        "playback-463-aac-mpeg2-lc-mkv-188",
+        "raw-463-aac-mpeg2-lc-mkv-188",
+        "playback-463-aac-mpeg2-lc-mkv-377",
+        "raw-463-aac-mpeg2-lc-mkv-377",
+        "playback-463-aac-mpeg2-lc-mkv-389",
+        "raw-463-aac-mpeg2-lc-mkv-389",
+        "playback-463-aac-mpeg2-lc-mkv-2048",
+        "raw-463-aac-mpeg2-lc-mkv-2048",
+        "playback-463-aac-mpeg2-lc-mkv-whole",
+        "raw-463-aac-mpeg2-lc-mkv-whole",
+        "playback-464-aac-mpeg4-lc-timed-mkv-4",
+        "raw-464-aac-mpeg4-lc-timed-mkv-4",
+        "playback-464-aac-mpeg4-lc-timed-mkv-8",
+        "raw-464-aac-mpeg4-lc-timed-mkv-8",
+        "playback-464-aac-mpeg4-lc-timed-mkv-188",
+        "raw-464-aac-mpeg4-lc-timed-mkv-188",
+        "playback-464-aac-mpeg4-lc-timed-mkv-377",
+        "raw-464-aac-mpeg4-lc-timed-mkv-377",
+        "playback-464-aac-mpeg4-lc-timed-mkv-389",
+        "raw-464-aac-mpeg4-lc-timed-mkv-389",
+        "playback-464-aac-mpeg4-lc-timed-mkv-2048",
+        "raw-464-aac-mpeg4-lc-timed-mkv-2048",
+        "playback-464-aac-mpeg4-lc-timed-mkv-whole",
+        "raw-464-aac-mpeg4-lc-timed-mkv-whole",
+        "playback-465-aac-mpeg4-lc-mkv-4",
+        "raw-465-aac-mpeg4-lc-mkv-4",
+        "playback-465-aac-mpeg4-lc-mkv-8",
+        "raw-465-aac-mpeg4-lc-mkv-8",
+        "playback-465-aac-mpeg4-lc-mkv-188",
+        "raw-465-aac-mpeg4-lc-mkv-188",
+        "playback-465-aac-mpeg4-lc-mkv-377",
+        "raw-465-aac-mpeg4-lc-mkv-377",
+        "playback-465-aac-mpeg4-lc-mkv-389",
+        "raw-465-aac-mpeg4-lc-mkv-389",
+        "playback-465-aac-mpeg4-lc-mkv-2048",
+        "raw-465-aac-mpeg4-lc-mkv-2048",
+        "playback-465-aac-mpeg4-lc-mkv-whole",
+        "raw-465-aac-mpeg4-lc-mkv-whole"
       ],
       "cause": "collect on isolated AArch64 and ARMv7 gate hosts after parity triage"
     },
@@ -19401,7 +19513,63 @@
         "playback-461-replay-hevc-aac-00-m2ts-2048",
         "raw-461-replay-hevc-aac-00-m2ts-2048",
         "playback-461-replay-hevc-aac-00-m2ts-whole",
-        "raw-461-replay-hevc-aac-00-m2ts-whole"
+        "raw-461-replay-hevc-aac-00-m2ts-whole",
+        "playback-462-aac-mpeg2-lc-laced-mkv-4",
+        "raw-462-aac-mpeg2-lc-laced-mkv-4",
+        "playback-462-aac-mpeg2-lc-laced-mkv-8",
+        "raw-462-aac-mpeg2-lc-laced-mkv-8",
+        "playback-462-aac-mpeg2-lc-laced-mkv-188",
+        "raw-462-aac-mpeg2-lc-laced-mkv-188",
+        "playback-462-aac-mpeg2-lc-laced-mkv-377",
+        "raw-462-aac-mpeg2-lc-laced-mkv-377",
+        "playback-462-aac-mpeg2-lc-laced-mkv-389",
+        "raw-462-aac-mpeg2-lc-laced-mkv-389",
+        "playback-462-aac-mpeg2-lc-laced-mkv-2048",
+        "raw-462-aac-mpeg2-lc-laced-mkv-2048",
+        "playback-462-aac-mpeg2-lc-laced-mkv-whole",
+        "raw-462-aac-mpeg2-lc-laced-mkv-whole",
+        "playback-463-aac-mpeg2-lc-mkv-4",
+        "raw-463-aac-mpeg2-lc-mkv-4",
+        "playback-463-aac-mpeg2-lc-mkv-8",
+        "raw-463-aac-mpeg2-lc-mkv-8",
+        "playback-463-aac-mpeg2-lc-mkv-188",
+        "raw-463-aac-mpeg2-lc-mkv-188",
+        "playback-463-aac-mpeg2-lc-mkv-377",
+        "raw-463-aac-mpeg2-lc-mkv-377",
+        "playback-463-aac-mpeg2-lc-mkv-389",
+        "raw-463-aac-mpeg2-lc-mkv-389",
+        "playback-463-aac-mpeg2-lc-mkv-2048",
+        "raw-463-aac-mpeg2-lc-mkv-2048",
+        "playback-463-aac-mpeg2-lc-mkv-whole",
+        "raw-463-aac-mpeg2-lc-mkv-whole",
+        "playback-464-aac-mpeg4-lc-timed-mkv-4",
+        "raw-464-aac-mpeg4-lc-timed-mkv-4",
+        "playback-464-aac-mpeg4-lc-timed-mkv-8",
+        "raw-464-aac-mpeg4-lc-timed-mkv-8",
+        "playback-464-aac-mpeg4-lc-timed-mkv-188",
+        "raw-464-aac-mpeg4-lc-timed-mkv-188",
+        "playback-464-aac-mpeg4-lc-timed-mkv-377",
+        "raw-464-aac-mpeg4-lc-timed-mkv-377",
+        "playback-464-aac-mpeg4-lc-timed-mkv-389",
+        "raw-464-aac-mpeg4-lc-timed-mkv-389",
+        "playback-464-aac-mpeg4-lc-timed-mkv-2048",
+        "raw-464-aac-mpeg4-lc-timed-mkv-2048",
+        "playback-464-aac-mpeg4-lc-timed-mkv-whole",
+        "raw-464-aac-mpeg4-lc-timed-mkv-whole",
+        "playback-465-aac-mpeg4-lc-mkv-4",
+        "raw-465-aac-mpeg4-lc-mkv-4",
+        "playback-465-aac-mpeg4-lc-mkv-8",
+        "raw-465-aac-mpeg4-lc-mkv-8",
+        "playback-465-aac-mpeg4-lc-mkv-188",
+        "raw-465-aac-mpeg4-lc-mkv-188",
+        "playback-465-aac-mpeg4-lc-mkv-377",
+        "raw-465-aac-mpeg4-lc-mkv-377",
+        "playback-465-aac-mpeg4-lc-mkv-389",
+        "raw-465-aac-mpeg4-lc-mkv-389",
+        "playback-465-aac-mpeg4-lc-mkv-2048",
+        "raw-465-aac-mpeg4-lc-mkv-2048",
+        "playback-465-aac-mpeg4-lc-mkv-whole",
+        "raw-465-aac-mpeg4-lc-mkv-whole"
       ],
       "cause": "collect on isolated AArch64 and ARMv7 gate hosts after parity triage"
     }
@@ -33379,6 +33547,118 @@
     },
     {
       "id": "raw-461-replay-hevc-aac-00-m2ts-389",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "playback-462-aac-mpeg2-lc-laced-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "raw-462-aac-mpeg2-lc-laced-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "playback-462-aac-mpeg2-lc-laced-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "raw-462-aac-mpeg2-lc-laced-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "playback-463-aac-mpeg2-lc-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "raw-463-aac-mpeg2-lc-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "playback-463-aac-mpeg2-lc-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "raw-463-aac-mpeg2-lc-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "playback-464-aac-mpeg4-lc-timed-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "raw-464-aac-mpeg4-lc-timed-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "playback-464-aac-mpeg4-lc-timed-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "raw-464-aac-mpeg4-lc-timed-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "playback-465-aac-mpeg4-lc-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "raw-465-aac-mpeg4-lc-mkv-4",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "playback-465-aac-mpeg4-lc-mkv-8",
+      "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "raw-465-aac-mpeg4-lc-mkv-8",
       "requirement": "The candidate selects from a source signature and the reference has no qualifying score. A container magic or carrier sync pattern denotes a possible source without proving all subsequent syntax.",
       "targets": [
         "aarch64-unknown-linux-gnu"
