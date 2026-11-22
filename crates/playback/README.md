@@ -131,7 +131,9 @@ checks detection over fixed prefixes and checks the bytes delivered after
 container selection. It also checks carrier-width evidence when a prefix supplies
 the three TS188 sync positions before the playback probe has enough bytes to select.
 The [source-view comparison](../../harness/features/playback-source-view/contract.json)
-checks direct-player track metadata and complete forward packet streams. It
+checks direct-player track metadata and complete forward packet streams. For
+Matroska it reads CodecID and effective language independently from TrackEntry
+and compares the native codec identity and configuration alongside them. It
 opens the bounded timing-prefix controls with `TimingRunPolicy::BoundedPrefix`.
 The [MP4 clock oracle](../../harness/features/mp4-source-clock/contract.json)
 checks sample decode and composition times before the movie's edit list. For

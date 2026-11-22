@@ -5,11 +5,80 @@
 
 typedef struct {
     const char *demuxer;
-    int seekable, ignore_edits, transport, raw;
+    int seekable, ignore_edits, transport, raw, matroska;
     uint8_t *entities;
     size_t size, pid_count;
     unsigned pids[64];
 } PlaybackSourceCase;
+
+typedef struct {
+    const uint8_t *data;
+    size_t size;
+} CatalogueField;
+
+static int player_ebml_vint(const uint8_t *bytes, size_t end, size_t *at,
+                            unsigned maximum, int identifier, uint64_t *value);
+
+/* This walk reads the source fields AVStream does not expose. The native
+ * decoder identity, configuration, dispositions and packets still come
+ * from the public demux API. */
+static int catalogue_element(CatalogueField parent, size_t *at, uint64_t *id,
+                              CatalogueField *payload)
+{
+    uint64_t size;
+    if (player_ebml_vint(parent.data, parent.size, at, 4, 1, id) < 0 ||
+        player_ebml_vint(parent.data, parent.size, at, 8, 0, &size) < 0)
+        return AVERROR_INVALIDDATA;
+    if (size == UINT64_MAX && *id == UINT64_C(0x18538067))
+        size = parent.size - *at;
+    if (size > parent.size - *at)
+        return AVERROR_INVALIDDATA;
+    *payload = (CatalogueField){parent.data + *at, (size_t)size};
+    *at += (size_t)size;
+    return 0;
+}
+
+static int catalogue_find(CatalogueField parent, uint64_t wanted, CatalogueField *field)
+{
+    for (size_t at = 0; at < parent.size;) {
+        uint64_t id;
+        int rc = catalogue_element(parent, &at, &id, field);
+        if (rc < 0 || id == wanted)
+            return rc;
+    }
+    return AVERROR(ENOENT);
+}
+
+static int catalogue_track(CatalogueField tracks, uint64_t number, CatalogueField *codec,
+                            CatalogueField *language)
+{
+    for (size_t at = 0; at < tracks.size;) {
+        uint64_t id;
+        CatalogueField entry, field;
+        if (catalogue_element(tracks, &at, &id, &entry) < 0)
+            return AVERROR_INVALIDDATA;
+        if (id != 0xae)
+            continue;
+        if (catalogue_find(entry, 0xd7, &field) < 0 || !field.size || field.size > 8)
+            return AVERROR_INVALIDDATA;
+        uint64_t value = 0;
+        for (size_t i = 0; i < field.size; ++i)
+            value = (value << 8) | field.data[i];
+        if (value != number)
+            continue;
+        if (catalogue_find(entry, 0x86, codec) < 0 || !codec->size)
+            return AVERROR_INVALIDDATA;
+        int rc = catalogue_find(entry, 0x22b59d, language);
+        if (rc == AVERROR(ENOENT))
+            rc = catalogue_find(entry, 0x22b59c, language);
+        if (rc == AVERROR(ENOENT)) {
+            *language = (CatalogueField){(const uint8_t *)"eng", 3};
+            return 0;
+        }
+        return rc;
+    }
+    return AVERROR_INVALIDDATA;
+}
 
 static int source_view_codec_is_pcm(enum AVCodecID codec)
 {
@@ -62,7 +131,8 @@ static uint64_t source_view_track_id(const AVStream *stream)
     return stream->id > 0 ? (uint64_t)stream->id : (uint64_t)stream->index + 1;
 }
 
-static void source_view_track(ViewWork *work, const AVStream *stream, const PlaybackSourceCase *source)
+static int source_view_track(ViewWork *work, const AVStream *stream,
+                             const PlaybackSourceCase *source, CatalogueField tracks)
 {
     const AVCodecParameters *parameters = stream->codecpar;
     const char *codec = source_view_codec(parameters);
@@ -73,31 +143,44 @@ static void source_view_track(ViewWork *work, const AVStream *stream, const Play
     const uint64_t forced = 1 + !!(stream->disposition & AV_DISPOSITION_FORCED);
     const uint32_t tag = parameters->codec_tag;
     const uint8_t tag_bytes[] = {tag, tag >> 8, tag >> 16, tag >> 24};
-    const size_t tag_size = source->ignore_edits ? 4 : source->transport && tag <= 255 ? 1 : tag ? 4 : 0;
+    CatalogueField codec_tag = {tag_bytes,
+        source->ignore_edits ? 4 : source->transport && tag <= 255 ? 1 : tag ? 4 : 0};
+    CatalogueField lang = {0};
+    if (language)
+        lang = (CatalogueField){(const uint8_t *)language->value, strlen(language->value)};
+    if (source->matroska) {
+        const int rc = catalogue_track(tracks, id, &codec_tag, &lang);
+        if (rc < 0)
+            return rc;
+        if (work->trace)
+            fprintf(stderr, "track %" PRIu64 " native codec tag=%" PRIu32 " language=%s\n",
+                    id, tag, language ? language->value : "(absent)");
+    }
     const size_t config_size = parameters->extradata_size > 0 ? (size_t)parameters->extradata_size : 0;
     fold(&work->digest, 2);
     fold(&work->digest, id);
     fold(&work->digest, kind);
     source_view_string(work, (const uint8_t *)codec, strlen(codec));
-    source_view_string(work, tag_bytes, tag_size);
+    source_view_string(work, codec_tag.data, codec_tag.size);
     source_view_string(work, parameters->extradata, config_size);
-    fold(&work->digest, language != NULL);
-    if (language)
-        source_view_string(work, (const uint8_t *)language->value, strlen(language->value));
+    fold(&work->digest, lang.data != NULL);
+    if (lang.data)
+        source_view_string(work, lang.data, lang.size);
     fold(&work->digest, default_track);
     fold(&work->digest, forced);
     ++work->packets;
     if (work->trace) {
         printf("2 %" PRIu64 " %" PRIu64 " %s ", id, kind, codec);
-        source_view_hex(tag_bytes, tag_size);
+        source_view_hex(codec_tag.data, codec_tag.size);
         putchar(' ');
         source_view_hex(parameters->extradata, config_size);
-        if (language)
-            printf(" Some(\"%s\")", language->value);
+        if (lang.data)
+            printf(" Some(\"%.*s\")", (int)lang.size, (const char *)lang.data);
         else
             printf(" None");
         printf(" %" PRIu64 " %" PRIu64 "\n", default_track, forced);
     }
+    return 0;
 }
 
 static int source_view_open_mp4(AVFormatContext **format, PacketInput *input, int seekable)
@@ -225,9 +308,21 @@ static int source_view_run(const ViewCase *input, ViewWork *work)
             printf("%" PRIu64 "\n", terminal);
         return 0;
     }
+    CatalogueField tracks = {0};
+    if (source->matroska) {
+        CatalogueField segment;
+        if (catalogue_find((CatalogueField){input->data, input->size}, 0x18538067, &segment) < 0 ||
+            catalogue_find(segment, 0x1654ae6b, &tracks) < 0) {
+            packet_close(&format);
+            return 2;
+        }
+    }
     for (unsigned i = 0; i < format->nb_streams; ++i) {
-        if (source_view_selected(format, format->streams[i], source))
-            source_view_track(work, format->streams[i], source);
+        if (source_view_selected(format, format->streams[i], source) &&
+            source_view_track(work, format->streams[i], source, tracks) < 0) {
+            packet_close(&format);
+            return 2;
+        }
     }
     AVPacket *packet = av_packet_alloc();
     if (!packet) {
@@ -328,6 +423,7 @@ static int playback_source_view_prepare(ViewCase *input)
     if (!strcmp(layout, "matroska")) {
         source.demuxer = "matroska";
         source.seekable = 1;
+        source.matroska = 1;
     } else if (!strcmp(layout, "mp4") || !strcmp(layout, "mp4-progressive") ||
                !strcmp(layout, "mp4-timing-policy")) {
         source.demuxer = "mov";

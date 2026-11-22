@@ -8,7 +8,7 @@
   "contract": [
     "Open Matroska, indexed MP4, progressive MP4 and one MPEG-TS program through the direct player. Use source clocks and read every selected packet. The explicit bounded timing controls use the bounded opener and compatibility index while retaining source PacketInfo clocks. For ordered transport entities, continue the same player to the second entity and explicitly finish the logical source. The reference reads the same concatenated byte stream.",
     "The reference calls avformat_open_input and av_read_frame without stream discovery. Set ignore_editlist=1 for MOV and suppress elementary parsing and filling for MPEG-TS PES. Select the named PIDs of program 1 when the case declares PIDs. Matroska timestamps are in nanoseconds, MP4 in media timescale ticks, and transport in raw 90 kHz PES ticks.",
-    "Fold kind 2 with each initial track ID, media kind, framed codec name, source codec tag, configuration, optional language and tri-state default and forced flags. The reference uses the public stream ID or the one-based stream ordinal if it has no positive ID. A Matroska CodecID string and an unavailable numeric codec_tag remain distinguishable.",
+    "Fold kind 2 with each initial track ID, media kind, framed codec name, source codec tag, configuration, optional language and tri-state default and forced flags. The reference uses the public stream ID or the one-based stream ordinal if it has no positive ID. For Matroska, read the literal CodecID and effective language independently from TrackEntry, keyed by the track number. Retain the native codec identity, decoder configuration and dispositions. The trace retains the native tag and language for diagnosis.",
     "Fold kind 1 with the shared packet row: track ID, optional PTS and DTS, duration, flags, size and every payload byte. Fold 7 on clean end or 8 on data refusal. Trace the candidate demux clock and trim for diagnosis.",
     "For raw Annex B, fold kind 4 with the stream rate from the active SPS timing and FFmpeg codec parameters. Fold kind 3 per unit with the queue-boundary timestamp in ns, zero for an unstamped packet. Trace any additional source VUI fields and the reference sample aspect ratio. Raw views run for parity only."
   ],
@@ -474,7 +474,6 @@
   ],
   "pending_module_requirements": [
     "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-    "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
     "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
     "The explicit BoundedPrefix opener and compatibility index expose the source PacketInfo clocks of the six samples. The comparison still needs to align raw sample-entry metadata with the decoder configuration and defaults exposed by the MOV demuxer."
   ],
@@ -832,132 +831,6 @@
     {
       "id": "mp4-forward-progressive-leading-video-edit-overlapping-sync",
       "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-avc-eight-pictures",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-avc-high-b",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-avc-high-b0",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-avc-high-b1",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-avc-mixed",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-avc-pgs-early-canvas",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-avc-six-pictures",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-hevc-b0",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-hevc-b1",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-hevc-b3",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-hevc-mixed",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-hevc-no-default-duration",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-hevc-repeated-configuration",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-startup-hevc-vps-timed-no-default",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-avc-seek-0-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-0-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-default-0-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh",
-      "requirement": "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
@@ -1342,6 +1215,70 @@
     }
   ],
   "open_deviations": [
+    {
+      "reading": "DefaultDuration is carried in exact nanoseconds",
+      "clause": "RFC 9559 sections 5.1.4.1.13 and 11.1 define DefaultDuration and timestamp units",
+      "candidate": "Keeps 41666666 ns durations, with the same selected packets, payloads, flags, PTS and DTS presence.",
+      "reference": "Reports 41000000 ns durations in the stream's integer demux clock.",
+      "compat": "compat::matroska::demux_tick_durations",
+      "cases": [
+        "matroska-startup-seek-startup-avc-high-b",
+        "matroska-startup-seek-startup-avc-high-b0",
+        "matroska-startup-seek-startup-avc-high-b1",
+        "matroska-startup-seek-seek-avc-seek-0-fresh"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "A Block presentation timestamp does not supply a decode timestamp",
+      "clause": "RFC 9559 sections 5.1.3.5.2 and 11.2 specify the Block timestamp as presentation time",
+      "candidate": "Keeps DTS absent and zero duration in the fold when no duration is present; payloads, flags and PTS match.",
+      "reference": "Publishes a derived DTS for each HEVC packet.",
+      "compat": "compat::matroska::inferred_decode_timestamps",
+      "cases": [
+        "matroska-startup-seek-startup-hevc-no-default-duration",
+        "matroska-startup-seek-startup-hevc-vps-timed-no-default",
+        "matroska-startup-seek-seek-hevc-seek-no-default-0-fresh"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "Exact duration and missing DTS are separate Block facts",
+      "clause": "RFC 9559 sections 5.1.4.1.13 and 11.1\u20132 define DefaultDuration and Block presentation timestamps",
+      "candidate": "Keeps 41666666 ns durations and leaves DTS absent. Payloads, flags and PTS match in order.",
+      "reference": "Reports 41000000 ns video durations and uses derived DTS for the HEVC packets or the PGS packet.",
+      "compat": "compat::matroska::demux_packet_clocks",
+      "cases": [
+        "matroska-startup-seek-startup-avc-pgs-early-canvas",
+        "matroska-startup-seek-startup-hevc-b0",
+        "matroska-startup-seek-startup-hevc-b1",
+        "matroska-startup-seek-startup-hevc-b3",
+        "matroska-startup-seek-startup-hevc-repeated-configuration",
+        "matroska-startup-seek-seek-hevc-seek-0-fresh",
+        "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "CodecDelay adjusts source presentation in nanoseconds",
+      "clause": "RFC 9559 sections 5.1.4.1.13, 5.1.4.1.25 and 11.1\u20132 define exact duration and subtract CodecDelay from each Block presentation timestamp",
+      "candidate": "Keeps delay-adjusted PTS, exact duration and absent DTS. Every track, payload and packet flag matches in order.",
+      "reference": "Uses a millisecond demux clock, quantizes presentation or duration where needed and also derives DTS.",
+      "compat": "compat::matroska::demux_packet_clocks",
+      "cases": [
+        "matroska-startup-seek-startup-avc-mixed",
+        "matroska-startup-seek-startup-hevc-mixed"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
     {
       "reading": "Surplus composition timing entries make a strict sample table inadmissible",
       "clause": "ISO/IEC 14496-12:2015 \u00a7\u00a78.6.1.3.1\u20138.6.1.3.3 and \u00a78.7.3.2.2 define one timing fact per sample described by the size table. This fixture writes 12 timing occurrences for six samples.",
