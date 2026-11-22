@@ -815,6 +815,19 @@ fn reset_advances_generation_rejects_stale_windows_and_preserves_retained_frames
 }
 
 #[test]
+fn end_after_core_sync_truncates_the_source_header() {
+    let pool = Budget::new(65536).unwrap();
+    for packing in [P::CanonicalBe, P::Words16Le] {
+        let (raw, _) = pack(&0x7ffe8001_u32.to_be_bytes(), packing, false, 0);
+        let mut source = reader(&pool, None, packing, settings());
+        assert_eq!(
+            next(&mut source, &pool, &raw, 1, 1).unwrap_err(),
+            Error::Truncated
+        );
+    }
+}
+
+#[test]
 fn odd_word_eof_limits_frame_count_and_foreign_pool_are_explicit_errors() {
     let pool = Budget::new(65536).unwrap();
     let (mut raw, _) = pack(&logical(96, false), P::Words14Le, false, 0);

@@ -653,9 +653,11 @@ impl DtsNormalSourceReader {
         if header.value(DtsCoreField::Normal) != Some(1)
             || header.value(DtsCoreField::Short) != Some(31)
         {
-            return Err(Error::Unsupported(
-                "DTS termination or abnormal normal sync",
-            ));
+            return Err(if header.value(DtsCoreField::Short).is_none() {
+                Error::Truncated
+            } else {
+                Error::Unsupported("DTS termination or abnormal normal sync")
+            });
         }
         if !header.syntax_complete() {
             return Err(Error::Truncated);
