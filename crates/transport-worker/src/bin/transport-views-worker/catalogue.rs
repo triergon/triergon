@@ -4,16 +4,18 @@ use std::io::Write;
 use std::sync::atomic::AtomicBool;
 
 use triergon_core::container::CodecId;
-use triergon_core::{Budget, Error, Step, WorkBudget};
+use triergon_core::{Budget, Error, SourceLocation, Step, WorkBudget};
 use triergon_mpegts::compat::pes::SourceContext;
 use triergon_mpegts::psi::{
     DescriptorNamespace, DvbNamespaceEvidence, ElementaryStream, PatCollector, PatReader, PatTable,
-    PmtReader, ProgramMap, Section, SectionAssembler, TableStep,
+    PmtReader, ProgramMap, Section, SectionAssembler, SectionHeader, TableStep,
 };
-use triergon_mpegts::reference_trace::catalogue::{Catalogue, PsiCompatibilityPolicies};
-use triergon_mpegts::stream::TransportStream;
+use triergon_mpegts::reference_trace::catalogue::{
+    Catalogue, PsiCompatibility, PsiCompatibilityPolicies, PsiCompatibilitySourceStatus,
+};
+use triergon_mpegts::stream::{FaultKind, TraceEvent, TransportStream};
 use triergon_mpegts::transport::{Continuity, ContinuityOutcome, PacketFormat, TransportPacket};
-use triergon_mpegts::{AssemblyStep, ParseLimits};
+use triergon_mpegts::{AssemblyStep, ParseLimits, SourceRange};
 
 use super::packets::{self, Carrier, GRANT, SOURCE, record};
 use super::protocol::{Operation, Work};
@@ -173,6 +175,7 @@ fn projected(
             .map_err(|e| e.to_string())?;
     }
     let mut ordinal = 0;
+    let mut observed = Vec::new();
     let result = loop {
         match transport.poll(&mut input, &mut WorkBudget::new(GRANT), &cancel) {
             Ok(Step::Ready(event)) => {
@@ -182,6 +185,7 @@ fn projected(
                         epochs: transport.source_epochs(),
                         byte_run_epoch: None,
                     };
+                    observed.push((context, SourceEvent::from(&event)));
                     view.required_psi_compatibility_work(&event)
                         .and_then(|units| {
                             view.observe_psi_compatibility(
@@ -236,8 +240,66 @@ fn projected(
         eprintln!("catalogue projection: {error}");
         return record(work, out, 8, &[], &[]);
     }
-    for evidence in view.psi_compatibility_evidence() {
+    for evidence in view.evidence() {
+        check_ranges(
+            data,
+            evidence.ranges.as_slice(),
+            evidence
+                .bytes
+                .as_slice()
+                .iter()
+                .flat_map(|section| section.iter().copied()),
+        )?;
+    }
+    for (index, evidence) in view.psi_compatibility_evidence().iter().enumerate() {
         let admitted = evidence.record();
+        let bytes = evidence.section_bytes().as_ref();
+        let header = wire_header(bytes).ok_or("missing retained PSI section header")?;
+        if admitted.evidence_index != index
+            || evidence.wire_header() != header
+            || observed
+                .get(admitted.context.source_event_ordinal as usize)
+                .map(|item| item.0)
+                != Some(admitted.context)
+        {
+            return Err("catalogue compatibility record differs from its source event".into());
+        }
+        let linked = view
+            .evidence()
+            .get(admitted.catalogue_evidence_index)
+            .ok_or("missing linked PSI evidence")?;
+        if !linked
+            .bytes
+            .as_slice()
+            .iter()
+            .any(|section| section.as_ref() == bytes)
+        {
+            return Err("catalogue record links to a different section".into());
+        }
+        check_ranges(data, evidence.source_ranges(), bytes.iter().copied())?;
+        for carrier_index in 0..evidence.carrier_count() {
+            let (carrier, context) = evidence
+                .carrier(carrier_index)
+                .ok_or("missing PSI evidence carrier")?;
+            let location =
+                usize::try_from(carrier.source_offset).map_err(|error| error.to_string())?;
+            if carrier.source_id != Some(SOURCE)
+                || data.get(location..location.saturating_add(carrier.source.len()))
+                    != Some(carrier.source.as_ref())
+                || observed.get(context.source_event_ordinal as usize)
+                    != Some(&(context, SourceEvent::Carrier(carrier.source_offset)))
+            {
+                return Err("PSI evidence carrier differs from the offered input".into());
+            }
+        }
+        check_psi_status(
+            admitted.policy,
+            header,
+            evidence.source_status(),
+            evidence.descriptor_stop_offset(),
+            bytes,
+            &observed,
+        )?;
         if out.is_some() {
             eprintln!(
                 "{}: {:?}",
@@ -279,6 +341,153 @@ fn projected(
         }
     }
     record(work, out, 7, &[], &[])
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SourceEvent {
+    Carrier(u64),
+    Pat(SectionHeader),
+    Diagnostic(FaultKind, Error, SourceLocation, Option<u16>),
+    Other,
+}
+
+impl From<&TraceEvent> for SourceEvent {
+    fn from(event: &TraceEvent) -> Self {
+        match event {
+            TraceEvent::Transport(packet) => Self::Carrier(packet.source_offset),
+            TraceEvent::Section(section) if section.pid() == 0 => {
+                wire_header(section.bytes()).map_or(Self::Other, Self::Pat)
+            }
+            TraceEvent::Diagnostic(fault) => {
+                Self::Diagnostic(fault.kind, fault.error, fault.location, fault.pid)
+            }
+            _ => Self::Other,
+        }
+    }
+}
+
+fn wire_header(bytes: &[u8]) -> Option<SectionHeader> {
+    let [table_id, _, _, high, low, version, section, last, ..] = *bytes else {
+        return None;
+    };
+    Some(SectionHeader {
+        table_id,
+        extension: u16::from_be_bytes([high, low]),
+        version: (version >> 1) & 31,
+        current_next: version & 1 != 0,
+        section_number: section,
+        last_section_number: last,
+    })
+}
+
+fn check_ranges(
+    data: &[u8],
+    ranges: &[SourceRange],
+    mut expected: impl Iterator<Item = u8>,
+) -> Result<(), String> {
+    for range in ranges {
+        let start = usize::try_from(range.offset).map_err(|error| error.to_string())?;
+        let span = data
+            .get(start..start.saturating_add(range.bytes))
+            .ok_or("PSI range outside source")?;
+        if range.entity != SOURCE || !span.iter().copied().eq(expected.by_ref().take(span.len())) {
+            return Err("PSI evidence differs from the original source range".into());
+        }
+    }
+    if expected.next().is_some() {
+        return Err("PSI evidence ranges omit section bytes".into());
+    }
+    Ok(())
+}
+
+fn check_psi_status(
+    policy: PsiCompatibility,
+    header: SectionHeader,
+    status: PsiCompatibilitySourceStatus,
+    descriptor_stop: Option<usize>,
+    bytes: &[u8],
+    observed: &[(SourceContext, SourceEvent)],
+) -> Result<(), String> {
+    let valid = match status {
+        PsiCompatibilitySourceStatus::IncompleteCurrentPat {
+            section_number,
+            last_section_number,
+        } => {
+            policy == PsiCompatibility::CurrentPatSectionBeforeWholeTable
+                && header.table_id == 0
+                && header.current_next
+                && header.section_number == section_number
+                && header.last_section_number == last_section_number
+                && last_section_number != 0
+        }
+        PsiCompatibilitySourceStatus::NotRoutedByStrictIncompletePat {
+            pat_source_event_ordinal,
+        } => {
+            policy == PsiCompatibility::CurrentPatSectionBeforeWholeTable
+                && header.table_id == 2
+                && matches!(observed.get(pat_source_event_ordinal as usize), Some((_, SourceEvent::Pat(pat))) if pat.table_id == 0 && pat.current_next && pat.last_section_number != 0)
+        }
+        PsiCompatibilitySourceStatus::RejectedPmt {
+            kind,
+            error,
+            location,
+            pid,
+            source_event_ordinal,
+            epochs,
+        } => {
+            header.table_id == 2
+                && policy != PsiCompatibility::CurrentPatSectionBeforeWholeTable
+                && observed
+                    .get(source_event_ordinal as usize)
+                    .is_some_and(|(context, event)| {
+                        context.epochs == epochs
+                            && *event == SourceEvent::Diagnostic(kind, error, location, Some(pid))
+                    })
+        }
+    };
+    let stop_matches = match policy {
+        PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity => {
+            descriptor_stop.is_some_and(|offset| malformed_descriptor(bytes) == Some(offset))
+        }
+        PsiCompatibility::PmtNonzeroSection => {
+            descriptor_stop.is_none()
+                && (header.section_number != 0 || header.last_section_number != 0)
+        }
+        PsiCompatibility::CurrentPatSectionBeforeWholeTable => descriptor_stop.is_none(),
+    };
+    if valid && stop_matches {
+        Ok(())
+    } else {
+        Err("PSI compatibility status disagrees with the wire and source diagnostic".into())
+    }
+}
+
+fn malformed_descriptor(section: &[u8]) -> Option<usize> {
+    let end = section.len().checked_sub(4)?;
+    let program_length = usize::from(u16::from_be_bytes([
+        *section.get(10)? & 15,
+        *section.get(11)?,
+    ]));
+    let mut start = 12 + program_length;
+    while start < end {
+        let head = section.get(start..start + 5)?;
+        let mut offset = start + 5;
+        start = offset + usize::from(u16::from_be_bytes([head[3] & 15, head[4]]));
+        if start > end {
+            return None;
+        }
+        while offset < start {
+            if offset + 2 > start {
+                return Some(offset);
+            }
+            let next = offset + 2 + usize::from(section[offset + 1]);
+            if next > start {
+                return Some(offset);
+            }
+            offset = next;
+        }
+    }
+    None
 }
 
 struct PsiPid {

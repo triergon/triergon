@@ -127,12 +127,6 @@
         "needs": "ts-reader-container compares packet output and ordered carrier evidence, including the confirming source fault. The full typed diagnostic context remains candidate trace evidence."
       },
       {
-        "name": "reference-trace-catalogue",
-        "entry_points": ["reference_trace::catalogue::Catalogue", "reference_trace::catalogue::CatalogueCodec", "reference_trace::catalogue::PsiCompatibility", "reference_trace::catalogue::PsiCompatibilityPolicies", "reference_trace::catalogue::PsiCompatibilityEvidence"],
-        "degree": "unit-tests",
-        "needs": "ts-catalogue compares program and selected stream order, registration tags, MPEG audio, language dispositions and DVB services. Source ranges and individual PSI compatibility evidence records remain candidate trace facts."
-      },
-      {
         "name": "reference-trace-recovery",
         "entry_points": ["reference_trace::recovery::RecoveryObserver", "reference_trace::recovery::RecoveredPacket", "reference_trace::recovery::EncodedHeader", "reference_trace::recovery::PatSelection", "reference_trace::recovery::PmtBindingJob", "reference_trace::recovery::DiagnosticPacket"],
         "degree": "unit-tests",

@@ -10,6 +10,7 @@
     "Drain each physical transport entity independently. Reference FFmpeg formats opens MPEG-TS with a preloaded byte source and calls av_read_frame to EOF with codec parsers and timestamp fill disabled.",
     "Fold kind 5 program rows (subkind 0: program number, PMT PID, PCR PID, signed PMT version), followed by member streams in observable order. The absent PMT has PCR PID zero and version -1. Reference tracks without program membership are reported as program zero.",
     "Fold kind 5 stream rows (subkind 1: program number, PID, PMT stream type, hearing-impaired flag, visual-impaired flag), then length-prefixed codec name (subkind 2), language bytes (subkind 3) and DVB subtitle initialization (subkind 4, composition and ancillary page words and type for each service). MPEG audio is represented as one codec family because the stream_type does not identify the exact audio layer. Initialization outside DVB subtitle signalling is outside this comparison.",
+    "Check every retained PSI section byte against its physical source ranges. For each compatibility record, check the linked evidence, original header, carrier and event context, and confirm the incomplete PAT, nonzero PMT section or descriptor-overrun policy against the retained wire and matching strict-source event.",
     "Fold kind 7 for clean end and kind 8 for source refusal."
   ],
   "required_profiles": [

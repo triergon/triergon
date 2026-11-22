@@ -276,6 +276,9 @@ cuts any stream type, including PGS (`0x90`), teletext and caption-carrying vide
 The [observer comparison](../../harness/features/ts-observer-forms/contract.json)
 checks each owned and borrowed span against its input carrier and checks the
 source context and ordering returned by the compact cursor.
+The [catalogue comparison](../../harness/features/ts-catalogue/contract.json)
+checks retained section and carrier bytes and the source evidence for each
+PSI compatibility policy alongside the native program and stream rows.
 `DemuxClock` places timestamps in the demuxer's 33-bit interval beside the raw
 values. Contexts outside the observed profile return `Error::Unsupported`.
 The [recovery comparison](../../harness/features/ts-recovery-trace/contract.json)
