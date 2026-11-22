@@ -36,6 +36,7 @@ impl Kind {
             "ac3-features",
             "elementary-metadata",
             "opus-final-range",
+            "flac-integer",
             "ts-video-descriptors",
             "ts-packets",
             "ts-time",

@@ -24,6 +24,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
     ("views-smoke-", protocol::smoke),
     ("media-probe-", readers::operation),
     ("elementary-metadata-", readers::operation),
+    ("flac-integer-", readers::operation),
     ("ogg-tracks-", readers::operation),
     ("ogg-pages-", readers::operation),
     ("picture-props-", video::operation),

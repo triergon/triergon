@@ -8,6 +8,7 @@ use triergon::ogg::page::{PageHeader, write_page};
 use super::protocol::{Operation, Work};
 
 mod decode;
+mod flac_integer;
 mod metadata;
 mod metadata_wire;
 mod packets;
@@ -91,6 +92,13 @@ pub(super) fn operation<'a>(
             name: "ogg-pages",
             run: Box::new(move |work, trace| pages(input, work, trace)),
         }),
+        "flac-integer-" if arguments.is_empty() || arguments == ["bare"] => {
+            let bare = !arguments.is_empty();
+            Ok(Operation {
+                name: "flac-integer",
+                run: Box::new(move |work, trace| flac_integer::run(input, bare, work, trace)),
+            })
+        }
         _ => Err(format!("usage: {prefix} operation is unavailable")),
     }
 }

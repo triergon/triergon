@@ -29,6 +29,7 @@ ORACLES = {
 }
 # Trace oracles return canonical text rows without line endings. Load each on demand.
 TRACE_ORACLES = {
+    "flac-integer": ("harness.flac_integer_oracle", "trace"),
     "elementary-metadata": ("harness.elementary_oracle", "trace"),
     "hvcc-prefix": ("harness.codec_config_oracle", "hvcc_prefix"),
     "vpcc": ("harness.codec_config_oracle", "vpcc"),

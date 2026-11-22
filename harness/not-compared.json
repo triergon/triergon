@@ -84,12 +84,6 @@
     "triergon-codec-dca": [],
     "triergon-codec-flac": [
       {
-        "name": "integer-output",
-        "entry_points": ["Decoder::decode_integer", "IntegerFrame"],
-        "degree": "recorded",
-        "needs": "a gated comparison of native integer PCM, including the low bits of 32-bit samples. The test step verifies the integer output against STREAMINFO MD5. The codecs-files item grades decoded float PCM and stereo device output."
-      },
-      {
         "name": "crc-policy",
         "entry_points": ["CrcPolicy", "Decoder::with_crc_policy"],
         "degree": "step",

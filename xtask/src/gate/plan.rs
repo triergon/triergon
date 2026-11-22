@@ -104,6 +104,7 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ("dsp-windows", Coverage::Item("oracle-compare")),
     ("dsp-divide", Coverage::Item("oracle-compare")),
     ("opus-final-range", Coverage::Item("oracle-compare")),
+    ("flac-integer", Coverage::Item("oracle-compare")),
     ("dsp-imdct", Coverage::Item("codecs dsp")),
     ("shape-libass", Coverage::Item("shape compare")),
     ("shape-text", Coverage::Item("shape compare")),
