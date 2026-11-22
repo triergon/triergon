@@ -642,396 +642,12 @@
     }
   ],
   "pending_module_requirements": [
-    "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
     "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
     "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
     "H.222.0 permits more than one PAT program. The facade requires exactly one media program and the reference is told to select program 1.",
-    "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-    "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-    "An unfinished coded audio frame at EOF has no complete access unit under ISO/IEC 14496-3. The strict reader returns truncation while the native parser exposes the remaining fragment."
+    "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree."
   ],
   "open_cases": [
-    {
-      "id": "ts188-basic",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "m2ts192-opaque-prefix",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 8637207689052002347
-      }
-    },
-    {
-      "id": "pes-header-every-byte",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "psi-header-every-byte",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 9921810301599277183
-      }
-    },
-    {
-      "id": "pes-multiple-ts",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 512,
-        "digest": 15463357684512389673
-      }
-    },
-    {
-      "id": "pes-unbounded-next-pusi",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 31,
-        "digest": 259831140731694758
-      }
-    },
-    {
-      "id": "pes-unbounded-definitive-eof",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "pes-time-unknown",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 5189187993285138615
-      }
-    },
-    {
-      "id": "pts-wrap-forward",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 2,
-        "digest": 16990955868162189420
-      }
-    },
-    {
-      "id": "pts-reorder",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 2,
-        "digest": 16520777674330161996
-      }
-    },
-    {
-      "id": "pts-dts-common-epoch",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 2,
-        "digest": 17220451788516813700
-      }
-    },
-    {
-      "id": "pts-negative-against-dts",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 1,
-        "digest": 9514069927527362964
-      }
-    },
-    {
-      "id": "pts-half-wrap-ambiguous",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 2,
-        "digest": 17174552604445888844
-      }
-    },
-    {
-      "id": "cc-wrap-15-to-zero",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 2,
-        "digest": 16520777674330161996
-      }
-    },
-    {
-      "id": "cc-one-duplicate",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 54,
-        "digest": 721451836577352255
-      }
-    },
-    {
-      "id": "cc-third-copy",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 81,
-        "digest": 10013462900046159905
-      }
-    },
-    {
-      "id": "cc-same-counter-changed-payload",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 36,
-        "digest": 14886647742272178221
-      }
-    },
-    {
-      "id": "cc-adaptation-only",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 28,
-        "digest": 9089964102301322958
-      }
-    },
-    {
-      "id": "cc-duplicate-pcr-update",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 54,
-        "digest": 721451836577352255
-      }
-    },
-    {
-      "id": "cc-loss-mid-pes",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 354,
-        "digest": 8524302181987922236
-      }
-    },
-    {
-      "id": "cc-loss-clean-pusi",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 28,
-        "digest": 9089964102301322958
-      }
-    },
-    {
-      "id": "pcr-timeline-discontinuity",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 30,
-        "digest": 1602270805323916750
-      }
-    },
-    {
-      "id": "pcr-extension-preserved",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "pcr-extension-invalid",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "transport-tei",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "transport-scrambled",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "transport-null-pid",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "transport-partial-final-packet",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "transport-sync-loss",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
     {
       "id": "psi-crc-invalid",
       "requirement": "The facade requires three regularly spaced carrier sync bytes before opening. The reference is given the MPEG-TS format explicitly and can open a short or damaged prefix.",
@@ -1271,115 +887,6 @@
       }
     },
     {
-      "id": "carriage-aac-adts-direct",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: ADTS sync/layer"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 9949399113737223991
-      }
-    },
-    {
-      "id": "carriage-aac-latm-direct",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: LOAS syncword"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529078
-      }
-    },
-    {
-      "id": "carriage-hevc-direct",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529110
-      }
-    },
-    {
-      "id": "pes-timestamp-marker",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "pes-forbidden-time-flags",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 5189187993285138615
-      }
-    },
-    {
-      "id": "pes-finite-truncated-eof",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 24,
-        "digest": 4907315518400620928
-      }
-    },
-    {
-      "id": "pes-finite-extra-payload",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "pes-audio-zero-length-invalid",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 11581988676067009176
-      }
-    },
-    {
       "id": "elementary-bytes-cross-pes",
       "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
       "candidate": {
@@ -1391,363 +898,6 @@
         "packets": 1,
         "bytes": 5,
         "digest": 8203004531478402716
-      }
-    },
-    {
-      "id": "pat-pointer-then-clean-pusi",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 6997440758094392699
-      }
-    },
-    {
-      "id": "pmt-pointer-then-clean-pusi",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 6997440758094392699
-      }
-    },
-    {
-      "id": "di-continuous-pes-payload",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 240,
-        "digest": 13839270040222557329
-      }
-    },
-    {
-      "id": "di-continuous-pes-header",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
-      }
-    },
-    {
-      "id": "di-continuous-adaptation-only",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 240,
-        "digest": 13839270040222557329
-      }
-    },
-    {
-      "id": "di-duplicate-complete",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 54,
-        "digest": 721451836577352255
-      }
-    },
-    {
-      "id": "di-duplicate-start",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 354,
-        "digest": 11810546308006601532
-      }
-    },
-    {
-      "id": "di-continuous-pat",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 6997440758094392699
-      }
-    },
-    {
-      "id": "di-continuous-pmt",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 27,
-        "digest": 6997440758094392699
-      }
-    },
-    {
-      "id": "partial-start-duplicate",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 682,
-        "digest": 1212521382984876328
-      }
-    },
-    {
-      "id": "partial-middle-duplicate",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 696,
-        "digest": 6776344600959560765
-      }
-    },
-    {
-      "id": "interleaved-other-pid-duplicate",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 54,
-        "digest": 721451836577352255
-      }
-    },
-    {
-      "id": "m2ts-prefix-only-duplicate",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 54,
-        "digest": 14599650728403439691
-      }
-    },
-    {
-      "id": "same-content-new-counters",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 54,
-        "digest": 721451836577352255
-      }
-    },
-    {
-      "id": "loss-then-clean-pusi",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 528,
-        "digest": 178975925244385769
-      }
-    },
-    {
-      "id": "loss-at-clean-pusi",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 186,
-        "digest": 1472868352923905000
-      }
-    },
-    {
-      "id": "opcr-change-is-not-duplicate",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 54,
-        "digest": 721451836577352255
-      }
-    },
-    {
-      "id": "third-middle-copy-then-clean",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 896,
-        "digest": 8454704867915823633
-      }
-    },
-    {
-      "id": "opcr-without-pcr-invalid",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 54,
-        "digest": 721451836577352255
-      }
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-finite",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 464,
-        "digest": 2206633110332191569
-      }
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-unbounded",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 464,
-        "digest": 2206633110332191569
-      }
-    },
-    {
-      "id": "finite-continuation-body-400",
-      "requirement": "H.264 and H.265 Annex B require a start-code prefix. The strict reader refuses the opaque carrier payload where the compatibility demuxer returns a parser packet.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: Annex B leading bytes"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 400,
-        "digest": 16869101003598167857
-      }
-    },
-    {
-      "id": "finite-continuation-body-401",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 401,
-        "digest": 16203249262521375477
-      }
-    },
-    {
-      "id": "finite-continuation-body-408",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 408,
-        "digest": 9612112129987823033
-      }
-    },
-    {
-      "id": "finite-continuation-body-409",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 409,
-        "digest": 10076691746746783341
-      }
-    },
-    {
-      "id": "finite-continuation-body-414",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 414,
-        "digest": 1104262977870271519
-      }
-    },
-    {
-      "id": "finite-continuation-body-415",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 415,
-        "digest": 1975334822625632647
       }
     },
     {
@@ -1804,20 +954,6 @@
         "packets": 1,
         "bytes": 2045,
         "digest": 4753204930410131174
-      }
-    },
-    {
-      "id": "au-avc-header-only-eof",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 731,
-        "digest": 13863135286758084553
       }
     },
     {
@@ -1933,20 +1069,6 @@
       }
     },
     {
-      "id": "au-hevc-header-only-eof",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 2418,
-        "digest": 14450656509375418947
-      }
-    },
-    {
       "id": "au-hevc-final-au-at-eof",
       "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
       "candidate": {
@@ -2059,19 +1181,6 @@
       }
     },
     {
-      "id": "au-adts-aac-lc-header-only-eof",
-      "requirement": "An unfinished coded audio frame at EOF has no complete access unit under ISO/IEC 14496-3. The strict reader returns truncation while the native parser exposes the remaining fragment.",
-      "candidate": {
-        "exit": 2,
-        "error": "truncated input"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 7,
-        "digest": 11955137421171832738
-      }
-    },
-    {
       "id": "au-adts-aac-lc-final-au-at-eof",
       "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
       "candidate": {
@@ -2083,19 +1192,6 @@
         "packets": 2,
         "bytes": 390,
         "digest": 8746447412952426760
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-truncated-final",
-      "requirement": "An unfinished coded audio frame at EOF has no complete access unit under ISO/IEC 14496-3. The strict reader returns truncation while the native parser exposes the remaining fragment.",
-      "candidate": {
-        "exit": 2,
-        "error": "truncated input"
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 389,
-        "digest": 12222211940478850660
       }
     },
     {
@@ -2155,71 +1251,6 @@
       }
     },
     {
-      "id": "au-adts-aac-lc-two-opaque-pes",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: ADTS sync/layer"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 25,
-        "digest": 2031204361098929596
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-opaque-then-coded",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: ADTS sync/layer"
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 208,
-        "digest": 507070727244423008
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-coded-then-opaque",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: ADTS sync/layer"
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 207,
-        "digest": 13352404034386126096
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-opaque-prefix-in-pes",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: ADTS sync/layer"
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 208,
-        "digest": 2630892234460979701
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-opaque-suffix-in-pes",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: ADTS sync/layer"
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 207,
-        "digest": 15947745093917374559
-      }
-    },
-    {
       "id": "au-adts-aac-lc-recover-pat-pointer",
       "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
       "candidate": {
@@ -2273,139 +1304,6 @@
         "packets": 2,
         "bytes": 584,
         "digest": 1769109294796948231
-      }
-    },
-    {
-      "id": "au-latm-aac-lc-opaque-prefix-in-pes",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: LOAS syncword"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 220,
-        "digest": 16613187259993382962
-      }
-    },
-    {
-      "id": "au-latm-aac-lc-opaque-then-coded",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: LOAS syncword"
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 220,
-        "digest": 12059753546944082767
-      }
-    },
-    {
-      "id": "au-latm-aac-lc-coded-then-opaque",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: LOAS syncword"
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 220,
-        "digest": 6566358389590218443
-      }
-    },
-    {
-      "id": "au-latm-aac-lc-two-opaque-pes",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: LOAS syncword"
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 26,
-        "digest": 15095274907949675884
-      }
-    },
-    {
-      "id": "au-latm-aac-lc-truncated-envelope",
-      "requirement": "An unfinished coded audio frame at EOF has no complete access unit under ISO/IEC 14496-3. The strict reader returns truncation while the native parser exposes the remaining fragment.",
-      "candidate": {
-        "exit": 2,
-        "error": "truncated input"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 197,
-        "digest": 3226882278880041755
-      }
-    },
-    {
-      "id": "au-latm-aac-lc-empty-envelope",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: empty LOAS multiplex element"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 3,
-        "digest": 14082017935433025708
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-unbounded-at-eof",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 16555830350569948468
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-unbounded-before-pes",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 13540346467430524196
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 16773510934581463536
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-unbounded-split-frame",
-      "requirement": "ISO/IEC 14496-3 defines ADTS and LOAS sync headers. The strict framer rejects an invalid header where the parser-compatible path may report opaque bytes.",
-      "candidate": {
-        "exit": 2,
-        "error": "invalid data: ADTS sync/layer"
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 16555830350569948468
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-unbounded-opaque-prefix",
-      "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
-      "candidate": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 208,
-        "digest": 3856042665398456175
       }
     },
     {
@@ -2547,6 +1445,199 @@
         "bytes": 288,
         "digest": 10022219321387664983
       }
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "A PES marked AVC or HEVC contains bytes before any admissible Annex B start code",
+      "clause": "ITU-T H.264 (08/2024) \u00a7B.1 and H.265 (07/2024) \u00a7B.2 define byte-stream NAL units with a 0x000001 prefix and allow only zero-valued leading padding; H.222.0 \u00a7\u00a72.1 and 2.4.3.6 distinguish a video elementary stream from a PES envelope.",
+      "candidate": "The strict source reader refuses with Invalid for Annex B leading bytes and does not publish an access unit there.",
+      "reference": "The compatibility parser emits one packet, from 1 to 896 bytes depending on the input, including the unchanged 27-byte PES payload for ts188-basic.",
+      "compat": "A caller forwarding opaque PES payloads uses the separate compat::pes packet view.",
+      "cases": [
+        "ts188-basic",
+        "m2ts192-opaque-prefix",
+        "pes-header-every-byte",
+        "psi-header-every-byte",
+        "pes-multiple-ts",
+        "pes-unbounded-next-pusi",
+        "pes-unbounded-definitive-eof",
+        "pes-time-unknown",
+        "pts-wrap-forward",
+        "pts-reorder",
+        "pts-dts-common-epoch",
+        "pts-negative-against-dts",
+        "pts-half-wrap-ambiguous",
+        "cc-wrap-15-to-zero",
+        "cc-one-duplicate",
+        "cc-third-copy",
+        "cc-same-counter-changed-payload",
+        "cc-adaptation-only",
+        "cc-duplicate-pcr-update",
+        "cc-loss-clean-pusi",
+        "pcr-timeline-discontinuity",
+        "pcr-extension-preserved",
+        "transport-null-pid",
+        "transport-partial-final-packet",
+        "transport-sync-loss",
+        "carriage-hevc-direct",
+        "pat-pointer-then-clean-pusi",
+        "pmt-pointer-then-clean-pusi",
+        "di-continuous-pes-payload",
+        "di-continuous-pes-header",
+        "di-continuous-adaptation-only",
+        "di-duplicate-complete",
+        "di-duplicate-start",
+        "di-continuous-pat",
+        "di-continuous-pmt",
+        "partial-start-duplicate",
+        "partial-middle-duplicate",
+        "interleaved-other-pid-duplicate",
+        "m2ts-prefix-only-duplicate",
+        "same-content-new-counters",
+        "loss-then-clean-pusi",
+        "loss-at-clean-pusi",
+        "opcr-change-is-not-duplicate",
+        "third-middle-copy-then-clean",
+        "duplicate-middle-low-occupancy-finite",
+        "duplicate-middle-low-occupancy-unbounded",
+        "finite-continuation-body-400"
+      ]
+    },
+    {
+      "reading": "ADTS bytes at a frame boundary do not contain a valid sync and layer",
+      "clause": "ISO/IEC 13818-7 \u00a76.2.1 ADTS fixed header, as described in the framing and MPEG-TS crate documentation, defines a 12-bit syncword and zero layer.",
+      "candidate": "The aligned AAC-LC framer refuses with Invalid for ADTS sync/layer.",
+      "reference": "The parser returns one or two packets for each supplied PES sequence, including opaque bytes before or after coded ADTS.",
+      "compat": "A caller forwarding damaged PES or recovering after failed ADTS framing would use compat::pes without strict audio admission.",
+      "cases": [
+        "carriage-aac-adts-direct",
+        "au-adts-aac-lc-two-opaque-pes",
+        "au-adts-aac-lc-opaque-then-coded",
+        "au-adts-aac-lc-coded-then-opaque",
+        "au-adts-aac-lc-opaque-prefix-in-pes",
+        "au-adts-aac-lc-opaque-suffix-in-pes",
+        "au-adts-aac-lc-unbounded-split-frame"
+      ]
+    },
+    {
+      "reading": "LOAS bytes at an envelope boundary do not carry the syncword",
+      "clause": "ISO/IEC 14496-3 \u00a71.7.2 AudioSyncStream, as described in the MPEG-TS crate README, defines the 11-bit LOAS syncword and delimited AudioMuxElement.",
+      "candidate": "The strict aligned framer refuses with Invalid for the LOAS syncword.",
+      "reference": "The parser returns packets containing the opaque bytes, including controls with a coded envelope adjacent to the opaque payload.",
+      "compat": "A caller preserving opaque transport payloads can use compat::pes.",
+      "cases": [
+        "carriage-aac-latm-direct",
+        "au-latm-aac-lc-opaque-prefix-in-pes",
+        "au-latm-aac-lc-opaque-then-coded",
+        "au-latm-aac-lc-coded-then-opaque",
+        "au-latm-aac-lc-two-opaque-pes"
+      ]
+    },
+    {
+      "reading": "A zero-length LOAS envelope has no LATM AudioMuxElement",
+      "clause": "ISO/IEC 14496-3 \u00a71.7.2 AudioSyncStream and AudioMuxElement, as described in the MPEG-TS crate README, require an AudioMuxElement inside the envelope.",
+      "candidate": "The strict framer refuses the empty LOAS multiplex element.",
+      "reference": "The parser emits the three-byte envelope as a packet.",
+      "compat": "A caller preserving the empty transport payload can use compat::pes.",
+      "cases": [
+        "au-latm-aac-lc-empty-envelope"
+      ]
+    },
+    {
+      "reading": "EOF within an ADTS frame or LOAS envelope does not complete an access unit",
+      "clause": "ISO/IEC 13818-7 \u00a7\u00a76.2.1\u20136.2.2 ADTS frame length and ISO/IEC 14496-3 \u00a71.7.2 LOAS audioMuxLengthBytes, described in the framing and MPEG-TS documentation, designate the complete coded extents.",
+      "candidate": "Reports Truncated at the unfinished extent.",
+      "reference": "Returns one or two parser packets, including the unfinished final extent.",
+      "compat": "A caller needing the incomplete tail can use the opaque PES operation in compat::pes.",
+      "cases": [
+        "au-adts-aac-lc-header-only-eof",
+        "au-adts-aac-lc-truncated-final",
+        "au-latm-aac-lc-truncated-envelope"
+      ]
+    },
+    {
+      "reading": "Continuity loss interrupts the finite PES",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7 define continuity on the PID and the finite packet extent.",
+      "candidate": "No complete access unit is published from the interrupted payload.",
+      "reference": "Emits one 354-byte recovered packet.",
+      "compat": "A caller recovering opaque or corrupt PES may choose compat::pes.",
+      "cases": [
+        "cc-loss-mid-pes"
+      ]
+    },
+    {
+      "reading": "Invalid PCR extension and unpaired OPCR make the carrier inadmissible",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 defines a PCR extension below 300 and permits OPCR only in a transport packet with PCR.",
+      "candidate": "No access unit is published from the invalid clock carrier or run.",
+      "reference": "Emits 27 bytes for the invalid PCR control and 54 bytes for the unpaired OPCR control.",
+      "compat": "A caller recovering opaque or corrupt PES may choose compat::pes.",
+      "cases": [
+        "pcr-extension-invalid",
+        "opcr-without-pcr-invalid"
+      ]
+    },
+    {
+      "reading": "The carrier marks payload as errored or scrambled",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 and Table 2-4 define TEI as an uncorrectable error and distinguish unscrambled payload from user-defined scrambling.",
+      "candidate": "No access unit is published from the affected payload.",
+      "reference": "Emits one 27-byte packet for each carrier.",
+      "compat": "A caller recovering opaque or corrupt PES may choose compat::pes.",
+      "cases": [
+        "transport-tei",
+        "transport-scrambled"
+      ]
+    },
+    {
+      "reading": "PES timestamp flags or marker bits violate the header grammar",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.6\u20132.4.3.7 and Table 2-21 forbid PTS_DTS_flags 01 and require timestamp marker bits to be one.",
+      "candidate": "Does not publish an access unit from the invalid PES.",
+      "reference": "Returns a 27-byte packet in both cases.",
+      "compat": "A caller recovering opaque or corrupt PES may choose compat::pes.",
+      "cases": [
+        "pes-timestamp-marker",
+        "pes-forbidden-time-flags"
+      ]
+    },
+    {
+      "reading": "A finite PES is short or its continuation exceeds the declared extent",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7 locate a single PES start at a PUSI carrier and define the exact nonzero PES_packet_length.",
+      "candidate": "Publishes no access unit from the incomplete or overlong physical run.",
+      "reference": "Emits 24 bytes from a short finite PES, 27 bytes from the bounded-prefix control, or 401 to 415 bytes from the overlong continuation controls.",
+      "compat": "A caller recovering opaque or corrupt PES may choose compat::pes.",
+      "cases": [
+        "pes-finite-truncated-eof",
+        "pes-finite-extra-payload",
+        "finite-continuation-body-401",
+        "finite-continuation-body-408",
+        "finite-continuation-body-409",
+        "finite-continuation-body-414",
+        "finite-continuation-body-415"
+      ]
+    },
+    {
+      "reading": "Zero PES_packet_length in a selected audio stream",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 permits an unbounded PES only for video elementary stream data in TS.",
+      "candidate": "Does not publish bytes from the unbounded audio PES as an access unit. A subsequent valid PES still delivers its one 195-byte frame.",
+      "reference": "Returns one 27-byte or 195-byte packet at EOF, two packets totalling 390 bytes with the following valid PES, or two packets totalling 208 bytes with the opaque prefix.",
+      "compat": "A caller recovering opaque or corrupt PES may choose compat::pes.",
+      "cases": [
+        "pes-audio-zero-length-invalid",
+        "au-adts-aac-lc-unbounded-at-eof",
+        "au-adts-aac-lc-unbounded-before-pes",
+        "au-adts-aac-lc-unbounded-opaque-prefix"
+      ]
+    },
+    {
+      "reading": "An AVC or HEVC stream ends after parameter-set NAL units",
+      "clause": "ITU-T H.264 (08/2024) \u00a7\u00a77.4.1.2.3 and B.1 and H.265 (07/2024) \u00a7\u00a77.4.2.4 and B.2 distinguish NAL headers and the VCL units that supply a coded picture.",
+      "candidate": "Reports no neutral picture packet; the source events retain header-only data.",
+      "reference": "Flushes one packet containing 731 AVC or 2418 HEVC header bytes.",
+      "compat": "A caller forwarding header-only bytes can select the source events or a compat::pes packet operation.",
+      "cases": [
+        "au-avc-header-only-eof",
+        "au-hevc-header-only-eof"
+      ]
     }
   ]
 }
