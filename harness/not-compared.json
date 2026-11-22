@@ -208,12 +208,6 @@
         "needs": "ts-recovery-trace compares projected clocks on emitted packets. Packet output is the reference observation for accepted and refused recovery contexts."
       },
       {
-        "name": "demux-profile-metadata",
-        "entry_points": ["compat::pes::DemuxProfile", "compat::pes::DemuxObserver::profile", "compat::pes::DemuxObserver::operation", "compat::pes::PrivateAudioCarriage::label", "psi::DvbViewProfile::reference_revision"],
-        "degree": "unit-tests",
-        "needs": "a check that each profile's label, revision, operation and flags equal the reference worker identity the harness records for the contract that names it; nothing a consumer runs"
-      },
-      {
         "name": "reader-views",
         "entry_points": ["Track", "Track::configuration_epoch", "Packet", "reader::Ac3AccessUnit::syncframes", "reader::DvbSubtitleUnit::segment_count", "reader::DvbSubtitleUnit::truncated_tail", "reader::IncompleteVideo::elementary_range", "reader::UnframedAudio::carriage", "reader::UnframedAudio::elementary_range"],
         "degree": "step",
