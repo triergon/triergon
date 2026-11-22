@@ -397,22 +397,19 @@ impl DtsPackedPayloadJob {
                     builder,
                     phase,
                 } => (raw, builder, phase),
-                State::Frozen { .. } => {
+                State::Frozen { raw, storage } => {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    let State::Frozen { raw, storage } =
-                        std::mem::replace(&mut self.state, State::Complete)
-                    else {
-                        unreachable!("the payload is frozen")
-                    };
-                    return Ok(Step::Ready(DtsPackedPayload {
-                        raw,
-                        storage,
+                    let payload = DtsPackedPayload {
+                        raw: raw.clone(),
+                        storage: storage.clone(),
                         identity: self.identity,
                         packing: self.packing,
                         valid_bits: self.valid_bits,
-                    }));
+                    };
+                    self.state = State::Complete;
+                    return Ok(Step::Ready(payload));
                 }
                 State::Complete => return Ok(Step::End(self.end)),
                 &mut State::Failed(error) => return Err(error),
@@ -456,22 +453,11 @@ impl DtsPackedPayloadJob {
                     *phase = Phase::Bits;
                 }
                 Phase::Freeze => {
-                    let State::Unpacking { raw, builder, .. } =
-                        std::mem::replace(&mut self.state, State::Complete)
-                    else {
-                        unreachable!("the payload is unpacking")
+                    let storage = crate::freeze_whole(builder)?;
+                    self.state = State::Frozen {
+                        raw: raw.clone(),
+                        storage,
                     };
-                    match builder.freeze() {
-                        Ok(storage) => self.state = State::Frozen { raw, storage },
-                        Err(refused) => {
-                            self.state = State::Unpacking {
-                                raw,
-                                builder: refused.value,
-                                phase: Phase::Freeze,
-                            };
-                            return Err(refused.error);
-                        }
-                    }
                 }
             }
         }

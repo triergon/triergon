@@ -301,24 +301,21 @@ impl Dts14BitUnpacker {
                     output,
                     phase,
                 } => (source, output, phase),
-                State::Frozen { .. } => {
+                State::Frozen { source, canonical } => {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    let State::Frozen { source, canonical } =
-                        std::mem::replace(&mut self.state, State::Complete)
-                    else {
-                        unreachable!("the payload is frozen")
-                    };
-                    return Ok(Step::Ready(Dts14BitPayload {
-                        source,
-                        canonical,
+                    let payload = Dts14BitPayload {
+                        source: source.clone(),
+                        canonical: canonical.clone(),
                         identity: self.identity,
                         order: self.order,
                         payload_bits: self.payload_bits,
                         residual_bits: self.partial_bits,
                         residual_value: self.partial,
-                    }));
+                    };
+                    self.state = State::Complete;
+                    return Ok(Step::Ready(payload));
                 }
                 State::Complete => return Ok(Step::End(self.record_end)),
                 &mut State::Failed(error) => return Err(error),
@@ -364,22 +361,11 @@ impl Dts14BitUnpacker {
                     if output.len() != self.output_bytes {
                         return Err(Error::Invalid("DTS packed output length"));
                     }
-                    let State::Unpacking { source, output, .. } =
-                        std::mem::replace(&mut self.state, State::Complete)
-                    else {
-                        unreachable!("the payload is unpacking")
+                    let canonical = crate::freeze_whole(output)?;
+                    self.state = State::Frozen {
+                        source: source.clone(),
+                        canonical,
                     };
-                    match output.freeze() {
-                        Ok(canonical) => self.state = State::Frozen { source, canonical },
-                        Err(refused) => {
-                            self.state = State::Unpacking {
-                                source,
-                                output: refused.value,
-                                phase: Phase::Freeze,
-                            };
-                            return Err(refused.error);
-                        }
-                    }
                 }
             }
         }
