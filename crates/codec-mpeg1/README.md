@@ -80,7 +80,7 @@ charges a caller's `Budget`.
   picture (a keepalive). When the whole picture repeats, a macroblock the previous
   picture skipped after its residual quantised to zero is skipped again without
   computing the residual, as long as its quantiser is no finer: its residual is the
-  same, and the output is what computing it would give. The first I picture of an
+  same, and both reconstruction buffers already hold the skipped samples. The first I picture of an
   encoder runs a trial pass that counts bits to seed the intra rate model.
   Reconstruction runs only for the coded picture.
 - The picture rate is fixed at 30 Hz. Timestamps belong to the caller or muxer.

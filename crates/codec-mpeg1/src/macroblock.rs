@@ -252,13 +252,14 @@ impl Encoder {
             // The previous picture skipped this macroblock and the picture is
             // repeated, so its residual is the one that quantised to zero
             // there, at a quantiser no coarser than this one: skip again.
+            // The previous skip copied the zero-vector prediction, so both
+            // reconstruction buffers already hold the same samples here.
             #[cfg(test)]
             {
                 self.reused_skips += 1;
             }
             s.skipped += 1;
             s.pmv = Mv::ZERO;
-            self.copy_reference(mb_x, mb_y);
             return;
         }
         let g = self.cfg.geometry;
@@ -399,24 +400,6 @@ impl Encoder {
             write_mv_component(&mut self.writer, v - p, f_code);
         }
         s.pmv = mv;
-    }
-
-    /// Reconstruct a macroblock as the reference's co-sited samples.
-    fn copy_reference(&mut self, mb_x: usize, mb_y: usize) {
-        let g = self.cfg.geometry;
-        for b in [0, 4, 5] {
-            let (plane, stride, x, y, _) = block_origin(g, b, mb_x, mb_y);
-            let size = if plane == 0 { 16 } else { 8 };
-            let (src, dst) = match plane {
-                0 => (self.reference.y(), self.recon.y_mut()),
-                1 => (self.reference.cb(), self.recon.cb_mut()),
-                _ => (self.reference.cr(), self.recon.cr_mut()),
-            };
-            for r in 0..size {
-                let at = (y + r) * stride + x;
-                dst[at..at + size].copy_from_slice(&src[at..at + size]);
-            }
-        }
     }
 
     /// Write a macroblock's six predicted (or reconstructed) blocks to the

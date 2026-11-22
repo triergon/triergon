@@ -205,6 +205,8 @@ fn skips_reused_for_a_repeated_picture_match_the_computed_path() {
         computed.encode(&input, &mut b).unwrap();
         assert_eq!(a, b);
         assert_eq!(reused.reference.y(), computed.reference.y());
+        assert_eq!(reused.reference.cb(), computed.reference.cb());
+        assert_eq!(reused.reference.cr(), computed.reference.cr());
     }
     assert!(
         reused.reused_skips > 0,
