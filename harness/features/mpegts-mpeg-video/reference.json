@@ -1,0 +1,19 @@
+{
+  "worker_sha256": "20f44220bb9402b61e637aa20c68f5d30014845c9ccc0424c6185abda4722471",
+  "mode": "ts-au-fold",
+  "libraries": [
+    {
+      "file": "libavformat.63.1.102.dylib",
+      "sha256": "eb56e3ec67f4374a8aafa55b1fc9e97be06cfb2d2357409e605387a59e1fffb3"
+    },
+    {
+      "file": "libavcodec.63.1.102.dylib",
+      "sha256": "1caae9c7df5e4811c2f72096f481adcf05caec2b621ed6b310e57e585e8814d2"
+    },
+    {
+      "file": "libavutil.61.1.102.dylib",
+      "sha256": "2f9f3ee3250af47a077d8a83fbf6885f3868f28b5f365b211cbb01dddb031c75"
+    }
+  ],
+  "adapter_sha256": "072c93d8fe8c9856d41d7f5b3b822e4f89ca11bd9afbc306e0cf0fd2553c8046"
+}

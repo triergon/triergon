@@ -140,6 +140,10 @@ The probe charges bounded work, preserves the original table and PES facts
 and applies again at framing resets. A failed initial probe reports the
 route as unsupported and later PES cannot rescue it.
 
+Select MPEG video to read one complete MPEG-1 I or MPEG-2 I, P or B picture
+from an aligned finite PES of at most 175 payload bytes. A picture may span
+multiple carriers. The packet retains the original clocks and source ranges.
+
 ### Packets, events and timing
 
 `Packet` implements `PacketInfo` and retains its PMT, source configuration epoch,

@@ -36,6 +36,8 @@ pub enum Profile {
     Subtitles,
     /// MPEG-TS and the DTS core packet parser.
     TransportDts,
+    /// MPEG-TS and the ordinary MPEG-1/2 video packet parser.
+    TransportMpegVideo,
     /// FFmpeg's default configuration (static libraries, `ffmpeg`, `ffprobe`):
     /// the decoder comparison reference, and the independent decoder and demuxer
     /// of the capture comparison.
@@ -61,6 +63,7 @@ impl Profile {
             Profile::Matroska => ".research/reference",
             Profile::Formats => ".research/reference-formats",
             Profile::TransportDts => ".research/reference-transport-dts",
+            Profile::TransportMpegVideo => ".research/reference-transport-mpeg-video",
             Profile::Video => ".research/reference-video",
             Profile::Subtitles => ".research/reference-subtitles",
             Profile::Decode => ".research/reference-decode",
@@ -75,7 +78,8 @@ impl Profile {
             | Profile::Formats
             | Profile::Video
             | Profile::Subtitles
-            | Profile::TransportDts => Source::Revision,
+            | Profile::TransportDts
+            | Profile::TransportMpegVideo => Source::Revision,
             Profile::Decode | Profile::Capture | Profile::CaptureSmall => Source::Release,
         }
     }
@@ -85,6 +89,7 @@ impl Profile {
             Profile::Matroska,
             Profile::Formats,
             Profile::TransportDts,
+            Profile::TransportMpegVideo,
             Profile::Video,
             Profile::Subtitles,
             Profile::Decode,
@@ -100,6 +105,7 @@ impl Profile {
             Profile::Matroska => "matroska",
             Profile::Formats => "formats",
             Profile::TransportDts => "transport-dts",
+            Profile::TransportMpegVideo => "transport-mpeg-video",
             Profile::Video => "video",
             Profile::Subtitles => "subtitles",
             Profile::Decode => "decode",
@@ -167,7 +173,8 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
         | Profile::Formats
         | Profile::Video
         | Profile::Subtitles
-        | Profile::TransportDts => {}
+        | Profile::TransportDts
+        | Profile::TransportMpegVideo => {}
     }
     let mut argv: Vec<String> = [
         "./configure",
@@ -209,6 +216,16 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
             *flag = match flag.as_str() {
                 "--enable-demuxer=matroska" => "--enable-demuxer=mpegts",
                 "--enable-parser=h264,hevc,aac,ac3,vorbis" => "--enable-parser=dca",
+                other => other,
+            }
+            .to_owned();
+        }
+    }
+    if profile == Profile::TransportMpegVideo {
+        for flag in &mut argv {
+            *flag = match flag.as_str() {
+                "--enable-demuxer=matroska" => "--enable-demuxer=mpegts",
+                "--enable-parser=h264,hevc,aac,ac3,vorbis" => "--enable-parser=mpegvideo",
                 other => other,
             }
             .to_owned();
@@ -745,11 +762,39 @@ mod tests {
         assert_eq!(matroska[1], "--prefix=/p/install");
         assert_eq!(matroska.len() + 1, formats.len());
         assert!(formats.contains(
+            &"--enable-parser=h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub,mpegaudio".to_owned()
+        ));
+        assert!(formats.contains(
             &"--enable-demuxer=matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub".to_owned()
         ));
         assert_eq!(
             formats.last().unwrap(),
             "--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata"
+        );
+    }
+
+    #[test]
+    fn transport_mpeg_video_isolates_the_ordinary_parser() {
+        let prefix = Path::new("/p/install");
+        let dts = configure_argv(prefix, Profile::TransportDts);
+        let video = configure_argv(prefix, Profile::TransportMpegVideo);
+        let expected: Vec<_> = dts
+            .into_iter()
+            .map(|arg| {
+                if arg == "--enable-parser=dca" {
+                    "--enable-parser=mpegvideo".to_owned()
+                } else {
+                    arg
+                }
+            })
+            .collect();
+        assert_eq!(video, expected);
+        assert!(video.contains(&"--enable-demuxer=mpegts".to_owned()));
+        assert!(Profile::TransportMpegVideo.source() == Source::Revision);
+        assert!(Profile::parse("transport-mpeg-video") == Some(Profile::TransportMpegVideo));
+        assert_ne!(
+            Profile::TransportMpegVideo.cache(),
+            Profile::Formats.cache()
         );
     }
 
