@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "id": "ac3-features",
+  "gate": "required",
+  "operation": "ac3-features",
+  "candidate": "codec-views-worker",
+  "worker_operation": "ac3-features-",
+  "oracle": "ac3-features",
+  "required_profiles": [
+    "zero-width"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "contract": [
+    "Read AC-3 main-body syncframes through all six blocks under the A/52:2018 high-exponent, minimum-SNR profile. An independent wire reader checks exponent strategies, bit allocation side information and the zero-width mantissa domain.",
+    "Compare one kind 4 row per syncframe: byte offset and the 16 FrameFeatures flags in declaration order.",
+    "The controls vary early and late block flags, coupling, phase words, rematrixing, delta allocation, dynamic range, dither and reuse across blocks. General bit allocation and Annex E tool usage remain outside this contract."
+  ],
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "no-flags",
+        "switch-first",
+        "switch-last",
+        "dither-last",
+        "range-last",
+        "rematrix-last",
+        "delta-first",
+        "delta-last",
+        "plain-coupling",
+        "phase-flags",
+        "skip-first",
+        "skip-last",
+        "mixed",
+        "feature-reset"
+      ],
+      "cause": "The specification oracle has no equivalent live reference operation."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "no-flags",
+        "switch-first",
+        "switch-last",
+        "dither-last",
+        "range-last",
+        "rematrix-last",
+        "delta-first",
+        "delta-last",
+        "plain-coupling",
+        "phase-flags",
+        "skip-first",
+        "skip-last",
+        "mixed",
+        "feature-reset"
+      ],
+      "cause": "The specification oracle has no equivalent live reference operation."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "no-flags",
+        "switch-first",
+        "switch-last",
+        "dither-last",
+        "range-last",
+        "rematrix-last",
+        "delta-first",
+        "delta-last",
+        "plain-coupling",
+        "phase-flags",
+        "skip-first",
+        "skip-last",
+        "mixed",
+        "feature-reset"
+      ],
+      "cause": "The specification oracle has no equivalent live reference operation."
+    }
+  ]
+}

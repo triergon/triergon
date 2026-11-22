@@ -1,0 +1,5412 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "clock-00-00-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/1000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-00-00-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/1000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-00-01-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/90000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12096848527779787859
+      }
+    },
+    {
+      "id": "clock-00-01-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/90000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12096848527779787859
+      }
+    },
+    {
+      "id": "clock-00-02-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/48000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17761353733721090131
+      }
+    },
+    {
+      "id": "clock-00-02-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/48000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17761353733721090131
+      }
+    },
+    {
+      "id": "clock-00-03-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/44100",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5560710342538660435
+      }
+    },
+    {
+      "id": "clock-00-03-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/44100",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5560710342538660435
+      }
+    },
+    {
+      "id": "clock-00-04-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/1000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6195281532545398867
+      }
+    },
+    {
+      "id": "clock-00-04-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/1000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6195281532545398867
+      }
+    },
+    {
+      "id": "clock-00-05-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/1000000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9546846599522011219
+      }
+    },
+    {
+      "id": "clock-00-05-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/1000000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9546846599522011219
+      }
+    },
+    {
+      "id": "clock-00-06-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1001/30000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18163570702990342797
+      }
+    },
+    {
+      "id": "clock-00-06-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1001/30000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18163570702990342797
+      }
+    },
+    {
+      "id": "clock-00-07-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/24000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7821968084466440275
+      }
+    },
+    {
+      "id": "clock-00-07-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/24000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7821968084466440275
+      }
+    },
+    {
+      "id": "clock-00-08-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/22050",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17027686686514826195
+      }
+    },
+    {
+      "id": "clock-00-08-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/22050",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17027686686514826195
+      }
+    },
+    {
+      "id": "clock-00-09-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/32000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11135096634217990227
+      }
+    },
+    {
+      "id": "clock-00-09-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/32000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11135096634217990227
+      }
+    },
+    {
+      "id": "clock-00-10-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/192000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3610691334410782803
+      }
+    },
+    {
+      "id": "clock-00-10-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000",
+        "1/192000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3610691334410782803
+      }
+    },
+    {
+      "id": "clock-01-00-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/1000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 701393212264555405
+      }
+    },
+    {
+      "id": "clock-01-00-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/1000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 701393212264555405
+      }
+    },
+    {
+      "id": "clock-01-01-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/90000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-01-01-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/90000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-01-02-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/48000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3686872028838197389
+      }
+    },
+    {
+      "id": "clock-01-02-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/48000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3686872028838197389
+      }
+    },
+    {
+      "id": "clock-01-03-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/44100",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5849238689381798541
+      }
+    },
+    {
+      "id": "clock-01-03-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/44100",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5849238689381798541
+      }
+    },
+    {
+      "id": "clock-01-04-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/1000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8828975103426502099
+      }
+    },
+    {
+      "id": "clock-01-04-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/1000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8828975103426502099
+      }
+    },
+    {
+      "id": "clock-01-05-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/1000000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3332191493168932307
+      }
+    },
+    {
+      "id": "clock-01-05-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/1000000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3332191493168932307
+      }
+    },
+    {
+      "id": "clock-01-06-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1001/30000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15656560756623847565
+      }
+    },
+    {
+      "id": "clock-01-06-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1001/30000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15656560756623847565
+      }
+    },
+    {
+      "id": "clock-01-07-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/24000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16333944337662981133
+      }
+    },
+    {
+      "id": "clock-01-07-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/24000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16333944337662981133
+      }
+    },
+    {
+      "id": "clock-01-08-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/22050",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 14571573005921007117
+      }
+    },
+    {
+      "id": "clock-01-08-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/22050",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 14571573005921007117
+      }
+    },
+    {
+      "id": "clock-01-09-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/32000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 646845762624061453
+      }
+    },
+    {
+      "id": "clock-01-09-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/32000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 646845762624061453
+      }
+    },
+    {
+      "id": "clock-01-10-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/192000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15796924006718726739
+      }
+    },
+    {
+      "id": "clock-01-10-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/90000",
+        "1/192000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15796924006718726739
+      }
+    },
+    {
+      "id": "clock-02-00-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/1000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11171394200079562381
+      }
+    },
+    {
+      "id": "clock-02-00-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/1000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11171394200079562381
+      }
+    },
+    {
+      "id": "clock-02-01-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/90000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17282738752077273825
+      }
+    },
+    {
+      "id": "clock-02-01-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/90000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17282738752077273825
+      }
+    },
+    {
+      "id": "clock-02-02-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/48000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-02-02-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/48000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-02-03-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/44100",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16615498301088125453
+      }
+    },
+    {
+      "id": "clock-02-03-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/44100",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16615498301088125453
+      }
+    },
+    {
+      "id": "clock-02-04-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/1000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9503853914481276243
+      }
+    },
+    {
+      "id": "clock-02-04-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/1000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9503853914481276243
+      }
+    },
+    {
+      "id": "clock-02-05-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/1000000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7333205184699941203
+      }
+    },
+    {
+      "id": "clock-02-05-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/1000000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7333205184699941203
+      }
+    },
+    {
+      "id": "clock-02-06-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1001/30000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3909858199975965069
+      }
+    },
+    {
+      "id": "clock-02-06-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1001/30000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3909858199975965069
+      }
+    },
+    {
+      "id": "clock-02-07-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/24000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8125747929557289613
+      }
+    },
+    {
+      "id": "clock-02-07-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/24000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8125747929557289613
+      }
+    },
+    {
+      "id": "clock-02-08-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/22050",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4260142926450506509
+      }
+    },
+    {
+      "id": "clock-02-08-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/22050",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4260142926450506509
+      }
+    },
+    {
+      "id": "clock-02-09-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/32000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12361238492439530637
+      }
+    },
+    {
+      "id": "clock-02-09-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/32000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12361238492439530637
+      }
+    },
+    {
+      "id": "clock-02-10-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/192000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8762518746942341203
+      }
+    },
+    {
+      "id": "clock-02-10-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/48000",
+        "1/192000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8762518746942341203
+      }
+    },
+    {
+      "id": "clock-03-00-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/1000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18185942698458153613
+      }
+    },
+    {
+      "id": "clock-03-00-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/1000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18185942698458153613
+      }
+    },
+    {
+      "id": "clock-03-01-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/90000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3187566478456826835
+      }
+    },
+    {
+      "id": "clock-03-01-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/90000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3187566478456826835
+      }
+    },
+    {
+      "id": "clock-03-02-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/48000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16898758595640825953
+      }
+    },
+    {
+      "id": "clock-03-02-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/48000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16898758595640825953
+      }
+    },
+    {
+      "id": "clock-03-03-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/44100",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-03-03-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/44100",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-03-04-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/1000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17465479163939283
+      }
+    },
+    {
+      "id": "clock-03-04-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/1000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17465479163939283
+      }
+    },
+    {
+      "id": "clock-03-05-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/1000000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17245593556871904851
+      }
+    },
+    {
+      "id": "clock-03-05-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/1000000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17245593556871904851
+      }
+    },
+    {
+      "id": "clock-03-06-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1001/30000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18304611257413733005
+      }
+    },
+    {
+      "id": "clock-03-06-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1001/30000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18304611257413733005
+      }
+    },
+    {
+      "id": "clock-03-07-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/24000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16494346890775391245
+      }
+    },
+    {
+      "id": "clock-03-07-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/24000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16494346890775391245
+      }
+    },
+    {
+      "id": "clock-03-08-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/22050",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8125747929557289613
+      }
+    },
+    {
+      "id": "clock-03-08-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/22050",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8125747929557289613
+      }
+    },
+    {
+      "id": "clock-03-09-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/32000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1557582558509955469
+      }
+    },
+    {
+      "id": "clock-03-09-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/32000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1557582558509955469
+      }
+    },
+    {
+      "id": "clock-03-10-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/192000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2237186348987797587
+      }
+    },
+    {
+      "id": "clock-03-10-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/44100",
+        "1/192000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2237186348987797587
+      }
+    },
+    {
+      "id": "clock-04-00-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/1000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17441873327408594701
+      }
+    },
+    {
+      "id": "clock-04-00-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/1000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17441873327408594701
+      }
+    },
+    {
+      "id": "clock-04-01-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/90000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9218975281432135437
+      }
+    },
+    {
+      "id": "clock-04-01-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/90000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9218975281432135437
+      }
+    },
+    {
+      "id": "clock-04-02-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/48000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16533573144047379853
+      }
+    },
+    {
+      "id": "clock-04-02-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/48000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16533573144047379853
+      }
+    },
+    {
+      "id": "clock-04-03-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/44100",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18298553962116668813
+      }
+    },
+    {
+      "id": "clock-04-03-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/44100",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18298553962116668813
+      }
+    },
+    {
+      "id": "clock-04-04-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/1000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-04-04-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/1000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-04-05-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/1000000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6195281532545398867
+      }
+    },
+    {
+      "id": "clock-04-05-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/1000000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6195281532545398867
+      }
+    },
+    {
+      "id": "clock-04-06-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1001/30000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11988800356274934669
+      }
+    },
+    {
+      "id": "clock-04-06-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1001/30000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11988800356274934669
+      }
+    },
+    {
+      "id": "clock-04-07-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/24000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12773649423725051789
+      }
+    },
+    {
+      "id": "clock-04-07-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/24000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12773649423725051789
+      }
+    },
+    {
+      "id": "clock-04-08-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/22050",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7408795560508873741
+      }
+    },
+    {
+      "id": "clock-04-08-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/22050",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7408795560508873741
+      }
+    },
+    {
+      "id": "clock-04-09-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/32000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1623855306672026381
+      }
+    },
+    {
+      "id": "clock-04-09-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/32000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1623855306672026381
+      }
+    },
+    {
+      "id": "clock-04-10-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/192000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15528324101736687373
+      }
+    },
+    {
+      "id": "clock-04-10-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000",
+        "1/192000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15528324101736687373
+      }
+    },
+    {
+      "id": "clock-05-00-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/1000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5237148829687733133
+      }
+    },
+    {
+      "id": "clock-05-00-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/1000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5237148829687733133
+      }
+    },
+    {
+      "id": "clock-05-01-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/90000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3583851746091380365
+      }
+    },
+    {
+      "id": "clock-05-01-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/90000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3583851746091380365
+      }
+    },
+    {
+      "id": "clock-05-02-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/48000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10947463670555068557
+      }
+    },
+    {
+      "id": "clock-05-02-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/48000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10947463670555068557
+      }
+    },
+    {
+      "id": "clock-05-03-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/44100",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11408950190810161421
+      }
+    },
+    {
+      "id": "clock-05-03-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/44100",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11408950190810161421
+      }
+    },
+    {
+      "id": "clock-05-04-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/1000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17441873327408594701
+      }
+    },
+    {
+      "id": "clock-05-04-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/1000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17441873327408594701
+      }
+    },
+    {
+      "id": "clock-05-05-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/1000000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-05-05-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/1000000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-05-06-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1001/30000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 14934210424317733645
+      }
+    },
+    {
+      "id": "clock-05-06-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1001/30000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 14934210424317733645
+      }
+    },
+    {
+      "id": "clock-05-07-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/24000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8611935185573911565
+      }
+    },
+    {
+      "id": "clock-05-07-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/24000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8611935185573911565
+      }
+    },
+    {
+      "id": "clock-05-08-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/22050",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4505610980925973261
+      }
+    },
+    {
+      "id": "clock-05-08-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/22050",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4505610980925973261
+      }
+    },
+    {
+      "id": "clock-05-09-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/32000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3838235030325842445
+      }
+    },
+    {
+      "id": "clock-05-09-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/32000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3838235030325842445
+      }
+    },
+    {
+      "id": "clock-05-10-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/192000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 13654732175462183949
+      }
+    },
+    {
+      "id": "clock-05-10-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1000000000",
+        "1/192000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 13654732175462183949
+      }
+    },
+    {
+      "id": "clock-06-00-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/1000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8318557847884145363
+      }
+    },
+    {
+      "id": "clock-06-00-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/1000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8318557847884145363
+      }
+    },
+    {
+      "id": "clock-06-01-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/90000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7922201868873589331
+      }
+    },
+    {
+      "id": "clock-06-01-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/90000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7922201868873589331
+      }
+    },
+    {
+      "id": "clock-06-02-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/48000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7361108160906282707
+      }
+    },
+    {
+      "id": "clock-06-02-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/48000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7361108160906282707
+      }
+    },
+    {
+      "id": "clock-06-03-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/44100",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 872454301881994451
+      }
+    },
+    {
+      "id": "clock-06-03-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/44100",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 872454301881994451
+      }
+    },
+    {
+      "id": "clock-06-04-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/1000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18288329853284942163
+      }
+    },
+    {
+      "id": "clock-06-04-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/1000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18288329853284942163
+      }
+    },
+    {
+      "id": "clock-06-05-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/1000000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2836350146142001491
+      }
+    },
+    {
+      "id": "clock-06-05-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/1000000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2836350146142001491
+      }
+    },
+    {
+      "id": "clock-06-06-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1001/30000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-06-06-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1001/30000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-06-07-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/24000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9977980298644546643
+      }
+    },
+    {
+      "id": "clock-06-07-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/24000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9977980298644546643
+      }
+    },
+    {
+      "id": "clock-06-08-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/22050",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5896312820890221779
+      }
+    },
+    {
+      "id": "clock-06-08-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/22050",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5896312820890221779
+      }
+    },
+    {
+      "id": "clock-06-09-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/32000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6945963294029638739
+      }
+    },
+    {
+      "id": "clock-06-09-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/32000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6945963294029638739
+      }
+    },
+    {
+      "id": "clock-06-10-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/192000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12021051702271814867
+      }
+    },
+    {
+      "id": "clock-06-10-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1001/30000",
+        "1/192000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12021051702271814867
+      }
+    },
+    {
+      "id": "clock-07-00-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/1000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16066381699566370189
+      }
+    },
+    {
+      "id": "clock-07-00-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/1000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16066381699566370189
+      }
+    },
+    {
+      "id": "clock-07-01-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/90000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6587158402270381523
+      }
+    },
+    {
+      "id": "clock-07-01-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/90000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6587158402270381523
+      }
+    },
+    {
+      "id": "clock-07-02-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/48000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12545922627931841619
+      }
+    },
+    {
+      "id": "clock-07-02-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/48000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12545922627931841619
+      }
+    },
+    {
+      "id": "clock-07-03-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/44100",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9307977820322759009
+      }
+    },
+    {
+      "id": "clock-07-03-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/44100",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9307977820322759009
+      }
+    },
+    {
+      "id": "clock-07-04-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/1000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17507624938442976083
+      }
+    },
+    {
+      "id": "clock-07-04-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/1000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17507624938442976083
+      }
+    },
+    {
+      "id": "clock-07-05-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/1000000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15341430473686640979
+      }
+    },
+    {
+      "id": "clock-07-05-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/1000000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15341430473686640979
+      }
+    },
+    {
+      "id": "clock-07-06-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1001/30000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9333406376651019277
+      }
+    },
+    {
+      "id": "clock-07-06-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1001/30000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9333406376651019277
+      }
+    },
+    {
+      "id": "clock-07-07-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/24000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-07-07-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/24000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-07-08-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/22050",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16615498301088125453
+      }
+    },
+    {
+      "id": "clock-07-08-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/22050",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16615498301088125453
+      }
+    },
+    {
+      "id": "clock-07-09-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/32000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4252591012520387041
+      }
+    },
+    {
+      "id": "clock-07-09-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/32000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4252591012520387041
+      }
+    },
+    {
+      "id": "clock-07-10-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/192000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1195710984963340371
+      }
+    },
+    {
+      "id": "clock-07-10-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/24000",
+        "1/192000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1195710984963340371
+      }
+    },
+    {
+      "id": "clock-08-00-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/1000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7575528711167680525
+      }
+    },
+    {
+      "id": "clock-08-00-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/1000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7575528711167680525
+      }
+    },
+    {
+      "id": "clock-08-01-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/90000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7972620489526995667
+      }
+    },
+    {
+      "id": "clock-08-01-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/90000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7972620489526995667
+      }
+    },
+    {
+      "id": "clock-08-02-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/48000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10365899617323699795
+      }
+    },
+    {
+      "id": "clock-08-02-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/48000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10365899617323699795
+      }
+    },
+    {
+      "id": "clock-08-03-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/44100",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12545922627931841619
+      }
+    },
+    {
+      "id": "clock-08-03-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/44100",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12545922627931841619
+      }
+    },
+    {
+      "id": "clock-08-04-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/1000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15296554184585507155
+      }
+    },
+    {
+      "id": "clock-08-04-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/1000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15296554184585507155
+      }
+    },
+    {
+      "id": "clock-08-05-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/1000000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16769678189530591315
+      }
+    },
+    {
+      "id": "clock-08-05-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/1000000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16769678189530591315
+      }
+    },
+    {
+      "id": "clock-08-06-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1001/30000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2108453588064235789
+      }
+    },
+    {
+      "id": "clock-08-06-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1001/30000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2108453588064235789
+      }
+    },
+    {
+      "id": "clock-08-07-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/24000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16898758595640825953
+      }
+    },
+    {
+      "id": "clock-08-07-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/24000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16898758595640825953
+      }
+    },
+    {
+      "id": "clock-08-08-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/22050",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-08-08-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/22050",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-08-09-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/32000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5582549314836665185
+      }
+    },
+    {
+      "id": "clock-08-09-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/32000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5582549314836665185
+      }
+    },
+    {
+      "id": "clock-08-10-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/192000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5320645668699386835
+      }
+    },
+    {
+      "id": "clock-08-10-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/22050",
+        "1/192000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5320645668699386835
+      }
+    },
+    {
+      "id": "clock-09-00-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/1000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10370411667210277901
+      }
+    },
+    {
+      "id": "clock-09-00-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/1000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10370411667210277901
+      }
+    },
+    {
+      "id": "clock-09-01-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/90000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17029920996790474707
+      }
+    },
+    {
+      "id": "clock-09-01-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/90000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17029920996790474707
+      }
+    },
+    {
+      "id": "clock-09-02-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/48000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6825014957557182305
+      }
+    },
+    {
+      "id": "clock-09-02-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/48000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6825014957557182305
+      }
+    },
+    {
+      "id": "clock-09-03-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/44100",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1915369092622789345
+      }
+    },
+    {
+      "id": "clock-09-03-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/44100",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1915369092622789345
+      }
+    },
+    {
+      "id": "clock-09-04-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/1000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5680453222089209555
+      }
+    },
+    {
+      "id": "clock-09-04-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/1000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5680453222089209555
+      }
+    },
+    {
+      "id": "clock-09-05-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/1000000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4011698213380719699
+      }
+    },
+    {
+      "id": "clock-09-05-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/1000000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4011698213380719699
+      }
+    },
+    {
+      "id": "clock-09-06-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1001/30000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5794590092978860813
+      }
+    },
+    {
+      "id": "clock-09-06-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1001/30000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5794590092978860813
+      }
+    },
+    {
+      "id": "clock-09-07-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/24000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11200935059556144653
+      }
+    },
+    {
+      "id": "clock-09-07-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/24000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11200935059556144653
+      }
+    },
+    {
+      "id": "clock-09-08-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/22050",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 14286609338569088141
+      }
+    },
+    {
+      "id": "clock-09-08-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/22050",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 14286609338569088141
+      }
+    },
+    {
+      "id": "clock-09-09-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/32000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-09-09-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/32000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-09-10-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/192000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4979114865952840787
+      }
+    },
+    {
+      "id": "clock-09-10-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/32000",
+        "1/192000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4979114865952840787
+      }
+    },
+    {
+      "id": "clock-10-00-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/1000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10356826959171417741
+      }
+    },
+    {
+      "id": "clock-10-00-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/1000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10356826959171417741
+      }
+    },
+    {
+      "id": "clock-10-01-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/90000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3252882085262090125
+      }
+    },
+    {
+      "id": "clock-10-01-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/90000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3252882085262090125
+      }
+    },
+    {
+      "id": "clock-10-02-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/48000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2576875575489661325
+      }
+    },
+    {
+      "id": "clock-10-02-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/48000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2576875575489661325
+      }
+    },
+    {
+      "id": "clock-10-03-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/44100",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11908455436147975437
+      }
+    },
+    {
+      "id": "clock-10-03-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/44100",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11908455436147975437
+      }
+    },
+    {
+      "id": "clock-10-04-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/1000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1463022651688531667
+      }
+    },
+    {
+      "id": "clock-10-04-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/1000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1463022651688531667
+      }
+    },
+    {
+      "id": "clock-10-05-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/1000000000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4268647295615476563
+      }
+    },
+    {
+      "id": "clock-10-05-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/1000000000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4268647295615476563
+      }
+    },
+    {
+      "id": "clock-10-06-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1001/30000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 13756657105691585293
+      }
+    },
+    {
+      "id": "clock-10-06-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1001/30000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 13756657105691585293
+      }
+    },
+    {
+      "id": "clock-10-07-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/24000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15257815112659145741
+      }
+    },
+    {
+      "id": "clock-10-07-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/24000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15257815112659145741
+      }
+    },
+    {
+      "id": "clock-10-08-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/22050",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2052599850261510669
+      }
+    },
+    {
+      "id": "clock-10-08-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/22050",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2052599850261510669
+      }
+    },
+    {
+      "id": "clock-10-09-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/32000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3385442162396885773
+      }
+    },
+    {
+      "id": "clock-10-09-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/32000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3385442162396885773
+      }
+    },
+    {
+      "id": "clock-10-10-direct",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/192000",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "clock-10-10-prepared",
+      "profile": "clocks",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/192000",
+        "1/192000",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "seed-00-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "877324117/1116735497",
+        "1163876029/1506705062",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4384969424308353121
+      }
+    },
+    {
+      "id": "seed-00-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "877324117/1116735497",
+        "1163876029/1506705062",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4384969424308353121
+      }
+    },
+    {
+      "id": "seed-01-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1851209552/250515588",
+        "379386582/815117931",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11591250932249809235
+      }
+    },
+    {
+      "id": "seed-01-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1851209552/250515588",
+        "379386582/815117931",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11591250932249809235
+      }
+    },
+    {
+      "id": "seed-02-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "483526400/621842761",
+        "62485878/482510476",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10084475848317769683
+      }
+    },
+    {
+      "id": "seed-02-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "483526400/621842761",
+        "62485878/482510476",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10084475848317769683
+      }
+    },
+    {
+      "id": "seed-03-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "250505111/1221250767",
+        "18909939/215135140",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 14469302707906296019
+      }
+    },
+    {
+      "id": "seed-03-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "250505111/1221250767",
+        "18909939/215135140",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 14469302707906296019
+      }
+    },
+    {
+      "id": "seed-04-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "336489930/1663113974",
+        "1103190712/1479228426",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8207885582808558989
+      }
+    },
+    {
+      "id": "seed-04-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "336489930/1663113974",
+        "1103190712/1479228426",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8207885582808558989
+      }
+    },
+    {
+      "id": "seed-05-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "2124919851/650650046",
+        "1489301945/1361533959",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3414758298072124627
+      }
+    },
+    {
+      "id": "seed-05-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "2124919851/650650046",
+        "1489301945/1361533959",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 3414758298072124627
+      }
+    },
+    {
+      "id": "seed-06-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "812664867/1269156778",
+        "869833385/1645178452",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16914799193743390305
+      }
+    },
+    {
+      "id": "seed-06-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "812664867/1269156778",
+        "869833385/1645178452",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16914799193743390305
+      }
+    },
+    {
+      "id": "seed-07-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1484576127/1438886627",
+        "700337098/769409818",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10192366992185960673
+      }
+    },
+    {
+      "id": "seed-07-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1484576127/1438886627",
+        "700337098/769409818",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10192366992185960673
+      }
+    },
+    {
+      "id": "seed-08-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "157954798/727612351",
+        "1807156664/607157225",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17946213042578220685
+      }
+    },
+    {
+      "id": "seed-08-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "157954798/727612351",
+        "1807156664/607157225",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17946213042578220685
+      }
+    },
+    {
+      "id": "seed-09-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1325469773/341553869",
+        "240539270/1097394361",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5070968876640848851
+      }
+    },
+    {
+      "id": "seed-09-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1325469773/341553869",
+        "240539270/1097394361",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5070968876640848851
+      }
+    },
+    {
+      "id": "seed-10-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "150467071/1264049203",
+        "203211114/579823900",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17980576263522235917
+      }
+    },
+    {
+      "id": "seed-10-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "150467071/1264049203",
+        "203211114/579823900",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17980576263522235917
+      }
+    },
+    {
+      "id": "seed-11-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "2059271998/677377484",
+        "231320202/2025330288",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18019504420365383635
+      }
+    },
+    {
+      "id": "seed-11-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "2059271998/677377484",
+        "231320202/2025330288",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18019504420365383635
+      }
+    },
+    {
+      "id": "seed-12-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1342857963/1764859575",
+        "2082130315/622141217",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5444133408415797005
+      }
+    },
+    {
+      "id": "seed-12-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1342857963/1764859575",
+        "2082130315/622141217",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5444133408415797005
+      }
+    },
+    {
+      "id": "seed-13-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "75169083/739917772",
+        "828668513/205756715",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 696485626702265101
+      }
+    },
+    {
+      "id": "seed-13-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "75169083/739917772",
+        "828668513/205756715",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 696485626702265101
+      }
+    },
+    {
+      "id": "seed-14-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1024953081/1022430869",
+        "1969005121/409268868",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8203653029286798221
+      }
+    },
+    {
+      "id": "seed-14-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1024953081/1022430869",
+        "1969005121/409268868",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8203653029286798221
+      }
+    },
+    {
+      "id": "seed-15-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "405000746/279264386",
+        "554795678/1604419930",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7356995557400182099
+      }
+    },
+    {
+      "id": "seed-15-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "405000746/279264386",
+        "554795678/1604419930",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7356995557400182099
+      }
+    },
+    {
+      "id": "seed-16-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "532500010/1667651125",
+        "105666372/93297038",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5671113461864770189
+      }
+    },
+    {
+      "id": "seed-16-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "532500010/1667651125",
+        "105666372/93297038",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5671113461864770189
+      }
+    },
+    {
+      "id": "seed-17-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1446795845/2062811752",
+        "1753861582/1459990655",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10948317590692697997
+      }
+    },
+    {
+      "id": "seed-17-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1446795845/2062811752",
+        "1753861582/1459990655",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10948317590692697997
+      }
+    },
+    {
+      "id": "seed-18-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "937086802/1524416523",
+        "81246873/1586141775",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 462808037898459475
+      }
+    },
+    {
+      "id": "seed-18-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "937086802/1524416523",
+        "81246873/1586141775",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 462808037898459475
+      }
+    },
+    {
+      "id": "seed-19-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1532401338/1491893732",
+        "1582794257/1813454700",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6708941240149985761
+      }
+    },
+    {
+      "id": "seed-19-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1532401338/1491893732",
+        "1582794257/1813454700",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 6708941240149985761
+      }
+    },
+    {
+      "id": "seed-20-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1403264698/1742678805",
+        "705776606/793525504",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2218407550062118413
+      }
+    },
+    {
+      "id": "seed-20-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1403264698/1742678805",
+        "705776606/793525504",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2218407550062118413
+      }
+    },
+    {
+      "id": "seed-21-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1783445851/1011203167",
+        "1354113428/974162211",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7150888504372411361
+      }
+    },
+    {
+      "id": "seed-21-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1783445851/1011203167",
+        "1354113428/974162211",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 7150888504372411361
+      }
+    },
+    {
+      "id": "seed-22-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1266958688/1722201010",
+        "1160778026/323382834",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17388497223870006029
+      }
+    },
+    {
+      "id": "seed-22-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1266958688/1722201010",
+        "1160778026/323382834",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 17388497223870006029
+      }
+    },
+    {
+      "id": "seed-23-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "500925237/1038202572",
+        "978334483/2133547251",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9231973456686355681
+      }
+    },
+    {
+      "id": "seed-23-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "500925237/1038202572",
+        "978334483/2133547251",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 9231973456686355681
+      }
+    },
+    {
+      "id": "seed-24-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1705230147/1581885577",
+        "1468353381/2136789391",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15047632651543349985
+      }
+    },
+    {
+      "id": "seed-24-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1705230147/1581885577",
+        "1468353381/2136789391",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 15047632651543349985
+      }
+    },
+    {
+      "id": "seed-25-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "742830402/1323391721",
+        "1760107559/2090247046",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10780030981592938509
+      }
+    },
+    {
+      "id": "seed-25-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "742830402/1323391721",
+        "1760107559/2090247046",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10780030981592938509
+      }
+    },
+    {
+      "id": "seed-26-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1802632552/1584014440",
+        "93680081/596935077",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16566460288710833619
+      }
+    },
+    {
+      "id": "seed-26-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1802632552/1584014440",
+        "93680081/596935077",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 16566460288710833619
+      }
+    },
+    {
+      "id": "seed-27-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "337733165/19949927",
+        "479203461/1896554937",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1289076637944925139
+      }
+    },
+    {
+      "id": "seed-27-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "337733165/19949927",
+        "479203461/1896554937",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 1289076637944925139
+      }
+    },
+    {
+      "id": "seed-28-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "31328429/1245622314",
+        "1618032787/1296714148",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2873132081040353549
+      }
+    },
+    {
+      "id": "seed-28-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "31328429/1245622314",
+        "1618032787/1296714148",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 2873132081040353549
+      }
+    },
+    {
+      "id": "seed-29-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1388971786/1193996739",
+        "1166516752/605027621",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5778336341261544333
+      }
+    },
+    {
+      "id": "seed-29-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1388971786/1193996739",
+        "1166516752/605027621",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5778336341261544333
+      }
+    },
+    {
+      "id": "seed-30-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "2136027847/2028079236",
+        "765960087/1210060519",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 778860868211402465
+      }
+    },
+    {
+      "id": "seed-30-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "2136027847/2028079236",
+        "765960087/1210060519",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 778860868211402465
+      }
+    },
+    {
+      "id": "seed-31-direct",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "427450073/868724035",
+        "239485630/775119405",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11601248348647358945
+      }
+    },
+    {
+      "id": "seed-31-prepared",
+      "profile": "seed",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "427450073/868724035",
+        "239485630/775119405",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 11601248348647358945
+      }
+    },
+    {
+      "id": "half-direct",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/2",
+        "1/1",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8125747929557289613
+      }
+    },
+    {
+      "id": "half-prepared",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/2",
+        "1/1",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 8125747929557289613
+      }
+    },
+    {
+      "id": "double-direct",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "2/1",
+        "1/1",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12545922627931841619
+      }
+    },
+    {
+      "id": "double-prepared",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "2/1",
+        "1/1",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 12545922627931841619
+      }
+    },
+    {
+      "id": "minimum-identity-direct",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/minimum.bin",
+      "sha256": "e6ad6c9a3a3b7658c35bacf6553fcb8ffe34387534a648fe18f875b8f7a86ddb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1",
+        "1/1",
+        "direct"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 17227037357956633036
+      }
+    },
+    {
+      "id": "minimum-identity-prepared",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/minimum.bin",
+      "sha256": "e6ad6c9a3a3b7658c35bacf6553fcb8ffe34387534a648fe18f875b8f7a86ddb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1",
+        "1/1",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 17227037357956633036
+      }
+    },
+    {
+      "id": "minimum-sentinel-direct",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1",
+        "1/1",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "minimum-sentinel-prepared",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/1",
+        "1/1",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 5038651101451457293
+      }
+    },
+    {
+      "id": "maximum-ratio-direct",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "2147483647/1",
+        "1/2147483647",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4712656029746285789
+      }
+    },
+    {
+      "id": "maximum-ratio-prepared",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "2147483647/1",
+        "1/2147483647",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 4712656029746285789
+      }
+    },
+    {
+      "id": "minimum-ratio-direct",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/2147483647",
+        "2147483647/1",
+        "direct"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18226653776411629965
+      }
+    },
+    {
+      "id": "minimum-ratio-prepared",
+      "profile": "edge",
+      "file": "harness/features/time-rescale/inputs/ticks.bin",
+      "sha256": "7a77277100973a42b3f6b694fc729f84535152722762b9e44afd82ea7e74bd0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1/2147483647",
+        "2147483647/1",
+        "prepared"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 18226653776411629965
+      }
+    }
+  ]
+}

@@ -1,0 +1,1384 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "aligned",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/aligned.adts",
+      "sha256": "893a329232321497bdafe107e219b3c7ecd62e83bdb2c30ba2191eb33dde74df",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 36,
+        "digest": 887262317855406854
+      }
+    },
+    {
+      "id": "protected-single",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/protected-single.adts",
+      "sha256": "e5ed565b3adf990dc56353f67455dc92ca09d142965023f73425358e12318ca2",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 11,
+        "digest": 18363880569794752307
+      }
+    },
+    {
+      "id": "truncated-crc-0",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-crc-0.adts",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-crc-1",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-crc-1.adts",
+      "sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-crc-2",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-crc-2.adts",
+      "sha256": "cb48cb917df319f0bbbd3fc3f004ef8428f954bbcaf7f734d32357dd53875507",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-crc-3",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-crc-3.adts",
+      "sha256": "541f584aaa76f60b67d3b28b2078dfa1003e50f0dc17a73418c69a1e748d972f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-crc-4",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-crc-4.adts",
+      "sha256": "a2ab20a9bab4057906c5ec11c414c6266fe34d51e602d1c712f1204254ca9c7f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-crc-5",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-crc-5.adts",
+      "sha256": "1ecefeabf0b5e4fe1897fd8a0effc5f787534c0d7d30258c99f0bdcb87e4effc",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-crc-6",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-crc-6.adts",
+      "sha256": "4d742084518042e32cb0371f1a576f6fa58fba64b222340435b756862fedb9f5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-crc-7",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-crc-7.adts",
+      "sha256": "94f429a17b7ece4cff636ce9c722c1a24489763da7e95443ef016bd6e73ffad3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 6251196548378221478
+      }
+    },
+    {
+      "id": "truncated-crc-8",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-crc-8.adts",
+      "sha256": "2b067b658e33d3344ddf93040913c6e46b83c2e50dc67b10649a380cb2cabac5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 9319653115520387270
+      }
+    },
+    {
+      "id": "truncated-crc-9",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-crc-9.adts",
+      "sha256": "320dd5a09abcaac4f823d577600922c4604a50b3cc4339d145f3f6ee3ad8c0a1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 12208111915110892006
+      }
+    },
+    {
+      "id": "truncated-crc-10",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-crc-10.adts",
+      "sha256": "b420dd750c0b99983f86979e246aa66ead6df0242b8bc0af27ee6ec03ad70c55",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 10,
+        "digest": 9517407522533600700
+      }
+    },
+    {
+      "id": "truncated-1",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-1.adts",
+      "sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-2",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-2.adts",
+      "sha256": "cf49443a9dff80123a05e1697784302ec72e007a8288e7c7f763b6df5252cfe9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-3",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-3.adts",
+      "sha256": "a4de00593d431721bb501734599ef14450778f51a177301ee91c00f8b6159d52",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-4",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-4.adts",
+      "sha256": "ecf1769a97afa9c33c9f9730ecda2901bd0943a45745c2f4c213665545855d8d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-5",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-5.adts",
+      "sha256": "1daf5a0a4138887a6a8dd1247e7ed823a1bf94ed28be181bbe6a6153d0d3680b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-6",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-6.adts",
+      "sha256": "10ceafdf42d85816f03bf393d7cb405b7d70472fdf69580a3cace8451afa5dc5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "truncated-7",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-7.adts",
+      "sha256": "158fd6c09248f5309479d3d63cd3389359d98964abca2254cf2f5ee754cae031",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 6200379594614038983
+      }
+    },
+    {
+      "id": "truncated-8",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/truncated-8.adts",
+      "sha256": "087b3bf732badbc4b4d92956caef8faf6c7b51ce03e0077ea7b5ba9ba8100ba4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 7744327548830729787
+      }
+    },
+    {
+      "id": "empty-payload-unprotected",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/empty-payload-unprotected.adts",
+      "sha256": "15a29bb9ee53dcce2ba354e8b560c1e960fb1766294b78ce920df1c3c50b3edd",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 6149562640821234312
+      }
+    },
+    {
+      "id": "short-extent-unprotected",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/short-extent-unprotected.adts",
+      "sha256": "47d97091bfaa36373a0595f14c7220b6c3cb5b75b969c5e4e5e5661730626a24",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 6124154163924828489
+      }
+    },
+    {
+      "id": "two-blocks-unprotected",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/two-blocks-unprotected.adts",
+      "sha256": "51758a8080d5cda0462bbed36b02c0c5fe110f2366ba0134e81ce589e8221cc7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 266507495150614037
+      }
+    },
+    {
+      "id": "empty-payload-protected",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/empty-payload-protected.adts",
+      "sha256": "0b55d5d52a83c9084fa627894e274ef73042e1e1b05b0a860627cb146e27ce95",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 266507467638003432
+      }
+    },
+    {
+      "id": "short-extent-protected",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/short-extent-protected.adts",
+      "sha256": "e8beedbe2d674b18a387ea0f15b25ad6d45f400837799f22d9dbbe73fa46ca14",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 6956664764154645731
+      }
+    },
+    {
+      "id": "two-blocks-protected",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/two-blocks-protected.adts",
+      "sha256": "f40c30e108fa7886c33ab54c8b4e79dfe1c4174278fd83e4c2b10ab68a06f5e4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 11,
+        "digest": 18363880569795675828
+      }
+    },
+    {
+      "id": "frequency-13",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/frequency-13.adts",
+      "sha256": "87b1c92b66b786bd7ec7b1c65b6b3c9586049f18b61d3b267f1f534ed868ab92",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 520592299614808626
+      }
+    },
+    {
+      "id": "frequency-14",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/frequency-14.adts",
+      "sha256": "de4cd76720b5f2ae5f8abb7f95125b559bf4a993a34a3479530433fc5e9a1b64",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 546000780061228181
+      }
+    },
+    {
+      "id": "frequency-15",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/frequency-15.adts",
+      "sha256": "91db794157807b3d6cdde0ab0d066c5c504038fdf25f144ec85fd68df38a29da",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 571409260507647736
+      }
+    },
+    {
+      "id": "bad-sync",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/bad-sync.adts",
+      "sha256": "809248fec7c302cc67f6c5048998be0502458f2a57bdbd748ea0509d3cad5616",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "layer-1",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/layer-1.adts",
+      "sha256": "cdff797d5f875444e04c511113ca6db15a60a8f49ea7bc20eaf2927841c14104",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 266507550175841298
+      }
+    },
+    {
+      "id": "profile-0",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/profile-0.adts",
+      "sha256": "943e8480f1b25a147b215d1a1550b8fc1ee269bb074d438ffe5e069154facd8e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 17925588728271379347
+      }
+    },
+    {
+      "id": "profile-2",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/profile-2.adts",
+      "sha256": "fb94e8446a14e45a5ba5af984c4161a568eb197f98dd67e450fc33ed26e93024",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 1054170335739398421
+      }
+    },
+    {
+      "id": "profile-3",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/profile-3.adts",
+      "sha256": "7ccab23542f1cbabfde7d2205ee308cd4d7863c043921c334beebe9237fc887c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 1841833176328183766
+      }
+    },
+    {
+      "id": "rate-0",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-0.adts",
+      "sha256": "8f5220eaeb4ba88b2dd2ded3552690d0cfc1b8f46f02c1af509c8fa6a0ba7415",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 190282053811354411
+      }
+    },
+    {
+      "id": "rate-1",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-1.adts",
+      "sha256": "543d5fa78617efc72f70263a6b81de3374aff1cd944cf1929fec8fda5a874c99",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 215690534257773966
+      }
+    },
+    {
+      "id": "rate-2",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-2.adts",
+      "sha256": "98850953f2e7a57c456c511251634d53e5a26bfa7e0829666cb868fb146d82a7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 241099014704193521
+      }
+    },
+    {
+      "id": "rate-3",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-3.adts",
+      "sha256": "ce47c4c89ef5c5d3d3f1ecc8152232cc7a4df43ed646128cf48de3977536dcff",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 266507495150613076
+      }
+    },
+    {
+      "id": "rate-4",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-4.adts",
+      "sha256": "b9a21ae039dbfc600b09242f7e68e929ec713ff98f53a3e59f8eea9dc6561ca3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 291915975597032631
+      }
+    },
+    {
+      "id": "rate-5",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-5.adts",
+      "sha256": "57d033b431762ffd90ef586ea58300a737647061e183eeee4758989e898adb14",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 317324456043452186
+      }
+    },
+    {
+      "id": "rate-6",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-6.adts",
+      "sha256": "75fcc36f874a9bed92c1ec4a0da75ceab162c8f7d9d3dcb71c45f8184e9179fe",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 342732936489871741
+      }
+    },
+    {
+      "id": "rate-7",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-7.adts",
+      "sha256": "4119c03b7d34f5e1e90b0e4f52def3d7dd3c95f152abc5606cd199115e02b136",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 368141416936291296
+      }
+    },
+    {
+      "id": "rate-8",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-8.adts",
+      "sha256": "883c3fa7776e097451d857de2661c4eba88699c5c1c73a41713299c67beb9b5f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 393549897382710851
+      }
+    },
+    {
+      "id": "rate-9",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-9.adts",
+      "sha256": "b9176e55026ca4116b12d6108f7d858c46e7ce33417a22c019fc02053bcebc19",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 418958377829130406
+      }
+    },
+    {
+      "id": "rate-10",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-10.adts",
+      "sha256": "b13d8373617cf2af74bd05c69ea82b3af1cede4b3b97e903616c7ccb7c1ffa03",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 444366858275549961
+      }
+    },
+    {
+      "id": "rate-11",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-11.adts",
+      "sha256": "fc90bcd565aeba2e9f1dee37a944bae1e2d5d8cba6f03a35fd40988c4efaad93",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 469775338721969516
+      }
+    },
+    {
+      "id": "rate-12",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/rate-12.adts",
+      "sha256": "9155e61a0cf283cf47a14912a55f9d0db2777f73b02432a005c21b822d1a7c7b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 495183819168389071
+      }
+    },
+    {
+      "id": "channel-0",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/channel-0.adts",
+      "sha256": "063942864cb450689f0f36d67189e781612a4dc4be463ad3f8af795c45a68e18",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 264868234912120146
+      }
+    },
+    {
+      "id": "channel-1",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/channel-1.adts",
+      "sha256": "8f40e25e251ff3667cdc67c92121bc2c49944e047687ac88f1803b94500381be",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 265687865031366611
+      }
+    },
+    {
+      "id": "channel-2",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/channel-2.adts",
+      "sha256": "ce47c4c89ef5c5d3d3f1ecc8152232cc7a4df43ed646128cf48de3977536dcff",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 266507495150613076
+      }
+    },
+    {
+      "id": "channel-3",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/channel-3.adts",
+      "sha256": "43230361dcc9bdf31eae49a9d3ad1d260209b12969d7c967dbdd8f79e533d22c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 267327125269859541
+      }
+    },
+    {
+      "id": "channel-4",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/channel-4.adts",
+      "sha256": "3bd0ae8d4df61395b9c118fc404abfb1102de6429dd4a8e6d4dc832653024809",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 268146748947547031
+      }
+    },
+    {
+      "id": "channel-5",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/channel-5.adts",
+      "sha256": "75d6aefcd3c474051fe68b507e2fcdb3f75552ee0eb871174cb0786e44f62b5b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 268966379066793496
+      }
+    },
+    {
+      "id": "channel-6",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/channel-6.adts",
+      "sha256": "aea9825e74afcca6128dfb5af1f02b5a2e30bbceeba5bbf7c3c211353984dcef",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 269786009186039961
+      }
+    },
+    {
+      "id": "channel-7",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/channel-7.adts",
+      "sha256": "fa5ce9691e871fa0a0f6c10d79c44a1f620b54578df8541451ee1931e64c9735",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 270605639305286426
+      }
+    },
+    {
+      "id": "crc-0000",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/crc-0000.adts",
+      "sha256": "edfd8b75e2ffe30f98a6d0307257d15ce19593a558bba0e9964402abbc5c5a9d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 13,
+        "digest": 16375257426813177024
+      }
+    },
+    {
+      "id": "crc-0001",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/crc-0001.adts",
+      "sha256": "5ebefed6acf35c4ec5fc3a9517dcbf24a9bbf554e8db6c3a96fc72fdb04f95be",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 13,
+        "digest": 16375257426814100545
+      }
+    },
+    {
+      "id": "crc-8000",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/crc-8000.adts",
+      "sha256": "a31a6a575e84b10e9505f934fb5733a7d254e9e21967ce4b3df9562fc0b1e1a3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 13,
+        "digest": 16375257430477708352
+      }
+    },
+    {
+      "id": "crc-ffff",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/crc-ffff.adts",
+      "sha256": "4d7037af3b78b348f1347c70c139d07e81ea40a2e69e5f516e09688d6ab9ecf7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 13,
+        "digest": 16375257434349108384
+      }
+    },
+    {
+      "id": "header-flags",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/header-flags.adts",
+      "sha256": "f802c9c409ca12f812553e5727c56a81db309ce8a89ecbdbc9f6508ff562a73c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 64,
+        "bytes": 512,
+        "digest": 6626719831197781696
+      }
+    },
+    {
+      "id": "buffer-fullness",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/buffer-fullness.adts",
+      "sha256": "b394fdc733b1b1235d9e7f8b25155ca31eb140d5abbada8f294f612943b7fbaa",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 36,
+        "digest": 1315410029265493891
+      }
+    },
+    {
+      "id": "maximum-frame",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/maximum-frame.adts",
+      "sha256": "258a381a576439dff91ff23937d249b5129159b79da1e4bc5607b8017ad1e222",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 8191,
+        "digest": 14449527717146912500
+      }
+    },
+    {
+      "id": "ps-change-while-off",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/ps-change-while-off.adts",
+      "sha256": "6f326fe923bae64b5d5793073f5c8fbb15a4ac36a01a7bea40e853c1e35c1102",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 26,
+        "bytes": 8294,
+        "digest": 6967462760463768562
+      }
+    },
+    {
+      "id": "ps-ipd-after-iid34",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/ps-ipd-after-iid34.adts",
+      "sha256": "967cd0355a507128fb7adf06b0544252a1f56e6d04dd78b74733f821c35e18ce",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 10,
+        "bytes": 3412,
+        "digest": 11651308029205335430
+      }
+    },
+    {
+      "id": "ps-no-sbr-element",
+      "profile": "authored",
+      "file": ".research/stream-parser-fixtures/ps-no-sbr-element.adts",
+      "sha256": "e22e5c0730680743e810384f56ad31a68cf993ecab119b21de506dedb88c30a3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 26,
+        "bytes": 8263,
+        "digest": 1539560506333417056
+      }
+    },
+    {
+      "id": "aac-sce-in-stereo",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/aac-sce-in-stereo.adts",
+      "sha256": "04947370585296a25c63f1e31252c4290328151a0fa2ecf3271518b4d4db8796",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 217,
+        "bytes": 42006,
+        "digest": 12885054967862913931
+      }
+    },
+    {
+      "id": "al04_44",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al04_44.adts",
+      "sha256": "ce01790c62e932cc33eb3a1092cece90df608e9f8b6b88baaa57b623488c8f1e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 355,
+        "bytes": 68371,
+        "digest": 16720895434051080815
+      }
+    },
+    {
+      "id": "al05_44",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al05_44.adts",
+      "sha256": "7b11acefbea0c1180b370405d4933ef06a80e3abbb558e1400bc264384146903",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 320,
+        "bytes": 121062,
+        "digest": 69221254689232425
+      }
+    },
+    {
+      "id": "al06_44",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al06_44.adts",
+      "sha256": "a28702cffbea3ade83390c2b8e83833261ca87468c139df3490ea9ef1dda399f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 355,
+        "bytes": 200256,
+        "digest": 13261972598244030354
+      }
+    },
+    {
+      "id": "al07_96",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al07_96.adts",
+      "sha256": "77b8c71a77c98816f95a49b209264af383d4a515a5fd24486e9806bdfda2961a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 780,
+        "bytes": 404789,
+        "digest": 5961686237417815108
+      }
+    },
+    {
+      "id": "al15_44",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al15_44.adts",
+      "sha256": "b6646ef38d56f50824a0ad3108bff9d560d3cb75833fbe2bcd69daa4bb1072d0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 130,
+        "bytes": 145819,
+        "digest": 5696232638321684913
+      }
+    },
+    {
+      "id": "al17_44",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al17_44.adts",
+      "sha256": "15ce1b21c69691275140c4c0a474b660331716ba2b177f0c9abbbc8b8763be42",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 323,
+        "bytes": 121910,
+        "digest": 13895433018167616312
+      }
+    },
+    {
+      "id": "al18_44",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al18_44.adts",
+      "sha256": "17e6246f5e46613e903000b4387672586252b12128b3af882d8fa9b98ce127ba",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 2813,
+        "bytes": 542116,
+        "digest": 8753589255176673741
+      }
+    },
+    {
+      "id": "al22_chCfg0PCE_44",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al22_chCfg0PCE_44.adts",
+      "sha256": "bcc3a68808c793f9865d87b1ec3d895c5010b5f6a6bd206cb1426d4151f9bad6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 52,
+        "bytes": 69547,
+        "digest": 16282730800745356659
+      }
+    },
+    {
+      "id": "al_sbr_cm_48_2",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al_sbr_cm_48_2.adts",
+      "sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 754,
+        "bytes": 198304,
+        "digest": 17343280364666022348
+      }
+    },
+    {
+      "id": "al_sbr_cm_48_5.1",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al_sbr_cm_48_5.1.adts",
+      "sha256": "2f756af575771e9890c97841c13c555612599ce85e82af47df175a1e0e16d6a8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 754,
+        "bytes": 520018,
+        "digest": 12857718892097960614
+      }
+    },
+    {
+      "id": "al_sbr_ps_04_new",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al_sbr_ps_04_new.adts",
+      "sha256": "f95a16be6678ced08108ed788a3c4619501cea3936eabd831ad450b76b91f43f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 106,
+        "bytes": 27887,
+        "digest": 12305382198182252440
+      }
+    },
+    {
+      "id": "al_sbr_ps_06_new",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al_sbr_ps_06_new.adts",
+      "sha256": "cc7e5b18455c04c76efa8a87bf7db40f297fb38aa56b93d4bd7f97a397b4fa87",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 212,
+        "bytes": 55767,
+        "digest": 11818552481962559224
+      }
+    },
+    {
+      "id": "al_sbr_sr_48_2_fsaac48",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/al_sbr_sr_48_2_fsaac48.adts",
+      "sha256": "10f2d0f66455a3b9dea8138a1f21d9c39cd9633fde3f31750b8e61e16a59fb75",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 1148,
+        "bytes": 161104,
+        "digest": 7410143933316024107
+      }
+    },
+    {
+      "id": "am00_88",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/am00_88.adts",
+      "sha256": "1ff00000c44317a3eb32c7b6b67b1e2269e16e941cc3ff7990d473584c00688f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 5646,
+        "bytes": 563793,
+        "digest": 14033117754809071347
+      }
+    },
+    {
+      "id": "am05_44",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/am05_44.adts",
+      "sha256": "090ecd1da2493bd920536964870423719bf6061202b8a27d8033507d08a122c1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 130,
+        "bytes": 145822,
+        "digest": 574022176308205135
+      }
+    },
+    {
+      "id": "ap05_48",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ap05_48.adts",
+      "sha256": "ec4aa0192a7672510eeca67d733868ada88600124f8ca81777fba75e98952005",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 891,
+        "bytes": 310736,
+        "digest": 6582863794129120373
+      }
+    },
+    {
+      "id": "ct_File2",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_File2.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 169,
+        "bytes": 32577,
+        "digest": 1278624096873955846
+      }
+    },
+    {
+      "id": "ct_File3",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_File3.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 169,
+        "bytes": 32577,
+        "digest": 1278624096873955846
+      }
+    },
+    {
+      "id": "ct_File4",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_File4.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 169,
+        "bytes": 32577,
+        "digest": 1278624096873955846
+      }
+    },
+    {
+      "id": "ct_File5",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_File5.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 169,
+        "bytes": 32577,
+        "digest": 1278624096873955846
+      }
+    },
+    {
+      "id": "ct_File6",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_File6.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 169,
+        "bytes": 32577,
+        "digest": 1278624096873955846
+      }
+    },
+    {
+      "id": "ct_File7",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_File7.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 169,
+        "bytes": 32577,
+        "digest": 1278624096873955846
+      }
+    },
+    {
+      "id": "ct_faac-adts",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_faac-adts.adts",
+      "sha256": "052f9c7c5359d642fbba887d57fc72fe5745fc75b34cddc7a7adc0a912f9cf9c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 861,
+        "bytes": 299647,
+        "digest": 15015301774843539792
+      }
+    },
+    {
+      "id": "ct_sbr_bc-ps_bc",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_sbr_bc-ps_bc.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 169,
+        "bytes": 32577,
+        "digest": 1278624096873955846
+      }
+    },
+    {
+      "id": "ct_sbr_bc-ps_i",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_sbr_bc-ps_i.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 169,
+        "bytes": 32577,
+        "digest": 1278624096873955846
+      }
+    },
+    {
+      "id": "ct_sbr_bic-ps_i",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_sbr_bic-ps_i.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 169,
+        "bytes": 32577,
+        "digest": 1278624096873955846
+      }
+    },
+    {
+      "id": "ct_sbr_i-ps_bic",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_sbr_i-ps_bic.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 169,
+        "bytes": 32577,
+        "digest": 1278624096873955846
+      }
+    },
+    {
+      "id": "ct_sbr_i-ps_i",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/ct_sbr_i-ps_i.adts",
+      "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 169,
+        "bytes": 32577,
+        "digest": 1278624096873955846
+      }
+    },
+    {
+      "id": "foo",
+      "profile": "fate",
+      "file": ".research/stream-parser-fixtures/foo.adts",
+      "sha256": "4439c5a704ed599e45d3b88fe135f994d32d2b65f5d0c0f6a8eb329ea69c45ec",
+      "rights": "fetched-not-redistributed",
+      "arguments": [],
+      "expected": {
+        "packets": 86,
+        "bytes": 32768,
+        "digest": 17247836563157991110
+      }
+    },
+    {
+      "id": "adts_51.aac",
+      "profile": "reader-aac",
+      "file": ".research/elementary/adts_51.aac",
+      "sha256": "0aafadbf51a54d1469565901477f707a8a1dca4653b070afab6456f098fc765e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 142,
+        "bytes": 129650,
+        "digest": 7811920973990375497
+      }
+    },
+    {
+      "id": "adts_lc.aac",
+      "profile": "reader-aac",
+      "file": ".research/elementary/adts_lc.aac",
+      "sha256": "756494f09100b66748cf57bbec30dadba0ccac66fe63832a1f5c75597a672695",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 217,
+        "bytes": 81376,
+        "digest": 11248300759525771963
+      }
+    },
+    {
+      "id": "adts_mid_junk.aac",
+      "profile": "reader-aac",
+      "file": ".research/elementary/crafted/adts_mid_junk.aac",
+      "sha256": "6490572a4960ed9f90277217dc982d04c5d119e7abcc8ad6d2445c9917e051e9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 217,
+        "bytes": 81376,
+        "digest": 15659680216890121260
+      }
+    },
+    {
+      "id": "adts_tags.aac",
+      "profile": "reader-aac",
+      "file": ".research/elementary/crafted/adts_tags.aac",
+      "sha256": "5bce628f9ba02157fda5ce3a6521c7877a1e06fbf657d1622d7357d7fa883468",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 217,
+        "bytes": 81376,
+        "digest": 5674838434462699685
+      }
+    },
+    {
+      "id": "adts_truncated.aac",
+      "profile": "reader-aac",
+      "file": ".research/elementary/crafted/adts_truncated.aac",
+      "sha256": "6045b6db08d54a13490f18b3b5c18de851342c8e3ac1184b674b9ec87ba72040",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 216,
+        "bytes": 81276,
+        "digest": 17199839598422855383
+      }
+    },
+    {
+      "id": "junk-prefix-and-sync-payload",
+      "profile": "search",
+      "file": "harness/features/adts-sync/inputs/junk-prefix-and-sync-payload.adts",
+      "sha256": "b4dc18b559be2a214b44d7ad48f7737edcf96579b6f15261b7eeedfabaeaae47",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 22,
+        "digest": 1902001610583465973
+      }
+    },
+    {
+      "id": "junk-between-frames",
+      "profile": "search",
+      "file": "harness/features/adts-sync/inputs/junk-between-frames.adts",
+      "sha256": "e2c43dc88832b85fe93547c21a870bd95ac35523fce314b65e5905185e278441",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 22,
+        "digest": 14036841211815305520
+      }
+    },
+    {
+      "id": "bad-length-then-frames",
+      "profile": "search",
+      "file": "harness/features/adts-sync/inputs/bad-length-then-frames.adts",
+      "sha256": "1324f445a808bc98f1b390d23e33211f2b891ac1266746669dc6b27f65bdab24",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 3,
+        "bytes": 29,
+        "digest": 2381889299128124584
+      }
+    },
+    {
+      "id": "short-final-frame",
+      "profile": "search",
+      "file": "harness/features/adts-sync/inputs/short-final-frame.adts",
+      "sha256": "4db0a39059fa6dd1a4bbaad7cf7a0eca033cd27877d021db120949ddc46c85e0",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 14803541270020943581
+      }
+    },
+    {
+      "id": "protected-after-junk",
+      "profile": "search",
+      "file": "harness/features/adts-sync/inputs/protected-after-junk.adts",
+      "sha256": "ad8a0e16f062ad319d7205285e326ec08a2b4c5994b3125a3a773867ee0474a6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 2,
+        "bytes": 22,
+        "digest": 17480128950155739909
+      }
+    }
+  ]
+}
