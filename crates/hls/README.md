@@ -54,6 +54,15 @@ The [progressive TS188 contract](../../harness/features/progressive-ts188/contra
 checks complete packet fields and payloads with two retained units per stream.
 It also records the reference refusal of the legal duplicate control.
 
+The [packet-view comparison](../../harness/features/hls-unit-packets/contract.json)
+reads AVC and AAC through `PacketInfo`. The [AAC clock comparison](../../harness/features/hls-aac-clocks/contract.json)
+checks exact timestamps, their anchor origins and the 90 kHz projection.
+The [compact input comparison](../../harness/features/hls-compact-push/contract.json)
+drives the standalone readers with compact PES payloads. The
+[segment push comparison](../../harness/features/hls-push-input/contract.json)
+checks the complete feed and final timestamps with 1-, 188- and 4096-byte
+replies through both segment readers.
+
 ## Conformance
 
 - MPEG-TS: ITU-T H.222.0 (§2.14.1 AVC delimiters).

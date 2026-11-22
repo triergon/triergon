@@ -29,5 +29,9 @@ The [probe comparison](../../harness/features/playback-probe/contract.json)
 checks the combined probe's container and raw-video choices. The
 [raw source views](../../harness/features/playback-source-view/contract.json)
 compare the initial SPS-derived frame rate and the default unstamped queue timestamps.
+The [raw Annex B comparison](../../harness/features/raw-annex-b/contract.json)
+checks the active SPS picture period. HLS HEVC feeds use the tracked
+parameter sets, and the [Matroska startup comparison](../../harness/features/matroska-startup-seek/contract.json)
+checks packet timing derived from the HEVC startup chain.
 
 The integration tests (`tests/it`) read the fixtures of `crates/playback/tests/fixtures`.
