@@ -94,8 +94,10 @@ The Huffman tables are checked to be complete prefix codes.
 ## Verification
 
 The codec correctness comparison checks `he_mode.bit` frame by frame in its native
-mono and stereo layouts, including every float sample and end of stream. The separate
-stereo device-path comparison remains subject to its fixed-format conversion.
+mono and stereo layouts, including all 128 frames, 262,656 channel samples and end of
+stream. The file workload requires passing PCM parity from the measured workers and the
+same complete work in timing and memory. The separate stereo device-path comparison
+reports the fixed-format reference's refusal when the layout changes.
 
 `harness/codecs/mp3/make_vectors.sh FFMPEG OUT` generates the test streams (libmp3lame,
 mp2 and mp2fixed encodes at MPEG-1, 2 and 2.5 rates, and random Layer I/II frames from

@@ -4547,7 +4547,7 @@
   {
    "lane": "mp3",
    "name": "he_mode.bit",
-   "native_frames": true,
+   "native_frames": {"frames": 128, "channel_samples": 262656},
    "path": ".research/fate-samples/mp3-conformance/he_mode.bit",
    "bytes": 53498,
    "sha256": "fb90396d9bb13311be35284d061e19196830d213d823e05297b18172c88d90ce"

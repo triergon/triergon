@@ -15,7 +15,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use super::correctness::file_sha;
+use super::correctness::{
+    MP3_FRAMES, admit_native_mp3, file_sha, native_mp3_input_matches, native_mp3_work_matches,
+};
 use crate::harness::{gate_build, memory, worker};
 use crate::json::{self, Value};
 use crate::python;
@@ -245,12 +247,27 @@ pub fn run(options: &Options) -> Result<(), String> {
                 Value::str("input-hash-mismatch"),
             )]))
         } else {
+            if operation == MP3_FRAMES {
+                let parity = admit_native_mp3(
+                    &options.repository,
+                    options.candidates.of(operation),
+                    &options.reference,
+                    &input,
+                )?;
+                record.push(("native_audio_parity".into(), parity));
+            }
             match (
                 work(options.candidates.of(operation), operation, &input),
                 work(&options.reference, operation, &input),
             ) {
                 (Ok(candidate), Ok(reference))
-                    if crate::harness::diff::equal(&candidate, &reference) =>
+                    if crate::harness::diff::equal(&candidate, &reference)
+                        && record
+                            .iter()
+                            .find(|(key, _)| key == "native_audio_parity")
+                            .is_none_or(|(_, proof)| {
+                                native_mp3_work_matches(proof, &candidate, 1)
+                            }) =>
                 {
                     let expected =
                         Value::object([("candidate", candidate), ("reference", reference)]);
@@ -316,15 +333,22 @@ pub fn run(options: &Options) -> Result<(), String> {
         if measured.get("status").and_then(Value::as_str) != Some("qualified") {
             unmeasured.push(id.to_owned());
         }
-        let parity_matches = parity.as_ref().is_none_or(|parity| {
-            parity.matches(
-                measured
-                    .get("certificate")
-                    .and_then(|certificate| certificate.get("worker_hashes")),
-                &measured,
-                w.get("sha256"),
-            )
-        });
+        let measured_workers = measured
+            .get("certificate")
+            .and_then(|certificate| certificate.get("worker_hashes"));
+        let native = record.iter().find(|(k, _)| k == "native_audio_parity");
+        let parity_matches = parity
+            .as_ref()
+            .is_none_or(|parity| parity.matches(measured_workers, &measured, w.get("sha256")))
+            && native.is_none_or(|(_, proof)| {
+                native_mp3_input_matches(proof, measured_workers, &measured)
+            });
+        if native.is_some() {
+            record.push((
+                "native_audio_parity_matches".into(),
+                Value::Bool(parity_matches),
+            ));
+        }
         if parity.is_some() {
             record.push(("parity_matches".into(), Value::Bool(parity_matches)));
         }

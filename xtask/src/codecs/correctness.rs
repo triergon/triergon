@@ -32,6 +32,7 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(120);
 const CANVAS: usize = 1920 * 1080 * 4;
 const AAC_SINGLE_SCE_STEREO_SHA256: &str =
     "04947370585296a25c63f1e31252c4290328151a0fa2ecf3271518b4d4db8796";
+pub(super) const MP3_FRAMES: &str = "audio-mp3-frames";
 
 fn uses_initialized_aac_reference(lane: &str, name: &str, sha256: &str) -> bool {
     lane == "aac" && name == "aac-sce-in-stereo.adts" && sha256 == AAC_SINGLE_SCE_STEREO_SHA256
@@ -731,6 +732,7 @@ fn native_mp3_compare(candidate: &[u8], reference: &[u8], rules: &Rules) -> Opti
             }),
         ),
         ("frames", Value::int(c.len() as i128)),
+        ("serialized_bytes", Value::int(candidate.len() as i128)),
         (
             "channel_samples",
             Value::int(planes.iter().map(Vec::len).sum::<usize>() as i128 / 4),
@@ -740,35 +742,143 @@ fn native_mp3_compare(candidate: &[u8], reference: &[u8], rules: &Rules) -> Opti
     ]))
 }
 
-fn native_mp3(a: &Grade, path: &str, tmp: &Path) -> Result<Value, Stop> {
+fn native_mp3(
+    ours: &Path,
+    theirs: &Path,
+    path: &str,
+    tmp: &Path,
+    rules: &Rules,
+    expected: &Value,
+) -> Result<Value, Stop> {
     let candidate = tmp.join("candidate.frames");
     let reference = tmp.join("reference.frames");
-    let op = "audio-mp3-frames-raw";
-    let ours = run_text(
-        &[
-            python::path(a.codec_workers.of("audio-mp3")),
-            op.into(),
-            path.into(),
-            python::path(&candidate),
-        ],
-        RUN_TIMEOUT,
-    )?;
-    let theirs = run_text(
-        &[
-            a.reference.clone(),
-            op.into(),
-            path.into(),
-            python::path(&reference),
-        ],
-        RUN_TIMEOUT,
-    )?;
+    let decode = |worker: &Path, output: &Path| {
+        run_text(
+            &[
+                python::path(worker),
+                format!("{MP3_FRAMES}-raw"),
+                path.into(),
+                python::path(output),
+            ],
+            RUN_TIMEOUT,
+        )
+    };
+    let ours = decode(ours, &candidate)?;
+    let theirs = decode(theirs, &reference)?;
     if ours.code != 0 || theirs.code != 0 {
         return Ok(Value::object([("status", Value::str("fail"))]));
     }
     let c = fs::read(candidate).unwrap_or_default();
     let r = fs::read(reference).unwrap_or_default();
-    Ok(native_mp3_compare(&c, &r, &a.rules)
+    Ok(native_mp3_compare(&c, &r, rules)
+        .filter(|comparison| complete_native_mp3(comparison, expected))
         .unwrap_or_else(|| Value::object([("status", Value::str("fail"))])))
+}
+
+fn complete_native_mp3(comparison: &Value, expected: &Value) -> bool {
+    ["frames", "channel_samples"].into_iter().all(|field| {
+        expected
+            .get(field)
+            .is_some_and(|count| Some(count) == comparison.get(field))
+    })
+}
+
+pub(super) fn admit_native_mp3(
+    repository: &Path,
+    candidate: &Path,
+    reference: &Path,
+    input: &Path,
+) -> Result<Value, String> {
+    let identity = || -> Result<Value, String> {
+        Ok(Value::object([
+            (
+                "worker_hashes",
+                Value::object([
+                    ("candidate", Value::str(file_sha(candidate)?)),
+                    ("reference", Value::str(file_sha(reference)?)),
+                ]),
+            ),
+            ("input_sha256", Value::str(file_sha(input)?)),
+            (
+                "manifest_sha256",
+                Value::str(file_sha(
+                    &repository.join("harness/codecs/correctness-manifest.json"),
+                )?),
+            ),
+            (
+                "numeric_rules_sha256",
+                Value::str(file_sha(
+                    &repository.join("harness/codecs/numeric-rules.json"),
+                )?),
+            ),
+        ]))
+    };
+    let bound_inputs = identity()?;
+    let tmp = TempDir::new(None)?;
+    let rules = Rules::load(repository)?;
+    let manifest =
+        crate::checks::read_json(&repository.join("harness/codecs/correctness-manifest.json"))?;
+    let expected = manifest
+        .get("vectors")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .find(|case| case.get("sha256") == bound_inputs.get("input_sha256"))
+        .and_then(|case| case.get("native_frames"))
+        .ok_or("native MP3 input has no complete frame expectation")?;
+    let comparison = native_mp3(
+        candidate,
+        reference,
+        &python::path(input),
+        &tmp.0,
+        &rules,
+        expected,
+    )
+    .map_err(|stop| format!("native MP3 comparison stopped: {stop:?}"))?;
+    if comparison.get("status").and_then(Value::as_str) != Some("pass") {
+        return Err(format!(
+            "native MP3 comparison failed for {}: {}",
+            input.display(),
+            json::to_python(&comparison, None),
+        ));
+    }
+    if identity()? != bound_inputs {
+        return Err("native MP3 input, workers or rules changed during comparison".into());
+    }
+    Ok(Value::object([
+        ("inputs", bound_inputs),
+        ("comparison", comparison),
+    ]))
+}
+
+pub(super) fn native_mp3_input_matches(
+    parity: &Value,
+    workers: Option<&Value>,
+    measured: &Value,
+) -> bool {
+    parity.get("inputs").is_some_and(|inputs| {
+        workers.is_some()
+            && inputs.get("worker_hashes") == workers
+            && inputs
+                .get("input_sha256")
+                .is_some_and(|input| Some(input) == measured.get("input_sha256"))
+    })
+}
+
+pub(super) fn native_mp3_work_matches(parity: &Value, work: &Value, iterations: u32) -> bool {
+    let count = |object: &Value, field: &str| crate::harness::linux::py_int(object.get(field));
+    let Some(comparison) = parity.get("comparison") else {
+        return false;
+    };
+    let scale = i128::from(iterations);
+    let packets = count(comparison, "frames")
+        .and_then(|frames| frames.checked_add(1))
+        .and_then(|frames| frames.checked_mul(scale));
+    let bytes = count(comparison, "serialized_bytes").and_then(|bytes| bytes.checked_mul(scale));
+    packets.is_some()
+        && bytes.is_some()
+        && packets == count(work, "packets")
+        && bytes == count(work, "bytes")
 }
 
 fn output_path(
@@ -949,12 +1059,19 @@ pub fn grade(a: &Grade) -> Result<(), String> {
         } else {
             let tmp = TempDir::new(a.scratch.as_deref())?;
             let initialized_aac = uses_initialized_aac_reference(&lane, &name, &sha256);
-            let native_frames = v.get("native_frames").is_some_and(Value::truthy);
-            if native_frames && lane != "mp3" {
+            let native_frames = v.get("native_frames");
+            if native_frames.is_some() && lane != "mp3" {
                 return Err(format!("native_frames is unsupported for {lane}"));
             }
-            let decoded = if native_frames {
-                native_mp3(a, &path, &tmp.0)
+            let decoded = if let Some(expected) = native_frames {
+                native_mp3(
+                    a.codec_workers.of(MP3_FRAMES),
+                    Path::new(&a.reference),
+                    &path,
+                    &tmp.0,
+                    &a.rules,
+                    expected,
+                )
             } else if video_extensions(&lane).is_some() {
                 video::decoder(&a.ffprobe, &a.ffmpeg, &a.example(&lane)?, &lane, &path)
             } else {
@@ -1085,6 +1202,56 @@ mod tests {
         let mut nan = data.clone();
         nan[12..16].copy_from_slice(&f32::NAN.to_le_bytes());
         assert!(native_mp3_compare(&data, &nan, &rules).is_none());
+    }
+
+    #[test]
+    fn native_mp3_measurement_must_match_the_compared_workers_and_input() {
+        let inputs = Value::object([
+            ("worker_hashes", Value::str("compared workers")),
+            ("input_sha256", Value::str("compared input")),
+        ]);
+        let parity = Value::object([("inputs", inputs.clone())]);
+        let workers = inputs.get("worker_hashes");
+        assert!(native_mp3_input_matches(&parity, workers, &inputs));
+        assert!(!native_mp3_input_matches(&parity, None, &inputs));
+        assert!(!native_mp3_input_matches(
+            &parity,
+            Some(&Value::str("different workers")),
+            &inputs,
+        ));
+        let different = Value::object([("input_sha256", Value::str("different input"))]);
+        assert!(!native_mp3_input_matches(&parity, workers, &different));
+    }
+
+    #[test]
+    fn native_mp3_admission_and_measurement_require_complete_output() {
+        let expected = Value::object([
+            ("frames", Value::int(128)),
+            ("channel_samples", Value::int(262656)),
+        ]);
+        let short = Value::object([
+            ("frames", Value::int(127)),
+            ("channel_samples", Value::int(261504)),
+        ]);
+        assert!(complete_native_mp3(&expected, &expected));
+        assert!(!complete_native_mp3(&short, &expected));
+        let parity = Value::object([(
+            "comparison",
+            Value::object([
+                ("frames", Value::int(128)),
+                ("serialized_bytes", Value::int(1052164)),
+            ]),
+        )]);
+        let work = |packets, bytes| {
+            Value::object([
+                ("packets", Value::int(packets)),
+                ("bytes", Value::int(bytes)),
+            ])
+        };
+        assert!(native_mp3_work_matches(&parity, &work(129, 1052164), 1));
+        assert!(native_mp3_work_matches(&parity, &work(516, 4208656), 4));
+        assert!(!native_mp3_work_matches(&parity, &work(128, 1047544), 1));
+        assert!(!native_mp3_work_matches(&parity, &Value::Null, 1));
     }
 
     #[test]

@@ -414,14 +414,7 @@ const VECTOR_CONTRACT: &str = "harness/features/matroska-segment-metadata/contra
 /// Fetch and verify the external vectors needed by the workspace check.
 pub fn vectors(root: &Path, net: &dyn Transport, limit: usize) -> Result<Vec<String>, String> {
     let cache = download_cache();
-    let mut verified = required_vectors(root, net, cache.as_deref(), limit)?;
-    verified.extend(fetch_pins(
-        root,
-        corpus_pins(root)?,
-        net,
-        cache.as_deref(),
-        limit,
-    )?);
+    let verified = fetch_pins(root, pins(root)?, net, cache.as_deref(), limit)?;
     crate::transport_fixtures::dts_discovery::prepare(root)?;
     Ok(verified)
 }
@@ -439,9 +432,11 @@ pub struct Pin {
 pub fn pins(root: &Path) -> Result<Vec<Pin>, String> {
     let mut pins = required_pins(root)?;
     pins.extend(corpus_pins(root)?);
+    pins.extend(codec_workload_pins(root)?);
     Ok(pins)
 }
 
+#[cfg(test)]
 fn required_vectors(
     root: &Path,
     net: &dyn Transport,
@@ -497,6 +492,34 @@ fn required_pins(root: &Path) -> Result<Vec<Pin>, String> {
             directory: ".research/fate-samples".into(),
             file: file.to_owned(),
             sha256: sha256.to_owned(),
+            url: None,
+        });
+    }
+    Ok(pins)
+}
+
+fn codec_workload_pins(root: &Path) -> Result<Vec<Pin>, String> {
+    let directory = ".research/fate-samples";
+    let manifest = crate::checks::read_json(&root.join("harness/codecs/file-workloads.json"))?;
+    let mut pins = Vec::new();
+    for workload in manifest
+        .get("workloads")
+        .and_then(Value::as_array)
+        .ok_or("missing codec file workloads")?
+    {
+        let field = |key| workload.get(key).and_then(Value::as_str);
+        let Some(file) = field("source").and_then(|s| s.strip_prefix("fate-suite/")) else {
+            continue;
+        };
+        if !relative_path(file) || field("path") != Some(&format!("{directory}/{file}")) {
+            return Err(format!("inconsistent codec workload input: {file}"));
+        }
+        pins.push(Pin {
+            directory: directory.into(),
+            file: file.into(),
+            sha256: field("sha256")
+                .ok_or("codec workload input has no hash")?
+                .into(),
             url: None,
         });
     }

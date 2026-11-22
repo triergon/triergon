@@ -143,7 +143,8 @@ limit becomes an explicit, reviewed rule for that case.
 - **Required vectors.** Larger external vectors are fetched and hash-verified by `cargo
   xtask fetch-vectors` and kept outside version control. A corpus that pins public
   HTTPS inputs can set `fetch_https_cases` in its contract and give each download
-  an `input_url` and `sha256` in the corpus.
+  an `input_url` and `sha256` in the corpus. A codec file workload can name a
+  `fate-suite/` source and its matching path under `.research/fate-samples`.
 
 ## Correctness by module family
 
