@@ -1,6 +1,7 @@
 //! Inputs and reference pins for the transport views worker.
 
 mod catalogue;
+mod mux;
 mod packets;
 
 use std::fs;
@@ -28,7 +29,8 @@ pub(crate) fn fixtures(paths: &crate::corpus::Paths) -> Result<String, String> {
     let dir = paths.fixtures("fixtures-transport-views")?;
     catalogue::fixtures(&dir)?;
     packets::fixtures(&dir)?;
-    Ok("Generated MPEG-TS catalogue and carrier fixtures".into())
+    mux::fixtures(paths)?;
+    Ok("Generated MPEG-TS catalogue, carrier and mux fixtures".into())
 }
 
 fn write(dir: &Path, name: &str, data: &[u8]) -> Result<(), String> {
