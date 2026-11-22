@@ -36,14 +36,28 @@ const OPERATIONS: u32 = 200_000;
 /// for a face, whose glyphs' extents it then gives.
 pub(crate) struct Face<'a> {
     table: &'a [u8],
-    cff2: bool,
+    version: Version<'a>,
     charstrings: Index<'a>,
     global: Index<'a>,
-    charset: Option<Charset<'a>>,
-    store: Option<&'a [u8]>,
     privates: Privates<'a>,
     /// The face's limit on nested subroutine calls.
     depth: u32,
+}
+
+/// What a CFF table has that a CFF2 one does not, and the reverse.
+#[derive(Clone, Copy)]
+enum Version<'a> {
+    /// CFF, with a name-keyed table's charset, for the accented form of
+    /// `endchar`.
+    Cff { charset: Option<Charset<'a>> },
+    /// CFF2, with its ItemVariationStore.
+    Cff2 { store: Option<&'a [u8]> },
+}
+
+impl Version<'_> {
+    const fn is_cff2(self) -> bool {
+        matches!(self, Self::Cff2 { .. })
+    }
 }
 
 /// Where a glyph's Private DICT is: the one of a name-keyed CFF table, or
@@ -60,7 +74,7 @@ enum Privates<'a> {
 impl std::fmt::Debug for Face<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Face")
-            .field("cff2", &self.cff2)
+            .field("cff2", &self.version.is_cff2())
             .field("glyphs", &self.charstrings.count)
             .finish_non_exhaustive()
     }
@@ -99,11 +113,9 @@ impl<'a> Face<'a> {
             };
             return Some(Self {
                 table,
-                cff2,
+                version: Version::Cff2 { store },
                 charstrings,
                 global,
-                charset: None,
-                store,
                 privates: Privates::FdArray { select, fonts },
                 depth,
             });
@@ -130,11 +142,9 @@ impl<'a> Face<'a> {
         });
         Some(Self {
             table,
-            cff2,
+            version: Version::Cff { charset },
             charstrings,
             global,
-            charset,
-            store: None,
             privates,
             depth,
         })
@@ -194,21 +204,19 @@ impl<'a> Face<'a> {
             Privates::One(private) => private,
             Privates::FdArray { select, fonts } => {
                 let fd = match select {
-                    Some(at) => fd_select(self.table, at, glyph, self.cff2)?,
+                    Some(at) => fd_select(self.table, at, glyph, self.version.is_cff2())?,
                     None => 0,
                 };
                 dict_find(fonts.get(fd)?, 18)?
             }
         };
-        let (local, vsindex) = Program::private(self.table, private, self.cff2)?;
+        let (local, vsindex) = Program::private(self.table, private, self.version.is_cff2())?;
         Some(Program {
-            cff2: self.cff2,
+            version: self.version,
             charstrings: self.charstrings,
             global: self.global,
             local,
-            charset: self.charset,
-            store: self.store,
-            vsindex: if self.cff2 { vsindex } else { 0 },
+            vsindex,
         })
     }
 }
@@ -366,15 +374,12 @@ fn offset(value: i64) -> Option<usize> {
 
 /// The parts of a table that one glyph's charstring runs with.
 struct Program<'a> {
-    cff2: bool,
+    version: Version<'a>,
     charstrings: Index<'a>,
     global: Index<'a>,
     /// The local subroutines of the glyph's Private DICT, if it has any.
     local: Option<Index<'a>>,
-    /// A name-keyed CFF table's charset, for the accented form of `endchar`.
-    charset: Option<Charset<'a>>,
-    /// CFF2's ItemVariationStore, and the Private DICT's `vsindex`.
-    store: Option<&'a [u8]>,
+    /// The Private DICT's `vsindex`; 0 in CFF.
     vsindex: i64,
 }
 
@@ -409,7 +414,10 @@ impl<'a> Program<'a> {
             let at = offset_at(store, 8 + 4 * ivd, 4)?;
             Some(usize::from(u16_at(store, at.checked_add(4)?)?))
         };
-        self.store.and_then(count).unwrap_or(0)
+        match self.version {
+            Version::Cff2 { store } => store.and_then(count).unwrap_or(0),
+            Version::Cff { .. } => 0,
+        }
     }
 }
 
@@ -592,7 +600,7 @@ impl<'a> Run<'_, 'a, '_> {
         match self.code(&mut s, charstring, 0, accents)? {
             // CFF2 has no endchar; a CFF charstring must end with it, and a
             // number cut short ends it. probe: cff-box, cff-tail, cff2-tail
-            Flow::End if self.program.cff2 => Ok(()),
+            Flow::End if self.program.version.is_cff2() => Ok(()),
             Flow::End | Flow::Return => Err(Fault::Glyph),
             Flow::Endchar => Ok(()),
         }
@@ -710,7 +718,7 @@ impl<'a> Run<'_, 'a, '_> {
                         Flow::Return => {}
                         // A CFF2 subroutine ends at its end; a CFF one must
                         // return. probe: cff-subrs, cff2-subrs
-                        Flow::End if self.program.cff2 => {}
+                        Flow::End if self.program.version.is_cff2() => {}
                         Flow::End => return Err(Fault::Glyph),
                         Flow::Endchar => return Ok(Flow::Endchar),
                     }
@@ -726,8 +734,8 @@ impl<'a> Run<'_, 'a, '_> {
                     self.endchar(s, accents)?;
                     return Ok(Flow::Endchar);
                 }
-                15 if self.program.cff2 => self.vsindex(s)?,
-                16 if self.program.cff2 => self.blend(s)?,
+                15 if self.program.version.is_cff2() => self.vsindex(s)?,
+                16 if self.program.version.is_cff2() => self.blend(s)?,
                 19 | 20 => {
                     // Operands left before the first mask are vstems; a mask
                     // is as many bytes as the stems declared before the first
@@ -785,7 +793,7 @@ impl<'a> Run<'_, 'a, '_> {
     /// ady) into the same box; more fail. CFF2 has no accented form. probe:
     /// cff-endchar, cff2-tail
     fn endchar(&mut self, s: &mut State, accents: bool) -> Step<()> {
-        if self.program.cff2 || s.len < 4 {
+        if self.program.version.is_cff2() || s.len < 4 {
             return Ok(());
         }
         if s.len > 5 || !accents {
@@ -805,7 +813,12 @@ impl<'a> Run<'_, 'a, '_> {
         let code = usize::try_from(code.trunc() as i64).map_err(|_| Fault::Glyph)?;
         let sid = *CFF_STANDARD_ENCODING.get(code).ok_or(Fault::Glyph)?;
         let program = self.program;
-        let charset = program.charset.as_ref().ok_or(Fault::Glyph)?;
+        let Version::Cff {
+            charset: Some(charset),
+        } = &program.version
+        else {
+            return Err(Fault::Glyph);
+        };
         let glyph = charset.glyph(sid, self.work)?.ok_or(Fault::Glyph)?;
         program.charstrings.get(glyph).ok_or(Fault::Glyph)
     }
