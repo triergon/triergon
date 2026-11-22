@@ -59,6 +59,7 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ("tx3g-semantics", Coverage::Item("oracle-compare")),
     ("ts-video-descriptors", Coverage::Item("oracle-compare")),
     ("ts-packet-fields", Coverage::Item("oracle-compare")),
+    ("ts-bounded-time-oracle", Coverage::Item("oracle-compare")),
     ("dts-core-header", Coverage::Item("oracle-compare")),
     ("av1-obu-wire", Coverage::Item("oracle-compare")),
     ("bridge-av1-low-overhead", Coverage::Item("oracle-compare")),
@@ -976,7 +977,9 @@ impl Plan<'_> {
         let worker = format!("{}/codec-views-worker", self.release);
         let h264 = format!("video-h264={worker}");
         let hevc = format!("video-hevc={worker}");
-        let selected = lanes::video_workloads();
+        let selected = lanes::video_workload_names(include_str!(
+            "../../../harness/codecs/nal-workloads.json"
+        ));
         let grade = "codecs-grade-nal-workloads";
         let mut steps = Vec::new();
         for (codec, package, example, name) in [
