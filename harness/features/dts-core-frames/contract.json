@@ -28,20 +28,6 @@
   "confidence": 0.95,
   "reference": "ffmpeg-framing-views-native",
   "runner": "cargo xtask report",
-  "pending_module_requirements": [
-    "Termination frames (FTYPE 0 with SHORT 0 to 30, ETSI TS 102 114 V1.6.1 Tables 5-2 and 5-3) are valid input that the core frame readers refuse until crates/framing reads them",
-    "A core frame followed by an extension substream (ETSI TS 102 114 V1.6.1 clause 7.2) is valid DTS-HD input that the aligned core reader refuses until crates/framing steps over the substream"
-  ],
-  "open_cases": [
-    {
-      "id": "matrix-termination-raw",
-      "requirement": "Termination frames (FTYPE 0 with SHORT 0 to 30, ETSI TS 102 114 V1.6.1 Tables 5-2 and 5-3) are valid input that the core frame readers refuse until crates/framing reads them"
-    },
-    {
-      "id": "good-then-extension",
-      "requirement": "A core frame followed by an extension substream (ETSI TS 102 114 V1.6.1 clause 7.2) is valid DTS-HD input that the aligned core reader refuses until crates/framing steps over the substream"
-    }
-  ],
   "open_deviations": [
     {
       "reading": "Header codes the specification rules out",
@@ -124,6 +110,24 @@
       "cases": [
         "two-frames", "rate-change"
       ]
+    },
+    {
+      "reading": "The coded core clock of a termination frame",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2, Tables 5-2 and 5-3 and NBLKS: FTYPE 0 with SHORT 0 to 30 keeps a 32 × (NBLKS + 1) coding window independently of its padding",
+      "candidate": "returns the complete frame with its 48000 Hz clock and a coded window of 192 samples per channel",
+      "reference": "returns the bytes but reports 0 for both rate and duration",
+      "cases": [
+        "matrix-termination-raw"
+      ]
+    }
+  ],
+  "pending_module_requirements": [
+    "The reader handles aligned core frames only. Supporting a following extension substream requires a bounded streaming extent skip with split-header, EOF and next-core tests for TS 102 114 clauses 7.2 and 7.5.2. This control has only an extension sync marker followed by an invalid size prefix, so it cannot certify a valid DTS-HD extent."
+  ],
+  "open_cases": [
+    {
+      "id": "good-then-extension",
+      "requirement": "The reader handles aligned core frames only. Supporting a following extension substream requires a bounded streaming extent skip with split-header, EOF and next-core tests for TS 102 114 clauses 7.2 and 7.5.2. This control has only an extension sync marker followed by an invalid size prefix, so it cannot certify a valid DTS-HD extent."
     }
   ],
   "open_unmeasured": [

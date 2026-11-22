@@ -104,7 +104,7 @@ assert_eq!(decoder_input, [
 | `aac`: configuration | `AacAscParser`, `AacAscScopeParser`, `decoder_configuration_view` | AudioSpecificConfig for AAC-LC (2), SBR (5), PS (29): frequency, fixed channel configurations 1–7, 11, 12 and 14, GASpecificConfig, PCE, `0x2b7`/`0x548` sync extensions |
 | `aac`: ADTS | `inspect_adts_header`, `AacAdtsParser`, `AacAdtsWriter`, `AacAdtsStreamReader`, `AacAdtsCarrierReader` | 56-bit header facts; single-block AAC-LC frames; ADTS wrapping of raw access units (`AacAdtsParameters::from_asc`); aligned ADTS streams |
 | `ac3` | `probe_header`, `Ac3FrameReader`, `Ac3ConfigParser`, `Eac3BsiParser` | Header facts (bsid 0–8, 11–16), aligned syncframe reader, dac3/dec3 records, complete E-AC-3 BSI |
-| `dts`: core | `probe_core_header`, `DtsCoreFrameReader`, `DtsHeaderInspector` | Normal core header (all fields, optional HCRC), FSIZE+1 frame acquisition |
+| `dts`: core | `probe_core_header`, `DtsCoreFrameReader`, `DtsHeaderInspector` | Normal and termination core headers (all fields, optional HCRC), FSIZE+1 frame acquisition |
 | `dts`: declared extents | `probe_frame_extent`, `probe_extension_substream_extent` | Bounded core and extension size fields at an established canonical sync, including the short and long extension prefixes |
 | `dts`: packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14SyncReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
 | `reference_trace::dts` | `ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
@@ -115,12 +115,17 @@ assert_eq!(decoder_input, [
 
 The framing views harness compares aligned DTS core frames and declared extents
 with FFmpeg's DTS parser and `dca_core` filter. Its header oracle checks every
-field, bit range and derived view from both inspectors. The packed-reader
+field, bit range and derived view from both inspectors. A non-core sync leaves
+all later core fields unread. The packed-reader
 comparison covers 14-bit big- and little-endian words and 16-bit little-endian
-words. The unpacking oracle checks canonical bytes and physical bit locations,
+words. A 16-bit source ending immediately after the core sync reports a
+truncated header. The unpacking oracle checks canonical bytes and physical
+bit locations,
 with reference-decoded PCM equality on real first-frame repackings. The parser
 trace comparison checks packets, duration, rate, profile and byte hints at
-multiple input window sizes.
+multiple input window sizes. The comparison reports the core clock with
+the profile selected by XCh, XXCh or X96, and retains the core profile when
+only an incomplete extension-substream marker follows the core.
 
 Prepare the shared inputs with `cargo xtask framing-views fixtures dts`. The
 [feature results](../../docs/status.md#dts-core-header-inspection) link the five
@@ -222,8 +227,9 @@ descriptors are 16 bytes.
   coded duration of one frame, not a presentation time.
   `Ac3FrameReader::read_frame_parts` can consume a complete aligned frame
   from several slices when the first slice contains its header prefix.
-- DTS: canonical big-endian normal frames only in `DtsCoreFrameReader`; no
-  resync or termination frames. The extension extent probes read size fields. HCRC is reported, not
+- DTS: `DtsCoreFrameReader` reads canonical big-endian normal and termination
+  frames without resynchronizing. A termination frame reports its coded
+  window and its padding sample count separately. The extension extent probes read size fields. HCRC is reported, not
   checked. `DtsHeaderInspector` and `inspect_header_bits` expose the raw
   seven-bit NBLKS code once complete. Their `coded_window_samples` view is
   `32 × (NBLKS + 1)` core samples per channel for codes 5 through 127.
