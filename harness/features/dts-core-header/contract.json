@@ -21,47 +21,6 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "oracle": "dts-header",
-  "pending_module_requirements": [
-    "inspect_header_bits reads core fields and derives views after a sync word that is not the core sync, where ETSI TS 102 114 V1.6.1 clause 5.4.2 has no core header and the owned inspector and the oracle report none, until crates/framing stops it there"
-  ],
-  "open_cases": [
-    {
-      "id": "header-reserved-extension-sync",
-      "requirement": "inspect_header_bits reads core fields and derives views after a sync word that is not the core sync, where ETSI TS 102 114 V1.6.1 clause 5.4.2 has no core header and the owned inspector and the oracle report none, until crates/framing stops it there"
-    },
-    {
-      "id": "header-bad-sync",
-      "requirement": "inspect_header_bits reads core fields and derives views after a sync word that is not the core sync, where ETSI TS 102 114 V1.6.1 clause 5.4.2 has no core header and the owned inspector and the oracle report none, until crates/framing stops it there"
-    },
-    {
-      "id": "source-original-header-reserved-extension-sync",
-      "requirement": "inspect_header_bits reads core fields and derives views after a sync word that is not the core sync, where ETSI TS 102 114 V1.6.1 clause 5.4.2 has no core header and the owned inspector and the oracle report none, until crates/framing stops it there"
-    },
-    {
-      "id": "source-original-header-bad-sync",
-      "requirement": "inspect_header_bits reads core fields and derives views after a sync word that is not the core sync, where ETSI TS 102 114 V1.6.1 clause 5.4.2 has no core header and the owned inspector and the oracle report none, until crates/framing stops it there"
-    },
-    {
-      "id": "source-source-carriage18-reserved-extension-sync",
-      "requirement": "inspect_header_bits reads core fields and derives views after a sync word that is not the core sync, where ETSI TS 102 114 V1.6.1 clause 5.4.2 has no core header and the owned inspector and the oracle report none, until crates/framing stops it there"
-    },
-    {
-      "id": "source-source-carriage18-bad-sync",
-      "requirement": "inspect_header_bits reads core fields and derives views after a sync word that is not the core sync, where ETSI TS 102 114 V1.6.1 clause 5.4.2 has no core header and the owned inspector and the oracle report none, until crates/framing stops it there"
-    },
-    {
-      "id": "good-then-invalid",
-      "requirement": "inspect_header_bits reads core fields and derives views after a sync word that is not the core sync, where ETSI TS 102 114 V1.6.1 clause 5.4.2 has no core header and the owned inspector and the oracle report none, until crates/framing stops it there"
-    },
-    {
-      "id": "good-then-extension",
-      "requirement": "inspect_header_bits reads core fields and derives views after a sync word that is not the core sync, where ETSI TS 102 114 V1.6.1 clause 5.4.2 has no core header and the owned inspector and the oracle report none, until crates/framing stops it there"
-    },
-    {
-      "id": "xll_51_24_48_none",
-      "requirement": "inspect_header_bits reads core fields and derives views after a sync word that is not the core sync, where ETSI TS 102 114 V1.6.1 clause 5.4.2 has no core header and the owned inspector and the oracle report none, until crates/framing stops it there"
-    }
-  ],
   "open_unmeasured": [
     {
       "bound": "runtime",
