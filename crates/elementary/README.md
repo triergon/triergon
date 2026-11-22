@@ -80,6 +80,11 @@ exceeding a limit is a typed error.
 
 ## Comparison with FFmpeg
 
+The [metadata comparison](../../harness/features/elementary-metadata/contract.json)
+compares FLAC stream declarations from the stored STREAMINFO block, alongside
+packet trim and mapped tags. The [wire comparison](../../harness/features/elementary-metadata-wire/contract.json)
+checks raw headers and tag envelopes, including SEEKTABLE and LAME fields.
+
 The `elementary-readers` gate compares native FLAC, MPEG audio, ADTS, AC-3 and E-AC-3
 packets with FFmpeg and checks each reviewed difference against its frozen values.
 

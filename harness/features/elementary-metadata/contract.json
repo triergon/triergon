@@ -6,7 +6,7 @@
   "candidate": "codec-views-worker",
   "worker_operation": "elementary-metadata-",
   "contract": [
-    "Force the same elementary format on both sides over a preloaded seekable source. Read the first audio packet and fold codec and FLAC STREAMINFO, sample rate and channels where the reference supplies them, declared duration in samples, and start trim in samples. AAC rate and channels and E-AC-3 channels are compared by the wire oracle.",
+    "Force the same elementary format on both sides over a preloaded seekable source. Read the first audio packet and fold codec, sample rate, channels, declared duration in samples, and start trim in samples. For FLAC with STREAMINFO, compare its original bytes and read its source declarations independently of the reference demuxer’s first-packet context. AAC rate and channels and E-AC-3 channels are compared by the wire oracle.",
     "For MPEG audio, read through the footer in the candidate to include ID3v1 and APEv2 tags. Compare the sorted dictionary projection with the reference format dictionary. The projection includes the shared title, artist, album_artist, album, date, track, disc, composer, copyright, encoded_by, publisher, encoder and comment keys. Decode ID3v2 text frames by their encoding and ID3v1 fields as Latin-1. Compare the FLAC comment through the same key set.",
     "The separate wire comparison covers physical metadata and tag layout, SEEKTABLE points that lack a public reference index view, first frame headers, Xing/Info fields and the LAME view. The reference's skip-sample side data is a decoder trim and is compared to candidate packet trim."
   ],
@@ -894,76 +894,12 @@
   ],
   "open_cases": [
     {
-      "id": "01---wrong-max-blocksize.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
-      "id": "04---wrong-number-of-channels.flac",
-      "requirement": "The FLAC STREAMINFO and first frame disagree on channels. The candidate uses the declared stream channels and the reference publishes the parsed frame's channels."
-    },
-    {
-      "id": "08---blocksize-65536.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
-      "id": "51---extremely-large-vorbiscomment.flac",
-      "requirement": "The candidate retains bounded FLAC metadata and exposes the kept comment entries. The reference retains large comments and concatenates repeated dictionary values."
-    },
-    {
       "id": "54---1000x-repeating-vorbiscomment.flac",
       "requirement": "The candidate retains bounded FLAC metadata and exposes the kept comment entries. The reference retains large comments and concatenates repeated dictionary values."
     },
     {
-      "id": "55---file-48-53-combined.flac",
-      "requirement": "The candidate retains bounded FLAC metadata and exposes the kept comment entries. The reference retains large comments and concatenates repeated dictionary values."
-    },
-    {
-      "id": "06---samplerate-768khz.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
-      "id": "08---blocksize-65535.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
-      "id": "09---rice-partition-order-15.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
-      "id": "11---file-starting-with-unparsable-data.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
-      "id": "ff-s16-block16384.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
-      "id": "ff-s16-block32768.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
-      "id": "flac-s16-block65535.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
-      "id": "flac-s16-partition15.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
-      "id": "flac-s16-rate1.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
-      "id": "flac-s20-rate768k.flac",
-      "requirement": "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input."
-    },
-    {
       "id": "mp3-tags-tail.mp3",
       "requirement": "The candidate preserves the tag envelope and exposes its mapped text. The reference open publishes a different dictionary after its tag precedence and demuxer policy."
-    },
-    {
-      "id": "he-free.bit",
-      "requirement": "The candidate confirms the free-format MPEG audio frame spacing. The forced reference MP3 demuxer refuses the file."
     },
     {
       "id": "adts-tags.aac",
@@ -987,11 +923,39 @@
     }
   ],
   "pending_module_requirements": [
-    "The FLAC STREAMINFO and first frame disagree on channels. The candidate uses the declared stream channels and the reference publishes the parsed frame's channels.",
-    "The FLAC reader publishes stream facts from STREAMINFO or its confirmed frame. With one packet and no stream-info pass the reference leaves rate, channels or duration unset on this input.",
-    "The candidate confirms the free-format MPEG audio frame spacing. The forced reference MP3 demuxer refuses the file.",
     "The candidate preserves the tag envelope and exposes its mapped text. The reference open publishes a different dictionary after its tag precedence and demuxer policy.",
     "The candidate retains bounded FLAC metadata and exposes the kept comment entries. The reference retains large comments and concatenates repeated dictionary values.",
     "The candidate skips the leading ID3v2 tag and confirms the first syncframe. The forced demuxer does not set the sample rate from its first returned packet."
+  ],
+  "open_deviations": [
+    {
+      "reading": "The metadata retention limit bounds large FLAC comment blocks",
+      "clause": "RFC 9639 sections 8.1 and 8.6.1 define block and comment lengths. The elementary reader’s Limits bounds retained tags and metadata to 4 MiB by default.",
+      "candidate": "returns the track without the unretained comment dictionary",
+      "reference": "publishes the 16770684-byte comment or concatenates album values into a 59999-byte value",
+      "compat": "compat::flac::retain_large_metadata",
+      "cases": [
+        "51---extremely-large-vorbiscomment.flac",
+        "55---file-48-53-combined.flac"
+      ]
+    },
+    {
+      "reading": "Recover stream facts from a confirmed frame when there is no file header",
+      "clause": "RFC 9639 sections 6, 8.2 and 9.1–9.1.5 distinguish the file header from the CRC-checked frame header. The elementary reader documents markerless access and derived track metadata.",
+      "candidate": "reports the confirmed frame’s 44100 Hz and one channel, with no STREAMINFO or duration",
+      "reference": "reports no sample rate, channel count, STREAMINFO or duration",
+      "cases": [
+        "11---file-starting-with-unparsable-data.flac"
+      ]
+    },
+    {
+      "reading": "Free-format MPEG audio frame spacing can be determined from subsequent headers",
+      "clause": "ISO/IEC 11172-3 section 2.4.2.3 defines free-format bitrate index zero, as described by the MPEG audio frame documentation and the elementary reader’s frame extent contract.",
+      "candidate": "reports MPEG audio at 44100 Hz with two channels and no duration",
+      "reference": "refuses the forced MP3 demux operation",
+      "cases": [
+        "he-free.bit"
+      ]
+    }
   ]
 }

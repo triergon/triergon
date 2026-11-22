@@ -239,12 +239,23 @@ static int reader_elementary_metadata(const ViewCase *input, ViewWork *work)
         size_t size = 0;
         const uint8_t *skip = av_packet_get_side_data(pkt, AV_PKT_DATA_SKIP_SAMPLES, &size);
         uint64_t duration = UINT64_MAX;
+        unsigned rate = codec == 3 ? 0 : (unsigned)params->sample_rate;
+        unsigned channels = codec == 3 || codec == 5 ? 0 : (unsigned)params->ch_layout.nb_channels;
         if ((codec == 1 || codec == 2 || codec == 6 || codec == 7) && stream->duration != AV_NOPTS_VALUE && params->sample_rate)
             duration = av_rescale_q(stream->duration, stream->time_base, (AVRational){1, params->sample_rate});
+        if (codec == 1 && params->extradata_size == 34) {
+            /* RFC 9639 section 8.2: this view describes the stream declarations
+             * in STREAMINFO. Packet parsing may replace the context's fields. */
+            const uint64_t info = AV_RB64(params->extradata + 10);
+            const uint64_t total_samples = info & ((UINT64_C(1) << 36) - 1);
+            rate = (unsigned)(info >> 44);
+            channels = (unsigned)((info >> 41) & 7u) + 1;
+            duration = total_samples ? total_samples : UINT64_MAX;
+        }
         const uint64_t fields[] = {
             codec,
-            codec == 3 ? 0 : (uint64_t)params->sample_rate,
-            codec == 3 || codec == 5 ? 0 : (uint64_t)params->ch_layout.nb_channels,
+            rate,
+            channels,
             duration,
             size >= 4 ? AV_RL32(skip) : 0,
             (uint64_t)params->extradata_size
