@@ -101,7 +101,6 @@ impl SliceDecoder<'_> {
 
     /// Luma motion vector prediction (8.4.1.3). `shape`: 0 generic, 1 16x8, 2 8x16 with
     /// partition index `p`.
-    #[allow(clippy::too_many_arguments)] // kernel takes explicit sample geometry instead of a wrapper struct
     fn mvp(
         &self,
         list: usize,
@@ -120,12 +119,12 @@ impl SliceDecoder<'_> {
     #[inline]
     fn mvp_from(abc: (NbMv, NbMv, NbMv), ref_idx: i32, shape: u8, p: usize) -> [i32; 2] {
         let (a, b, c) = abc;
-        let ra = a.map(|v| v.1).unwrap_or(-1);
-        let rb = b.map(|v| v.1).unwrap_or(-1);
-        let rc = c.map(|v| v.1).unwrap_or(-1);
-        let ma = a.map(|v| v.0).unwrap_or([0, 0]);
-        let mb = b.map(|v| v.0).unwrap_or([0, 0]);
-        let mc = c.map(|v| v.0).unwrap_or([0, 0]);
+        let ra = a.map_or(-1, |v| v.1);
+        let rb = b.map_or(-1, |v| v.1);
+        let rc = c.map_or(-1, |v| v.1);
+        let ma = a.map_or([0, 0], |v| v.0);
+        let mb = b.map_or([0, 0], |v| v.0);
+        let mc = c.map_or([0, 0], |v| v.0);
         if shape == 1 {
             if p == 0 && rb == ref_idx {
                 return mb;
@@ -177,7 +176,7 @@ impl SliceDecoder<'_> {
     fn store_ref(&mut self, list: usize, b8: usize, r: i32) {
         let cur = self.cur;
         let id = if r >= 0 {
-            self.ref_pic(list, r).map(|p| p.id).unwrap_or(-1)
+            self.ref_pic(list, r).map_or(-1, |p| p.id)
         } else {
             -1
         };
@@ -399,9 +398,9 @@ impl SliceDecoder<'_> {
         };
         for list in 0..2 {
             let (a, b, c) = abcs[list];
-            let ra = a.map(|v| v.1).unwrap_or(-1);
-            let rb = b.map(|v| v.1).unwrap_or(-1);
-            let rc = c.map(|v| v.1).unwrap_or(-1);
+            let ra = a.map_or(-1, |v| v.1);
+            let rb = b.map_or(-1, |v| v.1);
+            let rc = c.map_or(-1, |v| v.1);
             refs[list] = min_positive(ra, min_positive(rb, rc));
         }
         let mut zero = false;
@@ -428,7 +427,7 @@ impl SliceDecoder<'_> {
         let cur = self.cur;
         for list in 0..2 {
             let id = if refs[list] >= 0 {
-                self.ref_pic(list, refs[list]).map(|p| p.id).unwrap_or(-1)
+                self.ref_pic(list, refs[list]).map_or(-1, |p| p.id)
             } else {
                 -1
             };
@@ -522,7 +521,6 @@ impl SliceDecoder<'_> {
     }
 
     #[inline(never)]
-    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
     fn direct_spatial(&mut self, i: usize) -> Result<(), SliceError> {
         let (refs, mvps, zero) = self.spatial_refs();
         let x0 = (i as i32 & 1) * 8;
@@ -530,7 +528,7 @@ impl SliceDecoder<'_> {
         for list in 0..2 {
             self.store_ref(list, i, refs[list]);
         }
-        let l1_short = self.s.col.map(|c| c.short_term).unwrap_or(false);
+        let l1_short = self.s.col.is_some_and(|c| c.short_term);
         let blocks: &[(i32, i32)] = if self.s.direct_8x8_inference {
             &[(0, 0)]
         } else {
@@ -648,57 +646,51 @@ impl SliceDecoder<'_> {
                 }
             }
         } else if !self.pic.mbaff {
-            match st.coding {
-                Coding::Fields => {
-                    motion = &st.motion[if top_closer { 0 } else { 1 }];
-                    mb_col = w * (cur_y / 2) + cur_x;
-                    ym = 8 * (cur_y % 2) as i32 + 4 * (ycol / 8);
-                    vs = VertScale::FldToFrm;
-                }
-                _ => {
-                    motion = &st.motion[0];
-                    mb_col = cur;
-                    ym = ycol;
-                    vs = VertScale::One;
-                }
+            if st.coding == Coding::Fields {
+                motion = &st.motion[usize::from(!top_closer)];
+                mb_col = w * (cur_y / 2) + cur_x;
+                ym = 8 * (cur_y % 2) as i32 + 4 * (ycol / 8);
+                vs = VertScale::FldToFrm;
+            } else {
+                motion = &st.motion[0];
+                mb_col = cur;
+                ym = ycol;
+                vs = VertScale::One;
             }
         } else {
             let cur_field = self.pic.mbs[cur].field;
-            match st.coding {
-                Coding::Fields => {
-                    mb_col = cur / 2;
-                    if !cur_field {
-                        motion = &st.motion[if top_closer { 0 } else { 1 }];
-                        ym = 8 * (cur % 2) as i32 + 4 * (ycol / 8);
-                        vs = VertScale::FldToFrm;
-                    } else {
-                        motion = &st.motion[cur & 1];
-                        ym = ycol;
-                        vs = VertScale::One;
-                    }
+            if st.coding == Coding::Fields {
+                mb_col = cur / 2;
+                if !cur_field {
+                    motion = &st.motion[usize::from(!top_closer)];
+                    ym = 8 * (cur % 2) as i32 + 4 * (ycol / 8);
+                    vs = VertScale::FldToFrm;
+                } else {
+                    motion = &st.motion[cur & 1];
+                    ym = ycol;
+                    vs = VertScale::One;
                 }
-                _ => {
-                    motion = &st.motion[0];
-                    let x_field = motion.mb_flags.get(cur).copied().unwrap_or(0) & MBF_FIELD != 0;
-                    if !cur_field {
-                        if !x_field {
-                            mb_col = cur;
-                            ym = ycol;
-                            vs = VertScale::One;
-                        } else {
-                            mb_col = 2 * (cur / 2) + if top_closer { 0 } else { 1 };
-                            ym = 8 * (cur % 2) as i32 + 4 * (ycol / 8);
-                            vs = VertScale::FldToFrm;
-                        }
-                    } else if !x_field {
-                        mb_col = 2 * (cur / 2) + (ycol as usize / 8);
-                        ym = (2 * ycol) % 16;
-                        vs = VertScale::FrmToFld;
-                    } else {
+            } else {
+                motion = &st.motion[0];
+                let x_field = motion.mb_flags.get(cur).copied().unwrap_or(0) & MBF_FIELD != 0;
+                if !cur_field {
+                    if !x_field {
                         mb_col = cur;
                         ym = ycol;
                         vs = VertScale::One;
+                    } else {
+                        mb_col = 2 * (cur / 2) + usize::from(!top_closer);
+                        ym = 8 * (cur % 2) as i32 + 4 * (ycol / 8);
+                        vs = VertScale::FldToFrm;
                     }
+                } else if !x_field {
+                    mb_col = 2 * (cur / 2) + (ycol as usize / 8);
+                    ym = (2 * ycol) % 16;
+                    vs = VertScale::FrmToFld;
+                } else {
+                    mb_col = cur;
+                    ym = ycol;
+                    vs = VertScale::One;
                 }
             }
         }
@@ -1001,7 +993,6 @@ impl SliceDecoder<'_> {
     }
 
     /// Prediction block with refIdx `r` (-1: list unused) and vectors `mv` per list.
-    #[allow(clippy::too_many_arguments)] // kernel takes explicit sample geometry instead of a wrapper struct
     fn make_part(
         &self,
         x: i32,
@@ -1357,7 +1348,7 @@ fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf, O: McOut>(
         }
         return;
     }
-    let list = if p.refs[0].is_some() { 0 } else { 1 };
+    let list = usize::from(p.refs[0].is_none());
     let Some(rp) = &p.refs[list] else { return };
     let lp = list_pos(&g, p, list, rp, refbuf(rp.idx));
     let fb = lp.fb;

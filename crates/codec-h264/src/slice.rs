@@ -98,7 +98,6 @@ pub(crate) fn peek_pps_id(r: &mut BitReader<'_>) -> R<(u32, u32, u32)> {
     Ok((first_mb, st, pps_id))
 }
 
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 pub(crate) fn parse_slice_header(
     r: &mut BitReader<'_>,
     nal: NalHeader,

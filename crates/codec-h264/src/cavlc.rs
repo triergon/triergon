@@ -205,7 +205,6 @@ fn read_run_before(r: &mut BitReader<'_>, zeros_left: i32) -> i32 {
 /// Writes coefficient level `k` (scan index start_idx + k) to `dst[map[start_idx + k]]` and
 /// returns TotalCoeff, or `None` on invalid data. `dst` must be zero on entry.
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn residual_block(
     r: &mut BitReader<'_>,
     t: &CavlcTables,
@@ -224,8 +223,6 @@ pub(crate) fn residual_block(
 }
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn residual_block_inner(
     r: &mut BitReader<'_>,
     t: &CavlcTables,
@@ -279,7 +276,7 @@ fn residual_block_inner(
             };
         }
     }
-    let mut suffix_length: u32 = if total > 10 && t1s < 3 { 1 } else { 0 };
+    let mut suffix_length = u32::from(total > 10 && t1s < 3);
     for i in t1s..total {
         // level_prefix (9.2.2.1) and level_suffix from one 32-bit window.
         let w = r.peek(32);

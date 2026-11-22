@@ -138,7 +138,6 @@ pub(crate) struct Pps {
 type ScalingFallback<'a> = (&'a [[u8; 16]; 6], &'a [[u8; 64]; 6]);
 
 /// scaling_list() syntax, clause 7.3.2.1.1.1. Returns true when useDefaultScalingMatrixFlag.
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn scaling_list(r: &mut BitReader<'_>, list: &mut [u8]) -> R<bool> {
     let mut last = 8i32;
     let mut next = 8i32;
@@ -186,7 +185,7 @@ fn parse_scaling_matrix(
                 s4[i] = match (i, fallback) {
                     (0, None) => DEFAULT_4X4_INTRA,
                     (3, None) => DEFAULT_4X4_INTER,
-                    (0, Some((f4, _))) | (3, Some((f4, _))) => f4[i],
+                    (0 | 3, Some((f4, _))) => f4[i],
                     _ => s4[i - 1],
                 };
             }
@@ -207,7 +206,7 @@ fn parse_scaling_matrix(
                 s8[k] = match (k, fallback) {
                     (0, None) => DEFAULT_8X8_INTRA,
                     (1, None) => DEFAULT_8X8_INTER,
-                    (0, Some((_, f8))) | (1, Some((_, f8))) => f8[k],
+                    (0 | 1, Some((_, f8))) => f8[k],
                     _ => s8[k - 2],
                 };
             }
@@ -495,7 +494,7 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
         transform_8x8_mode = r.bit();
         pic_scaling_matrix_present = r.bit();
         if pic_scaling_matrix_present {
-            let chroma_format_idc = sps.map(|s| s.chroma_format_idc).unwrap_or(1);
+            let chroma_format_idc = sps.map_or(1, |s| s.chroma_format_idc);
             let n = 6 + if chroma_format_idc != 3 { 2 } else { 6 } * transform_8x8_mode as usize;
             let (f4, f8) = (s4, s8);
             parse_scaling_matrix(r, n, &mut s4, &mut s8, Some((&f4, &f8)))?;

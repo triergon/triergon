@@ -526,7 +526,6 @@ pub(crate) fn pred8x8(mode: u8, e: &Edge<8, 16>, dst: &mut [u8], off: usize, str
 // ---------------------------------------------------------------- intra 16x16 / chroma
 
 /// Intra_16x16 prediction (8.3.3). `top` = p[0..15,-1], `left` = p[-1,0..15].
-#[allow(clippy::too_many_arguments)] // kernel takes explicit sample geometry instead of a wrapper struct
 pub(crate) fn pred16x16(
     mode: u8,
     top: &[u8; 16],
@@ -601,7 +600,6 @@ pub(crate) fn pred16x16(
 }
 
 /// Intra chroma prediction for one 8x8 (4:2:0) component (8.3.4).
-#[allow(clippy::too_many_arguments)] // kernel takes explicit sample geometry instead of a wrapper struct
 pub(crate) fn pred_chroma8(
     mode: u8,
     top: &[u8; 8],

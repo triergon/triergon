@@ -175,7 +175,6 @@ impl BsCtx<'_> {
 
     /// Boundary strength between 4x4 block pb of MB p and block qb of MB q (8.7.2.1).
     #[inline]
-    #[allow(clippy::too_many_arguments)] // kernel takes explicit sample geometry instead of a wrapper struct
     fn bs(
         &self,
         p: usize,
@@ -338,7 +337,6 @@ fn qp_avg(p: [i8; 2], q: [i32; 2]) -> [i32; 2] {
 /// Gather an edge whose lines run along a row (horizontal edge) into lanes `at..at + N`: lane
 /// k = row q0 + (k-4)*step.
 #[inline(always)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn load_h<const N: usize>(s: &[u8], q0: usize, step: usize, l: &mut Lanes, at: usize) {
     for k in 0..8 {
         let o = q0 + k * step - 4 * step;
@@ -349,7 +347,6 @@ fn load_h<const N: usize>(s: &[u8], q0: usize, step: usize, l: &mut Lanes, at: u
 
 /// Scatter rows `lo..hi` of a horizontal edge back from lanes `at..at + N`.
 #[inline(always)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn store_h<const N: usize>(
     s: &mut [u8],
     q0: usize,
@@ -395,7 +392,6 @@ fn transpose8(r: &mut [u64; 8]) {
 /// column (k - 4).
 #[cfg(target_pointer_width = "64")]
 #[inline(always)]
-#[allow(clippy::needless_range_loop)]
 // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 #[expect(
     clippy::unwrap_used,
@@ -419,7 +415,6 @@ fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes, 
 /// are unchanged).
 #[cfg(target_pointer_width = "64")]
 #[inline(always)]
-#[allow(clippy::needless_range_loop)]
 // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 #[expect(
     clippy::unwrap_used,
@@ -911,8 +906,6 @@ fn internal_bs(ctx: &BsCtx<'_>, q: usize, t8: bool) -> ([[u8; 4]; 4], [[u8; 4]; 
     (v, h)
 }
 
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn deblock_mb(
     pic: &PicView<'_>,
     uni: &[Uni],
@@ -977,7 +970,7 @@ fn deblock_mb(
         } else {
             addr - 1
         };
-        if !(sp.disable_idc == 2 && !same_slice(p)) {
+        if sp.disable_idc != 2 || same_slice(p) {
             let bs4 = ctx.edge_bs(p, [3, 7, 11, 15], addr, [0, 4, 8, 12], true);
             if bs4 != [0; 4] {
                 let mp = &pic.mbs[p];
@@ -1100,7 +1093,7 @@ fn deblock_mb(
         } else {
             let prow_pic = yi - dy;
             let (p, prow) = mb_at_row(pic, mbx, prow_pic);
-            if !(sp.disable_idc == 2 && !same_slice(p)) {
+            if sp.disable_idc != 2 || same_slice(p) {
                 let mixed = pic.mbaff && pic.mbs[p].field != qfield;
                 let pr0 = (prow / 4) * 4;
                 let bs = if mixed {

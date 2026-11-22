@@ -842,11 +842,7 @@ impl SliceDecoder<'_> {
                     if skip_or_intra || direct || r < 0 {
                         0
                     } else {
-                        let thr = if self.pic.mbaff && cur_frame && nfield {
-                            1
-                        } else {
-                            0
-                        };
+                        let thr = i32::from(self.pic.mbaff && cur_frame && nfield);
                         (r > thr) as usize
                     }
                 }
@@ -903,13 +899,7 @@ impl SliceDecoder<'_> {
                     sum += v;
                 }
             }
-            let inc = if sum > 32 {
-                2
-            } else if sum > 2 {
-                1
-            } else {
-                0
-            };
+            let inc = if sum > 32 { 2 } else { usize::from(sum > 2) };
             let o = if comp == 0 { off::MVD_X } else { off::MVD_Y };
             out[comp] = c.mvd(o, inc);
         }
@@ -1287,7 +1277,6 @@ impl SliceDecoder<'_> {
         Ok(())
     }
 
-    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
     fn finish_nzmask(&mut self) {
         let cur = self.cur;
         let mut m: u16 = 0;

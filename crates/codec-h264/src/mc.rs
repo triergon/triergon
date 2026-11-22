@@ -71,7 +71,6 @@ fn fetch(r: &PlaneRef<'_>, x0: i32, y0: i32, ww: usize, wh: usize, out: &mut [u8
 
 /// Luma prediction of a w x h block at integer position (xi, yi) with fraction (fx, fy),
 /// written to `dst` with stride `ds` (8.4.2.2.1).
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn luma_mc(
     r: &PlaneRef<'_>,
     xi: i32,
@@ -171,7 +170,6 @@ fn copy_block<const W: usize>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn luma_mc_w<const W: usize>(
     r: &PlaneRef<'_>,
@@ -203,8 +201,6 @@ fn luma_mc_w<const W: usize>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn luma_kernel<const W: usize>(
     src: &[u8],
     base: usize,
@@ -267,7 +263,7 @@ fn luma_kernel<const W: usize>(
                 let d = &mut dst[y * ds..y * ds + W];
                 match (fx, fy) {
                     (2, 2) => d.copy_from_slice(&j),
-                    (2, 1) | (2, 3) => {
+                    (2, 1 | 3) => {
                         let br = &b1[y + 2 + (fy == 3) as usize];
                         for x in 0..W {
                             d[x] = ((j[x] as u16 + clip_h(br[x]) as u16 + 1) >> 1) as u8;
@@ -299,7 +295,6 @@ fn luma_kernel<const W: usize>(
 }
 
 /// Chroma prediction (8.4.2.2.2) of a w x h block at integer (xi, yi), eighth fraction (fx, fy).
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn chroma_mc(
     r: &PlaneRef<'_>,
     xi: i32,
@@ -318,7 +313,6 @@ pub(crate) fn chroma_mc(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn chroma_mc_w<const W: usize>(
     r: &PlaneRef<'_>,
@@ -358,7 +352,6 @@ fn chroma_mc_w<const W: usize>(
 /// (`next`), packed at stride W.
 const GATHER: usize = 72;
 
-#[allow(clippy::too_many_arguments)]
 fn chroma_kernel<const W: usize>(
     src: &[u8],
     base: usize,
@@ -426,7 +419,6 @@ struct Average;
 
 impl Combine for Average {
     #[inline(always)]
-    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays keeps the loop vectorisable
     fn apply<const N: usize>(self, d: &mut [u8; N], a: &[u8; N], b: &[u8; N]) {
         for x in 0..N {
             d[x] = ((a[x] as u16 + b[x] as u16 + 1) >> 1) as u8;
@@ -446,7 +438,6 @@ struct Weighted<T> {
 
 impl<T: WLane> Combine for Weighted<T> {
     #[inline(always)]
-    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays keeps the loop vectorisable
     #[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
     fn apply<const N: usize>(self, d: &mut [u8; N], a: &[u8; N], b: &[u8; N]) {
         for x in 0..N {
@@ -457,7 +448,6 @@ impl<T: WLane> Combine for Weighted<T> {
 }
 
 /// Combine h rows of W samples of `a` and `b` (strides `sa`, `sb`) into `d` (stride `ds`).
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn combine_rows<const W: usize, C: Combine>(
     c: C,
@@ -513,7 +503,6 @@ macro_rules! with_combine {
 
 /// Weighted sample prediction (8-272 / 8-273) of a w x h block: predictions `a` and `b`
 /// (strides `sa`, `sb`) combined into `d` (stride `ds`).
-#[allow(clippy::too_many_arguments)]
 #[inline]
 pub(crate) fn weight_bi(
     d: &mut [u8],
@@ -541,7 +530,6 @@ pub(crate) fn weight_bi(
 /// predictions are rows of stride `st` in `a` and `b`, each with room for a whole number of
 /// 16-sample chunks: the 16-sample loop runs over the rows end to end, the result replaces `a`
 /// and the block's `w` samples of each row are copied into `d` (stride `ds`).
-#[allow(clippy::too_many_arguments)]
 #[inline]
 pub(crate) fn weight_bi_narrow(
     d: &mut [u8],

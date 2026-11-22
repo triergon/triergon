@@ -9,14 +9,9 @@
     unreachable_pub,
     missing_docs
 )]
-// Kept in the forms whose generated code was measured on the hot paths.
-#![allow(
-    clippy::bool_to_int_with_if,
-    clippy::map_unwrap_or,
-    clippy::nonminimal_bool,
-    clippy::single_match_else,
-    clippy::unnested_or_patterns
-)]
+// Sample kernels and per-block steps take their geometry and operands as plain
+// arguments, not parameter structs: the shape the hot paths are measured in.
+#![allow(clippy::too_many_arguments)]
 mod cabac;
 mod cavlc;
 mod deblock;
@@ -951,7 +946,6 @@ impl Decoder {
         }
     }
 
-    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
     fn decode_slice_data(
         &mut self,
         sps: &Sps,

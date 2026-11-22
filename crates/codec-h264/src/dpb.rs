@@ -80,88 +80,85 @@ pub(crate) struct PocState {
 pub(crate) fn compute_poc(sps: &Sps, sh: &SliceHeader, st: &PocState) -> ([i32; 2], i32) {
     let max_frame_num = sps.max_frame_num() as i32;
     let fnum = sh.frame_num as i32;
-    match sps.poc_type {
-        0 => {
-            let max_lsb = 1i32 << sps.log2_max_poc_lsb;
-            let (prev_msb, prev_lsb) = if sh.idr {
-                (0, 0)
-            } else {
-                (st.prev_poc_msb, st.prev_poc_lsb)
-            };
-            let lsb = sh.poc_lsb as i32;
-            let msb = if lsb < prev_lsb && (prev_lsb - lsb) >= max_lsb / 2 {
-                prev_msb.wrapping_add(max_lsb)
-            } else if lsb > prev_lsb && (lsb - prev_lsb) > max_lsb / 2 {
-                prev_msb.wrapping_sub(max_lsb)
-            } else {
-                prev_msb
-            };
+    if sps.poc_type == 0 {
+        let max_lsb = 1i32 << sps.log2_max_poc_lsb;
+        let (prev_msb, prev_lsb) = if sh.idr {
+            (0, 0)
+        } else {
+            (st.prev_poc_msb, st.prev_poc_lsb)
+        };
+        let lsb = sh.poc_lsb as i32;
+        let msb = if lsb < prev_lsb && (prev_lsb - lsb) >= max_lsb / 2 {
+            prev_msb.wrapping_add(max_lsb)
+        } else if lsb > prev_lsb && (lsb - prev_lsb) > max_lsb / 2 {
+            prev_msb.wrapping_sub(max_lsb)
+        } else {
+            prev_msb
+        };
+        let mut poc = [0; 2];
+        if !sh.field_pic {
+            poc[0] = msb.wrapping_add(lsb);
+            poc[1] = poc[0].wrapping_add(sh.delta_poc_bottom);
+        } else if !sh.bottom_field {
+            poc[0] = msb.wrapping_add(lsb);
+            poc[1] = poc[0];
+        } else {
+            poc[1] = msb.wrapping_add(lsb);
+            poc[0] = poc[1];
+        }
+        (poc, msb)
+    } else {
+        let offset = if sh.idr {
+            0
+        } else if st.prev_frame_num as i32 > fnum {
+            st.prev_frame_num_offset.wrapping_add(max_frame_num)
+        } else {
+            st.prev_frame_num_offset
+        };
+        let nonref = sh.nal.nal_ref_idc == 0;
+        if sps.poc_type == 1 {
+            let n = sps.offset_for_ref_frame.len() as i32;
+            let mut abs = if n != 0 { offset.wrapping_add(fnum) } else { 0 };
+            if nonref && abs > 0 {
+                abs -= 1;
+            }
+            let mut expected = 0i32;
+            if abs > 0 {
+                let cycle = (abs - 1) / n;
+                let in_cycle = (abs - 1) % n;
+                let sum = |o: &[i32]| o.iter().fold(0i32, |s, &v| s.wrapping_add(v));
+                let delta_cycle = sum(&sps.offset_for_ref_frame);
+                expected = cycle.wrapping_mul(delta_cycle);
+                expected =
+                    expected.wrapping_add(sum(&sps.offset_for_ref_frame[..=in_cycle as usize]));
+            }
+            if nonref {
+                expected = expected.wrapping_add(sps.offset_for_non_ref_pic);
+            }
+            let to_bottom = sps.offset_for_top_to_bottom_field;
             let mut poc = [0; 2];
             if !sh.field_pic {
-                poc[0] = msb.wrapping_add(lsb);
-                poc[1] = poc[0].wrapping_add(sh.delta_poc_bottom);
+                poc[0] = expected.wrapping_add(sh.delta_poc[0]);
+                poc[1] = poc[0].wrapping_add(to_bottom).wrapping_add(sh.delta_poc[1]);
             } else if !sh.bottom_field {
-                poc[0] = msb.wrapping_add(lsb);
+                poc[0] = expected.wrapping_add(sh.delta_poc[0]);
                 poc[1] = poc[0];
             } else {
-                poc[1] = msb.wrapping_add(lsb);
+                poc[1] = expected
+                    .wrapping_add(to_bottom)
+                    .wrapping_add(sh.delta_poc[0]);
                 poc[0] = poc[1];
             }
-            (poc, msb)
-        }
-        _ => {
-            let offset = if sh.idr {
+            (poc, offset)
+        } else {
+            let temp = if sh.idr {
                 0
-            } else if st.prev_frame_num as i32 > fnum {
-                st.prev_frame_num_offset.wrapping_add(max_frame_num)
+            } else if nonref {
+                offset.wrapping_add(fnum).wrapping_mul(2).wrapping_sub(1)
             } else {
-                st.prev_frame_num_offset
+                offset.wrapping_add(fnum).wrapping_mul(2)
             };
-            let nonref = sh.nal.nal_ref_idc == 0;
-            if sps.poc_type == 1 {
-                let n = sps.offset_for_ref_frame.len() as i32;
-                let mut abs = if n != 0 { offset.wrapping_add(fnum) } else { 0 };
-                if nonref && abs > 0 {
-                    abs -= 1;
-                }
-                let mut expected = 0i32;
-                if abs > 0 {
-                    let cycle = (abs - 1) / n;
-                    let in_cycle = (abs - 1) % n;
-                    let sum = |o: &[i32]| o.iter().fold(0i32, |s, &v| s.wrapping_add(v));
-                    let delta_cycle = sum(&sps.offset_for_ref_frame);
-                    expected = cycle.wrapping_mul(delta_cycle);
-                    expected =
-                        expected.wrapping_add(sum(&sps.offset_for_ref_frame[..=in_cycle as usize]));
-                }
-                if nonref {
-                    expected = expected.wrapping_add(sps.offset_for_non_ref_pic);
-                }
-                let to_bottom = sps.offset_for_top_to_bottom_field;
-                let mut poc = [0; 2];
-                if !sh.field_pic {
-                    poc[0] = expected.wrapping_add(sh.delta_poc[0]);
-                    poc[1] = poc[0].wrapping_add(to_bottom).wrapping_add(sh.delta_poc[1]);
-                } else if !sh.bottom_field {
-                    poc[0] = expected.wrapping_add(sh.delta_poc[0]);
-                    poc[1] = poc[0];
-                } else {
-                    poc[1] = expected
-                        .wrapping_add(to_bottom)
-                        .wrapping_add(sh.delta_poc[0]);
-                    poc[0] = poc[1];
-                }
-                (poc, offset)
-            } else {
-                let temp = if sh.idr {
-                    0
-                } else if nonref {
-                    offset.wrapping_add(fnum).wrapping_mul(2).wrapping_sub(1)
-                } else {
-                    offset.wrapping_add(fnum).wrapping_mul(2)
-                };
-                ([temp, temp], offset)
-            }
+            ([temp, temp], offset)
         }
     }
 }

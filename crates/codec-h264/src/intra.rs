@@ -49,7 +49,7 @@ fn dequant8(coef: &[i32; 64], ls: &[i32; 64], qp: i32) -> [i32; 64] {
 impl SliceDecoder<'_> {
     #[inline]
     fn intra_avail(&self, n: usize) -> bool {
-        n == self.cur || !(self.s.constrained_intra && !self.pic.mbs[n].kind.is_intra())
+        n == self.cur || !self.s.constrained_intra || self.pic.mbs[n].kind.is_intra()
     }
 
     /// Plane offset of luma location (xN, yN) relative to the current MB, if available for intra.
@@ -347,12 +347,11 @@ impl SliceDecoder<'_> {
             } else {
                 self.nb_luma(x + 4, y - 1)
             };
-            match tr {
-                Some(o2) => e.top[4..].copy_from_slice(&buf[o2..o2 + 4]),
-                None => {
-                    let v = e.top[3];
-                    e.top[4..].fill(v);
-                }
+            if let Some(o2) = tr {
+                e.top[4..].copy_from_slice(&buf[o2..o2 + 4]);
+            } else {
+                let v = e.top[3];
+                e.top[4..].fill(v);
             }
         }
         for yy in 0..4 {
@@ -390,12 +389,11 @@ impl SliceDecoder<'_> {
             } else {
                 self.nb_luma(x + 8, y - 1)
             };
-            match tr {
-                Some(o2) => e.top[8..].copy_from_slice(&buf[o2..o2 + 8]),
-                None => {
-                    let v = e.top[7];
-                    e.top[8..].fill(v);
-                }
+            if let Some(o2) = tr {
+                e.top[8..].copy_from_slice(&buf[o2..o2 + 8]);
+            } else {
+                let v = e.top[7];
+                e.top[8..].fill(v);
             }
         }
         for yy in 0..8 {
@@ -449,7 +447,6 @@ impl SliceDecoder<'_> {
         }
     }
 
-    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
     fn residual_i16(&mut self, qp: i32) {
         let has_dc = self.mb.blk & (1 << 31) != 0;
         let mut dc = [0i32; 16];
@@ -467,7 +464,6 @@ impl SliceDecoder<'_> {
     }
 
     /// Chroma residual (DC + AC) for both components.
-    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
     pub(crate) fn residual_chroma(&mut self, intra: bool) {
         let li = if intra { 0 } else { 3 };
         for comp in 0..2 {
