@@ -656,9 +656,6 @@
         "capsule-mov-text-clear-then-good",
         "fragmented-subtitles",
         "r-subtitle-tx3g"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -671,9 +668,6 @@
         "ass-empty-not-clear",
         "ass-invalid-utf8-unvalidated",
         "ass-unknown-charset-opaque"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -689,9 +683,6 @@
         "capsule-mov-text-tags-ranges",
         "capsule-mov-text-tags-nul-transitions",
         "capsule-tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -702,9 +693,6 @@
       "cases": [
         "capsule-mov-text-cr-lf-markup",
         "capsule-mov-text-tags-font-table"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -717,9 +705,6 @@
         "capsule-mov-text-utf16be",
         "capsule-tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
         "capsule-tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -730,9 +715,6 @@
       "cases": [
         "capsule-mov-text-size0",
         "capsule-tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -745,9 +727,6 @@
         "capsule-mov-text-bad-two",
         "capsule-mov-text-empty-physical",
         "capsule-mov-text-tx3g-missing-length"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -760,9 +739,6 @@
         "tx3g-text-overrun",
         "capsule-mov-text-overstated",
         "capsule-mov-text-tx3g-text-overrun"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -780,9 +756,6 @@
         "capsule-mov-text-tx3g-box-overrun",
         "capsule-mov-text-tx3g-short-box",
         "capsule-mov-text-understated"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -801,9 +774,6 @@
         "capsule-mov-text-tx3g-utf16-odd",
         "capsule-mov-text-utf16le",
         "capsule-mov-text-utf8-refusal-then-good"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -815,9 +785,6 @@
       "cases": [
         "utf8-packet-bom-nul-content",
         "utf8-packet-markup"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -827,9 +794,6 @@
       "reference": "Emits no cue and completes successfully.",
       "cases": [
         "utf8-packet-too-large-scalar"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -841,9 +805,6 @@
         "capsule-mov-text-known-zero-duration",
         "capsule-mov-text-negative-half",
         "utf8-packet-known-zero-duration"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -854,9 +815,6 @@
       "compat": "compat::matroska::clamp_negative_subtitle_pts for callers needing the reference projected time.",
       "cases": [
         "utf8-packet-negative-start"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -866,9 +824,6 @@
       "reference": "Reports 1000000 us for the same one-byte cue.",
       "cases": [
         "capsule-mov-text-overflow-clock"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -878,9 +833,6 @@
       "reference": "Returns only the eight bytes of the visible word relative.",
       "cases": [
         "mkv-vtt-relative-inline-time"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -890,9 +842,6 @@
       "reference": "Decodes and publishes the four-byte cue body without the invalid additional fields.",
       "cases": [
         "mkv-vtt-truncated-addition"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -903,9 +852,6 @@
       "compat": "compat::text::suppress_empty_tx3g for consumers that only want visible cues.",
       "cases": [
         "fragmented-subtitle-edit"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -915,9 +861,6 @@
       "reference": "Suppresses the cue.",
       "cases": [
         "capsule-mov-text-noncharacter-fffe"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -927,9 +870,6 @@
       "reference": "Refuses the first sample with an invalid box size and publishes only b.",
       "cases": [
         "capsule-mov-text-box-refusal-then-good"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
