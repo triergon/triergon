@@ -198,7 +198,7 @@
         }
       },
       "harness/features/subtitle-dvd-host/contract.json": {
-        "open_cases": {
+        "open_deviations": {
           "aarch64-unknown-linux-gnu": 4
         }
       },
