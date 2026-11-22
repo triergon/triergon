@@ -574,7 +574,7 @@ fn blocking_initial_vorbis_recovery_and_limit() {
     }
 }
 
-fn initial_interleaved_vorbis(lost_page: bool) -> Vec<u8> {
+fn interleaved_vorbis_headers() -> (Vec<u8>, Muxer, Muxer) {
     let mut file = Vec::new();
     let mut a = Muxer::new(3);
     let mut b = Muxer::new(4);
@@ -587,11 +587,19 @@ fn initial_interleaved_vorbis(lost_page: bool) -> Vec<u8> {
         mux.packet(&vorbis_setup(), 0, &mut file);
         mux.flush(false, &mut file);
     }
+    (file, a, b)
+}
+
+fn initial_interleaved_vorbis(lost_before_packet: Option<usize>) -> Vec<u8> {
+    let (mut file, mut a, mut b) = interleaved_vorbis_headers();
+    if lost_before_packet == Some(0) {
+        b.sequence += 1;
+    }
     for mux in [&mut a, &mut b] {
         mux.packet(&[0], 0, &mut file);
         mux.flush(false, &mut file);
     }
-    if lost_page {
+    if lost_before_packet == Some(1) {
         b.sequence += 1;
     }
     for mux in [&mut b, &mut a] {
@@ -603,7 +611,7 @@ fn initial_interleaved_vorbis(lost_page: bool) -> Vec<u8> {
 
 #[test]
 fn blocking_recovery_keeps_interleaved_tracks_in_order() {
-    let file = initial_interleaved_vorbis(false);
+    let file = initial_interleaved_vorbis(None);
     let cancel = AtomicBool::new(false);
     let mut reader =
         triergon_ogg::BlockingReader::open_stream(&file[..], Limits::default()).unwrap();
@@ -631,27 +639,65 @@ fn blocking_recovery_keeps_interleaved_tracks_in_order() {
 
 #[test]
 fn blocking_recovery_keeps_the_other_tracks_anchor_after_loss() {
-    let file = initial_interleaved_vorbis(true);
     let cancel = AtomicBool::new(false);
-    let mut reader =
-        triergon_ogg::BlockingReader::open_stream(&file[..], Limits::default()).unwrap();
-    reader
-        .recover_initial_vorbis(triergon_ogg::compat::clock::InitialVorbis { max_events: 16 })
-        .unwrap();
-    let mut packets = Vec::new();
-    let mut loss = Vec::new();
-    while let Some(event) = reader.next_event(&cancel).unwrap() {
-        match event {
-            Event::Packet(packet) => {
-                packets.push((packet.track_index(), packet_timing(&packet).pts));
+    for (lost_before_packet, preceding_count) in [(0, 1), (1, 2)] {
+        let file = initial_interleaved_vorbis(Some(lost_before_packet));
+        let mut reader =
+            triergon_ogg::BlockingReader::open_stream(&file[..], Limits::default()).unwrap();
+        reader
+            .recover_initial_vorbis(triergon_ogg::compat::clock::InitialVorbis { max_events: 16 })
+            .unwrap();
+        let mut packets = Vec::new();
+        let mut loss = Vec::new();
+        while let Some(event) = reader.next_event(&cancel).unwrap() {
+            match event {
+                Event::Packet(packet) => {
+                    packets.push((packet.track_index(), packet_timing(&packet).pts));
+                }
+                Event::Other(ReaderEvent::Lost { track, .. }) => loss.push((track, packets.len())),
+                _ => {}
             }
-            Event::Other(ReaderEvent::Lost { track, .. }) => loss.push((track, packets.len())),
-            _ => {}
         }
+        assert_eq!(loss, [(1, preceding_count)]);
+        assert_eq!(packets[0..2], [(0, Some(-128)), (1, None)]);
+        assert_eq!(packets.last(), Some(&(0, Some(0))));
     }
-    assert_eq!(loss, [(1, 2)]);
-    assert_eq!(packets[0..2], [(0, Some(-128)), (1, None)]);
-    assert_eq!(packets.last(), Some(&(0, Some(0))));
+}
+
+#[test]
+fn blocking_recovery_returns_the_drained_prefix_budget() {
+    let (mut file, mut a, _) = interleaved_vorbis_headers();
+    for _ in 0..32 {
+        a.packet(&[0], 0, &mut file);
+        a.flush(false, &mut file);
+    }
+    a.packet(&[0], 128, &mut file);
+    a.flush(false, &mut file);
+
+    let cancel = AtomicBool::new(false);
+    let bytes_after_prefix = |recover: bool| {
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut reader = triergon_ogg::BlockingReader::open_in(
+            std::io::Cursor::new(file.as_slice()),
+            Limits::default(),
+            &pool,
+        )
+        .unwrap();
+        if recover {
+            reader
+                .recover_initial_vorbis(triergon_ogg::compat::clock::InitialVorbis {
+                    max_events: 64,
+                })
+                .unwrap();
+        }
+        for _ in 0..33 {
+            assert!(reader.next_packet(&cancel).unwrap().is_some());
+        }
+        // The other track still has no observed packet.
+        pool.used()
+    };
+    let ordinary = bytes_after_prefix(false);
+    assert!(bytes_after_prefix(true) <= ordinary + 2);
 }
 
 #[test]

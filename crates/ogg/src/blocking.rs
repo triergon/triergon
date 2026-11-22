@@ -47,22 +47,9 @@ impl InitialVorbis {
 
     fn observe(&mut self, event: &Event<Packet, ReaderEvent>) {
         match event {
-            Event::Other(ReaderEvent::Link { .. }) => self.abandon(),
+            Event::Other(ReaderEvent::Link { .. } | ReaderEvent::Resync { .. }) => self.abandon(),
             Event::Other(ReaderEvent::Lost { track, .. }) => {
-                if self.states.get(*track) == Some(&Initial::Pending) {
-                    self.states[*track] = Initial::Done;
-                    self.remaining -= 1;
-                    self.pending -= 1;
-                }
-            }
-            Event::Other(ReaderEvent::Resync { .. }) => {
-                for state in self.states.as_mut_slice() {
-                    if *state == Initial::Pending {
-                        *state = Initial::Done;
-                    }
-                }
-                self.remaining -= self.pending;
-                self.pending = 0;
+                self.finish_track(*track);
             }
             Event::Packet(packet) => {
                 let index = packet.track_index();
@@ -81,22 +68,25 @@ impl InitialVorbis {
                         self.states[index] = Initial::Pending;
                         self.pending += 1;
                     }
-                    (Initial::Unseen, false) => {
-                        self.states[index] = Initial::Done;
-                        self.remaining -= 1;
-                    }
+                    (Initial::Unseen, false) => self.finish_track(index),
                     (Initial::Pending, false) => {
                         if let Some(anchor) = timing.pts {
                             self.backfill(index, anchor);
                         }
-                        self.states[index] = Initial::Done;
-                        self.pending -= 1;
-                        self.remaining -= 1;
+                        self.finish_track(index);
                     }
                     _ => {}
                 }
             }
             _ => {}
+        }
+    }
+
+    fn finish_track(&mut self, index: usize) {
+        if let Some(state) = self.states.get_mut(index) {
+            self.remaining -= usize::from(*state != Initial::Done);
+            self.pending -= usize::from(*state == Initial::Pending);
+            *state = Initial::Done;
         }
     }
 
@@ -240,6 +230,13 @@ impl<R: Read> BlockingReader<R> {
             }
             if recovery.draining {
                 if let Some(event) = recovery.held.pop() {
+                    if recovery.held.len() == 0 {
+                        if recovery.remaining == 0 && recovery.error.is_none() {
+                            self.recovery = None;
+                        } else {
+                            recovery.held = Queue::new(recovery.held.budget());
+                        }
+                    }
                     return Ok(Some(event));
                 }
                 if recovery.remaining == 0 {
@@ -251,21 +248,18 @@ impl<R: Read> BlockingReader<R> {
                     break;
                 }
                 recovery.draining = false;
-                if let Some(error) = recovery.error.take() {
-                    return Err(error);
-                }
             }
-            if recovery.held.len() == recovery.max_events {
-                recovery.abandon();
-                continue;
-            }
-            if let Err(error) = recovery.held.reserve(1) {
-                if recovery.held.len() == 0 {
-                    return Err(error);
+            let buffering = recovery.held.len() != 0;
+            if buffering {
+                if recovery.held.len() == recovery.max_events {
+                    recovery.abandon();
+                    continue;
                 }
-                recovery.error = Some(error);
-                recovery.abandon();
-                continue;
+                if let Err(error) = recovery.held.reserve(1) {
+                    recovery.error = Some(error);
+                    recovery.abandon();
+                    continue;
+                }
             }
             let result = match self.queued.pop() {
                 Some(event) => Ok(Some(event)),
@@ -274,6 +268,19 @@ impl<R: Read> BlockingReader<R> {
             match result {
                 Ok(Some(event)) => {
                     recovery.observe(&event);
+                    if !buffering {
+                        if recovery.pending == 0 {
+                            if recovery.remaining == 0 {
+                                self.recovery = None;
+                            }
+                            return Ok(Some(event));
+                        }
+                        if let Err(error) = recovery.held.reserve(1) {
+                            recovery.error = Some(error);
+                            recovery.abandon();
+                            return Ok(Some(event));
+                        }
+                    }
                     recovery.held.push(event)?;
                     if recovery.pending == 0 {
                         recovery.draining = true;
@@ -325,6 +332,11 @@ impl<R: Read> BlockingReader<R> {
                 .retain(|event| matches!(event, Event::Other(_)));
             recovery.abandon();
             recovery.error = None;
+            if recovery.held.len() == 0 {
+                self.recovery = None;
+            } else {
+                recovery.held.release_spare_capacity();
+            }
         }
         self.queued.retain(|event| matches!(event, Event::Other(_)));
         self.driver.seek(request)?;

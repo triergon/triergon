@@ -86,6 +86,10 @@ impl<T> Queue<T> {
     pub(crate) fn budget(&self) -> &Budget {
         self.slots.budget()
     }
+
+    pub(crate) fn release_spare_capacity(&mut self) {
+        let _ = self.slots.try_shrink_to(0);
+    }
 }
 
 #[cfg(test)]
