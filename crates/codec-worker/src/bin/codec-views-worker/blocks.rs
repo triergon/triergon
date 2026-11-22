@@ -2,8 +2,8 @@ use std::ffi::OsString;
 
 use triergon::{Rounding, TimeBase};
 use triergon_bitstream::crc::{Crc32Ieee, Crc32Mpeg, crc8, crc16_a52};
-use triergon_core::TickScale;
 use triergon_harness_protocol::digest::signed;
+use triergon_harness_runner::TickScale;
 
 use super::protocol::Operation;
 

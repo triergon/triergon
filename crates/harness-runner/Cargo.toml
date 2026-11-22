@@ -12,5 +12,8 @@ publish.workspace = true
 triergon-core = { path = "../core" }
 triergon-harness-protocol = { path = "../harness-protocol" }
 
+[features]
+views = []
+
 [lints]
 workspace = true
