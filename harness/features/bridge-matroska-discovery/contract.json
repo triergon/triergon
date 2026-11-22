@@ -166,7 +166,7 @@
     },
     {
       "reading": "An explicitly supplied empty CodecPrivate cannot initialize AAC-LC",
-      "clause": "Matroska codec mappings draft 21 sections 3.4.1 and 3.4.6 distinguish ASC initialization from the legacy mapping with none. legacy_aac_lc_initialization derives a configuration only for an absent initialization.",
+      "clause": "Matroska codec mappings draft 21 sections 3.4.1 and 3.4.6 distinguish ASC initialization from the legacy mapping with none. MatroskaFeedSetup derives ADTS parameters only for absent initialization.",
       "candidate": "Preserves the supplied empty record and the ASC parser reports Truncated.",
       "reference": "Treats the empty record as absence and derives the stereo 48000 Hz ASC 1190, then replays eight packets.",
       "compat": "compat::matroska::legacy_aac_lc_empty_private for callers recovering legacy files with an empty codec record.",

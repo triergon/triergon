@@ -10,7 +10,6 @@ feeds text, bitmap, caption and teletext packets to subtitle receivers.
 | Access units | `access::AccessUnits` from a container track's `TrackInfo` and its packets' `PacketInfo`: AVC and HEVC as Annex B, AAC with an AudioSpecificConfig as ADTS, other codecs and tracks without a record as they are; `AccessUnits::with_record` where the record comes from elsewhere |
 | Packet bridges | `aac::AacBridge` (MP4 AAC as ADTS, bound to one plan's track and configuration revision), `av1::Av1Bridge` (including MP4 `av01` and `dav1`) |
 | Subtitles | `text::TextBridge`, `bitmap::{PgsBridge, DvdReceiver}`, `matroska::MatroskaBitmapTrack`, `mp4_dvd::{Mp4DvdSetup, Mp4DvdTrack}`, `ts::dvb::DvbTsBridge`, `ts::pgs::PgsTsTrack`, `ts::teletext::TeletextTsBridge`, `caption::CaptionBridge` |
-| Compatibility | `compat::matroska::legacy_aac_lc_initialization` |
 
 ## Behaviour and limits
 
@@ -32,14 +31,13 @@ The access-unit readers in `triergon-hls`, `triergon-raw-video` and
 `triergon-mpegts` already frame Annex B and ADTS. For a decoder that takes
 contiguous input, join a sliced unit through `contiguous_feed` or `segments`.
 `Event::DemuxPes` and PES carried in `Event::Ts` have no packet view.
-`AccessUnits::for_track` refuses Matroska AAC without CodecPrivate. For legacy
-AAC-LC, pass the derived AudioSpecificConfig to `AccessUnits::with_record`.
+`AccessUnits::for_track` refuses Matroska AAC without CodecPrivate.
+`AccessUnits::with_record` accepts a caller-supplied AudioSpecificConfig.
 
 **Legacy Matroska AAC.** Discovery and `MatroskaFeedSetup` accept
 `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. When a track has no initialization
-record, `compat::matroska::legacy_aac_lc_initialization` derives AAC-LC
-configuration from the Audio element's indexed sampling frequency and a count
-of one to six channels. A present Audio element can use the EBML defaults for
+record, the feed derives ADTS parameters from the Audio element's indexed
+sampling frequency and a count of one to six channels. A present Audio element can use the EBML defaults for
 its children. Larger layouts require explicit initialization. The feed
 preserves the source packet bytes. Discovery replays packets in source
 order with the original signed Block time and exact nanosecond CodecDelay.

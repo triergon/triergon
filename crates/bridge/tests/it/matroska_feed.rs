@@ -228,14 +228,6 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
                     assert_eq!(track.codec_tag(), codec);
                     assert!(!track.has_codec_private());
                     assert!(track.configuration().is_empty());
-                    assert_eq!(
-                        triergon_bridge::compat::matroska::legacy_aac_lc_initialization(
-                            configuration,
-                            0
-                        )
-                        .unwrap(),
-                        Some([0x11, 0x90])
-                    );
                     feed = Some(setup(&pool, configuration, 0));
                 }
                 Event::Matroska(MkvEvent::Packet(packet)) => {
@@ -259,9 +251,8 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
 }
 
 #[test]
-fn access_units_frame_legacy_aac_lc_from_the_derived_record_and_refuse_it_without() {
+fn access_units_frame_legacy_aac_lc_from_a_supplied_record_and_refuse_it_without() {
     use triergon_bridge::access::{AccessUnitLimits, AccessUnits};
-    use triergon_bridge::compat::matroska::legacy_aac_lc_initialization;
     use triergon_core::container::PacketInfo;
 
     let input = include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc.mkv");
@@ -281,9 +272,7 @@ fn access_units_frame_legacy_aac_lc_from_the_derived_record_and_refuse_it_withou
                     "Matroska AAC track without an initialization record"
                 ))
             ));
-            let record = legacy_aac_lc_initialization(configuration, 0)
-                .unwrap()
-                .unwrap();
+            let record = [0x11, 0x90]; // AAC-LC, 48000 Hz, stereo
             let mut setup =
                 AccessUnits::with_record(&pool, track, &record, AccessUnitLimits::default())
                     .unwrap();
@@ -307,8 +296,6 @@ fn access_units_frame_legacy_aac_lc_from_the_derived_record_and_refuse_it_withou
 
 #[test]
 fn legacy_aac_lc_refuses_empty_initialization_and_ambiguous_channels() {
-    use triergon_bridge::compat::matroska::legacy_aac_lc_initialization;
-
     for (input, private_present) in [
         (
             include_bytes!(
@@ -338,17 +325,6 @@ fn legacy_aac_lc_refuses_empty_initialization_and_ambiguous_channels() {
             configuration.tracks()[0].has_codec_private(),
             private_present
         );
-        if private_present {
-            assert_eq!(
-                legacy_aac_lc_initialization(configuration, 0).unwrap(),
-                None
-            );
-        } else {
-            assert!(matches!(
-                legacy_aac_lc_initialization(configuration, 0),
-                Err(Error::Unsupported("legacy Matroska AAC channel layout"))
-            ));
-        }
         if let Ok(mut setup) = MatroskaFeedSetup::new(&pool, ID, configuration, 0, LIMITS) {
             assert!(
                 setup
@@ -356,46 +332,6 @@ fn legacy_aac_lc_refuses_empty_initialization_and_ambiguous_channels() {
                     .is_err()
             );
         }
-    }
-}
-
-#[test]
-fn legacy_aac_lc_uses_defaults_only_with_audio_settings() {
-    use triergon_bridge::compat::matroska::legacy_aac_lc_initialization;
-
-    let original = include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc.mkv");
-    let audio = original
-        .windows(4)
-        .position(|bytes| bytes == [0xe1, 0x8d, 0xb5, 0x88])
-        .unwrap();
-    let mut input = original.to_vec();
-    // Replace both audio children with a same-size Void.
-    input[audio + 2..audio + 15].fill(0);
-    input[audio + 2..audio + 4].copy_from_slice(&[0xec, 0x8b]);
-
-    for (element_id, initialization) in [
-        (0xe1, Ok(Some([0x15, 0x88]))),
-        (
-            0xec,
-            Err(Error::Unsupported(
-                "legacy Matroska AAC needs Audio settings",
-            )),
-        ),
-    ] {
-        input[audio] = element_id;
-        let (mut player, _) = player_with_input(&input, 7);
-        let events = collect(&mut player);
-        let configuration = events
-            .iter()
-            .find_map(|output| match output.event() {
-                Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
-                _ => None,
-            })
-            .unwrap();
-        assert_eq!(
-            legacy_aac_lc_initialization(configuration, 0),
-            initialization
-        );
     }
 }
 

@@ -101,8 +101,6 @@ impl AccessUnits {
     }
 
     /// Overrides the track's record. Empty Matroska AAC records give `Unsupported`.
-    /// [`legacy_aac_lc_initialization`](crate::compat::matroska::legacy_aac_lc_initialization)
-    /// derives one for legacy AAC-LC identifiers such as `A_AAC/MPEG4/LC`.
     pub fn with_record(
         pool: &Budget,
         track: &dyn TrackInfo,
