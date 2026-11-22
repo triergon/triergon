@@ -368,6 +368,7 @@ pub struct TransportInspector {
     offset: u64,
     entity: Option<SourceId>,
     phase: Phase,
+    pcr_policy: crate::compat::pes::PcrPolicy,
     position: usize,
     fields: Envelope,
     error: Option<Error>,
@@ -414,6 +415,7 @@ impl TransportInspector {
             offset,
             entity,
             phase: Phase::Header,
+            pcr_policy: crate::compat::pes::PcrPolicy::Strict,
             position: 0,
             fields: Envelope {
                 pid: 0,
@@ -449,6 +451,11 @@ impl TransportInspector {
         }
         self.phase = Phase::Finish;
     }
+    pub(crate) fn pcr_policy(mut self, policy: crate::compat::pes::PcrPolicy) -> Self {
+        self.pcr_policy = policy;
+        self
+    }
+
     fn field_end(position: usize, end: usize, count: usize) -> Result<usize> {
         let next = position.checked_add(count).ok_or(Error::Overflow)?;
         if next > end {
@@ -563,7 +570,10 @@ impl TransportInspector {
                         if self.fields.flags & 0x10 != 0 {
                             let next =
                                 Self::field_end(self.position, self.fields.adaptation_end, 6)?;
-                            match crate::transport::pcr(&data[self.position..next]) {
+                            match crate::transport::pcr_with_policy(
+                                &data[self.position..next],
+                                self.pcr_policy,
+                            ) {
                                 Ok(clock) => {
                                     self.fields.pcr = Some(clock);
                                     self.fields.pcr_range = Some(self.position..next);

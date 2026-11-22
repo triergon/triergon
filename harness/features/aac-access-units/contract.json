@@ -3,7 +3,7 @@
   "id": "aac-access-units",
   "gate": "on-demand",
   "operation": "audio-aac-access-units",
-  "candidate": "codec-worker",
+  "candidate": "codec-aac-worker",
   "reference": "ffmpeg-decode-native",
   "runner": "cargo xtask codecs aac-access-units",
   "contract": [

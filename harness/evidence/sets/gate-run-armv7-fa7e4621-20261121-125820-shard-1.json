@@ -1,0 +1,48 @@
+{
+ "name": "gate-run-armv7-fa7e4621-20261121-125820-shard-1",
+ "path": "gate-run-armv7-fa7e4621-20261121-125820-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at fa7e4621 on one c6g.4xlarge host, ARMv7 (thumbv7neon): the subtitle-dvb item (timing, kernel-bound memory and grade of all 241 cases) and the checked and release workspace tests with the worker tests; the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results).",
+ "key": "evidence/gate-runs/fa7e4621bc8717bab7b75a4a9c2b0a078d34557c-armv7-20261121-125820/shard-1/eb1d42b3994493e10615a3214061bbf96828c4a562e4a49b3695cc8e685c62ed.tar.zst",
+ "sha256": "eb1d42b3994493e10615a3214061bbf96828c4a562e4a49b3695cc8e685c62ed",
+ "bytes": 29801661,
+ "results": [
+  {
+   "path": "memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "74035c2ea204292849ef72e847fc59698a41477afd6ced31df46202be9d865f0",
+   "status": 0,
+   "report_sha256": "3248b5dba9fa95f30f20a0b0d4d7d552bdd0b1f5ce67c1ff76a649529887cf90",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "dfe2a6307875a39cf85a8abe7ab5a6bf66185dd86da23300f888fc575ad55f64",
+   "status": 0,
+   "report_sha256": "a7b811ad45cae0752ef5c137880e650e186501c99f1612b35a56233384b9916b",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "567317ec06cc4b825fe94b5cd2cb5eb2e8e48358dc1044ab1adcaf89583e1ea7",
+   "status": 0,
+   "report_sha256": "4401a8619c8e54b086b4bfa227730c591cb8876f662cba45e48430c3605d03c0"
+  },
+  {
+   "path": "tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "f3f54b018fc488e25551f7cabfe602ee358d781f5b740c45a1597870ef56178a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "f4592f1ce7aba8cd0f09793784f1785c01166cc09626ea9c6496507b177c4c3a",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

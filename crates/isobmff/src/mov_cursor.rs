@@ -198,26 +198,11 @@ impl<'a> Slot<'a> {
     }
 
     fn try_clone(&self) -> Result<Self> {
-        self.try_clone_with_edit_storage(None)
-    }
-
-    fn try_clone_with_edit_storage(
-        &self,
-        storage: Option<BudgetVec<EditCursor<'a>>>,
-    ) -> Result<Self> {
-        let edited = match (&self.edited, storage) {
-            (None, _) => None,
-            (Some(source), Some(mut storage)) => {
-                storage.as_mut_slice()[0].clone_from(&source.as_slice()[0]);
-                Some(storage)
-            }
-            (Some(source), None) => Some(source.try_clone()?),
-        };
         Ok(Self {
             resume_remaining: self.resume_remaining,
             track: self.track,
             cursor: self.cursor.clone(),
-            edited,
+            edited: self.edited.as_ref().map(BudgetVec::try_clone).transpose()?,
             encoded_edit: self.encoded_edit,
             head: self.head.clone(),
             clock: self.clock,
@@ -232,6 +217,54 @@ impl<'a> Slot<'a> {
             starts_fragment_run: self.starts_fragment_run,
             ended: self.ended,
         })
+    }
+
+    /// Makes `target`, a slot cloned from the same track before, a copy of this
+    /// one in place, keeping its edit cursor storage. A slot is several hundred
+    /// bytes, so this spares a seek that keeps replacing its best state from
+    /// building each one apart and moving it in.
+    fn try_clone_into(&self, target: &mut Self) -> Result<()> {
+        let Self {
+            resume_remaining,
+            track,
+            cursor,
+            edited,
+            encoded_edit,
+            head,
+            clock,
+            shift,
+            append_run,
+            discard_boundary,
+            fragment_cto_minimum,
+            fragment_edit,
+            front_fragment,
+            previous_clock,
+            saw_fragment,
+            starts_fragment_run,
+            ended,
+        } = self;
+        match (edited, &mut target.edited) {
+            (None, kept) => *kept = None,
+            (Some(source), Some(kept)) => kept.as_mut_slice()[0].clone_from(&source.as_slice()[0]),
+            (Some(source), kept @ None) => *kept = Some(source.try_clone()?),
+        }
+        target.resume_remaining = *resume_remaining;
+        target.track = *track;
+        target.cursor.clone_from(cursor);
+        target.encoded_edit = *encoded_edit;
+        target.head.clone_from(head);
+        target.clock = *clock;
+        target.shift = *shift;
+        target.append_run = *append_run;
+        target.discard_boundary = *discard_boundary;
+        target.fragment_cto_minimum = *fragment_cto_minimum;
+        target.fragment_edit = *fragment_edit;
+        target.front_fragment = *front_fragment;
+        target.previous_clock = *previous_clock;
+        target.saw_fragment = *saw_fragment;
+        target.starts_fragment_run = *starts_fragment_run;
+        target.ended = *ended;
+        Ok(())
     }
 
     fn fragment_edit_offset(&self) -> i64 {
@@ -1167,25 +1200,31 @@ impl<'a> PacketCursor<'a> {
         }
     }
 
-    /// This one-track complete-source cursor's state at its ready occurrence,
-    /// the `occurrence`-th from zero. `previous`, a state this method returned
-    /// earlier, lends its edit cursor storage.
-    pub(crate) fn ready_track_resume(
+    /// Stores this one-track complete-source cursor's state at its ready
+    /// occurrence, the `occurrence`-th from zero, in `resume`, in place of and
+    /// in the storage of a state this method stored there before.
+    pub(crate) fn store_track_resume(
         &self,
         occurrence: u64,
-        previous: Option<TrackResume<'a>>,
-    ) -> Result<TrackResume<'a>> {
+        resume: &mut Option<TrackResume<'a>>,
+    ) -> Result<()> {
         let ([slot], Some(0), true) = (self.slots.as_slice(), self.ready, self.complete_source)
         else {
             return Err(Error::Invalid(
                 "track resume needs a ready one-track complete cursor",
             ));
         };
-        Ok(TrackResume {
+        if let Some(kept) = resume {
+            kept.occurrence = occurrence;
+            kept.validated = self.validated;
+            return slot.try_clone_into(&mut kept.slot);
+        }
+        *resume = Some(TrackResume {
             occurrence,
             validated: self.validated,
-            slot: slot.try_clone_with_edit_storage(previous.and_then(|p| p.slot.edited))?,
-        })
+            slot: slot.try_clone()?,
+        });
+        Ok(())
     }
 
     /// The slot of a prepared one-track complete-source cursor that has produced

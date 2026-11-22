@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "directory": ".research/fate-samples",
+  "cases": [
+    {
+      "id": "fate-dts-private-data",
+      "profile": "fate-dts-private-data",
+      "file": "dts/dts.ts",
+      "source": "fate-suite/dts/dts.ts",
+      "sha256": "749561299cf838d55f52d5697f78c273a6c381c5e6c8300f859dfe23252ae2c2",
+      "rights": "fetched-not-redistributed",
+      "arguments": ["188", "1", "--dts-core=256", "--ignore-pcr-reserved-bits"],
+      "expected": {
+        "packets": 253,
+        "bytes": 254518,
+        "digest": 7472862154947781891
+      }
+    }
+  ]
+}

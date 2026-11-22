@@ -1,0 +1,9 @@
+{
+ "name": "ass-cache-keys-stage-0e2366db",
+ "path": "ass-cache-keys-stage-0e2366db",
+ "retention": "retained",
+ "reason": "Cause and counts of the render caches' shared-count traffic, one c6g.4xlarge host (Graviton2) from the Linux AArch64 gate image: perf stat user-mode instructions, cycles, branch misses and L1 instruction misses of ass-worker at main d66c90dd and at 0e2366db and of libass-player-worker on cache-keys-ass-720p and cache-keys-ass-1080p, 20 iterations on one CPU, with their timed spans; calls of each outlined atomic helper per iteration from uprobes; cycle profiles by symbol of all three; the fold output (digest and work) of every ass-render and ass-render-host fixture from both builds (104, all identical) with their user cycles; raster-worker's fold outputs and instruction and cycle counts at both revisions on the required raster cases; the scripts, workers' SHA-256 and host details; cited by docs/status.md for the Linux AArch64 runtime of ass-render.",
+ "key": "evidence/ass-cache-keys-stage-0e2366db/c93e4651ed6263dd5b480fa960e11eb92e0d8bb3f29de0a0cec3cbe3aa59b0d2.tar.gz",
+ "sha256": "c93e4651ed6263dd5b480fa960e11eb92e0d8bb3f29de0a0cec3cbe3aa59b0d2",
+ "bytes": 153121
+}

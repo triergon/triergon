@@ -31,6 +31,9 @@ pub(super) struct Font {
     pub id: u16,
     pub name: Range<usize>,
 }
+/// The most bytes the subtitle header takes.
+const HEADER_BYTES: usize = 2048;
+
 #[derive(Debug, Clone, Copy)]
 enum Phase {
     Fixed,
@@ -56,7 +59,7 @@ pub(super) struct Configuration {
     at: usize,
     count: usize,
     read: usize,
-    writer: Writer,
+    writer: Writer<HEADER_BYTES>,
 }
 impl Configuration {
     pub(super) fn new(
@@ -246,7 +249,7 @@ impl Configuration {
                 Phase::Header => {
                     // A fixed bounded header construction is fully funded before
                     // formatting; its later charged byte copies remain resumable.
-                    if !funding.pay(2048, caller)? {
+                    if !funding.pay(HEADER_BYTES, caller)? {
                         return Ok(false);
                     }
                     self.writer.pending = self.make_header()?;
@@ -254,7 +257,7 @@ impl Configuration {
                     self.phase = Phase::Copy;
                 }
                 Phase::Copy => {
-                    if !self.writer.drain(2048, funding, caller)? {
+                    if !self.writer.drain(HEADER_BYTES, funding, caller)? {
                         return Ok(false);
                     }
                     self.phase = Phase::Freeze;
@@ -269,7 +272,7 @@ impl Configuration {
             }
         }
     }
-    fn make_header(&self) -> Result<Fixed<2048>> {
+    fn make_header(&self) -> Result<Fixed<HEADER_BYTES>> {
         let mut h = Fixed::new();
         let defaults = self.fallback;
         let width = if defaults || self.options.frame_width == 0 || self.options.frame_height == 0 {

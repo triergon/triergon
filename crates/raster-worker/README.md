@@ -25,11 +25,8 @@ for `raster` and the host's SIMD engine for `raster-simd`.
 | `glyphs HEIGHT COUNT CASE...` | a font file | each argument one case; `g K` names the k-th of `COUNT` glyph ids spread evenly over face 0, loaded unhinted at the 26.6 pixel `HEIGHT` as libass loads them with hinting off |
 | `lines` | a case file | one case per line, outlines given inline |
 
-The case grammar is in `src/case.rs`: outline conversion, rotation, stroking,
-transforms, rasterisation, runs of glyphs through the glyph pipeline and the
-compositor, blur, the bitmap blends, the border's fill subtraction, shifts and
-clipping. A case outside the grammar is recorded as unparsed. Each operation
-records a status:
+The case grammar is in `src/case.rs`; a case outside it is recorded as unparsed. Each
+operation records a status:
 
 | Status | Outcome |
 |---|---|
@@ -40,11 +37,9 @@ records a status:
 | 4 | the storage budget ran out (`Error::Backpressure`, `Error::Allocation`) |
 | 5 | any other error, which the crate does not return for these operations |
 
-The reference records only 0 to 2, so a case where the crate reaches 3, 4 or
-5 fails. The fold, bench and memory modes print the
-harness protocol's one JSON line, whose `digest` folds every record in a fixed
-order (`src/record.rs`); the bench mode adds the elapsed time of the timed loop
-and the memory mode brackets one operation with the allocation-window markers.
-Reading the file, loading the glyphs and parsing the cases are outside both.
-The dump mode prints the same records as lines, identical to the reference's
-dump. The features are `harness/features/raster-*/`.
+The reference records only 0 to 2, so a case where the crate reaches 3, 4 or 5 fails.
+The fold, bench and memory modes print the harness protocol's one JSON line, whose
+`digest` folds every record in a fixed order; the bench mode adds the elapsed time and
+the memory mode brackets one operation with the allocation-window markers. The dump mode
+prints the same records as lines, identical to the reference's dump. The features are
+`harness/features/raster-*/`.

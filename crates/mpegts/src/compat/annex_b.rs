@@ -310,7 +310,9 @@ impl ContainerReader for ContinuityReader {
         })
     }
     fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
-        self.reader.request_seek(request)
+        let input = self.reader.request_seek(request)?;
+        self.discard();
+        Ok(input)
     }
     fn track_count(&self) -> usize {
         self.reader.track_count()

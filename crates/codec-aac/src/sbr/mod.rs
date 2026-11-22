@@ -131,6 +131,8 @@ pub(crate) struct Chan {
     m_prev: usize,
     xh: BudgetVec<[Cpx; 40]>,
     y: BudgetVec<[Cpx; 64]>,
+    /// Scratch: the prediction coefficients of this frame's source bands, by band.
+    alpha: [(Cpx, Cpx); 32],
 }
 
 impl Chan {
@@ -175,6 +177,7 @@ impl Chan {
             m_prev: 0,
             xh: BudgetVec::try_filled(budget, [Cpx::default(); 40], rows(64))?,
             y: BudgetVec::try_filled(budget, [Cpx::default(); 64], rows(40))?,
+            alpha: [(Cpx::default(), Cpx::default()); 32],
         })
     }
 
@@ -238,7 +241,8 @@ impl Chan {
             m_prev: _,
             xh,
             y,
-        } = self; // the fields set to `_` are reset_signal's
+            alpha: _,
+        } = self; // the fields set to `_` are reset_signal's, and scratch
         *frame_class = 0;
         *num_env = 0;
         *t_env = [0; 6];
@@ -565,8 +569,8 @@ impl Sbr {
             let buf: &mut [f32] = if c == 0 { &mut l[..] } else { &mut r[..] };
             let ch = &mut self.ch[c];
             // QMF analysis of the core output (float scale -> 16-bit domain)
+            let mut bands = [Cpx::default(); 32];
             for (t, input) in buf[..1024].chunks_exact(32).enumerate() {
-                let mut bands = [Cpx::default(); 32];
                 ch.analysis.run(qmf, input, 32768.0, &mut bands);
                 for (xl, band) in ch.xl.iter_mut().zip(bands) {
                     xl[T_HFGEN + t] = band;
@@ -1075,7 +1079,7 @@ fn hf_generate(c: &mut Chan, ft: &FreqTables) {
         .map(|(&start, &num)| start + num)
         .max()
         .unwrap_or(0);
-    let mut alpha = [(Cpx::default(), Cpx::default()); 64];
+    let alpha = &mut c.alpha;
     predictors(&c.xl[first..end], &mut alpha[first..end]);
     let mut k = ft.kx;
     for (p, &num) in ft.patch_num.iter().enumerate() {
@@ -1344,12 +1348,13 @@ fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
     }
     let mut idx_noise = c.index_noise;
     let mut idx_sine = c.index_sine;
+    // the smoothed gains of one slot (bands below m)
+    let mut gf = [0f32; 64];
+    let mut qf = [0f32; 64];
     for e in 0..ne {
         let transient = e as i32 == c.l_a || e as i32 == c.l_a_prev;
         for i in 2 * c.t_env[e]..2 * c.t_env[e + 1] {
             let xh_t = i + T_HFADJ;
-            let mut gf = [0f32; 64];
-            let mut qf = [0f32; 64];
             if h_sl > 0 && !transient {
                 for mm in 0..m {
                     let mut g = gain[e][mm] * H_SMOOTH[0];

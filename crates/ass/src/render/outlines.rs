@@ -67,7 +67,7 @@ impl Hash for KeptOutline {
 }
 
 /// A border outline (libass's `BorderHashKey`): a glyph's outline stroked.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug)]
 struct BorderKey {
     glyph: KeptOutline,
     stroke: BorderStroke,
@@ -120,7 +120,7 @@ enum OutlineKey {
 enum KeyRef<'a> {
     Glyph(&'a GlyphKey),
     Drawing(&'a [u8]),
-    Border(&'a BorderKey),
+    Border(&'a KeptOutline, BorderStroke),
     UnitBox,
 }
 
@@ -131,7 +131,7 @@ impl CacheKey for OutlineKey {
         match self {
             Self::Glyph(glyph) => KeyRef::Glyph(glyph),
             Self::Drawing(text) => KeyRef::Drawing(text),
-            Self::Border(border) => KeyRef::Border(border),
+            Self::Border(border) => KeyRef::Border(&border.glyph, border.stroke),
             Self::UnitBox => KeyRef::UnitBox,
         }
     }
@@ -215,21 +215,16 @@ impl Outlines {
         raster: &mut Raster,
         work: &mut WorkBudget,
     ) -> Result<Option<KeptOutline>> {
+        if let Some(found) = self.cache.get(KeyRef::Border(glyph, stroke)) {
+            return Ok(KeptOutline::built(found));
+        }
+        // A stroked border holds only what it needs, as a kept outline should.
+        let value = raster
+            .stroke_border(&glyph.shape, &stroke, work)?
+            .map(OutlineValue::of_shape);
         let key = BorderKey {
             glyph: glyph.clone(),
             stroke,
-        };
-        if let Some(found) = self.cache.get(KeyRef::Border(&key)) {
-            return Ok(KeptOutline::built(found));
-        }
-        let value = match raster.stroke_border(&glyph.shape, &stroke, work)? {
-            Some(mut shape) => {
-                // The stroker grows its output as it goes; a kept border
-                // keeps only what it holds.
-                shape.shrink_to_fit()?;
-                Some(OutlineValue::of_shape(shape))
-            }
-            None => None,
         };
         self.keep(OutlineKey::Border(key), value)
     }

@@ -62,7 +62,7 @@ impl Comparison {
         let candidate_record = identity
             .get("additional_candidates")
             .and_then(|workers| workers.get(candidate_name))
-            .ok_or("build codec-worker before comparing AAC access units")?;
+            .ok_or_else(|| format!("build {candidate_name} before comparing AAC access units"))?;
         let reference_record =
             harness::comparison::reference_named(&identity, string(&contract, "reference")?)?;
         let profile = reference_record

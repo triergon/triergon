@@ -7,7 +7,9 @@ use std::ops::{Deref, Range};
 use std::sync::{Arc, atomic::AtomicUsize};
 use triergon_core::container::{CodecId, MediaKind, PacketInfo, RandomAccess, TrackId, TrackInfo};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result, Time, TimeBase};
-use triergon_framing::{AacAdtsCarrier, AacAdtsFrame, Ac3Frame, Ac3FrameFacts, RawAccessUnit};
+use triergon_framing::{
+    AacAdtsCarrier, AacAdtsFrame, Ac3Frame, Ac3FrameFacts, MpegAudioHeader, RawAccessUnit,
+};
 
 #[derive(Debug)]
 struct Owned<T> {
@@ -79,13 +81,14 @@ impl SourceEvent {
 #[derive(Clone, Debug)]
 pub struct Track {
     pub(super) source: SourceEvent,
-    pub(super) index: usize,
+    pub(super) index: u16,
     pub(super) epoch: u64,
+    pub(super) unlabelled_dts_core: bool,
 }
 
 impl Track {
     pub fn stream(&self) -> &ElementaryStream {
-        &self.source.map().streams.as_slice()[self.index]
+        &self.source.map().streams.as_slice()[usize::from(self.index)]
     }
     pub fn program_map(&self) -> &ProgramMap {
         self.source.map()
@@ -106,13 +109,21 @@ impl TrackInfo for Track {
         self.stream().id()
     }
     fn kind(&self) -> MediaKind {
-        self.stream().kind()
+        if self.unlabelled_dts_core {
+            MediaKind::Audio
+        } else {
+            self.stream().kind()
+        }
     }
     fn codec_tag(&self) -> &[u8] {
         self.stream().codec_tag()
     }
     fn codec(&self) -> CodecId<'_> {
-        TrackInfo::codec(self.stream())
+        if self.unlabelled_dts_core {
+            CodecId::Dts
+        } else {
+            TrackInfo::codec(self.stream())
+        }
     }
     fn configuration(&self) -> &[u8] {
         self.stream().configuration()
@@ -197,7 +208,7 @@ pub(super) struct DependentSyncframe {
     pub pending_bytes: Option<Bytes>,
 }
 
-/// A complete AC-3 syncframe or a DVB E-AC-3 syncframe group.
+/// A complete AC-3 syncframe or an E-AC-3 access-unit group.
 /// Clones share the charged bytes and syncframe facts.
 #[derive(Clone, Debug)]
 pub struct Ac3AccessUnit {
@@ -224,7 +235,7 @@ impl Ac3AccessUnit {
         self.bytes
     }
 
-    /// Facts of the primary syncframe, which supplies the unit's sample span.
+    /// Unchanged facts of the first primary syncframe.
     pub const fn facts(&self) -> Ac3FrameFacts {
         self.first
     }
@@ -235,6 +246,27 @@ impl Ac3AccessUnit {
             self.dependents
                 .iter()
                 .flat_map(|frames| frames.as_slice().iter().map(|frame| frame.facts)),
+        )
+    }
+
+    /// Combined primary sample span; dependent substreams add no time.
+    pub fn sample_span(&self) -> Result<Time> {
+        if self.first.header.blocks == 6 {
+            return self.first.header.sample_span();
+        }
+        let blocks: u16 = self
+            .syncframes()
+            .filter(|facts| {
+                !matches!(
+                    facts.header.details,
+                    triergon_framing::Ac3FrameDetails::Eac3 { stream_type: 1, .. }
+                )
+            })
+            .map(|facts| u16::from(facts.header.blocks))
+            .sum();
+        Time::new(
+            i128::from(blocks) * 256,
+            u128::from(self.first.header.sample_rate_hz),
         )
     }
 
@@ -295,14 +327,133 @@ impl LoasFrame {
     }
 }
 
+/// One MPEG-1 or MPEG-2 audio frame from an audio PES stream.
+#[derive(Debug)]
+pub struct MpegAudioFrame {
+    pub(super) bytes: Bytes,
+    pub(super) offset: u64,
+    pub(super) header: MpegAudioHeader,
+}
+
+impl MpegAudioFrame {
+    /// Complete frame, including its MPEG audio header.
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    /// Audio frame syntax and sample timing.
+    pub const fn header(&self) -> &MpegAudioHeader {
+        &self.header
+    }
+
+    /// Frame extent in the track's concatenated PES payload.
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.offset..self.offset + self.bytes.len() as u64
+    }
+}
+
+/// One complete core-bearing DTS access unit from a DVB-signalled stream.
+#[derive(Debug)]
+pub struct DtsAudioFrame {
+    pub(super) bytes: Bytes,
+    pub(super) core_bytes: usize,
+    pub(super) offset: u64,
+    pub(super) duration: Time,
+}
+
+impl DtsAudioFrame {
+    /// Complete access unit, including any extension substreams.
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    /// Exact source bytes of the core substream.
+    pub fn core_bytes(&self) -> &[u8] {
+        &self.bytes.as_ref()[..self.core_bytes]
+    }
+
+    /// Exact duration of the core coding window.
+    pub const fn sample_span(&self) -> Time {
+        self.duration
+    }
+
+    /// Frame extent in the track's concatenated PES payload.
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.offset..self.offset + self.bytes.len() as u64
+    }
+}
+
+/// One DTS-HD access unit containing extension substreams without a DTS core.
+#[derive(Debug)]
+pub struct DtsExtensionFrame {
+    pub(super) bytes: Bytes,
+    pub(super) offset: u64,
+    pub(super) duration: Option<Time>,
+}
+
+impl DtsExtensionFrame {
+    /// Original extension headers, alignment bytes and asset payloads.
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    /// Duration from the lowest-index extension's current static metadata, if known.
+    pub const fn sample_span(&self) -> Option<Time> {
+        self.duration
+    }
+
+    /// Frame extent in the track's concatenated PES payload.
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.offset..self.offset + self.bytes.len() as u64
+    }
+}
+
+/// Picture coding type from H.262 section 6.2.3.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MpegPictureCoding {
+    #[default]
+    Intra,
+    Predictive,
+    Bidirectional,
+}
+
+/// A picture with sequence setup and its original coded slices.
+#[derive(Debug)]
+pub struct MpegVideoPicture {
+    pub(super) bytes: Bytes,
+    pub(super) range: Range<u64>,
+    pub width: u16,
+    pub height: u16,
+    pub temporal_reference: u16,
+    pub coding: MpegPictureCoding,
+    /// Picture start-code offset in the private elementary view.
+    pub picture_offset: u64,
+    pub slice_count: u8,
+    pub mpeg2: bool,
+    pub(super) duration: Time,
+}
+
+impl MpegVideoPicture {
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.range.clone()
+    }
+}
+
 /// Original framed bytes and syntax facts, before decoder-feed conversion.
 /// Framer offsets use a private concatenated elementary view (`SourceId(0)`);
 /// physical transport provenance is retained by [`Packet::sources`].
 #[derive(Debug)]
 pub enum AccessUnit {
     Video(RawAccessUnit),
+    MpegVideo(MpegVideoPicture),
     Adts(AacAdtsFrame),
     Loas(LoasFrame),
+    MpegAudio(MpegAudioFrame),
+    Dts(DtsAudioFrame),
+    DtsExtension(DtsExtensionFrame),
     /// An opaque ADTS parser observation with its original source diagnostic.
     AdtsFragment(AacAdtsCarrier),
     Ac3(Ac3AccessUnit),
@@ -318,9 +469,13 @@ pub enum AccessUnit {
 impl AccessUnit {
     fn stored_bytes(&self) -> &Bytes {
         match self {
+            Self::MpegVideo(frame) => frame.bytes(),
             Self::Adts(frame) => frame.source_bytes(),
             Self::AdtsFragment(fragment) => fragment.source_bytes(),
             Self::Loas(frame) => frame.bytes(),
+            Self::MpegAudio(frame) => frame.bytes(),
+            Self::Dts(frame) => frame.bytes(),
+            Self::DtsExtension(frame) => frame.bytes(),
             Self::Ac3(frame) => frame.bytes(),
             Self::DvbSubtitle(unit) => unit.bytes(),
             Self::IncompleteAudio { bytes, .. } => bytes,
@@ -331,6 +486,7 @@ impl AccessUnit {
     pub(super) fn range(&self) -> Range<u64> {
         match self {
             Self::Video(unit) => unit.range.clone(),
+            Self::MpegVideo(unit) => unit.range.clone(),
             Self::Adts(frame) => {
                 frame.source().offset..frame.source().offset + frame.source_bytes().len() as u64
             }
@@ -339,6 +495,9 @@ impl AccessUnit {
                 start..start + fragment.source_bytes().len() as u64
             }
             Self::Loas(frame) => frame.elementary_range(),
+            Self::MpegAudio(frame) => frame.elementary_range(),
+            Self::Dts(frame) => frame.elementary_range(),
+            Self::DtsExtension(frame) => frame.elementary_range(),
             Self::Ac3(frame) => {
                 frame.facts().offset..frame.facts().offset + frame.bytes().len() as u64
             }
@@ -363,6 +522,7 @@ impl AccessUnit {
     }
     pub(super) fn duration(&self) -> Result<Option<Time>> {
         match self {
+            Self::MpegVideo(unit) => Ok(Some(unit.duration)),
             Self::Video(_)
             | Self::Loas(_)
             | Self::DvbSubtitle(_)
@@ -375,7 +535,13 @@ impl AccessUnit {
                     .ok_or(Error::Invalid("ADTS frequency"))?;
                 Ok(Some(Time::new(1024, u128::from(rate))?))
             }
-            Self::Ac3(frame) => Ok(Some(frame.facts().header.sample_span()?)),
+            Self::Ac3(frame) => Ok(Some(frame.sample_span()?)),
+            Self::Dts(frame) => Ok(Some(frame.sample_span())),
+            Self::DtsExtension(frame) => Ok(frame.sample_span()),
+            Self::MpegAudio(frame) => Ok(Some(Time::new(
+                i128::from(frame.header.samples_per_frame()),
+                u128::from(frame.header.sample_rate),
+            )?)),
         }
     }
 }
@@ -455,6 +621,10 @@ impl PacketInfo for Packet {
     }
     fn random_access(&self) -> RandomAccess {
         match &self.0.unit {
+            AccessUnit::MpegVideo(unit) if unit.coding == MpegPictureCoding::Intra => {
+                RandomAccess::Sync
+            }
+            AccessUnit::MpegVideo(_) => RandomAccess::NotSync,
             AccessUnit::Video(unit) if unit.random_access => RandomAccess::Sync,
             AccessUnit::Video(unit) if unit.has_vcl => RandomAccess::NotSync,
             _ => RandomAccess::Unknown,

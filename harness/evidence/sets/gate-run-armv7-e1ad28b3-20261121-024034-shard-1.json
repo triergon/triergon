@@ -1,0 +1,57 @@
+{
+ "name": "gate-run-armv7-e1ad28b3-20261121-024034-shard-1",
+ "path": "gate-run-armv7-e1ad28b3-20261121-024034-shard-1",
+ "retention": "retained",
+ "reason": "A partial gate run at e1ad28b3 on the 32-bit ARMv7 gate target in the armhf user space, one c6g.4xlarge from the gate image, items mp4-forward and mp4-range: the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; every step passes; for the MP4 forward and MP4 range rows on ARMv7 and the reuse of these results",
+ "key": "evidence/gate-runs/e1ad28b333349c79231cba3567c4612c2454fae7-armv7-20261121-024034/shard-1/131d824d5b9f1b5ca059618c959a296abdbadb56db47de20ece75a43d582af56.tar.zst",
+ "sha256": "131d824d5b9f1b5ca059618c959a296abdbadb56db47de20ece75a43d582af56",
+ "bytes": 14362479,
+ "results": [
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "157e0384fd564cd9e868f87b7c0b99c68a8bfe13fb161f8198b1955541331454",
+   "status": 0,
+   "report_sha256": "e8447d1771821be01915a5e43a96c82a6f839b2aa550d0dac35b12610e798d1f",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "41e810091935c2b3fab8b3d8ce16fcf0336adcf330c620a806ec4f7b1abfa1d3",
+   "status": 0,
+   "report_sha256": "4b42be2555039f210f3a767ea82904072e77a2f937ee10d7a04b2cfc07ef2647",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "322e485467426db6af165cbcabad53cfbff362d5c26b82b75b4bb9fbdea477d6",
+   "status": 0,
+   "report_sha256": "6e8215b8f3545e4a5d53d32445637af19a190820c5906ca5e21228f4bf792023",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b42a4fc0696981c59f5483b1a0bb608f5e323d1b835a37e47d8b3af754673521",
+   "status": 0,
+   "report_sha256": "5d1cfe5fa72e400b2faf9ca32ddcbc689f11ee4f997a84400c886ba15cb1c846",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "b94626ab7f58196d902e7ad3f2dff2579dfc1fe786ae0f70fa8fcaa3f69623e9",
+   "status": 0,
+   "report_sha256": "a82872a7097e6818a1f9d01ce5a573dcb4d8fda9f6d3c001cbe6ce44772e482e"
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "c18c34b47077e9a394fb0ab53483aef42636065b27b5d7a3e10fd07144ef7afd",
+   "status": 0,
+   "report_sha256": "098abc72b5b56a442db9ef7c425ff5c1098f341fdb3b2f3486f256311ba25ebf"
+  }
+ ]
+}

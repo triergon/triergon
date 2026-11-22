@@ -315,6 +315,7 @@ impl Synth {
         }
         let mut m = [zero; SLOTS];
         let mut d = [zero; SLOTS];
+        let mut sections = [zero; SECTION_BUFFER];
         for (j, band) in lay.bands.iter().enumerate() {
             if !live[j] {
                 for row in &mut x_r[..SLOTS] {
@@ -330,7 +331,13 @@ impl Synth {
                     }
                 }
             }
-            decorrelate(band.kind, &mut self.lines[band.line], &m, &mut d);
+            decorrelate(
+                band.kind,
+                &mut self.lines[band.line],
+                &m,
+                &mut d,
+                &mut sections,
+            );
             for (v, g) in d.iter_mut().zip(self.gain.iter()) {
                 let g = g[band.par];
                 v.re *= g;
@@ -478,8 +485,18 @@ impl Synth {
     }
 }
 
-/// The linear decorrelator of one band over a frame, with its state in `line`.
-fn decorrelate(kind: Kind, line: &mut Line, x: &[Cpx; SLOTS], y: &mut [Cpx; SLOTS]) {
+/// Room for a section's state and the frame's outputs ([`decorrelate`]).
+const SECTION_BUFFER: usize = 5 + SLOTS;
+
+/// The linear decorrelator of one band over a frame, with its state in `line`; `buf` is
+/// scratch.
+fn decorrelate(
+    kind: Kind,
+    line: &mut Line,
+    x: &[Cpx; SLOTS],
+    y: &mut [Cpx; SLOTS],
+    buf: &mut [Cpx; SECTION_BUFFER],
+) {
     let zero = Cpx::default();
     // x[t - n] for t < n comes from the inputs kept, oldest first
     let delayed = |n: usize, out: &mut [Cpx; SLOTS]| {
@@ -490,13 +507,12 @@ fn decorrelate(kind: Kind, line: &mut Line, x: &[Cpx; SLOTS], y: &mut [Cpx; SLOT
         Kind::Delay(n) => delayed(n, y),
         Kind::AllPass { lead, frac, decay } => {
             // lead: u[t] = lead x[t - 2]
-            let mut cur = [zero; SLOTS];
-            delayed(t::LEAD_DELAY, &mut cur);
-            for c in &mut cur {
+            let cur = y;
+            delayed(t::LEAD_DELAY, cur);
+            for c in cur.iter_mut() {
                 *c = lead.mul(*c);
             }
             // sections in lattice form: y[t] = Q s[t - d] - a u[t], s[t] = u[t] + a y[t]
-            let mut buf = [zero; 5 + SLOTS];
             let mut off = 0;
             for ((&d, q), a) in t::SECTION_DELAY.iter().zip(frac).zip(decay) {
                 let state = &mut line.sections[off..off + d];
@@ -512,7 +528,6 @@ fn decorrelate(kind: Kind, line: &mut Line, x: &[Cpx; SLOTS], y: &mut [Cpx; SLOT
                 off += d;
             }
             line.sections_live = line.sections.iter().any(|&v| v != zero);
-            y.copy_from_slice(&cur);
         }
     }
     line.input.copy_from_slice(&x[SLOTS - INPUTS..]);

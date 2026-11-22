@@ -11,7 +11,7 @@
 #       replacing the earlier ones and their snapshots. INPUT is a media inputs
 #       archive (.tar.gz, repository-relative paths): a local file or s3:KEY in
 #       the evidence archive
-#   tools/gate-aws.sh run aarch64|armv7 SHARDS REVISION OUT [--full] [--items NAME,...]
+#   tools/gate-aws.sh run aarch64|armv7 SHARDS REVISION OUT [--full] [--no-early-stop] [--items NAME,...]
 #       [--input s3:KEY]...
 #       the full gate of REVISION on SHARDS hosts from the target's image, in
 #       parallel: each takes the references of REVISION from its image or the
@@ -507,6 +507,7 @@ run() {
     while [ $# -gt 0 ]; do
         case $1 in
         --full) full=--full ;;
+        --no-early-stop) ENVIRONMENT+=("FIXED_REPORT_PAIRS=1") ;;
         --items) items=$2; shift ;;
         --input)
             case $2 in

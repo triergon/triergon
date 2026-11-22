@@ -1,0 +1,25 @@
+{
+ "name": "gate-run-armv7-36cead7d-20261121-001547-shard-2",
+ "path": "gate-run-armv7-36cead7d-20261121-001547-shard-2",
+ "retention": "retained",
+ "reason": "Partial gate run at 36cead7d (the Opus decoder's joint de-emphasis of CELT-only packets, on main e9596487) on two c6g.4xlarge hosts, ARMv7, shard 2 of the audio file workload items (codec-file-workloads timing and its three memory parts), codec-worker built by stable: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/36cead7d1d5e07617ae61e9820d5f2e8463f15b1-armv7-20261121-001547/shard-2/c816d43870e6b6ca7c9117122908700b69cd6b2d176f9fcfa122e61e598f6722.tar.zst",
+ "sha256": "c816d43870e6b6ca7c9117122908700b69cd6b2d176f9fcfa122e61e598f6722",
+ "bytes": 891512,
+ "results": [
+  {
+   "path": "memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "0c61ff3712338f48d159f0e642530229e56c67008327487502851a517b53a31f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "e955710800eb37aed6fa0bf4be61e8bf0f9d0975ccff8016bee5a46e9f9958de",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

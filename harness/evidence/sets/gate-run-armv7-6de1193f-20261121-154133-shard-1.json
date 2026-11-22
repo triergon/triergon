@@ -1,0 +1,27 @@
+{
+ "name": "gate-run-armv7-6de1193f-20261121-154133-shard-1",
+ "path": "gate-run-armv7-6de1193f-20261121-154133-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at 6de1193f, the merge of main 6ca0098d into 4ec296c5, one c6g.4xlarge host (Graviton2) from the gate image, 32-bit ARMv7: the progressive item (MPEG-TS progressive playback: parity, timing on CPU 1 and kernel-bound memory on CPUs 1-15, no result reused); the shard outputs, build identities, plan, step records and logs",
+ "key": "evidence/gate-runs/6de1193fbc8dd0676d09cd4ee36cf295cec84b9a-armv7-20261121-154133/shard-1/bbbe4c4f68b2a336887321d5b696defea3adf6f6a90935925e4f0381a3fb0f70.tar.zst",
+ "sha256": "bbbe4c4f68b2a336887321d5b696defea3adf6f6a90935925e4f0381a3fb0f70",
+ "bytes": 5450704,
+ "results": [
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "ac2c5f60a049b8f5695c674990fd9551e6e9bc9b359d4a156daba089b088f7d3",
+   "status": 0,
+   "report_sha256": "c46337d28f1ef207009cc3a2e38fefb19be84deb7f45a918a116d0eaa5f66b11",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "8544a58ae681b9ec69236d22ad70af9a20b3b67a98763d456d8eb737da2b6bd2",
+   "status": 0,
+   "report_sha256": "9c8182d99a3499a7ed49a1cd7a92e8eb3a619fc39d6c7a6ef94330c3e7b034ca",
+   "cases_checked": true
+  }
+ ]
+}

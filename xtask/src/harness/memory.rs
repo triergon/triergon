@@ -1045,6 +1045,7 @@ pub(super) fn kernel_used(certificate: &Value, samples: &[Value]) -> bool {
 
 /// Recompute the memory verdict of raw samples. Failures return the failing
 /// status with the samples and certificate kept.
+#[cfg(test)]
 pub fn evaluate(
     root: &Path,
     samples: &[Value],
@@ -1052,6 +1053,54 @@ pub fn evaluate(
     seed: u64,
     certificate: &Value,
     expected_outputs: Option<&Value>,
+) -> Value {
+    evaluate_work(
+        root,
+        samples,
+        pairs,
+        seed,
+        certificate,
+        expected_outputs,
+        false,
+    )
+}
+
+fn matched_refusal_work(row: &Value) -> bool {
+    let work = |key| row.get(key).and_then(|sample| sample.get("work"));
+    let (Some(candidate), Some(reference)) = (work("candidate_heap"), work("reference_heap"))
+    else {
+        return false;
+    };
+    // Each role's observers must agree on the entire output. Across roles,
+    // diagnostic details may differ for the same pinned zero-output refusal.
+    let comparable = |output: &Value| {
+        let Value::Object(fields) = output else {
+            unreachable!("a checked refusal is an object");
+        };
+        Value::Object(
+            fields
+                .iter()
+                .filter(|(key, _)| !matches!(key.as_str(), "refusal" | "cause" | "error"))
+                .cloned()
+                .collect(),
+        )
+    };
+    super::parity::reports_zero_output_refusal(candidate)
+        && super::parity::reports_zero_output_refusal(reference)
+        && candidate.get("iterations") == Some(&Value::int(1))
+        && work("candidate_rss").is_some_and(|rss| equal(candidate, rss))
+        && work("reference_rss").is_some_and(|rss| equal(reference, rss))
+        && equal(&comparable(candidate), &comparable(reference))
+}
+
+fn evaluate_work(
+    root: &Path,
+    samples: &[Value],
+    pairs: Pairs,
+    seed: u64,
+    certificate: &Value,
+    expected_outputs: Option<&Value>,
+    pinned_refusal: bool,
 ) -> Value {
     let linux = s(certificate, "platform") == Some("Linux");
     let failed = |status: &str| {
@@ -1148,16 +1197,20 @@ pub fn evaluate(
         if expected_outputs.is_none() && reference_output.is_none() {
             return failed("invalid-memory-observation");
         }
-        let work_matches = entries.iter().all(|(key, sample)| {
-            let expected = match expected_outputs {
-                Some(outputs) => key.split_once('_').and_then(|(role, _)| outputs.get(role)),
-                None => reference_output,
-            };
-            sample
-                .get("work")
-                .zip(expected)
-                .is_some_and(|(a, b)| equal(a, b))
-        });
+        let work_matches = if pinned_refusal && expected_outputs.is_none() {
+            matched_refusal_work(row)
+        } else {
+            entries.iter().all(|(key, sample)| {
+                let expected = match expected_outputs {
+                    Some(outputs) => key.split_once('_').and_then(|(role, _)| outputs.get(role)),
+                    None => reference_output,
+                };
+                sample
+                    .get("work")
+                    .zip(expected)
+                    .is_some_and(|(a, b)| equal(a, b))
+            })
+        };
         if !work_matches {
             return failed("unequal-memory-work");
         }
@@ -1378,6 +1431,7 @@ struct Invocation<'a> {
     arguments: &'a [String],
     candidate_arguments: Option<&'a [String]>,
     expected_outputs: Option<&'a Value>,
+    pinned_refusal: bool,
     work_fields: Option<&'a [String]>,
     /// How long one observer run may take.
     timeout: Duration,
@@ -1526,13 +1580,14 @@ fn measure(
             ("certificate", certificate.clone()),
         ])
     } else {
-        evaluate(
+        evaluate_work(
             root,
             &samples,
             pairs,
             seed,
             certificate,
             invocation.expected_outputs,
+            invocation.pinned_refusal,
         )
     };
     if !retried.is_empty() {
@@ -1808,6 +1863,7 @@ fn relocated(workers: &WorkerPaths<'_>) -> bool {
 
 /// One memory collection in `slot`, rejected (but kept) when tracked processes
 /// used CPU meanwhile.
+#[allow(clippy::too_many_arguments)] // The slot, workload and pairing configuration.
 pub fn collect(
     slot: &Slot,
     root: &Path,
@@ -1816,6 +1872,7 @@ pub fn collect(
     pairs: Pairs,
     seed: u64,
     operation: &Operation,
+    pinned_refusal: bool,
 ) -> R<Value> {
     if !operation.candidate_options.is_empty() {
         let arguments = |candidate| {
@@ -1843,6 +1900,7 @@ pub fn collect(
                 arguments: &reference_arguments,
                 candidate_arguments: Some(&candidate_arguments),
                 expected_outputs: None,
+                pinned_refusal,
                 work_fields: Some(&operation.work.fields),
                 timeout: operation.timeout,
             },
@@ -1866,6 +1924,7 @@ pub fn collect(
             arguments: &arguments,
             candidate_arguments: None,
             expected_outputs: None,
+            pinned_refusal,
             work_fields: Some(&operation.work.fields),
             timeout: operation.timeout,
         },
@@ -1897,6 +1956,7 @@ pub(crate) fn collect_command(
             arguments,
             candidate_arguments: None,
             expected_outputs: Some(expected_outputs),
+            pinned_refusal: false,
             work_fields: None,
             timeout,
         },
@@ -1938,6 +1998,7 @@ pub(crate) fn collect_commands(
             arguments: commands.reference,
             candidate_arguments: Some(commands.candidate),
             expected_outputs: Some(commands.expected_outputs),
+            pinned_refusal: false,
             work_fields: None,
             timeout: worker::DEFAULT_TIMEOUT,
         },
@@ -2153,7 +2214,16 @@ pub fn evidence_valid_with_outputs(
             }
         }
         let seed = py_int(memory.get("seed")).unwrap_or(280) as u64;
-        let recomputed = evaluate(root, raw, pairs, seed, certificate, expected_outputs);
+        let pinned_refusal = expected.is_some_and(super::parity::pins_zero_output_refusal);
+        let recomputed = evaluate_work(
+            root,
+            raw,
+            pairs,
+            seed,
+            certificate,
+            expected_outputs,
+            pinned_refusal,
+        );
         let same = [
             "status",
             "total_rss_ratio_upper_95",
@@ -2411,6 +2481,7 @@ mod command_tests {
                 arguments: &[],
                 candidate_arguments: None,
                 expected_outputs: None,
+                pinned_refusal: false,
                 work_fields: None,
                 timeout: worker::DEFAULT_TIMEOUT,
             },
@@ -2490,6 +2561,7 @@ mod command_tests {
             arguments: &reference,
             candidate_arguments: Some(&candidate),
             expected_outputs: None,
+            pinned_refusal: false,
             work_fields: None,
             timeout: worker::DEFAULT_TIMEOUT,
         };
@@ -2506,10 +2578,51 @@ mod command_tests {
             arguments: &arguments,
             candidate_arguments: None,
             expected_outputs: None,
+            pinned_refusal: false,
             work_fields: None,
             timeout: worker::DEFAULT_TIMEOUT,
         };
         assert_eq!(invocation.arguments_for(true), arguments);
         assert_eq!(invocation.arguments_for(false), arguments);
     }
+}
+#[test]
+fn pinned_refusals_compare_equal_work_and_keep_role_diagnostics() {
+    let pair = |candidate: &Value, reference: &Value, candidate_rss: &Value| {
+        let measured = |work: &Value| Value::object([("work", work.clone())]);
+        Value::object([
+            ("candidate_heap", measured(candidate)),
+            ("candidate_rss", measured(candidate_rss)),
+            ("reference_heap", measured(reference)),
+            ("reference_rss", measured(reference)),
+        ])
+    };
+    let output = |refusal, packets, eof, iterations, diagnostic| {
+        Value::object([
+            ("refusal", Value::str(refusal)),
+            ("packets", Value::int(packets)),
+            ("bytes", Value::int(0)),
+            ("digest", Value::int(0)),
+            ("eof", Value::Bool(eof)),
+            ("iterations", Value::int(iterations)),
+            (diagnostic, Value::str("details")),
+        ])
+    };
+    let candidate = output("typed refusal", 0, false, 1, "cause");
+    let reference = output("refused", 0, false, 1, "error");
+    assert!(matched_refusal_work(&pair(
+        &candidate, &reference, &candidate
+    )));
+    for different in [
+        output("refused", 1, false, 1, "error"),
+        output("refused", 0, true, 1, "error"),
+        output("refused", 0, false, 2, "error"),
+    ] {
+        assert!(!matched_refusal_work(&pair(
+            &candidate, &different, &candidate
+        )));
+    }
+    assert!(!matched_refusal_work(&pair(
+        &candidate, &reference, &reference
+    )));
 }

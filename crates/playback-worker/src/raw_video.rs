@@ -84,16 +84,21 @@ fn operation(pool: &Budget, raw: &Bytes, codec: Codec, mut work: Work) -> Result
     let mut feed = probe
         .finish()?
         .into_feed(MAX_PARAMETER_SET_BYTES, RawFeedClock::Unspecified)?;
+    // The picture period of the active configuration, derived when it changes.
+    let mut duration = 0;
     loop {
         match feed.poll(&mut WorkBudget::new(WORK), &cancel)? {
             Step::Ready(packet) => {
+                if packet.configuration_changed {
+                    duration = picture_ticks(packet.configuration.as_ref())?;
+                }
                 let unit = &packet.unit;
                 let size = usize::try_from(unit.range.end - unit.range.start)?;
                 work.packet(Packet {
                     track: 0,
                     pts: None,
                     dts: None,
-                    duration: picture_ticks(packet.configuration.as_ref())?,
+                    duration,
                     flags: u64::from(unit.random_access),
                     size,
                     payload: unit.segments(),

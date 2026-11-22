@@ -526,6 +526,21 @@
         "bytes": 18082,
         "digest": 7551416059253223528
       }
+    },
+    {
+      "id": "m2ts-replay-avc-aac-00-program",
+      "profile": "m2ts-replay-avc-aac-00-program",
+      "file": "harness/fixtures/ts-program/replay-avc-aac-00.m2ts",
+      "sha256": "c259510f2149db3bb931c3238897e1acf45d62f5bce4b5c3cbd397473cb8f609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "m2ts192:256=avc,257=aac"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 26592,
+        "digest": 12066748960095057291
+      }
     }
   ]
 }

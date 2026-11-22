@@ -1,0 +1,25 @@
+{
+ "name": "gate-run-armv7-2d82a042-20261121-000639-shard-3",
+ "path": "gate-run-armv7-2d82a042-20261121-000639-shard-3",
+ "retention": "retained",
+ "reason": "Partial gate run at 2d82a042 (the AAC decoder's std::simd DCT-IV passes with codec-aac's simd feature and its SBR and PS scratch no longer zeroed, on main e9596487) on three c6g.4xlarge hosts, ARMv7, shard 3 of the codec workload items (codec-workloads timing and its five memory parts), codec-aac-worker built by the pinned nightly with codec-aac's simd feature and codec-worker by stable: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/2d82a042c70e08a6cedc0b74967d25d28b4df973-armv7-20261121-000639/shard-3/d6dd682c7a4a9a474987650c02e7c20a55d82967be3bb815b66242febd85f092.tar.zst",
+ "sha256": "d6dd682c7a4a9a474987650c02e7c20a55d82967be3bb815b66242febd85f092",
+ "bytes": 909365,
+ "results": [
+  {
+   "path": "memory/codec-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "a7eb79c899c833c4530a03b8b04cd640755a87440cfdf7264c7d391bcb9574da",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "03d32c868460cd571558530dbb0cf6c85d529daf1e5c35f18df04c5baf7334f7",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

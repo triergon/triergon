@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "mpegts-dts-legacy",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "mpegts-access-unit-packets",
+  "candidate": "transport-worker",
+  "worker_operation": "ts-au-",
+  "reference": "ffmpeg-transport-dts",
+  "fetch_fate_cases": true,
+  "contract": [
+    "Read a legacy TS188 sample through physical EOF with the same program and explicit DTS core PID. The reference sets the codec identity through AVCodecParameters after opening the unchanged transport.",
+    "Accept the valid encoded PCR clock values with nonconforming reserved bits. Compare every DTS packet's payload, stream index and PID, flags, duration, PTS, DTS, position and side data."
+  ],
+  "required_profiles": ["fate-dts-private-data"],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

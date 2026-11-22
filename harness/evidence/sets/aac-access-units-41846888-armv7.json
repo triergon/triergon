@@ -1,0 +1,28 @@
+{
+ "name": "aac-access-units-41846888-armv7",
+ "path": "aac-access-units-41846888-armv7",
+ "retention": "retained",
+ "reason": "Configured AAC access-unit parity, paired runtime and kernel-bound memory at 41846888, measured from codec-aac-worker (the pinned nightly with codec-aac's simd feature), with the build identity, the raw PCM identity of codec-worker and codec-aac-worker on all 34 workloads, and loop-only counts of both and the reference on six workloads.",
+ "key": "evidence/aac-access-units/41846888-armv7/fb686da4b996f22054de3f8277910a650c3f95aac5f012172967cb839ffafcfd.tar.zst",
+ "sha256": "fb686da4b996f22054de3f8277910a650c3f95aac5f012172967cb839ffafcfd",
+ "bytes": 69361133,
+ "results": [
+  {
+   "path": "benchmark/gate-result.json",
+   "command": "codecs time",
+   "key": "4e031d6d93d3964f3890a5b6a69c4bde4f9061f90a38a454ca4bbb6e23ed86d2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/gate-result.json",
+   "command": "codecs memory",
+   "key": "56ca9782bb56500262bc71f46a6cf921603fc6a6d6578ab9f9ee33eff8dd0f26",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "41846888291776f0a9664ad4b5e1dba30bd79518"
+ ]
+}

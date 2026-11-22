@@ -9,6 +9,9 @@ use std::{fmt::Write, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 const INVALID_DATA: i32 = -1094995529;
+/// Room for the event prefix: the read order, at most ten digits, the fixed
+/// fields and a wrap tag.
+const PREFIX_BYTES: usize = 64;
 #[derive(Debug, Clone, Copy)]
 struct Span {
     start: u16,
@@ -67,7 +70,7 @@ pub(super) struct PacketJob {
     stage: Stage,
     font_at: usize,
     color: u32,
-    writer: Writer,
+    writer: Writer<PREFIX_BYTES>,
 }
 impl PacketJob {
     pub(super) fn new(input: Input, clock: Clock, pool: &Budget) -> Self {

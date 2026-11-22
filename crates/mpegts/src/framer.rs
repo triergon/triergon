@@ -125,6 +125,7 @@ enum BufferedCarrier {
 pub struct TransportFramer {
     budget: Budget,
     format: PacketFormat,
+    pcr_policy: crate::compat::pes::PcrPolicy,
     buffered_carrier: BufferedCarrier,
     shared_owner: Option<ByteStorageAddress>,
     progressive_windows: [Option<Bytes>; MAX_PROGRESSIVE_SHARED_WINDOWS],
@@ -146,6 +147,7 @@ impl TransportFramer {
             carry: Some(BudgetVec::new(&budget)),
             budget,
             format,
+            pcr_policy: crate::compat::pes::PcrPolicy::Strict,
             buffered_carrier: BufferedCarrier::Carry,
             shared_owner: None,
             progressive_windows: [const { None }; MAX_PROGRESSIVE_SHARED_WINDOWS],
@@ -162,6 +164,10 @@ impl TransportFramer {
     }
     pub(crate) fn share_input(&mut self) {
         self.buffered_carrier = BufferedCarrier::Shared;
+    }
+
+    pub(crate) fn set_pcr_policy(&mut self, policy: crate::compat::pes::PcrPolicy) {
+        self.pcr_policy = policy;
     }
 
     pub(crate) fn carry_storage(&self) -> Result<usize> {
@@ -266,7 +272,8 @@ impl TransportFramer {
         self.last_packet_offset = Some(start);
         self.inspection = Some(
             TransportInspector::detached(source, self.format, start, self.entity)
-                .map_err(|failure| failure.error)?,
+                .map_err(|failure| failure.error)?
+                .pcr_policy(self.pcr_policy),
         );
         Ok(())
     }

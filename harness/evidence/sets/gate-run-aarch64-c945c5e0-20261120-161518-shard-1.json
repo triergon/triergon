@@ -1,0 +1,53 @@
+{
+ "name": "gate-run-aarch64-c945c5e0-20261120-161518-shard-1",
+ "path": "gate-run-aarch64-c945c5e0-20261120-161518-shard-1",
+ "retention": "retained",
+ "reason": "MPEG-TS PES and access-unit parity, 30 timing pairs and 30 kernel-bound memory pairs per case on Linux AArch64.",
+ "key": "evidence/gate-runs/c945c5e00f317b93f597146196dbe9bea8609ee0-aarch64-20261120-161518/shard-1/38193fc5966e1ac32bb5dc4663315ac6fae8c0225c94a951c6c7e56d52dec61b.tar.zst",
+ "sha256": "38193fc5966e1ac32bb5dc4663315ac6fae8c0225c94a951c6c7e56d52dec61b",
+ "bytes": 36212091,
+ "results": [
+  {
+   "path": "memory/mpegts-access-units/gate-result.json",
+   "command": "report --memory",
+   "key": "b3b6495e0aa89c4bda4a206f12ffd8ec0d8b966ea9a8e098b124536fa8abdcee",
+   "status": 0,
+   "report_sha256": "28ad6b5c9b741b8531763e6d92160bc918d9e9f62a3486a7a51a9519a9ba087a"
+  },
+  {
+   "path": "memory/mpegts-pes/gate-result.json",
+   "command": "report --memory",
+   "key": "0ad9e0f40e53232102c923e9985f4c592ea2ccb282d22378507f22b3006a8f3a",
+   "status": 0,
+   "report_sha256": "80260986217cadf8e8d4c49e02865ac4c69df0a1a8233abf74ac875ba9535a29"
+  },
+  {
+   "path": "benchmark/mpegts-access-units/gate-result.json",
+   "command": "report --benchmark",
+   "key": "723b58667eadcd1dec5a905b99ee5a5c01afc388f599f0ef381ce8f3b2c92074",
+   "status": 0,
+   "report_sha256": "f784ec25bdf084ea1ea284c81ace3dac871a685ac0961251346783b21785f0bd"
+  },
+  {
+   "path": "benchmark/mpegts-pes/gate-result.json",
+   "command": "report --benchmark",
+   "key": "51fe4cf46149a341c76652fda894ae46d8913ef71c8de652900cf30672520421",
+   "status": 0,
+   "report_sha256": "eb708c0af339fe655cf1913544829d40108803a982d9b2ae75f19911c5a915e1"
+  },
+  {
+   "path": "graded/mpegts-access-units/gate-result.json",
+   "command": "grade",
+   "key": "7bd2442d47a26c07ea517b23036aaf114d0174cc316fb4bf6ea83017b2b88c8d",
+   "status": 0,
+   "report_sha256": "24f77d8ef5e19f75e3046a7cd4b091d55e3392ac1b9d0514c3c0562d76894dfb"
+  },
+  {
+   "path": "graded/mpegts-pes/gate-result.json",
+   "command": "grade",
+   "key": "a9059e8189a67d3e52f6cfd033ab0ccfb398de414c04584d25b94e6545f83a50",
+   "status": 0,
+   "report_sha256": "985405e5cca5a4c801bc59896a1aa121ad149d7df16133afd156b3de1ea2c2de"
+  }
+ ]
+}

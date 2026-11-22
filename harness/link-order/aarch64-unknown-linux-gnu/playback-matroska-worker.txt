@@ -8,19 +8,12 @@ __init_cpu_features
 __init_cpu_features_constructor
 std::sys::args::unix::imp::ARGV_INIT_ARRAY::init_wrapper
 main
-__aarch64_cas8_relax
-std::sys::pal::unix::stack_overflow::imp::make_handler
-std::sys::pal::unix::stack_overflow::thread_info::set_current_info
-__aarch64_cas4_acq
-__aarch64_cas8_acq
-__aarch64_swp4_rel
-std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> std::process::ExitCode, std::process::ExitCode>
-playback_matroska_worker::main
 std::env::args
 <std::env::Args as core::iter::traits::iterator::Iterator>::nth
 core::str::converts::from_utf8
 playback_worker::matroska_video::run
 <triergon_harness_runner::Invocation>::parse
+__aarch64_cas8_relax
 std::fs::read::inner
 <std::sys::fs::unix::File>::open_c
 std::sys::fs::unix::try_statx
@@ -30,8 +23,8 @@ alloc::io::read::default_read_to_end::small_probe_read::<std::fs::File>
 __aarch64_ldadd8_relax
 triergon_harness_runner::measure_dyn
 <std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>
-<std::sys::sync::once::futex::Once>::call
-<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+__aarch64_cas4_acq
+__aarch64_swp4_rel
 <std::io::stdio::StdoutLock as core::io::write::Write>::write_all
 <std::sys::stdio::unix::Stdout as core::io::write::Write>::write_all
 <alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
@@ -219,7 +212,6 @@ core::fmt::write
 <alloc::string::String as core::fmt::Display>::fmt
 <core::io::write::default_write_fmt::Adapter<std::io::stdio::StdoutLock> as core::fmt::Write>::write_str
 <alloc::sync::Arc<triergon_core::budget::Inner>>::drop_slow
-<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0}
 release_registered_frames
 btree_destroy
 __aarch64_swp8_acq_rel
@@ -265,6 +257,7 @@ core::ptr::drop_glue::<triergon_matroska::incremental::ParseStep<triergon_matros
 <triergon_matroska::matroska::typed::epoch::EpochRestoreJob>::after_group
 <triergon_matroska::matroska::typed::epoch::RestoredEpoch as core::clone::Clone>::clone
 core::ptr::drop_glue::<triergon_matroska::typed::reader::seeking::ScanBoundary>
+triergon_matroska::matroska::typed::packet::keep_recovery_packet
 <triergon_playback::matroska_feed::video_seek::MatroskaVideoSeekGate>::admits
 <triergon_matroska::incremental::ElementReader>::admit_typed_leaf
 <triergon_framing::hevc_config::HvcConfigParser>::new
@@ -280,7 +273,6 @@ triergon_playback::raw_video::config::hevc::skip_profile_tier_level
 <triergon_playback::raw_video::config::hevc::Rbsp>::flag
 <triergon_playback::raw_video::config::hevc::Rbsp>::bounded
 triergon_playback::raw_video::config::hevc::vps
-<triergon_framing::hevc_config::HvcConfigNal>::length_field_bytes
 core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfiguration>
 core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfigParser>
 <triergon_matroska::matroska::Track>::legacy_aac_profile
@@ -289,7 +281,7 @@ core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfigParser>
 <triergon_matroska::matroska::typed::configuration::Configuration>::initialization
 <triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>::step
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>
-triergon_playback::raw_video::config::hevc::vps_timing
+triergon_playback::raw_video::config::hevc::read_vps_timing
 <triergon_bitstream::rbsp::Rbsp>::skip
 <triergon_playback::raw_video::config::hevc::Rbsp>::skip
 triergon_playback::raw_video::config::hevc::sps_timing

@@ -14,6 +14,7 @@ mod catalogue;
 mod checksum;
 mod colour;
 mod content;
+mod eac3;
 mod header;
 mod mp4_range;
 mod reference_encodings;
@@ -136,6 +137,9 @@ const TESTS: &[Test] = &[
 
 /// Run every test whose name contains `filter`; fails if any check failed.
 pub fn run(root: &Path, filter: Option<&str>) -> Result<(), String> {
+    if filter == Some("transport::eac3-experiment") {
+        return eac3::run(root);
+    }
     let selected: Vec<&Test> = TESTS
         .iter()
         .filter(|t| filter.is_none_or(|f| t.name.contains(f)))

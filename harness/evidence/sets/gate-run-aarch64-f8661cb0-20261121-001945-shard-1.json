@@ -1,0 +1,27 @@
+{
+ "name": "gate-run-aarch64-f8661cb0-20261121-001945-shard-1",
+ "path": "gate-run-aarch64-f8661cb0-20261121-001945-shard-1",
+ "retention": "retained",
+ "reason": "A partial gate run at f8661cb0 on the Linux AArch64 gate target, one c6g.4xlarge from the gate image, item isobmff-seek: the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; every step passes; for the ISO BMFF seek rows and the reuse of these results",
+ "key": "evidence/gate-runs/f8661cb08b7a67b6f52aedbd15d3237c0ba85ede-aarch64-20261121-001945/shard-1/5aa8f78be5d925e31c2c5a16f67556145c764720fca289695fd5479868a5051e.tar.zst",
+ "sha256": "5aa8f78be5d925e31c2c5a16f67556145c764720fca289695fd5479868a5051e",
+ "bytes": 40870921,
+ "results": [
+  {
+   "path": "memory/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --memory",
+   "key": "e0a3329fd2fbb083801befdeccf37bfaaa03e6ac08824077e51780ef1d6dd52e",
+   "status": 0,
+   "report_sha256": "f12b35628f3c44848e658cf3536eb44e10b5e48caa8e1aaf2d2746beb353abf8",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --benchmark",
+   "key": "f36d6d380a441fd40293866f9fb095279f15717cd97c9e36f1387a9e077b1702",
+   "status": 0,
+   "report_sha256": "48f69ab31aa9dc3584b0c5afcdbf12898cbeda04d7226a8825f48b3b963a6e11",
+   "cases_checked": true
+  }
+ ]
+}

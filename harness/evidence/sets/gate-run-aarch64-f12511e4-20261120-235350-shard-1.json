@@ -1,0 +1,57 @@
+{
+ "name": "gate-run-aarch64-f12511e4-20261120-235350-shard-1",
+ "path": "gate-run-aarch64-f12511e4-20261120-235350-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run of Matroska segment metadata and the external HDR vector on Linux AArch64 with metadata documents parsed without per-node source handles: timing, memory and grades of all 49 cases.",
+ "key": "evidence/gate-runs/f12511e4f9d631c2aac50445a572a1722b3de5d3-aarch64-20261120-235350/shard-1/548df59e660c774f58cb2daaa73953e214e5e72b0bb071d24464baf540103999.tar.zst",
+ "sha256": "548df59e660c774f58cb2daaa73953e214e5e72b0bb071d24464baf540103999",
+ "bytes": 8883541,
+ "results": [
+  {
+   "path": "memory/external-vector/gate-result.json",
+   "command": "external-vector --memory",
+   "key": "8972616b5ce7a11e15ca75c9d36776311887a49309e0e44c0f198ddad4f966b1",
+   "status": 0,
+   "report_sha256": "d4eac029e4910359598685290876620b0e277abe330de624ca2ecaa68b0f3341",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-segment-metadata/gate-result.json",
+   "command": "report --memory",
+   "key": "8a00769eb42d8ad03953796600936f860c7abb5ea699c74362308dd883d750b8",
+   "status": 0,
+   "report_sha256": "edf5fefab4540d674b7d7d4fdca94e3b8dd310dcc4d4aed5169fc47121376f98",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/external-vector/gate-result.json",
+   "command": "external-vector --benchmark",
+   "key": "dae4eb87c2080a77f299685f25c2ebdf2ddd92249d755971365bb3500f657d31",
+   "status": 0,
+   "report_sha256": "1fbddc6031046464c67f444150acf8ccaf210b7062d6244abe1db07080a58bd4",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-segment-metadata/gate-result.json",
+   "command": "report --benchmark",
+   "key": "d2633eba3bf33d30da5bb7a6ec46ed59613efde3cd9cdf30d78ed835708fa6fe",
+   "status": 0,
+   "report_sha256": "f0977c71d4928c09eb16cadd2dc0b5a090a62f7694242432103982e8f6980403",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/external-vector/gate-result.json",
+   "command": "grade",
+   "key": "469cd68d4d9b9d3b5ec9167b5dc2cd1b32baa319ef9e3d0bf89ef9a27af69498",
+   "status": 0,
+   "report_sha256": "a916d43577a1c55be04a465c38826d3579520c85f925e2e280f22b0556265c3d"
+  },
+  {
+   "path": "graded/matroska-segment-metadata/gate-result.json",
+   "command": "grade",
+   "key": "f1def5b8bf901071de4d19570e31a016c9ad7020e6e97b62e3005e9ae2e7bdae",
+   "status": 0,
+   "report_sha256": "2178ba41530c3c31693db0c42eb82d393f7dc5b30fa5b52b5bd1e0e10cbe58e8"
+  }
+ ]
+}

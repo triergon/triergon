@@ -1,4 +1,5 @@
 //! H.222.0 (08/2023), 2.4.3.1-5. No implementation source was used.
+use crate::compat::pes::PcrPolicy;
 use std::ops::Range;
 use triergon_core::{Bytes, Error, Result, SourceId, Time};
 
@@ -61,6 +62,14 @@ pub struct Adaptation {
     pub extension: Option<Bytes>,
 }
 
+impl Adaptation {
+    /// The six encoded reserved bits, when this field carries a PCR.
+    pub fn pcr_reserved_bits(&self) -> Option<u8> {
+        self.pcr?;
+        self.source.as_ref().get(6).map(|byte| (byte >> 1) & 0x3f)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct TransportPacket {
     /// Whole source packet (including the opaque four-byte prefix, if present).
@@ -97,6 +106,10 @@ impl TransportPacket {
 }
 
 pub(crate) fn pcr(data: &[u8]) -> Result<Pcr> {
+    pcr_with_policy(data, PcrPolicy::Strict)
+}
+
+pub(crate) fn pcr_with_policy(data: &[u8], policy: PcrPolicy) -> Result<Pcr> {
     if data.len() != 6 {
         return Err(Error::Truncated);
     }
@@ -106,7 +119,7 @@ pub(crate) fn pcr(data: &[u8]) -> Result<Pcr> {
         | (u64::from(data[3]) << 1)
         | u64::from(data[4] >> 7);
     let extension = (u16::from(data[4] & 1) << 8) | u16::from(data[5]);
-    if data[4] & 0x7e != 0x7e || extension > 299 {
+    if extension > 299 || (data[4] & 0x7e != 0x7e && policy == PcrPolicy::Strict) {
         return Err(Error::Invalid("PCR reserved bits/extension"));
     }
     Ok(Pcr { base, extension })

@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-armv7-ee4e5290-20261121-182615-shard-1",
+ "path": "gate-run-armv7-ee4e5290-20261121-182615-shard-1",
+ "retention": "retained",
+ "reason": "DTS-HD mode-zero and retained transport comparisons on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/ee4e529052b754a93f78e1520a424fc3f376dc5c-armv7-20261121-182615/shard-1/a473f4cd72029155e64eaa44b1caaff986a75172e6564556db386114f42c9a05.tar.zst",
+ "sha256": "a473f4cd72029155e64eaa44b1caaff986a75172e6564556db386114f42c9a05",
+ "bytes": 4988411,
+ "results": [
+  {
+   "path": "memory/mpegts-dts-seek/gate-result.json",
+   "command": "report --memory",
+   "key": "d9bdf6b687d19d9dc066f4cf2ba8722d884fbb2f685527d6f5c08931f1117a9e",
+   "status": 0,
+   "report_sha256": "2619b00d122e2657c4c64992478566cf94e48ba36c53aafb9d7d24c237b1b6fe",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-dts-seek/gate-result.json",
+   "command": "report --benchmark",
+   "key": "1c7556cb84fa2b1bb4b624cffd494b774169aef6778561be9ef6f70db62c988b",
+   "status": 0,
+   "report_sha256": "8fafb8a75e88f1d2d291dfa3cbee46a18990d7ab11f660c96deecb1d532d9023",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-dts-seek/gate-result.json",
+   "command": "grade",
+   "key": "54bd2f51808fb0588f600cba72131ca0862ea6b18c02adfa46f5ae4f7e6aef42",
+   "status": 0,
+   "report_sha256": "271292686c8723b009c9e70c24bbb763111dadbc2f20cdad90c7c7208cb17a56"
+  }
+ ]
+}

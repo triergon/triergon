@@ -9,7 +9,7 @@ use crate::matroska::typed::syntax::{ChildCursor, check};
 use crate::{
     Error, Result, ebml,
     incremental::ParseStep,
-    storage::{SharedBytes, StorageVec, text_job::TextJob},
+    storage::{SharedBytes, StorageVec, text_job::TextCheck},
 };
 use std::{
     mem::size_of,
@@ -42,6 +42,7 @@ struct Fields {
     ordered: Option<u64>,
 }
 
+#[inline]
 const fn bit(id: u64) -> u64 {
     let index = match id {
         0x61a7 => 0,
@@ -141,7 +142,7 @@ fn require(fields: Fields, ids: &[u64]) -> Result<()> {
         Ok(())
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum Phase {
     Owner,
     NodeReserve,
@@ -179,7 +180,7 @@ pub(crate) struct DocumentJob {
     stack: [Option<Frame>; 65],
     stack_len: usize,
     attachment_bytes: usize,
-    text: Option<TextJob>,
+    text: Option<TextCheck>,
     phase: Phase,
     validate: usize,
     child: usize,
@@ -276,9 +277,10 @@ impl DocumentJob {
             .and_then(|n| n.checked_add(self.raw.owner_overhead_bound()))
             .ok_or(Error::Overflow)
     }
-    fn range(&self, index: usize) -> Result<Range<usize>> {
+    /// The payload of node `index` in `raw`, this job's source.
+    fn range(&self, raw: &[u8], index: usize) -> Result<Range<usize>> {
         if index == 0 {
-            return Ok(0..self.raw.len());
+            return Ok(0..raw.len());
         }
         let node = self
             .nodes
@@ -286,8 +288,8 @@ impl DocumentJob {
             .get(index)
             .required("missing metadata node")?;
         let at = node.header as usize;
-        let (_, a, _) = ebml::vint(&self.raw[at..], true)?;
-        let (size, b, unknown) = ebml::vint(&self.raw[at + a..], false)?;
+        let (_, a, _) = ebml::vint(&raw[at..], true)?;
+        let (size, b, unknown) = ebml::vint(&raw[at + a..], false)?;
         if unknown {
             return Err(Error::Invalid("unknown metadata child size"));
         }
@@ -295,20 +297,26 @@ impl DocumentJob {
         let end = start
             .checked_add(usize::try_from(size).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
-        if end > self.raw.len() {
+        if end > raw.len() {
             return Err(Error::Truncated);
         }
         Ok(start..end)
     }
-    fn uint(&self, index: usize) -> Result<u64> {
-        let raw = &self.raw[self.range(index)?];
-        if raw.is_empty() {
+    fn uint(&self, raw: &[u8], index: usize) -> Result<u64> {
+        let value = &raw[self.range(raw, index)?];
+        if value.is_empty() {
             Ok(default_uint(u64::from(self.nodes.as_slice()[index].id)))
         } else {
-            ebml::uint(raw)
+            ebml::uint(value)
         }
     }
-    fn collect(&self, singletons: u64, child: usize, fields: &mut Fields) -> Result<()> {
+    fn collect(
+        &self,
+        raw: &[u8],
+        singletons: u64,
+        child: usize,
+        fields: &mut Fields,
+    ) -> Result<()> {
         let id = u64::from(self.nodes.as_slice()[child].id);
         let field = bit(id);
         if fields.presence & singletons & field != 0 {
@@ -316,16 +324,12 @@ impl DocumentJob {
         }
         fields.presence |= field;
         match id {
-            0x91 => fields.start = Some(self.uint(child)?),
-            0x92 => fields.end = Some(self.uint(child)?),
-            0x45dd => fields.ordered = Some(self.uint(child)?),
+            0x91 => fields.start = Some(self.uint(raw, child)?),
+            0x92 => fields.end = Some(self.uint(raw, child)?),
+            0x45dd => fields.ordered = Some(self.uint(raw, child)?),
             _ => (),
         }
         Ok(())
-    }
-    fn next_validation(&mut self) {
-        self.validate += 1;
-        self.phase = Phase::ValidateStart;
     }
     fn validation_context(&self) -> Result<(u64, u64, bool)> {
         if self.stack_len == 0 {
@@ -368,14 +372,28 @@ impl DocumentJob {
             other => other,
         }
     }
+    /// Runs the phases from a local copy of the phase, so that one node's
+    /// transitions dispatch from a register, and stores it on every return.
     fn advance(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<SharedDocument>> {
+        let mut phase = self.phase;
+        let result = self.run(&mut phase, work, cancel);
+        self.phase = phase;
+        result
+    }
+    fn run(
+        &mut self,
+        phase: &mut Phase,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<SharedDocument>> {
+        let raw: &[u8] = &self.raw;
         loop {
             check(cancel)?;
-            match self.phase {
+            match *phase {
                 Phase::Owner => {
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
@@ -384,7 +402,7 @@ impl DocumentJob {
                         self.pool
                             .reserve(size_of::<Document>() + 2 * size_of::<usize>())?,
                     );
-                    self.phase = Phase::NodeReserve;
+                    *phase = Phase::NodeReserve;
                 }
                 Phase::NodeReserve => {
                     if !work.try_charge(1) {
@@ -394,10 +412,10 @@ impl DocumentJob {
                         return Err(Error::Policy("metadata nodes"));
                     }
                     if self.nodes.len() < self.nodes.capacity() {
-                        self.phase = Phase::NodeAppend;
+                        *phase = Phase::NodeAppend;
                         continue;
                     }
-                    let initial = (self.raw.len() / 2 + 1).min(8);
+                    let initial = (raw.len() / 2 + 1).min(8);
                     let target = self
                         .nodes
                         .len()
@@ -418,7 +436,7 @@ impl DocumentJob {
                         return Err(Error::Policy("metadata retained storage"));
                     }
                     self.growth = Some((replacement, 0));
-                    self.phase = Phase::NodeCopy;
+                    *phase = Phase::NodeCopy;
                 }
                 Phase::NodeCopy => {
                     let growth = self
@@ -431,7 +449,7 @@ impl DocumentJob {
                             .take()
                             .required("missing metadata arena growth")?;
                         self.nodes = replacement;
-                        self.phase = Phase::NodeAppend;
+                        *phase = Phase::NodeAppend;
                         continue;
                     }
                     let count = work.take((self.nodes.len() - growth.1).min(64) as u64) as usize;
@@ -457,7 +475,7 @@ impl DocumentJob {
                         self.pending = Some(error.value);
                         return Err(error.error);
                     }
-                    self.phase = Phase::NodeKind;
+                    *phase = Phase::NodeKind;
                 }
                 Phase::NodeKind => {
                     if !work.try_charge(1) {
@@ -485,15 +503,15 @@ impl DocumentJob {
                             depth: u8::try_from(depth).map_err(|_| Error::Overflow)?,
                         });
                         self.stack_len += 1;
-                        self.phase = Phase::Parse;
+                        *phase = Phase::Parse;
                         continue;
                     }
-                    let raw = &self.raw[self.pending_range.clone()];
+                    let payload = &raw[self.pending_range.clone()];
                     if unsigned(id) {
-                        let value = if raw.is_empty() {
+                        let value = if payload.is_empty() {
                             default_uint(id)
                         } else {
-                            ebml::uint(raw)?
+                            ebml::uint(payload)?
                         };
                         if id == 0x2ad7b1
                             && self.nodes.as_slice()[index].parent == 0
@@ -525,14 +543,16 @@ impl DocumentJob {
                         self.uid_kinds |= uid_kind;
                     }
                     if id == 0x4489 {
-                        let value = match raw.len() {
+                        let value = match payload.len() {
                             0 => 0.,
                             4 => f64::from(f32::from_be_bytes(
-                                raw.try_into()
+                                payload
+                                    .try_into()
                                     .map_err(|_| Error::Invalid("metadata float width"))?,
                             )),
                             8 => f64::from_be_bytes(
-                                raw.try_into()
+                                payload
+                                    .try_into()
                                     .map_err(|_| Error::Invalid("metadata float width"))?,
                             ),
                             _ => return Err(Error::Invalid("metadata float width")),
@@ -541,45 +561,42 @@ impl DocumentJob {
                             return Err(Error::Invalid("Segment duration range"));
                         }
                     }
-                    if id == 0x4461 && !matches!(raw.len(), 0 | 8) {
+                    if id == 0x4461 && !matches!(payload.len(), 0 | 8) {
                         return Err(Error::Invalid("DateUTC width"));
                     }
-                    if id == 0x6e67 && raw.len() != 16 {
+                    if id == 0x6e67 && payload.len() != 16 {
                         return Err(Error::Invalid("chapter SegmentUUID length"));
                     }
                     if id == 0x465c {
                         self.attachment_bytes = self
                             .attachment_bytes
-                            .checked_add(raw.len())
+                            .checked_add(payload.len())
                             .ok_or(Error::Overflow)?;
                         if self.attachment_bytes > self.attachment_limit {
                             return Err(Error::Policy("attachment payload bytes"));
                         }
                     }
                     if utf8(id) || ascii(id) {
-                        self.text = Some(TextJob::new(
-                            self.raw.clone(),
-                            self.pending_range.clone(),
-                            ascii(id),
-                        )?);
-                        self.phase = Phase::Text;
+                        self.text =
+                            Some(TextCheck::new(raw, self.pending_range.clone(), ascii(id))?);
+                        *phase = Phase::Text;
                     } else {
                         let next = u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
                         self.nodes.as_mut_slice()[index].next = next;
-                        self.phase = Phase::Parse;
+                        *phase = Phase::Parse;
                     }
                 }
                 Phase::Text => match self
                     .text
                     .as_mut()
                     .required("missing metadata text job")?
-                    .step(work, cancel)?
+                    .step(raw, work, cancel)?
                 {
                     ParseStep::Event(_) => {
                         self.text = None;
                         let next = u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
                         self.nodes.as_mut_slice()[usize::from(self.pending_index)].next = next;
-                        self.phase = Phase::Parse;
+                        *phase = Phase::Parse;
                     }
                     other => return crate::matroska::typed::pending(other),
                 },
@@ -589,7 +606,7 @@ impl DocumentJob {
                     else {
                         return Err(Error::Invalid("missing metadata parse frame"));
                     };
-                    match cursor.step(&self.raw, work, cancel) {
+                    match cursor.step(raw, work, cancel) {
                         Err(Error::Invalid("unknown size inside metadata")) => {
                             return Err(Error::Invalid("unknown metadata child size"));
                         }
@@ -606,7 +623,7 @@ impl DocumentJob {
                             self.stack_len -= 1;
                             self.stack[self.stack_len] = None;
                             if self.stack_len == 0 {
-                                self.phase = Phase::ValidateStart;
+                                *phase = Phase::ValidateStart;
                             }
                         }
                         Ok(ParseStep::Event(Some(child))) => {
@@ -617,7 +634,7 @@ impl DocumentJob {
                                 parent: *node,
                             });
                             self.pending_range = child.payload;
-                            self.phase = Phase::NodeReserve;
+                            *phase = Phase::NodeReserve;
                         }
                         _ => return Err(Error::Invalid("invalid metadata parse transition")),
                     }
@@ -625,7 +642,7 @@ impl DocumentJob {
                 Phase::ValidateStart => {
                     if self.validate == self.nodes.len() {
                         self.uid_at = 0;
-                        self.phase = if self.uid_count == 0 {
+                        *phase = if self.uid_count == 0 {
                             Phase::Finish
                         } else {
                             Phase::UidReserve
@@ -661,7 +678,7 @@ impl DocumentJob {
                     self.fields = Fields::default();
                     self.child = self.validate + 1;
                     self.child_end = usize::from(self.nodes.as_slice()[self.validate].next);
-                    self.phase = Phase::ValidateChildren;
+                    *phase = Phase::ValidateChildren;
                 }
                 Phase::ValidateChildren => {
                     // One charged visit and one cancellation check per child, as
@@ -679,7 +696,7 @@ impl DocumentJob {
                             self.fields = fields;
                             return Ok(ParseStep::Yield);
                         }
-                        let result = self.collect(singletons, self.child, &mut fields);
+                        let result = self.collect(raw, singletons, self.child, &mut fields);
                         self.fields = fields;
                         result?;
                         self.child = usize::from(self.nodes.as_slice()[self.child].next);
@@ -687,7 +704,7 @@ impl DocumentJob {
                     if !first {
                         check(cancel)?;
                     }
-                    self.phase = Phase::ValidateRules;
+                    *phase = Phase::ValidateRules;
                 }
                 Phase::ValidateRules => {
                     if !work.try_charge(1) {
@@ -735,9 +752,10 @@ impl DocumentJob {
                         && usize::from(self.nodes.as_slice()[self.validate].next)
                             > self.validate + 1
                     {
-                        self.phase = Phase::ValidateContext;
+                        *phase = Phase::ValidateContext;
                     } else {
-                        self.next_validation();
+                        self.validate += 1;
+                        *phase = Phase::ValidateStart;
                     }
                 }
                 Phase::ValidateContext => {
@@ -765,7 +783,8 @@ impl DocumentJob {
                         ordered,
                     });
                     self.stack_len += 1;
-                    self.next_validation();
+                    self.validate += 1;
+                    *phase = Phase::ValidateStart;
                 }
                 Phase::UidReserve => {
                     if !work.try_charge(1) {
@@ -789,7 +808,7 @@ impl DocumentJob {
                     // order; absent kinds need no second walk of every node.
                     self.uid_kind = self.uid_kinds.trailing_zeros() as usize;
                     self.uid_at = 0;
-                    self.phase = Phase::UidFill;
+                    *phase = Phase::UidFill;
                 }
                 Phase::UidFill => {
                     // One charged visit and one cancellation check per node, as
@@ -805,7 +824,7 @@ impl DocumentJob {
                             return Ok(ParseStep::Yield);
                         }
                         if u64::from(self.nodes.as_slice()[self.uid_at].id) == kind {
-                            let value = self.uint(self.uid_at)?;
+                            let value = self.uint(raw, self.uid_at)?;
                             self.uids.try_push(value).map_err(|e| e.error)?;
                         }
                         self.uid_at += 1;
@@ -814,7 +833,7 @@ impl DocumentJob {
                         check(cancel)?;
                     }
                     self.heap = Some(Heap::new(self.uids.len()));
-                    self.phase = Phase::UidSort;
+                    *phase = Phase::UidSort;
                 }
                 Phase::UidSort => {
                     if !self.heap.as_mut().required("missing UID sort job")?.step(
@@ -825,7 +844,7 @@ impl DocumentJob {
                         return Ok(ParseStep::Yield);
                     }
                     self.uid_at = 0;
-                    self.phase = Phase::UidCheck;
+                    *phase = Phase::UidCheck;
                 }
                 Phase::UidCheck => {
                     if self.uid_at + 1 >= self.uids.len() {
@@ -833,13 +852,13 @@ impl DocumentJob {
                         if self.uid_kinds == 0 {
                             self.uids = BudgetVec::new(&self.pool);
                             self.heap = None;
-                            self.phase = Phase::Finish;
+                            *phase = Phase::Finish;
                         } else {
                             self.uid_kind = self.uid_kinds.trailing_zeros() as usize;
                             self.uid_at = 0;
                             self.uids.clear();
                             self.heap = None;
-                            self.phase = Phase::UidFill;
+                            *phase = Phase::UidFill;
                         }
                         continue;
                     }
@@ -869,7 +888,7 @@ impl DocumentJob {
                         owner_charge: charge,
                     };
                     self.result = Some(SharedDocument(Arc::new(document)));
-                    self.phase = Phase::Done;
+                    *phase = Phase::Done;
                 }
                 Phase::Done => {
                     return Ok(ParseStep::Event(
@@ -918,19 +937,32 @@ impl Heap {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
+        // The phase stays local while the sort runs and is stored on every return.
+        let mut phase = self.phase;
+        let result = self.run(&mut phase, values, work, cancel);
+        self.phase = phase;
+        result
+    }
+    fn run(
+        &mut self,
+        phase: &mut HeapPhase,
+        values: &mut [u64],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
         loop {
             check(cancel)?;
-            match self.phase {
+            match *phase {
                 HeapPhase::Build => {
                     if self.build == 0 {
-                        self.phase = HeapPhase::Extract;
+                        *phase = HeapPhase::Extract;
                         continue;
                     }
                     if !work.try_charge(1) {
                         return Ok(false);
                     }
                     self.build -= 1;
-                    self.phase = HeapPhase::Sift {
+                    *phase = HeapPhase::Sift {
                         root: self.build,
                         end: values.len(),
                         building: true,
@@ -946,7 +978,7 @@ impl Heap {
                         .and_then(|n| n.checked_add(1))
                         .ok_or(Error::Overflow)?;
                     if left >= end {
-                        self.phase = if building {
+                        *phase = if building {
                             HeapPhase::Build
                         } else {
                             HeapPhase::Extract
@@ -963,13 +995,13 @@ impl Heap {
                     };
                     if values[child] > values[root] {
                         values.swap(root, child);
-                        self.phase = HeapPhase::Sift {
+                        *phase = HeapPhase::Sift {
                             root: child,
                             end,
                             building,
                         };
                     } else {
-                        self.phase = if building {
+                        *phase = if building {
                             HeapPhase::Build
                         } else {
                             HeapPhase::Extract
@@ -978,7 +1010,7 @@ impl Heap {
                 }
                 HeapPhase::Extract => {
                     if self.end <= 1 {
-                        self.phase = HeapPhase::Done;
+                        *phase = HeapPhase::Done;
                         continue;
                     }
                     if !work.try_charge(1) {
@@ -986,7 +1018,7 @@ impl Heap {
                     }
                     self.end -= 1;
                     values.swap(0, self.end);
-                    self.phase = HeapPhase::Sift {
+                    *phase = HeapPhase::Sift {
                         root: 0,
                         end: self.end,
                         building: false,
@@ -1392,7 +1424,6 @@ crate::matroska::typed::usage::storage!(DocumentJob, |s| [
     s.owner,
     s.growth.as_ref().map(|(buffer, _)| buffer),
     s.uids,
-    s.text,
     s.result
 ]);
 crate::matroska::typed::usage::storage!(CataloguePrepareJob, |s| [

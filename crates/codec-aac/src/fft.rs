@@ -1,6 +1,9 @@
 //! Complex FFT, DCT-IV and (I)MDCT built on it. Own derivation (see unit tests that compare
 //! against the direct O(N^2) definitions).
 
+#[cfg(feature = "simd")]
+mod simd;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct Cpx {
     pub re: f32,
@@ -131,40 +134,56 @@ impl Fft {
     /// The radix-4 stages after the first (twiddle-free) one.
     fn middle(&self, re: &mut [f32], im: &mut [f32]) {
         for st in &self.stages {
-            if st.h == 4 {
-                // one 4-lane vector per quarter: fixed-size blocks so the lanes vectorise
-                let w: [[f32; 4]; 6] = std::array::from_fn(|t| st.w[t][..4].try_into().unwrap());
-                for (br, bi) in re.chunks_exact_mut(16).zip(im.chunks_exact_mut(16)) {
-                    let br: &mut [f32; 16] = br.try_into().unwrap();
-                    let bi: &mut [f32; 16] = bi.try_into().unwrap();
-                    for k in 0..4 {
-                        radix4(
-                            br,
-                            bi,
-                            [k, 4 + k, 8 + k, 12 + k],
-                            [w[0][k], w[1][k], w[2][k], w[3][k], w[4][k], w[5][k]],
-                        );
-                    }
-                }
-                continue;
-            }
-            let h = st.h;
-            for (br, bi) in re.chunks_exact_mut(4 * h).zip(im.chunks_exact_mut(4 * h)) {
-                let (r01, r23) = br.split_at_mut(2 * h);
-                let (r0, r1) = r01.split_at_mut(h);
-                let (r2, r3) = r23.split_at_mut(h);
-                let (i01, i23) = bi.split_at_mut(2 * h);
-                let (i0, i1) = i01.split_at_mut(h);
-                let (i2, i3) = i23.split_at_mut(h);
-                radix4_block(r0, r1, r2, r3, i0, i1, i2, i3, &st.w);
+            #[cfg(feature = "simd")]
+            simd::stage(re, im, st.h, &st.w);
+            #[cfg(not(feature = "simd"))]
+            stage(re, im, st.h, &st.w);
+        }
+    }
+}
+
+/// One radix-4 stage with quarters of `h` points: the butterflies of each group of `4h`
+/// points.
+#[cfg_attr(
+    feature = "simd",
+    allow(dead_code, reason = "the scalar form, tested against the kernel")
+)]
+fn stage(re: &mut [f32], im: &mut [f32], h: usize, w: &[Vec<f32>; 6]) {
+    if h == 4 {
+        // one 4-lane vector per quarter: fixed-size blocks so the lanes vectorise
+        let w: [[f32; 4]; 6] = std::array::from_fn(|t| w[t][..4].try_into().unwrap());
+        for (br, bi) in re.chunks_exact_mut(16).zip(im.chunks_exact_mut(16)) {
+            let br: &mut [f32; 16] = br.try_into().unwrap();
+            let bi: &mut [f32; 16] = bi.try_into().unwrap();
+            for k in 0..4 {
+                radix4(
+                    br,
+                    bi,
+                    [k, 4 + k, 8 + k, 12 + k],
+                    [w[0][k], w[1][k], w[2][k], w[3][k], w[4][k], w[5][k]],
+                );
             }
         }
+        return;
+    }
+    for (br, bi) in re.chunks_exact_mut(4 * h).zip(im.chunks_exact_mut(4 * h)) {
+        let (r01, r23) = br.split_at_mut(2 * h);
+        let (r0, r1) = r01.split_at_mut(h);
+        let (r2, r3) = r23.split_at_mut(h);
+        let (i01, i23) = bi.split_at_mut(2 * h);
+        let (i0, i1) = i01.split_at_mut(h);
+        let (i2, i3) = i23.split_at_mut(h);
+        radix4_block(r0, r1, r2, r3, i0, i1, i2, i3, w);
     }
 }
 
 /// h radix-4 butterflies between the quarters `r`/`i` (each of length h). A separate,
 /// non-inlined function: its `&mut` arguments are known not to alias, so the loop
 /// vectorises without runtime overlap checks.
+#[cfg_attr(
+    feature = "simd",
+    allow(dead_code, reason = "the scalar form, tested against the kernel")
+)]
 #[inline(never)]
 // separate slice arguments are the point: each gets its own no-alias guarantee
 #[allow(clippy::too_many_arguments)]
@@ -221,6 +240,10 @@ fn radix4_block(
 
 /// One radix-4 butterfly on positions `p` (quarters 0..3) with twiddles [W^k, W^2k, W^3k]
 /// as (re, im) pairs. Same arithmetic as the general stage loop.
+#[cfg_attr(
+    feature = "simd",
+    allow(dead_code, reason = "the scalar form, tested against the kernel")
+)]
 #[inline(always)]
 fn radix4(r: &mut [f32; 16], i: &mut [f32; 16], p: [usize; 4], w: [f32; 6]) {
     let (t0r, t0i) = (r[p[0]], i[p[0]]);
@@ -259,6 +282,10 @@ fn blocks_mut(s: &mut [f32], n: usize) -> &mut [[f32; 4]] {
 // immediate offsets; a block is also one vector on targets with float vectors.
 
 /// DCT-IV pre-twiddle: (x[2n] + i x[m - 1 - 2n]) * pre[n].
+#[cfg_attr(
+    feature = "simd",
+    allow(dead_code, reason = "the scalar form, tested against the kernel")
+)]
 #[inline(never)]
 fn pre(x: &[f32], pr: &[f32], pi: &[f32], tr: &mut [f32], ti: &mut [f32]) {
     let h = tr.len();
@@ -281,6 +308,10 @@ fn pre(x: &[f32], pr: &[f32], pi: &[f32], tr: &mut [f32], ti: &mut [f32]) {
 }
 
 /// DCT-IV post-twiddle: ye = Re(z q), yo = -Im(z q).
+#[cfg_attr(
+    feature = "simd",
+    allow(dead_code, reason = "the scalar form, tested against the kernel")
+)]
 #[inline(never)]
 fn post(re: &[f32], im: &[f32], qr: &[f32], qi: &[f32], ye: &mut [f32], yo: &mut [f32]) {
     let h = re.len();
@@ -297,6 +328,10 @@ fn post(re: &[f32], im: &[f32], qr: &[f32], qi: &[f32], ye: &mut [f32], yo: &mut
 
 /// Last radix-2 FFT stage (z = lo +/- w hi) fused with the DCT-IV post-twiddle of both
 /// halves. Non-inlined so the non-aliasing arguments let the loop vectorise.
+#[cfg_attr(
+    feature = "simd",
+    allow(dead_code, reason = "the scalar form, tested against the kernel")
+)]
 #[inline(never)]
 // separate slice arguments are the point: each gets its own no-alias guarantee
 #[allow(clippy::too_many_arguments)]
@@ -420,6 +455,9 @@ impl Dct4 {
         let x = &x[..m];
         let (pr, pi) = (&self.pre[0][..h], &self.pre[1][..h]);
         let (tr, ti) = (&mut self.tr[..h], &mut self.ti[..h]);
+        #[cfg(feature = "simd")]
+        simd::pre(x, pr, pi, tr, ti);
+        #[cfg(not(feature = "simd"))]
         pre(x, pr, pi, tr, ti);
         let (re, im) = (&mut self.re[..h], &mut self.im[..h]);
         for ((r4, i4), s4) in re
@@ -444,8 +482,14 @@ impl Dct4 {
             let (im0, im1) = im.split_at(q);
             let (ye0, ye1) = ye.split_at_mut(q);
             let (yo0, yo1) = yo.split_at_mut(q);
+            #[cfg(feature = "simd")]
+            simd::last_post(re0, re1, im0, im1, wr, wi, qr, qi, ye0, ye1, yo0, yo1);
+            #[cfg(not(feature = "simd"))]
             last_post(re0, re1, im0, im1, wr, wi, qr, qi, ye0, ye1, yo0, yo1);
         } else {
+            #[cfg(feature = "simd")]
+            simd::post(re, im, qr, qi, ye, yo);
+            #[cfg(not(feature = "simd"))]
             post(re, im, qr, qi, ye, yo);
         }
     }

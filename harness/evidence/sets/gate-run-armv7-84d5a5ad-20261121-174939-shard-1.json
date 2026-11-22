@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-armv7-84d5a5ad-20261121-174939-shard-1",
+ "path": "gate-run-armv7-84d5a5ad-20261121-174939-shard-1",
+ "retention": "retained",
+ "reason": "Picture seek comparisons on 32-bit ARMv7 with 30 timing and 30 kernel-bound memory pairs per case.",
+ "key": "evidence/gate-runs/84d5a5ad6749e4d88a9312eac0cd5403ced7ba5f-armv7-20261121-174939/shard-1/0c20e7b6aa91047f3d1e55be2d929271870e76a8d03b5c96c09b805247ba0646.tar.zst",
+ "sha256": "0c20e7b6aa91047f3d1e55be2d929271870e76a8d03b5c96c09b805247ba0646",
+ "bytes": 6418714,
+ "results": [
+  {
+   "path": "memory/mpegts-previous-picture/gate-result.json",
+   "command": "report --memory",
+   "key": "7507252845fa320a73a07be2d42f4153cc4c7612d04c3fe25c165038d0b31f4e",
+   "status": 0,
+   "report_sha256": "3ed8ed36b1ecb3fb5ce3ace9ec90eed0c18c284fccaa9c04a4e9733a52201ea1",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-previous-picture/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b5500792cebde996bde1ba9b26511d72b6167041dc31f68f8f1e95f9a51c001b",
+   "status": 0,
+   "report_sha256": "c11a869f5fded2c940a08f832a1fba9e29b46d41dae0d05b2afcff7391112bcb",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-previous-picture/gate-result.json",
+   "command": "grade",
+   "key": "2647df2c9f222bd8e0e6973bb907db2d301a734a846795ebb5e19786b666a57c",
+   "status": 0,
+   "report_sha256": "8538b809915c31044225856a79f06b2c18ac8a13516a5d79ee931ed50bf68e76"
+  }
+ ]
+}

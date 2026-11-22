@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-aarch64-a86ead25-20261121-192148-shard-1",
+ "path": "gate-run-aarch64-a86ead25-20261121-192148-shard-1",
+ "retention": "retained",
+ "reason": "ATSC E-AC-3 grouping and retained transport comparisons on Linux AArch64.",
+ "key": "evidence/gate-runs/a86ead25a0e7be2259efb50e8c5f396678d73ecd-aarch64-20261121-192148/shard-1/a47599f16b15164ee2121f69ffca427b5d1ac2fd1ce7834c8d9c1187bfb2a80e.tar.zst",
+ "sha256": "a47599f16b15164ee2121f69ffca427b5d1ac2fd1ce7834c8d9c1187bfb2a80e",
+ "bytes": 1852582,
+ "results": [
+  {
+   "path": "memory/mpegts-atsc-eac3-six-block/gate-result.json",
+   "command": "report --memory",
+   "key": "ef8281dbf8957a3a0fec322bc9c7bda359b96b15bd971477a7cec549c3447c64",
+   "status": 0,
+   "report_sha256": "546f17f6890d820dad85c4c34ac3de573516aa24a3b5e114fe4546cc844e25e1",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-atsc-eac3-six-block/gate-result.json",
+   "command": "report --benchmark",
+   "key": "10c5b818212474b20f3a03f095c7261c5888b96ef4966ce6e4ab3da388158c78",
+   "status": 0,
+   "report_sha256": "d881270aa6f113c522c23dfa24e316f22fe23418749e51a0dcc47b0e5bc8f6d0",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-atsc-eac3-six-block/gate-result.json",
+   "command": "grade",
+   "key": "0ae7e509f87c149312336d5880412b2cb4775af377abc6ea94247999fa560ee3",
+   "status": 0,
+   "report_sha256": "18741f79e060496c691dafe4876cba4e37e7abcd5c6f3bda0129008d1e9f585b"
+  }
+ ]
+}

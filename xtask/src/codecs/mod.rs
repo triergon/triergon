@@ -19,6 +19,8 @@ use std::path::{Path, PathBuf};
 
 use crate::json::Value;
 
+pub(crate) const INITIALIZED_AAC_REFERENCE: &str = "ffmpeg-aac-initialized-pcm";
+
 pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
   aac-access-units --out DIR [--record]
@@ -127,6 +129,19 @@ impl Gate<'_> {
         )?;
         crate::harness::reuse::step(repository, self.out, &key, full, || run().map(|()| 0))
     }
+}
+
+/// Keep the default key compatible with existing results. Full pair collections
+/// have a distinct key because an early collection may have fewer observations.
+fn collection_settings<'a>(
+    members: impl IntoIterator<Item = (&'a str, Value)>,
+    early_stop: bool,
+) -> Value {
+    Value::object(
+        members
+            .into_iter()
+            .chain((!early_stop).then_some(("early_stop", Value::Bool(false)))),
+    )
 }
 
 /// The candidate worker of each operation: `--candidate W` (`--codec-worker W` for a
@@ -509,19 +524,22 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 part: a.get("part").map(crate::gate::parse_part).transpose()?,
                 early_stop: a.get("no-early-stop").is_none(),
             };
-            let settings = Value::object([
-                ("pairs", Value::int(options.pairs as i64)),
-                ("part", a.get("part").map_or(Value::Null, Value::str)),
-                ("seed", Value::int(options.seed)),
-                (
-                    "only",
-                    options.only.as_deref().map_or(Value::Null, Value::str),
-                ),
-                (
-                    "kernel_bound",
-                    std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
-                ),
-            ]);
+            let settings = collection_settings(
+                [
+                    ("pairs", Value::int(options.pairs as i64)),
+                    ("part", a.get("part").map_or(Value::Null, Value::str)),
+                    ("seed", Value::int(options.seed)),
+                    (
+                        "only",
+                        options.only.as_deref().map_or(Value::Null, Value::str),
+                    ),
+                    (
+                        "kernel_bound",
+                        std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
+                    ),
+                ],
+                options.early_stop,
+            );
             let gate = Gate {
                 command: "codecs memory",
                 settings,
@@ -570,13 +588,16 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
                 early_stop: a.get("no-early-stop").is_none(),
             };
-            let settings = Value::object([
-                ("label", Value::str(&options.label)),
-                (
-                    "only",
-                    options.only.as_deref().map_or(Value::Null, Value::str),
-                ),
-            ]);
+            let settings = collection_settings(
+                [
+                    ("label", Value::str(&options.label)),
+                    (
+                        "only",
+                        options.only.as_deref().map_or(Value::Null, Value::str),
+                    ),
+                ],
+                options.early_stop,
+            );
             let gate = Gate {
                 command: "codecs time",
                 settings,
@@ -637,4 +658,21 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
         _ => return Err(USAGE.to_owned()),
     }
     Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn full_pair_settings_cannot_reuse_an_early_collection() {
+        let members = || [("pairs", Value::int(30))];
+        assert_eq!(
+            collection_settings(members(), true),
+            Value::object(members())
+        );
+        let full = collection_settings(members(), false);
+        assert_eq!(full.get("early_stop"), Some(&Value::Bool(false)));
+        assert_eq!(full.get("pairs"), Some(&Value::int(30)));
+    }
 }

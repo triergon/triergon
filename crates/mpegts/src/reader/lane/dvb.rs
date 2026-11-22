@@ -1,10 +1,9 @@
 //! DVB subtitle PES envelopes (EN 300 743, §§6.2 and 7.2).
-use super::{Piece, table_storage};
-use crate::reader::model::{PacketData, Shared};
-use crate::reader::{DvbSubtitleTailPolicy, DvbSubtitleUnit, PayloadSource};
-use crate::{Pes, PesSpan, TraceEvent};
+use super::{Piece, pes_storage::Storage};
+use crate::Pes;
+use crate::reader::{DvbSubtitleTailPolicy, DvbSubtitleUnit};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
+use triergon_core::{BudgetVec, Bytes, Error, Result, WorkBudget};
 
 const WRAPPER: [u8; 2] = [0x20, 0x00];
 const SEGMENT_SYNC: u8 = 0x0f;
@@ -228,40 +227,14 @@ impl Envelope {
         let size = self.complete_end - WRAPPER.len();
         let pool = pieces.budget();
         if self.storage.is_none() {
-            let minimum = Budget::control_storage_bytes()
-                .checked_add(table_storage(pieces)?)
-                .and_then(|n| n.checked_add(table_storage(&pes.header_source_ranges).ok()?))
-                .and_then(|n| n.checked_add(pes.spans().len().checked_mul(size_of::<PesSpan>())?))
-                .and_then(|n| n.checked_add(pes.header.retained_storage()))
-                .and_then(|n| n.checked_add(Shared::<TraceEvent>::allocation_bytes().ok()?))
-                .and_then(|n| n.checked_add(Shared::<PacketData>::allocation_bytes().ok()?))
-                .and_then(|n| n.checked_add(size_of::<PayloadSource>()))
-                .and_then(|n| {
-                    if contiguous {
-                        Some(n)
-                    } else {
-                        n.checked_add(size)?
-                            .checked_add(Bytes::owner_overhead_bytes())
-                    }
-                })
-                .ok_or(Error::Overflow)?;
-            self.storage = Some(Storage {
-                minimum,
-                span: 0,
-                prior: 0,
-            });
+            self.storage = Some(Storage::new(pes, pieces, (!contiguous).then_some(size))?);
             self.cursor = Cursor::default();
         }
         let storage = self.storage.as_mut().expect("DVB subtitle storage check");
         if !storage.step(pes, work, cancel)? {
             return Ok(None);
         }
-        if storage.minimum > pool.limit() {
-            return Err(Error::Limit {
-                requested: storage.minimum,
-                maximum: pool.limit(),
-            });
-        }
+        storage.check_limit(pool)?;
         if contiguous {
             if !work.try_charge(1) {
                 return Ok(None);
@@ -307,42 +280,5 @@ impl Envelope {
                 Err(error.error)
             }
         }
-    }
-}
-
-// Count each allocation pinned by this PES once, regardless of its slice count.
-// Other pool reservations can still cause retryable backpressure.
-struct Storage {
-    minimum: usize,
-    span: usize,
-    prior: usize,
-}
-
-impl Storage {
-    fn step(&mut self, pes: &Pes, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
-        while let Some(span) = pes.spans().get(self.span) {
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-            if !work.try_charge(1) {
-                return Ok(false);
-            }
-            let bytes = span.backing_bytes();
-            if self.prior == self.span {
-                self.minimum = self
-                    .minimum
-                    .checked_add(bytes.retained_storage_bytes())
-                    .ok_or(Error::Overflow)?;
-            } else if !pes.spans()[self.prior]
-                .backing_bytes()
-                .shares_storage_with(bytes)
-            {
-                self.prior += 1;
-                continue;
-            }
-            self.span += 1;
-            self.prior = 0;
-        }
-        Ok(true)
     }
 }

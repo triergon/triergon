@@ -4,9 +4,10 @@
 //! end of the source.
 //!
 //! TS188 uses `Engine::ts_native_program_v1` with every selection. M2TS192 starts
-//! through `NativeStartup::new_m2ts_prefix_v2`, which admits one registered
-//! carriage. Times are 90 kHz ticks of the native projection; the duration is the
-//! demuxer's raw 90 kHz duration and the flags its packet flags.
+//! through `NativeStartup::new_m2ts_prefix_v2`; a program selection shares its
+//! input context through `PreparedNative::into_program_player`.
+//! Times and durations use the demuxer's 90 kHz clock and flags come from its
+//! packet view.
 
 use crate::packet_fold::{Packet, Work, drive};
 use crate::runner::Result;
@@ -104,33 +105,41 @@ fn player(
         )?;
         Player::new(engine, source, Selection::All, PlayerPolicy::default())?
     } else {
-        let [
-            TsNativeTrackSelection {
-                pid,
-                carriage: TsNativeCarriage::Registered(carriage),
-            },
-        ] = selections
-        else {
-            return Err("M2TS192 admits one registered carriage".into());
-        };
         let mut startup = NativeStartup::new_m2ts_prefix_v2(SelectedInput {
             input,
             source,
             format: Format::Ts(format),
         })?;
         while startup.advance(&mut WorkBudget::new(WORK), &cancel)? != StartupStep::Ready {}
-        let native = TsNativeSelection {
-            pid: *pid,
-            carriage: *carriage,
-        };
-        startup.finish()?.into_player(
-            PROGRAM,
-            limits,
-            policy,
-            native,
-            Selection::All,
-            PlayerPolicy::default(),
-        )?
+        let prepared = startup.finish()?;
+        if let [
+            TsNativeTrackSelection {
+                pid,
+                carriage: TsNativeCarriage::Registered(carriage),
+            },
+        ] = selections
+        {
+            prepared.into_player(
+                PROGRAM,
+                limits,
+                policy,
+                TsNativeSelection {
+                    pid: *pid,
+                    carriage: *carriage,
+                },
+                Selection::All,
+                PlayerPolicy::default(),
+            )?
+        } else {
+            prepared.into_program_player(
+                PROGRAM,
+                limits,
+                policy,
+                NAMESPACE,
+                selections,
+                PlayerPolicy::default(),
+            )?
+        }
     };
     player.set_clock_view(ClockChoice::ExplicitNativeProjection)?;
     Ok(player)

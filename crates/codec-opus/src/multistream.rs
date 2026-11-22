@@ -101,22 +101,31 @@ impl Mapping {
     ) {
         for (plane, &index) in planes.iter_mut().zip(&self.source) {
             if let Some((_, channel)) = self.locate(index).filter(|&(s, _)| s == stream) {
-                let out = &mut plane[..samples];
-                out.copy_from_slice(&pcm[channel][..samples]);
-                if let Some(gain) = self.gain {
-                    for v in out {
-                        *v *= gain;
-                    }
-                }
+                plane[..samples].copy_from_slice(&pcm[channel][..samples]);
             }
         }
     }
 
-    /// Silence the planes no stream feeds.
+    /// The stream and channel within it that each output plane takes, `None` for a
+    /// silent plane, in plane order.
+    pub(crate) fn sources(&self) -> impl Iterator<Item = Option<(usize, usize)>> + '_ {
+        self.source[..self.channels()]
+            .iter()
+            .map(|&index| self.locate(index))
+    }
+
+    /// Apply the output gain to the planes the streams fed, and silence the others.
     pub(crate) fn finish(&self, samples: usize, planes: &mut [Vec<f32>]) {
         for (plane, &index) in planes.iter_mut().zip(&self.source) {
-            if self.locate(index).is_none() {
-                plane[..samples].fill(0.0);
+            let plane = &mut plane[..samples];
+            match (self.locate(index), self.gain) {
+                (None, _) => plane.fill(0.0),
+                (Some(_), Some(gain)) => {
+                    for v in plane {
+                        *v *= gain;
+                    }
+                }
+                (Some(_), None) => {}
             }
         }
     }

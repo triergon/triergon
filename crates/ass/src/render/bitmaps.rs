@@ -240,7 +240,7 @@ impl Painter {
         };
         let raster = &mut self.raster;
         self.bitmaps
-            .get(raster, key, &outline.shape, None, at, work)
+            .get(raster, &key, &outline.shape, None, at, work)
             .map(Some)
     }
 
@@ -335,7 +335,7 @@ impl Painter {
         out: &mut BudgetVec<Combined>,
         work: &mut WorkBudget,
     ) -> Result<()> {
-        let drawn = self.drawn.as_slice();
+        let drawn = self.drawn.as_mut_slice();
         let Some(origin) = drawn
             .iter()
             .map(|d| d.bitmaps.origin())
@@ -355,11 +355,13 @@ impl Painter {
         let glyphs = &mut self.glyphs;
         glyphs.clear();
         glyphs.try_reserve_exact(drawn.len())?;
-        for glyph in drawn {
+        // The keys move to the composite's key: the glyphs' bitmaps are let
+        // go once the run is composited.
+        for glyph in drawn.iter_mut() {
             glyphs
                 .try_push(GlyphRef {
-                    fill: glyph.fill.clone(),
-                    border: glyph.border.clone(),
+                    fill: glyph.fill.take(),
+                    border: glyph.border.take(),
                     origin: in_run(glyph.bitmaps.origin()),
                     border_origin: in_run(glyph.bitmaps.border_origin()),
                 })
@@ -424,9 +426,7 @@ impl GlyphSource for CachedBitmaps<'_> {
             source: BitmapSource::Outline(self.glyph.clone()),
             transform: at.transform,
         };
-        let found = self
-            .bitmaps
-            .drawn(raster, key.clone(), shape, None, at, work)?;
+        let found = self.bitmaps.drawn(raster, &key, shape, None, at, work)?;
         self.fill = found.is_some().then_some(key);
         Ok(found)
     }
@@ -448,9 +448,7 @@ impl GlyphSource for CachedBitmaps<'_> {
             transform: at.transform,
         };
         let shape = &unit_box.shape;
-        let found = self
-            .bitmaps
-            .drawn(raster, key.clone(), shape, None, at, work)?;
+        let found = self.bitmaps.drawn(raster, &key, shape, None, at, work)?;
         self.border = found.is_some().then_some(key);
         Ok(found)
     }
@@ -476,7 +474,7 @@ impl GlyphSource for CachedBitmaps<'_> {
         let shape = &border.shape;
         let found = self
             .bitmaps
-            .drawn(raster, key.clone(), shape, Some(&border), at, work)?;
+            .drawn(raster, &key, shape, Some(&border), at, work)?;
         self.border = found.is_some().then_some(key);
         Ok(found)
     }
@@ -491,19 +489,20 @@ struct Bitmaps {
 
 impl Bitmaps {
     /// The bitmap of `shape` under `key`, placed at `at`: from the cache, or
-    /// drawn and kept with `drawn_from`. A shape that draws nothing gives a
-    /// bitmap without pixels, which is kept too, as libass keeps it.
+    /// drawn and kept with `drawn_from` under a copy of `key`. A shape that
+    /// draws nothing gives a bitmap without pixels, which is kept too, as
+    /// libass keeps it.
     fn get(
         &mut self,
         raster: &mut Raster,
-        key: BitmapKey,
+        key: &BitmapKey,
         shape: &Shape,
         drawn_from: Option<&KeptOutline>,
         at: Quantized,
         work: &mut WorkBudget,
     ) -> Result<PlacedBitmap<SharedBitmap>> {
         charge(work, LOOKUP_UNITS)?;
-        let kept = if let Some(kept) = self.cache.get(&key) {
+        let kept = if let Some(kept) = self.cache.get(key) {
             kept
         } else {
             let bitmap = match raster.draw(shape, &at.transform, work)? {
@@ -522,7 +521,7 @@ impl Bitmaps {
                 bitmap,
                 _drawn_from: drawn_from.cloned(),
             };
-            self.cache.insert(key, kept, size)?
+            self.cache.insert(key.clone(), kept, size)?
         };
         Ok(PlacedBitmap {
             bitmap: SharedBitmap(kept),
@@ -535,7 +534,7 @@ impl Bitmaps {
     fn drawn(
         &mut self,
         raster: &mut Raster,
-        key: BitmapKey,
+        key: &BitmapKey,
         shape: &Shape,
         drawn_from: Option<&KeptOutline>,
         at: Quantized,
