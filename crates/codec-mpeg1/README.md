@@ -54,8 +54,10 @@ charges a caller's `Budget`.
 - `Encoder::new` refuses `gop == 0` (`Error::Gop`), a zero `bit_rate` or a `max_rate`
   that is zero or above 104,856,800 bit/s, whose 400 bit/s units would reach 0x3FFFF,
   the sequence-header bit_rate that marks variable bit rate operation
-  (`Error::BitRate`, with the refused rate), and a `vbv_bits` that is zero or beyond
-  1023 units of 16 kbit (`Error::VbvBuffer`). Geometry limits (even, 2–4094) are
+  (`Error::BitRate`, with the refused rate), and a `vbv_bits` below one picture at the
+  average rate (`bit_rate` / 30) or beyond 1023 units of 16 kbit (`Error::VbvBuffer`):
+  every picture leaves the VBV whole (Annex C), so a smaller buffer cannot carry the
+  average rate. Geometry limits (even, 2–4094) are
   enforced by `Geometry::new`.
 - `encode` refuses a picture whose geometry differs from the configuration
   (`Error::PictureGeometry`) before changing any state. A successful encode replaces the contents of `out`.

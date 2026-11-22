@@ -38,6 +38,22 @@ fn a_max_rate_the_header_would_code_as_variable_bit_rate_is_refused() {
     assert_eq!(bit_rate, 0x3FFFE);
 }
 #[test]
+fn a_vbv_buffer_below_one_picture_at_the_average_rate_is_refused() {
+    // 2,500,000 bit/s at 30 Hz: pictures average 83,333⅓ bits.
+    let rate = |vbv_bits| {
+        Encoder::new(EncoderConfig {
+            bit_rate: 2_500_000,
+            max_rate: 3_500_000,
+            vbv_bits,
+            ..cfg()
+        })
+    };
+    for vbv_bits in [0, 1, 83_333] {
+        assert!(matches!(rate(vbv_bits), Err(Error::VbvBuffer(bits)) if bits == vbv_bits));
+    }
+    assert!(rate(83_334).is_ok());
+}
+#[test]
 fn mismatched_picture_returns_owner_unchanged_before_encoder_mutation() {
     let mut e = Encoder::new(cfg()).unwrap();
     let p = Picture::new(Geometry::new(32, 16).unwrap());

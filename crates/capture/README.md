@@ -90,8 +90,9 @@ elementary stream, identical per-frame PTS, DTS and PCR, valid continuity and th
 table cadence. The harness measures peak live heap and total resident peak RSS
 with the same input and checked output for each worker.
 The configuration cases exercise nondefault geometry, GOP, VBV and multiplex
-settings. PCR is carried on every picture. At 2.5 Mbit/s the capture session
-accepts a one-bit VBV setting that the reference refuses at encoder open.
+settings. PCR is carried on every picture. A VBV buffer below one picture at the
+average rate (`bit_rate` / 30) is refused at open (`CaptureError::Encoder`), as the
+reference refuses it.
 
 `tests/session.rs` covers the start sequence and timing, keepalive, sink failure,
 bottom-up input, geometry and rate extremes, and error mapping.

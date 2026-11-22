@@ -46,8 +46,10 @@ pub struct EncoderConfig {
     /// bit_rate, rounded up to 400 bit/s units; 1 to 104,856,800 (the field's next
     /// value marks a variable bit rate stream).
     pub max_rate: u32,
-    /// VBV buffer size in bits, signalled rounded up to 16,384-bit units; 1 to
-    /// 16,760,832 (1023 units).
+    /// VBV buffer size in bits, signalled rounded up to 16,384-bit units; from one
+    /// picture at the average rate (`bit_rate` / 30: no picture can be larger than
+    /// the buffer, so a smaller one cannot carry the average rate) to 16,760,832
+    /// (1023 units).
     pub vbv_bits: u32,
     /// Intra period: an I picture at least every `gop` pictures; nonzero.
     pub gop: u32,
@@ -264,7 +266,11 @@ fn validate(cfg: &EncoderConfig) -> Result<()> {
     if cfg.max_rate == 0 || cfg.max_rate.div_ceil(400) >= syntax::VARIABLE_BIT_RATE {
         return Err(Error::BitRate(cfg.max_rate));
     }
-    if cfg.vbv_bits == 0 || cfg.vbv_bits.div_ceil(16384) > 1023 {
+    // Each picture leaves the VBV whole at its decode time (Annex C), so pictures
+    // averaging bit_rate / 30 bits need a buffer of at least that.
+    if u64::from(cfg.vbv_bits) * (FPS as u64) < u64::from(cfg.bit_rate)
+        || cfg.vbv_bits.div_ceil(16384) > 1023
+    {
         return Err(Error::VbvBuffer(cfg.vbv_bits));
     }
     Ok(())

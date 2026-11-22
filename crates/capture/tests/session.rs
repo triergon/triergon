@@ -174,6 +174,18 @@ fn invalid_requests_are_explicit_errors() {
 }
 
 #[test]
+fn a_vbv_buffer_too_small_for_the_average_rate_is_refused_at_open() {
+    let mut c = SessionConfig::with_rate_rule(16, 16, 2_500_000);
+    c.vbv_bits = 1;
+    assert_eq!(
+        Session::open(&c).unwrap_err(),
+        CaptureError::Encoder(mpeg1::Error::VbvBuffer(1))
+    );
+    c.vbv_bits = 83_334;
+    assert!(Session::open(&c).is_ok());
+}
+
+#[test]
 fn the_rate_rule_saturates_a_rate_beyond_the_encoder() {
     let cfg = SessionConfig::with_rate_rule(64, 48, u32::MAX);
     assert_eq!(cfg.max_rate, u32::MAX);

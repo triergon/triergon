@@ -194,10 +194,20 @@ fn censored_and_measured_pictures_debit_the_same_bits_and_underflow() {
 
 #[test]
 fn an_intra_picture_under_the_vbv_guard_underflows_and_keeps_the_seeded_model() {
-    let mut e = encoder(1);
+    // 200 bits hold two pictures at the average 3 kbit/s, but no 64×64 I picture:
+    // its headers and DC-only macroblocks alone are larger.
+    let geometry = Geometry::new(64, 64).unwrap();
+    let mut e = Encoder::new(EncoderConfig {
+        geometry,
+        bit_rate: 3_000,
+        max_rate: 4_200,
+        vbv_bits: 200,
+        gop: 30,
+    })
+    .unwrap();
     e.rc.seed_intra(0.0, 800.0, 4, 1.0);
     let model = e.rc.alpha_i;
-    let mut input = Picture::new(e.cfg.geometry);
+    let mut input = Picture::new(geometry);
     for (i, p) in input.y_mut().iter_mut().enumerate() {
         *p = ((i * 137) % 256) as u8;
     }
@@ -207,7 +217,7 @@ fn an_intra_picture_under_the_vbv_guard_underflows_and_keeps_the_seeded_model() 
     assert_eq!(picture.bits, output.len() * 8);
     assert!(e.vbv_underflow_bits() > 0.0);
     assert_eq!(e.rc.alpha_i, model);
-    assert_eq!(e.rc.bank, 1000.0 - picture.bits as f64);
+    assert_eq!(e.rc.bank, 100.0 - picture.bits as f64);
 }
 
 #[test]
