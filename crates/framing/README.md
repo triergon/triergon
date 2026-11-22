@@ -176,6 +176,11 @@ CARGO_INCREMENTAL=0 TRIERGON_VVC_FATE=/path/to/vvc TRIERGON_VVC_FFPROBE=/path/to
   cargo test -p triergon-framing --test vvc original_fate_vvc_packet_comparison -- --ignored --nocapture
 ```
 
+The [whole-stream comparison](../../harness/features/vvc-access-units/contract.json)
+uses the public parser from the pinned decoder reference. It reads the original
+inputs through the compatibility API and compares the offset, length and bytes
+of every access unit through EOF. The native gate item is `vvc-access-units`.
+
 The test pins each source SHA-256 and uses FFprobe 9.0.2. Native runtime and
 memory qualification remain open.
 
