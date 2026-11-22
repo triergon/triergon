@@ -123,6 +123,14 @@ limit becomes an explicit, reviewed rule for that case.
   every listed case still fails and every other case passes, and refuse a listed case
   that passes. A module stays unaccepted while any case of a gating feature is listed;
   additional-coverage features (`shape-text`, `shape-text-all`) do not block it.
+- **Registered decoder refusals.** A prefix comparison can register unsupported
+  inputs under `open_refusals` with a specification clause, the first typed
+  unsupported detail, and each case's input hash and exact candidate fold up to
+  the refusal. The report checks these values and requires a complete reference
+  fold that equals its pin and differs from the candidate fold. When a case
+  lists `reference_pin_targets` for a host-dependent fold, the report still
+  verifies the candidate refusal and reference completion on other targets,
+  and marks the reference fold unpinned and ineligible for gate acceptance.
 - **Bounds.** `grade` fails on a case whose runtime bound is above the ceiling, whose
   heap or total RSS bound is not below 1, or whose measurement is not valid. A contract
   may list `open_bounds` (`bound`, `cases`, measured `cause`, optional `targets`); such
