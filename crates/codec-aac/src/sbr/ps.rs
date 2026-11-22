@@ -47,7 +47,8 @@
 //!   t12, t17..t19).
 //! - A frame with an invalid value, a decreasing border, a reserved mode or more data than
 //!   its extension holds outputs the mono signal on both channels, keeps the signal state
-//!   and resets the values; PS stays off until the next header (t08, t09, t11, t20, t21).
+//!   and resets the values, IPD/OPD to index 0 with the last extension's enable bit kept;
+//!   PS stays off until the next header (t08, t09, t11, t20, t21, o41, o42).
 //! - A frame whose configuration differs from that of the frame read before it converts
 //!   its start matrices to the new layout, restarts the decorrelator and resets the
 //!   IPD/OPD smoothing history; a frame without PS after it does so again (t13, t14,
@@ -670,7 +671,8 @@ impl Ps {
         }
     }
 
-    /// An error frame: mono output, values reset, PS off until the next header.
+    /// An error frame: mono output, values reset (IPD/OPD to index 0 with their enable bit
+    /// kept, o41, o42), PS off until the next header.
     fn fault(&mut self, fault: Option<Fault>) {
         match fault {
             Some(Fault::Read(n)) => {
@@ -686,6 +688,8 @@ impl Ps {
         }
         self.last_iid = [0; MAX_PAR];
         self.last_icc = [0; MAX_PAR];
+        self.last_ipd = [[0; 17]; 2];
+        self.phase = [[[0; MAX_PAR]; 2]; MAX_ENV];
         self.active = false;
         self.status = Status::Mono;
     }

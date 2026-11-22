@@ -181,19 +181,19 @@ a frame that overran its extension.
   dropped as well, with and without PS. o00 (the stream: 8.4e-5 to 8.9e-9), o31 (ICC 4
   and 7 at 1.1e-8; FIXVAR before the frame, v1 and v2), o32 (random streams). Only
   kx = 32 is probed.
+- **IPD/OPD after an error frame.** An error frame resets the IPD/OPD values to index 0
+  and keeps the last extension's enable bit. A header without the extension after it runs
+  IPD/OPD index 0 (o41: bit-identical to an extension with the enable bit 1 and every
+  index 0, 7.2e-3 from one with the bit 0), and a time-differential IPD/OPD envelope after
+  it reads index 0 (o42: bit-identical to the same values coded frequency-differentially;
+  against the values before the error 1.3e-2). This path's stream is
+  `ps-open-noext-after-error` of [../ps-open-manifest.json](../ps-open-manifest.json).
 
-The crafted streams of these paths are vectors of the aac lane
+The crafted streams of the other paths are vectors of the aac lane
 ([../correctness-manifest.json](../../correctness-manifest.json), files in `vectors/`).
 
 ## Not recovered
 
-- A header without the PS extension after an error frame, while IPD/OPD was on
-  (`ps-open-noext-after-error`): 8.9e-3 rms in that frame and more in the next. The
-  decoder keeps the last extension's enable bit and its IPD/OPD values. The reference's
-  output there is bit-identical to an extension with the enable bit 1 and every index 0
-  (o41). It differs from one with the enable bit 0 by 7.2e-3. Without the error frame, or
-  with an extension in that frame, the decoder matches. Whether the error frame or the
-  missing extension resets the values is not separated.
 - A time-differential IID envelope after a frame with more envelopes and fewer coded bands
   (`ps-open-dt-envelope-reference`, from a random stream; 7.4e-3 rms, and the composed model
   misses the same way). In the hand-built shape of o41 the frames are:
@@ -225,4 +225,5 @@ The crafted streams of these paths are vectors of the aac lane
   one shape of it; the others are not reduced.
 
 The crafted streams of these cases are the open cases of
-[../ps-open-manifest.json](../ps-open-manifest.json) (files in `open/`).
+[../ps-open-manifest.json](../ps-open-manifest.json) (files in `open/`); a stream whose
+path is recovered stays there as a vector.

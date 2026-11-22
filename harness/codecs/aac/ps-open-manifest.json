@@ -31,7 +31,6 @@
   }
  ],
  "open_cases": [
-  "ps-open-noext-after-error.adts",
   "ps-open-dt-envelope-reference.adts",
   "ps-open-sbr-after-missing.adts",
   "ps-open-sbr-truncated.adts"

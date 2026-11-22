@@ -65,9 +65,6 @@ fn disposition(key: &str) -> Option<&'static str> {
         "aac-sce-in-stereo.adts" => {
             "FFmpeg leaves the FR plane of SCE-only frames unwritten (stale pooled buffer); ours is silent there (harness/codecs/STATUS.md)"
         }
-        "ps-open-noext-after-error.adts" => {
-            "a Parametric Stereo header without the extension after an error frame while IPD/OPD was on; FFmpeg's output equals IPD/OPD indices 0 there (harness/codecs/aac/ps/README.md)"
-        }
         "ps-open-dt-envelope-reference.adts" => {
             "a time-differential IID envelope after a 4-envelope 10-band frame; FFmpeg's reference values differ from this decoder's above the 10 coded bands (harness/codecs/aac/ps/README.md)"
         }
@@ -754,7 +751,7 @@ mod tests {
 
     #[test]
     fn strict_video_summary_requires_the_registered_result() {
-        let dir = crate::walk::scratch("summary-video");
+        let dir = crate::files::scratch("summary-video");
         fs::create_dir_all(&dir).unwrap();
         let run = dir.join("run.jsonl");
         let out = dir.join("summary.json");

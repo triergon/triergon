@@ -137,8 +137,8 @@
       "harness/codecs/gate-lanes.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 99, "thumbv7neon-unknown-linux-gnueabihf": 99}},
       "harness/codecs/aac/ps-open-manifest.json": {
         "open_cases": {
-          "aarch64-unknown-linux-gnu": 4,
-          "thumbv7neon-unknown-linux-gnueabihf": 4
+          "aarch64-unknown-linux-gnu": 3,
+          "thumbv7neon-unknown-linux-gnueabihf": 3
         }
       },
       "harness/features/ass-parse-host/contract.json": {
