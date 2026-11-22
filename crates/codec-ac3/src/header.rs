@@ -39,6 +39,26 @@ pub(crate) fn ac3_rate_shift(bsid: u8) -> u32 {
     bsid.saturating_sub(8) as u32
 }
 
+// A/52 section 5.3.2: lfeon and dialnorm follow the optional mix and surround fields.
+#[inline]
+fn ac3_lfe_bit(acmod: u8) -> u32 {
+    let mut bit = 3;
+    if (acmod & 1) != 0 && acmod != 1 {
+        bit += 2;
+    }
+    if acmod & 4 != 0 {
+        bit += 2;
+    }
+    if acmod == 2 {
+        bit += 2;
+    }
+    bit
+}
+
+pub(crate) fn ac3_dialnorm(bsi_prefix: [u8; 2], acmod: u8) -> u8 {
+    ((u16::from_be_bytes(bsi_prefix) >> (10 - ac3_lfe_bit(acmod))) & 31) as u8
+}
+
 /// Which syntax a syncframe uses.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Syntax {
@@ -120,19 +140,8 @@ pub fn parse_header(data: &[u8]) -> Result<FrameHeader, DecodeError> {
         }
         let words = ac3_frame_words(fscod, frmsizecod).ok_or(DecodeError::Invalid("frmsizecod"))?;
         let acmod = data[6] >> 5;
-        // lfeon follows optional cmixlev/surmixlev/dsurmod fields (2 bits each).
-        let mut bit = 3u32; // bits of data[6] consumed after acmod
-        if (acmod & 1) != 0 && acmod != 1 {
-            bit += 2;
-        }
-        if acmod & 4 != 0 {
-            bit += 2;
-        }
-        if acmod == 2 {
-            bit += 2;
-        }
         let w = u16::from_be_bytes([data[6], data[7]]);
-        let lfeon = (w >> (15 - bit)) & 1 != 0;
+        let lfeon = (w >> (15 - ac3_lfe_bit(acmod))) & 1 != 0;
         return Ok(FrameHeader {
             syntax: Syntax::Ac3,
             bsid,

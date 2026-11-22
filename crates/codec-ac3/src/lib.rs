@@ -111,7 +111,7 @@ pub struct FrameInfo {
     /// Independent substream 0 carries an LFE channel.
     pub lfeon: bool,
     /// Dialogue normalization code of independent substream 0 (1..=31 = -1..=-31 dB,
-    /// 0 reserved); reported, not applied.
+    /// 0 reserved); reported even when a short AC-3 frame needs block concealment.
     pub dialnorm: u8,
     /// Output sample rate in Hz.
     pub sample_rate: u32,
@@ -317,7 +317,8 @@ impl Decoder {
             if first.syntax == Syntax::Eac3 {
                 return Err(truncated);
             }
-            return self.conceal_truncated(&first, layout, rate, truncated, out);
+            let dialnorm = header::ac3_dialnorm([au[6], au[7]], first.acmod);
+            return self.conceal_truncated(&first, layout, rate, truncated, dialnorm, out);
         }
 
         let mut crc_ok = true;
@@ -483,6 +484,7 @@ impl Decoder {
         layout: ChannelLayout,
         rate: u32,
         truncated: DecodeError,
+        dialnorm: u8,
         out: &mut AudioFrame,
     ) -> Result<FrameInfo, DecodeError> {
         let dual_mono = first.acmod == 0;
@@ -501,6 +503,7 @@ impl Decoder {
             }
         }
         Ok(FrameInfo {
+            dialnorm,
             concealed: Some(truncated),
             downmix_codes: self.indep.downmix,
             // The header of the truncated frame is not decoded; repeat the last info.

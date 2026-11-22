@@ -105,9 +105,12 @@ hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
 ## Conformance
 
 The [syncframe header comparison](../../harness/features/ac3-frame-header/contract.json)
-checks header geometry, and the [decoded frame
+checks each syncframe's coded clock and geometry, including a parser-drained
+packet, and the [decoded frame
 comparison](../../harness/features/ac3-frame-info/contract.json) checks sample geometry,
-layout and downmix side data. The [audio block
+layout, dialogue normalization and downmix side data. A short AC-3 syncframe
+retains its coded dialogue normalization when the decoder repeats its audio
+blocks. The [audio block
 oracle](../../harness/features/ac3-features/contract.json) checks the coding-tool flags
 across all six blocks of complete version-8 AC-3 syncframes, including grouped mantissas.
 

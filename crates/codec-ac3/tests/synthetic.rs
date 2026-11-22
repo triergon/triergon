@@ -267,6 +267,7 @@ fn truncated_ac3_frame_repeats_last_block() {
         })
     ));
     assert_eq!(out.samples_per_channel, 1536);
+    assert_eq!(info.dialnorm, 27);
 }
 
 #[test]
