@@ -36,12 +36,6 @@
         "entry_points": ["cabac::Engine"],
         "degree": "step",
         "needs": "H.264 and HEVC picture comparisons exercise every Engine method. The HEVC overrun check observes only the length of the slice returned by data(). A specification oracle needs to compare the returned slice and cursor values and cover initial offsets 510 and 511, bypass reads of 17 through 32 bins, and capped unary reads"
-      },
-      {
-        "name": "crc",
-        "entry_points": ["crc", "crc::Crc32Mpeg", "crc::Crc32Ieee"],
-        "degree": "step",
-        "needs": "each polynomial's values over a corpus against the reference's av_crc; compared only through the readers and decoders that check Ogg pages, MPEG-TS sections, Matroska elements and audio frames"
       }
     ],
     "triergon-bridge": [
@@ -94,12 +88,6 @@
     ],
     "triergon-codec-aac": [
       {
-        "name": "adts-sync-search",
-        "entry_points": ["adts::find_frame"],
-        "degree": "unit-tests",
-        "needs": "ADTS streams with junk and damaged headers, with the frame offsets the reference's parser finds"
-      },
-      {
         "name": "inspection-aids",
         "entry_points": ["Decoder::enable_stats", "Decoder::stats", "Decoder::sbr_fill_ranges", "Decoder::ps_input"],
         "degree": "no-reference",
@@ -121,9 +109,9 @@
       },
       {
         "name": "frame-info",
-        "entry_points": ["parse_header", "FrameHeader", "FrameInfo", "DownmixInfo", "FrameFeatures"],
-        "degree": "step",
-        "needs": "a worker operation folding each frame's header, downmix and feature fields against the reference's stream parameters and downmix side data; compared only through the decoded and mixed output"
+        "entry_points": ["FrameFeatures"],
+        "degree": "no-reference",
+        "needs": "The reference does not publish audio block tool flags. The ac3-features oracle compares main-body flags in the zero-width mantissa profile. General mantissa allocation and Annex E need a specification oracle."
       },
       {
         "name": "bit-position-trace",
@@ -179,12 +167,6 @@
         "entry_points": ["Decoder::send_nal"],
         "degree": "step",
         "needs": "a worker operation feeding NAL units one at a time, folded against the same reference pictures; compared only through Decoder::send of whole access units"
-      },
-      {
-        "name": "access-unit-splitting",
-        "entry_points": ["nal::AccessUnitSplitter"],
-        "degree": "unit-tests",
-        "needs": "Annex B streams split by AccessUnitSplitter, compared with the units of the reference's HEVC parser; the codec worker splits with its own measurement splitter"
       }
     ],
     "triergon-codec-mp3": [],
@@ -199,12 +181,6 @@
     "triergon-codec-opus": [],
     "triergon-codec-vorbis": [],
     "triergon-core": [
-      {
-        "name": "exact-time",
-        "entry_points": ["Time", "TimeBase::rescale", "TickScale", "Rounding", "round_ties_even_i32"],
-        "degree": "step",
-        "needs": "a worker operation rescaling ticks across bases and rounding modes against the reference's av_rescale_rnd; compared only through the timestamps of compared readers, and with an independent Python model by the core time oracle"
-      },
       {
         "name": "source-signatures",
         "entry_points": ["signature"],
