@@ -318,7 +318,7 @@ pub(super) fn append_options(args: &mut Vec<String>, vector: &Value) {
 pub(super) fn reset_audio_format(lane: &str, path: &str) -> Result<Option<&'static str>, String> {
     let suffix = Path::new(path).extension().and_then(|value| value.to_str());
     match (lane, suffix) {
-        ("dts", Some("mka" | "mkv")) | ("opus", Some("mka" | "mkv")) => Ok(Some("matroska")),
+        ("dts" | "opus", Some("mka" | "mkv")) => Ok(Some("matroska")),
         ("opus", Some("opus" | "ogg")) => Ok(Some("ogg")),
         _ => audio_format(lane),
     }
