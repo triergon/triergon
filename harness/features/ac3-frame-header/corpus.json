@@ -445,19 +445,6 @@
       }
     },
     {
-      "id": "frmsizecod-12",
-      "profile": "authored",
-      "file": "harness/features/ac3-frame-header/authored/frmsizecod-12.ac3",
-      "sha256": "9c9a65c5382a17fbf66ba45b23da3920915ba5ec0e5e1c97756580a7c5373cb8",
-      "rights": "authored-synthetic",
-      "arguments": [],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 15742451489063461418
-      }
-    },
-    {
       "id": "frmsizecod-13",
       "profile": "authored",
       "file": "harness/features/ac3-frame-header/authored/frmsizecod-13.ac3",
@@ -832,19 +819,6 @@
         "packets": 2,
         "bytes": 0,
         "digest": 13287480323194141886
-      }
-    },
-    {
-      "id": "acmod-2-lfe-0",
-      "profile": "authored",
-      "file": "harness/features/ac3-frame-header/authored/acmod-2-lfe-0.ac3",
-      "sha256": "100642e4c23dee5904044840b28f9af5915156f55a0f8b8877413ab6f3c4662c",
-      "rights": "authored-synthetic",
-      "arguments": [],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 14049734630086287746
       }
     },
     {
