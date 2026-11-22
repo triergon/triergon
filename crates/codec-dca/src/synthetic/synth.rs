@@ -1,7 +1,11 @@
 //! Minimal DTS core frame *writer* for tests and oracle experiments (not production code).
 //! It emits exactly the syntax of ETSI TS 102 114 Tables 5-1, 5-21, 5-28, 5-29 and 6-17..6-20
 //! from explicit field values; it does no analysis or psychoacoustics.
-#![allow(dead_code, clippy::needless_range_loop, clippy::too_many_arguments)]
+#![allow(
+    dead_code,
+    clippy::too_many_arguments,
+    reason = "a test writer that spells out every syntax field; not every scenario uses all of it"
+)]
 
 use crate::tables::{self, HuffBook};
 use std::collections::HashMap;

@@ -982,7 +982,10 @@ impl Core {
 
 /// Per-channel processing after spectral decoding and stereo tools:
 /// prediction / LTP / coupling / TNS / filterbank.
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the channel, its element's identity and the shared filterbank and coupling state"
+)]
 pub(crate) fn process_channel(
     fb: &mut Filterbank,
     cfg: &CoreCfg,

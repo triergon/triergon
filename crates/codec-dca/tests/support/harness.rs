@@ -1,5 +1,5 @@
 //! Test harness: stream splitting, whole-stream decoding and fingerprint checks.
-#![allow(dead_code)]
+#![allow(dead_code, reason = "each test binary uses part of the harness")]
 
 use triergon_codec_dca::{AudioFrame, DecodeError, Decoder, Packing};
 

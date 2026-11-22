@@ -54,8 +54,10 @@ pub(super) fn post(re: &[f32], im: &[f32], qr: &[f32], qi: &[f32], ye: &mut [f32
 
 /// The last radix-2 stage fused with the post-twiddle of both halves.
 #[inline(never)]
-// separate slice arguments, as the scalar form takes them
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the scalar form's slice arguments, each with its own no-alias guarantee"
+)]
 pub(super) fn last_post(
     re0: &[f32],
     re1: &[f32],

@@ -41,7 +41,10 @@ const XL_LEN: usize = T_HFGEN + 2 * NUM_TIME_SLOTS;
 /// limGain (4.6.18.7.5).
 const LIM_GAIN: [f32; 4] = [0.70795, 1.0, 1.41254, 10_000_000_000.0];
 /// Smoothing window h_smooth (4.6.18.7.6).
-#[allow(clippy::excessive_precision)] // printed precision of the source
+#[expect(
+    clippy::excessive_precision,
+    reason = "the digits the specification prints"
+)]
 const H_SMOOTH: [f32; 5] = [
     0.33333333333333,
     0.30150283239582,
@@ -51,7 +54,10 @@ const H_SMOOTH: [f32; 5] = [
 ];
 const EPS0: f32 = 1e-12;
 /// Maximum boost factor G_boost,max = 10^(2/10) (1.584893192, 4.6.18.7.5).
-#[allow(clippy::excessive_precision)] // printed precision of the source
+#[expect(
+    clippy::excessive_precision,
+    reason = "the digits the specification prints"
+)]
 const BOOST_MAX: f32 = 1.584893192;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

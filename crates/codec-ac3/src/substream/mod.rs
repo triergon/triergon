@@ -243,7 +243,10 @@ pub(crate) fn acmod_channels(acmod: u8) -> &'static [crate::Speaker] {
 pub(crate) const NFCHANS: [usize; 8] = [2, 1, 2, 3, 3, 4, 4, 5];
 
 impl Substream {
-    #[allow(clippy::large_stack_arrays)] // Built once per substream, then boxed.
+    #[expect(
+        clippy::large_stack_arrays,
+        reason = "built once per substream, then boxed"
+    )]
     pub(crate) fn new() -> Self {
         Substream {
             eac3: false,
@@ -350,7 +353,10 @@ impl Substream {
 
     /// Decode one syncframe already copied (with zero padding) into `buf`.
     /// On error returns the number of blocks fully output before the error.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the decoder state a syncframe decodes against, borrowed field by field"
+    )]
     pub(crate) fn decode_frame(
         &mut self,
         buf: &[u8],

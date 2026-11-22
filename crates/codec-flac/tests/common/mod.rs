@@ -1,5 +1,5 @@
 //! Hand-built FLAC streams for the tests.
-#![allow(dead_code)]
+#![allow(dead_code, reason = "each test binary uses part of the streams")]
 
 use triergon_bitstream::crc::{crc8, crc16_a52};
 

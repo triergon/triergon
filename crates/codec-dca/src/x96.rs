@@ -126,7 +126,10 @@ impl X96Side {
 
 /// Decode one X96 subframe (residual subband samples of bands 0..64) into `buf`
 /// rows `ch`, samples `t0 .. t0 + nssc * 8`.
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the extension's header, side information and state, borrowed field by field"
+)]
 pub(crate) fn decode_subframe(
     br: &mut BitReader<'_>,
     h: &X96Header,

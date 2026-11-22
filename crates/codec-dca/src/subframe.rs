@@ -205,7 +205,10 @@ fn scale_value(shuff: u8, idx: i32) -> Result<f32, DecodeError> {
 
 /// Decode one subframe of a channel set into `buf` rows `slot0 + ch`, samples
 /// `t0 .. t0 + nssc * 8` (relative to the row's sample area).
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the channel set's header, side information and state, borrowed field by field"
+)]
 pub(crate) fn decode_subframe(
     br: &mut BitReader<'_>,
     hdr: &SetHeader,

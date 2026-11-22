@@ -249,7 +249,10 @@ static AHT_IDCT: std::sync::LazyLock<[[f32; 6]; 6]> =
 /// Unpack the mantissas of a run of bins (7.3) as Q23 integers shifted by the exponent.
 /// The reader and the group state are worked on as local copies so that they stay in
 /// registers through the loop.
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the local copies of the reader and group state, passed in and back"
+)]
 #[inline]
 fn read_mantissas(
     br: &mut BitReader<'_>,

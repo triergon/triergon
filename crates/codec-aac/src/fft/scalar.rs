@@ -35,8 +35,10 @@ pub(super) fn stage(re: &mut [f32], im: &mut [f32], h: usize, w: &[Vec<f32>; 6])
 /// non-inlined function: its `&mut` arguments are known not to alias, so the loop
 /// vectorises without runtime overlap checks.
 #[inline(never)]
-// separate slice arguments are the point: each gets its own no-alias guarantee
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "each slice argument carries its own no-alias guarantee"
+)]
 fn radix4_block(
     r0: &mut [f32],
     r1: &mut [f32],
@@ -167,8 +169,10 @@ pub(super) fn post(re: &[f32], im: &[f32], qr: &[f32], qi: &[f32], ye: &mut [f32
 /// Last radix-2 FFT stage (z = lo +/- w hi) fused with the DCT-IV post-twiddle of both
 /// halves. Non-inlined so the non-aliasing arguments let the loop vectorise.
 #[inline(never)]
-// separate slice arguments are the point: each gets its own no-alias guarantee
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "each slice argument carries its own no-alias guarantee"
+)]
 pub(super) fn last_post(
     re0: &[f32],
     re1: &[f32],

@@ -340,8 +340,6 @@ impl Mdct {
 }
 
 #[cfg(test)]
-// direct O(N^2) reference definitions, written index-style to mirror the formulas
-#[allow(clippy::needless_range_loop)]
 mod tests {
     use super::*;
 

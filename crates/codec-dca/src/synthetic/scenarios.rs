@@ -2,7 +2,11 @@
 //! code). Each scenario is a deterministic stream used to compare this decoder with the
 //! FFmpeg oracle (`harness/codecs/dca/run_all.sh`) or to recover codebooks
 //! (`harness/codecs/dca/recover_vq.py`, `recover_pr.py`).
-#![allow(dead_code, clippy::needless_range_loop, clippy::too_many_arguments)]
+#![allow(
+    dead_code,
+    clippy::too_many_arguments,
+    reason = "scenario builders that spell out every syntax field; not every test uses all of them"
+)]
 
 use super::synth::*;
 use crate::Packing;

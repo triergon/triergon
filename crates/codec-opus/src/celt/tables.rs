@@ -179,7 +179,7 @@ pub(super) const CACHE_CAPS: [u8; 168] = [
 ];
 
 /// The rising half of the 120-sample low-overlap window, as the table RFC 6716 prints it.
-#[allow(clippy::excessive_precision)] // The digits the reference prints.
+#[expect(clippy::excessive_precision, reason = "the digits RFC 6716 prints")]
 pub(super) const WINDOW: [f32; 120] = [
     6.7286966e-05,
     0.00060551348,
