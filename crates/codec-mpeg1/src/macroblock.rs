@@ -9,6 +9,7 @@ use crate::rate::VBV_GUARD_BITS;
 use crate::syntax::{PictureType, write_coefficients, write_dc, write_mv_component};
 use crate::tables::*;
 use crate::{block, dct};
+use core::num::NonZeroU8;
 use triergon_pixel::{Geometry, Picture};
 
 /// How `inter_mb` codes one macroblock of a P picture.
@@ -104,7 +105,7 @@ impl Encoder {
                 PictureType::Predicted => {
                     let a = self.analysis[address];
                     if a.intra && !tight {
-                        self.skipped_at[address] = 0;
+                        self.skipped_at[address] = None;
                         self.intra_mb::<false>(
                             input,
                             mb_x,
@@ -253,8 +254,11 @@ impl Encoder {
             repeated,
         } = inter;
         let zero = mv == Mv::ZERO;
-        let skipped_at = u32::from(self.skipped_at[address]);
-        if repeated && zero && !edge && skipped_at != 0 && s.target_q >= skipped_at {
+        if repeated
+            && zero
+            && !edge
+            && self.skipped_at[address].is_some_and(|q| s.target_q >= u32::from(q.get()))
+        {
             // The previous picture skipped this macroblock and the picture is
             // repeated, so its residual is the one that quantised to zero
             // there, at a quantiser no coarser than this one: skip again.
@@ -341,11 +345,15 @@ impl Encoder {
             s.skipped += 1;
             s.pmv = Mv::ZERO;
             // A skip forced by the VBV guard proves nothing about the residual.
-            self.skipped_at[address] = if tight { 0 } else { s.target_q as u8 };
+            self.skipped_at[address] = if tight {
+                None
+            } else {
+                NonZeroU8::new(s.target_q as u8)
+            };
             self.store_prediction(mb_x, mb_y, &pred);
             return;
         }
-        self.skipped_at[address] = 0;
+        self.skipped_at[address] = None;
         self.write_address(s);
         let requant = cbp != 0 && s.target_q != s.q;
         match (cbp != 0, zero) {

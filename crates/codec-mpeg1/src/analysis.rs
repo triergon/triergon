@@ -154,7 +154,7 @@ impl Encoder {
                         u32::MAX
                     };
                     search.run(&candidates, coarse, mb_x, mb_y, neighbour)
-                } else if self.skipped_at[i] != 0 {
+                } else if self.skipped_at[i].is_some() {
                     // The source luma and the skipped zero-vector prediction
                     // are both unchanged, so the previous SAD still holds.
                     (Mv::ZERO, self.analysis[i].sad)

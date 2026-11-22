@@ -40,7 +40,7 @@ impl Encoder {
         };
         if picture_type == PictureType::Intra {
             self.gop_start = self.index;
-            self.skipped_at.fill(0);
+            self.skipped_at.fill(None);
             self.intra_analysis(input);
             if self.rc.needs_intra_probe()
                 && let Some(scratch) = self.probe.take()
