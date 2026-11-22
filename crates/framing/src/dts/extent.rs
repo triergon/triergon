@@ -55,7 +55,7 @@ pub struct DtsExtensionSubstreamExtent {
     pub frame_bytes: usize,
 }
 
-/// Declared extent of a normal core frame or an extension substream frame. A
+/// Declared extent of a core frame or an extension substream frame. A
 /// core frame is validated as [`probe_core_header`] validates it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DtsFrameExtent {

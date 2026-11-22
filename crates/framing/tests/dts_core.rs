@@ -787,9 +787,8 @@ fn cancel_during_partial_header_and_body_releases_private_storage_exactly() {
 }
 
 #[test]
-fn termination_future_encoder_and_extension_sources_keep_required_gaps_explicit() {
+fn future_encoder_and_extension_sources_keep_required_gaps_explicit() {
     for id in [
-        "termination-raw",
         "version-8",
         "version-15",
         "extension-7",
@@ -808,8 +807,21 @@ fn termination_future_encoder_and_extension_sources_keep_required_gaps_explicit(
     assert_eq!(observed.terminal, "unsupported");
     assert_eq!(observed.frames.len(), 1);
     assert_eq!(observed.frames[0].facts().offset, 0);
-    // No14-bit unpacking, word swapping, termination-duration or HD-asset API
-    // is part of the canonical core.
+}
+
+#[test]
+fn termination_frame_keeps_the_coded_window_and_padding_count() {
+    let mut bytes = fixture(HEADERS, "termination-raw");
+    bytes.resize(96, 0);
+    let observed = drive(&bytes, 1, 1, false, limits());
+    assert_eq!(observed.frames.len(), 1);
+    assert_eq!(observed.error, None);
+    let frame = &observed.frames[0];
+    assert_eq!(frame.bytes().as_ref(), bytes);
+    let header = frame.facts().header;
+    assert_eq!(header.coding_window_samples, 192);
+    assert_eq!(header.termination_padding_samples(), Some(1));
+    assert_eq!(header.window, Time::new(192, 48000).unwrap());
 }
 
 #[test]

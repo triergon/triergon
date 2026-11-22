@@ -815,6 +815,41 @@ fn reset_advances_generation_rejects_stale_windows_and_preserves_retained_frames
 }
 
 #[test]
+fn consecutive_termination_frames_keep_their_source_boundaries() {
+    let mut termination = values(96, false);
+    termination[1] = 0;
+    termination[2] = 30;
+    termination[4] = 5;
+    let mut end = author(termination);
+    end.resize(96, 0x55);
+    let pool = Budget::new(65536).unwrap();
+    for packing in PACKINGS {
+        let (mut raw, _) = pack(&logical(96, false), packing, false, 0);
+        let (last, _) = pack(&end, packing, false, 0);
+        let offset = raw.len() as u64;
+        raw.extend_from_slice(&last);
+        raw.extend_from_slice(&last);
+        let mut source = reader(&pool, None, packing, settings());
+        for (start, next_offset) in [(0, offset), (offset, offset * 2)] {
+            let frame = next(&mut source, &pool, &raw, 1, 1).unwrap().unwrap();
+            assert_eq!(frame.facts().identity.offset, start);
+            assert_eq!(
+                frame.facts().boundary,
+                DtsNormalBoundary::FollowingTerminationSync {
+                    offset: next_offset
+                }
+            );
+        }
+        let frame = next(&mut source, &pool, &raw, 1, 1).unwrap().unwrap();
+        assert_eq!(frame.facts().identity.offset, offset * 2);
+        assert_eq!(frame.facts().header.value(F::Short), Some(30));
+        assert_eq!(frame.source_bytes().as_ref(), last);
+        assert_eq!(frame.facts().header.views().coded_window_samples, Some(192));
+        assert!(next(&mut source, &pool, &raw, 1, 1).unwrap().is_none());
+    }
+}
+
+#[test]
 fn end_after_core_sync_truncates_the_source_header() {
     let pool = Budget::new(65536).unwrap();
     for packing in [P::CanonicalBe, P::Words16Le] {

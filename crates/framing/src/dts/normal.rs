@@ -1,5 +1,5 @@
-//! Normal core frames of a DTS stream in any word packing, ETSI TS 102 114 §5.3 and
-//! §5.4.2. A frame is the span from one normal sync to the next; how its length
+//! Core frames of a DTS stream in any word packing, ETSI TS 102 114 §5.3 and
+//! §5.4.2. A frame is the span from one core sync to the next; how its length
 //! relates to `FSIZE` is reported, and neither shows that the coded audio is valid.
 use crate::dts::core_frame::CORE_SYNC;
 use crate::dts::reader::{limit, source_error};
@@ -37,6 +37,12 @@ pub enum DtsNormalBoundary {
     /// grid starts where this frame ends. Coded audio can hold the same 38 bits, so
     /// the sync alone does not prove that a frame starts there.
     FollowingNormalSync {
+        /// Source offset of the following sync, in bytes.
+        offset: u64,
+    },
+    /// The next termination sync (`SYNC`, `FTYPE` 0, `SHORT` 0 to 30)
+    /// starts where this frame ends on the same source unit grid.
+    FollowingTerminationSync {
         /// Source offset of the following sync, in bytes.
         offset: u64,
     },
@@ -91,7 +97,7 @@ pub struct DtsNormalFacts {
     pub storage_bytes: usize,
     /// What ended the frame.
     pub boundary: DtsNormalBoundary,
-    /// Number of normal syncs inside the frame that did not end it, because fewer
+    /// Number of normal or termination syncs that did not end the frame because fewer
     /// than `FSIZE` + 1 source bytes preceded them.
     pub skipped_short_syncs: usize,
     /// How the frame's length relates to `FSIZE`.
@@ -179,20 +185,20 @@ enum BodyStep {
     Freeze,
 }
 
-/// Reads the normal core frames of a DTS stream stored in any of the four
+/// Reads the core frames of a DTS stream stored in any of the four
 /// [`DtsPacking`]s, each frame with its own measured length.
 ///
-/// The stream must start with a normal sync: `SYNC`, `FTYPE` 1 and `SHORT` 31. A
-/// frame ends at the next normal sync on the source unit grid, or at the end of the
+/// The stream must start with a normal or termination sync. A
+/// frame ends at the next such sync on the source unit grid, or at the end of the
 /// source. Source units are bytes for [`DtsPacking::CanonicalBe`] and whole two-byte
-/// words for the other packings. A normal sync that follows fewer than `FSIZE` + 1
+/// words for the other packings. A sync that follows fewer than `FSIZE` + 1
 /// source bytes, the smaller of the two extents `FSIZE` can describe, is kept as
 /// frame content and counted in [`DtsNormalFacts::skipped_short_syncs`]. A later one
 /// ends the frame even when neither extent matches the frame's length;
 /// [`DtsNormalFacts::extent_relation`] reports that relation as it is.
 ///
 /// The packing states how the source stores the stream; it does not select a reading
-/// of `FSIZE`. Termination frames and extension substreams are not supported, no sync
+/// of `FSIZE`. Extension substreams are not supported, no sync
 /// is searched for after input that is not a frame, and the coded audio is not
 /// checked: a returned frame is a measured span of the source, not a judgement on
 /// its content.
@@ -355,7 +361,7 @@ impl DtsNormalSourceReader {
     /// free pool storage and call again. Every other error is kept and returned by all
     /// later calls: [`Error::Cancelled`] when `cancel` is set, [`Error::Invalid`] when
     /// the stream does not start with `SYNC`, [`Error::Unsupported`] when it starts
-    /// with a termination frame (`FTYPE` 0) or a `SHORT` other than 31,
+    /// with a `SHORT` code that disagrees with the frame type,
     /// [`Error::Truncated`] when the source ends inside a header or a source word, and
     /// [`Error::Limit`] when a frame or the number of frames exceeds its limit.
     pub fn step(
@@ -471,12 +477,12 @@ impl DtsNormalSourceReader {
                         if !work.try_charge(1) {
                             return Ok(Step::Yield);
                         }
-                        let normal = self.packing.normal_sync(&self.lookahead)?;
+                        let sync = self.packing.frame_sync(&self.lookahead)?;
                         let shortest = shortest_extent(header, self.packing)?;
-                        if normal && buffer.len() >= shortest {
+                        if sync && buffer.len() >= shortest {
                             *step = BodyStep::Freeze;
                         } else {
-                            if normal {
+                            if sync {
                                 self.skipped_short_syncs = self
                                     .skipped_short_syncs
                                     .checked_add(1)
@@ -633,7 +639,7 @@ impl DtsNormalSourceReader {
             }
         }
     }
-    /// The header in the prefix, which must be a complete normal frame header.
+    /// The header in the prefix, with compatible frame type and deficit codes.
     fn probe(&self) -> Result<DtsPackedHeader> {
         limit(self.prefix_len, self.limits.maximum_source_frame_bytes)?;
         let bits = self.packing.payload_bits(self.prefix_len)?;
@@ -650,19 +656,30 @@ impl DtsNormalSourceReader {
                 Error::Invalid("DTS normal source sync")
             });
         }
-        if header.value(DtsCoreField::Normal) != Some(1)
-            || header.value(DtsCoreField::Short) != Some(31)
-        {
-            return Err(if header.value(DtsCoreField::Short).is_none() {
-                Error::Truncated
-            } else {
-                Error::Unsupported("DTS termination or abnormal normal sync")
-            });
+        match (
+            header.value(DtsCoreField::Normal),
+            header.value(DtsCoreField::Short),
+        ) {
+            (None, _) | (_, None) => return Err(Error::Truncated),
+            (Some(1), Some(31)) => {}
+            (Some(0), Some(0..=30)) => {
+                if header
+                    .value(DtsCoreField::BlockCount)
+                    .is_some_and(|n| n < 5)
+                {
+                    return Err(Error::Invalid("DTS termination block count"));
+                }
+            }
+            _ => {
+                return Err(Error::Unsupported(
+                    "DTS termination or abnormal normal sync",
+                ));
+            }
         }
-        if !header.syntax_complete() {
-            return Err(Error::Truncated);
-        }
-        Ok(header)
+        header
+            .syntax_complete()
+            .then_some(header)
+            .ok_or(Error::Truncated)
     }
     /// What the reader measured for a frame whose payload the job returned.
     fn measure(
@@ -710,7 +727,11 @@ impl DtsNormalSourceReader {
             {
                 return Err(Error::Invalid("DTS following sync source mapping"));
             }
-            DtsNormalBoundary::FollowingNormalSync { offset: end }
+            if self.packing.bit(&self.lookahead, 32)? == 1 {
+                DtsNormalBoundary::FollowingNormalSync { offset: end }
+            } else {
+                DtsNormalBoundary::FollowingTerminationSync { offset: end }
+            }
         };
         Ok(DtsNormalFacts {
             identity: payload.identity(),
@@ -735,7 +756,7 @@ fn declared_frame_bytes(header: &DtsPackedHeader, missing: &'static str) -> Resu
         .ok_or(Error::Invalid(missing))? as usize)
 }
 
-/// The fewest source bytes a frame must span before a normal sync can end it: the
+/// The fewest source bytes a frame must span before a following sync can end it: the
 /// smaller of the two extents `FSIZE` + 1 can describe, a count of source bytes or of
 /// payload bytes rounded up to whole source units.
 fn shortest_extent(header: &DtsPackedHeader, packing: DtsPacking) -> Result<usize> {

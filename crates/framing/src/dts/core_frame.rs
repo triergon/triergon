@@ -1,4 +1,4 @@
-//! Normal core frame headers of a canonical DTS stream and the frames they declare
+//! Core frame headers of a canonical DTS stream and the frames they declare
 //! (ETSI TS 102 114 V1.6.1 §3.4, §5.3, §5.4.2). Coded audio and the extensions
 //! inside a frame stay unread source bytes.
 use crate::dts::reader::source_error;
@@ -40,21 +40,21 @@ pub(super) const fn core_rate(code: u32) -> Option<u32> {
     }
 }
 
-/// The header of a normal DTS core frame (ETSI TS 102 114 V1.6.1 clause 5.3,
+/// The header of a DTS core frame (ETSI TS 102 114 V1.6.1 clause 5.4.2,
 /// Table 5-1): every field as coded, in bitstream order, then the values derived
 /// from them. The ranges given are those [`probe_core_header`] returns. `None`
 /// for channel count, nominal bitrate or dialog gain means the code defines no
 /// value; no default is substituted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsCoreHeader {
-    /// `FTYPE`, the frame type: 1, a normal frame.
+    /// `FTYPE`, the frame type: 1 for normal, 0 for termination.
     pub normal: u8,
-    /// `SHORT`, the deficit sample count: 31 in a normal frame.
+    /// `SHORT`: 31 in a normal frame, 0 to 30 in a termination frame.
     pub short: u8,
     /// `CPF`: 1 when the header carries `HCRC`, otherwise 0.
     pub cpf: u8,
     /// `NBLKS`, the number of 32-sample blocks per channel minus one: 7, 15, 31,
-    /// 63 or 127.
+    /// 63 or 127 in a normal frame, 5 to 127 in a termination frame.
     pub nblks: u8,
     /// `FSIZE`, the frame size in bytes minus one: 95 to 16383.
     pub fsize: u16,
@@ -136,6 +136,19 @@ pub struct DtsCoreHeader {
     pub window: Time,
 }
 
+impl DtsCoreHeader {
+    /// Samples per channel that follow the coded audio as padding in a
+    /// termination frame (TS 102 114 clause 5.4.2). Normal frames have no
+    /// termination padding.
+    pub const fn termination_padding_samples(self) -> Option<u8> {
+        if self.normal == 0 && self.short < 31 {
+            Some(self.short + 1)
+        } else {
+            None
+        }
+    }
+}
+
 fn check_sync(input: &[u8]) -> Result<()> {
     let bytes: [u8; 4] = input
         .get(..4)
@@ -163,7 +176,7 @@ impl HeaderBits<'_> {
     }
 }
 
-/// Reads the header of a normal core frame from the start of `input`, which
+/// Reads the header of a core frame from the start of `input`, which
 /// begins at the sync word `0x7FFE8001` in canonical big-endian byte order.
 /// The probe allocates nothing and inspects at most fifteen bytes (120 bits).
 /// Success does not certify a complete body, coded audio or decoder readiness.
@@ -172,9 +185,9 @@ impl HeaderBits<'_> {
 /// with `HCRC`; `Invalid` when `input` begins with neither the core nor the extension
 /// substream sync word, and for a field the specification rules out: an `SFREQ` or
 /// `RATE` code without a value, `FSIZE` below 95, `NBLKS` below 5, a set reserved bit,
-/// `LFF` 3, `PCMR` 4 or 7, a `SHORT` other than 31 or an `NBLKS` other than 7, 15, 31,
-/// 63 and 127; `Unsupported` for the extension substream sync word `0x64582025`, a
-/// termination frame, `VERNUM` above 7, and `EXT_AUDIO` set with an `EXT_AUDIO_ID`
+/// `LFF` 3, `PCMR` 4 or 7, a frame type and `SHORT` that disagree, or a normal frame
+/// whose `NBLKS` is other than 7, 15, 31, 63 or 127; `Unsupported` for the extension
+/// substream sync word `0x64582025`, `VERNUM` above 7, and `EXT_AUDIO` with `EXT_AUDIO_ID`
 /// other than 0, 2 and 6.
 pub fn probe_core_header(input: &[u8]) -> Result<DtsCoreHeader> {
     check_sync(input)?;
@@ -224,14 +237,14 @@ pub fn probe_core_header(input: &[u8]) -> Result<DtsCoreHeader> {
     if nominal_bitrate.is_none() && rate != 29 {
         return Err(Error::Invalid("DTS nominal-bitrate code"));
     }
-    if normal == 0 {
-        return Err(Error::Unsupported("DTS termination frame"));
-    }
     if version > 7 {
         return Err(Error::Unsupported("future DTS encoder version"));
     }
-    if short != 31 || !matches!(nblks, 7 | 15 | 31 | 63 | 127) {
+    if normal != 0 && (short != 31 || !matches!(nblks, 7 | 15 | 31 | 63 | 127)) {
         return Err(Error::Invalid("normal DTS synchronization/block count"));
+    }
+    if normal == 0 && short == 31 {
+        return Err(Error::Invalid("DTS termination deficit code"));
     }
     if extension != 0 && !matches!(extension_id, 0 | 2 | 6) {
         return Err(Error::Unsupported("reserved DTS internal-extension code"));
@@ -395,11 +408,10 @@ enum BodyStep {
     Freeze,
 }
 
-/// Reads the core frames of an aligned stream: canonical big-endian normal
+/// Reads the core frames of an aligned stream: canonical big-endian
 /// frames back to back, the first at offset zero. The reader never searches for
 /// a sync word: bytes that are not a frame header where one is due are an error.
-/// It does not convert word packings, and refuses termination frames and
-/// extension substreams.
+/// It does not convert word packings and refuses extension substreams.
 ///
 /// Reading input and copying into the frame are each charged one unit of work per
 /// byte; the sync check, reading `CPF`, the header probe, the allocation,

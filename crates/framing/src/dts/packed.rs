@@ -104,7 +104,7 @@ impl DtsPacking {
         }
         Err(Error::Invalid("DTS source sync packing"))
     }
-    pub(crate) fn normal_sync(self, prefix: &[u8]) -> Result<bool> {
+    pub(super) fn frame_sync(self, prefix: &[u8]) -> Result<bool> {
         if self.payload_bits(prefix.len())? < 38 {
             return Ok(false);
         }
@@ -112,7 +112,7 @@ impl DtsPacking {
         for bit in 0..38 {
             value = (value << 1) | u64::from(self.bit(prefix, bit)?);
         }
-        Ok(value == ((u64::from(CORE_SYNC) << 6) | 63))
+        Ok(value >> 6 == u64::from(CORE_SYNC) && matches!(value & 63, 0..=30 | 63))
     }
 }
 
