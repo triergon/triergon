@@ -80,6 +80,38 @@ pub(super) fn fixtures(dir: &Path) -> Result<(), String> {
     write(dir, "video-descriptor-flags.ts", &video)
 }
 
+pub(super) fn recovery_rebind(root: &Path, dir: &Path) -> Result<(), String> {
+    let path = root.join("crates/mpegts/tests/data/ts188-basic.ts");
+    let input = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let sample = input
+        .get(376..564)
+        .ok_or("basic TS control has no PES carrier")?;
+    let hevc_path = root.join("crates/mpegts/tests/data/raw-hevc-structural.hevc");
+    let hevc = std::fs::read(&hevc_path).map_err(|e| format!("{}: {e}", hevc_path.display()))?;
+    let mut hevc_carrier = [0xff; 188];
+    let Some(pes) = 188usize
+        .checked_sub(14 + hevc.len())
+        .filter(|&start| start >= 6)
+    else {
+        return Err("HEVC control does not fit a single TS carrier".into());
+    };
+    hevc_carrier[..6].copy_from_slice(&[0x47, 0x41, 0, 0x31, (pes - 5) as u8, 0]);
+    hevc_carrier[pes..pes + 14].copy_from_slice(&sample[147..161]);
+    hevc_carrier[pes + 4..pes + 6].copy_from_slice(&((hevc.len() + 8) as u16).to_be_bytes());
+    hevc_carrier[pes + 14..].copy_from_slice(&hevc);
+
+    let mut data = Vec::new();
+    section_packets(&mut data, 0, &mut 0, &pat(&[(0, 0x10), (1, 0x1000)]));
+    let mut counter = 0;
+    let tracks = [(0x1b, 0x100, Vec::new())];
+    section_packets(&mut data, 0x1000, &mut counter, &pmt(1, 0, 0x100, &tracks));
+    data.extend_from_slice(sample);
+    let retyped = [(0x24, 0x100, Vec::new())];
+    section_packets(&mut data, 0x1000, &mut counter, &pmt(1, 1, 0x100, &retyped));
+    data.extend_from_slice(&hevc_carrier);
+    write(dir, "selected-pmt-rebind.ts", &data)
+}
+
 fn hevc(flags: u16) -> Vec<u8> {
     let subset = flags & 8 != 0;
     let mut descriptor = vec![0x38, if subset { 15 } else { 13 }];

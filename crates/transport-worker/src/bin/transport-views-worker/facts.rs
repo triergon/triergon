@@ -26,6 +26,7 @@ const WORK: u64 = 64 * 1024;
 
 mod completion;
 mod opaque;
+mod recovery;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Policy {
@@ -188,7 +189,7 @@ impl Recovery {
                 Step::Ready(TraceEvent::Finished) => {
                     let observer = self.observer.as_mut().ok_or("no selected PMT")?;
                     observer.end_of_source().map_err(explain)?;
-                    if !self.drain(output, bound.then_some(&cursor))? {
+                    if !self.drain(output, bound.then_some(&cursor), bytes)? {
                         return Err("recovery observer requested input at logical EOF".into());
                     }
                     return Ok(());
@@ -206,7 +207,7 @@ impl Recovery {
                         context,
                         startup.as_ref().map(|startup| (startup, &cursor)),
                     )?;
-                    if self.drain(output, bound.then_some(&cursor))? {
+                    if self.drain(output, bound.then_some(&cursor), bytes)? {
                         return Err("recovery observer reached EOF before the source".into());
                     }
                 }
@@ -229,14 +230,28 @@ impl Recovery {
     ) -> Result<(), String> {
         match event {
             TraceEvent::Pat(table) => {
+                recovery::check_pat_selection(&table, pool, context)?;
                 let mut selection =
                     PatSelection::new(&table, self.program, pool, context).map_err(explain)?;
+                recovery::expect_pending(|work, cancel| selection.poll(work, cancel))?;
+                let expected = table
+                    .programs
+                    .as_slice()
+                    .iter()
+                    .find(|entry| entry.program_number == self.program);
                 loop {
                     match selection
                         .poll(&mut WorkBudget::new(WORK), &self.cancel)
                         .map_err(explain)?
                     {
                         TableStep::Output(route) => {
+                            recovery::check_pat(&table, expected, route)?;
+                            if !matches!(
+                                selection.poll(&mut WorkBudget::new(WORK), &self.cancel),
+                                Ok(TableStep::Done)
+                            ) {
+                                return Err("PAT selection published a route twice".into());
+                            }
                             self.route = route;
                             break;
                         }
@@ -329,22 +344,52 @@ impl Recovery {
             };
         }
         let observer = self.observer.as_mut().ok_or("no recovery observer")?;
+        let old_scope = observer.scope();
         let mut job = if rebind {
             observer.rebind_drained_selected_pmt(route, map, context)
         } else {
             observer.bind_selected_pmt(route, map, context)
         }
         .map_err(explain)?;
-        loop {
+        recovery::expect_pending(|work, cancel| job.poll(work, cancel))?;
+        if job.current_scope() != old_scope {
+            return Err("PMT job changed the active scope before commit".into());
+        }
+        let binding = loop {
             match job
                 .poll(&mut WorkBudget::new(WORK), &self.cancel)
                 .map_err(explain)?
             {
-                TableStep::Output(_) => return Ok(()),
+                TableStep::Output(binding) => break binding,
                 TableStep::Yield => {}
                 TableStep::Done => return Err("PMT binding finished without a result".into()),
             }
+        };
+        if !matches!(
+            job.poll(&mut WorkBudget::new(WORK), &self.cancel),
+            Ok(TableStep::Done)
+        ) {
+            return Err("PMT job published a binding twice".into());
         }
+        if binding.version != (map.source[5] >> 1) & 31
+            || binding.pcr_pid != u16::from_be_bytes([map.source[8] & 31, map.source[9]])
+            || binding.scope != observer.scope()
+            || binding.scope.epochs != context.epochs
+            || binding.scope.entity != SOURCE
+            || binding.scope.program != self.program
+            || binding.scope.pid != self.pid
+            || map
+                .streams
+                .as_slice()
+                .first()
+                .map(|stream| stream.stream_type)
+                != Some(binding.scope.stream_type)
+            || binding.context != context
+            || observer.pmt_binding() != Some(binding)
+        {
+            return Err("PMT job committed a different scope or source context".into());
+        }
+        Ok(())
     }
 
     fn observer(
@@ -425,6 +470,7 @@ impl Recovery {
         &mut self,
         out: &mut Output<'_, '_>,
         input: Option<&InputCursor>,
+        source: &[u8],
     ) -> Result<bool, String> {
         let Some(observer) = &mut self.observer else {
             return Ok(false);
@@ -433,6 +479,7 @@ impl Recovery {
         let clock = &mut self.clock;
         let first = &mut self.first_clock;
         let cancel = &self.cancel;
+        let program = self.program;
         loop {
             let mut work = WorkBudget::new(WORK);
             let step = if let Some(input) = input {
@@ -463,6 +510,7 @@ impl Recovery {
                     )?;
                 }
                 AssemblyStep::Output(DemuxObservation::FromRejectedCarrier(packet)) => {
+                    recovery::check_rejected(source, &packet, program)?;
                     let time = checked_projection(packet.pid, &mut grant, cancel, |pid, w, c| {
                         clock.project_encoded_header(pid, &packet.encoded_header, w, c)
                     })?;
@@ -491,6 +539,7 @@ impl Recovery {
                     )?;
                 }
                 AssemblyStep::Output(DemuxObservation::FromSelectedDiagnostic(packet)) => {
+                    recovery::check_diagnostic(source, &packet, program)?;
                     let time = checked_projection(packet.pid, &mut grant, cancel, |pid, w, c| {
                         clock.project_diagnostic_header(pid, &packet.encoded_header, w, c)
                     })?;

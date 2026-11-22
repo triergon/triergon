@@ -315,6 +315,10 @@ The [fault and completion comparison](../../harness/features/ts-fault-facts/cont
 checks physical ends, discarded carrier syntax and recovered source spans
 alongside the paired packet and terminal results.
 
+The [recovery comparison](../../harness/features/ts-recovery-trace/contract.json)
+checks selected PAT associations, initial and replacement PMT bindings, and
+diagnostic carrier and PES fields alongside recovered packet output.
+
 ## Writing TS
 
 `mux::Muxer` writes 188-byte packets for one video elementary stream, one PES per

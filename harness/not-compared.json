@@ -101,14 +101,7 @@
     "triergon-hls": [],
     "triergon-isobmff": [],
     "triergon-matroska": [],
-    "triergon-mpegts": [
-      {
-        "name": "reference-trace-recovery",
-        "entry_points": ["reference_trace::recovery::RecoveryObserver", "reference_trace::recovery::RecoveredPacket", "reference_trace::recovery::EncodedHeader", "reference_trace::recovery::PatSelection", "reference_trace::recovery::PmtBindingJob", "reference_trace::recovery::DiagnosticPacket"],
-        "degree": "unit-tests",
-        "needs": "ts-recovery-trace compares registered, selected-AVC, private-audio and DVB recovery. The isolated-fault contract declares the compound-fault and incomplete-PES differences."
-      }
-    ],
+    "triergon-mpegts": [],
     "triergon-ogg": [
       {
         "name": "track-properties",

@@ -33,6 +33,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
 pub(crate) fn fixtures(paths: &crate::corpus::Paths) -> Result<String, String> {
     let dir = paths.fixtures("fixtures-transport-views")?;
     catalogue::fixtures(&dir)?;
+    catalogue::recovery_rebind(&paths.root, &dir)?;
     packets::fixtures(&dir)?;
     time::fixtures(&paths.root, &dir)?;
     signatures::fixtures(&dir)?;

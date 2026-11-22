@@ -10,7 +10,8 @@
   "contract": [
     "Read the selected TS188 stream through the recovery observer with the specified registered, private-audio, DVB subtitle or selected-AVC policy. Bind the observer from the real PAT and PMT. The reference reads the same PID with its MPEG-TS demuxer and disables the parser and field filling.",
     "Compare PID, projected PTS and DTS, carrier position, corrupt flag and all payload bytes for every packet, followed by kind 7 at clean EOF or kind 8 for a source/projection refusal. The demux clock is shared across packets and projects the encoded and diagnostic headers with their public APIs.",
-    "Check raw encoded PTS against the PES bytes and check the interval origin and projected clock for encoded and diagnostic packets. Check zero work, cancellation and reserved PID refusal before the successful projection of the same header. The selected program must equal the program requested for the comparison."
+    "Check raw encoded PTS against the PES bytes and check the interval origin and projected clock for encoded and diagnostic packets. Check zero work, cancellation and reserved PID refusal before the successful projection of the same header. The selected program must equal the program requested for the comparison.",
+    "Check PAT selection against the source association list, and check the PMT binding's version, PCR PID, stream scope, event context and single publication. Exercise the drained AVC-to-HEVC rebind on the same PID and compare both emitted packets. Check the original carrier, fault, encoded header and payload spans of recovered or diagnostic packets."
   ],
   "required_profiles": [
     "opcr-without-pcr",
@@ -53,7 +54,8 @@
     "dvb-nonmodifying",
     "dvb-partial-alpha-projection",
     "dvb-truncated-segment",
-    "dvb2-literals-fields"
+    "dvb2-literals-fields",
+    "selected-pmt-rebind"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
@@ -106,7 +108,8 @@
         "dvb-nonmodifying",
         "dvb-partial-alpha-projection",
         "dvb-truncated-segment",
-        "dvb2-literals-fields"
+        "dvb2-literals-fields",
+        "selected-pmt-rebind"
       ],
       "cause": "The recovery projection exists for comparison."
     },
@@ -153,7 +156,8 @@
         "dvb-nonmodifying",
         "dvb-partial-alpha-projection",
         "dvb-truncated-segment",
-        "dvb2-literals-fields"
+        "dvb2-literals-fields",
+        "selected-pmt-rebind"
       ],
       "cause": "The recovery projection exists for comparison."
     },
@@ -200,7 +204,8 @@
         "dvb-nonmodifying",
         "dvb-partial-alpha-projection",
         "dvb-truncated-segment",
-        "dvb2-literals-fields"
+        "dvb2-literals-fields",
+        "selected-pmt-rebind"
       ],
       "cause": "The recovery projection exists for comparison."
     }

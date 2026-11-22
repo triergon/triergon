@@ -698,6 +698,23 @@
         "bytes": 126,
         "digest": 12378235829569247642
       }
+    },
+    {
+      "id": "selected-pmt-rebind",
+      "profile": "selected-pmt-rebind",
+      "file": ".research/fixtures-transport-views/selected-pmt-rebind.ts",
+      "sha256": "68f9658b37624ef4c2c4be3e385644fcd86ef3fe5559a826e8456195d69a3025",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "selected"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 46,
+        "digest": 3573954411134880926
+      }
     }
   ]
 }
