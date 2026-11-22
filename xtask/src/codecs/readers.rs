@@ -2159,6 +2159,10 @@ pub fn run(options: &Options) -> Result<(), String> {
             .ok_or_else(|| format!("vector without {key}"))
     };
     let selected = |lane: &str| only.as_ref().is_some_and(|only| only.contains(&lane));
+    let enable_views = |lane: &str| match &only {
+        Some(_) => selected(lane),
+        None => options.views_worker.is_some(),
+    };
     // Variants reuse the original vector and its pin. Push uses the original
     // disposition name only after every byte-for-byte window comparison.
     let mut jobs = Vec::new();
@@ -2169,11 +2173,11 @@ pub fn run(options: &Options) -> Result<(), String> {
         let lane = text(vector, "lane")?;
         jobs.push((vector, lane.clone(), Mode::Blocking));
         if let Some((_, push)) = PUSH_LANES.iter().find(|(base, _)| *base == lane)
-            && selected(push)
+            && enable_views(push)
         {
             jobs.push((vector, (*push).to_owned(), Mode::Push));
         }
-        if lane == "reader-ogg" && selected(STREAM_LANE) {
+        if lane == "reader-ogg" && enable_views(STREAM_LANE) {
             jobs.push((vector, STREAM_LANE.to_owned(), Mode::Stream));
         }
     }
@@ -2189,6 +2193,9 @@ pub fn run(options: &Options) -> Result<(), String> {
             "reader-ogg" | "reader-flac" | "reader-mp3" | "reader-aac" | "reader-ac3"
         ) {
             return Err(format!("seek {}: {base} has no seeking lane", seek.name));
+        }
+        if base != "reader-ogg" && options.views_worker.is_none() && !selected(&lane) {
+            continue;
         }
         jobs.push((vector, lane, Mode::Seek(seek)));
     }
