@@ -1704,15 +1704,15 @@ fn coded_cued_aac_playback_seek_invalidates_queue_and_feeds_indexed_suffix() {
     assert!(!player.current(&old));
     assert_eq!(player.queued(), 0);
     let outputs = collect_with_work(&mut player, 1);
-    let receipt = outputs
+    let landing = outputs
         .iter()
         .find_map(|o| match o.event() {
-            RawEvent::Matroska(Event::Seek(receipt)) => Some(receipt),
+            RawEvent::Matroska(Event::Seek(landing)) => Some(landing),
             _ => None,
         })
         .unwrap();
-    assert!(receipt.used_index);
-    assert_eq!(receipt.actual_ns, 93_000_000);
+    assert!(landing.used_index);
+    assert_eq!(landing.actual_ns, 93_000_000);
     let configuration = outputs
         .iter()
         .find_map(|o| match o.event() {
