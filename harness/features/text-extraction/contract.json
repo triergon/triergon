@@ -686,19 +686,20 @@
       "cause": "paired runtime, heap and total RSS collections are pending on isolated gate hosts"
     }
   ],
-  "pending_module_requirements": [
-    "The opaque extractor accepts a caller-supplied zero-byte payload. The demuxer omits the empty ASS block, so these calls compare a supplied packet with no admitted packet."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "ass-empty-not-clear",
-      "requirement": "The opaque extractor accepts a caller-supplied zero-byte payload. The demuxer omits the empty ASS block, so these calls compare a supplied packet with no admitted packet.",
+      "reading": "A zero-byte ASS Block is retained as opaque source data",
+      "clause": "RFC 9559 \u00a710.1 and Matroska codec mapping draft \u00a7\u00a73.5.7 and 5.3: Block framing and ASS event syntax are separate",
+      "candidate": "projects one opaque zero-byte cue",
+      "reference": "ends with no admitted packet or cue",
+      "compat": "compat::matroska::omit_empty_ass_blocks",
+      "cases": [
+        "ass-empty-not-clear"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
-    }
-  ],
-  "open_deviations": [
+    },
     {
       "reading": "The source view preserves a signed Matroska presentation time",
       "clause": "RFC 9559 \u00a711.2, the signed Block timestamp and Cluster timestamp determine the presentation time; a negative result is discouraged",
