@@ -83,10 +83,177 @@ fn config(args: &[OsString]) -> Option<MuxConfig> {
 fn mux(config: &MuxConfig, pictures: &[Picture<'_>]) -> triergon_core::Result<Vec<u8>> {
     let mut muxer = Muxer::new(config)?;
     let mut ts = Vec::new();
+    let mut wire = MuxWire::default();
     for picture in pictures {
+        let begin = ts.len();
         muxer.write_picture(picture.data, picture.pts, picture.dts, picture.key, &mut ts);
+        wire.check_picture(config, picture, &ts[begin..])?;
     }
     Ok(ts)
+}
+
+#[derive(Default)]
+struct MuxWire {
+    sdt: Option<i64>,
+    pat_pmt: Option<i64>,
+    previous_key: bool,
+    next_cc: [u8; 4],
+}
+
+impl MuxWire {
+    fn check_picture(
+        &mut self,
+        config: &MuxConfig,
+        picture: &Picture<'_>,
+        bytes: &[u8],
+    ) -> triergon_core::Result<()> {
+        // A 90 kHz clock advances 9,000 ticks in 100 ms and 45,000 in 500 ms.
+        let sdt = self.sdt.is_none_or(|last| picture.dts >= last + 45_000);
+        let pat_pmt = (picture.key && !self.previous_key)
+            || self.pat_pmt.is_none_or(|last| picture.dts >= last + 9_000);
+        let (packets, trailing) = bytes.as_chunks::<188>();
+        if !trailing.is_empty() {
+            return Err(Error::Invalid("mux appended an incomplete carrier"));
+        }
+        let mut packets = packets.iter();
+        let tables = [
+            (sdt, 0x11, 0x42),
+            (pat_pmt, 0, 0),
+            (pat_pmt, config.pmt_pid, 2),
+        ];
+        for (index, (due, pid, table_id)) in tables.into_iter().enumerate() {
+            if due {
+                let packet = packets.next().ok_or(Error::Truncated)?;
+                self.check_header(packet, pid, index, true)?;
+                if packet[3] & 0x30 != 0x10 || packet[4..6] != [0, table_id] {
+                    return Err(Error::Invalid("mux table pointer or ID"));
+                }
+                let section_length = usize::from(u16::from_be_bytes([packet[6] & 15, packet[7]]));
+                let end = 8 + section_length;
+                let section = packet.get(5..end).ok_or(Error::Truncated)?;
+                if wire_crc_remainder(section) != 0
+                    || packet[end..].iter().any(|&byte| byte != 0xff)
+                {
+                    return Err(Error::Invalid("mux table CRC or stuffing"));
+                }
+            }
+        }
+        let mut data = picture.data;
+        let carriers = packets.len();
+        for (index, packet) in packets.enumerate() {
+            let first = index == 0;
+            self.check_header(packet, config.video_pid, 3, first)?;
+            let adaptation = packet[3] & 0x20 != 0;
+            let payload = if adaptation {
+                let end = 5 + usize::from(packet[4]);
+                let field = packet.get(5..end).ok_or(Error::Truncated)?;
+                let stuffing = if first {
+                    field.get(7..).ok_or(Error::Truncated)?
+                } else if let Some((&flags, rest)) = field.split_first() {
+                    if flags != 0 {
+                        return Err(Error::Invalid("mux continuation adaptation flags"));
+                    }
+                    rest
+                } else {
+                    field
+                };
+                if ((!first || !stuffing.is_empty()) && index + 1 != carriers)
+                    || stuffing.iter().any(|&byte| byte != 0xff)
+                {
+                    return Err(Error::Invalid("mux video stuffing location or bytes"));
+                }
+                &packet[end..]
+            } else {
+                &packet[4..]
+            };
+            let payload = if first {
+                let expected_flags = if picture.key { 0x50 } else { 0x10 };
+                let base = u64::from_be_bytes([
+                    0, 0, 0, packet[6], packet[7], packet[8], packet[9], packet[10],
+                ]) >> 7;
+                if !adaptation
+                    || packet[4] < 7
+                    || packet[5] != expected_flags
+                    || base != picture.dts as u64
+                    || packet[10] & 0x7f != 0x7e
+                    || packet[11] != 0
+                {
+                    return Err(Error::Invalid("mux first carrier PCR or random access"));
+                }
+                checked_pes_payload(payload, picture)?
+            } else {
+                payload
+            };
+            data = data
+                .strip_prefix(payload)
+                .ok_or(Error::Invalid("mux changed coded picture bytes"))?;
+        }
+        if !data.is_empty() {
+            return Err(Error::Invalid("mux dropped coded picture bytes"));
+        }
+        if sdt {
+            self.sdt = Some(self.sdt.unwrap_or(picture.dts).max(picture.dts));
+        }
+        if pat_pmt {
+            self.pat_pmt = Some(self.pat_pmt.unwrap_or(picture.dts).max(picture.dts));
+        }
+        self.previous_key = picture.key;
+        Ok(())
+    }
+
+    fn check_header(
+        &mut self,
+        packet: &[u8; 188],
+        pid: u16,
+        index: usize,
+        start: bool,
+    ) -> triergon_core::Result<()> {
+        let start_bits = if start { 0x40 } else { 0 };
+        let actual = u16::from_be_bytes([packet[1] & 31, packet[2]]);
+        if packet[0] != 0x47
+            || packet[1] & 0xe0 != start_bits
+            || actual != pid
+            || packet[3] & 0xd0 != 0x10
+            || packet[3] & 15 != self.next_cc[index]
+        {
+            return Err(Error::Invalid("mux carrier order, PID or continuity"));
+        }
+        self.next_cc[index] = (self.next_cc[index] + 1) % 16;
+        Ok(())
+    }
+}
+
+fn wire_crc_remainder(section: &[u8]) -> u32 {
+    let mut residue = u32::MAX;
+    for &byte in section {
+        residue ^= u32::from(byte) << 24;
+        for _ in 0..8 {
+            let high_bit = residue >> 31;
+            residue = (residue << 1) ^ (0x04c1_1db7 * high_bit);
+        }
+    }
+    residue
+}
+
+fn checked_pes_payload<'a>(
+    payload: &'a [u8],
+    picture: &Picture<'_>,
+) -> triergon_core::Result<&'a [u8]> {
+    let (header, data) = payload.split_first_chunk::<19>().ok_or(Error::Truncated)?;
+    let pts = &header[9..14];
+    let dts = &header[14..19];
+    if header[..9] != [0, 0, 1, 0xe0, 0, 0, 0x80, 0xc0, 10]
+        || pts[0] >> 4 != 3
+        || dts[0] >> 4 != 1
+        || [pts[0], pts[2], pts[4], dts[0], dts[2], dts[4]]
+            .into_iter()
+            .any(|byte| byte & 1 == 0)
+        || super::facts::wire_timestamp(pts) != Some(picture.pts as u64)
+        || super::facts::wire_timestamp(dts) != Some(picture.dts as u64)
+    {
+        return Err(Error::Invalid("mux PES extent or encoded clocks"));
+    }
+    Ok(data)
 }
 
 pub(super) fn operation<'a>(

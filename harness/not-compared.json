@@ -137,12 +137,6 @@
         "entry_points": ["reference_trace::recovery::RecoveryObserver", "reference_trace::recovery::RecoveredPacket", "reference_trace::recovery::EncodedHeader", "reference_trace::recovery::PatSelection", "reference_trace::recovery::PmtBindingJob", "reference_trace::recovery::DiagnosticPacket"],
         "degree": "unit-tests",
         "needs": "ts-recovery-trace compares registered, selected-AVC, private-audio and DVB recovery. The isolated-fault contract declares the compound-fault and incomplete-PES differences."
-      },
-      {
-        "name": "mux-single-program",
-        "entry_points": ["mux::Muxer", "mux::MuxConfig"],
-        "degree": "step",
-        "needs": "ts-mux-readback compares packet fields, wire random-access signalling, program and stream identifiers and SDT names. Configuration controls use the independent muxer, and ordinary read-back uses the bytes emitted by Muxer."
       }
     ],
     "triergon-ogg": [

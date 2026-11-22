@@ -329,6 +329,10 @@ assert_eq!(out.len() % 188, 0);
   video PID outside 0x0020–0x1FFE, equal PMT and video PIDs, and stream types other
   than 0x01 and 0x02.
 
+The [mux read-back comparison](../../harness/features/ts-mux-readback/contract.json)
+checks the table cadence, continuity, PCR and PES headers, stuffing and coded
+picture bytes on the original transport stream before native demux.
+
 | Item | FFmpeg 9.0.2 | `mux` | Reason |
 |---|---|---|---|
 | PMT stream type | 0x02 | 0x01 by default, 0x02 selectable | H.222.0 Table 2-34 reserves 0x02 for constrained-parameter 11172-2 video |
