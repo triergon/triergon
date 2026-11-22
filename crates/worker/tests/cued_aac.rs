@@ -90,25 +90,12 @@ fn coded_fixture_seek_folds_every_packet_through_eof() {
     std::fs::remove_file(path).unwrap();
 }
 
-#[test]
-fn cued_ac3_folds_both_cue_landings_through_eof() {
-    let fixture =
-        include_bytes!("../../../harness/features/matroska-cued-ac3/inputs/coded-cues.mkv");
-    assert_eq!(fixture.as_slice(), ebml::cued_ac3_coded());
-    let path = std::env::temp_dir().join(format!("triergon-cued-ac3-{}.mkv", std::process::id()));
+fn check_dolby_folds(fixture: &[u8], mode: &str, expected: [&str; 2]) {
+    let path = std::env::temp_dir().join(format!("triergon-{mode}-{}.mkv", std::process::id()));
     std::fs::write(&path, fixture).unwrap();
-    for (target, expected) in [
-        (
-            "130000000",
-            "{\"packets\":4,\"bytes\":3072,\"digest\":4603375696001153562,\"eof\":true}\n",
-        ),
-        (
-            "127600000",
-            "{\"packets\":8,\"bytes\":6144,\"digest\":7084967468992935401,\"eof\":true}\n",
-        ),
-    ] {
+    for (target, expected) in ["130000000", "127600000"].into_iter().zip(expected) {
         let result = std::process::Command::new(env!("CARGO_BIN_EXE_media-worker"))
-            .args(["cued-ac3-fold", path.to_str().unwrap(), target])
+            .args([mode, path.to_str().unwrap(), target])
             .output()
             .unwrap();
         assert!(
@@ -119,4 +106,34 @@ fn cued_ac3_folds_both_cue_landings_through_eof() {
         assert_eq!(String::from_utf8(result.stdout).unwrap(), expected);
     }
     std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn cued_ac3_folds_both_cue_landings_through_eof() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-ac3/inputs/coded-cues.mkv");
+    assert_eq!(fixture.as_slice(), ebml::cued_ac3_coded());
+    check_dolby_folds(
+        fixture,
+        "cued-ac3-fold",
+        [
+            "{\"packets\":4,\"bytes\":3072,\"digest\":4603375696001153562,\"eof\":true}\n",
+            "{\"packets\":8,\"bytes\":6144,\"digest\":7084967468992935401,\"eof\":true}\n",
+        ],
+    );
+}
+
+#[test]
+fn cued_eac3_folds_both_cue_landings_through_eof() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-eac3/inputs/coded-cues.mkv");
+    assert_eq!(fixture.as_slice(), ebml::cued_eac3_coded());
+    check_dolby_folds(
+        fixture,
+        "cued-eac3-fold",
+        [
+            "{\"packets\":4,\"bytes\":3072,\"digest\":18072471727007900406,\"eof\":true}\n",
+            "{\"packets\":8,\"bytes\":6144,\"digest\":9717410312991101686,\"eof\":true}\n",
+        ],
+    );
 }

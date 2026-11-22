@@ -1757,11 +1757,7 @@ fn coded_cued_aac_playback_seek_invalidates_queue_and_feeds_indexed_suffix() {
     }
 }
 
-#[test]
-fn coded_cued_ac3_player_seek_preserves_suffix_and_projects_clocks() {
-    let fixture =
-        include_bytes!("../../../harness/features/matroska-cued-ac3/inputs/coded-cues.mkv");
-    assert_eq!(fixture.as_slice(), cued_audio_fixture::cued_ac3_coded());
+fn check_cued_dolby_player_seek(fixture: &[u8]) {
     let (mut player, pool) = player_with_input(fixture, 7);
     let cancel = AtomicBool::new(false);
     let old = loop {
@@ -1835,6 +1831,46 @@ fn coded_cued_ac3_player_seek_preserves_suffix_and_projects_clocks() {
             (Some(ms * 1_000_000), Some(ms * 1_000_000), Some(32_000_000))
         );
     }
+}
+
+#[test]
+fn coded_cued_ac3_player_seek_preserves_suffix_and_projects_clocks() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-ac3/inputs/coded-cues.mkv");
+    assert_eq!(fixture.as_slice(), cued_audio_fixture::cued_ac3_coded());
+    check_cued_dolby_player_seek(fixture);
+}
+
+#[test]
+fn coded_cued_eac3_player_seek_preserves_suffix_and_projects_clocks() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-eac3/inputs/coded-cues.mkv");
+    assert_eq!(fixture.as_slice(), cued_audio_fixture::cued_eac3_coded());
+    let cancel = AtomicBool::new(false);
+    let mut reader = triergon_matroska::typed::BlockingReader::open_seekable(
+        std::io::Cursor::new(fixture),
+        triergon_matroska::Limits::default(),
+    )
+    .unwrap();
+    let mut count = 0;
+    while let Some(packet) = reader.next_packet(&cancel).unwrap() {
+        let header = triergon_framing::probe_ac3_header(&packet.data).unwrap();
+        assert_eq!(
+            (
+                header.family,
+                header.frame_bytes,
+                header.sample_rate_hz,
+                header.blocks,
+                header.coded_samples(),
+                header.acmod,
+                header.lfe_on
+            ),
+            (Ac3Family::Eac3, 768, 48_000, 6, 1536, 1, false)
+        );
+        count += 1;
+    }
+    assert_eq!(count, 8);
+    check_cued_dolby_player_seek(fixture);
 }
 
 #[test]

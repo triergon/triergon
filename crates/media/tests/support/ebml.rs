@@ -99,7 +99,21 @@ fn aac_cues(first: Vec<u8>, second: Vec<u8>, second_time: u64) -> (Vec<u8>, u64,
 
 /// Eight encoded 48 kHz AC-3 frames from the repository's authored fixture.
 pub(crate) fn cued_ac3_coded() -> Vec<u8> {
-    let source = include_bytes!("../../../../harness/fixtures/encoded/avc-ac3.mkv");
+    cued_dolby_coded(
+        include_bytes!("../../../../harness/fixtures/encoded/avc-ac3.mkv"),
+        b"A_AC3",
+    )
+}
+
+/// Eight encoded 48 kHz E-AC-3 frames from the repository's authored fixture.
+pub(crate) fn cued_eac3_coded() -> Vec<u8> {
+    cued_dolby_coded(
+        include_bytes!("../../../../harness/fixtures/encoded/avc-eac3.mkv"),
+        b"A_EAC3",
+    )
+}
+
+fn cued_dolby_coded(source: &[u8], codec: &[u8]) -> Vec<u8> {
     let frames: Vec<_> = source
         .windows(768)
         .filter(|w| w[..2] == [0x0b, 0x77])
@@ -114,21 +128,14 @@ pub(crate) fn cued_ac3_coded() -> Vec<u8> {
     };
     let rate = element(0xb5, &48_000_f64.to_be_bytes());
     let audio = element(0xe1, &[rate, uint(0x9f, 1)].concat());
-    audio_cues(
-        make_cluster(0, 0),
-        make_cluster(128, 4),
-        128,
-        b"A_AC3",
-        &audio,
-    )
-    .0
+    audio_cues(make_cluster(0, 0), make_cluster(128, 4), 128, codec, &audio).0
 }
 
-/// A track admission control; the payload is deliberately opaque, not E-AC-3.
+/// A 44.1 kHz track admission control; the payload is deliberately opaque, not E-AC-3.
 pub(crate) fn cued_eac3_opaque() -> Vec<u8> {
     let audio = element(
         0xe1,
-        &[element(0xb5, &48_000_f64.to_be_bytes()), uint(0x9f, 1)].concat(),
+        &[element(0xb5, &44_100_f64.to_be_bytes()), uint(0x9f, 1)].concat(),
     );
     audio_cues(
         cluster(0, simple(7, 0, 0x80, b"opaque")),

@@ -360,6 +360,27 @@ impl<R: Read> BlockingReader<R> {
             cancel,
         )
     }
+    /// Seek to a validated preceding Cue in the supported single-track E-AC-3 profile.
+    pub fn seek_cued_eac3(
+        &mut self,
+        track: usize,
+        requested_ns: i64,
+        cancel: &AtomicBool,
+    ) -> Result<crate::matroska::SeekReceipt> {
+        if !crate::matroska::typed::seek::cued_eac3_profile(self.reader.tracks(), track) {
+            self.reader.failed = true;
+            return Err(Error::Unsupported("seek requires single-track cued E-AC-3"));
+        }
+        self.seek(
+            SeekRequest {
+                track,
+                requested_ns,
+                playback_preroll: false,
+            },
+            RecoveryAudio::CuedAudio,
+            cancel,
+        )
+    }
     pub fn seek_for_playback(
         &mut self,
         track: usize,

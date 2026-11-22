@@ -8,7 +8,9 @@ fn main() -> std::io::Result<()> {
     let kind = std::env::args_os().nth(2);
     std::fs::write(
         path,
-        if kind.as_deref() == Some(std::ffi::OsStr::new("ac3")) {
+        if kind.as_deref() == Some(std::ffi::OsStr::new("eac3")) {
+            ebml::cued_eac3_coded()
+        } else if kind.as_deref() == Some(std::ffi::OsStr::new("ac3")) {
             ebml::cued_ac3_coded()
         } else if kind.as_deref() == Some(std::ffi::OsStr::new("coded")) {
             ebml::cued_aac_coded()

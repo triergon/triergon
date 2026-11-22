@@ -294,7 +294,7 @@ static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t)
 
 #ifdef TRIERGON_CUED_AAC_REFERENCE
 static int cued_audio_main(int argc, char **argv, const uint8_t *data, size_t size) {
-    const char *mode = argv[1] + 9;
+    const char *mode = argv[1] + (!strncmp(argv[1], "cued-eac3-", 10) ? 10 : 9);
     int bench = !strcmp(mode, "bench");
     int memory = !strcmp(mode, "memory");
     int trace = !strcmp(mode, "trace");
@@ -390,7 +390,7 @@ int main(int argc,char **argv){
     if(!strncmp(argv[1],"subtitle-text-",14)){int result=text_main(argc,argv,data,size);free(data);return result;}
 #endif
 #ifdef TRIERGON_CUED_AAC_REFERENCE
-    if (!strncmp(argv[1], "cued-aac-", 9) || !strncmp(argv[1], "cued-ac3-", 9)) {
+    if (!strncmp(argv[1], "cued-aac-", 9) || !strncmp(argv[1], "cued-ac3-", 9) || !strncmp(argv[1], "cued-eac3-", 10)) {
         int result = cued_audio_main(argc, argv, data, (size_t)size);
         free(data);
         return result;

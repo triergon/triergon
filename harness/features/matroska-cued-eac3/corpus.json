@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "preceding-cue",
+      "profile": "preceding-cue",
+      "file": "harness/features/matroska-cued-eac3/inputs/coded-cues.mkv",
+      "sha256": "5dee8e8b4b0e217d1de4e32beaf71820f37674e460bf31bb3a82840fda63bc9e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "130000000"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 3072,
+        "digest": 18072471727007900406,
+        "eof": true
+      }
+    },
+    {
+      "id": "fraction-before-second-cue",
+      "profile": "fraction-before-second-cue",
+      "file": "harness/features/matroska-cued-eac3/inputs/coded-cues.mkv",
+      "sha256": "5dee8e8b4b0e217d1de4e32beaf71820f37674e460bf31bb3a82840fda63bc9e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "127600000"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 6144,
+        "digest": 9717410312991101686,
+        "eof": true
+      }
+    }
+  ]
+}

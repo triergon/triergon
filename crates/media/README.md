@@ -175,15 +175,15 @@ its source clock and bytes; it does not validate or decode AAC payloads. The
 neutral `ContainerReader::request_seek` routes audio requests through this same
 checked operation; video requests retain their existing seek policies.
 
-The neutral reader also admits a single `A_AC3` track at 48 kHz and one
+The neutral reader also admits a single `A_AC3` or `A_EAC3` track at 48 kHz and one
 channel, with empty CodecPrivate and zero delay and preroll. It requires a
 preceding validated Cue and returns source packet clocks and bytes without
-validating the payload. `BlockingReader::seek_cued_ac3` exposes the same seek.
+validating the payload. `BlockingReader::seek_cued_ac3` and `seek_cued_eac3` expose the same seek.
 The [local comparison](../../harness/features/matroska-cued-ac3/README.md)
 checks an encoded packet suffix through EOF. Cue structure follows RFC 9559
 §§5.1.5 and 22; AC-3 syncframe timing follows ATSC A/52:2018.
 
-The `media-worker` and public libavformat reference expose the `cued-aac-`
+The `media-worker` and public libavformat reference expose the `cued-aac-`, `cued-ac3-` and `cued-eac3-`
 worker protocol. The reference uses a backward `av_seek_frame` and public flags
 that preserve demuxed fields. `trace`, `fold` and `memory` take a file and a
 seek target in nanoseconds; `bench` additionally takes an iteration count before

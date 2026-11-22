@@ -485,7 +485,8 @@ fn entry() -> Outcome {
             Ok(())
         }
         "cued-aac-trace" | "cued-aac-fold" | "cued-aac-bench" | "cued-aac-memory"
-        | "cued-ac3-trace" | "cued-ac3-fold" | "cued-ac3-bench" | "cued-ac3-memory" => {
+        | "cued-ac3-trace" | "cued-ac3-fold" | "cued-ac3-bench" | "cued-ac3-memory"
+        | "cued-eac3-trace" | "cued-eac3-fold" | "cued-eac3-bench" | "cued-eac3-memory" => {
             cued_audio(mode, &data, words)
         }
         "seek-trace" => seek_trace(data, words, false),
@@ -509,13 +510,16 @@ fn entry() -> Outcome {
 #[inline(never)]
 fn cued_audio(mode: &str, data: &[u8], words: &[String]) -> Outcome {
     use std::io::Write;
-    let (ac3, mode) = match mode.strip_prefix("cued-ac3-") {
-        Some(mode) => (true, mode),
-        None => (
-            false,
+    let (codec, mode) = if let Some(mode) = mode.strip_prefix("cued-eac3-") {
+        (2, mode)
+    } else if let Some(mode) = mode.strip_prefix("cued-ac3-") {
+        (1, mode)
+    } else {
+        (
+            0,
             mode.strip_prefix("cued-aac-")
                 .ok_or("unknown cued audio mode")?,
-        ),
+        )
     };
     let bench = mode == "bench";
     let memory = mode == "memory";
@@ -538,7 +542,9 @@ fn cued_audio(mode: &str, data: &[u8], words: &[String]) -> Outcome {
     for _ in 0..n {
         let mut reader = Demuxer::open_seekable(Cursor::new(data), Limits::default())?;
         let cancel = AtomicBool::new(false);
-        let landing = if ac3 {
+        let landing = if codec == 2 {
+            reader.seek_cued_eac3(0, target, &cancel)?
+        } else if codec == 1 {
             reader.seek_cued_ac3(0, target, &cancel)?
         } else {
             reader.seek_cued_aac(0, target, &cancel)?
