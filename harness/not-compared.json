@@ -281,19 +281,13 @@
         "name": "transport-packets",
         "entry_points": ["transport::parse_transport", "transport::TransportFramer::push", "transport::TransportFramer::finish", "transport::NullCarrierRun", "transport::Pcr::ticks_27mhz", "transport::Pcr::raw_time", "transport::Adaptation::pcr_reserved_bits", "transport::TransportObservation::to_packet", "transport::RejectedTransport::source_range"],
         "degree": "step",
-        "needs": "a worker operation framing each corpus file with TransportFramer and parse_transport at 1-, 7- and 4096-byte windows, folding every packet's offset and bytes against the reference's mpegtsraw packets and its header, adaptation and PCR fields against an H.222.0 2.4.3 oracle; compared today only inside TransportStream and Reader"
+        "needs": "ts-packet-fields compares all carrier fields and ranges against the specification oracle. The ts-packets reference comparison still has opening refusals on physical entities the source framer reads."
       },
       {
         "name": "psi-catalogue",
         "entry_points": ["psi::PatReader", "psi::PmtReader::new", "psi::PatCollector", "psi::SectionAssembler", "psi::ElementaryStream", "psi::Descriptor::languages", "psi::DvbSubtitling::services", "psi::DvbSubtitlingService::has_dvb_subtitling_type"],
         "degree": "step",
-        "needs": "a catalogue operation folding each accepted PAT and PMT (program number, PMT PID, PCR PID, stream PID, stream type, codec, language, DVB subtitling services) against the reference's AVProgram and AVStream fields; compared today only through the packets the readers select by them"
-      },
-      {
-        "name": "psi-video-descriptors",
-        "entry_points": ["psi::Descriptor::avc_video", "psi::Descriptor::hevc_video"],
-        "degree": "unit-tests",
-        "needs": "the AVC and HEVC video descriptor fields of each PMT compared with an H.222.0 2.6.64 and 2.6.95 oracle; no reference reports them"
+        "needs": "ts-psi-readers compares the standalone PAT and PMT readers with the formats demuxer. Open cases cover table recovery, stream identity and private namespace selection."
       },
       {
         "name": "source-stream-polling",
@@ -359,7 +353,7 @@
         "name": "reference-trace-catalogue",
         "entry_points": ["reference_trace::catalogue::Catalogue", "reference_trace::catalogue::CatalogueCodec", "reference_trace::catalogue::PsiCompatibility", "reference_trace::catalogue::PsiCompatibilityPolicies", "reference_trace::catalogue::PsiCompatibilityEvidence"],
         "degree": "unit-tests",
-        "needs": "a worker operation running the catalogue projection against the reference's program and stream order, PCR PID, codec and language after avformat_open_input; no worker runs it"
+        "needs": "ts-catalogue compares the projection and its opt-in PSI policies with the formats demuxer. Open cases cover its selected-program scope, unsupported descriptors and stream types, disposition flags and table recovery."
       },
       {
         "name": "reference-trace-recovery",
