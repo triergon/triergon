@@ -141,9 +141,6 @@
       "compat": "compat::pes::reject_corrupt_duplicate_carrier for a consumer reproducing the reference demux corruption decision.",
       "cases": [
         "legal-duplicate-44100"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
