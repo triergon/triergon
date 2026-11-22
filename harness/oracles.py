@@ -42,6 +42,7 @@ TRACE_ORACLES = {
     "tx3g-semantics": ("harness.tx3g_semantics_oracle", "trace"),
     "opus-final-range": ("harness.opus_range_oracle", "ranges"),
     "core-budgets": ("harness.core_budget_oracle", "budget_trace"),
+    "ac3-features": ("harness.ac3_audblk_oracle", "trace"),
     "divide": ("harness.codec_dsp_oracle", "divide"),
     "windows": ("harness.codec_dsp_oracle", "windows"),
     "rbsp": ("harness.bitstream_oracle", "rbsp"),
