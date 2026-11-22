@@ -303,6 +303,10 @@ The [continuity reader comparison](../../harness/features/ts-reader-container/co
 checks the pending request and closure, then grades the residue's physical
 source end and typed confirming events alongside its paired packet result.
 
+The [reader view comparison](../../harness/features/ts-reader-views/contract.json)
+checks track signalling against PMT carrier bytes and reconstructs the reported
+opaque or incomplete elementary ranges from the retained PES payload.
+
 ## Writing TS
 
 `mux::Muxer` writes 188-byte packets for one video elementary stream, one PES per

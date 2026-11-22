@@ -32,6 +32,8 @@ use triergon_mpegts::{
 use super::{CAPACITY, SOURCE, WINDOW, WORK, capabilities, explain, row};
 use crate::protocol::{Operation, Work};
 
+mod wire;
+
 struct Entity {
     bytes: Bytes,
     base: u64,
@@ -436,6 +438,7 @@ impl Output<'_, '_> {
         if self.tracks.insert(pid, epoch) == Some(epoch) || self.container {
             return Ok(());
         }
+        wire::track(self.entities, track)?;
         let stream = track.stream();
         let tag = crate::catalogue::published_codec_tag(stream)?;
         let mut dvb = Vec::new();
@@ -618,6 +621,9 @@ impl Output<'_, '_> {
                     .pes_source()
                     .ok_or("video source is not PES")?;
                 let range = video.elementary_range();
+                if !self.container {
+                    wire::payload(range.clone(), video.bytes().as_ref(), video.sources())?;
+                }
                 self.timed_packet(
                     pes,
                     (first.payload_range.start == 0).then_some(pes),
@@ -640,6 +646,9 @@ impl Output<'_, '_> {
                     .pes_source()
                     .ok_or("audio source is not PES")?;
                 let range = audio.elementary_range();
+                if !self.container {
+                    wire::payload(range.clone(), audio.bytes().as_ref(), audio.sources())?;
+                }
                 let carriage = match audio.carriage() {
                     PrivateAudioCarriage::DvbAc3Tag => 0,
                     PrivateAudioCarriage::DvbEac3Tag => 1,
