@@ -245,23 +245,24 @@ pub struct ProgramMap {
 
 /// Incremental parser of one PMT section's descriptor and elementary stream loops.
 #[derive(Debug)]
+#[repr(C)]
 pub struct PmtReader {
-    budget: Budget,
-    limits: ParseLimits,
-    source: Bytes,
+    pending: Option<ElementaryStream>,
+    streams: BudgetVec<ElementaryStream>,
+    source_ranges: BudgetVec<SourceRange>,
     header: SectionHeader,
-    pcr_pid: u16,
+    budget: Budget,
+    source: Bytes,
     program_descriptors: Bytes,
+    limits: ParseLimits,
     position: usize,
     descriptor_end: usize,
     descriptor_start: usize,
-    namespace: super::DescriptorNamespace,
-    pending: Option<ElementaryStream>,
-    program_phase: bool,
-    streams: BudgetVec<ElementaryStream>,
-    source_ranges: BudgetVec<SourceRange>,
     descriptor_count: usize,
+    pcr_pid: u16,
+    program_phase: bool,
     done: bool,
+    namespace: super::DescriptorNamespace,
 }
 
 impl PmtReader {
