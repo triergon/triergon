@@ -1144,7 +1144,7 @@ enum PlanPhase {
     AvcBuffering(LengthSize),
     AvcBufferingInject,
     Scan,
-    Inject,
+    Inject(Injection),
     Nal,
     Reserve,
 }
@@ -1178,22 +1178,23 @@ struct PacketState<'a> {
     observed_packet: bool,
     packet_source_refusal: Option<NalHeaderError>,
 }
+#[repr(C)]
 struct PacketPlan {
-    phase: PlanPhase,
+    // A hint sizes a later spill without reserving while descriptors fit inline.
+    segment_hint: Option<usize>,
+    storage_bound: PacketStorageBound,
+    injection_index: usize,
     // Verification, array admission, lookahead and scanning run in order.
     // The cursor is reset before its next role; source offsets stay full width.
     offset: usize,
     length: usize,
     prefix_read: usize,
     nals: usize,
+    look_nals: usize,
     nal: Option<u8>,
-    injection: Option<(Injection, usize)>,
+    phase: PlanPhase,
     injected_irap: bool,
     has_irap: bool,
-    look_nals: usize,
-    storage_bound: PacketStorageBound,
-    // A hint sizes a later spill without reserving while descriptors fit inline.
-    segment_hint: Option<usize>,
 }
 enum PacketStorageBound {
     Unchecked,
@@ -1209,7 +1210,7 @@ impl PacketPlan {
             prefix_read: 0,
             nals: 0,
             nal: None,
-            injection: None,
+            injection_index: 0,
             injected_irap: false,
             has_irap: false,
             look_nals: 0,

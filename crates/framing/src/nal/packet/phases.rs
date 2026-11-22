@@ -112,7 +112,9 @@ impl PacketPlan {
                     self.inject_for_avc_buffering(state, input, work)?
                 }
                 PlanPhase::Scan => self.scan_nal(state, input, work, cancel)?,
-                PlanPhase::Inject => self.inject_configuration(state, input, work, cancel)?,
+                PlanPhase::Inject(which) => {
+                    self.inject_configuration(state, input, which, work, cancel)?
+                }
                 PlanPhase::Nal => self.append_nal(state, input, work)?,
                 PlanPhase::Reserve => return Ok(None),
             };
@@ -492,8 +494,8 @@ impl PacketPlan {
             self.segment_hint = Some(state.session.segments.len() + 1 + inserted);
         }
         if let Some(i) = inject {
-            self.injection = Some((i, 0));
-            self.phase = PlanPhase::Inject;
+            self.injection_index = 0;
+            self.phase = PlanPhase::Inject(i);
         } else {
             self.phase = PlanPhase::Nal;
         }
@@ -581,13 +583,11 @@ impl PacketPlan {
         &mut self,
         state: &mut PacketState<'_>,
         input: PacketInput<'_>,
+        which: Injection,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step> {
-        // Continuing to the NAL without a plan instead measured +0.2% per packet.
-        let (which, mut index) = self
-            .injection
-            .ok_or(Error::Invalid("missing injection plan"))?;
+        let mut index = self.injection_index;
         loop {
             if !work.try_charge(1) {
                 return Ok(YIELD);
@@ -596,7 +596,6 @@ impl PacketPlan {
                 if matches!(which, Injection::Sps) {
                     state.avc.set(AvcState::SPS);
                 }
-                self.injection = None;
                 self.injected_irap = true;
                 self.phase = PlanPhase::Nal;
                 return Ok(NEXT);
@@ -612,7 +611,7 @@ impl PacketPlan {
                 self.append(state, input, segment)?;
             }
             index += 1;
-            self.injection = Some((which, index));
+            self.injection_index = index;
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
