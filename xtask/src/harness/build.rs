@@ -579,6 +579,10 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             "harness/reference_transport_facts.h",
             "harness/reference_transport_reader.h",
             "harness/reference_transport_mux.h",
+            "harness/ts_descriptor_oracle.py",
+            "harness/ts_packet_oracle.py",
+            "xtask/src/transport_views/catalogue.rs",
+            "xtask/src/transport_views/packets.rs",
             "xtask/src/transport_views/mod.rs",
         ],
         "playback-views-worker" => &[
