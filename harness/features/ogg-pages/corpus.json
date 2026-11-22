@@ -1,0 +1,780 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "remux-1.0-test-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-1.0-test_small.ogg",
+      "sha256": "83d63952ef8fbf2d1f3d58c207a4ce9bbcab5af78ddc415f69dcbe1cba41205d",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 16,
+        "bytes": 98557,
+        "digest": 2978679615216950793
+      }
+    },
+    {
+      "id": "remux-1.0.1-test-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-1.0.1-test_small.ogg",
+      "sha256": "f5ad15dcc5baf2ba2c528a59fd39473a4c33a4fc00678f05235dbb99577e6853",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 20,
+        "bytes": 97670,
+        "digest": 18172364128782755279
+      }
+    },
+    {
+      "id": "remux-6.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-6.ogg",
+      "sha256": "b771866c242c2bb16930455592998b27ecf41a6a4fe8cbb6d3b838db398a8f49",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 16,
+        "bytes": 86227,
+        "digest": 10945102278487266242
+      }
+    },
+    {
+      "id": "remux-beta3-test-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-beta3-test_small.ogg",
+      "sha256": "669c176aaae60304722b67641b47b15dca82e74ba4cfe9a592e8c1e79d792974",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 14,
+        "bytes": 98024,
+        "digest": 1668209290870493378
+      }
+    },
+    {
+      "id": "remux-beta4-test-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-beta4-test_small.ogg",
+      "sha256": "b3a820729f082a94a5665e4d1839b3b82894dac39121d3a7039ecb8a0ed23609",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 20,
+        "bytes": 96635,
+        "digest": 5753090434475844585
+      }
+    },
+    {
+      "id": "remux-chain-test1-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-chain-test1_small.ogg",
+      "sha256": "5a37f1636469dbd21898638d26ed280b1e08708dd20a205d725d6c61c3fd8866",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 20,
+        "bytes": 98425,
+        "digest": 8929194979447796697
+      }
+    },
+    {
+      "id": "remux-chain-test2-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-chain-test2_small.ogg",
+      "sha256": "372a632e3b09d34a4bcf5ef62d38c7b2ffc1d69ac790505b7e93aca959d96476",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 26,
+        "bytes": 96888,
+        "digest": 13945956977133318830
+      }
+    },
+    {
+      "id": "remux-highrate-test-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-highrate-test_small.ogg",
+      "sha256": "76012270064a45c890471eb5e402457960151b2f75e6b9a34d2113a1c4198b40",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 14,
+        "bytes": 97810,
+        "digest": 8883461267679304922
+      }
+    },
+    {
+      "id": "remux-lsp-test2-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-lsp-test2_small.ogg",
+      "sha256": "d7786e56a16217393ab296657caff736b07a2928d76c77e61488140c6e673509",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 16,
+        "bytes": 98224,
+        "digest": 13178325721850582898
+      }
+    },
+    {
+      "id": "remux-lsp-test3-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-lsp-test3_small.ogg",
+      "sha256": "c96f62d9bdedcb5f2be4225b0ddbd6417ec8dd5f8dfd2675605cb04b5dd9a717",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 12,
+        "bytes": 98227,
+        "digest": 6219043708358970204
+      }
+    },
+    {
+      "id": "remux-lsp-test4-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-lsp-test4_small.ogg",
+      "sha256": "baa7074fd303a9249ecd10e5a10e3a85078f103e2c1b5e4edcf016b913f2a869",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 14,
+        "bytes": 97863,
+        "digest": 1424034206431967658
+      }
+    },
+    {
+      "id": "remux-lsp-test-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-lsp-test_small.ogg",
+      "sha256": "32604665148892cdacd1ffbcd35e2f5ef94be612041520b92e4ebde3ef34d47b",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 18,
+        "bytes": 96202,
+        "digest": 16770191113550997366
+      }
+    },
+    {
+      "id": "remux-mono-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-mono_small.ogg",
+      "sha256": "780c650019188ce6233d146e4a0950dbccc78fe2fd02ce150d581a8acb21f0c2",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 22,
+        "bytes": 97718,
+        "digest": 1736758544830941546
+      }
+    },
+    {
+      "id": "remux-moog-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-moog_small.ogg",
+      "sha256": "1a0578175e3fe41738600737362466a2821e3c6a5f27c99d7fbf6f011322b2c3",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 18,
+        "bytes": 97808,
+        "digest": 182312110778983275
+      }
+    },
+    {
+      "id": "remux-rc1-test-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-rc1-test_small.ogg",
+      "sha256": "df9a0af029dd674bd005183e57d5a7f2ca66cae68f4e64203073657815fa044e",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 22,
+        "bytes": 96877,
+        "digest": 14148652763505329100
+      }
+    },
+    {
+      "id": "remux-rc2-test2-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-rc2-test2_small.ogg",
+      "sha256": "5b0c5b501d2dfcf8dd8d90f61992c8195d8db6e09c6c56d5fdceca1cd709fbdf",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 30,
+        "bytes": 98419,
+        "digest": 149350646712487179
+      }
+    },
+    {
+      "id": "remux-rc2-test-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-rc2-test_small.ogg",
+      "sha256": "1f4b4283f877c9b711b697074c0be8ebe5c607ef98a5147f1ecbe1209f32680b",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 26,
+        "bytes": 98694,
+        "digest": 6734614122177547503
+      }
+    },
+    {
+      "id": "remux-rc3-test-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-rc3-test_small.ogg",
+      "sha256": "cdcbe09a5d1856898681de2a9e45d24664ecc2bdbce5ba0ce108d1736089ef17",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 16,
+        "bytes": 96100,
+        "digest": 10487010108952716445
+      }
+    },
+    {
+      "id": "remux-sleepzor-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-sleepzor_small.ogg",
+      "sha256": "b6d818e397ccb60b851221f8e90d9140189eec0b817206a85f7d13bd6a9ee547",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 16,
+        "bytes": 98892,
+        "digest": 1550371775666340010
+      }
+    },
+    {
+      "id": "remux-test-short2-small.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-test-short2_small.ogg",
+      "sha256": "c2f1176a4f61131ac142cbe15ce8505b14e80d7d12240cec6d49ff5dbab66957",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 14,
+        "bytes": 97989,
+        "digest": 12614355520569206537
+      }
+    },
+    {
+      "id": "remux-vorbis-chapter-extension-demo.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-vorbis_chapter_extension_demo.ogg",
+      "sha256": "35f94cf84914c11b54e76b30685d88727079acd371841eda156139782309e4de",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 44,
+        "bytes": 107295,
+        "digest": 12353431030404328866
+      }
+    },
+    {
+      "id": "remux-a-flac.oga",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-a_flac.oga",
+      "sha256": "7d5814e0de62f61c98b17046102f769ac5bc60b681fdf6ebf49dcc18cc58ac29",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 19544,
+        "digest": 2773276821759386684
+      }
+    },
+    {
+      "id": "remux-a-opus.opus",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-a_opus.opus",
+      "sha256": "e5064256fe3ed0bc6913f6d4c7c1c1b2e2927e249406df5dd63e91785dc7e633",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 19520,
+        "digest": 6530723420391089701
+      }
+    },
+    {
+      "id": "remux-a-vorbis.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-a_vorbis.ogg",
+      "sha256": "c66242b9d700b6d5e858e0632f060dfd5f469a42c7a16072758901d1137886d7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 8430,
+        "digest": 17998335562063665200
+      }
+    },
+    {
+      "id": "remux-b-opus.opus",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-b_opus.opus",
+      "sha256": "8d92aa6fa763903c39a51e7b65fd8d724bc3f4e91a190224bd4081a897fbb2ca",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 6,
+        "bytes": 10391,
+        "digest": 8024347879342752915
+      }
+    },
+    {
+      "id": "remux-b-vorbis.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-b_vorbis.ogg",
+      "sha256": "e4ef73e8b0196b0910856c3173037d01b7be89214f77051b5ed53daa0a98a795",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 6,
+        "bytes": 6004,
+        "digest": 1172624153653859169
+      }
+    },
+    {
+      "id": "remux-chain-opus.opus",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-chain_opus.opus",
+      "sha256": "8f7b2746bf120a926b10fdc7ce1b4c4c26e824bc9153075fbf9e2a309516af63",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 14,
+        "bytes": 29911,
+        "digest": 7519738879690768866
+      }
+    },
+    {
+      "id": "remux-chain-vorbis.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-chain_vorbis.ogg",
+      "sha256": "ff01ea0558245c6070568feeedba54b0b6871bcb0679546fa20cb15dba8d76a9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 14,
+        "bytes": 14434,
+        "digest": 13094165680658183163
+      }
+    },
+    {
+      "id": "remux-crc-bad.opus",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-crc_bad.opus",
+      "sha256": "3f59e00db00fb93ac28be08ad497a6b1103c587cf3870475b756bcaa060bd55a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 17845,
+        "digest": 17524709308477701485
+      }
+    },
+    {
+      "id": "remux-flac-51-24.oga",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-flac_51_24.oga",
+      "sha256": "30c04c9a4703ad9001bda221ddbb3df196831ead8d4553764fce90ab3ddd71f1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 113971,
+        "digest": 11513674332029827176
+      }
+    },
+    {
+      "id": "remux-lost-page.opus",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-lost_page.opus",
+      "sha256": "4c448e8cf384543a38d5fe1de89600aca075abd7348a2fa1101d8a6b78232ef1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 18020,
+        "digest": 2740831903765630141
+      }
+    },
+    {
+      "id": "remux-mc-opus.opus",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-mc_opus.opus",
+      "sha256": "a0161f3d07c11bf2ab58676c9987c5a86fe57fd9c1b340de583b59dd7e1632ef",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 24244,
+        "digest": 4381848745056080027
+      }
+    },
+    {
+      "id": "remux-mux2.opus",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-mux2.opus",
+      "sha256": "377e3715b1eb46a85ecbaec1281e8f53c894eb941c15eb7361c713904388f55c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 12,
+        "bytes": 13025,
+        "digest": 2810729421016404663
+      }
+    },
+    {
+      "id": "remux-truncated.opus",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-truncated.opus",
+      "sha256": "d6cd426ec565d2c9aebaa8688f347878f60d3c940e77a99c7fd5afba3d337308",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 18320,
+        "digest": 15703916353070618396
+      }
+    },
+    {
+      "id": "remux-bear.ogv",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-bear.ogv",
+      "sha256": "cdf14f0f03cfa08a94c1f2825b43e3df194c3f0af02018fe8695e91d6947cc3c",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 24,
+        "bytes": 57893,
+        "digest": 7878646803131376394
+      }
+    },
+    {
+      "id": "remux-empty-theora-packets.ogv",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-empty_theora_packets.ogv",
+      "sha256": "de42934c0ad6049dada4c27132982a09213c24d2d82d80f2959a183e94f1b97b",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 48,
+        "bytes": 5205,
+        "digest": 4091471156625306475
+      }
+    },
+    {
+      "id": "remux-offset-test.ogv",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-offset_test.ogv",
+      "sha256": "4e21bcb866dd67db275dd73420f435b98ce5dc70fc7f3feb6eec3d68dcf58385",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 30,
+        "bytes": 211835,
+        "digest": 11123592063728614935
+      }
+    },
+    {
+      "id": "remux-ogg-flac-chained-meta.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-ogg-flac-chained-meta.ogg",
+      "sha256": "44af2531dea6c00babcb0b809630804a35b0d8511cbdd070649d34807fef1794",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 12,
+        "bytes": 5289,
+        "digest": 14298997575432377588
+      }
+    },
+    {
+      "id": "remux-ogg-opus-chained-meta.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-ogg-opus-chained-meta.ogg",
+      "sha256": "1214339a3e2baaebcb10444bb22ce8a82dc34cb22c489f1abcf9e2c0f3f7e9e1",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 12,
+        "bytes": 3307,
+        "digest": 9295273536810698623
+      }
+    },
+    {
+      "id": "remux-ogg-vorbis-chained-meta.ogg",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-ogg-vorbis-chained-meta.ogg",
+      "sha256": "7a20792a10505397e5972a5ca659f4f95a374fbe81432098b96209ddcf1a40a3",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 12,
+        "bytes": 7175,
+        "digest": 14043143696464016873
+      }
+    },
+    {
+      "id": "remux-speex-nb.spx",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-speex_nb.spx",
+      "sha256": "a951cd4f212cffe8d7e7fb9de3de854bd5a51adde75e33286e0903fb5204f40e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 2686,
+        "digest": 696118467693438348
+      }
+    },
+    {
+      "id": "remux-speex-wb.spx",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-speex_wb.spx",
+      "sha256": "b7aa16121d8e913bd8150dbdb608f51fc3c4b9947b88992b6e04644986212837",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 6,
+        "bytes": 1021,
+        "digest": 677573882329332135
+      }
+    },
+    {
+      "id": "remux-speex-uwb-stereo.spx",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-speex_uwb_stereo.spx",
+      "sha256": "b0af25c6dd5949eb2bbf572739ead920fd0c4394bbff39ad54e6b4dec5bf548c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 6,
+        "bytes": 4549,
+        "digest": 14731237894413723692
+      }
+    },
+    {
+      "id": "remux-speex-skeleton.spx",
+      "profile": "reference-refusal",
+      "file": ".research/speex-generated/speex_skeleton.spx",
+      "sha256": "07a5070c8bcc01f545a17acb529879f6cddd06efa0bff9ab53b7befeeafb1e27",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "remux-chain-speex.spx",
+      "profile": "remux",
+      "file": ".research/ogg-page-inputs/page-a-chain_speex.spx",
+      "sha256": "fca1bec8d702f74eec8c5eda8fb3ff19af35bdf20856e2e9609659670d74ed28",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 4042,
+        "digest": 6688306632785424034
+      }
+    },
+    {
+      "id": "wire-flags",
+      "profile": "wire",
+      "file": ".research/ogg-page-inputs/wire-flags.ogg",
+      "sha256": "85974b6413a6b877ba4f7dd9dba293c17d1d177c4ea10c73c658e6f662772163",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "wire"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 65814,
+        "digest": 18341550444463273127
+      }
+    },
+    {
+      "id": "wire-short-4",
+      "profile": "wire",
+      "file": ".research/ogg-page-inputs/wire-short-4.ogg",
+      "sha256": "68d9ed2adb24458ff173db06b41b9d1b6e228764c457030d63fad11b02bfae1e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "wire"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "wire-short-26",
+      "profile": "wire",
+      "file": ".research/ogg-page-inputs/wire-short-26.ogg",
+      "sha256": "414b5e0fec3b50aa7ad977377de95eb9becc73a6035288af490833ba20f389d2",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "wire"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "wire-short-28",
+      "profile": "wire",
+      "file": ".research/ogg-page-inputs/wire-short-28.ogg",
+      "sha256": "ca163d04273a33e59ee25565991bd8441ea99c93e73fb79f6685db27817fdf2f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "wire"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "wire-short-65537",
+      "profile": "wire",
+      "file": ".research/ogg-page-inputs/wire-short-65537.ogg",
+      "sha256": "c2d9a3e0332d5dff9f600402dbd1396fd64e88bfd1bd1b92a51a60c1413ed758",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "wire"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 252,
+        "digest": 17493461587227885107
+      }
+    },
+    {
+      "id": "wire-remux-lost-page.opus",
+      "profile": "wire",
+      "file": ".research/ogg-page-inputs/page-a-lost_page.opus",
+      "sha256": "4c448e8cf384543a38d5fe1de89600aca075abd7348a2fa1101d8a6b78232ef1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "wire"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 18020,
+        "digest": 6182998414525424842
+      }
+    },
+    {
+      "id": "wire-remux-speex-uwb-stereo.spx",
+      "profile": "wire",
+      "file": ".research/ogg-page-inputs/page-a-speex_uwb_stereo.spx",
+      "sha256": "b0af25c6dd5949eb2bbf572739ead920fd0c4394bbff39ad54e6b4dec5bf548c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "wire"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 4549,
+        "digest": 4801871654992259234
+      }
+    },
+    {
+      "id": "wire-remux-speex-skeleton.spx",
+      "profile": "wire",
+      "file": ".research/speex-generated/speex_skeleton.spx",
+      "sha256": "07a5070c8bcc01f545a17acb529879f6cddd06efa0bff9ab53b7befeeafb1e27",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "wire"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 2661,
+        "digest": 11271481890011886773
+      }
+    },
+    {
+      "id": "wire-remux-chain-speex.spx",
+      "profile": "wire",
+      "file": ".research/ogg-page-inputs/page-a-chain_speex.spx",
+      "sha256": "fca1bec8d702f74eec8c5eda8fb3ff19af35bdf20856e2e9609659670d74ed28",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "wire"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 4042,
+        "digest": 14236107025168995569
+      }
+    }
+  ]
+}

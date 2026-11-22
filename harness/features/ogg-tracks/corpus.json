@@ -1,0 +1,748 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "1.0-test-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/1.0-test_small.ogg",
+      "sha256": "9f510e92b976eaf735009b444511f856db601eb13698b54fdfc9c4e078f9f3bc",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 7,
+        "bytes": 4231,
+        "digest": 9713458293430371247
+      }
+    },
+    {
+      "id": "1.0.1-test-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/1.0.1-test_small.ogg",
+      "sha256": "1eef411505a81a7b4e2e6bcc382844479fa51db88f2d03ed8e638682b0786e4e",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 3923,
+        "digest": 15074964579515551740
+      }
+    },
+    {
+      "id": "6.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/6.ogg",
+      "sha256": "1dbce194fb1ca74250c156b4aba10b3bf76f90bc5ca8896823cef6c965a2c46a",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 7272,
+        "digest": 15320710817518211196
+      }
+    },
+    {
+      "id": "beta3-test-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/beta3-test_small.ogg",
+      "sha256": "c756dbf9e72680b6b35b9d5547aa15a76298e3d53600b85f17f1a2d19714ec14",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 7,
+        "bytes": 4430,
+        "digest": 17202125802655158364
+      }
+    },
+    {
+      "id": "beta4-test-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/beta4-test_small.ogg",
+      "sha256": "67517ea51560fac1c6190bd90ab3c18ff1bcdbc30d8e10e3585476ea44aba518",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 7,
+        "bytes": 11259,
+        "digest": 17368472919669977960
+      }
+    },
+    {
+      "id": "chain-test1-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/chain-test1_small.ogg",
+      "sha256": "f5099bddbe1c7dd80c1b46ba99930cd7f818c63f5120d7c5a5d9d991852cafe0",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 3869,
+        "digest": 4028733254516776659
+      }
+    },
+    {
+      "id": "chain-test2-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/chain-test2_small.ogg",
+      "sha256": "48e5024d95170b064208c469ea75915e98294cf74c7fcec2b73b4e679d0dfd0a",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 3207,
+        "digest": 18426416895535677967
+      }
+    },
+    {
+      "id": "highrate-test-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/highrate-test_small.ogg",
+      "sha256": "9974ea9a70159b6157ff8c157ca6969183037a8e6ccdc4f0d84e4a8aa607e923",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 7,
+        "bytes": 3802,
+        "digest": 2924604424338472313
+      }
+    },
+    {
+      "id": "lsp-test2-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/lsp-test2_small.ogg",
+      "sha256": "6946aa25a4d27153b38aefeb3c139fa8542689adafc5ae2bdb2ce4aa3af77e54",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 8170,
+        "digest": 4043908797206777776
+      }
+    },
+    {
+      "id": "lsp-test3-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/lsp-test3_small.ogg",
+      "sha256": "3358bacdc7cd33b0b75e4ed84913b1f11847e1d556dbe00ff60fb1e30cf711f5",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 8383,
+        "digest": 439769767638858888
+      }
+    },
+    {
+      "id": "lsp-test4-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/lsp-test4_small.ogg",
+      "sha256": "5dd55ac71ebffe5db1a351fc5beaeddeab61e415853ce351d268eda547b2264e",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 4415,
+        "digest": 1162985193584343923
+      }
+    },
+    {
+      "id": "lsp-test-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/lsp-test_small.ogg",
+      "sha256": "f908598728585cdec80f47d96ae36eaa9f3afaa2774c01638f52b11a6e4c5727",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 6703,
+        "digest": 17538763346333862472
+      }
+    },
+    {
+      "id": "mono-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/mono_small.ogg",
+      "sha256": "67565c74021eb0a6b68bd20bbef431ff76a0bd7d8c4865702b6d6408860f54cd",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 12,
+        "bytes": 3794,
+        "digest": 16788441812699113754
+      }
+    },
+    {
+      "id": "moog-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/moog_small.ogg",
+      "sha256": "25778a973824fcf488c751ecbc2fdbc594e8655666802e1f7d319c11c2814461",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 12536,
+        "digest": 10572414897646534669
+      }
+    },
+    {
+      "id": "rc1-test-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/rc1-test_small.ogg",
+      "sha256": "0db535709f6b3f9810c6980370ec72911df2a22d67cf0a32c1445aa5f2b43e99",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 2562,
+        "digest": 12157030088936395872
+      }
+    },
+    {
+      "id": "rc2-test2-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/rc2-test2_small.ogg",
+      "sha256": "db45e1c0ad0c172f2ac32a09984c1a8486963e4be4924bdf3049a4db46880ab7",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 4320,
+        "digest": 10008107002297676583
+      }
+    },
+    {
+      "id": "rc2-test-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/rc2-test_small.ogg",
+      "sha256": "2277d4f8278a0b38894cded850e036db53702f16b6631d69a1407f575bed2e59",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 7,
+        "bytes": 4956,
+        "digest": 18243476609730778030
+      }
+    },
+    {
+      "id": "rc3-test-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/rc3-test_small.ogg",
+      "sha256": "f6e63631d1e757780ebee1cc82844a3f5e7aa7b49daa0ff7963bd9bcc27659d6",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 2733,
+        "digest": 13991849322882179107
+      }
+    },
+    {
+      "id": "sleepzor-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/sleepzor_small.ogg",
+      "sha256": "dcc01bcbccd9c1ed4cd2304f893a52e3f551573a99a2183635c8db070d18ada2",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 9729,
+        "digest": 8993778230464343491
+      }
+    },
+    {
+      "id": "test-short2-small.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/test-short2_small.ogg",
+      "sha256": "56900907a3603f842970467a3ea0ed19d4d7426b9c31388333cf45ca2566561c",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 4415,
+        "digest": 5170084123663089715
+      }
+    },
+    {
+      "id": "vorbis-chapter-extension-demo.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/vorbis/vorbis_chapter_extension_demo.ogg",
+      "sha256": "b3490672085ff1377f6d23f2d4738129a1b96d3e735711654f535f42228730df",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 3491,
+        "digest": 5327314333807966425
+      }
+    },
+    {
+      "id": "a-flac.oga",
+      "profile": "reader",
+      "file": ".research/ogg-generated/a_flac.oga",
+      "sha256": "8f8c5a846e484931852b466a3e08ef33fb125630cebf921a1a00abcd716ad1da",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 63,
+        "digest": 15522074849373170761
+      }
+    },
+    {
+      "id": "a-opus.opus",
+      "profile": "reader",
+      "file": ".research/ogg-generated/a_opus.opus",
+      "sha256": "c53015f62682fc2936cc1f29456445087e82b687b853490b89f9abf1b0146ae9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 54,
+        "digest": 8252200398109349577
+      }
+    },
+    {
+      "id": "a-vorbis.ogg",
+      "profile": "reader",
+      "file": ".research/ogg-generated/a_vorbis.ogg",
+      "sha256": "ff3157d4b3b1ed595665a314a597a5d357ed5f1570bb22de57b02a1d9c8a3a7c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 3310,
+        "digest": 4979031031710542847
+      }
+    },
+    {
+      "id": "b-opus.opus",
+      "profile": "reader",
+      "file": ".research/ogg-generated/b_opus.opus",
+      "sha256": "ed1b19e31297aad7db9fa663d4e6631341678b9da8abdcdef730d56e47ba2904",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 54,
+        "digest": 2816056394007828457
+      }
+    },
+    {
+      "id": "b-vorbis.ogg",
+      "profile": "reader",
+      "file": ".research/ogg-generated/b_vorbis.ogg",
+      "sha256": "f9bd978104bcaf4c02f0232c6102ba51d744370158a51570cc78d1a6dc6ee419",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 3310,
+        "digest": 1513767104419827391
+      }
+    },
+    {
+      "id": "chain-opus.opus",
+      "profile": "reader",
+      "file": ".research/ogg-generated/chain_opus.opus",
+      "sha256": "8c4318d74908867bc5e56e44e6c9aaa609cbcbc5cf0886fb9e0cfabc7c534aab",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 54,
+        "digest": 2816056394007828457
+      }
+    },
+    {
+      "id": "chain-vorbis.ogg",
+      "profile": "reader",
+      "file": ".research/ogg-generated/chain_vorbis.ogg",
+      "sha256": "19cd38a41bd876db81c5f7a881c7fa9bdfc4821be9b8588f7fe7265202932690",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 3310,
+        "digest": 1513767104419827391
+      }
+    },
+    {
+      "id": "crc-bad.opus",
+      "profile": "reader",
+      "file": ".research/ogg-generated/crc_bad.opus",
+      "sha256": "58955283b54fc60407a235dc3579c6919619ca8d7f8f77ef7f0f41bd9430e614",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 54,
+        "digest": 7305696088708970889
+      }
+    },
+    {
+      "id": "flac-51-24.oga",
+      "profile": "reader",
+      "file": ".research/ogg-generated/flac_51_24.oga",
+      "sha256": "4353a415af59ce3567aacb3cd040b81bb7afdd6b22475042c8d5db2a2901cdb8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 63,
+        "digest": 7175760910467450812
+      }
+    },
+    {
+      "id": "lost-page.opus",
+      "profile": "reader",
+      "file": ".research/ogg-generated/lost_page.opus",
+      "sha256": "553d074916d34d4687b6bea0bcd9d1004aa2e4b3a98713f0c4bc04fc4c819f13",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 54,
+        "digest": 8252200398109349577
+      }
+    },
+    {
+      "id": "mc-opus.opus",
+      "profile": "reader",
+      "file": ".research/ogg-generated/mc_opus.opus",
+      "sha256": "b814a5ddc354e41a63ac97aaabbf0c87aae5fe40c52e4de972b1ec606f058b8b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 62,
+        "digest": 13939601348240421471
+      }
+    },
+    {
+      "id": "mux2.opus",
+      "profile": "reader",
+      "file": ".research/ogg-generated/mux2.opus",
+      "sha256": "504885e07bab8e7d19285f706d4d6437dd3859e8c26d9bec5cae42b3a32b4ec1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 13536893153570913760
+      }
+    },
+    {
+      "id": "truncated.opus",
+      "profile": "reader",
+      "file": ".research/ogg-generated/truncated.opus",
+      "sha256": "ad8c5f58bd770cc5604e55fdd4ea506ea5d5eb56e0aa545e05c961d81f9f2446",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 54,
+        "digest": 5591821871254426929
+      }
+    },
+    {
+      "id": "bear.ogv",
+      "profile": "reader",
+      "file": ".research/fate-samples/ogg/bear.ogv",
+      "sha256": "c6281b645fc9ddcba7ecc8eb16c525758cec498de9645a5e6be44f6a8962ce57",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 9,
+        "bytes": 6154,
+        "digest": 6735983789880493420
+      }
+    },
+    {
+      "id": "empty-theora-packets.ogv",
+      "profile": "reader",
+      "file": ".research/fate-samples/ogg/empty_theora_packets.ogv",
+      "sha256": "de42934c0ad6049dada4c27132982a09213c24d2d82d80f2959a183e94f1b97b",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 3274,
+        "digest": 1283617315679980636
+      }
+    },
+    {
+      "id": "offset-test.ogv",
+      "profile": "reader",
+      "file": ".research/fate-samples/vp3/offset_test.ogv",
+      "sha256": "83ba8d258cc3a1715be473925faf757469f67d2e29a553cf6d5a521488393f3e",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 3467,
+        "digest": 15798823665476813359
+      }
+    },
+    {
+      "id": "ogg-flac-chained-meta.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/ogg-flac/chained-meta.ogg",
+      "sha256": "03809147054f307c79913e25aab5dfa9294773796d591dbc556e0adb98388a7a",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 6,
+        "bytes": 81,
+        "digest": 12071852594405967165
+      }
+    },
+    {
+      "id": "ogg-opus-chained-meta.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/ogg-opus/chained-meta.ogg",
+      "sha256": "14ef86e6d37476d4008ec33722c406136f261bb76dfb8fad5ddb8d6f64cdbd6c",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 6,
+        "bytes": 72,
+        "digest": 3543791652754780786
+      }
+    },
+    {
+      "id": "ogg-vorbis-chained-meta.ogg",
+      "profile": "reader",
+      "file": ".research/fate-samples/ogg-vorbis/chained-meta.ogg",
+      "sha256": "9a664f79d0a201b8733a26a3a178a14f3c07c2f116f4e87738f692a69f187804",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 6,
+        "bytes": 3273,
+        "digest": 15771307533522981135
+      }
+    },
+    {
+      "id": "speex-nb.spx",
+      "profile": "reader",
+      "file": ".research/speex-generated/speex_nb.spx",
+      "sha256": "7a620f8ac4bcc4e8121e802853e731aa34b81e6149cd6cf547dcf4e604d15d87",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 88,
+        "digest": 5488831985759746094
+      }
+    },
+    {
+      "id": "speex-wb.spx",
+      "profile": "reader",
+      "file": ".research/speex-generated/speex_wb.spx",
+      "sha256": "e191096259c6e07792e4e9207c58cab205c2e25b495db36b236a49279faa1462",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 88,
+        "digest": 12429499911769995818
+      }
+    },
+    {
+      "id": "speex-uwb-stereo.spx",
+      "profile": "reader",
+      "file": ".research/speex-generated/speex_uwb_stereo.spx",
+      "sha256": "2cfd837317047e6fb7a81871a99d92f13f8b9c478c2ba75fd76faade89d484ba",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 88,
+        "digest": 1363076674218559311
+      }
+    },
+    {
+      "id": "speex-skeleton.spx",
+      "profile": "reader",
+      "file": ".research/speex-generated/speex_skeleton.spx",
+      "sha256": "07a5070c8bcc01f545a17acb529879f6cddd06efa0bff9ab53b7befeeafb1e27",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 8,
+        "bytes": 88,
+        "digest": 6082648588958094015
+      }
+    },
+    {
+      "id": "chain-speex.spx",
+      "profile": "reader",
+      "file": ".research/speex-generated/chain_speex.spx",
+      "sha256": "6688b5492f43b4f5812d8acb91dc426c63f0bbe8a31b4b6c1fed081cddff914d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 88,
+        "digest": 13332850904365191678
+      }
+    },
+    {
+      "id": "comment-fields",
+      "profile": "authored",
+      "file": ".research/ogg-page-inputs/comment-fields.opus",
+      "sha256": "983ac4be67c352363cf884f2d6085c20ef190b7e0c62fb1c91aa4ec7c6ff79cb",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 6,
+        "bytes": 45,
+        "digest": 12644649257906734367
+      }
+    },
+    {
+      "id": "comment-long",
+      "profile": "authored",
+      "file": ".research/ogg-page-inputs/comment-long.opus",
+      "sha256": "ad8a5761fcf69d349581d46201162b349d8f00d222d1b02f78b0a992f009a427",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 60034,
+        "digest": 9848501529955901141
+      }
+    },
+    {
+      "id": "comment-picture",
+      "profile": "authored",
+      "file": ".research/ogg-page-inputs/comment-picture.opus",
+      "sha256": "485cd9ce0dd5cdea9699db50e114e517c03c981623f5d1d8d625e63c79f9728f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 27,
+        "digest": 4679791089798472435
+      }
+    },
+    {
+      "id": "bad-comment",
+      "profile": "authored",
+      "file": ".research/ogg-page-inputs/bad-comment.opus",
+      "sha256": "ed2109dc21aa31249511a3b61e48b093efdcf53c962c4dd3dc5783434c075184",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "opus-family-255",
+      "profile": "authored",
+      "file": ".research/ogg-page-inputs/opus-family-255.opus",
+      "sha256": "687b49edfc3f89422b63a150d4b53be9d535e203b95914866d65e6c37368c55a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 62,
+        "digest": 2821789938571875805
+      }
+    },
+    {
+      "id": "theora-30000-1001",
+      "profile": "authored",
+      "file": ".research/ogg-page-inputs/theora-30000-1001.ogv",
+      "sha256": "531c1874ff1d13d429d3b3369b01bdef3a76af64de1787cc07fa4a144e9dbe6c",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 3274,
+        "digest": 6739211903658433426
+      }
+    },
+    {
+      "id": "theora-0-0",
+      "profile": "authored",
+      "file": ".research/ogg-page-inputs/theora-0-0.ogv",
+      "sha256": "fdd1e73680c694c3bde4402a52e9f3f8ba54e35b29c3cb1fcd44a97308236bc7",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 3274,
+        "digest": 3889244408122384322
+      }
+    },
+    {
+      "id": "comment-valid-picture",
+      "profile": "authored",
+      "file": ".research/ogg-page-inputs/comment-valid-picture.opus",
+      "sha256": "5c3ee5a59a46602edbb210cc9dc4ec5f6ec1eb3cb8f5fff516fb0bbb4e7d711b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [],
+      "expected": {
+        "packets": 5,
+        "bytes": 95,
+        "digest": 346592494630837522
+      }
+    }
+  ]
+}

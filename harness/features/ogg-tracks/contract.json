@@ -1,0 +1,278 @@
+{
+  "schema": 1,
+  "id": "ogg-tracks",
+  "gate": "required",
+  "operation": "ogg-tracks",
+  "candidate": "codec-views-worker",
+  "worker_operation": "ogg-tracks-",
+  "contract": [
+    "Open a seekable Ogg source and fold the track properties available at open. The reference forces the Ogg demuxer through memory AVIO, with no stream-info pass. Compare stream order, codec, rate and channels, reduced Theora frame rate, end in stream ticks, header error and configuration presence, and codec tag.",
+    "Project FLAC to STREAMINFO and take reference channels and rate from it. Compare OpusHead and the Speex identification packet byte for byte. Split Xiph lacing and the reference's Theora big-endian 16-bit length fields into identification and setup packets. Compare the comments through their dictionary projection.",
+    "Sort the UTF-8 comment pairs by ASCII-lowercased key and value. Map ALBUMARTIST, TRACKNUMBER, DISCNUMBER and DESCRIPTION to album_artist, track, disc and comment. Ignore the vendor string and any comment framing bit. A valid METADATA_BLOCK_PICTURE contributes its image payload in the separate attachment records, sorted by bytes after all track records.",
+    "For Opus, convert the reference duration to the end on the audible timeline by subtracting pre-skip. For other mappings use the stream end in ticks derived from the reference duration and any available start time. A demuxer that fails to open emits a refusal."
+  ],
+  "required_profiles": [
+    "authored",
+    "reader"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 20,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-codec-views-native",
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "1.0-test-small.ogg",
+        "1.0.1-test-small.ogg",
+        "6.ogg",
+        "beta3-test-small.ogg",
+        "beta4-test-small.ogg",
+        "chain-test1-small.ogg",
+        "chain-test2-small.ogg",
+        "highrate-test-small.ogg",
+        "lsp-test2-small.ogg",
+        "lsp-test3-small.ogg",
+        "lsp-test4-small.ogg",
+        "lsp-test-small.ogg",
+        "mono-small.ogg",
+        "moog-small.ogg",
+        "rc1-test-small.ogg",
+        "rc2-test2-small.ogg",
+        "rc2-test-small.ogg",
+        "rc3-test-small.ogg",
+        "sleepzor-small.ogg",
+        "test-short2-small.ogg",
+        "vorbis-chapter-extension-demo.ogg",
+        "a-flac.oga",
+        "a-opus.opus",
+        "a-vorbis.ogg",
+        "b-opus.opus",
+        "b-vorbis.ogg",
+        "chain-opus.opus",
+        "chain-vorbis.ogg",
+        "crc-bad.opus",
+        "flac-51-24.oga",
+        "lost-page.opus",
+        "mc-opus.opus",
+        "mux2.opus",
+        "truncated.opus",
+        "bear.ogv",
+        "empty-theora-packets.ogv",
+        "offset-test.ogv",
+        "ogg-flac-chained-meta.ogg",
+        "ogg-opus-chained-meta.ogg",
+        "ogg-vorbis-chained-meta.ogg",
+        "speex-nb.spx",
+        "speex-wb.spx",
+        "speex-uwb-stereo.spx",
+        "speex-skeleton.spx",
+        "chain-speex.spx",
+        "comment-fields",
+        "comment-long",
+        "comment-picture",
+        "bad-comment",
+        "opus-family-255",
+        "theora-30000-1001",
+        "theora-0-0",
+        "comment-valid-picture"
+      ],
+      "cause": "Paired runtime, heap and total RSS collection remains due on the gate hosts."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "1.0-test-small.ogg",
+        "1.0.1-test-small.ogg",
+        "6.ogg",
+        "beta3-test-small.ogg",
+        "beta4-test-small.ogg",
+        "chain-test1-small.ogg",
+        "chain-test2-small.ogg",
+        "highrate-test-small.ogg",
+        "lsp-test2-small.ogg",
+        "lsp-test3-small.ogg",
+        "lsp-test4-small.ogg",
+        "lsp-test-small.ogg",
+        "mono-small.ogg",
+        "moog-small.ogg",
+        "rc1-test-small.ogg",
+        "rc2-test2-small.ogg",
+        "rc2-test-small.ogg",
+        "rc3-test-small.ogg",
+        "sleepzor-small.ogg",
+        "test-short2-small.ogg",
+        "vorbis-chapter-extension-demo.ogg",
+        "a-flac.oga",
+        "a-opus.opus",
+        "a-vorbis.ogg",
+        "b-opus.opus",
+        "b-vorbis.ogg",
+        "chain-opus.opus",
+        "chain-vorbis.ogg",
+        "crc-bad.opus",
+        "flac-51-24.oga",
+        "lost-page.opus",
+        "mc-opus.opus",
+        "mux2.opus",
+        "truncated.opus",
+        "bear.ogv",
+        "empty-theora-packets.ogv",
+        "offset-test.ogv",
+        "ogg-flac-chained-meta.ogg",
+        "ogg-opus-chained-meta.ogg",
+        "ogg-vorbis-chained-meta.ogg",
+        "speex-nb.spx",
+        "speex-wb.spx",
+        "speex-uwb-stereo.spx",
+        "speex-skeleton.spx",
+        "chain-speex.spx",
+        "comment-fields",
+        "comment-long",
+        "comment-picture",
+        "bad-comment",
+        "opus-family-255",
+        "theora-30000-1001",
+        "theora-0-0",
+        "comment-valid-picture"
+      ],
+      "cause": "Paired runtime, heap and total RSS collection remains due on the gate hosts."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "1.0-test-small.ogg",
+        "1.0.1-test-small.ogg",
+        "6.ogg",
+        "beta3-test-small.ogg",
+        "beta4-test-small.ogg",
+        "chain-test1-small.ogg",
+        "chain-test2-small.ogg",
+        "highrate-test-small.ogg",
+        "lsp-test2-small.ogg",
+        "lsp-test3-small.ogg",
+        "lsp-test4-small.ogg",
+        "lsp-test-small.ogg",
+        "mono-small.ogg",
+        "moog-small.ogg",
+        "rc1-test-small.ogg",
+        "rc2-test2-small.ogg",
+        "rc2-test-small.ogg",
+        "rc3-test-small.ogg",
+        "sleepzor-small.ogg",
+        "test-short2-small.ogg",
+        "vorbis-chapter-extension-demo.ogg",
+        "a-flac.oga",
+        "a-opus.opus",
+        "a-vorbis.ogg",
+        "b-opus.opus",
+        "b-vorbis.ogg",
+        "chain-opus.opus",
+        "chain-vorbis.ogg",
+        "crc-bad.opus",
+        "flac-51-24.oga",
+        "lost-page.opus",
+        "mc-opus.opus",
+        "mux2.opus",
+        "truncated.opus",
+        "bear.ogv",
+        "empty-theora-packets.ogv",
+        "offset-test.ogv",
+        "ogg-flac-chained-meta.ogg",
+        "ogg-opus-chained-meta.ogg",
+        "ogg-vorbis-chained-meta.ogg",
+        "speex-nb.spx",
+        "speex-wb.spx",
+        "speex-uwb-stereo.spx",
+        "speex-skeleton.spx",
+        "chain-speex.spx",
+        "comment-fields",
+        "comment-long",
+        "comment-picture",
+        "bad-comment",
+        "opus-family-255",
+        "theora-30000-1001",
+        "theora-0-0",
+        "comment-valid-picture"
+      ],
+      "cause": "Paired runtime, heap and total RSS collection remains due on the gate hosts."
+    }
+  ],
+  "open_cases": [
+    {
+      "id": "vorbis-chapter-extension-demo.ogg",
+      "requirement": "The candidate retains the chapter comments. The reference publishes them through a chapter view and omits them from its stream dictionary."
+    },
+    {
+      "id": "chain-opus.opus",
+      "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
+    },
+    {
+      "id": "chain-vorbis.ogg",
+      "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
+    },
+    {
+      "id": "crc-bad.opus",
+      "requirement": "The post-CRC-loss end scan reports different Opus stream end ticks."
+    },
+    {
+      "id": "ogg-flac-chained-meta.ogg",
+      "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
+    },
+    {
+      "id": "ogg-opus-chained-meta.ogg",
+      "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
+    },
+    {
+      "id": "ogg-vorbis-chained-meta.ogg",
+      "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
+    },
+    {
+      "id": "speex-nb.spx",
+      "requirement": "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open."
+    },
+    {
+      "id": "speex-wb.spx",
+      "requirement": "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open."
+    },
+    {
+      "id": "speex-uwb-stereo.spx",
+      "requirement": "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open."
+    },
+    {
+      "id": "speex-skeleton.spx",
+      "requirement": "The candidate exposes the Skeleton identification packet. The reference exposes an unconfigured stream with no extradata."
+    },
+    {
+      "id": "chain-speex.spx",
+      "requirement": "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open."
+    },
+    {
+      "id": "comment-fields",
+      "requirement": "The comment packet contains an empty TITLE field. The candidate emits the field and the reference drops it."
+    },
+    {
+      "id": "bad-comment",
+      "requirement": "The candidate reports the Opus identification alongside a second-header error. The reference refuses to open the malformed header sequence."
+    },
+    {
+      "id": "theora-0-0",
+      "requirement": "A 0/0 frame rate is invalid. The candidate exposes a header error without a frame rate. The reference publishes a default 25 Hz frame clock."
+    }
+  ],
+  "pending_module_requirements": [
+    "A 0/0 frame rate is invalid. The candidate exposes a header error without a frame rate. The reference publishes a default 25 Hz frame clock.",
+    "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration.",
+    "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open.",
+    "The candidate exposes the Skeleton identification packet. The reference exposes an unconfigured stream with no extradata.",
+    "The candidate reports the Opus identification alongside a second-header error. The reference refuses to open the malformed header sequence.",
+    "The candidate retains the chapter comments. The reference publishes them through a chapter view and omits them from its stream dictionary.",
+    "The comment packet contains an empty TITLE field. The candidate emits the field and the reference drops it.",
+    "The post-CRC-loss end scan reports different Opus stream end ticks."
+  ]
+}

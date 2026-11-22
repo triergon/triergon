@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "id": "elementary-metadata-wire",
+  "gate": "required",
+  "operation": "elementary-metadata",
+  "candidate": "codec-views-worker",
+  "worker_operation": "elementary-metadata-",
+  "contract": [
+    "Compare first header fields from the typed elementary reader, STREAMINFO fields and MD5, FLAC block kinds, lengths and retained bytes, seek points with placeholder entries omitted, MPEG Info/Xing/VBRI view and LAME encoder, delay and padding, and original ID3 and APE tag envelopes.",
+    "The oracle reads the authored pinned wire bytes and interprets the framing and tag envelopes independently. Compare the resulting rate, channels and declared sample count as well. Fold exact canonical trace bytes."
+  ],
+  "required_profiles": [
+    "aac",
+    "ac3",
+    "eac3",
+    "flac",
+    "mp3"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "oracle": "elementary-metadata",
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "flac-extra",
+        "id3v1-plain",
+        "id3v1-track",
+        "apev2",
+        "flac-id3v2",
+        "mp3-id3v2",
+        "aac-id3v2",
+        "ac3-id3v2",
+        "eac3-id3v2",
+        "flac-default.flac",
+        "flac-small-blocks.flac",
+        "mp3-vbr-xing.mp3",
+        "mp3-cbr-info.mp3",
+        "adts-51.aac",
+        "adts-lc.aac",
+        "ac3-stereo.ac3",
+        "ac3-51.ac3",
+        "eac3-stereo.eac3",
+        "eac3-51.eac3",
+        "crafted-mp3-name-lame.mp3",
+        "mp3-vbri",
+        "mp3-id3-utf16"
+      ],
+      "cause": "The independent wire oracle compares exposed syntax fields. It does not run a comparable reader workload."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "flac-extra",
+        "id3v1-plain",
+        "id3v1-track",
+        "apev2",
+        "flac-id3v2",
+        "mp3-id3v2",
+        "aac-id3v2",
+        "ac3-id3v2",
+        "eac3-id3v2",
+        "flac-default.flac",
+        "flac-small-blocks.flac",
+        "mp3-vbr-xing.mp3",
+        "mp3-cbr-info.mp3",
+        "adts-51.aac",
+        "adts-lc.aac",
+        "ac3-stereo.ac3",
+        "ac3-51.ac3",
+        "eac3-stereo.eac3",
+        "eac3-51.eac3",
+        "crafted-mp3-name-lame.mp3",
+        "mp3-vbri",
+        "mp3-id3-utf16"
+      ],
+      "cause": "The independent wire oracle compares exposed syntax fields. It does not run a comparable reader workload."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "flac-extra",
+        "id3v1-plain",
+        "id3v1-track",
+        "apev2",
+        "flac-id3v2",
+        "mp3-id3v2",
+        "aac-id3v2",
+        "ac3-id3v2",
+        "eac3-id3v2",
+        "flac-default.flac",
+        "flac-small-blocks.flac",
+        "mp3-vbr-xing.mp3",
+        "mp3-cbr-info.mp3",
+        "adts-51.aac",
+        "adts-lc.aac",
+        "ac3-stereo.ac3",
+        "ac3-51.ac3",
+        "eac3-stereo.eac3",
+        "eac3-51.eac3",
+        "crafted-mp3-name-lame.mp3",
+        "mp3-vbri",
+        "mp3-id3-utf16"
+      ],
+      "cause": "The independent wire oracle compares exposed syntax fields. It does not run a comparable reader workload."
+    }
+  ]
+}

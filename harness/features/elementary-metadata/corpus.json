@@ -1,0 +1,4518 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "flac-corrupt.flac",
+      "profile": "flac",
+      "file": ".research/elementary/crafted/flac_corrupt.flac",
+      "sha256": "a64d636b1cb23938fc5488d7b421c0d884b01c02f5fdc0ab2592a1c95d1df577",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 824071288491844637
+      }
+    },
+    {
+      "id": "flac-id3.flac",
+      "profile": "flac",
+      "file": ".research/elementary/crafted/flac_id3.flac",
+      "sha256": "f1a8e639ad4dd5e9d00cdc723f2c139fb17b7026b04797124fdb54d46db9946f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 824071288491844637
+      }
+    },
+    {
+      "id": "flac-mid-junk.flac",
+      "profile": "flac",
+      "file": ".research/elementary/crafted/flac_mid_junk.flac",
+      "sha256": "e709b8e162689cd7f8c17c7b5857cde30f85c6ec7fcc28925929bf1b6727dfb4",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 824071288491844637
+      }
+    },
+    {
+      "id": "flac-truncated.flac",
+      "profile": "flac",
+      "file": ".research/elementary/crafted/flac_truncated.flac",
+      "sha256": "091e7fe26007843c4f4b949ff3f94986b07d1bd6576d7f6d879f049e542075f7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 824071288491844637
+      }
+    },
+    {
+      "id": "flac-24bit.flac",
+      "profile": "flac",
+      "file": ".research/elementary/flac_24bit.flac",
+      "sha256": "f6e8155a43ff66a5adc7db968c1aa049da62c7bbf314763e7285c4a9b3dacfd0",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 12135446133072279590
+      }
+    },
+    {
+      "id": "flac-default.flac",
+      "profile": "flac",
+      "file": ".research/elementary/flac_default.flac",
+      "sha256": "e87f997ad8e462501f8695668ba6d95b1597499684d643abec62e258d83398c5",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 824071288491844637
+      }
+    },
+    {
+      "id": "flac-mono48.flac",
+      "profile": "flac",
+      "file": ".research/elementary/flac_mono48.flac",
+      "sha256": "b64c7c1a883b3946fb9a411b0863e2a45420a265eee5b9501cd1b610b08f091e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 7243666452636326396
+      }
+    },
+    {
+      "id": "flac-small-blocks.flac",
+      "profile": "flac",
+      "file": ".research/elementary/flac_small_blocks.flac",
+      "sha256": "aebccbe21e4263a94ed17a829b83497747d175d491b1c5ab1ff3ef8edb93b2db",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 6925695305153701357
+      }
+    },
+    {
+      "id": "01---wrong-max-blocksize.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/faulty/01 - wrong max blocksize.flac",
+      "sha256": "7abd0c6062b33949cc646bc887b5267d698ec8aff9cd8d8c2f270d40b7b63615",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 16451479664468932423
+      }
+    },
+    {
+      "id": "02---wrong-maximum-framesize.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/faulty/02 - wrong maximum framesize.flac",
+      "sha256": "1e7f0cb5e19b984d549beea65a9f074cc7693ff594e6ae4685bca43b48dc3143",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 13730062827420835194
+      }
+    },
+    {
+      "id": "03---wrong-bit-depth.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/faulty/03 - wrong bit depth.flac",
+      "sha256": "6d3258785ae23fe90958a7bd8eab8443d07d28f456b5d49b908772fa2f803a22",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 14359568768286830425
+      }
+    },
+    {
+      "id": "04---wrong-number-of-channels.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/faulty/04 - wrong number of channels.flac",
+      "sha256": "5410a65f762a6c97a2f8c51fb0354bbde564f35d07ef95fee60e8a715d110efc",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 3443868795753044523
+      }
+    },
+    {
+      "id": "05---wrong-total-number-of-samples.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/faulty/05 - wrong total number of samples.flac",
+      "sha256": "92f98457511f2f9413445f2fb3e236ae92eab86c38e0082dfbe9dd96d01ba92c",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 12737978142608300735
+      }
+    },
+    {
+      "id": "06---missing-streaminfo-metadata-block.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/faulty/06 - missing streaminfo metadata block.flac",
+      "sha256": "53aed5e7fde7a652b82ba06a8382b2612b02ebbde7b0d2016276644d17cc76cd",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "07---other-metadata-blocks-preceding-streaminfo-metadata-block.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/faulty/07 - other metadata blocks preceding streaminfo metadata block.flac",
+      "sha256": "6d46725991ba5da477187fde7709ea201c399d00027257c365d7301226d851ea",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "08---blocksize-65536.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/faulty/08 - blocksize 65536.flac",
+      "sha256": "f6e3b6b72e86f259fcdafc50486b8bf9d4d85b193e18e6e4aa63a6e1ca9e7928",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 771120918511904313
+      }
+    },
+    {
+      "id": "09---blocksize-1.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/faulty/09 - blocksize 1.flac",
+      "sha256": "4a1e703e9ac7dc67ac82dc74087ba1d62a0f13e89d11e020e01e26306a0102af",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 10003394933771681905
+      }
+    },
+    {
+      "id": "10---invalid-vorbis-comment-metadata-block.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/faulty/10 - invalid vorbis comment metadata block.flac",
+      "sha256": "c79b0514a61634035a5653c5493797bbd1fcc78982116e4d429630e9e462d29b",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 6298218356391974714
+      }
+    },
+    {
+      "id": "11---incorrect-metadata-block-length.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/faulty/11 - incorrect metadata block length.flac",
+      "sha256": "3732151ba8c4e66a785165aa75a444aad814c16807ddc97b793811376acacfd6",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "01---blocksize-4096.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/01 - blocksize 4096.flac",
+      "sha256": "02c7e60ae7788c2cb6898a0a46985d759f1e62482ddd965a374dfd09a2a8390f",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 5789686328746516893
+      }
+    },
+    {
+      "id": "02---blocksize-4608.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/02 - blocksize 4608.flac",
+      "sha256": "f4e97914fb9a8cd95b9be90c9970f6d553d76ded55a7a443dbd0d5dfa7bd2819",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 3240716102404462977
+      }
+    },
+    {
+      "id": "03---blocksize-16.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/03 - blocksize 16.flac",
+      "sha256": "164d0747e8c4855407990182b784fcd7475da228bf20a6cff67e947c683959b3",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 2859140150088823524
+      }
+    },
+    {
+      "id": "04---blocksize-192.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/04 - blocksize 192.flac",
+      "sha256": "0f9f7e2fc262e16e8cd92de3e8869d13197a5e9c3ef7239f8ee749cbd2689980",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 17548855784397005588
+      }
+    },
+    {
+      "id": "05---blocksize-254.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/05 - blocksize 254.flac",
+      "sha256": "8965c9616f769573d3bf8ef5b92ee5a2827e797c098a9436a5e3366feb9c9ae2",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 14781576384857081708
+      }
+    },
+    {
+      "id": "06---blocksize-512.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/06 - blocksize 512.flac",
+      "sha256": "ba705cc365abf5b8bd6b4d4392a2668ae395844f82d04e74be3e19b60cb03260",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 12886169913012665432
+      }
+    },
+    {
+      "id": "07---blocksize-725.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/07 - blocksize 725.flac",
+      "sha256": "ffc15a2ead7a6651e2cd36fa886edcffffc32e831077dce852fb7df6f131d2b3",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 16640440708339419520
+      }
+    },
+    {
+      "id": "08---blocksize-1000.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/08 - blocksize 1000.flac",
+      "sha256": "fa189c885be140510348f18899fe151a903f0199d502982ecc7863cb85810ba6",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 30129782804065133
+      }
+    },
+    {
+      "id": "09---blocksize-1937.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/09 - blocksize 1937.flac",
+      "sha256": "8786ea66bf5d0083fcf760b874216ac566d0b2688ba58e5711f46525841a0028",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 5701661585442798568
+      }
+    },
+    {
+      "id": "10---blocksize-2304.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/10 - blocksize 2304.flac",
+      "sha256": "8ec67465e9041373a67f2440220825ba9d7706789584bffbbb3f109424df25ee",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 12191725159881168014
+      }
+    },
+    {
+      "id": "11---partition-order-8.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/11 - partition order 8.flac",
+      "sha256": "07596315fc9b297702984deab49041f4695e1482ec3e1d081888d1bf13198e53",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 525891285922366401
+      }
+    },
+    {
+      "id": "12---qlp-precision-15-bit.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/12 - qlp precision 15 bit.flac",
+      "sha256": "d33731350269929542c6e0a788c1b9a27eb91dcb3a20f5f960b8569be012c6fa",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 8864569109338603875
+      }
+    },
+    {
+      "id": "13---qlp-precision-2-bit.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/13 - qlp precision 2 bit.flac",
+      "sha256": "b60e113a6a3b97d7a3c48be90913ced8c85f1ee332c6c5dd5a79b46cdc38108a",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 11760893340045692705
+      }
+    },
+    {
+      "id": "14---wasted-bits.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/14 - wasted bits.flac",
+      "sha256": "58fa05681bd646168ea2a19bc9a6f4ee9d6de295fd832c1f70da1bdbf32d74cb",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 4719550220709172137
+      }
+    },
+    {
+      "id": "15---only-verbatim-subframes.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/15 - only verbatim subframes.flac",
+      "sha256": "80459f8ad5a9c7edf081a10f9269c55c29136749021e5a55483bc173aaaa82b0",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 804882760894205637
+      }
+    },
+    {
+      "id": "16---partition-order-8-containing-escaped-partitions.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/16 - partition order 8 containing escaped partitions.flac",
+      "sha256": "5562cff546a1b0d93cea31c0c375c5df65658311de1fc3d322d14b8a2c5ac930",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 7860962615712022045
+      }
+    },
+    {
+      "id": "17---all-fixed-orders.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/17 - all fixed orders.flac",
+      "sha256": "d6f082cbbbcb03015f861b8fa30cf16708a62b85520905a126da28db29645feb",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 9408847613508851661
+      }
+    },
+    {
+      "id": "18---precision-search.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/18 - precision search.flac",
+      "sha256": "562dd053a92a83bf64baf90ae5f9b3d0af58121c5534b3c05353d77b2ff25aaa",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 1413231646646626935
+      }
+    },
+    {
+      "id": "19---samplerate-35467hz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/19 - samplerate 35467Hz.flac",
+      "sha256": "72ee52c82ee46eea28d659392ce75557e66df1051563fde1936d3e5a8fd8d2c2",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 57,
+        "digest": 12728629361029129251
+      }
+    },
+    {
+      "id": "20---samplerate-39khz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/20 - samplerate 39kHz.flac",
+      "sha256": "9c87394f650fda9d08bc6b4a7c56a4fd56dcac3531913aa536e7d4d576580ee0",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 57,
+        "digest": 6570749879921439348
+      }
+    },
+    {
+      "id": "21---samplerate-22050hz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/21 - samplerate 22050Hz.flac",
+      "sha256": "a808ffa5c3cb99c7bc8268141f2d01fb7ccb4c3ced617fd7909f578fb9363f88",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 57,
+        "digest": 253654083227195991
+      }
+    },
+    {
+      "id": "22---12-bit-per-sample.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/22 - 12 bit per sample.flac",
+      "sha256": "d9c385129c4253da4c0de34ed5b163b404523aa971773277b8b74ef92f7d4f44",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 13293143990596688412
+      }
+    },
+    {
+      "id": "23---8-bit-per-sample.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/23 - 8 bit per sample.flac",
+      "sha256": "d72ad54e1d0ebe5d65b1b1addd13ee873d38c58cb3357774a1943ced2d984cf9",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 57,
+        "digest": 11219513965731689613
+      }
+    },
+    {
+      "id": "24---variable-blocksize-file-created-with-flake-revision-264.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/24 - variable blocksize file created with flake revision 264.flac",
+      "sha256": "c6664710c935e4d862ab04f146ddd7f6df9e2278b651c17a432934e61488eaf7",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 12471571023400490421
+      }
+    },
+    {
+      "id": "25---variable-blocksize-file-created-with-flake-revision-264-modified-to-create-smaller-blocks.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac",
+      "sha256": "df5658969201d6867a1cc64d69e30a8ec833b53f7239345eda7eefff1a4a2ad8",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 1367182361229465709
+      }
+    },
+    {
+      "id": "26---variable-blocksize-file-created-with-cuetools.flake-2.1.6.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/26 - variable blocksize file created with CUETools.Flake 2.1.6.flac",
+      "sha256": "355ddbac0f596623f805c3d3ff8cf4ba25d3a13c9d61e63719a8d02ebb647c19",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 609756063938657957
+      }
+    },
+    {
+      "id": "27---old-format-variable-blocksize-file-created-with-flake-0.11.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac",
+      "sha256": "21b486a42dbf64c043d57dcd5a038163dc77f5eec398312d994643617ec3c5b6",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 2264820588035212163
+      }
+    },
+    {
+      "id": "28---high-resolution-audio-default-settings.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/28 - high resolution audio, default settings.flac",
+      "sha256": "62322a5c7821081bae99cc1a3f398f177a17cf9312131a5fbcfcc2ee38539346",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 57,
+        "digest": 14582939371975473150
+      }
+    },
+    {
+      "id": "29---high-resolution-audio-blocksize-16384.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/29 - high resolution audio, blocksize 16384.flac",
+      "sha256": "7551605d8a90a7e74e788b31273493ce5e24059d839b1d44dbad89cf9fb132a5",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 57,
+        "digest": 11215290356646450694
+      }
+    },
+    {
+      "id": "30---high-resolution-audio-blocksize-13456.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/30 - high resolution audio, blocksize 13456.flac",
+      "sha256": "d2e6b73cc0888419d709a03c317f59dfb8d48fcdc29e73fb0c099d5de7d512be",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 57,
+        "digest": 11959816299338396833
+      }
+    },
+    {
+      "id": "31---high-resolution-audio-using-only-32nd-order-predictors.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/31 - high resolution audio, using only 32nd order predictors.flac",
+      "sha256": "caf84fbf740a98e3371a58df03422722a7d6058289b11a291f0b39103ea20133",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 76,
+        "digest": 8140028851239321282
+      }
+    },
+    {
+      "id": "32---high-resolution-audio-partition-order-8-containing-escaped-partitions.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/32 - high resolution audio, partition order 8 containing escaped partitions.flac",
+      "sha256": "479474ac6a101725976aa9a4e94580040d650779da41db2981be03aa41ef7fdd",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 57,
+        "digest": 8486023696255477615
+      }
+    },
+    {
+      "id": "33---samplerate-192khz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/33 - samplerate 192kHz.flac",
+      "sha256": "4833aafc6a7d652bac05de6d304d3e63cc419a731df995b146d91294062bbcd0",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 14839447165866341058
+      }
+    },
+    {
+      "id": "34---samplerate-192khz-using-only-32nd-order-predictors.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/34 - samplerate 192kHz, using only 32nd order predictors.flac",
+      "sha256": "b32a7e21114034610fea4d43610980111dc9c40faa315a3111196102a7bac36e",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 14102406299213762756
+      }
+    },
+    {
+      "id": "35---samplerate-134560hz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/35 - samplerate 134560Hz.flac",
+      "sha256": "ffe10b26321fdc1a1be31cfd7034a4f98b1c0cb3e32e9c1cc129b7ff4a259177",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 57,
+        "digest": 11555347913017395602
+      }
+    },
+    {
+      "id": "36---samplerate-384khz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/36 - samplerate 384kHz.flac",
+      "sha256": "63fc6b1ae16fc0285f7053f49ce967087f6a041630ee105d3d67fd8d34e45b7c",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 57,
+        "digest": 18053420618245778854
+      }
+    },
+    {
+      "id": "37---20-bit-per-sample.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/37 - 20 bit per sample.flac",
+      "sha256": "8d8c0526b7823099974a348a6ae80eff9c7eeb4be4e3da270e8e2e9e45d74b3c",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 15787465691080570857
+      }
+    },
+    {
+      "id": "38---3-channels-3.0-.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/38 - 3 channels (3.0).flac",
+      "sha256": "44d14d0efa374049fd9f56aaee3a068a30045e62a571df574c7b824ae596a3cf",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 9608941670696039362
+      }
+    },
+    {
+      "id": "39---4-channels-4.0-.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/39 - 4 channels (4.0).flac",
+      "sha256": "ac670ce52561023dca32f7bd20fbe94c1e1459f06188cd0f870801ea5fb23cee",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 16346594020271733666
+      }
+    },
+    {
+      "id": "40---5-channels-5.0-.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/40 - 5 channels (5.0).flac",
+      "sha256": "bf616e933caab9b7a5da64f9527390f83f208134d327c72a16225c0779ba0da0",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 2819724301624015435
+      }
+    },
+    {
+      "id": "41---6-channels-5.1-.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/41 - 6 channels (5.1).flac",
+      "sha256": "c12650fda54a384abf017d4b931491de043eaa7a815ae74c7a9b49d4087d6193",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 10993609842110402346
+      }
+    },
+    {
+      "id": "42---7-channels-6.1-.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/42 - 7 channels (6.1).flac",
+      "sha256": "07a5d7fc8c4dd74c634b2f0e912a063496f67dd2ba9fbe14f7b5fa37fee8f638",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 15457136949432060573
+      }
+    },
+    {
+      "id": "43---8-channels-7.1-.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/43 - 8 channels (7.1).flac",
+      "sha256": "9c39ff436f316b3a8e72200c8f38af2d9ef15418c25be555aa621d0c793a6254",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 12544363749140993979
+      }
+    },
+    {
+      "id": "44---8-channel-surround-192khz-24-bit-using-only-32nd-order-predictors.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac",
+      "sha256": "1a0e8c17392ae03b2cb04e8c82fcc1f924580fdc978884101faa3e9cf7ed9197",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 6813388407402753290
+      }
+    },
+    {
+      "id": "45---no-total-number-of-samples-set.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/45 - no total number of samples set.flac",
+      "sha256": "336a18eb7a78f7fc0ab34980348e2895bc3f82db440a2430d9f92e996f889f9a",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 4233242605559661455
+      }
+    },
+    {
+      "id": "46---no-min-max-framesize-set.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/46 - no min-max framesize set.flac",
+      "sha256": "9dc39732ce17815832790901b768bb50cd5ff0cd21b28a123c1cabc16ed776cc",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 13924665991499763599
+      }
+    },
+    {
+      "id": "47---only-streaminfo.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/47 - only STREAMINFO.flac",
+      "sha256": "9a62c79f634849e74cb2183f9e3a9bd284f51e2591c553008d3e6449967eef85",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 3648224330008402470
+      }
+    },
+    {
+      "id": "48---extremely-large-seektable.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/48 - Extremely large SEEKTABLE.flac",
+      "sha256": "4417aca6b5f90971c50c28766d2f32b3acaa7f9f9667bd313336242dae8b2531",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 7865934963101329196
+      }
+    },
+    {
+      "id": "49---extremely-large-padding.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/49 - Extremely large PADDING.flac",
+      "sha256": "7bc44fa2754536279fde4f8fb31d824f43b8d0b3f93d27d055d209682914f20e",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 4109191100058085795
+      }
+    },
+    {
+      "id": "50---extremely-large-picture.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/50 - Extremely large PICTURE.flac",
+      "sha256": "1f04f237d74836104993a8072d4223e84a5d3bd76fbc44555c221c7e69a23594",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 7299924271933251463
+      }
+    },
+    {
+      "id": "51---extremely-large-vorbiscomment.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/51 - Extremely large VORBISCOMMENT.flac",
+      "sha256": "033160e8124ed287b0b5d615c94ac4139477e47d6e4059b1c19b7141566f5ef9",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 16770725,
+        "digest": 18156534324406099218
+      }
+    },
+    {
+      "id": "52---extremely-large-application.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/52 - Extremely large APPLICATION.flac",
+      "sha256": "0e45a4f8dbef15cbebdd8dfe690d8ae60e0c6abb596db1270a9161b62a7a3f1c",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 10713639159289926838
+      }
+    },
+    {
+      "id": "53---cuesheet-with-very-many-indexes.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/53 - CUESHEET with very many indexes.flac",
+      "sha256": "513fad18578f3225fae5de1bda8f700415be6fd8aa1e7af533b5eb796ed2d461",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 16934168133614995414
+      }
+    },
+    {
+      "id": "54---1000x-repeating-vorbiscomment.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/54 - 1000x repeating VORBISCOMMENT.flac",
+      "sha256": "b68dc6644784fac35aa07581be8603a360d1697e07a2265d7eb24001936fd247",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 160074,
+        "digest": 6626700298832070105
+      }
+    },
+    {
+      "id": "55---file-48-53-combined.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/55 - file 48-53 combined.flac",
+      "sha256": "a756b460df79b7cc492223f80cda570e4511f2024e5fa0c4d505ba51b86191f6",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 16060159,
+        "digest": 11413055178205081304
+      }
+    },
+    {
+      "id": "56---jpg-picture.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/56 - JPG PICTURE.flac",
+      "sha256": "5cebe7a3710cf8924bd2913854e9ca60b4cd53cfee5a3af0c3c73fddc1888963",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 5497343581126280829
+      }
+    },
+    {
+      "id": "57---png-picture.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/57 - PNG PICTURE.flac",
+      "sha256": "c6abff7f8bb63c2821bd21dd9052c543f10ba0be878e83cb419c248f14f72697",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 6426099183501052755
+      }
+    },
+    {
+      "id": "58---gif-picture.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/58 - GIF PICTURE.flac",
+      "sha256": "7c2b1a963a665847167a7275f9924f65baeb85c21726c218f61bf3f803f301c8",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 6992316760779303068
+      }
+    },
+    {
+      "id": "59---avif-picture.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/59 - AVIF PICTURE.flac",
+      "sha256": "7395d02bf8d9533dc554cce02dee9de98c77f8731a45f62d0a243bd0d6f9a45c",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 705623977945864286
+      }
+    },
+    {
+      "id": "60---mono-audio.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/60 - mono audio.flac",
+      "sha256": "20539fbbd6ae28cea2b2182a4c60c6c70cbb710a136199fc83200c4e5fa00b1c",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 7289132713360646727
+      }
+    },
+    {
+      "id": "61---predictor-overflow-check-16-bit.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/61 - predictor overflow check, 16-bit.flac",
+      "sha256": "9b15791a8b8ca14a6b9a2374ecf7c34be25bc7b9e64fa600eb5f7608194b0b61",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 8293358437716263429
+      }
+    },
+    {
+      "id": "62---predictor-overflow-check-20-bit.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/62 - predictor overflow check, 20-bit.flac",
+      "sha256": "a6b3904e8bcce7a93ad529f9b07e64d06d6647ea7a775ba91490dbacc3c771b7",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 12277398840132863181
+      }
+    },
+    {
+      "id": "63---predictor-overflow-check-24-bit.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/63 - predictor overflow check, 24-bit.flac",
+      "sha256": "d5e072373f2d9e80ca2e49b7dd349ebd4340929143d7e5f2c154a97f04755c38",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 2967749117226915602
+      }
+    },
+    {
+      "id": "64---rice-partitions-with-escape-code-zero.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/subset/64 - rice partitions with escape code zero.flac",
+      "sha256": "3ad0bf2e9b9c78cd04deb0a8e133f5d088db051e42cbf3ffb15e1b528f009ca6",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 14151414770813697307
+      }
+    },
+    {
+      "id": "01---changing-samplerate.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/01 - changing samplerate.flac",
+      "sha256": "9fa8f7c57186be8708f42620885a71d4c4871767ff55cfe063eb1cf3bad8d0a5",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 207243403525415778
+      }
+    },
+    {
+      "id": "02---increasing-number-of-channels.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/02 - increasing number of channels.flac",
+      "sha256": "fe70d5e324bea56e9569d4ff9d4b6fa9c33d3f763e7fec5b1f27904e648a0482",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 539147298511264858
+      }
+    },
+    {
+      "id": "03---decreasing-number-of-channels.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/03 - decreasing number of channels.flac",
+      "sha256": "8e3c451d835cd9a0ef8914e027cf93c98985bd1bb4d7eea59deb15996b97be3b",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 810983200388095269
+      }
+    },
+    {
+      "id": "04---changing-bitdepth.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/04 - changing bitdepth.flac",
+      "sha256": "f614382d8bd33b881668f2384dff03478ec2f863cb7069c42120cf8586c145b7",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 57,
+        "digest": 51869217340023394
+      }
+    },
+    {
+      "id": "05---32bps-audio.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/05 - 32bps audio.flac",
+      "sha256": "de71cbd81f0be1743fc8264f159a521dfc1d92a5e2056c30a64d66001e055eec",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 2589980042677907208
+      }
+    },
+    {
+      "id": "06---samplerate-768khz.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/06 - samplerate 768kHz.flac",
+      "sha256": "3e773546d57f7aa7d126a225f8db152a34196725b71ffb76bf2fe05bad6fbb9f",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 4880424916221210192
+      }
+    },
+    {
+      "id": "07---15-bit-per-sample.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/07 - 15 bit per sample.flac",
+      "sha256": "7defaacc8d1bcd3201081d7054de5df1665d17f79851c35b3c6360401d30aa71",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 10934820211145184361
+      }
+    },
+    {
+      "id": "08---blocksize-65535.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/08 - blocksize 65535.flac",
+      "sha256": "2c0825fc761db080dbfdc11ea2d2b02ee414c9ed83c6240ffbac62db22d08714",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 1221284331341670617
+      }
+    },
+    {
+      "id": "09---rice-partition-order-15.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/09 - Rice partition order 15.flac",
+      "sha256": "33ee6f02cc9d930dd421e02b716bc2d9d520c3facdf98030eb09c303227f8626",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 393287232599850479
+      }
+    },
+    {
+      "id": "10---file-starting-at-frame-header.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/10 - file starting at frame header.flac",
+      "sha256": "d95f63e8101320f5ac7ffe249bc429a209eb0e10996a987301eaa63386a8faa1",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40872234726940
+      }
+    },
+    {
+      "id": "11---file-starting-with-unparsable-data.flac",
+      "profile": "flac",
+      "file": ".research/flac-test-files/uncommon/11 - file starting with unparsable data.flac",
+      "sha256": "40c58b833fb07f0de41259d83cde78211e3faaf9e5f844aed43fa52c18435d2f",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1733293765689
+      }
+    },
+    {
+      "id": "ff-s16-block16.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block16.flac",
+      "sha256": "548054363fae3e66ad73b3d02909d1f5ca548a40b96d9009ac6f1c782e2f959d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 15272300718819668924
+      }
+    },
+    {
+      "id": "ff-s16-block16384.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block16384.flac",
+      "sha256": "fb8acf5a8c172a6c4bf4255492ce2ac9e7a253b2ae8c4b11e7eb4ee7f30ea860",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 8048232376492760552
+      }
+    },
+    {
+      "id": "ff-s16-block192.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block192.flac",
+      "sha256": "9bd59526cb74e88c358453ca87c01cb5beccf79c445e606f61b7e5892576cdb3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 10714516024080364988
+      }
+    },
+    {
+      "id": "ff-s16-block32768.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block32768.flac",
+      "sha256": "e90680b9245ad0dca98423753da3911d37e1ded023e2993cd0a0b362406aeab3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 4453935624781188109
+      }
+    },
+    {
+      "id": "ff-s16-block4608.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block4608.flac",
+      "sha256": "94e667f9699121d3f56225c6d60b4d880dfd23c4299fbf25d74f852b2acfbf8e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 438153404412847032
+      }
+    },
+    {
+      "id": "ff-s16-block576.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_block576.flac",
+      "sha256": "b88d3145b2078ef88519130407733b5a3834c7222a4c31edd8b99f344da1132a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 8607304056083258318
+      }
+    },
+    {
+      "id": "ff-s16-ch1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch1.flac",
+      "sha256": "e2572bd922f520a88c2743e22da6c84f9746ba2c08342a1e8992fd820e392e5f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 3664132371497650514
+      }
+    },
+    {
+      "id": "ff-s16-ch2.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch2.flac",
+      "sha256": "822a5b4df6458efa3b3ca9160bdc6a398d5d859cc6c73c2f4553cdf6abcfb67d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 14854838333499668883
+      }
+    },
+    {
+      "id": "ff-s16-ch3.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch3.flac",
+      "sha256": "8741fea36f842fca66a27dd151e43cf903d4faf0d7bf64ec0fbc8c7162f0dade",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 195056666729460323
+      }
+    },
+    {
+      "id": "ff-s16-ch4.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch4.flac",
+      "sha256": "3df23dae51a03aa7f6b871290977679ea061c0332f50e1826c587f95058b1a8a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 2268661682636960062
+      }
+    },
+    {
+      "id": "ff-s16-ch5.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch5.flac",
+      "sha256": "c4e2ff9a2493c508a4c2f69adaf17bbfb3ca2226bff0e479b09e0636c5cfbc9e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 4214766406390721677
+      }
+    },
+    {
+      "id": "ff-s16-ch6.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch6.flac",
+      "sha256": "cff18a774fb64c8423036ad36ff56c522b4be867701a9ad62926749240dbd81a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 2555010198617146858
+      }
+    },
+    {
+      "id": "ff-s16-ch7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch7.flac",
+      "sha256": "e997e05c739b0104a6efc26dc529a18edd291e144786a0f3def337312ba83f8c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 18424951743803238544
+      }
+    },
+    {
+      "id": "ff-s16-ch8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_ch8.flac",
+      "sha256": "9edc3f3a43f1c4821ffa5f216666fa305cbf99b261d07b9603ebf61eaeb5b710",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 14961795659085361485
+      }
+    },
+    {
+      "id": "ff-s16-exact-rice.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_exact_rice.flac",
+      "sha256": "1e021859d83a6e221e837b0609d79b6731fba8638a493e83f90686b5a8e3cda4",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 17905734557006849586
+      }
+    },
+    {
+      "id": "ff-s16-indep.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_indep.flac",
+      "sha256": "b3a4216e1717b58be3e75968080e0a98020b3f4d208f76d49dbe9fa4b2ab0424",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 7363926742397106837
+      }
+    },
+    {
+      "id": "ff-s16-left-side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_left_side.flac",
+      "sha256": "9b51bf7f46170a49d601457cbf212c0ffa1ec98e5fe7214a5bd2c7ded09103ae",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 4420450959122584016
+      }
+    },
+    {
+      "id": "ff-s16-level0.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level0.flac",
+      "sha256": "3f950058f59a5ebd34a3bddd41632a71d5d9fec069fc6feb5b575815faa36307",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 3448217408566059210
+      }
+    },
+    {
+      "id": "ff-s16-level1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level1.flac",
+      "sha256": "4342de09d616d703d78c51c85d01566300365c4e68745cb31c4311ec9830e778",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 15249510684614629269
+      }
+    },
+    {
+      "id": "ff-s16-level10.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level10.flac",
+      "sha256": "050b3577bfa9886b187e0e16244183fb9290c144b684388bbaec8943425dcc08",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 7081174143276831204
+      }
+    },
+    {
+      "id": "ff-s16-level11.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level11.flac",
+      "sha256": "208f540bd2c16231e594bc8aa7ec7967868bc4cadf4d186d3ef97e0a4bd090c0",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 3635405114777336764
+      }
+    },
+    {
+      "id": "ff-s16-level12.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level12.flac",
+      "sha256": "6def173a90a26b390aaf58ff05ea01ca602f1baf993b6a966d79fe347b2375a7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 12466351218920494017
+      }
+    },
+    {
+      "id": "ff-s16-level2.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level2.flac",
+      "sha256": "bf4a37c3bdc2562663185e14989491afaf6c2c5ba3a70c28e13e89c320ef4f74",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 8617811632812803778
+      }
+    },
+    {
+      "id": "ff-s16-level3.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level3.flac",
+      "sha256": "ed317d269c8aee3c8f917257526a348930eb175b767c2cee48f17e8307179f84",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 5151619965360746991
+      }
+    },
+    {
+      "id": "ff-s16-level4.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level4.flac",
+      "sha256": "ab21aea393eca66feecc9b2a571a5c723f2ba44265fa79ab10bf6b0ce230545f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 16356550301232707205
+      }
+    },
+    {
+      "id": "ff-s16-level5.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level5.flac",
+      "sha256": "4c55b1f461f2c865fdab156d7185a6419d2fd1319bb16f5bd23a8f32fc5274c1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 15882908182759396990
+      }
+    },
+    {
+      "id": "ff-s16-level6.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level6.flac",
+      "sha256": "1d810f1ca1a207676c31afc23c1f3483db57068b7683fa842da69ac296465e7a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 14707215160443672431
+      }
+    },
+    {
+      "id": "ff-s16-level7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level7.flac",
+      "sha256": "dcf23b025b0c9e62596bbdc84541107b9f00a48ee37611db964b3b553805364c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 15065021043958590258
+      }
+    },
+    {
+      "id": "ff-s16-level8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level8.flac",
+      "sha256": "b83f9a907078f200c15a968e4b081e32b3ddeb8eacba5a9fce70d44772277bad",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 3372316562107516454
+      }
+    },
+    {
+      "id": "ff-s16-level9.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_level9.flac",
+      "sha256": "dc7b39cf4f145bb6db77a4941fca37b22e0da95554943e28e6e091797091cdd3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 9935483152725884185
+      }
+    },
+    {
+      "id": "ff-s16-lpc-cholesky.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_lpc_cholesky.flac",
+      "sha256": "6a2e75c52399d2a5c9b7f5f6215800434e5301cb5e33048ef4da81e899d8b263",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 16675023225713455771
+      }
+    },
+    {
+      "id": "ff-s16-lpc-fixed.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_lpc_fixed.flac",
+      "sha256": "4b0d80200ea522bfd0cb9994bd2959bf9b1fc0e32b86005deb02d48c1450de18",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 16922049142454377371
+      }
+    },
+    {
+      "id": "ff-s16-lpc-levinson.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_lpc_levinson.flac",
+      "sha256": "d3e36709f7741cb2e678fdf71def9ab063965f86b0ce35c407cab90c4bc8591a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 338970660594657478
+      }
+    },
+    {
+      "id": "ff-s16-lpc-none.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_lpc_none.flac",
+      "sha256": "ae0bcfe9fb938f87024a11b1b48530ef37d4de845b421c767cd975cdcf4288f3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 16370076734166805114
+      }
+    },
+    {
+      "id": "ff-s16-mid-side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_mid_side.flac",
+      "sha256": "f844dff967e5a93e1be922b0ab0903426313bcb2e26a1a4e1ebc7d31cfaf3940",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 11237789043461680377
+      }
+    },
+    {
+      "id": "ff-s16-multi-dim-quant.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_multi_dim_quant.flac",
+      "sha256": "d37b2f6012d36366985183d266660148dec71d825ad82881274e88bb6e329eeb",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 16977229704438217595
+      }
+    },
+    {
+      "id": "ff-s16-order-2level.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_order_2level.flac",
+      "sha256": "c277537fbaf18f76e789bcf00953abfa939ad0ad42d6c10c9d0239705f68b55f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 9216682603471326736
+      }
+    },
+    {
+      "id": "ff-s16-order-estimation.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_order_estimation.flac",
+      "sha256": "4cfd751c9b9a28519821fcbbd3395755810a0f21dab36de3fbf1239b371c803c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 4947053652837170301
+      }
+    },
+    {
+      "id": "ff-s16-order-log.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_order_log.flac",
+      "sha256": "b5439e68aa7d2e8d55ae972c2f8ca8b28dcf7292f19ddce2ba6ccb00b3832c00",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 17775207721657363047
+      }
+    },
+    {
+      "id": "ff-s16-order-search.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_order_search.flac",
+      "sha256": "23574ab898a1a1998dc48bb7b1cf9e55a120f2d1ddefe3a8cf41e23cfd2b9305",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 8190558828399735611
+      }
+    },
+    {
+      "id": "ff-s16-partitions-0-0.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_partitions_0_0.flac",
+      "sha256": "eabd68c9a72c3b620859166da9b0b10b71653c83a1cca8e9e1655f92efd935ec",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 303294947993100184
+      }
+    },
+    {
+      "id": "ff-s16-partitions-0-8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_partitions_0_8.flac",
+      "sha256": "058fc1a24c6647d0284f10a9131469434dc2454028aad6ec71941a7993fbb643",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 17142561950438053714
+      }
+    },
+    {
+      "id": "ff-s16-partitions-8-8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_partitions_8_8.flac",
+      "sha256": "40f4670f10480da5d6ff6385a4766438fa1e7eff364b7511bd4c6db556a5f02f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 13511734078077045043
+      }
+    },
+    {
+      "id": "ff-s16-rate11025.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate11025.flac",
+      "sha256": "309e9d19fe3b6f33370c6b105d9b8fa2283fa759a2f290e42bfdc06ed1db0164",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 8050383075801022433
+      }
+    },
+    {
+      "id": "ff-s16-rate176400.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate176400.flac",
+      "sha256": "9361ce60edff58863639cc6271ff6b40f77a057df4f8813f3adaa6ba47b3b23d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 2361498738986746099
+      }
+    },
+    {
+      "id": "ff-s16-rate192000.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate192000.flac",
+      "sha256": "d36e59816ebc2d22efbbbad0f792046252f6029b1e32ad9909f9a246eb0030d9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 16471389762655953547
+      }
+    },
+    {
+      "id": "ff-s16-rate22050.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate22050.flac",
+      "sha256": "9cd6f31c9a8ba7811e1a173a3cc60953739e853d43ad0cc2accc0717920599d6",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 17937347196463782744
+      }
+    },
+    {
+      "id": "ff-s16-rate32000.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate32000.flac",
+      "sha256": "95eaed2637cce53d2e2ac763c9db68e8e57ec147af13d20ba1339779415d76b1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 17933012730731586490
+      }
+    },
+    {
+      "id": "ff-s16-rate37800.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate37800.flac",
+      "sha256": "e0d4eae4f7a6ff283f792356fe6c2500012831f145e7411f10c21011df2bb93d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 11736053301473012140
+      }
+    },
+    {
+      "id": "ff-s16-rate8000.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate8000.flac",
+      "sha256": "ea264945397e3f2e11c60282bcca1d2ebc8a8d0c0fcadc166620c776eebccda9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 3915545876675859053
+      }
+    },
+    {
+      "id": "ff-s16-rate88200.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_rate88200.flac",
+      "sha256": "b07dad3095f0944219df7a160be6c3bc0ffa4ffeb86d4fac77fa8141aff2c3f1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 14080359020056130074
+      }
+    },
+    {
+      "id": "ff-s16-right-side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_right_side.flac",
+      "sha256": "20671462cf0d9d2c999f4ff8b330587075d0e883aeeeb160a62746ec6745ca13",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 2366508070406885489
+      }
+    },
+    {
+      "id": "ff-s16-wasted2.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s16_wasted2.flac",
+      "sha256": "ebc7785dff177f21c91eb1a36440bd172beda390ddd2f4a1615f7bbf5db43866",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 10117890623674696808
+      }
+    },
+    {
+      "id": "ff-s24-ch1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_ch1.flac",
+      "sha256": "5c704c0facc4fac3d723442b3c3e2f62b250f2b9df1250569e8d12d3c905b014",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 3536641892067966177
+      }
+    },
+    {
+      "id": "ff-s24-ch6.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_ch6.flac",
+      "sha256": "9432219736b7dbbc1f6d15f9e25b76e44e2872bda2b5c127d4a406bea27290b1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 16153946302188983471
+      }
+    },
+    {
+      "id": "ff-s24-ch8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_ch8.flac",
+      "sha256": "3fbb8c4a2c9272b3da67a5ce2fae2101e5674d1d0a92d21ad5417fbbdc8f26ef",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 12079310489260444233
+      }
+    },
+    {
+      "id": "ff-s24-indep.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_indep.flac",
+      "sha256": "3860e4370bbb28506b2e52b47cb8ef6104ef4080be3b4dfab765f8c26a35398b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 12634626201188785105
+      }
+    },
+    {
+      "id": "ff-s24-left-side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_left_side.flac",
+      "sha256": "adafa194ae2332569b260f96cfec6da519a0eeeae2b241431f13e786455d22cc",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 15378740014996626541
+      }
+    },
+    {
+      "id": "ff-s24-mid-side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_mid_side.flac",
+      "sha256": "7283261a9de033f31fbf7c80501cb17c03d112378f43221958bbadf15c317956",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 8677106388276646083
+      }
+    },
+    {
+      "id": "ff-s24-order1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_order1.flac",
+      "sha256": "67de173e96c651740cabbd91d86d44696f3ee773125117aca190254e2208472e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 9013932671057534202
+      }
+    },
+    {
+      "id": "ff-s24-order12.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_order12.flac",
+      "sha256": "d07c0ed6cec52006cd2d92d464a95745930b60855d92f40fdc22c1ff337c8e80",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 10206039128536297926
+      }
+    },
+    {
+      "id": "ff-s24-order32.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_order32.flac",
+      "sha256": "9924386b6c13f0a4f29d00e88883fd95d85b6c382a6202e20e3562c77586ef98",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 3755076560741355358
+      }
+    },
+    {
+      "id": "ff-s24-right-side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_right_side.flac",
+      "sha256": "898097ae4729f45a4295564eae364dca37d7c3177c84292cad462befde587fdd",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 11634293401394637591
+      }
+    },
+    {
+      "id": "ff-s24-wasted8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s24_wasted8.flac",
+      "sha256": "03094ef0dea69375bf779e05e7c09e4d698f9da4a22d54bcf45d3afb392d120d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 11091327118679402528
+      }
+    },
+    {
+      "id": "ff-s32-ch1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_ch1.flac",
+      "sha256": "32dd1355c8e8ac6be74c6c27f3fd102a275cc7fa78ff9311a4603206fd0abab1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 9033284956278548959
+      }
+    },
+    {
+      "id": "ff-s32-ch6.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_ch6.flac",
+      "sha256": "01ecc5387291d0e059eabdd02abf19b737d35d2430f57b914c41583e186db031",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 17172063741619752447
+      }
+    },
+    {
+      "id": "ff-s32-ch8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_ch8.flac",
+      "sha256": "15ac9aee06187a081b9e28a42cee18273ab5feabbb81ce2584bfef25d66b19ad",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 13576170666042813543
+      }
+    },
+    {
+      "id": "ff-s32-indep.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_indep.flac",
+      "sha256": "32ff8af7ee7c2b1240271e35be6661b3e17b2d7fbc4426ceb52b9faac797cdb3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 10062393817649514384
+      }
+    },
+    {
+      "id": "ff-s32-left-side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_left_side.flac",
+      "sha256": "38e02c90dc8b2e6051b1cfb9e38bb333b4b4acc0ecafbfe1117a24b692779ba8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 15749362903444494177
+      }
+    },
+    {
+      "id": "ff-s32-mid-side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_mid_side.flac",
+      "sha256": "1751955ef7f50f04342dd2d4c59c416fa715d3cab14a58b2e7e588e33f265868",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 6489887660291729592
+      }
+    },
+    {
+      "id": "ff-s32-order32.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_order32.flac",
+      "sha256": "811c62f212fb19d931d8ba730f0957f25220ed517cf9e2e83296227386bdc430",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 15897303203926107237
+      }
+    },
+    {
+      "id": "ff-s32-right-side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/ff_s32_right_side.flac",
+      "sha256": "fc57c6e0e9faa97a1859603d984641a5d4c4f67c650af3b36d006b198cd9916e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 3471451780916053446
+      }
+    },
+    {
+      "id": "flac-3ch-odd-mask.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_3ch_odd_mask.flac",
+      "sha256": "87e97b0c67626ee73d88345e60caa579ad712b4d3cb350b8caa2b1a3dbd5c087",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 5762172066176172998
+      }
+    },
+    {
+      "id": "flac-5ch-back-mask.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_5ch_back_mask.flac",
+      "sha256": "46b58f8553252ac71271500937c2a7f1b6fa62ee42f7acd4d09cbab9b27aa144",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 2717171728933868715
+      }
+    },
+    {
+      "id": "flac-b12-ch7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b12_ch7.flac",
+      "sha256": "e60b6a181cc50ac131534860cceeda69ed0da3c7e8a5e433b7750bce6d38e512",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 15725449468528654324
+      }
+    },
+    {
+      "id": "flac-b12-stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b12_stereo.flac",
+      "sha256": "404783304e2124a405de7b276d44b828ef8e3f9a40d1fcf5544f4e5198114e14",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 5201487488247664495
+      }
+    },
+    {
+      "id": "flac-b15-stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b15_stereo.flac",
+      "sha256": "a760b0266139626acc5d5758f086079efa1f27524497d67dce7c0dad418f72fa",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 17192974120608148514
+      }
+    },
+    {
+      "id": "flac-b16-stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b16_stereo.flac",
+      "sha256": "7d41e98d4ebafcee67348280ea047d8bb272e52bec06b267747d9e1a0d525f81",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 15839334009310251201
+      }
+    },
+    {
+      "id": "flac-b20-ch7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b20_ch7.flac",
+      "sha256": "e87d93f2ba06f74efbd3a6d67514cd297e4bbd8cb13c992ba35eb666409461eb",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 16442283232858730851
+      }
+    },
+    {
+      "id": "flac-b20-stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b20_stereo.flac",
+      "sha256": "0a4d1e866cc47239e6df1d15414dd2fe966f53743e33d505a70282a11698ec46",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 4519763194597634603
+      }
+    },
+    {
+      "id": "flac-b24-stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b24_stereo.flac",
+      "sha256": "da357d4634baca5d924a70638b7acf6aab35b6986654969a32024470aed1f287",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 13807167565691927511
+      }
+    },
+    {
+      "id": "flac-b28-stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b28_stereo.flac",
+      "sha256": "c5b8cceb426b01250aa9415694529c0f91f9e00ae94f5443ca67dee8dc5eaec8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 17714138297420580986
+      }
+    },
+    {
+      "id": "flac-b31-stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b31_stereo.flac",
+      "sha256": "2d34e0f5ad927022d6b28873c4c0cabc23092144541a702f825edbb5e73215d0",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 8586085505841651670
+      }
+    },
+    {
+      "id": "flac-b32-stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b32_stereo.flac",
+      "sha256": "44ead8e11d162c12e35d1d021f5c6587e253d53d9bae6cd5683910426b865652",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 18037235027987243953
+      }
+    },
+    {
+      "id": "flac-b4-stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b4_stereo.flac",
+      "sha256": "8cfc3fee961265c839230c38edd95e0137fd6faf7491ed6add9ae861e5d81f45",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 16793553768613472215
+      }
+    },
+    {
+      "id": "flac-b5-stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b5_stereo.flac",
+      "sha256": "5c3934c2e5a569168583d5e7a74e10f48a967f064dcd2d2ea10ff932e2831294",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 2868120599593312692
+      }
+    },
+    {
+      "id": "flac-b8-ch7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b8_ch7.flac",
+      "sha256": "b04f63546b56858cec9a33af22f6fa12506c7b648a8b12a05bdbba32b41e460d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 14136429848994544083
+      }
+    },
+    {
+      "id": "flac-b8-stereo.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_b8_stereo.flac",
+      "sha256": "42469f93bd23c20ba4275fcf01fb5872a30fb9f69a63b11877cefd170ca01e22",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 4997370311270795294
+      }
+    },
+    {
+      "id": "flac-quad-side-mask.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_quad_side_mask.flac",
+      "sha256": "bc4f8a82c4d48cf015cde1e12cd52063f4a2d2d4375730df4fdeea8ee9b53dac",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 367552946311150020
+      }
+    },
+    {
+      "id": "flac-s16-adaptive-mid-side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_adaptive_mid_side.flac",
+      "sha256": "3b8e6f786f80db709f56c013cd3b0d44c52cf5d0de4ab13968a34ba2275e9bbc",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 12348553978463455803
+      }
+    },
+    {
+      "id": "flac-s16-block16.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_block16.flac",
+      "sha256": "9693d2722d3c2c0d86b568621584e6230c70961b64043df8e963dc5b4355f78f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 13300263611965537155
+      }
+    },
+    {
+      "id": "flac-s16-block65535.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_block65535.flac",
+      "sha256": "ecc66bf25625890684c64e8042d00d2c63ae75231870ffcfbab773170a66d94e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 16034361993266889155
+      }
+    },
+    {
+      "id": "flac-s16-ch1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch1.flac",
+      "sha256": "631ca35739a1c4cd1922c8e343e344f1b79c0cbb8ba9b0ae296f2c49204eb847",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 4076123565981368623
+      }
+    },
+    {
+      "id": "flac-s16-ch2.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch2.flac",
+      "sha256": "b61ba81d31f68d70ce7f8ca80544e364aa66405f8e91a9edb1350d865e943ffb",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 10983765776016274995
+      }
+    },
+    {
+      "id": "flac-s16-ch3.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch3.flac",
+      "sha256": "ec57dcf43828fdd4ae09150601a4e23eb98aea815fca63040e062fbfe24ab2e7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 13397562639256975652
+      }
+    },
+    {
+      "id": "flac-s16-ch4.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch4.flac",
+      "sha256": "f1f88c8262da575049e15d9557b25025051cfe435c8bf1226401d16837092927",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 14948452287538152630
+      }
+    },
+    {
+      "id": "flac-s16-ch5.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch5.flac",
+      "sha256": "9561b0176da556d0dff463724f77887a36cb58e39ae23098f50e206e3f19ce8e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 6852180068205269232
+      }
+    },
+    {
+      "id": "flac-s16-ch6.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch6.flac",
+      "sha256": "d800fa59e65da9aee53a61e878518f52e7cc5173ac8003f106e75e582e6f55b8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 4803489237132156368
+      }
+    },
+    {
+      "id": "flac-s16-ch7.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch7.flac",
+      "sha256": "e9ef7aa20fd6c456baa868e9a7d5d8f16f1150ddeb97d4699273988bdd61652f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 5907108802639602609
+      }
+    },
+    {
+      "id": "flac-s16-ch8.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_ch8.flac",
+      "sha256": "1fffdd88054f0964b839f8c84df54752b42a33d686a2b02044074f174cd50c7f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 7678171193389870075
+      }
+    },
+    {
+      "id": "flac-s16-exhaustive.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_exhaustive.flac",
+      "sha256": "197229d7c0f6641fbb7077f58026aa73836592000c937c57ab00a3f591b3ca79",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 980688988470098219
+      }
+    },
+    {
+      "id": "flac-s16-level0.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_level0.flac",
+      "sha256": "c120d0b2c6a0b36ac896e0538cc3e79af52463f124051d09c7907da55c47109e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 9526966048809153894
+      }
+    },
+    {
+      "id": "flac-s16-level3.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_level3.flac",
+      "sha256": "16dfa93e3576f7516e1bea12ad86b3e4e76a515d498e510296b2711ed7384d68",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 8654948227131572549
+      }
+    },
+    {
+      "id": "flac-s16-level5.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_level5.flac",
+      "sha256": "beab06952dd5b05bf800974e6fbcc8038a650ef6a1fcd5f9b6d987366f5b884c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 15890537514472876815
+      }
+    },
+    {
+      "id": "flac-s16-no-mid-side.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_no_mid_side.flac",
+      "sha256": "155898f16330c1dbc878546331a19cd4728ab2b74f1877d7dba1ab95feb3ef2d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 13886745624456843069
+      }
+    },
+    {
+      "id": "flac-s16-partition15.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_partition15.flac",
+      "sha256": "a4759d7c67560e33c5d3153df5ed51f64b48caf49e735fd740159defa0082dc1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 15147741692068618668
+      }
+    },
+    {
+      "id": "flac-s16-precision5.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_precision5.flac",
+      "sha256": "449f24301fcf5ad557c6321a6dd0de641504487849b2e9638f19187bd1ae0a2e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 1254566086615681784
+      }
+    },
+    {
+      "id": "flac-s16-rate1.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_rate1.flac",
+      "sha256": "5a235bd079ae95f6317a9311aef06de4a067235f8fb213be4209be061fafae12",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 2375732405455186056
+      }
+    },
+    {
+      "id": "flac-s16-wasted3.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s16_wasted3.flac",
+      "sha256": "415f469be74378e22775a6e722192982c8b4daa94bd91aa35b34046780311753",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 9904300798801306353
+      }
+    },
+    {
+      "id": "flac-s20-rate768k.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s20_rate768k.flac",
+      "sha256": "ea3c5aa6fd530bd0b14f893f151904119d6d140d228bbfe67e4a1ac413f4bb0f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 9751287202596796562
+      }
+    },
+    {
+      "id": "flac-s24-lax-order32.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s24_lax_order32.flac",
+      "sha256": "8149571f13902f4c38f7aa4dedae8cce5cc0ff4cf2d16ec6ebe5915f3cdc442d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 14330435696602231143
+      }
+    },
+    {
+      "id": "flac-s32-lax-order32.flac",
+      "profile": "flac",
+      "file": ".research/flac-generated/flac_s32_lax_order32.flac",
+      "sha256": "cf908410b01401472170878dc3acf772724e8e40f3e50bf2bf2e1b591d0c4e5f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 34,
+        "digest": 2325032416445648975
+      }
+    },
+    {
+      "id": "mp3-ape-footer-only.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_ape_footer_only.mp3",
+      "sha256": "9e6be4796be8d72ad95da9a974e6079fb185219ef25d4d52f60079c6a1a1b676",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 14209329412456153943
+      }
+    },
+    {
+      "id": "mp3-ape-noheader-tail.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_ape_noheader_tail.mp3",
+      "sha256": "856f80784b54c1e1b16fd59929a2867293f957e67319f647de6fb42c94e54a8f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 14209329412456153943
+      }
+    },
+    {
+      "id": "mp3-cut-frame.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_cut_frame.mp3",
+      "sha256": "cec60c8eeba14bdc8b955f0b66469f0671f830cd43f5c3837359c3c1934e2218",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 14209329412456153943
+      }
+    },
+    {
+      "id": "mp3-foreign-frame.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_foreign_frame.mp3",
+      "sha256": "3ab7165c4c5ae4f7f5e4acadab49656c5341fcd2266f0c5787bb46d74f479ead",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 14209329412456153943
+      }
+    },
+    {
+      "id": "mp3-id3-footer.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_id3_footer.mp3",
+      "sha256": "7253a804bf4d9f99d7d09e2e3dd2be976fdb6481809de9b4d9b7a078d95808ca",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 10,
+        "digest": 10140915217941002872
+      }
+    },
+    {
+      "id": "mp3-id3-unsync.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_id3_unsync.mp3",
+      "sha256": "746e8a4d3d928a23b4eb75dffebb399a556832ee0a231233e054e60f5d381cc7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 10,
+        "digest": 10140915217941002872
+      }
+    },
+    {
+      "id": "mp3-info-as-xing.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_info_as_xing.mp3",
+      "sha256": "3fbda129b5c4292fc87a5845696948bf6bcc2afd3f55021a8180597493f9154a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 18156841536435321147
+      }
+    },
+    {
+      "id": "mp3-info-extended.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_info_extended.mp3",
+      "sha256": "0df7ef0fdd36a1b1b8c201cb12292be04fbc951996e1121dcd770e2c96b1ea8b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 8039884323627027494
+      }
+    },
+    {
+      "id": "mp3-info-nolame.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_info_nolame.mp3",
+      "sha256": "9c90999b8b4eca85c8ad3e08595ad802197af6ea4f5e713b80954f0c1d89320e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 5105865212072646808
+      }
+    },
+    {
+      "id": "mp3-info-nolame-name.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_info_nolame_name.mp3",
+      "sha256": "4e7e37b4f0c63b6228f7699cea9f0c8b229e75d674cf29ea4c3c51af059a01a4",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 5105865212072646808
+      }
+    },
+    {
+      "id": "mp3-info-othername.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_info_othername.mp3",
+      "sha256": "a0f5109b9f797370b11196099703e1eb1c95c7f1c5bb3d0ed83ac6b78a042784",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 18156841536435321147
+      }
+    },
+    {
+      "id": "mp3-info-shuffled.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_info_shuffled.mp3",
+      "sha256": "f026d5d52592f5df1263b6526ff4fa22977eebbadd096788964d904c89d5e8d8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 18156841536435321147
+      }
+    },
+    {
+      "id": "mp3-info-tail-junk.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_info_tail_junk.mp3",
+      "sha256": "54b36a649b9c5b12a88d84b720bc962abcbf2ab1d87db43d465d80416c636f15",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 18156841536435321147
+      }
+    },
+    {
+      "id": "mp3-info-truncated.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_info_truncated.mp3",
+      "sha256": "1108d1c87df111213c78c0b44a8295974a1ef72d540381bbf6e0ef63a5764ab7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 18156841536435321147
+      }
+    },
+    {
+      "id": "mp3-lead-junk.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_lead_junk.mp3",
+      "sha256": "8d0bcbc7e5dd9ef9a058313e112541596c7bbdfed2f48ca5cb9592c38e96c86e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40899775970202
+      }
+    },
+    {
+      "id": "mp3-lead-zero.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_lead_zero.mp3",
+      "sha256": "34c54d31beec57acb28cb3e052c9cc841fb15484ba480354e801be2a6b27acf1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40899775970202
+      }
+    },
+    {
+      "id": "mp3-mid-junk.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_mid_junk.mp3",
+      "sha256": "946e5a67110e4b9a7210e1fa0dd1dccecbbaff7a33a7a808885de1b5723bbb0d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 14209329412456153943
+      }
+    },
+    {
+      "id": "mp3-mid-junk-falsesync.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_mid_junk_falsesync.mp3",
+      "sha256": "eca2f347d0862c1f87a4ec5531688657844efef96322fde1dc583874674d7240",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 14209329412456153943
+      }
+    },
+    {
+      "id": "mp3-name-abcd.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_name_abcd.mp3",
+      "sha256": "347d66580987f1f1cd3efd6b046b2d0b5727b02bc8758df7c17b8945917e25f8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 5105865212072646808
+      }
+    },
+    {
+      "id": "mp3-name-gogo.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_name_gogo.mp3",
+      "sha256": "82fb77301c8ae65885b57bb8b705376bc8209257017a14340f603d02f8a53ae2",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 5105865212072646808
+      }
+    },
+    {
+      "id": "mp3-name-lame.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_name_lame.mp3",
+      "sha256": "412910d309db738799e38ec4d12e7c92b1ac8b2f29328bb6774e771e317a0b3f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 18156841536435321147
+      }
+    },
+    {
+      "id": "mp3-name-lav.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_name_lav.mp3",
+      "sha256": "943625d024fcfe3dc74cb692e68fb72fbc6f248824a3c1f04397890e07610c50",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 5105865212072646808
+      }
+    },
+    {
+      "id": "mp3-name-lavf.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_name_lavf.mp3",
+      "sha256": "e681abd2375707412eb7f7aa61ead61e57e46935523b57e921ae7f4bf1ae0846",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 18156841536435321147
+      }
+    },
+    {
+      "id": "mp3-name-zero4.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_name_zero4.mp3",
+      "sha256": "ecb9bacfd3f67da6b3687b0b674fa6bf623b231a31495f7d753ec3dbf1c7a27c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 18156841536435321147
+      }
+    },
+    {
+      "id": "mp3-pad-100.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_pad_100.mp3",
+      "sha256": "db5979368869c16c9ebe38c8856a304272a8ff0a0f035100870006c16115b431",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 3521503099843568579
+      }
+    },
+    {
+      "id": "mp3-pad-529.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_pad_529.mp3",
+      "sha256": "bf8ccbe51466a55da86358df6953bbc76a38d16eed90155eeab07fbd3a577839",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 5721777139850924118
+      }
+    },
+    {
+      "id": "mp3-pad-530.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_pad_530.mp3",
+      "sha256": "11f72df96567f7e765272c68560d66f92400d99ec18f6cc2eace5a4bc81d88d5",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 16261759825396023189
+      }
+    },
+    {
+      "id": "mp3-pad-600.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_pad_600.mp3",
+      "sha256": "271247f58ff86b13828800db7103091d2d7f1980621a5879cf93b2be33229dab",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 16190784865170893519
+      }
+    },
+    {
+      "id": "mp3-tags-tail.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_tags_tail.mp3",
+      "sha256": "49cf61d29f59850e0f05f33dfe5cda8e05d5fb48d86c1933cfe6e4364d7e0536",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 14209329412456153943
+      }
+    },
+    {
+      "id": "mp3-tail-junk.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_tail_junk.mp3",
+      "sha256": "e9496af0072a99badc1b6ac137225e72b12acb57e22574c34f71342bb28524d6",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 14209329412456153943
+      }
+    },
+    {
+      "id": "mp3-tail-junk-id3v1.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_tail_junk_id3v1.mp3",
+      "sha256": "338f464d1143467afeaa4ebab7828b09516ac77cfe83f8436006ab75c5dfdcf7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 14209329412456153943
+      }
+    },
+    {
+      "id": "mp3-truncated.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_truncated.mp3",
+      "sha256": "24dbec1afa4d83f3451c234ace597e1e770fc883ebbf9ee4ab6d504b44fe9cfa",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 14209329412456153943
+      }
+    },
+    {
+      "id": "mp3-two-id3.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_two_id3.mp3",
+      "sha256": "269e7e6a680043d3f367a774d5e443886ff538873f81e1329de269d92fa660d0",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 10,
+        "digest": 10140915217941002872
+      }
+    },
+    {
+      "id": "mp2-192.mp2",
+      "profile": "mp3",
+      "file": ".research/elementary/mp2_192.mp2",
+      "sha256": "5c10c7dcf26c1959f2ebf565ae74df6cc235ce3159e1c592b5d47af0de89f12f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 41037339040757
+      }
+    },
+    {
+      "id": "mp2-mono48.mp2",
+      "profile": "mp3",
+      "file": ".research/elementary/mp2_mono48.mp2",
+      "sha256": "7d3f04083bbaad397cf25aa042fa2a9c614a4405919fd00da463aff616793e84",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 44498574767506
+      }
+    },
+    {
+      "id": "mp3-cbr-info.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/mp3_cbr_info.mp3",
+      "sha256": "db32767a99ec36f1e06291411c162857ffe145184df9a8b5c36d46bc3af07650",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 18156841536435321147
+      }
+    },
+    {
+      "id": "mp3-cbr-noxing.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/mp3_cbr_noxing.mp3",
+      "sha256": "6c09e5b19e8d6d62d4f0228d14629c5848703fb8d6ccb1d93cd1241438d02fd3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 14209329412456153943
+      }
+    },
+    {
+      "id": "mp3-id3v1.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/mp3_id3v1.mp3",
+      "sha256": "309efcb9f4214bcfbdadeb252bc4f073b239440a862ab39a0a68d83771faacf8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 41,
+        "digest": 5216776374735304648
+      }
+    },
+    {
+      "id": "mp3-mpeg25.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/mp3_mpeg25.mp3",
+      "sha256": "870cb9c7f7abd4050f482baf96d00094a17feebbc425de744dd51ec5718cc74f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 16546262676537173060
+      }
+    },
+    {
+      "id": "mp3-mpeg2-mono.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/mp3_mpeg2_mono.mp3",
+      "sha256": "1f08c8ea19d3fdd136eb096f147280d7b3f774d791796e417fee103aa95ab0d9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 9200838076326532428
+      }
+    },
+    {
+      "id": "mp3-vbr-noxing-noid3.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/mp3_vbr_noxing_noid3.mp3",
+      "sha256": "587b109ee9d0ec37be89bd290678bff497b937aa1323ed4fc10430a6586db4b2",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40899775970202
+      }
+    },
+    {
+      "id": "mp3-vbr-xing.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/mp3_vbr_xing.mp3",
+      "sha256": "d91b48d9f533b994550e0e21ff78a6a4e3dc8f81417695e667804cc3c0e941a3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 18156841536435321147
+      }
+    },
+    {
+      "id": "compl.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/compl.bit",
+      "sha256": "3b93f3675821a5af4826abcff7097fa2e42efcc46154e02c992995f7e31dbc8e",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 44361011696951
+      }
+    },
+    {
+      "id": "he-32khz.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/he_32khz.bit",
+      "sha256": "965065cdcac3f45a61a9f54b4f94d59d0334f4b5cb74840a5aec7d405e2e050f",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 30160952800951
+      }
+    },
+    {
+      "id": "he-44khz.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/he_44khz.bit",
+      "sha256": "a64212281a8896d90e00f06c9b21f2c8f21ef9cb7367cae692a92ea421984441",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40899747341051
+      }
+    },
+    {
+      "id": "he-48khz.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/he_48khz.bit",
+      "sha256": "dd0383075710570648b8961f3cd0ce692f07a679b265fc4997e50883b3958299",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 44361011696951
+      }
+    },
+    {
+      "id": "he-free.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/he_free.bit",
+      "sha256": "b55afc2a21492c4b3035d423f36fe87560ef34f65eb997da60af9b01f300362c",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "he-mode.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/he_mode.bit",
+      "sha256": "fb90396d9bb13311be35284d061e19196830d213d823e05297b18172c88d90ce",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40899747341051
+      }
+    },
+    {
+      "id": "hecommon.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/hecommon.bit",
+      "sha256": "21999b77716aeba047c7f55c2c1ce17b54c780b6dc007912f251b7ea189676ef",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40899775970202
+      }
+    },
+    {
+      "id": "si.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/si.bit",
+      "sha256": "4f3382de1d9265013d42249ff108023d4a90ecf3c0136489d199243a90a5d0f9",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40899747341051
+      }
+    },
+    {
+      "id": "si-block.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/si_block.bit",
+      "sha256": "1d12956840638bf6b81164fc510c3e8269eeb038a51dc4548469e21a71e52b69",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40899747341051
+      }
+    },
+    {
+      "id": "si-huff.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/si_huff.bit",
+      "sha256": "fda6d8a7d4e1df3cb17d3560b57013ef98abbf9c60d940455c2e3ebf63eae0ef",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40899747341051
+      }
+    },
+    {
+      "id": "sin1k0db.bit",
+      "profile": "mp3",
+      "file": ".research/fate-samples/mp3-conformance/sin1k0db.bit",
+      "sha256": "64775e23c29aa84e27f68777460f88e0717af2ed64e732d287a20c5a92c9fa3e",
+      "rights": "fetched-not-redistributed",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40899775970202
+      }
+    },
+    {
+      "id": "adts-51.aac",
+      "profile": "aac",
+      "file": ".research/elementary/adts_51.aac",
+      "sha256": "0aafadbf51a54d1469565901477f707a8a1dca4653b070afab6456f098fc765e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1788318993911
+      }
+    },
+    {
+      "id": "adts-lc.aac",
+      "profile": "aac",
+      "file": ".research/elementary/adts_lc.aac",
+      "sha256": "756494f09100b66748cf57bbec30dadba0ccac66fe63832a1f5c75597a672695",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1788318993911
+      }
+    },
+    {
+      "id": "adts-mid-junk.aac",
+      "profile": "aac",
+      "file": ".research/elementary/crafted/adts_mid_junk.aac",
+      "sha256": "6490572a4960ed9f90277217dc982d04c5d119e7abcc8ad6d2445c9917e051e9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1788318993911
+      }
+    },
+    {
+      "id": "adts-tags.aac",
+      "profile": "aac",
+      "file": ".research/elementary/crafted/adts_tags.aac",
+      "sha256": "5bce628f9ba02157fda5ce3a6521c7877a1e06fbf657d1622d7357d7fa883468",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 30,
+        "digest": 231161547805503457
+      }
+    },
+    {
+      "id": "adts-truncated.aac",
+      "profile": "aac",
+      "file": ".research/elementary/crafted/adts_truncated.aac",
+      "sha256": "6045b6db08d54a13490f18b3b5c18de851342c8e3ac1184b674b9ec87ba72040",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1788318993911
+      }
+    },
+    {
+      "id": "ac3-51.ac3",
+      "profile": "ac3",
+      "file": ".research/elementary/ac3_51.ac3",
+      "sha256": "41d6db5aab063d28f14a57b335a5dfb40deca9fb9b0dd5c6799acb9e079f7469",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 44416180070928
+      }
+    },
+    {
+      "id": "ac3-stereo.ac3",
+      "profile": "ac3",
+      "file": ".research/elementary/ac3_stereo.ac3",
+      "sha256": "ddf1e315305f096a5b5217ea123f69ae9106e7134e5066480090fc05c296f541",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40954801198424
+      }
+    },
+    {
+      "id": "ac3-mid-junk.ac3",
+      "profile": "ac3",
+      "file": ".research/elementary/crafted/ac3_mid_junk.ac3",
+      "sha256": "bc6593256a855cf8f38f66e5160ba7c909ea4c887d8115a60a3deed7fce3ab6b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40954801198424
+      }
+    },
+    {
+      "id": "ac3-tags.ac3",
+      "profile": "ac3",
+      "file": ".research/elementary/crafted/ac3_tags.ac3",
+      "sha256": "7dfdd81edc33f2734acb33acd509f7826a08400ef72474946348b138c77de316",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40954801198424
+      }
+    },
+    {
+      "id": "ac3-truncated.ac3",
+      "profile": "ac3",
+      "file": ".research/elementary/crafted/ac3_truncated.ac3",
+      "sha256": "94553bba7d4834697904c19456a62952ab35fcebd9b153f4e4e64c45f4023181",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40954801198424
+      }
+    },
+    {
+      "id": "eac3-51.eac3",
+      "profile": "eac3",
+      "file": ".research/elementary/eac3_51.eac3",
+      "sha256": "ec9ca4c1ddbd8d42138931936eea6397789c5950a18f7b67e66c22c75aab4344",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 44443520910133
+      }
+    },
+    {
+      "id": "eac3-stereo.eac3",
+      "profile": "eac3",
+      "file": ".research/elementary/eac3_stereo.eac3",
+      "sha256": "c6bf6e6e5ef80bffd809e6466a297adfdbcbf5aa99e5094eb4cb756cab21a571",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40982256554233
+      }
+    },
+    {
+      "id": "flac-extra",
+      "profile": "flac",
+      "file": ".research/elementary-reader-authored/flac-extra.flac",
+      "sha256": "a7a7c8ad5895cb5b7cbbf2787166c3f8b4f2a4ca9cb31fcfca68adbe57a7260b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 48,
+        "digest": 11681621580801746511
+      }
+    },
+    {
+      "id": "id3v1-plain",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/id3v1-plain.mp3",
+      "sha256": "83f1700fa8926d9c63d5ce3992c355277a996ad39ef2d4bbd006acdbdc8ad504",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 59,
+        "digest": 16283362528019919078
+      }
+    },
+    {
+      "id": "id3v1-track",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/id3v1-track.mp3",
+      "sha256": "f3665b5e97344435bf620b91d32d12e5d011bc001220a2495befe6d135b3dfbf",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 65,
+        "digest": 5869753516790993284
+      }
+    },
+    {
+      "id": "apev2",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/apev2.mp3",
+      "sha256": "108ef0c01f1cd0ff9d3bb305fe1e42cedd7c4b19abe8935f20b391e069b5a270",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 40899775970202
+      }
+    },
+    {
+      "id": "flac-id3v2",
+      "profile": "flac",
+      "file": ".research/elementary-reader-authored/flac-id3v2.flac",
+      "sha256": "d30e8541719d053ff75b29133ac2fbc70bd143182dd58c1405f8b84771be58d5",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 824071288491844637
+      }
+    },
+    {
+      "id": "mp3-id3v2",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/mp3-id3v2.mp3",
+      "sha256": "3970772488b2e9fab0cec2471340b9ea9baa7a3b0c0c0d27cd6ede8e22483215",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 157,
+        "digest": 5815434754448032073
+      }
+    },
+    {
+      "id": "aac-id3v2",
+      "profile": "aac",
+      "file": ".research/elementary-reader-authored/aac-id3v2.aac",
+      "sha256": "05851b61309b39324df55a50792e30486350402e65b1c40a49400a10398442ac",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "aac"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 157,
+        "digest": 1849899771604857484
+      }
+    },
+    {
+      "id": "ac3-id3v2",
+      "profile": "ac3",
+      "file": ".research/elementary-reader-authored/ac3-id3v2.ac3",
+      "sha256": "12daad683b5ce61d8d4bdcbffef13d2537cf1d73740f648c6ce009c6d2677d99",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "ac3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1815831608022
+      }
+    },
+    {
+      "id": "eac3-id3v2",
+      "profile": "eac3",
+      "file": ".research/elementary-reader-authored/eac3-id3v2.eac3",
+      "sha256": "47078a7e2909cc068c0833827a86613eb906352d9a7fa05c756841f3fe9286ef",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 1843344222133
+      }
+    },
+    {
+      "id": "mp3-vbri",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/mp3-vbri.mp3",
+      "sha256": "a99bdb7d0ce98d0908159c4dc0f7f42ecb6c7b5055399f93ae61c0c9756062d3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 41102981066395
+      }
+    },
+    {
+      "id": "mp3-id3-utf16",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/mp3-id3-utf16.mp3",
+      "sha256": "c712a813f67e5218b29422f0a866e158277837507c50d7574df0d6d742417037",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 17,
+        "digest": 17636334928153947054
+      }
+    }
+  ]
+}
