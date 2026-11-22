@@ -2293,10 +2293,7 @@
   "open_cases": [
     {
       "id": "regular-encoded-avc-aac-indexed-seek",
-      "requirement": "Index the valid reordered MOV edit without losing its decode prefix. The basic MOV cursor refuses this composition edit before yielding any packets.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
+      "requirement": "Index the valid reordered MOV edit without losing its decode prefix. The basic MOV cursor refuses this composition edit before yielding any packets."
     }
   ],
   "open_deviations": [
@@ -2331,9 +2328,6 @@
         "terminal-open-ended--regular-terminal-pipe-unknown-7-4096",
         "terminal-open-ended--regular-terminal-pipe-unknown-4096-1",
         "terminal-open-ended--regular-terminal-pipe-unknown-4096-4096"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -2355,9 +2349,6 @@
         "terminal-mp4--bad-truncate-final-byte-pipe-unknown-7-4096",
         "terminal-mp4--bad-truncate-final-byte-pipe-unknown-4096-1",
         "terminal-mp4--bad-truncate-final-byte-pipe-unknown-4096-4096"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
