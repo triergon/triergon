@@ -1840,9 +1840,10 @@
       "reason": "Flexible macroblock ordering (more than one slice group)",
       "clause": "ITU-T H.264 (08/2024) §§7.4.2.2 and 8.2.2",
       "detail": "AVC flexible macroblock ordering",
+      "note": "The reference produces different output across hosts for this stream with more than one slice group, which the candidate decoder refuses.",
       "cases": [
-        {"id": "FM1_FT_E.264-nal", "sha256": "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade", "candidate": {"packets": 119, "bytes": 5712, "digest": 6468946432365744375}},
-        {"id": "FM1_FT_E.264-nals-split", "sha256": "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade", "candidate": {"packets": 119, "bytes": 5712, "digest": 6468946432365744375}}
+        {"id": "FM1_FT_E.264-nal", "sha256": "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade", "candidate": {"packets": 119, "bytes": 5712, "digest": 6468946432365744375}, "reference_pin_targets": ["aarch64-unknown-linux-gnu"]},
+        {"id": "FM1_FT_E.264-nals-split", "sha256": "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade", "candidate": {"packets": 119, "bytes": 5712, "digest": 6468946432365744375}, "reference_pin_targets": ["aarch64-unknown-linux-gnu"]}
       ]
     },
     {
