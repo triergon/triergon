@@ -137,7 +137,8 @@ pub struct Encoder {
     /// tells a repeated picture.
     previous_chroma: BudgetVec<u8>,
     /// Per macroblock, the quantiser at which the previous picture skipped it
-    /// after its residual quantised to zero; 0 (no quantiser) where it did not.
+    /// after its residual quantised to zero; 0 (no quantiser) where it did not. A
+    /// byte rather than an `Option`, which spilled registers in the macroblock loop.
     skipped_at: BudgetVec<u8>,
     /// Macroblocks skipped again from `skipped_at` without coding a residual.
     #[cfg(test)]
