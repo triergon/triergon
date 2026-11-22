@@ -111,6 +111,7 @@ impl Emitter {
     pub(super) fn poll(
         &mut self,
         input: &Input,
+        pool: &Budget,
         limits: Limits,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -139,7 +140,7 @@ impl Emitter {
                 self.text = Text::Decoded(input.payload.slice(span.text.clone())?);
             }
             Text::Transcode(transcode) => {
-                let Some(decoded) = transcode.poll(input, length, work, cancel)? else {
+                let Some(decoded) = transcode.poll(input, pool, length, work, cancel)? else {
                     return Ok(None);
                 };
                 self.text = Text::Decoded(decoded);
@@ -166,10 +167,7 @@ impl Emitter {
             start: plan.times.start,
             end: plan.times.end,
             duration: plan.times.duration,
-            modifiers: {
-                let empty = BudgetVec::new(plan.modifiers.budget());
-                std::mem::replace(&mut plan.modifiers, empty)
-            },
+            modifiers: std::mem::replace(&mut plan.modifiers, BudgetVec::new(pool)),
         }))
     }
 }
@@ -181,6 +179,7 @@ impl Transcode {
     fn poll(
         &mut self,
         input: &Input,
+        pool: &Budget,
         length: usize,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -226,8 +225,7 @@ impl Transcode {
         if !work.try_charge(1) {
             return Ok(None);
         }
-        let empty = BudgetVec::new(self.output.budget());
-        match std::mem::replace(&mut self.output, empty).freeze() {
+        match std::mem::replace(&mut self.output, BudgetVec::new(pool)).freeze() {
             Ok(bytes) => Ok(Some(bytes)),
             Err(rejection) => {
                 self.output = rejection.value;

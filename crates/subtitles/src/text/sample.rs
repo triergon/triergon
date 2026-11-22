@@ -163,9 +163,8 @@ impl Boxes {
     }
 
     /// The boxes read, leaving none.
-    pub(super) fn take_modifiers(&mut self) -> BudgetVec<Modifier> {
-        let empty = BudgetVec::new(self.modifiers.budget());
-        std::mem::replace(&mut self.modifiers, empty)
+    pub(super) fn take_modifiers(&mut self, pool: &Budget) -> BudgetVec<Modifier> {
+        std::mem::replace(&mut self.modifiers, BudgetVec::new(pool))
     }
 }
 

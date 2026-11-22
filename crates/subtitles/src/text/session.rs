@@ -181,7 +181,7 @@ impl Session {
                     if !boxes.poll(payload, limits, work, cancel)? {
                         return Ok(Action::Yield);
                     }
-                    let modifiers = boxes.take_modifiers();
+                    let modifiers = boxes.take_modifiers(pool);
                     self.phase = self.emit(input, pool, Fields::default(), modifiers)?;
                 }
                 Phase::Addition(addition) => {
@@ -191,7 +191,7 @@ impl Session {
                     self.phase = self.emit(input, pool, fields, BudgetVec::new(pool))?;
                 }
                 Phase::Emit(emitter) => {
-                    let Some(cue) = emitter.poll(input, limits, work, cancel)? else {
+                    let Some(cue) = emitter.poll(input, pool, limits, work, cancel)? else {
                         return Ok(Action::Yield);
                     };
                     self.phase = Phase::Done;
