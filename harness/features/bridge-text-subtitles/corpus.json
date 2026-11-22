@@ -1,0 +1,4348 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "tx3g-basic",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-basic.mp4",
+      "sha256": "f34cd78cae8ec168a5b5c6573a40c32f462c11616c6d615600950c0bea167ecc",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 8,
+        "digest": 1805322624446297728
+      }
+    },
+    {
+      "id": "tx3g-byte-not-character-count",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-byte-not-character-count.mp4",
+      "sha256": "94f8cdb89f74756a732b2cba19ff97e212c232b40b0f74df65fc8df86c9c7727",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 9579194067971965031
+      }
+    },
+    {
+      "id": "tx3g-utf16be-bom",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-utf16be-bom.mp4",
+      "sha256": "e4fd01dd530b821ef5e7a04ac6401fb8def97ca15dccfce7cf9d1d29068125ca",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "tx3g-empty-sample",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-empty-sample.mp4",
+      "sha256": "12cdaf461f39965949c27e71aa5e1ab95e16f2021171cfe3330991990cff597c",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "tx3g-embedded-nul",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-embedded-nul.mp4",
+      "sha256": "febe7b556dc15101db0f505b6d0a0133728df5854c22124611ac8f08518168e7",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 925332147968
+      }
+    },
+    {
+      "id": "tx3g-line-codepoints-exact",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-line-codepoints-exact.mp4",
+      "sha256": "e64557506ca156ea14e94df20c40d941de77b3f24c80073e141765038f8ad615",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 6,
+        "digest": 8044733983860834104
+      }
+    },
+    {
+      "id": "tx3g-style-highlight-raw",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-style-highlight-raw.mp4",
+      "sha256": "ff843f47d5ae059508e8354207d568c703f6d807a17489431009a123be3b4d39",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 889244254202367
+      }
+    },
+    {
+      "id": "tx3g-unknown-modifier",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-unknown-modifier.mp4",
+      "sha256": "ed2643878babc9fd4b4500721fe9ceb74cb1e17c2e2d6ee225138680a7cfc58d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 925332170071
+      }
+    },
+    {
+      "id": "tx3g-modifier-order",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-modifier-order.mp4",
+      "sha256": "deccf957997834f662bb1d2467213819910bf88ade4bc2ac834f55c21511d93d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 889244254202367
+      }
+    },
+    {
+      "id": "tx3g-empty-with-modifier",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-empty-with-modifier.mp4",
+      "sha256": "db7ed691cb18f68644ae384b05bba4d66f43c9c651818be2e87c5f59c6b456fe",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 29849420430
+      }
+    },
+    {
+      "id": "tx3g-u16-byte-count-boundary",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-u16-byte-count-boundary.mp4",
+      "sha256": "281d9643ed4dfc118eea14a90510e9295134f35971352edce78a894558ca81b9",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 65535,
+        "digest": 5989296508274698466
+      }
+    },
+    {
+      "id": "tx3g-missing-length",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-missing-length.mp4",
+      "sha256": "ae2e3d2529a96e4bb93908bfc65c0eab8e56b8fb99fb655f6d4ee7a978a3d5ac",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "tx3g-text-overrun",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-text-overrun.mp4",
+      "sha256": "621c6a1559be2366faf63a0618ff723b9f770adabef6a26539221457cb407fef",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 28685298303633
+      }
+    },
+    {
+      "id": "tx3g-utf16-odd",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-utf16-odd.mp4",
+      "sha256": "5cfe245dbd1c73a19284a59a925a2fbf5b8a416b16352414904140086544355c",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "tx3g-lone-surrogate",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-lone-surrogate.mp4",
+      "sha256": "78012687df695a9708a47b7d1918a08f0fb34b65b60fa3c5fcf365b37fba153c",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "tx3g-short-box",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-short-box.mp4",
+      "sha256": "fd01088252f79213e828ca5bc4bb0aeaf02e1b8181a25e0573eb4e798520f022",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "tx3g-box-overrun",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-box-overrun.mp4",
+      "sha256": "f17c5354cd56cbc9bf3af68598c74cae73fb2539df7597da993eab626e9772cf",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 925332170071
+      }
+    },
+    {
+      "id": "tx3g-extended-box-gap",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/tx3g-extended-box-gap.mp4",
+      "sha256": "187976703deee467d846da568fa2e3f0e7ba68d496150806ec7941313e565968",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 925332170071
+      }
+    },
+    {
+      "id": "utf8-packet-markup",
+      "profile": "text-mkv-utf8",
+      "file": "harness/features/text-extraction/inputs/utf8-packet-markup.mkv",
+      "sha256": "8469bbcb10fe6dbfa60aac5e601342e65505b04f512d161100ce4124030eed5a",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "utf8",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 17967474720189339445
+      }
+    },
+    {
+      "id": "utf8-packet-unknown-time",
+      "profile": "text-mkv-utf8",
+      "file": "harness/features/text-extraction/inputs/utf8-packet-unknown-time.mkv",
+      "sha256": "ff1c21b37588fadd0e9bc138df3eae351a5c629a93d3e189c9d09157f73d0683",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "utf8",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 10011322810855645499
+      }
+    },
+    {
+      "id": "utf8-packet-known-zero-duration",
+      "profile": "text-mkv-utf8",
+      "file": "harness/features/text-extraction/inputs/utf8-packet-known-zero-duration.mkv",
+      "sha256": "8f3bbfa79194c1167332ec65e16112a6a825c78c034a9035e58c80571b37ded1",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "utf8",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 9223398483616486370
+      }
+    },
+    {
+      "id": "utf8-packet-negative-start",
+      "profile": "text-mkv-utf8",
+      "file": "harness/features/text-extraction/inputs/utf8-packet-negative-start.mkv",
+      "sha256": "246c9ea5cc792bc67492e4062a01adadc3dfa8abefef68a3d37f1224c802c20a",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "utf8",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 9188146658274556
+      }
+    },
+    {
+      "id": "utf8-packet-raw-clock",
+      "profile": "text-mkv-utf8",
+      "file": "harness/features/text-extraction/inputs/utf8-packet-raw-clock.mkv",
+      "sha256": "d552f2f1dfb5b647d547af02d14aaffb012be66f64fe69c7b40b4da95f515595",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "utf8",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 5,
+        "digest": 10201658322278329
+      }
+    },
+    {
+      "id": "utf8-packet-bom-nul-content",
+      "profile": "text-mkv-utf8",
+      "file": "harness/features/text-extraction/inputs/utf8-packet-bom-nul-content.mkv",
+      "sha256": "928291aa35957df91a9fd03fb4397187fdb2261af94f7b0b8a12c0d00881d6cd",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "utf8",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 9223398487047800296
+      }
+    },
+    {
+      "id": "utf8-packet-too-large-scalar",
+      "profile": "text-mkv-utf8",
+      "file": "harness/features/text-extraction/inputs/utf8-packet-too-large-scalar.mkv",
+      "sha256": "c6e9632a6e8ec0b4e59c521e78178e5bd939fc74498938e77c8c5ba99a63de3f",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "utf8",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "utf8-packet-input-limit",
+      "profile": "text-mkv-utf8",
+      "file": "harness/features/text-extraction/inputs/utf8-packet-input-limit.mkv",
+      "sha256": "cc7f49979bc2fa0b6adab6257f953e48eb0712c6887507d8332bf69a7be596d6",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "utf8",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 6,
+        "digest": 9248788389726080031
+      }
+    },
+    {
+      "id": "mkv-vtt-no-addition",
+      "profile": "text-mkv-vtt",
+      "file": "harness/features/text-extraction/inputs/mkv-vtt-no-addition.mkv",
+      "sha256": "2fdac3544f8212cc806dd42838c94a1b97a897e9b77e326e3f4336cbeee5e34f",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "vtt",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 11,
+        "digest": 13332293794977108487
+      }
+    },
+    {
+      "id": "mkv-vtt-settings-id-comments",
+      "profile": "text-mkv-vtt",
+      "file": "harness/features/text-extraction/inputs/mkv-vtt-settings-id-comments.mkv",
+      "sha256": "99d39b8c7bf1ff2f8d95520d77d096fc6b4be25e70b94b206c8342b61513ab7a",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "vtt",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 27,
+        "digest": 6380070538899960317
+      }
+    },
+    {
+      "id": "mkv-vtt-present-empty-fields",
+      "profile": "text-mkv-vtt",
+      "file": "harness/features/text-extraction/inputs/mkv-vtt-present-empty-fields.mkv",
+      "sha256": "84385cfcf631d4e577e7d51aef7b9d61730f23cd6497f8dfbe8dc6ef448da9b3",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "vtt",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 12,
+        "digest": 12788280277598442542
+      }
+    },
+    {
+      "id": "mkv-vtt-relative-inline-time",
+      "profile": "text-mkv-vtt",
+      "file": "harness/features/text-extraction/inputs/mkv-vtt-relative-inline-time.mkv",
+      "sha256": "78ac7cbbb2f5caab2f2b3b4f23ccfa29a736ea9b0a24800aee5c6b35838b3efa",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "vtt",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 8,
+        "digest": 10536389511639434442
+      }
+    },
+    {
+      "id": "mkv-vtt-unknown-addition-opaque",
+      "profile": "text-mkv-vtt",
+      "file": "harness/features/text-extraction/inputs/mkv-vtt-unknown-addition-opaque.mkv",
+      "sha256": "7275e3d3872db74d36032e02bf1cdd3f11a2771ef092f68f293dfe24dedb3cc0",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "vtt",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 6,
+        "digest": 9248788897018875351
+      }
+    },
+    {
+      "id": "mkv-vtt-truncated-addition",
+      "profile": "text-mkv-vtt",
+      "file": "harness/features/text-extraction/inputs/mkv-vtt-truncated-addition.mkv",
+      "sha256": "69fb422b2f283de6ec934b777680bb46c9aa1220c02082c60fbe7c42e7d2df64",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "vtt",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 9223398482938214492
+      }
+    },
+    {
+      "id": "ass-raw-order-overrides",
+      "profile": "text-mkv-ass",
+      "file": "harness/features/text-extraction/inputs/ass-raw-order-overrides.mkv",
+      "sha256": "857eb59ce29944647abc5d797a9448677dc594cde6db62d5bd419af566724799",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "ass",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 59,
+        "digest": 4736503070652866679
+      }
+    },
+    {
+      "id": "ass-ssa-empty-layer",
+      "profile": "text-mkv-ass",
+      "file": "harness/features/text-extraction/inputs/ass-ssa-empty-layer.mkv",
+      "sha256": "3def05cbf4c26b08eb6def2d919bcab91a9a02ab27ab3cd8d96c462b54298649",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "ass",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 38,
+        "digest": 12580903360665377361
+      }
+    },
+    {
+      "id": "ass-private-verbatim",
+      "profile": "text-mkv-ass",
+      "file": "harness/features/text-extraction/inputs/ass-private-verbatim.mkv",
+      "sha256": "c8920e097a1224a4fe58b5938eb5e976619bb9f81b53bc846aac97117f541918",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "ass",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 26,
+        "digest": 893667497646161360
+      }
+    },
+    {
+      "id": "ass-unknown-charset-opaque",
+      "profile": "text-mkv-ass",
+      "file": "harness/features/text-extraction/inputs/ass-unknown-charset-opaque.mkv",
+      "sha256": "9dc1a754b4097d5b8625ca057803ea3c1483ea7c3449507288c72cc970879147",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "ass",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "ass-empty-not-clear",
+      "profile": "text-mkv-ass",
+      "file": "harness/features/text-extraction/inputs/ass-empty-not-clear.mkv",
+      "sha256": "a3eba3cda4478e64c5434d16a121da68a94168ebf6cc00b5ee3bc6534c821219",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "ass",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "ass-known-duration-unknown-start",
+      "profile": "text-mkv-ass",
+      "file": "harness/features/text-extraction/inputs/ass-known-duration-unknown-start.mkv",
+      "sha256": "c2000f2972a4866ac47e652c25bf1d091f24faa76a06e56ab0c56da981a327a5",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "ass",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 31,
+        "digest": 510690508394156815
+      }
+    },
+    {
+      "id": "ass-private-present-empty",
+      "profile": "text-mkv-ass",
+      "file": "harness/features/text-extraction/inputs/ass-private-present-empty.mkv",
+      "sha256": "c4e6d5e125727a6268c7b4540477f2b7d4715f74c0deb55429a3cde8b666e230",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "ass",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 32,
+        "digest": 7543192112211714197
+      }
+    },
+    {
+      "id": "ass-invalid-utf8-unvalidated",
+      "profile": "text-mkv-ass",
+      "file": "harness/features/text-extraction/inputs/ass-invalid-utf8-unvalidated.mkv",
+      "sha256": "8a9e589adc7f61ceb61c60a7e06dc4c76ce1cbcc9dd4fe09039c7eb3bce5ec3f",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mkv",
+        "ass",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-bad-two",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-bad-two.mp4",
+      "sha256": "ffab2861659bcbb3f0bceee202f6336fee63cfa4b0e9f0dc4d49509a2ce3c687",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-bom",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-bom.mp4",
+      "sha256": "1fe17e6977e5daa76def0d4841dc20f0818789414e2a390919d6f7adc71bfc8b",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566576918135488
+      }
+    },
+    {
+      "id": "capsule-mov-text-box-refusal-then-good",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-box-refusal-then-good.mp4",
+      "sha256": "f7bd2b044c89ba3e1abcc940a9b9a5681be4d3a61b624f2b5581041f6a0a14c2",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 29583112299929
+      }
+    },
+    {
+      "id": "capsule-mov-text-clear-then-good",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-clear-then-good.mp4",
+      "sha256": "2a81851595cd38939224886c8c61e186ee4be047127bd350cde2aff164793666",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 29583112299929
+      }
+    },
+    {
+      "id": "capsule-mov-text-clear",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-clear.mp4",
+      "sha256": "12cdaf461f39965949c27e71aa5e1ab95e16f2021171cfe3330991990cff597c",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-config-invalid-font-size",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-config-invalid-font-size.mp4",
+      "sha256": "14c07f7f5154eab34f3497db535176fd5949afea1fb47709a08722f70070dea5",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 28685297596337
+      }
+    },
+    {
+      "id": "capsule-mov-text-config-one-dimension",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-config-one-dimension.mp4",
+      "sha256": "26f64901ed9c6ca3ab0ce9f517057cbac5a6ee80308788dd85ff38f1c6bdc982",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 925332147968
+      }
+    },
+    {
+      "id": "capsule-mov-text-config-too-short",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-config-too-short.mp4",
+      "sha256": "4adfa5e24e32b94fbac0277d533a0339b6f5c570f4bca418cf3720b156f57c92",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 28685297596337
+      }
+    },
+    {
+      "id": "capsule-mov-text-config-valid-empty-fonts",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-config-valid-empty-fonts.mp4",
+      "sha256": "6f619e7703a5b791d86f7629bb90f2ca0a5df80b4a368c5d65d85c64f4760f18",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 28685297596337
+      }
+    },
+    {
+      "id": "capsule-mov-text-configured-defaults",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-configured-defaults.mp4",
+      "sha256": "acdba6e12d502e787e33434d1dfd1b3ab151536ac7f0eec9d0eaeb1498cd8fa9",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-configured-style-font",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-configured-style-font.mp4",
+      "sha256": "706f570a36a08aed3aaf1058afa11cda2e4851d11ba69aef9af4a364423caa49",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-cr-lf-markup",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-cr-lf-markup.mp4",
+      "sha256": "dcf9509ecab57eebd23fef06c4021ffaba69c79b1ada493a9b26960a26039828",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 6,
+        "digest": 8044733102460467948
+      }
+    },
+    {
+      "id": "capsule-mov-text-duplicate-fonts",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-duplicate-fonts.mp4",
+      "sha256": "4203d3179f9db686b5b16d6fafed248ff90c506f5a28f9676517f581399b4e77",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-duplicate-wrap",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-duplicate-wrap.mp4",
+      "sha256": "590d8e31983b78609f78f0aa8d69c42beb2238254b99376c216966400889bec0",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-empty-event",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-empty-event.mp4",
+      "sha256": "db7ed691cb18f68644ae384b05bba4d66f43c9c651818be2e87c5f59c6b456fe",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 29849420430
+      }
+    },
+    {
+      "id": "capsule-mov-text-empty-physical",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-empty-physical.mp4",
+      "sha256": "5f9877650328db9907705ebeb580ee90561c73b8a775ed781646e3966c665012",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-extended-short",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-extended-short.mp4",
+      "sha256": "c4f9c059158ba8a0829ee169dffb29743a5058b397a4ece5f69024eb0759254e",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-extended-wrap",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-extended-wrap.mp4",
+      "sha256": "978ff2d315d7b2e0ca306a92a26c43d1d1912e74ab492a9c807f26f0424177e8",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-ffff",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-ffff.mp4",
+      "sha256": "2a1d654e5571826b9bc59f78347391c4976a01b58be31b7a4d7466558efe03e3",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 889244388201324
+      }
+    },
+    {
+      "id": "capsule-mov-text-flush-read-order",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-flush-read-order.mp4",
+      "sha256": "5cb4968793ca051efdfc4bd4c132f651b79dbbe64ad56707dabad6886ba81dd0",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2,
+        "digest": 8044759290745430352
+      }
+    },
+    {
+      "id": "capsule-mov-text-font-nul",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-font-nul.mp4",
+      "sha256": "0bbccb334d6262ae9a7a4b76e06690ceca824c7e3a49886c797e0400215be7cb",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 925332147968
+      }
+    },
+    {
+      "id": "capsule-mov-text-font-utf16",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-font-utf16.mp4",
+      "sha256": "07d0dc9965e7ad202ac2f78d77fe3df66bbc8e1b8bbed7c7432faa9ae0d3d52e",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 925332147968
+      }
+    },
+    {
+      "id": "capsule-mov-text-highlight-color",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-highlight-color.mp4",
+      "sha256": "f3efabbf46ea2f546085c1f3b0a2e4e6750e13bcd14161d0fc8e3a341f2c6370",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-highlight-empty",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-highlight-empty.mp4",
+      "sha256": "171a497d521823bebabaa0a1530c87c15a9e3e752c271737fc100db0b37b71ab",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-highlight-inverse",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-highlight-inverse.mp4",
+      "sha256": "e11795cd2a191bdc7f2f3963b4a80d6cee8838033b67c8a6b84030544f01f554",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-invalid-overlong",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-invalid-overlong.mp4",
+      "sha256": "02adc05ad3f2839d0e1bd965ef2dcd8302c55de3695d161a35a0d4e37287d0b8",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-invalid-tail",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-invalid-tail.mp4",
+      "sha256": "a6d32ba6fa668bf46d3ba29c4f8a6afc24da67546e0b349318bff54fb4cd6b5e",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-known-zero-duration",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-known-zero-duration.mp4",
+      "sha256": "bf17eb97fa1eae0a1f5bb8643ef975a78e78117059b0ad52a4ad86f48a1fe0a9",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 9223372037742402776
+      }
+    },
+    {
+      "id": "capsule-mov-text-negative-half",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-negative-half.mp4",
+      "sha256": "5a38fc2abc5f958dadd035d35c9456761ec937a026654617dc28851e526a456f",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 9223372037742402776
+      }
+    },
+    {
+      "id": "capsule-mov-text-noncharacter-fffe",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-noncharacter-fffe.mp4",
+      "sha256": "0ee0032f67b28ec3603dd6abf1c01a83b8f037b264e8f477730ba7b75dd09964",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-nul-invalid-tail",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-nul-invalid-tail.mp4",
+      "sha256": "f8043f1deba6ce985ed1ce8f8185884fdb4bd4efc4fc0a1335336e3d590a2508",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 925332147968
+      }
+    },
+    {
+      "id": "capsule-mov-text-one-byte",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-one-byte.mp4",
+      "sha256": "ae2e3d2529a96e4bb93908bfc65c0eab8e56b8fb99fb655f6d4ee7a978a3d5ac",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-overflow-clock",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-overflow-clock.mp4",
+      "sha256": "ad5c61281365a4f9e3f479f06ee0d10c473c0de697d5a7664c1370525963e763",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 924408626968
+      }
+    },
+    {
+      "id": "capsule-mov-text-overrun-box",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-overrun-box.mp4",
+      "sha256": "80bcf00c3c7504ec351aafdc1228162b7c6d32ad62804fcb29890407d4067bd5",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-overstated",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-overstated.mp4",
+      "sha256": "adc5318988b3a41fedff9f157f6042710b0f83cf8a382808f4d98fac690ab71f",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 28685297596337
+      }
+    },
+    {
+      "id": "capsule-mov-text-positive-half",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-positive-half.mp4",
+      "sha256": "3a729c68ad263d4d07c122e71a0fa92e622c35a85436dcb98bada41210369492",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1349387468
+      }
+    },
+    {
+      "id": "capsule-mov-text-rational-clock",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-rational-clock.mp4",
+      "sha256": "130d3faf4ef29a24c4ed064ed4ba5eac3b05626732d1a05628a9d7544522755f",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 32733401611
+      }
+    },
+    {
+      "id": "capsule-mov-text-short-body",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-short-body.mp4",
+      "sha256": "ea5c263a8e08b5a6fe225dfd6f19d3c8812ccb9347d8b8049108d6b0c2db817f",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-short-box",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-short-box.mp4",
+      "sha256": "5e297edf5080aefa9703a71e1cb927cc473143f5b3c957febda69d51ac35c13b",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-size0",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-size0.mp4",
+      "sha256": "6d082612d813909b4295745774c65a06f3007591e647c62c04a6d0e9d5365fd6",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-style-adjacent-different",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-style-adjacent-different.mp4",
+      "sha256": "ac3bb70050273cb0bb502345c2fba3835bb0434b32bdf5b8e7fb1b457fe8740a",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-style-adjacent-equal",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-style-adjacent-equal.mp4",
+      "sha256": "1ab4796b50c8e3cc5f57f302e8d5b6022e113c06642126fbbd627a8a1935cd5a",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-style-all",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-style-all.mp4",
+      "sha256": "3eef3ccbfff99201515de4e5304d8e79a3083872f9ed41eabd8a0df5116d784a",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 889244254202367
+      }
+    },
+    {
+      "id": "capsule-mov-text-style-empty",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-style-empty.mp4",
+      "sha256": "95eaacf704beabdbd7c22a59c79caf9fecb090bb22892b7dfaf6670162e88807",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 889244254202367
+      }
+    },
+    {
+      "id": "capsule-mov-text-style-malformed-after-good",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-style-malformed-after-good.mp4",
+      "sha256": "03ac1c0ed16d6247fecc290677b3c827234a469d50bec87a7fbd7b1ef97624cf",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-style-outside",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-style-outside.mp4",
+      "sha256": "5370ae0661bba894665214ece091928a280ebb4d78fc5a3a1c5829ace9eb341a",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-style-overlap",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-style-overlap.mp4",
+      "sha256": "0139262b168cb41f1485deb000a7fc60958ddefdf46bedbdc3d48d7e07cb1ea7",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-style-repeated",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-style-repeated.mp4",
+      "sha256": "8954122b47ace7b6e2d10727054b3d40ef41d18a5252e0c71a264c03906cac40",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-style-reversed",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-style-reversed.mp4",
+      "sha256": "f4c9d51bf1073e79ade8ea0d0f928a3cce529899afcdc2eb1205ed2d504abab2",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-style-unicode",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-style-unicode.mp4",
+      "sha256": "992108796bbb1f87ff2b11a82689388fff4887fda743c1c405fb19ba5c961ca7",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 6,
+        "digest": 8044736793115214406
+      }
+    },
+    {
+      "id": "capsule-mov-text-style-zero-after-good",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-style-zero-after-good.mp4",
+      "sha256": "3029e22faea8cc925d6fdd462295ee1aa14f48283dd50ccccee56185436c5acc",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-two-packets",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-two-packets.mp4",
+      "sha256": "5cb4968793ca051efdfc4bd4c132f651b79dbbe64ad56707dabad6886ba81dd0",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2,
+        "digest": 8044759290745430352
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-basic",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-basic.mp4",
+      "sha256": "f34cd78cae8ec168a5b5c6573a40c32f462c11616c6d615600950c0bea167ecc",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 8,
+        "digest": 1805322624446297728
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-box-overrun",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-box-overrun.mp4",
+      "sha256": "d65f7c5c6bd33bff4e90a33ad380b0246a77819dcca0948c3c3f75b4d0dfd2c0",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 924408649071
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-byte-not-character-count",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-byte-not-character-count.mp4",
+      "sha256": "94f8cdb89f74756a732b2cba19ff97e212c232b40b0f74df65fc8df86c9c7727",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 9579194067971965031
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-embedded-nul",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-embedded-nul.mp4",
+      "sha256": "febe7b556dc15101db0f505b6d0a0133728df5854c22124611ac8f08518168e7",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 925332147968
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-empty-sample",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-empty-sample.mp4",
+      "sha256": "12cdaf461f39965949c27e71aa5e1ab95e16f2021171cfe3330991990cff597c",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-empty-with-modifier",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-empty-with-modifier.mp4",
+      "sha256": "db7ed691cb18f68644ae384b05bba4d66f43c9c651818be2e87c5f59c6b456fe",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 29849420430
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-extended-box-gap",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-extended-box-gap.mp4",
+      "sha256": "a64f3de3944ded22b9337d5789c8ba14a45b63acbbc76aa9c3b611a6e18a4c4f",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 924408649071
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-line-codepoints-exact",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-line-codepoints-exact.mp4",
+      "sha256": "e64557506ca156ea14e94df20c40d941de77b3f24c80073e141765038f8ad615",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 6,
+        "digest": 8044733983860834104
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-lone-surrogate",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-lone-surrogate.mp4",
+      "sha256": "53bd5903a66f2d0303ee7a7b8324df7bd92fffa7194b35385893693f2f89d3b1",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-missing-length",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-missing-length.mp4",
+      "sha256": "4f7fba141461bfebce3e94f0910d1f9c86b756a126689ab06b9b31ce0a803951",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-modifier-order",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-modifier-order.mp4",
+      "sha256": "deccf957997834f662bb1d2467213819910bf88ade4bc2ac834f55c21511d93d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 889244254202367
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-short-box",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-short-box.mp4",
+      "sha256": "3a8ff24d7f79b6196fd4bfe7f42348bef71fba4270d635a5d4b63df8d99e14c3",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-style-highlight-raw",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-style-highlight-raw.mp4",
+      "sha256": "ff843f47d5ae059508e8354207d568c703f6d807a17489431009a123be3b4d39",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 889244254202367
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-text-overrun",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-text-overrun.mp4",
+      "sha256": "56fe57486817201e4446fba145912d6263cbdfd9bd08486939c9d4c9052801d5",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 28656669152633
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-u16-byte-count-boundary",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-u16-byte-count-boundary.mp4",
+      "sha256": "281d9643ed4dfc118eea14a90510e9295134f35971352edce78a894558ca81b9",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 65535,
+        "digest": 5989296508274698466
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-unknown-modifier",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-unknown-modifier.mp4",
+      "sha256": "ed2643878babc9fd4b4500721fe9ceb74cb1e17c2e2d6ee225138680a7cfc58d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 925332170071
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-utf16-odd",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-utf16-odd.mp4",
+      "sha256": "a621ab02a622dce6bc769f0bb1f5218e28d29370073cbdd06662e1f45900d12c",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-tx3g-utf16be-bom",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-utf16be-bom.mp4",
+      "sha256": "e4fd01dd530b821ef5e7a04ac6401fb8def97ca15dccfce7cf9d1d29068125ca",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-understated",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-understated.mp4",
+      "sha256": "fc70e8f25b2540f8e53d8058e78ea740398c1188843a59ba894e7333362f9ad2",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 925332147968
+      }
+    },
+    {
+      "id": "capsule-mov-text-unicode",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-unicode.mp4",
+      "sha256": "94c6b6155c2a5e75dfe87eae36fdd2935f97c6e81317528050d4001145d43b75",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 12,
+        "digest": 12645101870938032643
+      }
+    },
+    {
+      "id": "capsule-mov-text-unknown-clock",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-unknown-clock.mp4",
+      "sha256": "a7d0ef9117f797ac16f2c7eec24cf350f757e005c743067643153e60052309b4",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 924408626968
+      }
+    },
+    {
+      "id": "capsule-mov-text-unknown",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-unknown.mp4",
+      "sha256": "84930020197f75fbe6de4ce674a4027a9f28168044e5358fdd31c24d3e239252",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-unset-clock",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-unset-clock.mp4",
+      "sha256": "9f4ddf3c7978007cf181de478cde1ce44aef321bbe991a6a52d82a428e8c6245",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1847929626968
+      }
+    },
+    {
+      "id": "capsule-mov-text-utf16be",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-utf16be.mp4",
+      "sha256": "8c846cf65480591c6cbe80f6b763e1224510168af09c98ddce1566b6a42aeb58",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-utf16le",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-utf16le.mp4",
+      "sha256": "9b82819f5b6f70d2884bc050bb10d915570c024834f0641148cf45207edffa32",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-mov-text-utf8-refusal-then-good",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-utf8-refusal-then-good.mp4",
+      "sha256": "88aa1eee9678c8280a779e0eaa281f123cac9476cbe76360b3c68100106864f3",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 29583112299929
+      }
+    },
+    {
+      "id": "capsule-mov-text-wrap-0",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-wrap-0.mp4",
+      "sha256": "3b5abbecf9a65fb2eefdb82933c995806076e5386818dc1435c7ab3554dfedb4",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-wrap-1",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-wrap-1.mp4",
+      "sha256": "ac2b92fe3e120579e2645d8ca211c122b6bbc240816421466582d5b67338a4d9",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-wrap-2",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-wrap-2.mp4",
+      "sha256": "2c2693d4fb3b9c03c990008a45efbb7d118fbff7632ed8c5cdaa907473dc74c3",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 27566572767864788
+      }
+    },
+    {
+      "id": "capsule-mov-text-wrap-nul",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-wrap-nul.mp4",
+      "sha256": "c18cfdfb6d5f2a8a28c7f6a286cd233b449fe1a953d23277d3c2adc864748c2e",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 29849420430
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-colour-against-alpha",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-colour-against-alpha.mp4",
+      "sha256": "99ec11868174b456f7c994b2dc0b671fe129ec631d2aaf56e1233c041301f006",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 12,
+        "digest": 2079601324603607207
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-face-against-all",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-face-against-all.mp4",
+      "sha256": "ec43c5127a27162708403b562346fe56ba83a06402d402810d40f709ae8cd015",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 18,
+        "digest": 5419036145387009071
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-face-against-bold",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-face-against-bold.mp4",
+      "sha256": "3116ea216502cf1be6c75bdfc4f3234bb0add7d68e2d85d4164b19744ae05320",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 36,
+        "digest": 12878844136704169415
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-font-long-names",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-font-long-names.mp4",
+      "sha256": "a55f1d72d2771d0edbdc36393e6be43ad9b6c5d5aca85610fad2425b0addc07b",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 6,
+        "digest": 16011172526794200991
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-font-table",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-font-table.mp4",
+      "sha256": "46958f413250ea4dbd3ee24ca565baae5d777f54fee22b3ccdae6ab584e91a7d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 61,
+        "digest": 7667734979558015745
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-highlight-coincident",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-highlight-coincident.mp4",
+      "sha256": "e0f89c78dc9d3ee394c236e79ec57e59b0f8f610c7d263de5cd54647b4837076",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 36,
+        "digest": 9789966099258355620
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-highlight-coloured-default",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-highlight-coloured-default.mp4",
+      "sha256": "627ee997156b3eb00b7eef571bb74048914e0385a1876d72f2ea6292525c43f8",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 12,
+        "digest": 13102952744048979910
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-highlight-ranges",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-highlight-ranges.mp4",
+      "sha256": "06d581db8a6ca86f79d0c20ba556b066d0d384b35dbaed38f739217085822bcd",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 24,
+        "digest": 4716986408975608309
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-highlight-style-colour",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-highlight-style-colour.mp4",
+      "sha256": "b4b3073e9d208e1d408aca92c214c0d8b98debf66e606fbad529d0b613a21bc2",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 52,
+        "digest": 5540379060702908472
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-no-description",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-no-description.mp4",
+      "sha256": "9555a20985191534fe1823228f9bf00f0b1570e4f6d250b3277fe8226a6c31d2",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 12,
+        "digest": 2079601324603607207
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-nul-transitions",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-nul-transitions.mp4",
+      "sha256": "e5fa0a299d74164c46e1dedf37bd4df2b330c566793bed7d51080084cf97000d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 24,
+        "digest": 17970316808669926222
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-ranges",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-ranges.mp4",
+      "sha256": "f6b3e0bc25b679e93307e764ea7be2d2537448161aedf1c78af67473da3eefd9",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 64,
+        "digest": 8746291803310936835
+      }
+    },
+    {
+      "id": "capsule-mov-text-tags-size-colour-alpha",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tags-size-colour-alpha.mp4",
+      "sha256": "0a85a5300220dcfb0175062b81df1d74dd3176b5397fe77724136c152fe58429",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 48,
+        "digest": 4584094070618561367
+      }
+    },
+    {
+      "id": "capsule-tx3g-adjacent_style_runs_remain_distinct_source_records",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-adjacent_style_runs_remain_distinct_source_records.mp4",
+      "sha256": "9d33dcf8db1ef0443c3b69c68de467b54e5d928659a5cc4cbb2d9ecc3bfba2ee",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-all_known_display_flags_and_directions_are_decoded_without_dropping_unknown_bits.mp4",
+      "sha256": "6505573d5f6d4c9537ecbb6e5a61a3bcb1d7fe40c55805500462b51666b8bc0f",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 4,
+        "digest": 6666447756211423319
+      }
+    },
+    {
+      "id": "capsule-tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets.mp4",
+      "sha256": "90ae9f6f091ce48e2ac9902f1d1d16a2f9e28cd5f1a09884fafbe6177048ff08",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108588398798
+      }
+    },
+    {
+      "id": "capsule-tx3g-cancellation_at_every_initial_single_unit_boundary_is_resumable",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-cancellation_at_every_initial_single_unit_boundary_is_resumable.mp4",
+      "sha256": "e90d29d669c7d512ef2c94860ceacfc2270fd4c23d2faddcf7a3c9f97910d92d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-continuous_karaoke_empty_character_range_keeps_the_requested_prefix_during_pause",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-continuous_karaoke_empty_character_range_keeps_the_requested_prefix_during_pause.mp4",
+      "sha256": "daeda569ca582d023ea224c9ce4b12c7e3b7cea78229814de473e020c27ef331",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-continuous_karaoke_resolves_prefix_from_source_display_flag",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-continuous_karaoke_resolves_prefix_from_source_display_flag.mp4",
+      "sha256": "11412e1746ba8a768f8be60bd6dfcb8df6b0e940300f59b1837160d9c84a6606",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-continuous_prefix_conflict_is_detected_even_outside_declared_start",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-continuous_prefix_conflict_is_detected_even_outside_declared_start.mp4",
+      "sha256": "e539e5bf8610d7ebeb273a838cdfce44e16175ad315e473d7ef7403bcb94e640",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 41295367209253788
+      }
+    },
+    {
+      "id": "capsule-tx3g-default_style_and_all_rgba_bytes_stay_exact_without_renderer_substitution",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-default_style_and_all_rgba_bytes_stay_exact_without_renderer_substitution.mp4",
+      "sha256": "2c2a21b8fb89121fcf5ad4c0dcf326b91e1efc95dc1b4e2f5e381b0e17e21da8",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169149071
+      }
+    },
+    {
+      "id": "capsule-tx3g-derived_run_limit_preserves_real_boundaries_and_never_coalesces_to_pass",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-derived_run_limit_preserves_real_boundaries_and_never_coalesces_to_pass.mp4",
+      "sha256": "de00f1470bc86655dfff6d42ea5a828867c2ae9a853b809e6d074255062fc3c2",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-disjoint_dynamic_static_and_link_ranges_remain_legal",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-disjoint_dynamic_static_and_link_ranges_remain_legal.mp4",
+      "sha256": "f580104303a5b298cf7dc17650e6690c08518ad6f1cc7850e2aeacaaccddf8da",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 41295367209253788
+      }
+    },
+    {
+      "id": "capsule-tx3g-disparity_minimum_is_widened_before_negation",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-disparity_minimum_is_widened_before_negation.mp4",
+      "sha256": "022800941fa286b5d4058ed85a57eb2bc798ebe38faafe7eaf8ace1862985e19",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169149071
+      }
+    },
+    {
+      "id": "capsule-tx3g-duplicate_and_missing_font_ids_are_explicit_semantic_errors",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-duplicate_and_missing_font_ids_are_explicit_semantic_errors.mp4",
+      "sha256": "475a237735f0e6ed5404afe4c1d13ccedd29f8d4387d26ba5a47c4cc03ea316a",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2,
+        "digest": 2791402054784181431
+      }
+    },
+    {
+      "id": "capsule-tx3g-duplicate_global_modifiers_never_silently_choose_last",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-duplicate_global_modifiers_never_silently_choose_last.mp4",
+      "sha256": "e0c45e446d203c3fc7edfc5d0e64c531e675d2dd53244966518a53fdc643dd26",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 5,
+        "digest": 2893279288547838415
+      }
+    },
+    {
+      "id": "capsule-tx3g-duplicate_karaoke_even_empty_and_unordered_times_refuse",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-duplicate_karaoke_even_empty_and_unordered_times_refuse.mp4",
+      "sha256": "dab0b56c6967d7571aac1cc0dd48462ea4b29bf516f38f16070a37e5b9a654f8",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 10248071633433247191
+      }
+    },
+    {
+      "id": "capsule-tx3g-dynamic_colour_is_foreground_while_static_colour_is_background",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-dynamic_colour_is_foreground_while_static_colour_is_background.mp4",
+      "sha256": "2b242bdb7a1c4f0c2660e7ea7ddbd358faf7fc8d6d1b6b392f0e32d37d95d68c",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 42971243945337
+      }
+    },
+    {
+      "id": "capsule-tx3g-empty_karaoke_header_start_obeys_known_sample_duration",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-empty_karaoke_header_start_obeys_known_sample_duration.mp4",
+      "sha256": "6a48541e4105af127777453334aee99d127365a327864911b15a51373c93d0fb",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169126968
+      }
+    },
+    {
+      "id": "capsule-tx3g-empty_text_has_no_runs_and_no_queryable_character",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-empty_text_has_no_runs_and_no_queryable_character.mp4",
+      "sha256": "4c15c2aa6104944fc62687d3165b593ee3b7a8f957609d309a6a7a6c38e3ab71",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-tx3g-explicit_clock_absence_keeps_relative_times_unknown_even_with_raw_input_clock",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-explicit_clock_absence_keeps_relative_times_unknown_even_with_raw_input_clock.mp4",
+      "sha256": "61ddc5460cce07b166a75a04bfbc2af88ef32bf1fd04ef5bebb905e8f23337ec",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169126968
+      }
+    },
+    {
+      "id": "capsule-tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules.mp4",
+      "sha256": "61ce88093fa69a88456faa23e42905cadb2d45d8170aa8e7c9925482c7117a23",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-tx3g-font_names_are_decoded_from_source_utf8_or_utf16_bom_without_selecting_renderer_fallback",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-font_names_are_decoded_from_source_utf8_or_utf16_bom_without_selecting_renderer_fallback.mp4",
+      "sha256": "79254a21bb87648977c1d774259169f88ebf224d45d3727e8e3c123a547bc214",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169149071
+      }
+    },
+    {
+      "id": "capsule-tx3g-foreign_payload_configuration_and_label_owners_never_enter_the_job",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-foreign_payload_configuration_and_label_owners_never_enter_the_job.mp4",
+      "sha256": "b059a7f10048ea4bdb62737c6cef7d2565f477f452cdeb7125e0a352c71199b1",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169149071
+      }
+    },
+    {
+      "id": "capsule-tx3g-full_u16_byte_count_is_not_reduced_to_recommended_2048",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-full_u16_byte_count_is_not_reduced_to_recommended_2048.mp4",
+      "sha256": "29d2efabb6e880c14b7a0afe9f7ae8fdf16c7ac08472758846ea0aa401d5ed5e",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 65535,
+        "digest": 6104017384238519633
+      }
+    },
+    {
+      "id": "capsule-tx3g-highlight_colour_order_does_not_change_semantic_authority",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-highlight_colour_order_does_not_change_semantic_authority.mp4",
+      "sha256": "ec726927240f2322796c5196ad0ddb19909f7dc232e8136981b8fddd463ddc53",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 1449850817019293111
+      }
+    },
+    {
+      "id": "capsule-tx3g-highlight_n_plus_one_sentinel_is_retained_as_a_derived_endpoint",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-highlight_n_plus_one_sentinel_is_retained_as_a_derived_endpoint.mp4",
+      "sha256": "2dff468f198a1ee4889d818a921ec2a587444639294f7d1ccb179cdbf9187ff8",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-hyperlink_empty_strings_are_preserved_not_invented_absolute_urls",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-hyperlink_empty_strings_are_preserved_not_invented_absolute_urls.mp4",
+      "sha256": "09c511a14575ac40fed6a946c5a0f7e9317b72176b7d0cd1f52428522c5f296a",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169126968
+      }
+    },
+    {
+      "id": "capsule-tx3g-hyperlink_requests_terminal_style_over_base_and_static_highlight",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-hyperlink_requests_terminal_style_over_base_and_static_highlight.mp4",
+      "sha256": "929c2506a3cca13461a2f55f5a4cc5b27421e5e223dc98a9523ae3dab91c3c57",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-hyperlink_utf8_url_alt_fields_are_strict_length_delimited",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-hyperlink_utf8_url_alt_fields_are_strict_length_delimited.mp4",
+      "sha256": "005f67302cbb061cc2e935ccb29c60fa1a58a285fd6337f8d1e03eadd08c1f5d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 3,
+        "digest": 6967242846057694264
+      }
+    },
+    {
+      "id": "capsule-tx3g-inverted_and_beyond_text_ranges_refuse_without_clamping",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-inverted_and_beyond_text_ranges_refuse_without_clamping.mp4",
+      "sha256": "d5dfaca0b390fc6c1860bf915e0ac8dd5648db706c2884eb1c51db6c94fe642d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 10248071633433247191
+      }
+    },
+    {
+      "id": "capsule-tx3g-karaoke_bounds_use_actual_track_ticks_not_assumed_milliseconds",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-karaoke_bounds_use_actual_track_ticks_not_assumed_milliseconds.mp4",
+      "sha256": "616937930803003e685a465c456a0ec52d0ba91cb8c05ef23ab55ffbaba10d4a",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 1449850817019293111
+      }
+    },
+    {
+      "id": "capsule-tx3g-karaoke_character_ranges_must_be_ordered_nonoverlapping",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-karaoke_character_ranges_must_be_ordered_nonoverlapping.mp4",
+      "sha256": "3fe613b3a51b20e1b47361edab326b03bdc47a1d0a962f2e859829199293ef48",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 1449850817019293111
+      }
+    },
+    {
+      "id": "capsule-tx3g-karaoke_events_have_half_open_time_intervals_and_zero_range_pauses",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-karaoke_events_have_half_open_time_intervals_and_zero_range_pauses.mp4",
+      "sha256": "c325367dd0338335dfa7c36c2c34aa444628073f19bcacdab297210745f7a65b",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-known_box_trailing_bytes_and_short_bodies_are_errors",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-known_box_trailing_bytes_and_short_bodies_are_errors.mp4",
+      "sha256": "e35b88606286f96db3eb3f4f5b883a693d078f2cd547b37e07d69633cfa09664",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 42,
+        "digest": 15568438462398740855
+      }
+    },
+    {
+      "id": "capsule-tx3g-malformed_advertised_record_counts_do_not_publish_partial_semantics",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-malformed_advertised_record_counts_do_not_publish_partial_semantics.mp4",
+      "sha256": "70f81fc0b3f27c3a03b27f65a54fdee58b581ffc4c433afd527caf7789be3f6f",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 3,
+        "digest": 6636743432274933807
+      }
+    },
+    {
+      "id": "capsule-tx3g-malformed_late_modifier_never_publishes_partial_semantic_output",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-malformed_late_modifier_never_publishes_partial_semantic_output.mp4",
+      "sha256": "f08c1a7135fe91767480c04e8702af6c93e2b0bbcc53d8a60024964817d08c41",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-missing_description_does_not_fake_complete_combination_validation",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-missing_description_does_not_fake_complete_combination_validation.mp4",
+      "sha256": "3a1522e7413f2cb6bd2b2f4f3913510d59b93c5f574e2119cbbf82210ea1f928",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 41295367209253788
+      }
+    },
+    {
+      "id": "capsule-tx3g-missing_description_does_not_invent_disparity_zero",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-missing_description_does_not_invent_disparity_zero.mp4",
+      "sha256": "35eaad53727dd0b516098ffb5fe2396b14fd5f07b7b74e85a354db786e8e6bd7",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2,
+        "digest": 2791402054784181431
+      }
+    },
+    {
+      "id": "capsule-tx3g-missing_description_keeps_unbound_font_id_and_base_style_unknown",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-missing_description_keeps_unbound_font_id_and_base_style_unknown.mp4",
+      "sha256": "0bb5b737e5c617a2bc22acb980de5968e234b94415ca436292858561595820de",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 42971243945337
+      }
+    },
+    {
+      "id": "capsule-tx3g-missing_duration_does_not_invent_a_time_bound_or_next_packet_end",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-missing_duration_does_not_invent_a_time_bound_or_next_packet_end.mp4",
+      "sha256": "54105d8179f0142ac09a468772f8d79fbd7842cdf9f9f4d87d893039e27dc4cb",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169126968
+      }
+    },
+    {
+      "id": "capsule-tx3g-original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_ambiguity",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_ambiguity.mp4",
+      "sha256": "736e7e1c403980787de00fb4e8f82b54e036249c0d6a7578c4db6b9195dad8fc",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-original_style_highlight_fixture_resolves_requested_style_and_colour_authority",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-original_style_highlight_fixture_resolves_requested_style_and_colour_authority.mp4",
+      "sha256": "465a398d6224db144253cb631ddd945ae985d083080789bae6b39c7cb7b7bc5c",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-output_is_taken_once_and_old_owners_survive_job_drop",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-output_is_taken_once_and_old_owners_survive_job_drop.mp4",
+      "sha256": "b059a7f10048ea4bdb62737c6cef7d2565f477f452cdeb7125e0a352c71199b1",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169149071
+      }
+    },
+    {
+      "id": "capsule-tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors.mp4",
+      "sha256": "21aaa1071790ffb5a914ec0d1840192eb6948bcbf19d6adbcc7299c2e4bb011e",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 10248071633433247191
+      }
+    },
+    {
+      "id": "capsule-tx3g-overlapping_styles_across_separate_boxes_are_not_last_wins",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-overlapping_styles_across_separate_boxes_are_not_last_wins.mp4",
+      "sha256": "281dbb85c42667c3c71e7f1feabf7152188605f3b76be16a4d9e21cc5371cf2d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-overlaps_within_highlights_links_and_blinks_are_rejected",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-overlaps_within_highlights_links_and_blinks_are_rejected.mp4",
+      "sha256": "9c0a40395bac33ffaf5eb56cf29e9980daff848be993daee8e8aa3135ab33236",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 10248071633433247191
+      }
+    },
+    {
+      "id": "capsule-tx3g-pool_pressure_and_repeated_zero_work_retry_do_not_duplicate_modifiers",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-pool_pressure_and_repeated_zero_work_retry_do_not_duplicate_modifiers.mp4",
+      "sha256": "5cc636794a89ca5874b28106cd982a51cc513364d991cfd81a666b31125bc631",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-positive_event_after_zero_duration_still_conflicts_with_static_or_link",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-positive_event_after_zero_duration_still_conflicts_with_static_or_link.mp4",
+      "sha256": "477c10243093c89637e378f60079ed38e22cee661bf85ae982ffde1d9fb0cbf7",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 16,
+        "digest": 15599331408191933325
+      }
+    },
+    {
+      "id": "capsule-tx3g-query_zero_work_and_cancel_preserve_search_progress",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-query_zero_work_and_cancel_preserve_search_progress.mp4",
+      "sha256": "7262467c5683fd0164363e8002b44f53652d7f0875497e8887d59ef13a1b1480",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-record_limit_failure_is_sticky_frees_construction_and_publishes_nothing",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-record_limit_failure_is_sticky_frees_construction_and_publishes_nothing.mp4",
+      "sha256": "13b1362a2c4f632dda05471a9f139b91a699379c9472de7ac19a6200471def1d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output.mp4",
+      "sha256": "754a774778b88a54c507bf43874feca9cec1d1b2a6aa10306330daf962d7c8ae",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-tx3g-sample_disparity_overrides_description_and_retains_sixteenth_pixels",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-sample_disparity_overrides_description_and_retains_sixteenth_pixels.mp4",
+      "sha256": "3093e03bc170c90bf6ade1af42bdd5d4024c8aa9d9e9ce10c441503e34da8bf1",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169149071
+      }
+    },
+    {
+      "id": "capsule-tx3g-sample_styles_override_description_only_on_the_declared_half_open_ranges",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-sample_styles_override_description_only_on_the_declared_half_open_ranges.mp4",
+      "sha256": "6e55220e1bcde226ad6b3fcc8c460064b6649c015f4a75aa3e33a84a99f494c5",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 5,
+        "digest": 1280156410999570230
+      }
+    },
+    {
+      "id": "capsule-tx3g-sample_textbox_overrides_description_without_clamping_signed_geometry",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-sample_textbox_overrides_description_without_clamping_signed_geometry.mp4",
+      "sha256": "7f71b824008ec47711b601bb3797acd694147f6e26829c579e049b31a1dfff22",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169149071
+      }
+    },
+    {
+      "id": "capsule-tx3g-scroll_delay_uses_track_ticks_and_only_specified_zero_default",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-scroll_delay_uses_track_ticks_and_only_specified_zero_default.mp4",
+      "sha256": "9e149f9cda6e701f967b99c86c81254c9def60420ca428ef19d7a1fe1f071124",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2,
+        "digest": 2791402054784181431
+      }
+    },
+    {
+      "id": "capsule-tx3g-stale_generation_is_rejected_while_original_caller_owners_remain",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-stale_generation_is_rejected_while_original_caller_owners_remain.mp4",
+      "sha256": "c7a5e766981240a5002c0feae2a665eaa11569002638b989485289d42dadd695",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169149071
+      }
+    },
+    {
+      "id": "capsule-tx3g-static_dynamic_and_dynamic_link_conflicts_are_rejected",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-static_dynamic_and_dynamic_link_conflicts_are_rejected.mp4",
+      "sha256": "288ba36752473d2965b64cfc5dc3382cc0e63fc5b01e236ebd1341f19ebb5c92",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 1449850817019293111
+      }
+    },
+    {
+      "id": "capsule-tx3g-static_highlight_without_colour_requests_terminal_inversion",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-static_highlight_without_colour_requests_terminal_inversion.mp4",
+      "sha256": "4591f6f3a16dc641057226e89e818a79b3023414be7c155dbfee06138360edd6",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-style_and_blink_ranges_do_not_adopt_the_highlight_sentinel",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-style_and_blink_ranges_do_not_adopt_the_highlight_sentinel.mp4",
+      "sha256": "25c6d96486bd80657c3e90abd06791d95b604360f187e6134228cbd929bc285d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 1449850817019293111
+      }
+    },
+    {
+      "id": "capsule-tx3g-unicode_scalar_offsets_are_not_utf8_byte_or_rendered_glyph_offsets",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-unicode_scalar_offsets_are_not_utf8_byte_or_rendered_glyph_offsets.mp4",
+      "sha256": "e14b8db3c059dd4af7330c4561dfc78d2641191bbe78b5a3393235ffb7b0db3f",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 12,
+        "digest": 396714878665414091
+      }
+    },
+    {
+      "id": "capsule-tx3g-unknown_configuration_layout_does_not_infer_default_style_or_disparity",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-unknown_configuration_layout_does_not_infer_default_style_or_disparity.mp4",
+      "sha256": "75dfdc5bd829fa2f10f6fa65db8b0120341fa6fd212d0feabed9fa2591f82891",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169149071
+      }
+    },
+    {
+      "id": "capsule-tx3g-unknown_description_keeps_continuous_extent_unresolved",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-unknown_description_keeps_continuous_extent_unresolved.mp4",
+      "sha256": "d6265bd306e1bb718188ac1fe179f440b38faafcd5aa7be568454ce9ce19f170",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-unknown_modifiers_remain_full_source_ranges_without_semantic_effect",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-unknown_modifiers_remain_full_source_ranges_without_semantic_effect.mp4",
+      "sha256": "b21e7bb234aaf6474ee3b5d3c91f3e7790ec334b30a319560942ca12a6b28a22",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169149071
+      }
+    },
+    {
+      "id": "capsule-tx3g-unknown_query_time_is_not_replaced_with_zero",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-unknown_query_time_is_not_replaced_with_zero.mp4",
+      "sha256": "3a6c7a08400275ac32600acaf39ef216cb6624f23ae0c8d770a95a8b4bac2def",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169126968
+      }
+    },
+    {
+      "id": "capsule-tx3g-unknown_time_after_all_karaoke_ends_is_never_dynamic_in_any_description_context",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-unknown_time_after_all_karaoke_ends_is_never_dynamic_in_any_description_context.mp4",
+      "sha256": "179cbe2ab2aca7940bf1481a93f73b5e4456b5d8ca918253729ea16a4c9da772",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 8,
+        "digest": 7784751128538915969
+      }
+    },
+    {
+      "id": "capsule-tx3g-unknown_time_character_membership_is_logarithmic_resumable_and_allocation_free",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-unknown_time_character_membership_is_logarithmic_resumable_and_allocation_free.mp4",
+      "sha256": "ffe7374b43c1846702a44b9f49583c6a9b516d3acabacc7913d5312be707d465",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2049,
+        "digest": 2854961802875291704
+      }
+    },
+    {
+      "id": "capsule-tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_hyperlink_authority",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_hyperlink_authority.mp4",
+      "sha256": "e1601e7eaf65ddedc3f5334dfb9417ceafed14aa2a77a6bbd6c88c93be648881",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 41295367209253788
+      }
+    },
+    {
+      "id": "capsule-tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_static_highlight",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-unknown_time_outside_known_noncontinuous_karaoke_keeps_static_highlight.mp4",
+      "sha256": "244efcb2c7dba93b8292bec5ff9686a9877fae83b54262dc8fd35e74b35b637d",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 41295367209253788
+      }
+    },
+    {
+      "id": "capsule-tx3g-unknown_time_with_only_zero_duration_karaoke_has_no_possible_dynamic_extent",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-unknown_time_with_only_zero_duration_karaoke_has_no_possible_dynamic_extent.mp4",
+      "sha256": "07513cdd7b2677709d55074d89a14f82e6df17720c6c305ff210d06cbed3a299",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar.mp4",
+      "sha256": "d62a76e570731e091c614a86101ec9080ca1c8f0a0d51b5b4402d78c2118e166",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 279
+      }
+    },
+    {
+      "id": "capsule-tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes.mp4",
+      "sha256": "8a71411b7057aff7111feab8986cbe6d0e8e19aed8e971d6c8642ac881c053d7",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 5,
+        "digest": 2893279288547838415
+      }
+    },
+    {
+      "id": "capsule-tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors.mp4",
+      "sha256": "c7a5e766981240a5002c0feae2a665eaa11569002638b989485289d42dadd695",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169149071
+      }
+    },
+    {
+      "id": "capsule-tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges.mp4",
+      "sha256": "9cf6ec3c0cb2e923767c369461c43efb10e6c5ea4ea73c3dd153b93a1a31a706",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 16,
+        "digest": 15599331408191933325
+      }
+    },
+    {
+      "id": "capsule-tx3g-zero_duration_karaoke_events_are_source_records_but_never_active",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_duration_karaoke_events_are_source_records_but_never_active.mp4",
+      "sha256": "af48ab6f6bbee669bd75adeeefa22ed170986f09741ef39d23f5d2845f9b4a1c",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 1386169126968
+      }
+    },
+    {
+      "id": "capsule-tx3g-zero_duration_only_events_need_no_invented_continuous_context_for_conflicts",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_duration_only_events_need_no_invented_continuous_context_for_conflicts.mp4",
+      "sha256": "bcf1b90c9da2a6238c286c851fcbac96d43412f95af8775859375e0b7e4853d1",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 8,
+        "digest": 7722098615503530210
+      }
+    },
+    {
+      "id": "capsule-tx3g-zero_duration_only_overlap_does_not_conflict_with_hyperlink",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_duration_only_overlap_does_not_conflict_with_hyperlink.mp4",
+      "sha256": "01c03753109e4e51381792aad3cf83b2eb126701fbd2b49245089113747d1840",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 8,
+        "digest": 7722098615503530210
+      }
+    },
+    {
+      "id": "capsule-tx3g-zero_duration_only_overlap_does_not_conflict_with_static_highlight",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_duration_only_overlap_does_not_conflict_with_static_highlight.mp4",
+      "sha256": "d0d9fa3373c8e5811de4d7aa99fd20a9b7ea043f66325f1ba190e3ecdfd113ba",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 8,
+        "digest": 7722098615503530210
+      }
+    },
+    {
+      "id": "capsule-tx3g-zero_duration_tail_never_extends_a_continuous_conflict_prefix",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_duration_tail_never_extends_a_continuous_conflict_prefix.mp4",
+      "sha256": "e99a2c31223db6f2736e639c2d99ad28f44e198d80ddc711c301edaf427dcd58",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 8,
+        "digest": 7722098615503530210
+      }
+    },
+    {
+      "id": "capsule-tx3g-zero_font_id_and_sparse_high_ids_do_not_use_truthiness_as_knownness",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_font_id_and_sparse_high_ids_do_not_use_truthiness_as_knownness.mp4",
+      "sha256": "a09fc0774122d5b43a8469831bbda47f0c003e00c057d65dcd2dcd1d3af2bc54",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 42971243945337
+      }
+    },
+    {
+      "id": "capsule-tx3g-zero_length_style_records_are_preserved_and_apply_to_no_character",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_length_style_records_are_preserved_and_apply_to_no_character.mp4",
+      "sha256": "077b32c5bfdc1660a65049717cb3552adc9dce9dad43563e791c8e4e7e1955b7",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "capsule-tx3g-zero_work_semantics_performs_no_progress_or_allocation",
+      "profile": "text-mov-tx3g",
+      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_work_semantics_performs_no_progress_or_allocation.mp4",
+      "sha256": "4591f6f3a16dc641057226e89e818a79b3023414be7c155dbfee06138360edd6",
+      "rights": "authored-synthetic",
+      "source": null,
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1332108591021367
+      }
+    },
+    {
+      "id": "fragmented-subtitle-edit",
+      "profile": "text-mov-tx3g",
+      "file": "crates/playback/tests/fixtures/mp4/fragmented-subtitle-edit.mp4",
+      "sha256": "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mp4/fragmented-subtitle-edit.mp4",
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0",
+        "opt:progressive=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 15,
+        "digest": 1977641369426820433
+      }
+    },
+    {
+      "id": "fragmented-subtitles",
+      "profile": "text-mov-tx3g",
+      "file": "crates/playback/tests/fixtures/mp4/fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mp4/fragmented-subtitles.mp4",
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0",
+        "opt:progressive=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 15,
+        "digest": 4698579031852600891
+      }
+    },
+    {
+      "id": "r-subtitle-tx3g",
+      "profile": "text-mov-tx3g",
+      "file": "crates/playback/tests/fixtures/mp4/r-subtitle-tx3g.mov",
+      "sha256": "133cf97e94036df359ba13f66d95cbd2b22b6c543fbf6520600829b6a06e5b2a",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mp4/r-subtitle-tx3g.mov",
+      "arguments": [
+        "text",
+        "mov",
+        "tx3g",
+        "0",
+        "0"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 18,
+        "digest": 13115166715645214975
+      }
+    }
+  ]
+}

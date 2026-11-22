@@ -95,6 +95,13 @@ checks discovered codec fields, PGS canvas, legacy AAC initialization, source
 replay and the HEVC seek landing. The AAC audio-clock comparison exercises
 the compact replay feed through its clock and raw packet output.
 
+The [text subtitle comparison](../../harness/features/bridge-text-subtitles/contract.json),
+[bitmap subtitle comparison](../../harness/features/bridge-bitmap-subtitles/contract.json)
+and [caption and teletext comparison](../../harness/features/bridge-captions-teletext/contract.json)
+feed real container packets from `Player` through the bridges. They compare
+cue bytes, bitmap geometry and pixels, palettes, and presentation clocks
+against the corresponding FFmpeg decoder outputs.
+
 The integration tests (`tests/it`) read the fixtures of `crates/playback/tests/fixtures`.
 Fixture provenance: [AV1](../playback/tests/fixtures/av1/README.md),
 [Matroska feeds](../playback/tests/fixtures/mkv-feed/README.md),
