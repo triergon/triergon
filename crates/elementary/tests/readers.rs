@@ -129,6 +129,52 @@ fn free_format_spacing_survives_headers_inside_main_data() {
 }
 
 #[test]
+fn free_layer_one_padding_and_false_headers_are_bounded() {
+    let mut file = Vec::new();
+    let mut extents = Vec::new();
+    for index in 0..6 {
+        let padded = index % 2 == 1;
+        let mut frame = vec![0; 136 + usize::from(padded) * 4];
+        frame[..4].copy_from_slice(&(0xffff_00c0u32 | (u32::from(padded) << 9)).to_be_bytes());
+        frame[40..44].copy_from_slice(&0xffff_00c0u32.to_be_bytes());
+        extents.push((file.len() as u64, frame.len()));
+        file.extend(frame);
+    }
+    let reading = invariant::<MpegAudio>(&file);
+    assert_eq!(
+        reading
+            .packets
+            .iter()
+            .map(|p| (p.offset, p.len))
+            .collect::<Vec<_>>(),
+        extents
+    );
+    assert!(
+        reading
+            .packets
+            .iter()
+            .all(|p| p.complete && p.duration == 384)
+    );
+    let tiny = read_file::<MpegAudio>(&file, 1, 1, false).unwrap();
+    assert_eq!(reading.packets, tiny.packets);
+    let mut bounded = BlockingReader::<MpegAudio, _>::open(
+        std::io::Cursor::new(&file),
+        Limits {
+            frame_bytes: 132,
+            ..Limits::default()
+        },
+    )
+    .unwrap();
+    let result = bounded.next_packet();
+    assert!(matches!(
+        result,
+        Err(
+            Error::Policy("free-format frame spacing could not be confirmed") | Error::Limit { .. }
+        )
+    ));
+}
+
+#[test]
 fn a_free_format_info_frame_is_metadata() {
     let mut frame = [0; 417];
     frame[..4].copy_from_slice(&0xfffb_0064u32.to_be_bytes());

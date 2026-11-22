@@ -49,12 +49,13 @@ output, without container trims. `--reset-at N` resets the decoder before access
   joint stereo and dual channel give two (`FL`, `FR`). A stream may change mode, sample
   rate or layer between frames.
 
-Free-format Layer III frames are accepted by `Decoder::decode_framed` and
+Free-format Layer I and III frames are accepted by `Decoder::decode_framed` and
 `AudioDecoder::decode` when the caller supplies exactly one complete frame,
 including its header and optional CRC.
 The header does not encode its extent, so the decoder cannot verify the boundary.
-Free-format Layer I and II remain unsupported. `decode_frame` requires the header
-to specify the frame length.
+Layer I extents are multiples of four, including the header, any CRC and any
+padding slot. Free-format Layer II remains unsupported. `decode_frame` requires
+the header to specify the frame length.
 
 ## Behaviour and limits
 
@@ -118,3 +119,10 @@ CARGO_INCREMENTAL=0 TRIERGON_MPG123=/path/to/mpg123 \
 The comparison reads complete access units through the normal reader and
 uses each decoder's PCM before gapless trimming. It reports the worst RMS and
 peak sample differences across all frames and channels.
+
+The free-format Layer I control contains six signal-bearing frames with alternating
+four-byte padding. With the original headers, mpg123 1.33.7 exposes one byte of each
+four-byte pad in its frame body. Its PCM differs by RMS 0.5586 and peak 1.333.
+Declaring the same frame extents through the bitrate field gives the same bodies,
+padding and packet boundaries, and the PCM comparison passes. Direct free-format
+PCM parity and native qualification remain open.
