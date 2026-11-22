@@ -683,9 +683,6 @@
         "vobsub-idx-no-index",
         "missing-index",
         "malformed-id"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -696,9 +693,6 @@
       "compat": "compat::dvd::limit_vobsub_timestamp_field_width",
       "cases": [
         "long-timestamp"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
