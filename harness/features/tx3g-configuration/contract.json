@@ -303,9 +303,6 @@
       "compat": "compat::tx3g::missing_description_style",
       "cases": [
         "bad-two"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -363,9 +360,6 @@
         "authored-truncated-44",
         "authored-truncated-45",
         "authored-truncated-46"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -378,9 +372,6 @@
         "config-valid-empty-fonts",
         "authored-empty-fonts",
         "authored-missing-font"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -391,9 +382,6 @@
       "compat": "compat::tx3g::font_name_c_string",
       "cases": [
         "font-utf16"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -404,9 +392,6 @@
       "compat": "compat::tx3g::duplicate_font_table",
       "cases": [
         "authored-duplicate-table"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -417,9 +402,6 @@
       "compat": "compat::tx3g::invalid_default_style_range",
       "cases": [
         "authored-default-range"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -430,9 +412,6 @@
       "compat": "compat::tx3g::reserved_justification",
       "cases": [
         "authored-bad-justification"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
