@@ -32,7 +32,9 @@ mod json;
 mod matroska_views;
 mod mpg123;
 mod numpy;
+mod play_views;
 mod playback_golds;
+mod playback_views;
 mod prepare;
 mod process;
 mod progressive_bench;
@@ -50,6 +52,7 @@ mod subtitle_views;
 mod test_skips;
 mod toml;
 mod transport_fixtures;
+mod transport_views;
 mod walk;
 mod worker_tests;
 mod zlib;
@@ -100,6 +103,9 @@ commands:
   codec-views fixtures|manifest --record [FEATURE]
   matroska-views fixtures|manifest --record [FEATURE]
   subtitle-views fixtures|manifest --record [FEATURE]
+  transport-views fixtures|manifest --record [FEATURE]
+  playback-views fixtures|manifest --record [FEATURE]
+  play-views fixtures|manifest --record [FEATURE]
   prepare-mpg123 [--jobs N]   build the pinned static free-format MPEG audio reference
   references     keys|pack|fetch|upload   the keys of the pinned reference builds, and
                  their packs in .research/reference-cache and the evidence archive, which
@@ -1105,6 +1111,8 @@ fn prepare_check(part: Option<Part>) -> Task {
             &["prepare-ffmpeg", "--profile", "framing-views"],
             &["prepare-ffmpeg", "--profile", "decode"],
             &["framing-views", "fixtures", "dts"],
+            &["framing-views", "fixtures", "streams"],
+            &["framing-views", "fixtures", "config"],
             &["prepare-ffmpeg", "--profile", "transport-dts"],
             &["prepare-mpg123"],
             &["prepare-ffmpeg", "--profile", "video"],

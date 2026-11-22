@@ -16,6 +16,14 @@ triergon-harness-runner = { path = "../harness-runner" }
 triergon-mpegts = { path = "../mpegts", features = ["reference-trace"] }
 triergon-worker-entry = { path = "../worker-entry" }
 
+[features]
+views = []
+
+[[bin]]
+name = "transport-views-worker"
+path = "src/bin/transport-views-worker/main.rs"
+required-features = ["views"]
+
 # The workspace's lints with unsafe_code denied instead of forbidden: the C entry
 # point of each worker binary is its one allowed exception (docs/quality.md).
 # `cargo xtask check` keeps the rest equal to the workspace's.

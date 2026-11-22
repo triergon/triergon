@@ -26,6 +26,7 @@ triergon-session = { path = "../session", features = ["codecs"] }
 triergon-worker-entry = { path = "../worker-entry" }
 
 [features]
+play = ["triergon/playback", "triergon/codecs", "triergon/render", "triergon/isobmff", "triergon/mpegts"]
 # Dependencies needed only by the comparison views binary.
 views = ["dep:triergon-bitstream", "dep:triergon-codec-opus", "triergon/framing"]
 # Nightly-only explicit SIMD kernels in the HEVC decoder; output is identical.
@@ -43,6 +44,11 @@ required-features = ["views"]
 name = "codec-hevc-worker"
 path = "src/bin/codec-hevc-worker.rs"
 required-features = ["hevc-simd"]
+
+[[bin]]
+name = "play-views-worker"
+path = "src/bin/play-views-worker/main.rs"
+required-features = ["play"]
 
 # The workspace's lints with unsafe_code denied instead of forbidden: the C entry
 # point of each worker binary is its one allowed exception (docs/quality.md).

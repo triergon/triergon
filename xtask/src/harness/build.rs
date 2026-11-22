@@ -317,7 +317,7 @@ const MEDIA_WORKER: Candidate = Candidate {
 
 /// Measurement workers a contract may name as its candidate besides
 /// `media-worker`.
-const ADDITIONAL_CANDIDATES: [Candidate; 20] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 23] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -339,6 +339,27 @@ const ADDITIONAL_CANDIDATES: [Candidate; 20] = [
         package: "transport-worker",
         example: None,
         features: &[],
+        nightly: false,
+    },
+    Candidate {
+        name: "transport-views-worker",
+        package: "transport-worker",
+        example: None,
+        features: &["views"],
+        nightly: false,
+    },
+    Candidate {
+        name: "playback-views-worker",
+        package: "playback-worker",
+        example: None,
+        features: &["views"],
+        nightly: false,
+    },
+    Candidate {
+        name: "play-views-worker",
+        package: "codec-worker",
+        example: None,
+        features: &["play"],
         nightly: false,
     },
     Candidate {
@@ -550,6 +571,35 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
         }
     }
     let view_headers: &[&str] = match name {
+        "transport-views-worker" => &[
+            "harness/reference_transport_views.c",
+            "harness/reference_transport_catalogue.h",
+            "harness/reference_transport_packets.h",
+            "harness/reference_transport_source.h",
+            "harness/reference_transport_facts.h",
+            "harness/reference_transport_reader.h",
+            "harness/reference_transport_mux.h",
+            "xtask/src/transport_views/mod.rs",
+        ],
+        "playback-views-worker" => &[
+            "harness/reference_playback_views.c",
+            "harness/reference_playback_probe.h",
+            "harness/reference_playback_source_view.h",
+            "harness/reference_playback_player.h",
+            "harness/reference_playback_hls.h",
+            "harness/reference_playback_bridge.h",
+            "harness/reference_playback_subtitles.h",
+            "harness/reference_packet_fold.h",
+            "harness/reference_subtitles_host.h",
+            "harness/reference_views_protocol.h",
+            "xtask/src/playback_views/mod.rs",
+        ],
+        "play-views-worker" => &[
+            "harness/reference_play_views.c",
+            "harness/reference_play_raw.h",
+            "harness/reference_decode.h",
+            "xtask/src/play_views/mod.rs",
+        ],
         "codec-views-worker" => &[
             "harness/reference_codec_views.c",
             "harness/reference_codec_readers.h",
@@ -580,8 +630,10 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             "harness/reference_dts_frames.h",
             "harness/dts_oracle.py",
             "harness/codec_stream_oracle.py",
+            "harness/codec_config_oracle.py",
             "xtask/src/framing_views/obu.rs",
             "xtask/src/framing_views/adts.rs",
+            "xtask/src/framing_views/config.rs",
             "xtask/src/framing_views/dts.rs",
             "xtask/src/framing_views/nal.rs",
         ],
@@ -593,13 +645,19 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             "harness/reference_isobmff_packets.h",
             "harness/reference_isobmff_index.h",
             "harness/reference_isobmff_trace.h",
+            "harness/isobmff_index_oracle.py",
+            "xtask/src/isobmff_views/index.rs",
         ],
         _ => &[],
     };
     inputs.extend(view_headers.iter().map(ToString::to_string));
     if matches!(
         name,
-        "codec-views-worker" | "matroska-views-worker" | "subtitle-views-worker"
+        "codec-views-worker"
+            | "matroska-views-worker"
+            | "subtitle-views-worker"
+            | "transport-views-worker"
+            | "play-views-worker"
     ) {
         inputs.extend(
             [
@@ -848,6 +906,27 @@ struct ProfileReference {
 
 const CONTAINER_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libavutil"];
 const CONTAINER_OPTIONS: &[&str] = &["-O3", "-Wall", "-Wextra", "-Werror"];
+const DECODE_PACKAGES: &[&str] = &[
+    "libavformat",
+    "libavfilter",
+    "libswscale",
+    "libswresample",
+    "libavcodec",
+    "libavutil",
+];
+// These conversions can differ between targets (reference_subtitles_host.h).
+const SUBTITLE_WRAPS: &[&str] = &[
+    "strtol",
+    "strtoul",
+    "__isoc23_strtol",
+    "__isoc23_strtoul",
+    "__isoc99_sscanf",
+    "lrint",
+    "lrintf",
+    "lround",
+    "llrint",
+    "llrintf",
+];
 /// The options the decoder and capture comparisons were measured with.
 const RELEASE_OPTIONS: &[&str] = &["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"];
 /// The shaping reference is compiled like its libraries, without contraction.
@@ -900,7 +979,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 25] = [
+const PROFILE_REFERENCES: [ProfileReference; 32] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -994,21 +1073,7 @@ const PROFILE_REFERENCES: [ProfileReference; 25] = [
         libraries: "subtitles_reference",
         packages: CONTAINER_PACKAGES,
         options: CONTAINER_OPTIONS,
-        // The calls whose result can differ between the targets, so that the
-        // worker flags the folds that reach such a result
-        // (`harness/reference_subtitles_host.h`).
-        wrapped: &[
-            "strtol",
-            "strtoul",
-            "__isoc23_strtol",
-            "__isoc23_strtoul",
-            "__isoc99_sscanf",
-            "lrint",
-            "lrintf",
-            "lround",
-            "llrint",
-            "llrintf",
-        ],
+        wrapped: SUBTITLE_WRAPS,
         identity: true,
         // Its wrappers run inside the timed operation, so it is never timed or
         // measured; `ffmpeg-subtitles-plain-native` is.
@@ -1034,14 +1099,7 @@ const PROFILE_REFERENCES: [ProfileReference; 25] = [
         record: "ffmpeg-decode-native",
         kind: "FFmpeg 9.0.2 decoders with the letterbox and downmix filter chains; codec operations",
         libraries: "decode_reference",
-        packages: &[
-            "libavformat",
-            "libavfilter",
-            "libswscale",
-            "libswresample",
-            "libavcodec",
-            "libavutil",
-        ],
+        packages: DECODE_PACKAGES,
         options: RELEASE_OPTIONS,
         ..REFERENCE
     },
@@ -1157,6 +1215,93 @@ const PROFILE_REFERENCES: [ProfileReference; 25] = [
         ..REFERENCE
     },
     ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-transport-views-worker",
+        source: "harness/reference_transport_views.c",
+        record: "ffmpeg-transport-views-native",
+        kind: "pinned FFmpeg MPEG-TS public-API views",
+        libraries: "transport_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-transport-views-raw-worker",
+        source: "harness/reference_transport_views.c",
+        record: "ffmpeg-transport-views-raw-native",
+        kind: "FFmpeg 9.0.2 raw MPEG-TS packet views",
+        libraries: "transport_views_raw_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-playback-views-worker",
+        source: "harness/reference_playback_views.c",
+        record: "ffmpeg-playback-views-native",
+        kind: "pinned FFmpeg playback public-API views",
+        libraries: "playback_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-bridge-views-worker",
+        source: "harness/reference_playback_views.c",
+        record: "ffmpeg-bridge-views-native",
+        kind: "FFmpeg 9.0.2 bitstream filter and muxer views",
+        libraries: "bridge_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-subtitles",
+        binary: "ffmpeg-playback-subtitle-views-worker",
+        source: "harness/reference_playback_views.c",
+        define: Some("-DTRIERGON_PLAYBACK_SUBTITLE_WRAP=1"),
+        record: "ffmpeg-playback-subtitle-views-native",
+        kind: "pinned FFmpeg subtitle playback views with host-dependent conversion detection",
+        libraries: "playback_subtitle_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        wrapped: SUBTITLE_WRAPS,
+        identity: true,
+        instrumented: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-subtitles",
+        binary: "ffmpeg-playback-subtitle-views-plain-worker",
+        source: "harness/reference_playback_views.c",
+        record: "ffmpeg-playback-subtitle-views-plain-native",
+        kind: "pinned FFmpeg subtitle playback views for timing and memory",
+        libraries: "playback_subtitle_views_plain_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-play-views-worker",
+        source: "harness/reference_play_views.c",
+        record: "ffmpeg-play-views-native",
+        kind: "FFmpeg 9.0.2 demux, decode and presentation output",
+        libraries: "play_views_reference",
+        packages: DECODE_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
         profile: ".research/freetype",
         binary: "freetype-font-worker",
         define: Some("-DTRIERGON_FONT_REFERENCE=1"),
@@ -1268,6 +1413,9 @@ fn build_selected(
                     | "codec-views-worker"
                     | "matroska-views-worker"
                     | "subtitle-views-worker"
+                    | "transport-views-worker"
+                    | "playback-views-worker"
+                    | "play-views-worker"
                     | "codec-hevc-worker"
             )
         ) {

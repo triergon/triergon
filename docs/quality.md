@@ -109,8 +109,8 @@ resource limit becomes an explicit, reviewed rule for that case.
   Matroska, and still links the playback engine's MP4 and TS backends, which `Engine`
   holds beside Matroska; and
   `playback-worker` carries every playback runner family for MP4 forward and range, TS
-  programs, raw Annex B and HLS segments against `formats` and its 12 demuxers (`ass`,
-  `h264`, `hevc`, `matroska`, `mov`, `mpegps`, `mpegts`, `mpegtsraw`, `srt`, `sup`,
+  programs, raw Annex B and HLS segments against `formats` and its 11 demuxers (`ass`,
+  `h264`, `hevc`, `matroska`, `mov`, `mpeg`, `mpegts`, `srt`, `sup`,
   `vobsub`, `webvtt`). Both playback binaries are built from the same runners
   (`crates/playback-worker`); a contract's `candidate` names its binary.
 - **FreeType pin.** `cargo xtask fonts prepare` builds the FreeType 2.15.0 release
@@ -506,6 +506,15 @@ The references for `codec-views-worker`, `matroska-views-worker` and
 respectively. Each pair uses the same prefix protocol as the framing and
 ISO BMFF views workers, including `PREFIXtrace`. The corresponding
 `cargo xtask codec-views`, `matroska-views` and `subtitle-views` commands verify
+fixture inputs and record reference folds or oracle trace pins.
+
+`transport-views-worker` uses references built against `formats` and against
+`decode` (FFmpeg 9.0.2) for the `mpegtsraw` demuxer. `playback-views-worker`
+uses references built against `formats`, against `decode` for bitstream filters
+and muxers, and against `subtitles` in wrapped and plain links for comparison and
+measurement, respectively. The `play-views-worker` reference links `decode`.
+These workers use the same prefix protocol. The corresponding
+`cargo xtask transport-views`, `playback-views` and `play-views` commands verify
 fixture inputs and record reference folds or oracle trace pins.
 
 `cargo xtask worker-tests` runs the integration tests
