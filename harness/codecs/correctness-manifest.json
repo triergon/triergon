@@ -1,6 +1,15 @@
 {
  "schema": "triergon.codecs.correctness-manifest.v1",
- "open_cases": ["flac_3ch_odd_mask.flac"],
+ "open_deviations": [
+  {
+   "reading": "A valid FLAC speaker mask remains supported on the stereo device path",
+   "clause": "RFC 9639 section 8.6.2 defines the loudspeaker mask, including front left, top back centre and top back right",
+   "candidate": "Matches the native decoded PCM and emits 52920 stereo samples per channel.",
+   "reference": "Matches the native decoded PCM and refuses the FL+TBC+TBR layout on the stereo path with zero output.",
+   "compat": "compat::flac::stereo_layout_admission",
+   "cases": ["flac_3ch_odd_mask.flac"]
+  }
+ ],
  "open_refusals": [
   {
    "kind": "video-grade",

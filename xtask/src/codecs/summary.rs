@@ -92,9 +92,6 @@ fn disposition(key: &str) -> Option<&'static str> {
         | "he_mode.bit" => {
             "the stream changes sample rate or channel count; the CLI resamples later frames to the first frame's format and its device path stops at the change, while each run decodes exactly (crates/codec-flac, crates/codec-mp3)"
         }
-        "flac_3ch_odd_mask.flac" => {
-            "FFmpeg refuses this channel mask's layout on the stereo device path; the decoder output matches exactly"
-        }
         _ => return None,
     })
 }
@@ -350,7 +347,9 @@ fn variant_reading<'a>(
     lane: &str,
     name: &str,
 ) -> Result<Option<&'a str>, String> {
-    let Some(path) = super::correctness::variant_manifest(lane) else {
+    let Some(path) = super::correctness::variant_manifest(lane)
+        .or_else(|| (lane == "flac").then_some(super::derived::MANIFEST))
+    else {
         return Ok(None);
     };
     let document = match documents.entry(path) {

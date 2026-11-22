@@ -67,6 +67,9 @@ channel counts that change between frames.
   C `strtol` with base 0, naming exactly as many of the 18 WAVEFORMATEXTENSIBLE speakers
   as STREAMINFO has channels. A frame with another channel count uses the default
   layout of its count.
+- The file comparison includes front left, top back centre and top back right.
+  Native PCM matches FFmpeg. The stereo device path also produces output for that
+  layout, which the reference's stereo path refuses.
 - An empty configuration decodes a stream picked up at a frame header (no STREAMINFO):
   each frame then supplies its own sample rate, and its sample size or the first
   frame's.
