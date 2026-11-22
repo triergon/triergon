@@ -865,6 +865,6 @@
     {"path": "hevc-conformance/ipcm_B_NEC_2.bit", "sha256": "cf1a824624d1cc26aca3d12656e30716b039e5edb48e41c3dd1c74538157f428", "source": "harness/codecs/correctness-manifest.json", "rights": "fetched-not-redistributed"},
     {"path": "hevc-conformance/ipcm_C_NEC_2.bit", "sha256": "a9800f093e66e7cb3147323e6ce6adc47620dfa4bbb89f15afb7f82b1e426977", "source": "harness/codecs/correctness-manifest.json", "rights": "fetched-not-redistributed"},
     {"path": "hevc-conformance/ipcm_D_NEC_2.bit", "sha256": "acb72389ebab10574a4821fd0a3329a307f3cf384a9ef67e6d0e761e807d8689", "source": "harness/codecs/correctness-manifest.json", "rights": "fetched-not-redistributed"},
-    {"path": "hevc-conformance/ipcm_E_NEC_2.bit", "sha256": "1c0652e89cffbfd45625371cbaca3b2293b09593672c9d81b63b83c6a5b55416", "source": "harness/codecs/correctness-manifest.json", "rights": "fetched-not-redistributed"},
+    {"path": "hevc-conformance/ipcm_E_NEC_2.bit", "sha256": "1c0652e89cffbfd45625371cbaca3b2293b09593672c9d81b63b83c6a5b55416", "source": "harness/codecs/correctness-manifest.json", "rights": "fetched-not-redistributed"}
   ]
 }
