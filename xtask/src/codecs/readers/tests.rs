@@ -263,7 +263,7 @@ fn resplit_and_shifted_times_cover_one_source_cut_differently() {
 fn reviewed_lists_must_hash_to_their_digest_and_name_known_dispositions() {
     let rules = r#"{"formats": {"ogg": {"streams": "position-in-link", "align_by": "size",
             "views": {"native": {"compare": ["pts"]}}}},
-            "dispositions": [{"id": "a", "reason": "why", "scope": {"views": ["native"],
+            "dispositions": [{"id": "a", "reason": "why", "clause": "test clause", "scope": {"views": ["native"],
             "fields": ["pts"], "packets": "any"}}]}"#;
     let rows = r#"[[0, 0, 0, "pts", 1, 2]]"#;
     let digest = list_sha256(json::parse(rows).unwrap().as_array().unwrap());

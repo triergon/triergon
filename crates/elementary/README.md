@@ -91,7 +91,8 @@ reviewed rules and dispositions of
 MPEG audio conformance bitstreams, streams FFmpeg writes (FLAC, MP3 with and without
 Xing/Info and LAME tags, MP2, ADTS, AC-3, E-AC-3) and crafted damaged ones, 253 of 271
 match on AArch64. Both readers refuse testbench faulty 06 and 07. The remaining 16
-files match their reviewed [packet differences](../../harness/codecs/reader-differences.json).
+files match their reviewed [packet differences](../../harness/codecs/reader-differences.json)
+under [rules that cite the applicable format clauses](../../harness/codecs/reader-rules.json).
 Those cases exercise the following FFmpeg behaviours.
 
 - delivers a FLAC frame's duration rescaled to the first frame's rate when the rate

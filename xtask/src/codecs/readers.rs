@@ -433,6 +433,13 @@ impl Rules {
             {
                 return Err(format!("disposition {id} has no reason"));
             }
+            if item
+                .get("clause")
+                .and_then(Value::as_str)
+                .is_none_or(|clause| clause.trim().is_empty() || clause.contains('\n'))
+            {
+                return Err(format!("disposition {id} needs a one-line clause"));
+            }
             dispositions.push(Disposition {
                 id: id.to_owned(),
                 scopes: scopes(item.get("scope"), id)?,

@@ -207,6 +207,7 @@
  "dispositions": [
   {
    "id": "ogg-negative-duration-unsigned",
+   "clause": "Vorbis I §A.2, end-of-stream granule position and discarded tail samples",
    "reason": "FFmpeg times the last Ogg page forwards from its first packet; when the page's granule position precedes its last packet's start, that packet's duration is negative and ffprobe prints it modulo 2^32. The compat view keeps it negative; the native view's coded duration is compared with FFmpeg's plus the padding, which carries the same 2^32",
    "scope": [
     {
@@ -224,6 +225,7 @@
   },
   {
    "id": "ogg-first-packet-after-bad-page",
+   "clause": "RFC 3533 §6, page CRC; RFC 7845 §§4.3 and 4.5, PCM position and initial granule position",
    "reason": "when the first audio page fails its CRC, FFmpeg times the first packet it keeps from that packet's page; the compat view times it from the stream start, as if the lost packets had been delivered",
    "scope": [
     {
@@ -241,6 +243,7 @@
   },
   {
    "id": "flac-rate-change-duration",
+   "clause": "RFC 9639 §§9.1.1–9.1.2, frame block size and sample rate",
    "reason": "when the sample rate changes, FFmpeg delivers each FLAC frame's duration rescaled to the first frame's rate; the reader times every frame at its own rate. The reader reports no per-frame rate, so the scope is every duration",
    "scope": [
     {
@@ -257,6 +260,7 @@
   },
   {
    "id": "flac-768k-no-duration",
+   "clause": "RFC 9639 §§9.1.1–9.1.2, frame block size and explicitly coded sample rates",
    "reason": "FFmpeg delivers FLAC frames at 768 kHz without a duration and the last one without a time; the reader times them from the frame headers",
    "scope": [
     {
@@ -284,6 +288,7 @@
   },
   {
    "id": "flac-last-frame-at-previous-end",
+   "clause": "RFC 9639 §9.1.5, coded sample or frame number",
    "reason": "FFmpeg's FLAC parser times the last frame of a stream at the previous packet's end (its time plus its duration as FFmpeg reports it), not from the frame's own number; this shows where block sizes vary under the fixed-blocking flag and where FFmpeg's durations differ from the frames' (a sample rate change, a time base taken from leading bytes); the reader times every frame from its frame number",
    "scope": [
     {
@@ -301,6 +306,7 @@
   },
   {
    "id": "flac-damaged-frame-merge",
+   "clause": "RFC 9639 §§9.1 and 9.3, frame sync, header CRC and frame CRC",
    "reason": "FFmpeg merges a damaged FLAC frame with the frames after it into one packet without times, spanning the bytes of the reader's packets; the reader ends the damaged frame at the next header its CRC-16 confirms",
    "scope": [
     {
@@ -330,6 +336,7 @@
   },
   {
    "id": "flac-parser-position-after-gap",
+   "clause": "RFC 9639 §§9.1 and 9.3, boundaries of confirmed frames; docs/architecture.md, Container contract, source facts",
    "reason": "after a packet FFmpeg's FLAC parser assembled from bytes the reader does not deliver as that packet (leading bytes, a merged damaged frame), it reports the next packet's position as its own read position; the reader reports the frame's source offset",
    "scope": [
     {
@@ -346,6 +353,7 @@
   },
   {
    "id": "flac-time-base-from-leading-bytes",
+   "clause": "RFC 9639 §§9.1.2 and 9.1.5, sample rate and coded number in the frame header",
    "reason": "in a FLAC stream without STREAMINFO that starts with unparsable bytes, FFmpeg takes the stream time base (1/32000) from a frame header in those bytes but times packets in samples of the stream rate; its times are the reader's sample times unconverted",
    "scope": [
     {
@@ -363,6 +371,7 @@
   },
   {
    "id": "leading-bytes-packet",
+   "clause": "RFC 9639 §§6 and 9.1, FLAC stream and frame structure; ATSC A/52:2018 §§5.3 and 5.4.1, AC-3 syncframe and sync information",
    "reason": "FFmpeg delivers the bytes before the first FLAC or AC-3 frame as a packet and times the frames after it from that packet's end; the reader keeps leading tags as tags and skips junk to the first confirmed frame",
    "scope": [
     {
@@ -390,6 +399,7 @@
   },
   {
    "id": "trailing-id3v1-in-last-packet",
+   "clause": "RFC 9639 §9.3, frame ends in its CRC-16; ATSC A/52:2018 §§5.3 and 5.4.1, AC-3 syncframe size",
    "reason": "FFmpeg delivers the 128-byte ID3v1 tag at the end of a FLAC or AC-3 stream as part of the last packet; the reader keeps it as a tag",
    "scope": [
     {
@@ -406,6 +416,7 @@
   },
   {
    "id": "mpeg-foreign-frame",
+   "clause": "ISO/IEC 11172-3 §§2.4.1.3 and 2.4.2.3, frame header and sync, as described in crates/elementary/src/mpeg.rs",
    "reason": "FFmpeg accepts an MPEG audio frame of another version or sample rate, or a header in junk that no frame follows, cutting the same bytes into other packets and timing later frames after them; the reader requires the frame after a header to confirm it",
    "scope": [
     {
@@ -435,6 +446,7 @@
   },
   {
    "id": "mpeg-free-format",
+   "clause": "ISO/IEC 11172-3 §2.4.2.3, zero bit-rate index selects free format, as described in crates/elementary/src/mpeg.rs",
    "reason": "FFmpeg 9.0.2 refuses free-format MPEG audio; the reader delivers its frames",
    "scope": [
     {
@@ -453,6 +465,7 @@
   },
   {
    "id": "adts-position-after-junk",
+   "clause": "ISO/IEC 13818-7, ADTS variable header aac_frame_length, as described in crates/framing/src/aac/adts.rs; docs/architecture.md, Container contract, source facts",
    "reason": "FFmpeg reports ADTS packet positions after junk as if the junk were not there; the reader reports each frame's source offset, one constant offset (the junk) later",
    "scope": [
     {
@@ -469,6 +482,7 @@
   },
   {
    "id": "flac-small-max-blocksize",
+   "clause": "RFC 9639 §§8.2 and 9.1.1, STREAMINFO block size limits and the frame block size",
    "reason": "FFmpeg refuses to open a FLAC stream whose STREAMINFO declares a maximum block size below 16; that is a decoder decision, so the reader still delivers the frames",
    "scope": [
     {
@@ -487,6 +501,7 @@
   },
   {
    "id": "flac-metadata-past-end",
+   "clause": "RFC 9639 §8.1, metadata block length counts all bytes following its header",
    "reason": "a metadata block whose length runs past the end of the file: FFmpeg declares the stream STREAMINFO describes and delivers no packets; the reader refuses the stream as truncated, since no frame can follow the metadata",
    "scope": [
     {
@@ -504,6 +519,7 @@
   },
   {
    "id": "ogg-seek-chained-one-link",
+   "clause": "RFC 3533 §4, physical chaining; docs/architecture.md, Container contract, seek landing and ordered packets",
    "reason": "after a seek in a chained file FFmpeg delivers one link only: Vorbis and FLAC from the first link's start to its end, Opus and Speex from the last link's start, timed from that link's own zero, with the discard padding and durations of its last page counted on that timeline. The reader lands in the link holding the target and reads on through the later links on one timeline",
    "scope": [
     {
@@ -553,6 +569,7 @@
   },
   {
    "id": "ogg-chain-same-serial",
+   "clause": "RFC 3533 §4, unique stream serial numbers in a physical bitstream",
    "reason": "when a chained link reuses the previous link's serial number, FFmpeg continues the same stream: it delivers the new link's header packets as packets and times the link from its own zero. The reader starts a new track for the link and times it after the previous one",
    "scope": [
     {
@@ -581,6 +598,7 @@
   },
   {
    "id": "ogg-granule-zero-backfill",
+   "clause": "RFC 3533 §6, granule position; Vorbis I §A.2, Ogg mapping and leading trim",
    "reason": "in a file with a video stream, FFmpeg times the Vorbis packets of the leading audio pages that state granule position 0 backwards from the first page stating a later one; the reader times them from the granule position each page states, and the compat view leaves them untimed, as FFmpeg does in audio-only files",
    "scope": [
     {

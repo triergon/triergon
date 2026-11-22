@@ -72,6 +72,12 @@ pub fn counted(data: &[(String, Value)]) -> Value {
             open.push((path.clone(), Value::Object(lists)));
         }
     }
+    if let Some(counts) = elementary_reader_deviations(data) {
+        open.push((
+            "harness/codecs/reader-differences.json".into(),
+            Value::object([("elementary_deviations", counts)]),
+        ));
+    }
     Value::object([
         ("features", Value::int(contracts.len() as i64)),
         ("required_by_check", with("gate", "required")),
@@ -83,6 +89,40 @@ pub fn counted(data: &[(String, Value)]) -> Value {
         ("open", Value::Object(open)),
         ("not_compared", not_compared(data)),
     ])
+}
+
+/// Count the frozen elementary packet comparisons by their manifest identity.
+/// The same differences file also holds Ogg packet and seek projections.
+fn elementary_reader_deviations(data: &[(String, Value)]) -> Option<Value> {
+    fn identity(row: &Value) -> Option<(&str, &str)> {
+        Some((row.get("name")?.as_str()?, row.get("sha256")?.as_str()?))
+    }
+    let rows = |path: &str, key: &str| {
+        data.iter()
+            .find(|(file, _)| file == path)
+            .and_then(|(_, doc)| doc.get(key)?.as_array())
+    };
+    let elementary: BTreeSet<_> = rows("harness/codecs/reader-manifest.json", "vectors")?
+        .iter()
+        .filter(|row| {
+            matches!(
+                row.get("lane").and_then(Value::as_str),
+                Some("reader-flac" | "reader-mp3" | "reader-aac" | "reader-ac3" | "reader-eac3")
+            )
+        })
+        .filter_map(identity)
+        .collect();
+    let count = rows("harness/codecs/reader-differences.json", "cases")?
+        .iter()
+        .filter(|row| identity(row).is_some_and(|key| elementary.contains(&key)))
+        .count();
+    (count != 0).then(|| {
+        Value::object(
+            crate::gate::TARGETS
+                .iter()
+                .map(|&target| (target, Value::int(count as i64))),
+        )
+    })
 }
 
 /// How many features each crate of [`NOT_COMPARED`] lists.
