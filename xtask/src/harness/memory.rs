@@ -26,7 +26,8 @@ use crate::stats;
 type R<T> = Result<T, String>;
 
 /// Pairs of one collection that may be measured again after the kernel RSS bound
-/// voided them ([`voided_by_foreign_update`]); beyond this the collection fails.
+/// voided them because another task updated the worker's resident counters.
+/// Any further voided pairs fail the collection.
 pub const MAX_RETRIES: usize = 2;
 
 /// The RSS bound module's error for a resident counter update by a task other
