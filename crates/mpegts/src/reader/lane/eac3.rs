@@ -399,10 +399,6 @@ impl Group {
         Ok(())
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "error returns here measured +0.12 to +0.14% on E-AC-3 workloads"
-    )]
     fn materialize(
         &mut self,
         pool: &Budget,
@@ -411,11 +407,15 @@ impl Group {
         cancel: &AtomicBool,
     ) -> Result<Option<Ac3AccessUnit>> {
         if self.dependents.is_none() {
-            return Ok(work.try_charge(1).then(|| Ac3AccessUnit {
-                first: self.first,
-                bytes: self.primary.take().expect("E-AC-3 primary"),
-                dependents: None,
-            }));
+            return Ok(if work.try_charge(1) {
+                self.primary.take().map(|bytes| Ac3AccessUnit {
+                    first: self.first,
+                    bytes,
+                    dependents: None,
+                })
+            } else {
+                None
+            });
         }
         let lookahead = lookahead.map_or(0, Bytes::retained_storage_bytes);
         if self.joined.is_none() {
@@ -433,7 +433,9 @@ impl Group {
             joined.try_reserve_exact(self.length)?;
             self.joined = Some(joined);
         }
-        let dependents = self.dependents.as_mut().expect("E-AC-3 dependent table");
+        let Some((dependents, joined)) = self.dependents.as_mut().zip(self.joined.as_mut()) else {
+            return Err(Error::Truncated);
+        };
         while self.frame_index <= dependents.len() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -443,16 +445,15 @@ impl Group {
             } else {
                 &mut dependents.as_mut_slice()[self.frame_index - 1].pending_bytes
             };
-            let bytes = source.as_ref().expect("pending E-AC-3 syncframe bytes");
+            let Some(bytes) = source.as_ref() else {
+                return Err(Error::Truncated);
+            };
             let count = work.take((bytes.len() - self.copied).min(4096) as u64) as usize;
             if count == 0 {
                 return Ok(None);
             }
             let end = self.copied + count;
-            self.joined
-                .as_mut()
-                .expect("E-AC-3 group buffer")
-                .try_extend_from_slice(&bytes[self.copied..end])?;
+            joined.try_extend_from_slice(&bytes[self.copied..end])?;
             self.copied = end;
             if end == bytes.len() {
                 *source = None;
@@ -478,9 +479,14 @@ impl Group {
             overhead,
         )?;
         let charge = pool.reserve(metadata)?;
-        match self.joined.take().expect("joined E-AC-3 group").freeze() {
+        let Some(joined) = self.joined.take() else {
+            return Err(Error::Truncated);
+        };
+        match joined.freeze() {
             Ok(bytes) => {
-                let frames = self.dependents.take().expect("E-AC-3 dependent table");
+                let Some(frames) = self.dependents.take() else {
+                    return Err(Error::Truncated);
+                };
                 Ok(Some(Ac3AccessUnit {
                     first: self.first,
                     bytes,
