@@ -202,7 +202,6 @@ fn ascending_groups(table: &[u8], at: usize, groups: usize, steps: &mut usize) -
     ascending.then_some(())
 }
 
-
 /// Validates a format 2 subtable: the keys and the subheaders they reach fit
 /// the table, and each subheader's glyph array lies within the subtable after
 /// the subheaders.
@@ -376,7 +375,7 @@ pub(crate) struct Subtables {
     /// Whether a variation-sequence subtable (format 14 or 15, which maps no
     /// codes) is listed for the Unicode platform or as Windows (3, 1): a CFF
     /// face then gets no charmap built from glyph names.
-    pub(crate) unicode_variations: bool,
+    unicode_variations: bool,
     /// The first valid (0, 5) variation-sequence subtable, which variation
     /// sequences are read from.
     pub(crate) variation_sequences: Option<Variations>,
@@ -388,10 +387,92 @@ pub(crate) struct Subtables {
 enum Kept {
     /// A selectable format, with the order of format 4's segments.
     Format(CmapFormat, SegmentOrder),
-    Variations {
-        extended: bool,
-    },
+    /// A variation-sequence subtable: format 14, or 15 when `extended`.
+    Variations { extended: bool },
+    /// A subtable of another format, or one that fails validation.
     None,
+}
+
+impl Kept {
+    /// Validates the subtable `sub` (its bytes to the end of the `cmap`
+    /// table); `steps` counts the records read.
+    fn of(sub: &[u8], steps: &mut usize) -> Self {
+        match u16_at(sub, 0) {
+            Some(n @ (14 | 15)) => variations_valid(sub, n == 15, steps)
+                .map_or(Self::None, |()| Self::Variations { extended: n == 15 }),
+            number => number
+                .and_then(CmapFormat::from_number)
+                .and_then(|format| format.check(sub, steps).map(|order| (format, order)))
+                .map_or(Self::None, |(format, order)| Self::Format(format, order)),
+        }
+    }
+}
+
+/// One encoding record: a platform and encoding, and the subtable's offset
+/// in the `cmap` table.
+#[derive(Clone, Copy, Debug)]
+struct Record {
+    platform: Platform,
+    encoding: u16,
+    offset: usize,
+}
+
+impl Subtables {
+    /// Whether a subtable of any format, variation sequences included, is
+    /// listed for the Unicode platform or as Windows (3, 1).
+    pub(crate) fn has_unicode(&self) -> bool {
+        self.unicode_variations
+            || self.list.iter().any(|s| {
+                s.platform == Platform::Unicode
+                    || (s.platform == Platform::Windows && s.encoding == 1)
+            })
+    }
+
+    /// No subtables.
+    pub(crate) fn empty(budget: &Budget) -> Self {
+        Self {
+            list: BudgetVec::new(budget),
+            unicode_variations: false,
+            variation_sequences: None,
+        }
+    }
+
+    /// Keeps the subtable `record` points at, as validation found it.
+    fn keep(&mut self, table: Table, record: Record, kept: Kept) -> Result<()> {
+        let Record {
+            platform,
+            encoding,
+            offset,
+        } = record;
+        match kept {
+            Kept::Format(format, order) => {
+                let subtable = Subtable {
+                    platform,
+                    encoding,
+                    format,
+                    order,
+                    offset: table.offset + offset,
+                    end: table.offset + table.len,
+                };
+                self.list.try_push(subtable).map_err(|e| e.error)?;
+            }
+            Kept::Variations { extended } => {
+                self.unicode_variations |= platform == Platform::Unicode
+                    || (platform == Platform::Windows && encoding == 1);
+                if platform == Platform::Unicode && encoding == 5 {
+                    self.variation_sequences.get_or_insert(Variations {
+                        table: Table {
+                            offset: table.offset + offset,
+                            len: table.len - offset,
+                        },
+                        extended,
+                    });
+                }
+            }
+            Kept::None => {}
+        }
+        Ok(())
+    }
 }
 
 /// Reads the encoding records, keeping the subtables that pass validation,
@@ -406,35 +487,14 @@ pub(crate) fn parse(
     work: &mut WorkBudget,
 ) -> Result<Subtables> {
     let bytes = slice(data, table.offset, table.len)?;
-    let mut subtables = Subtables {
-        list: BudgetVec::new(budget),
-        unicode_variations: false,
-        variation_sequences: None,
-    };
-    // The version is ignored: the format allows newer subtables under 0.
-    let Some(count) = u16_at(bytes, 2) else {
-        return Ok(subtables);
-    };
-    let records = usize::from(count).min(bytes.len().saturating_sub(4) / 8);
-    charge(work, records)?;
-    let mut list = BudgetVec::new(budget);
-    list.try_reserve_exact(records)?;
-    let mut r = Reader::at(bytes, 4)?;
-    for _ in 0..records {
-        let platform = Platform::from_id(r.u16()?);
-        let encoding = r.u16()?;
-        let offset = usize::try_from(r.u32()?).map_err(|_| Error::Overflow)?;
-        if offset != 0 {
-            list.try_push((platform, encoding, offset))
-                .map_err(|e| e.error)?;
-        }
-    }
+    let mut subtables = Subtables::empty(budget);
+    let records = records(bytes, budget, work)?;
     // Each distinct subtable, validated once.
     let mut validated: BudgetVec<(usize, Kept)> = BudgetVec::new(budget);
-    validated.try_reserve_exact(list.len())?;
-    for &(_, _, offset) in list.as_slice() {
+    validated.try_reserve_exact(records.len())?;
+    for record in records.as_slice() {
         validated
-            .try_push((offset, Kept::None))
+            .try_push((record.offset, Kept::None))
             .map_err(|e| e.error)?;
     }
     let validated = validated.as_mut_slice();
@@ -446,50 +506,44 @@ pub(crate) fn parse(
             continue;
         }
         let mut steps = 0;
-        let sub = bytes.get(*offset..).unwrap_or_default();
-        *kept = match u16_at(sub, 0) {
-            Some(n @ (14 | 15)) => variations_valid(sub, n == 15, &mut steps)
-                .map_or(Kept::None, |()| Kept::Variations { extended: n == 15 }),
-            number => number
-                .and_then(CmapFormat::from_number)
-                .and_then(|format| format.check(sub, &mut steps).map(|order| (format, order)))
-                .map_or(Kept::None, |(format, order)| Kept::Format(format, order)),
-        };
+        *kept = Kept::of(bytes.get(*offset..).unwrap_or_default(), &mut steps);
         last = Some((*offset, *kept));
         charge(work, steps)?;
     }
     let validated = &*validated;
-    for &(platform, encoding, offset) in list.as_slice() {
-        let at = validated.partition_point(|&(o, _)| o < offset);
-        match validated[at].1 {
-            Kept::Format(format, order) => {
-                let subtable = Subtable {
-                    platform,
-                    encoding,
-                    format,
-                    order,
-                    offset: table.offset + offset,
-                    end: table.offset + table.len,
-                };
-                subtables.list.try_push(subtable).map_err(|e| e.error)?;
-            }
-            Kept::Variations { extended } => {
-                subtables.unicode_variations |= platform == Platform::Unicode
-                    || (platform == Platform::Windows && encoding == 1);
-                if platform == Platform::Unicode && encoding == 5 {
-                    subtables.variation_sequences.get_or_insert(Variations {
-                        table: Table {
-                            offset: table.offset + offset,
-                            len: table.len - offset,
-                        },
-                        extended,
-                    });
-                }
-            }
-            Kept::None => {}
-        }
+    for &record in records.as_slice() {
+        let at = validated.partition_point(|&(o, _)| o < record.offset);
+        subtables.keep(table, record, validated[at].1)?;
     }
     Ok(subtables)
+}
+
+/// The encoding records of the `cmap` table `bytes` with a subtable, in
+/// directory order.
+fn records(bytes: &[u8], budget: &Budget, work: &mut WorkBudget) -> Result<BudgetVec<Record>> {
+    let mut list = BudgetVec::new(budget);
+    // The version is ignored: the format allows newer subtables under 0.
+    let Some(count) = u16_at(bytes, 2) else {
+        return Ok(list);
+    };
+    let records = usize::from(count).min(bytes.len().saturating_sub(4) / 8);
+    charge(work, records)?;
+    list.try_reserve_exact(records)?;
+    let mut r = Reader::at(bytes, 4)?;
+    for _ in 0..records {
+        let platform = Platform::from_id(r.u16()?);
+        let encoding = r.u16()?;
+        let offset = usize::try_from(r.u32()?).map_err(|_| Error::Overflow)?;
+        if offset != 0 {
+            let record = Record {
+                platform,
+                encoding,
+                offset,
+            };
+            list.try_push(record).map_err(|e| e.error)?;
+        }
+    }
+    Ok(list)
 }
 
 /// The index of the charmap Unicode text is read through
@@ -523,14 +577,6 @@ pub(crate) fn unicode_charmap<'f>(
 }
 
 impl Subtable {
-    pub(crate) const fn platform(&self) -> Platform {
-        self.platform
-    }
-
-    pub(crate) const fn encoding_id(&self) -> u16 {
-        self.encoding
-    }
-
     fn table<'a>(&self, data: &'a [u8]) -> &'a [u8] {
         data.get(self.offset..self.end).unwrap_or_default()
     }

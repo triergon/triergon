@@ -358,11 +358,7 @@ impl Font {
         let mut work = WorkBudget::new(limits.work);
         let cmap = match tables.cmap {
             Some(t) => cmap::parse(bytes, t, budget, &mut work)?,
-            None => cmap::Subtables {
-                list: BudgetVec::new(budget),
-                unicode_variations: false,
-                variation_sequences: None,
-            },
+            None => cmap::Subtables::empty(budget),
         };
         let (outlines, glyph_count) = match flavor {
             Flavor::TrueType => {
@@ -413,11 +409,7 @@ impl Font {
         let underline = metrics::underline(tables.post.map(|t| t.bytes(bytes)));
         // A CFF face without a Windows BMP or Unicode-platform charmap gets a
         // Unicode charmap built from its glyph names.
-        let unicode = cmap.unicode_variations
-            || cmap.list.iter().any(|s| {
-                s.platform() == Platform::Unicode
-                    || (s.platform() == Platform::Windows && s.encoding_id() == 1)
-            });
+        let unicode = cmap.has_unicode();
         let name_map = match &outlines {
             Outlines::Cff(cff) if !unicode && cff.has_charset() => {
                 postscript::UnicodeMap::new(cff.glyph_names(bytes), budget)?
