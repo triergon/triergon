@@ -232,7 +232,8 @@ impl Timer {
     }
 }
 
-/// The legacy timing line, with elapsed nanoseconds before the work counters.
+/// The timing line of the decoder and media workers, with elapsed nanoseconds before
+/// the work counters.
 #[derive(Debug)]
 pub struct BenchLine {
     /// Include the leading schema field used by the decoder and media workers.
