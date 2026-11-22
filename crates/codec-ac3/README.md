@@ -33,6 +33,12 @@ pool and `Decoder::new_in(&budget)` charges a caller's `Budget`.
 output conventions (`Compat::Reference`, the default, or `Compat::Specification`).
 `examples/decode_ac3.rs` writes interleaved f32le.
 
+## Features
+
+| Feature | Default | Effect |
+|---|---|---|
+| `reference-trace` | off | `Decoder::set_trace` and `Decoder::trace`: the bit positions of each access unit's frames and blocks (`FrameTrace`, `BlockTrace`), for comparison |
+
 ## Supported
 
 | Area | Coverage |
@@ -61,9 +67,9 @@ Further independent programs are skipped.
 - Concealment (A/52 7.10 block repeat): a damaged block repeats the previous block for
   the rest of the frame; a truncated AC-3 frame outputs six copies of the last block; a
   truncated E-AC-3 frame outputs nothing.
-- `CrcPolicy::Reject` refuses complete syncframes whose CRC fails. The `ac3-crc-reject`
-  and `eac3-crc-reject` gates compare frame counts and PCM with FFmpeg under `crccheck`,
-  including short AC-3 tails that the decoder conceals and FFmpeg drops.
+- `CrcPolicy::Reject` refuses complete syncframes whose CRC fails with
+  `DecodeError::CrcMismatch`; `CrcPolicy::Report`, the default, decodes them and reports
+  the failure.
 - Not applied, as in FFmpeg: dialnorm, compr, transient pre-noise processing (parsed).
 - `FrameInfo::downmix` mirrors FFmpeg's downmix side data: exported only for programs
   with more than two channels, taken from the last syncframe of the access unit.
@@ -87,7 +93,7 @@ differ from the text:
 - hebap 4 vector quantization (Table E4.4) decodes index `i` with row `i + 1` and index 31
   as zero.
 - A dependent substream whose rate or block count differs from the core is dropped and
-  the core is output alone (`InvalidData` with `Compat::Specification`).
+  the core is output alone (`Invalid` with `Compat::Specification`).
 - Reading past the frame end yields zero bits (an error with `Compat::Specification`).
 - E-AC-3 reduced sample rates are refused (decoded with `Compat::Specification`).
 
@@ -95,7 +101,20 @@ In both modes: coupling delta bit-allocation offsets count from the first coupli
 (A/52 5.4.3.51); AC-3 bsid 9/10 shifts sdecay/fdecay right by `bsid − 8` and indexes the
 hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
 
-## Known gaps
+## Conformance
+
+ATSC A/52:2018; `src/spec_tables.rs` is generated from its text by
+`harness/codecs/ac3/gen_tables.py`. The decoder is compared with FFmpeg's in
+[harness/codecs](../../harness/codecs/STATUS.md), whose
+[ac3 notes](../../harness/codecs/ac3/STATUS.md) hold the derivations and tools.
+`examples/strip_dither.rs` rewrites a stream without dither, and the
+[dither-free comparison](../../harness/codecs/nodither-streams.json) checks the pinned
+rewritten stream and exact AC-3 PCM; it declares observed binary32 and truncation
+diagnostic differences, and one E-AC-3 diagnostic for bytes before the first syncframe.
+The `ac3-crc-reject` and `eac3-crc-reject` lanes of the
+[CRC comparison](../../harness/codecs/crc-damage.json) compare frame counts and PCM
+under `CrcPolicy::Reject` with FFmpeg under `crccheck`, including short AC-3 tails the
+decoder conceals and FFmpeg drops. Results are in [docs/status.md](../../docs/status.md).
 
 - Not compared with FFmpeg: dual mono, 2/3-block E-AC-3 frames, `blkswe`, AHT on
   coupling and LFE channels, dependents without channel map, and E-AC-3 reduced sample
@@ -103,18 +122,3 @@ hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
   has been compared on self-authored probe streams only.
 - Error concealment on corrupt mono/stereo/2.1 input can differ from FFmpeg in a few
   frames.
-
-## Standards
-
-ATSC A/52:2018; `src/spec_tables.rs` is generated from its text by
-`harness/codecs/ac3/gen_tables.py`. `examples/strip_dither.rs` rewrites a stream without
-dither. The [dither-free comparison](../../harness/codecs/nodither-streams.json)
-checks the pinned rewritten stream and exact AC-3 PCM. It declares observed
-binary32 and truncation diagnostic differences, and one E-AC-3 diagnostic for
-bytes before the first syncframe. The
-[CRC comparison](../../harness/codecs/crc-damage.json) exercises
-`Decoder::with_options` with `CrcPolicy::Reject` against the reference CRC
-check.
-Derivation notes and tools:
-[harness/codecs/ac3](../../harness/codecs/ac3/STATUS.md); results in
-[docs/status.md](../../docs/status.md).
