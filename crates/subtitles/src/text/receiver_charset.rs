@@ -135,21 +135,43 @@ impl PacketView {
 /// cancellation are resumable.
 #[derive(Debug)]
 pub struct AssPacketJob {
-    extractor: Extractor,
-    source: Option<Cue>,
     pool: Budget,
     limits: Limits,
-    converter: Option<CharsetJob>,
-    converted: Option<ConvertedText>,
-    setup: bool,
     glibc_euc_kr: bool,
-    at: usize,
-    commas: u8,
-    text_at: Option<usize>,
-    visible_end: Option<usize>,
-    output: Option<PacketView>,
-    taken: bool,
+    state: State,
 }
+
+#[derive(Debug)]
+enum State {
+    /// Reading the packet into its cue.
+    Extract(Extractor),
+    /// The cue, and how far its conversion has got.
+    Packet(Cue, Step),
+    /// The view, ready to take.
+    Ready(PacketView),
+    /// The view was taken.
+    Taken,
+}
+
+#[derive(Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "The step is advanced in place; the conversion stays inline rather than in an allocation the pool does not charge."
+)]
+enum Step {
+    /// The charset label is not resolved yet.
+    Label,
+    /// Converting the payload.
+    Convert(CharsetJob),
+    /// Scanning the conversion for its first NUL and its eighth comma.
+    Scan {
+        converted: ConvertedText,
+        at: usize,
+        commas: u8,
+        text_at: Option<usize>,
+    },
+}
+
 impl AssPacketJob {
     /// A job converting `input`, whose label resolves with
     /// [`receiver_charset`]. `Error::Unsupported` unless the input is
@@ -163,20 +185,10 @@ impl AssPacketJob {
         let mut extractor = Extractor::new(pool, limits, generation);
         extractor.provide(input).map_err(|e| e.error)?;
         Ok(Self {
-            extractor,
-            source: None,
             pool: pool.clone(),
             limits,
-            converter: None,
-            converted: None,
-            setup: false,
             glibc_euc_kr: false,
-            at: 0,
-            commas: 0,
-            text_at: None,
-            visible_end: None,
-            output: None,
-            taken: false,
+            state: State::Extract(extractor),
         })
     }
     /// [`new`](Self::new), with the label resolved by
@@ -196,127 +208,161 @@ impl AssPacketJob {
     /// NUL. `Error::Invalid` once the view is taken.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<PacketStatus> {
         cancelled(cancel)?;
-        if self.taken {
-            return Err(Error::Invalid("receiver output already taken"));
-        }
-        if self.output.is_some() {
-            return Ok(PacketStatus::Ready);
+        match &self.state {
+            State::Taken => return Err(Error::Invalid("receiver output already taken")),
+            State::Ready(_) => return Ok(PacketStatus::Ready),
+            State::Extract(_) | State::Packet(..) => {}
         }
         if work.remaining() == 0 {
             return Ok(PacketStatus::Pending);
         }
-        if self.source.is_none() {
-            match self.extractor.step(work, cancel)? {
-                Status::Cue(cue) => self.source = Some(cue),
-                Status::Yield | Status::NeedOutput => return Ok(PacketStatus::Pending),
-                _ => return Err(Error::Invalid("receiver expected opaque cue")),
-            }
-        }
-        if !self.setup {
-            if !work.try_charge(1) {
-                return Ok(PacketStatus::Pending);
-            }
-            let source = self
-                .source
-                .as_ref()
-                .ok_or(Error::Invalid("missing source cue"))?;
-            let charset = match source.input.charset_label.as_ref() {
-                Some(label) => {
-                    if self.glibc_euc_kr {
-                        receiver_charset_with_glibc_euc_kr(label.as_ref())
-                    } else {
-                        receiver_charset(label.as_ref())
+        let outcome = loop {
+            match &mut self.state {
+                State::Extract(extractor) => match extractor.step(work, cancel)? {
+                    Status::Cue(cue) => self.state = State::Packet(cue, Step::Label),
+                    Status::Yield | Status::NeedOutput => return Ok(PacketStatus::Pending),
+                    _ => return Err(Error::Invalid("receiver expected opaque cue")),
+                },
+                State::Packet(source, step) => {
+                    let label = Label {
+                        pool: &self.pool,
+                        limits: self.limits,
+                        glibc_euc_kr: self.glibc_euc_kr,
+                    };
+                    match step.advance(source, label, work, cancel)? {
+                        Some(outcome) => break outcome,
+                        None => return Ok(PacketStatus::Pending),
                     }
                 }
-                None => Err(Error::Unsupported("receiver charset declaration absent")),
-            };
-            match charset {
-                Err(Error::Unsupported(_)) => {
-                    self.publish(Outcome::UnsupportedLabel)?;
-                    return Ok(PacketStatus::Ready);
-                }
-                Err(e) => return Err(e),
-                Ok(charset) => {
-                    self.converter = Some(CharsetJob::new(
-                        &source.input.payload,
-                        source.input.charset_label.as_ref(),
-                        charset,
-                        &self.pool,
-                        self.limits,
-                    )?);
-                }
+                State::Ready(_) => return Ok(PacketStatus::Ready),
+                State::Taken => return Err(Error::Invalid("receiver output already taken")),
             }
-            self.setup = true;
+        };
+        if let State::Packet(source, step) = std::mem::replace(&mut self.state, State::Taken) {
+            self.state = State::Ready(PacketView::new(source, outcome, step));
         }
-        if self.converted.is_none() {
-            let converter = self
-                .converter
-                .as_mut()
-                .ok_or(Error::Invalid("missing receiver converter"))?;
-            match converter.poll(work, cancel) {
-                Ok(CharsetStatus::Pending) => return Ok(PacketStatus::Pending),
-                Ok(CharsetStatus::Ready) => {
-                    self.converted = Some(converter.take_output(cancel)?);
-                    self.converter = None;
-                }
-                Err(e @ (Error::Cancelled | Error::Backpressure { .. })) => return Err(e),
-                Err(e) => {
-                    self.converter = None;
-                    self.publish(Outcome::ConversionRefused(e))?;
-                    return Ok(PacketStatus::Ready);
-                }
-            }
-        }
-        let bytes = self
-            .converted
-            .as_ref()
-            .ok_or(Error::Invalid("missing receiver bytes"))?
-            .utf8
-            .as_ref();
-        while self.at < bytes.len() {
-            cancelled(cancel)?;
-            if !work.try_charge(1) {
-                return Ok(PacketStatus::Pending);
-            }
-            let b = bytes[self.at];
-            if b == 0 {
-                self.visible_end = Some(self.at);
-                break;
-            }
-            if b == b',' && self.commas < 8 {
-                self.commas += 1;
-                if self.commas == 8 {
-                    self.text_at = Some(self.at + 1);
-                }
-            }
-            self.at += 1;
-        }
-        self.publish(Outcome::Converted)?;
         Ok(PacketStatus::Ready)
-    }
-    fn publish(&mut self, outcome: Outcome) -> Result<()> {
-        let end = self.visible_end.unwrap_or(self.at);
-        self.output = Some(PacketView {
-            source: self
-                .source
-                .take()
-                .ok_or(Error::Invalid("missing source cue"))?,
-            outcome,
-            converted: self.converted.take(),
-            visible: 0..end,
-            text: self.text_at.map(|start| start..end),
-        });
-        Ok(())
     }
     /// The view, once [`poll`](Self::poll) reported
     /// [`PacketStatus::Ready`]; `Error::Invalid` before then and once taken.
     pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<PacketView> {
         cancelled(cancel)?;
-        let out = self
-            .output
-            .take()
-            .ok_or(Error::Invalid("receiver output not ready"))?;
-        self.taken = true;
-        Ok(out)
+        match std::mem::replace(&mut self.state, State::Taken) {
+            State::Ready(view) => Ok(view),
+            state => {
+                self.state = state;
+                Err(Error::Invalid("receiver output not ready"))
+            }
+        }
+    }
+}
+
+/// How a packet's charset label resolves, and what its conversion may use.
+#[derive(Clone, Copy)]
+struct Label<'a> {
+    pool: &'a Budget,
+    limits: Limits,
+    glibc_euc_kr: bool,
+}
+
+impl Step {
+    /// Advances the conversion of `source`; the outcome once it has ended,
+    /// `None` when `work` runs out first.
+    fn advance(
+        &mut self,
+        source: &Cue,
+        label: Label<'_>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Outcome>> {
+        loop {
+            match self {
+                Self::Label => {
+                    if !work.try_charge(1) {
+                        return Ok(None);
+                    }
+                    let charset = match source.input.charset_label.as_ref() {
+                        Some(name) if label.glibc_euc_kr => {
+                            receiver_charset_with_glibc_euc_kr(name.as_ref())
+                        }
+                        Some(name) => receiver_charset(name.as_ref()),
+                        None => Err(Error::Unsupported("receiver charset declaration absent")),
+                    };
+                    let charset = match charset {
+                        Err(Error::Unsupported(_)) => return Ok(Some(Outcome::UnsupportedLabel)),
+                        result => result?,
+                    };
+                    *self = Self::Convert(CharsetJob::new(
+                        &source.input.payload,
+                        source.input.charset_label.as_ref(),
+                        charset,
+                        label.pool,
+                        label.limits,
+                    )?);
+                }
+                Self::Convert(converter) => match converter.poll(work, cancel) {
+                    Ok(CharsetStatus::Pending) => return Ok(None),
+                    Ok(CharsetStatus::Ready) => {
+                        *self = Self::Scan {
+                            converted: converter.take_output(cancel)?,
+                            at: 0,
+                            commas: 0,
+                            text_at: None,
+                        };
+                    }
+                    Err(e @ (Error::Cancelled | Error::Backpressure { .. })) => return Err(e),
+                    Err(e) => return Ok(Some(Outcome::ConversionRefused(e))),
+                },
+                Self::Scan {
+                    converted,
+                    at,
+                    commas,
+                    text_at,
+                } => {
+                    let bytes = converted.utf8.as_ref();
+                    while *at < bytes.len() {
+                        cancelled(cancel)?;
+                        if !work.try_charge(1) {
+                            return Ok(None);
+                        }
+                        let byte = bytes[*at];
+                        if byte == 0 {
+                            break;
+                        }
+                        if byte == b',' && *commas < 8 {
+                            *commas += 1;
+                            if *commas == 8 {
+                                *text_at = Some(*at + 1);
+                            }
+                        }
+                        *at += 1;
+                    }
+                    return Ok(Some(Outcome::Converted));
+                }
+            }
+        }
+    }
+}
+
+impl PacketView {
+    /// The view of `source` once its conversion ended with `outcome`; the
+    /// visible text ends where the scan stopped, at the first NUL or the end.
+    fn new(source: Cue, outcome: Outcome, step: Step) -> Self {
+        let (converted, end, text_at) = match step {
+            Step::Scan {
+                converted,
+                at,
+                text_at,
+                ..
+            } => (Some(converted), at, text_at),
+            Step::Label | Step::Convert(_) => (None, 0, None),
+        };
+        Self {
+            source,
+            outcome,
+            converted,
+            visible: 0..end,
+            text: text_at.map(|start| start..end),
+        }
     }
 }
