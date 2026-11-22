@@ -263,6 +263,9 @@
         "mpegts-pes"
       ]
     },
+    {"area": "MPEG-TS source polling", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-source-poll"},
+    {"area": "MPEG-TS PES assembly", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-pes-assembler"},
+    {"area": "MPEG-TS demux observer forms", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ts-observer-forms"},
     {
       "area": "MPEG-TS access units",
       "targets": [
