@@ -147,16 +147,6 @@ pub enum DvbViewProfile {
     /// The view of a stream that signals a single subtitling service.
     SingleService,
 }
-#[cfg(feature = "reference-trace")]
-impl DvbViewProfile {
-    /// The revision of the reference demuxer that this view profile reproduces.
-    pub fn reference_revision(self) -> &'static str {
-        match self {
-            Self::SingleService => "d32b387f2b0a484599d4587d651891f0c63c4238",
-        }
-    }
-}
-
 /// The single-service view of a DVB subtitling descriptor, as the reference demuxer exports it.
 #[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

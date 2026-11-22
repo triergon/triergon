@@ -581,7 +581,7 @@ fn registration_or_private_specifier_does_not_infer_a_dvb_namespace() {
 
 #[cfg(feature = "reference-trace")]
 #[test]
-fn named_single_service_demux_view_keeps_its_source_and_explicit_revision() {
+fn single_service_demux_view_keeps_its_source() {
     let parsed = map(&[], 6, &SINGLE, DVB);
     let stream = &parsed.streams.as_slice()[0];
     let view = stream
@@ -592,10 +592,6 @@ fn named_single_service_demux_view_keeps_its_source_and_explicit_revision() {
     assert_eq!(
         view.source.source.as_ptr(),
         stream.descriptor_bytes.as_ref()[2..].as_ptr()
-    );
-    assert_eq!(
-        view.profile.reference_revision(),
-        "d32b387f2b0a484599d4587d651891f0c63c4238"
     );
     let mut no_ancillary = SINGLE;
     no_ancillary[8..].copy_from_slice(&[0x12, 0x34]);
