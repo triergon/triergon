@@ -40,12 +40,6 @@ pub(crate) fn word(b: &[u8], at: usize) -> Result<u32> {
             .map_err(|_| Error::Truncated)?,
     ))
 }
-fn check_format<S: Source>(selected: &SelectedInput<S>) -> Result<()> {
-    if selected.format != Format::Mp4 {
-        return Err(Error::Invalid("not selected MP4"));
-    }
-    Ok(())
-}
 /// Opens the movie of a selected MP4 input: reads its metadata within work budgets.
 #[derive(Debug)]
 pub struct Mp4Open<S: Source> {
@@ -59,9 +53,7 @@ impl<S: Source> Mp4Open<S> {
     /// An opener that refuses out-of-source, truncated and zero-timescale media. Fails
     /// with `Invalid` unless `selected` is an MP4 input.
     pub fn new(selected: SelectedInput<S>, limits: OpenLimits) -> Result<Self> {
-        check_format(&selected)?;
-        let opener = MovieOpen::new(&selected.input, limits)?;
-        Ok(Self::with_opener(selected, opener))
+        Self::open_selected(selected, limits, MovieOpen::new)
     }
 
     /// [`Self::new`] with `policy` for sample tables that declare more timing entries
@@ -80,28 +72,33 @@ impl<S: Source> Mp4Open<S> {
     /// seekable source. [`Engine::mp4_progressive`](crate::Engine::mp4_progressive)
     /// reads the later fragments.
     pub fn new_progressive(selected: SelectedInput<S>, limits: OpenLimits) -> Result<Self> {
-        check_format(&selected)?;
-        let opener = MovieOpen::new_progressive(&selected.input, limits)?;
-        Ok(Self::with_opener(selected, opener))
+        Self::open_selected(selected, limits, MovieOpen::new_progressive)
     }
 
     /// An opener for the MOV demux view of [`compat::mov`](crate::compat::mov): it
     /// admits media declared outside the source, truncated or in a zero timescale,
     /// which that view recovers as FFmpeg does. [`Self::new`] refuses such media.
     pub fn new_recovery(selected: SelectedInput<S>, limits: OpenLimits) -> Result<Self> {
-        check_format(&selected)?;
-        let opener = MovieOpen::new_recovery(&selected.input, limits)?;
-        Ok(Self::with_opener(selected, opener))
+        Self::open_selected(selected, limits, MovieOpen::new_recovery)
     }
 
-    fn with_opener(selected: SelectedInput<S>, opener: MovieOpen) -> Self {
-        Self {
+    #[inline]
+    fn open_selected(
+        selected: SelectedInput<S>,
+        limits: OpenLimits,
+        open: fn(&InputCursor, OpenLimits) -> Result<MovieOpen>,
+    ) -> Result<Self> {
+        if selected.format != Format::Mp4 {
+            return Err(Error::Invalid("not selected MP4"));
+        }
+        let opener = open(&selected.input, limits)?;
+        Ok(Self {
             input: Some(selected.input),
             source: Some(selected.source),
             opener,
             request: None,
             failed: false,
-        }
+        })
     }
     /// Reads metadata within `w`. A failure other than backpressure closes the source
     /// and is final.
