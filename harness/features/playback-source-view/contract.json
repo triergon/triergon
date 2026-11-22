@@ -480,8 +480,7 @@
     "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.5\u20136 and 2.4.4.9. Compare the initial current PMT catalogue and its update events for a causal streaming consumer, or also require the post-probe demux catalogue for a consumer that needs read-ahead retyping.",
     "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.8. Retain opaque private PMT declarations for a source copier, or resolve codec identity, configuration and language in the selected descriptor namespace for a consumer that auto-selects a decoder.",
     "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.18. Compare a literal ISO 639 descriptor row as source evidence, or require that source TrackInfo interprets the descriptor on a video/private route as native demuxers do for a language-selector consumer.",
-    "Owner question under ISO/IEC 14496-12 sections 8.8.7\u20138 and 8.8.12. The two fragment ranges deliver clocks in a different order. Require physical source delivery for a forward-only consumer, or a seekable decode-order replay that can revisit the earlier range.",
-    "Owner question under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. A first fragment has no coded origin or known predecessor. Keep the clock absent for continuation of an unknown source, or explicitly admit a complete movie from zero for a consumer that knows this is the origin."
+    "Owner question under ISO/IEC 14496-12 sections 8.8.7\u20138 and 8.8.12. The two fragment ranges deliver clocks in a different order. Require physical source delivery for a forward-only consumer, or a seekable decode-order replay that can revisit the earlier range."
   ],
   "open_cases": [
     {
@@ -522,20 +521,6 @@
     {
       "id": "mp4-forward-progressive-unknown-clock-terminal",
       "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-first-source-clock-unknown",
-      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. A first fragment has no coded origin or known predecessor. Keep the clock absent for continuation of an unknown source, or explicitly admit a complete movie from zero for a consumer that knows this is the origin.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-fragment-aac-short",
-      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.1.1, 8.8.8 and 8.8.12. Should source delivery require an entire declared sample extent at the definitive endpoint, or expose recovered demux packets separately for salvage callers? Prove membership against the table and exact input extent before changing the fold.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
@@ -591,6 +576,24 @@
     }
   ],
   "open_deviations": [
+    {
+      "reading": "A forward source leaves the initial decode origin absent when no predecessor or explicit origin is known",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.6.1.2 and 8.8.12.1 derive the media decode origin from preceding durations or tfdt",
+      "candidate": "Emits all nine packets with the first three source PTS and DTS absent and the remaining source clocks from 3000 through 8000.",
+      "reference": "Emits the same nine packets, starting the first three PTS and DTS at 0, 1000 and 2000 as for a file with a known beginning.",
+      "compat": "compat::mov::front_source_media_start",
+      "cases": ["mp4-forward-progressive-first-source-clock-unknown"],
+      "targets": ["aarch64-unknown-linux-gnu"]
+    },
+    {
+      "reading": "A fragment source packet requires the complete declared sample extent",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.1.1 and 8.8.8 define the media extent and trun sample size",
+      "candidate": "Emits both complete video packets and reports data refusal. The first AAC sample starts at byte 3189 and declares 176 bytes. The file ends at byte 3240.",
+      "reference": "Emits both video packets and the 51 available bytes of the AAC sample as a corrupt packet, then reports end.",
+      "compat": "compat::mov::deliver_truncated_sample",
+      "cases": ["mp4-forward-progressive-fragment-aac-short"],
+      "targets": ["aarch64-unknown-linux-gnu"]
+    },
     {
       "reading": "DefaultDuration is carried in exact nanoseconds",
       "clause": "RFC 9559 sections 5.1.4.1.13 and 11.1 define DefaultDuration and timestamp units",

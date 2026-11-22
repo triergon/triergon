@@ -53,7 +53,7 @@
       "harness/features/facade-seek/container-pins.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 855, "thumbv7neon-unknown-linux-gnueabihf": 855}, "open_deviations": {"aarch64-unknown-linux-gnu": 156, "thumbv7neon-unknown-linux-gnueabihf": 156}},
       "harness/codecs/play-manifest.json": {"open_deviations": {"aarch64-unknown-linux-gnu": 9, "thumbv7neon-unknown-linux-gnueabihf": 9}},
       "harness/features/playback-probe/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 18690, "thumbv7neon-unknown-linux-gnueabihf": 18690}, "open_deviations": {"aarch64-unknown-linux-gnu": 1362}},
-      "harness/features/playback-source-view/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 402, "thumbv7neon-unknown-linux-gnueabihf": 402}, "open_cases": {"aarch64-unknown-linux-gnu": 15}, "open_deviations": {"aarch64-unknown-linux-gnu": 22}},
+      "harness/features/playback-source-view/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 402, "thumbv7neon-unknown-linux-gnueabihf": 402}, "open_cases": {"aarch64-unknown-linux-gnu": 13}, "open_deviations": {"aarch64-unknown-linux-gnu": 24}},
       "harness/features/mp4-source-clock/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 69, "thumbv7neon-unknown-linux-gnueabihf": 69}, "open_cases": {"aarch64-unknown-linux-gnu": 2}},
       "harness/features/ts-catalogue/contract.json": {"open_deviations": {"aarch64-unknown-linux-gnu": 9}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 801, "thumbv7neon-unknown-linux-gnueabihf": 801}},
       "harness/features/ts-psi-readers/contract.json": {"open_deviations": {"aarch64-unknown-linux-gnu": 16}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 789, "thumbv7neon-unknown-linux-gnueabihf": 789}},
