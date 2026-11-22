@@ -398,6 +398,7 @@ pub struct TransportStream {
     discover_program: bool,
     feed_omissions: Option<u64>,
     feed_validated_carriers: bool,
+    #[cfg(feature = "reference-trace")]
     feed_report_counter_breaks: bool,
     unbounded_adts: bool,
     deferred_feed_events: u64,
@@ -508,6 +509,7 @@ impl TransportStream {
 
     /// Share carriers during replay and report signalled counter breaks on active
     /// routes, including table and adaptation-only carriers.
+    #[cfg(feature = "reference-trace")]
     pub fn new_single_program_replay(
         budget: Budget,
         limits: ParseLimits,
@@ -567,6 +569,7 @@ impl TransportStream {
             discover_program: program.is_none(),
             feed_omissions: None,
             feed_validated_carriers: false,
+            #[cfg(feature = "reference-trace")]
             feed_report_counter_breaks: false,
             unbounded_adts: false,
             deferred_feed_events: 0,
@@ -2217,11 +2220,12 @@ impl TransportStream {
                             continue;
                         }
                         if let Some(outcome) = outcome {
-                            if FEED
-                                && self.feed_omissions.is_some()
+                            let omit = FEED && self.feed_omissions.is_some();
+                            #[cfg(feature = "reference-trace")]
+                            let omit = omit
                                 && !(outcome == ContinuityOutcome::SignalledDiscontinuity
-                                    && self.feed_report_counter_breaks)
-                            {
+                                    && self.feed_report_counter_breaks);
+                            if omit {
                                 self.omit_feed_events(1)?;
                                 continue;
                             }
