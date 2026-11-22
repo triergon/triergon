@@ -1282,6 +1282,13 @@ fn check_features(root: &Path) -> Task {
     let configured_aac = |contract: &harness::features::Contract| {
         harness::manifest::configured_aac_runner(&contract.document)
     };
+    let dsp = |contract: &harness::features::Contract| {
+        contract
+            .document
+            .get("runner")
+            .and_then(json::Value::as_str)
+            == Some("cargo xtask codecs dsp")
+    };
     for contract in contracts.iter().filter(|contract| configured_aac(contract)) {
         let (manifest, _) = harness::manifest::read(root, &contract.manifest())?;
         harness::manifest::validate_required(&contract.document, &manifest)?;
@@ -1294,9 +1301,21 @@ fn check_features(root: &Path) -> Task {
             return Err(format!("{}: required AAC comparison failed", contract.id));
         }
     }
+    for contract in contracts.iter().filter(|contract| dsp(contract)) {
+        let args = [
+            "dsp".to_owned(),
+            "--output".to_owned(),
+            output.join(&contract.id).display().to_string(),
+        ];
+        if codecs::main(root, &args)? != 0 {
+            return Err(format!("{}: required DSP comparison failed", contract.id));
+        }
+    }
     let reports = contracts
         .iter()
-        .filter(|contract| contract.document.get("oracle").is_none() && !configured_aac(contract))
+        .filter(|contract| {
+            contract.document.get("oracle").is_none() && !configured_aac(contract) && !dsp(contract)
+        })
         .map(|contract| {
             let manifest = contract.manifest();
             let (document, _) = harness::manifest::read(root, &manifest)?;
@@ -1320,7 +1339,7 @@ fn check_features(root: &Path) -> Task {
     }
     let passed = contracts
         .iter()
-        .filter(|contract| !configured_aac(contract))
+        .filter(|contract| !configured_aac(contract) && !dsp(contract))
         .all(|contract| {
             json::read(&output.join(&contract.id).join("report.json"))
                 .ok()
