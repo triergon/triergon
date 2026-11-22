@@ -321,31 +321,25 @@
         "name": "demux-view-entry-points-outside-the-gated-operations",
         "entry_points": ["compat::mov::index", "compat::mov::index_encoded_range", "compat::pes::open_private_audio", "compat::pes::open_segment", "compat::pes::startup::Startup::new"],
         "degree": "recorded",
-        "needs": "mp4-forward cases opened through compat::mov::index and index_encoded_range (the 499-row matrix is pinned FFprobe output no worker re-runs), and ts-program cases through open_segment, open_private_audio and the finite startup"
+        "needs": "Resolve the MOV index and terminal read differences in playback-mov-index and the finite startup and DVB subtitle differences in playback-ts-open."
       },
       {
         "name": "player-mp4-seeks",
         "entry_points": ["Player::prepare_mp4_sync_seek", "Player::apply_mp4_sync_seek", "Player::prepare_mp4_demux_seek", "Player::apply_mp4_demux_seek", "Player::prepare_mp4_progressive_sync_seek", "Player::prepare_mp4_progressive_demux_seek", "mp4::PreparedMp4::movie_seek", "Player::apply_movie_seek"],
         "degree": "recorded",
-        "needs": "a seek operation on Player beside mp4-range's, folding the landing and following packets against the reference's av_seek_frame and av_read_frame; mp4-range seeks through Mp4RangePlayer::prepare_seek only"
-      },
-      {
-        "name": "catalogue-replacement",
-        "entry_points": ["mp4::Mp4Catalogue", "Player::prepare_mp4_catalogue", "Player::replace_mp4_catalogue", "mp4::RetiredCatalogue"],
-        "degree": "no-reference",
-        "needs": "an operation that plays one file, replaces the catalogue with a second and folds the packets on both sides of the switch against the reference reading the first file to the same point and then opening the second; the reference has no transactional replacement"
+        "needs": "Resolve the open landing, duration, edit and suffix cases in playback-mp4-seek."
       },
       {
         "name": "fifo-delivery-and-pump",
         "entry_points": ["Player::advance", "Player::advance_ready", "Player::pop", "Player::may_deliver", "Player::pause", "Player::stop", "pump::Pump", "pump::Sink", "pump::CatalogueSink", "pump::Feed"],
         "degree": "no-reference",
-        "needs": "the playback corpus delivered through advance and pop and through Pump with a recording Sink, each required to fold the packets read_output folds against the same reference; the queue and sink protocol has no reference"
+        "needs": "Resolve the Matroska clock and preroll cases in playback-delivery. The queue and sink lifecycle is exercised by the library tests."
       },
       {
         "name": "track-selection",
         "entry_points": ["Selection::Tracks", "TrackKey", "Player::seek_and_select"],
         "degree": "unit-tests",
-        "needs": "cases selecting one track of each kind, folding only the delivered packets against the reference reading with AVDISCARD_ALL on the other streams; every gated operation selects all tracks"
+        "needs": "Resolve the Matroska clock and post-seek delivery cases in playback-track-selection."
       },
       {
         "name": "neutral-views",
