@@ -65,9 +65,10 @@ impl AdtsHeader {
 }
 
 /// The next plausible ADTS frame in `data` at or after `from`, as its offset and header:
-/// a valid header with a defined sampling frequency index that is followed by another
-/// syncword, an ID3 or APEv2 tag, or the end of `data`. A final frame that runs past the
-/// end of `data` is returned too, so that its decoder reports it as truncated.
+/// a valid header with a defined sampling frequency index. A complete frame at
+/// `from` is accepted at its declared length. A complete frame found after junk
+/// must be followed by another syncword, an ID3 or APEv2 tag, or the end of `data`.
+/// A final frame that runs past the end is returned for truncation reporting.
 pub fn find_frame(data: &[u8], from: usize) -> Option<(usize, AdtsHeader)> {
     let mut i = from;
     while i + 7 <= data.len() {
@@ -77,7 +78,8 @@ pub fn find_frame(data: &[u8], from: usize) -> Option<(usize, AdtsHeader)> {
         {
             let end = i + h.frame_length;
             if h.sf_index < 13 && end <= data.len() {
-                let next_ok = end + 2 > data.len()
+                let next_ok = i == from
+                    || end + 2 > data.len()
                     || (data[end] == 0xff && (data[end + 1] & 0xf6) == 0xf0)
                     || data[end..].starts_with(b"TAG")
                     || data[end..].starts_with(b"ID3")
@@ -105,6 +107,19 @@ mod tests {
         let data = [frame.as_slice(), b"APETAGEX"].concat();
         let (at, header) = find_frame(&data, 0).unwrap();
         assert_eq!((at, header.frame_length), (0, frame.len()));
+        assert!(find_frame(&data, at + header.frame_length).is_none());
+    }
+
+    #[test]
+    fn preserves_a_complete_frame_before_junk_and_resumes_after_its_payload() {
+        let frame = b"\xff\xf1\x50\x80\x01\x7f\xfc\xff\xf1\x50\xaa";
+        let data = [frame.as_slice(), b"\xde\xff\xf7\xbe\xef", frame].concat();
+        let (at, header) = find_frame(&data, 0).unwrap();
+        assert_eq!((at, header.frame_length), (0, 11));
+        assert_eq!(&data[at..at + header.frame_length], frame);
+        let (at, header) = find_frame(&data, at + header.frame_length).unwrap();
+        assert_eq!((at, header.frame_length), (16, 11));
+        assert_eq!(&data[at..at + header.frame_length], frame);
         assert!(find_frame(&data, at + header.frame_length).is_none());
     }
 }

@@ -88,6 +88,8 @@ on both targets; every other worker stays on stable.
 - `Decoder::decode` takes exactly one ADTS frame including its header. It clears and refills
   `out`, reusing capacity, because rate and layout can change between frames (implicit
   SBR/PS, a new PCE). A frame yields 1024 samples per raw data block, 2048 with SBR.
+- `adts::find_frame` preserves a complete frame at the requested boundary when
+  junk follows it. Continue searches from the frame's declared end.
 - On error `out` is empty and the decoder stays usable. Errors are typed:
   `Unsupported(Feature)`, `Invalid(&str)` naming the syntax element,
   `Policy(&str)`, `Truncated`, `Budget(StorageError)`.
