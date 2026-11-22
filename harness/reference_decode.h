@@ -298,12 +298,17 @@ static int file_lane(const char *name, const char **demuxer) {
 
 /* A file-format lane: the demuxer reads the piped (non-seekable) file, the decoder for
  * its first audio stream decodes every packet, and the same filter chain converts. */
-static void flac_frame(const AVFrame *frame, uint8_t **bytes, unsigned *capacity, struct out *o) {
+static void flac_frame(const AVFrame *frame, uint8_t **bytes, unsigned *capacity, int mp3, struct out *o) {
     int channels = frame->ch_layout.nb_channels;
     int samples = frame->nb_samples;
     enum AVSampleFormat format = frame->format;
+    if (mp3 && (format != AV_SAMPLE_FMT_FLTP ||
+        !((channels == 1 && av_channel_layout_channel_from_index(&frame->ch_layout, 0) == AV_CHAN_FRONT_CENTER) ||
+          (channels == 2 && av_channel_layout_channel_from_index(&frame->ch_layout, 0) == AV_CHAN_FRONT_LEFT &&
+           av_channel_layout_channel_from_index(&frame->ch_layout, 1) == AV_CHAN_FRONT_RIGHT))))
+        die("MP3 frame layout", AVERROR_INVALIDDATA);
     if (channels < 1 || channels > 8 || samples < 1 || samples > UINT16_MAX ||
-        (format != AV_SAMPLE_FMT_S16 && format != AV_SAMPLE_FMT_S16P &&
+        (!mp3 && format != AV_SAMPLE_FMT_S16 && format != AV_SAMPLE_FMT_S16P &&
          format != AV_SAMPLE_FMT_S32 && format != AV_SAMPLE_FMT_S32P))
         die("FLAC frame format", AVERROR_INVALIDDATA);
     size_t count = (size_t)samples * channels;
@@ -321,7 +326,9 @@ static void flac_frame(const AVFrame *frame, uint8_t **bytes, unsigned *capacity
             const uint8_t *input = frame->extended_data[planar ? channel : 0] +
                 (size_t)(planar ? sample : sample * channels + channel) * width;
             float value;
-            if (width == 2) {
+            if (mp3) {
+                memcpy(&value, input, 4);
+            } else if (width == 2) {
                 int16_t sample_value;
                 memcpy(&sample_value, input, 2);
                 value = (float)sample_value / 32768.0f;
@@ -396,7 +403,7 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size,
             if (r == AVERROR(EAGAIN) || r == AVERROR_EOF) break;
             if (r < 0) die("receive", r);
             if (flac_frames) {
-                flac_frame(frame, &native_bytes, &capacity, o);
+                flac_frame(frame, &native_bytes, &capacity, flac_frames == 2, o);
                 av_frame_unref(frame);
                 continue;
             }
@@ -439,6 +446,8 @@ static void pass(const char *name, const AVCodecParameters *par, const uint8_t *
         aac_access_units(data, size, o);
     else if (!video && !strcmp(name, "flac-frames"))
         demux_pass("flac", data, size, 1, o);
+    else if (!video && !strcmp(name, "mp3-frames"))
+        demux_pass("mp3", data, size, 2, o);
     else if (!video && file_lane(name, &demuxer))
         demux_pass(demuxer, data, size, 0, o);
     else

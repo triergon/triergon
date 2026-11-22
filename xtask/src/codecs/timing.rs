@@ -14,6 +14,10 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use super::correctness::{
+    MP3_FRAMES, admit_native_mp3, native_mp3_input_matches, native_mp3_work_matches,
+};
+use crate::harness::comparison;
 use crate::harness::gate_build;
 use crate::harness::policy;
 use crate::harness::timing::{self, GATE_PAIRS, Operation, Pairs, Work};
@@ -173,6 +177,9 @@ pub fn run(options: &Options) -> Result<(), String> {
         }
         let name = get_str(w, "operation").ok_or("workload without operation")?;
         let candidate = options.candidates.of(name);
+        let audio_parity = (name == MP3_FRAMES)
+            .then(|| admit_native_mp3(&options.repository, candidate, &options.reference, &path))
+            .transpose()?;
         let hashes = Value::object([
             ("candidate", Value::str(sha(candidate)?)),
             ("reference", Value::str(reference_sha.as_str())),
@@ -208,6 +215,7 @@ pub fn run(options: &Options) -> Result<(), String> {
             ("utc", Value::str(python::utc_now())),
         ]);
         let mut result_file = None;
+        let measuring = operation(name);
         let graded = timing_lock.measure(
             candidate,
             &options.reference,
@@ -215,7 +223,7 @@ pub fn run(options: &Options) -> Result<(), String> {
             Pairs::gate(GATE_PAIRS, gate.ceiling).early_stop(options.early_stop),
             iterations,
             SEED,
-            &operation(name),
+            &measuring,
             || {
                 let file = fs::OpenOptions::new()
                     .write(true)
@@ -240,12 +248,23 @@ pub fn run(options: &Options) -> Result<(), String> {
             ));
         };
         let graded = graded?;
+        let measured_workers = graded.record.get("worker_hashes");
         let parity_matches = parity.as_ref().is_none_or(|parity| {
-            parity.matches(
-                graded.record.get("worker_hashes"),
-                &graded.record,
-                Some(&input_sha),
-            )
+            parity.matches(measured_workers, &graded.record, Some(&input_sha))
+        }) && audio_parity.as_ref().is_none_or(|proof| {
+            native_mp3_input_matches(proof, measured_workers, &graded.record)
+                && graded
+                    .record
+                    .get("warmups")
+                    .and_then(Value::as_array)
+                    .is_some_and(|rows| {
+                        comparison::warmup_work(rows, i128::from(iterations), &measuring.work)
+                            .is_ok_and(|work| {
+                                work.get("candidate").is_some_and(|candidate| {
+                                    native_mp3_work_matches(proof, candidate, iterations)
+                                })
+                            })
+                    })
         });
         let state = graded.status().to_owned();
         // The seed of the attempt the session kept.
@@ -273,6 +292,13 @@ pub fn run(options: &Options) -> Result<(), String> {
         if let Some(parity) = &parity {
             result.push(("parity_sha256".to_owned(), Value::str(&parity.sha256)));
             result.push(("parity_matches".to_owned(), Value::Bool(parity_matches)));
+        }
+        if let Some(audio_parity) = audio_parity {
+            result.push(("native_audio_parity".into(), audio_parity));
+            result.push((
+                "native_audio_parity_matches".into(),
+                Value::Bool(parity_matches),
+            ));
         }
         let (mut ratio, mut delivery, mut digest_equal) = (None, None, None);
         if let Ok(interval) = &graded.interval {

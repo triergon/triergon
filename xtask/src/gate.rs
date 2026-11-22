@@ -3237,12 +3237,18 @@ done
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         let args = preflight_of("codec-file-workloads");
         let mut tree = Tree::committed(root).unwrap();
+        tree.fetched = crate::fetch::pins(root)
+            .unwrap()
+            .into_iter()
+            .map(|pin| (format!("{}/{}", pin.directory, pin.file), pin.sha256))
+            .collect();
         let (_, problems) = tree.problems(&args);
         assert_eq!(problems.len(), 10, "{problems:?}");
         tree.kept = kept_files(root).unwrap();
         let (sources, problems) = tree.problems(&args);
         assert_eq!(problems, Vec::<String>::new());
         assert_eq!(sources.iter().filter(|&&s| s == Source::Kept).count(), 10);
+        assert_eq!(sources.iter().filter(|&&s| s == Source::Fetched).count(), 1);
         let listed = ".research/codec-inputs/flac-16-44k-stereo.flac";
         *tree.kept.get_mut(listed).unwrap() = "0".repeat(64);
         let (_, problems) = tree.problems(&args);

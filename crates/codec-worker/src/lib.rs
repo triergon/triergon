@@ -194,7 +194,7 @@ fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
 /// A file-format lane: the first audio track of the file, decoded with its trims and
 /// mixed to stereo s16 like the elementary lanes. The file is read sequentially, as the
 /// reference reads its piped input.
-fn file_audio<const FLAC_FRAMES: bool>(data: &[u8], out: &mut Output) {
+fn file_audio<const FLAC_FRAMES: bool, const MP3_FRAMES: bool>(data: &[u8], out: &mut Output) {
     let pool = Budget::new(256 << 20).expect("pool");
     let mut source = open_sequential(data, &pool).expect("open");
     let mut decoder: Option<(triergon::TrackId, TrackDecoder)> = None;
@@ -214,36 +214,43 @@ fn file_audio<const FLAC_FRAMES: bool>(data: &[u8], out: &mut Output) {
             continue;
         }
         let decoded = decoder.decode(&packet, &mut frame);
-        if FLAC_FRAMES {
-            emit_flac_frame(decoded, &frame, &mut bytes, out);
+        if FLAC_FRAMES || MP3_FRAMES {
+            emit_native_frame::<MP3_FRAMES>(decoded, &frame, &mut bytes, out);
         } else {
             emit_mixed(decoded, &frame, &mut downmix, &mut pcm, &mut bytes, out);
         }
     }
     if let Some((_, decoder)) = decoder.as_mut() {
         let flushed = decoder.flush(&mut frame).map(|()| None);
-        if FLAC_FRAMES {
-            emit_flac_frame(flushed, &frame, &mut bytes, out);
+        if FLAC_FRAMES || MP3_FRAMES {
+            emit_native_frame::<MP3_FRAMES>(flushed, &frame, &mut bytes, out);
         } else {
             emit_mixed(flushed, &frame, &mut downmix, &mut pcm, &mut bytes, out);
         }
     }
-    if FLAC_FRAMES {
+    if FLAC_FRAMES || MP3_FRAMES {
         out.emit(b"EOF\0");
     }
 }
 
 /// Emit the current format followed by the interleaved samples of this frame.
-fn emit_flac_frame(
+fn emit_native_frame<const MP3: bool>(
     decoded: Result<Option<triergon_codec::DownmixLevels>, triergon_codec::DecodeFailure>,
     frame: &AudioFrame,
     bytes: &mut Vec<u8>,
     out: &mut Output,
 ) {
-    decoded.expect("decode FLAC frame");
+    decoded.expect("decode native audio frame");
     let samples = frame.samples_per_channel;
     if samples == 0 {
         return;
+    }
+    if MP3 {
+        use triergon_codec::Speaker::{FrontCenter, FrontLeft, FrontRight};
+        assert!(matches!(
+            frame.layout.speakers(),
+            [FrontCenter] | [FrontLeft, FrontRight]
+        ));
     }
     let channels = frame.layout.channels();
     assert_eq!(frame.planes.len(), channels);
@@ -322,9 +329,10 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
             }
         }
         "audio-dts" => audio(AudioCodec::Dts, data, out),
-        "audio-flac-frames" => file_audio::<true>(data, out),
+        "audio-flac-frames" => file_audio::<true, false>(data, out),
+        "audio-mp3-frames" => file_audio::<false, true>(data, out),
         "audio-flac" | "audio-mp3" | "audio-vorbis" | "audio-opus" => {
-            file_audio::<false>(data, out);
+            file_audio::<false, false>(data, out);
         }
         _ => {
             eprintln!("unknown operation {op}");
@@ -440,7 +448,7 @@ pub fn main(name: &str, operations: Operations) {
             // One decode and its output identity, without timing: what a fuzz campaign
             // compares between builds.
             run(op, &data, &mut out);
-            let eof = if op == "audio-flac-frames" {
+            let eof = if matches!(op, "audio-flac-frames" | "audio-mp3-frames") {
                 ",\"eof\":true"
             } else {
                 ""
