@@ -133,12 +133,12 @@
     }
   ],
   "pending_module_requirements": [
-    "The TS demuxer rejects a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control."
+    "The reference operation refuses an AAC packet marked corrupt after a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control."
   ],
   "open_cases": [
     {
       "id": "legal-duplicate-44100",
-      "requirement": "The TS demuxer rejects a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
+      "requirement": "The reference operation refuses an AAC packet marked corrupt after a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

@@ -96,13 +96,13 @@
     }
   ],
   "pending_module_requirements": [
-    "The TS demuxer rejects a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
+    "The reference operation refuses an AAC packet marked corrupt after a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
     "The standalone AVC reader requires an initial delimiter under H.222.0 section 2.14.1. The reference parser returns the opening access unit whose first NAL is SEI."
   ],
   "open_cases": [
     {
       "id": "legal-duplicate-44100",
-      "requirement": "The TS demuxer rejects a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
+      "requirement": "The reference operation refuses an AAC packet marked corrupt after a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
