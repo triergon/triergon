@@ -91,8 +91,9 @@ The reader does not apply edit lists: times are media times and the list is on
 `Track::edits`. It refuses forward-only sources, external data references (only a
 `url ` entry flagged self-contained counts as this file), media outside an `mdat`
 and an empty `traf`, which cannot state the base the next `traf` may inherit. A
-fragment without `tfdt` has unknown times and a seek cannot land on it; times beyond
-`i64` fail with `Error::Overflow`. `TrackInfo` describes a track's first sample entry:
+fragment without `tfdt` continues from the preceding fragment's known decode end
+on the same track. A fragment with no known origin has unknown times and a seek
+cannot land on it. Times beyond `i64` fail with `Error::Overflow`. `TrackInfo` describes a track's first sample entry:
 `Packet::sample` names each sample's entry and `Track::descriptions` keeps them all.
 Colour, chapters and other metadata have no typed field and stay readable through
 `Track::descriptions` and `Reader::movie_box`. Encrypted entries (`encv`, `enca`), a
@@ -258,8 +259,10 @@ Choices the modules leave to the caller:
   charged to the shared `Budget`; tables stay as compact wire runs, and nothing is
   stored per sample.
 - **Clocks.** `Sample` carries exact source ticks, and `Sample::source_times` converts
-  them to core `Time`. A fragment with no `tfdt` and no `FragmentContext::decode_origin`
-  has unknown times, not zero. `CompositionOffset` keeps the version, the raw bits and
+  them to core `Time`. The fragment builder uses an explicit `tfdt` or a caller
+  origin. `FragmentBuilder::new_with_inherited_decode_end` can also supply a
+  preceding decode end for a fragment that omits `tfdt`. Without any origin the
+  times are unknown. `CompositionOffset` keeps the version, the raw bits and
   the signed reading apart; an absent offset differs from an explicit zero.
 - **Payload ranges.** `SampleReader::new` requires the sample to lie inside the
   caller's `mdat` extent, and `PhysicalSampleCursor::new_with_media_extents` checks

@@ -130,13 +130,8 @@ fn check_plan(plan: &PreparedMp4, case: &gold::Case) {
             row.sample.range,
             expected.offset..expected.offset + expected.payload.len() as u64
         );
-        if case.name == "f-no-second-tfdt" && expected.ordinal > 3 {
-            assert_eq!(row.sample.dts_ticks, None);
-            assert_eq!(row.sample.cts_ticks, None);
-        } else {
-            assert_eq!(row.sample.dts_ticks, Some(expected.dts));
-            assert_eq!(row.sample.cts_ticks, Some(expected.cts));
-        }
+        assert_eq!(row.sample.dts_ticks, Some(expected.dts));
+        assert_eq!(row.sample.cts_ticks, Some(expected.cts));
         assert_eq!(row.sample.duration_ticks, expected.delta);
         assert_eq!(row.sample.is_container_sync(), expected.sync);
     }
@@ -321,7 +316,7 @@ fn check_outputs_with_roots(
                 assert_eq!(p.source.sample.description_index, wanted.description);
                 assert_eq!(p.source.sample.duration_ticks, wanted.delta);
                 assert_eq!(p.source.sample.is_container_sync(), wanted.sync);
-                if case.name == "f-no-second-tfdt" && wanted.ordinal > 3 {
+                if proof.is_some() && case.name == "f-no-second-tfdt" && wanted.ordinal > 3 {
                     assert_eq!(p.source.sample.dts_ticks, None);
                     assert_eq!(p.source.sample.cts_ticks, None);
                 } else {

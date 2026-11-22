@@ -173,8 +173,10 @@ fn multitrack_packet_configuration_uses_its_track_revision_not_latest_other_trac
 
 #[test]
 fn source_unknown_fragment_clock_is_not_filled_from_native_projection() {
-    let raw = include_bytes!("../fixtures/mp4/f-no-second-tfdt.mp4");
-    let (mut p, _) = mp4(raw, View::Demux, 1, 1).unwrap();
+    let mut raw = include_bytes!("../fixtures/mp4/f-no-second-tfdt.mp4").to_vec();
+    let first_tfdt = raw.windows(4).position(|bytes| bytes == b"tfdt").unwrap();
+    raw[first_tfdt..first_tfdt + 4].copy_from_slice(b"free");
+    let (mut p, _) = mp4(&raw, View::Demux, 1, 1).unwrap();
     let out = collect(&mut p, 1).unwrap();
     let unknown: Vec<_> = mp4_packets(&out)
         .into_iter()

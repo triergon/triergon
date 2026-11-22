@@ -318,15 +318,24 @@ fn edits_and_extra_entries_stay_on_the_track() {
 }
 
 #[test]
-fn a_fragment_without_a_decode_time_has_unknown_times() {
+fn a_fragment_without_tfdt_continues_the_preceding_track_clock() {
     let file = include_bytes!("fixtures/f-no-second-tfdt.mp4");
     let pool = Budget::new(16 << 20).unwrap();
-    let mut reader = open(&pool, file);
-    let reading = read(&mut reader, &pool, file, 1 << 20, 1 << 16).unwrap();
-    assert!(reading.packets[0].dts().is_some());
-    let last = reading.packets.last().unwrap();
-    assert_eq!((last.dts(), last.pts()), (None, None));
-    assert!(last.duration().is_some());
+    for (work, bytes) in [(3, 5), (1 << 20, 1), (1 << 20, 1 << 16)] {
+        let mut reader = open(&pool, file);
+        let reading = read(&mut reader, &pool, file, work, bytes).unwrap();
+        let times = reading
+            .packets
+            .iter()
+            .map(|packet| (packet.dts(), packet.pts(), packet.duration()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            times,
+            (0..6)
+                .map(|index| (Some(index * 1000), Some(index * 1000), Some(1000)))
+                .collect::<Vec<_>>()
+        );
+    }
 }
 
 #[test]

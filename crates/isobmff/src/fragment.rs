@@ -421,6 +421,20 @@ impl FragmentBuilder {
         budget: Budget,
         limits: Limits,
     ) -> Result<Self> {
+        Self::new_with_inherited_decode_end(raw, trex, context, budget, limits, None)
+    }
+    /// Builds a fragment using `end`, the preceding track decode end in media ticks,
+    /// if this fragment omits `tfdt`. A coded `tfdt` supersedes `end`. An explicit
+    /// origin in [`FragmentContext`] takes precedence and must agree with `tfdt`.
+    /// Fails under the same conditions as [`Self::new`].
+    pub fn new_with_inherited_decode_end(
+        raw: BoxView,
+        trex: Trex,
+        context: FragmentContext,
+        budget: Budget,
+        limits: Limits,
+        end: Option<i128>,
+    ) -> Result<Self> {
         if raw.header().kind != *b"traf" {
             return Err(Error::Invalid("not traf"));
         }
@@ -446,7 +460,7 @@ impl FragmentBuilder {
             defaults: trex,
             base: 0,
             byte: 0,
-            decode: context.decode_origin,
+            decode: context.decode_origin.or(end),
             ordinal: context.first_ordinal,
             run: 0,
             sample: 0,
@@ -465,8 +479,10 @@ impl FragmentBuilder {
         context: FragmentContext,
         budget: Budget,
         limits: Limits,
+        end: Option<i128>,
     ) -> Result<Self> {
-        let mut builder = Self::new(raw, trex, context, budget, limits)?;
+        let mut builder =
+            Self::new_with_inherited_decode_end(raw, trex, context, budget, limits, end)?;
         builder.reject_zero_size = true;
         Ok(builder)
     }

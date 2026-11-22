@@ -1078,7 +1078,7 @@ impl MovieOpen {
                     let build = if self.native_recovery {
                         FragmentBuilder::new_header_open
                     } else {
-                        FragmentBuilder::new
+                        FragmentBuilder::new_with_inherited_decode_end
                     };
                     walk.traf = TrafStage::Build {
                         track,
@@ -1088,6 +1088,7 @@ impl MovieOpen {
                             context,
                             self.pool.clone(),
                             self.limits.format,
+                            t.fragments().last().and_then(FragmentIndex::decode_end),
                         )?,
                     };
                 }
