@@ -85,7 +85,6 @@ const PARITY_PRIVATE: &[&str] = &[
     ".research/codec-variants",
     ".research/elementary",
     ".research/elementary-reader-authored",
-    ".research/flac-generated",
     ".research/mp3",
     ".research/ogg-generated",
     ".research/ogg-page-inputs",

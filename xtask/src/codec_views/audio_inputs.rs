@@ -10,6 +10,7 @@ use crate::json::{self, Value};
 use crate::{fetch, process, sha256};
 
 const DECODER: &str = ".research/reference-decode/install/bin/ffmpeg";
+const FLAC: &str = ".research/flac-generated";
 const MP3: &str = ".research/mp3/vectors";
 const OGG: &str = ".research/ogg-page-inputs";
 
@@ -24,7 +25,9 @@ pub(super) fn prepare(root: &Path) -> Result<(), String> {
         std::process::id()
     ));
     crate::harness::report::create_output(&stage)?;
-    let result = mpeg_audio(root, &stage).and_then(|()| ogg(root, &stage));
+    let result = mpeg_audio(root, &stage)
+        .and_then(|()| ogg(root, &stage))
+        .and_then(|()| flac(root, &stage));
     let clean = fs::remove_dir_all(&stage).map_err(|e| format!("{}: {e}", stage.display()));
     result.and(clean)
 }
@@ -158,6 +161,36 @@ fn ogg(root: &Path, stage: &Path) -> Result<(), String> {
         count += 1;
     }
     println!("Verified {count} Ogg remuxes from FATE");
+    Ok(())
+}
+
+fn flac(root: &Path, stage: &Path) -> Result<(), String> {
+    let files: BTreeMap<_, _> = features::required_inputs(root)?
+        .into_iter()
+        .filter_map(|input| {
+            let name = input.path.strip_prefix(root.join(FLAC)).ok()?;
+            Some((name.to_path_buf(), input.sha256?))
+        })
+        .collect();
+    let output = stage.join("flac");
+    process::run(
+        Command::new(crate::python::interpreter())
+            .arg("-B")
+            .arg(root.join("harness/codecs/flac/flac_vectors.py"))
+            .arg(root.join(DECODER))
+            .arg("flac")
+            .arg(&output),
+    )?;
+    for (name, pin) in &files {
+        if !matches!(
+            name.components().collect::<Vec<_>>().as_slice(),
+            [Component::Normal(_)]
+        ) {
+            return Err("invalid FLAC fixture name".into());
+        }
+        publish(&output.join(name), &root.join(FLAC).join(name), pin)?;
+    }
+    println!("Verified {} authored FLAC inputs", files.len());
     Ok(())
 }
 

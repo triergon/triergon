@@ -71,7 +71,7 @@ jobs:
           # when they do not.
           packages='build-essential pkg-config zlib1g-dev nasm rsync zstd'
           if [ "${{ matrix.part }}" = parity ]; then
-            packages="$packages autoconf automake libtool autopoint gettext"
+            packages="$packages autoconf automake libtool autopoint gettext flac"
           fi
           sudo apt-get install -y $packages ||
             { sudo apt-get update && sudo apt-get install -y $packages; }
