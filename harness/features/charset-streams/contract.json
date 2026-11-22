@@ -339,124 +339,103 @@
       "cause": "the reference converts inside an ASS decoder call, packet by packet"
     }
   ],
-  "pending_module_requirements": [
-    "Historical Unicode Big5 differs from glibc Big5, including byte 80 (candidate refusal, reference U+0080) and the alternative mappings in the pair matrix. The seeded streams exercise these Unicode mapping differences.",
-    "At 815F the historical Unicode Shift-JIS table returns U+005C and glibc returns U+FF3C.",
-    "Strict EUC-KR follows the CP949 A1–FE table and ASCII. glibc also converts C1 bytes 80–9F and A2E8 to U+327E; strict-only pairs and offset differences remain visible in the ordered matrix.",
-    "Microsoft CP932 table 2.01 refuses the 1,880 F040–F9FC user codes which glibc maps to U+E000–U+E757, skipping trail 7F.",
-    "At A2E8 both CP949 conversions refuse the input, at offset zero in the candidate and offset two through glibc.",
-    "Microsoft CP950 table 2.01 differs from glibc CP950, including byte 80, vendor code assignments and strict refusals. The corpus retains the seeded streams accepted on only one side.",
-    "At A2E8 the C1-only EUC-KR profile refuses the pair and glibc 2.39 returns U+327E."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "big5-bytes",
-      "requirement": "Historical Unicode Big5 differs from glibc Big5, including byte 80 (candidate refusal, reference U+0080) and the alternative mappings in the pair matrix. The seeded streams exercise these Unicode mapping differences.",
+      "reading": "Big5 uses the historical Unicode mapping and refuses unmapped positions",
+      "clause": "Unicode historical BIG5.TXT Table 2.0, kept in crates/subtitles/tests/multibyte-mapping-data, entries 80, A145, A15A and C6A1",
+      "candidate": "refuses 80 and A15A, maps A145 to U+2022 and C6A1 to U+30FE",
+      "reference": "accepts 80 as U+0080 and A15A as U+2574, maps A145 to U+2027 and C6A1 to U+F6B1",
+      "compat": "compat::charset::glibc_big5",
+      "cases": [
+        "big5-bytes",
+        "big5-pairs",
+        "big5-1024",
+        "big5-8192",
+        "big5-65536"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "big5-pairs",
-      "requirement": "Historical Unicode Big5 differs from glibc Big5, including byte 80 (candidate refusal, reference U+0080) and the alternative mappings in the pair matrix. The seeded streams exercise these Unicode mapping differences.",
+      "reading": "The declared CP950 mapping has no C1 byte 80 or private-use C6A1",
+      "clause": "Microsoft CP950.TXT Table 2.01, single-byte and double-byte entries",
+      "candidate": "refuses 80 and unmapped pairs such as C6A1",
+      "reference": "maps 80 to U+0080 and C6A1 to U+F6B1",
+      "compat": "compat::charset::glibc_cp950",
+      "cases": [
+        "cp950-bytes",
+        "cp950-pairs",
+        "cp950-1024",
+        "cp950-8192",
+        "cp950-65536"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "big5-1024",
-      "requirement": "Historical Unicode Big5 differs from glibc Big5, including byte 80 (candidate refusal, reference U+0080) and the alternative mappings in the pair matrix. The seeded streams exercise these Unicode mapping differences.",
+      "reading": "The historical Shift-JIS mapping for 815F",
+      "clause": "Unicode historical SHIFTJIS.TXT Table 2.0, entry 815F",
+      "candidate": "decodes U+005C",
+      "reference": "decodes U+FF3C",
+      "compat": "compat::charset::glibc_shift_jis",
+      "cases": [
+        "shift_jis-pairs"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "big5-8192",
-      "requirement": "Historical Unicode Big5 differs from glibc Big5, including byte 80 (candidate refusal, reference U+0080) and the alternative mappings in the pair matrix. The seeded streams exercise these Unicode mapping differences.",
+      "reading": "The strict 932 mapping leaves user-defined positions unmapped",
+      "clause": "Microsoft CP932.TXT Table 2.01, double-byte entries, F040\u2013F9FC are absent",
+      "candidate": "refuses 1,880 user-defined positions",
+      "reference": "maps them to U+E000\u2013U+E757",
+      "compat": "compat::charset::windows932_private_use",
+      "cases": [
+        "cp932-pairs"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "big5-65536",
-      "requirement": "Historical Unicode Big5 differs from glibc Big5, including byte 80 (candidate refusal, reference U+0080) and the alternative mappings in the pair matrix. The seeded streams exercise these Unicode mapping differences.",
+      "reading": "The strict EUC-KR profile uses ASCII and the A1\u2013FE subset of CP949",
+      "clause": "Microsoft CP949.TXT Table 2.01, subset and single-byte mapping documented by MultibyteCharset::EucKr",
+      "candidate": "refuses C1 bytes and the unmapped A2E8",
+      "reference": "decodes C1 controls and maps A2E8 to U+327E",
+      "compat": "compat::charset::glibc_euc_kr",
+      "cases": [
+        "euc-kr-bytes",
+        "euc-kr-pairs"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "shift_jis-pairs",
-      "requirement": "At 815F the historical Unicode Shift-JIS table returns U+005C and glibc returns U+FF3C.",
+      "reading": "The EUC-KR C1-only extension leaves pair A2E8 unmapped",
+      "clause": "Microsoft CP949.TXT Table 2.01, A2E8 absent; the C1-only profile documents only a single-byte extension",
+      "candidate": "refuses the pair at byte zero",
+      "reference": "maps the pair to U+327E",
+      "compat": "compat::charset::glibc_euc_kr",
+      "cases": [
+        "kr-c1-pairs"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "euc-kr-bytes",
-      "requirement": "Strict EUC-KR follows the CP949 A1–FE table and ASCII. glibc also converts C1 bytes 80–9F and A2E8 to U+327E; strict-only pairs and offset differences remain visible in the ordered matrix.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "euc-kr-pairs",
-      "requirement": "Strict EUC-KR follows the CP949 A1–FE table and ASCII. glibc also converts C1 bytes 80–9F and A2E8 to U+327E; strict-only pairs and offset differences remain visible in the ordered matrix.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "cp932-pairs",
-      "requirement": "Microsoft CP932 table 2.01 refuses the 1,880 F040–F9FC user codes which glibc maps to U+E000–U+E757, skipping trail 7F.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "cp949-pairs",
-      "requirement": "At A2E8 both CP949 conversions refuse the input, at offset zero in the candidate and offset two through glibc.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "cp950-bytes",
-      "requirement": "Microsoft CP950 table 2.01 differs from glibc CP950, including byte 80, vendor code assignments and strict refusals. The corpus retains the seeded streams accepted on only one side.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "cp950-pairs",
-      "requirement": "Microsoft CP950 table 2.01 differs from glibc CP950, including byte 80, vendor code assignments and strict refusals. The corpus retains the seeded streams accepted on only one side.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "cp950-1024",
-      "requirement": "Microsoft CP950 table 2.01 differs from glibc CP950, including byte 80, vendor code assignments and strict refusals. The corpus retains the seeded streams accepted on only one side.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "cp950-8192",
-      "requirement": "Microsoft CP950 table 2.01 differs from glibc CP950, including byte 80, vendor code assignments and strict refusals. The corpus retains the seeded streams accepted on only one side.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "cp950-65536",
-      "requirement": "Microsoft CP950 table 2.01 differs from glibc CP950, including byte 80, vendor code assignments and strict refusals. The corpus retains the seeded streams accepted on only one side.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "kr-c1-pairs",
-      "requirement": "At A2E8 the C1-only EUC-KR profile refuses the pair and glibc 2.39 returns U+327E.",
+      "reading": "An unmapped CP949 pair is refused at the start of that pair",
+      "clause": "Microsoft CP949.TXT Table 2.01, A2E8 absent; iconv input-error cursor points to the start of the invalid sequence",
+      "candidate": "refuses A2E8 at byte zero",
+      "reference": "refuses A2E8 at byte two",
+      "compat": "compat::charset::glibc_cp949_error_offset",
+      "cases": [
+        "cp949-pairs"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
