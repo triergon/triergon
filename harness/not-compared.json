@@ -136,12 +136,6 @@
         "entry_points": ["Flac::metadata", "Flac::seek_points", "Flac::stream_info", "MpegAudio::info_frame", "Reader::tags", "Track::channels", "Track::sample_rate", "Track::duration"],
         "degree": "unit-tests",
         "needs": "The elementary metadata and wire comparisons cover declared FLAC fields and tag envelopes. Ten declared deviations cover metadata retention, free-format admission and tag dictionary policy. The paired bounds remain due."
-      },
-      {
-        "name": "format-probe",
-        "entry_points": ["probe", "Kind"],
-        "degree": "step",
-        "needs": "Media probe compares the elementary Kind over four prefix lengths. The contract declares its score and recognition differences for short prefixes and leading junk. The paired bounds remain due."
       }
     ],
     "triergon-font": [],

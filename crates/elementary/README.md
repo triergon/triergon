@@ -27,6 +27,10 @@ assert_eq!((track.codec_tag(), track.sample_rate()), (b"mp3".as_slice(), 44100))
 
 ## Behaviour
 
+The [media probe comparison](../../harness/features/media-probe/contract.json)
+checks `probe` format selection over four prefix lengths, including ID3v2,
+marker-less FLAC, and prefixes without a recognized elementary stream.
+
 All four formats run one frame-stream engine: leading ID3v2 tags, the format's
 opening, a sync confirmed by the frames after it, then access units until a trailing
 ID3v1 or APEv2 tag or the end. Packet times are samples (`1/sample_rate`); every frame
