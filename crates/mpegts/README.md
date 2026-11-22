@@ -275,6 +275,9 @@ says why it ended. Carriages: `RegisteredCarriage` (AVC, HEVC, AAC ADTS and LATM
 cuts any stream type, including PGS (`0x90`), teletext and caption-carrying video.
 `DemuxClock` places timestamps in the demuxer's 33-bit interval beside the raw
 values. Contexts outside the observed profile return `Error::Unsupported`.
+The [recovery comparison](../../harness/features/ts-recovery-trace/contract.json)
+checks the raw fields and interval origin for encoded and diagnostic headers,
+and compares their projected packet clocks with the demux reference.
 
 Opt-in fault handling, each requiring the actual source diagnostic before output
 and never reconstructing source clocks or validated PES:

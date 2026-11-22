@@ -8,8 +8,8 @@ use triergon_core::{
 };
 use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep};
 use triergon_mpegts::compat::pes::{
-    DemuxClock, DemuxScope, DvbSubtitlesDescriptors, PrivateAudioCarriage, PrivateAudioDescriptors,
-    RegisteredCarriage, SourceContext,
+    ClockOrigin, DemuxClock, DemuxScope, DvbSubtitlesDescriptors, PrivateAudioCarriage,
+    PrivateAudioDescriptors, RegisteredCarriage, SourceContext,
 };
 use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence, ProgramMap, TableStep};
 use triergon_mpegts::reference_trace::recovery::{
@@ -119,6 +119,7 @@ struct Recovery {
     route: Option<PatRoute>,
     source: TransportStream,
     clock: DemuxClock,
+    first_clock: Option<u64>,
     cancel: AtomicBool,
 }
 
@@ -154,6 +155,7 @@ impl Recovery {
             route: None,
             source,
             clock,
+            first_clock: None,
             cancel: AtomicBool::new(false),
         })
     }
@@ -429,6 +431,7 @@ impl Recovery {
         };
         let mut grant = WorkBudget::new(WORK);
         let clock = &mut self.clock;
+        let first = &mut self.first_clock;
         let cancel = &self.cancel;
         loop {
             let mut work = WorkBudget::new(WORK);
@@ -449,6 +452,7 @@ impl Recovery {
                         )
                         .map_err(explain)?
                         .ok_or("demux clock yielded")?;
+                    *first = first.or(time.source_dts_raw33).or(time.source_pts_raw33);
                     out.packet(
                         packet.pid,
                         time.pts90,
@@ -459,15 +463,24 @@ impl Recovery {
                     )?;
                 }
                 AssemblyStep::Output(DemuxObservation::FromRejectedCarrier(packet)) => {
-                    let time = clock
-                        .project_encoded_header(
-                            packet.pid,
-                            &packet.encoded_header,
-                            &mut grant,
-                            cancel,
-                        )
-                        .map_err(explain)?
-                        .ok_or("encoded clock yielded")?;
+                    let time = checked_projection(packet.pid, &mut grant, cancel, |pid, w, c| {
+                        clock.project_encoded_header(pid, &packet.encoded_header, w, c)
+                    })?;
+                    let raw = packet
+                        .encoded_header
+                        .as_bytes()
+                        .get(9..14)
+                        .and_then(wire_timestamp)
+                        .ok_or("missing encoded PTS")?;
+                    let expected = clock_origin(first, Some(raw)).ok_or("missing clock origin")?;
+                    if time.encoded_pts_raw33 != raw
+                        || time.encoded_dts_raw33.is_some()
+                        || time.origin != expected
+                        || time.pts90 != lift(expected, raw)
+                        || time.dts90 != time.pts90
+                    {
+                        return Err("encoded header clock differs from the source bits".into());
+                    }
                     out.packet(
                         packet.pid,
                         Some(time.pts90),
@@ -478,15 +491,26 @@ impl Recovery {
                     )?;
                 }
                 AssemblyStep::Output(DemuxObservation::FromSelectedDiagnostic(packet)) => {
-                    let time = clock
-                        .project_diagnostic_header(
-                            packet.pid,
-                            &packet.encoded_header,
-                            &mut grant,
-                            cancel,
-                        )
-                        .map_err(explain)?
-                        .ok_or("diagnostic clock yielded")?;
+                    let time = checked_projection(packet.pid, &mut grant, cancel, |pid, w, c| {
+                        clock.project_diagnostic_header(pid, &packet.encoded_header, w, c)
+                    })?;
+                    let header = &packet.encoded_header;
+                    let bytes = header.as_bytes();
+                    let raw = if bytes.get(7).is_some_and(|byte| byte >> 6 == 2) {
+                        bytes.get(9..14).and_then(wire_timestamp)
+                    } else {
+                        None
+                    };
+                    let expected = clock_origin(first, raw);
+                    if header.encoded_pts_raw33() != raw
+                        || time.encoded_pts_raw33 != raw
+                        || time.encoded_dts_raw33.is_some()
+                        || time.origin != expected
+                        || time.pts90 != expected.zip(raw).map(|(origin, raw)| lift(origin, raw))
+                        || time.dts90 != time.pts90
+                    {
+                        return Err("diagnostic header clock differs from the source bits".into());
+                    }
                     out.packet(
                         packet.pid,
                         time.pts90,
@@ -501,6 +525,69 @@ impl Recovery {
                 AssemblyStep::Finished => return Ok(true),
             }
         }
+    }
+}
+
+fn checked_projection<T>(
+    pid: u16,
+    grant: &mut WorkBudget,
+    cancel: &AtomicBool,
+    mut project: impl FnMut(u16, &mut WorkBudget, &AtomicBool) -> triergon_core::Result<Option<T>>,
+) -> Result<T, String> {
+    if !matches!(project(pid, &mut WorkBudget::new(0), cancel), Ok(None))
+        || !matches!(
+            project(pid, &mut WorkBudget::new(1), &AtomicBool::new(true)),
+            Err(Error::Cancelled)
+        )
+        || !matches!(
+            project(0x1fff, &mut WorkBudget::new(1), cancel),
+            Err(Error::Invalid("assembly PID"))
+        )
+    {
+        return Err("header clock changed a work, cancellation or PID refusal".into());
+    }
+    project(pid, grant, cancel)
+        .map_err(explain)?
+        .ok_or("header clock yielded with a full grant".into())
+}
+
+pub(super) fn wire_timestamp(stamp: &[u8]) -> Option<u64> {
+    let [a, b, c, d, e] = *stamp else {
+        return None;
+    };
+    let high = u64::from(a >> 1 & 7);
+    let middle = u64::from(u16::from_be_bytes([b, c]) >> 1);
+    let low = u64::from(u16::from_be_bytes([d, e]) >> 1);
+    Some((high << 30) | (middle << 15) | low)
+}
+
+const DEMUX_PERIOD: i128 = 1 << 33;
+
+fn clock_origin(first: &mut Option<u64>, next: Option<u64>) -> Option<ClockOrigin> {
+    *first = first.or(next);
+    first.map(|raw| {
+        let start = i128::from(raw) - 5_400_000;
+        let start = if start + 10_800_000 >= DEMUX_PERIOD {
+            start - DEMUX_PERIOD
+        } else {
+            start.max(0)
+        };
+        ClockOrigin {
+            first_reference_raw90: raw,
+            interval_origin90: start,
+        }
+    })
+}
+
+fn lift(origin: ClockOrigin, raw: u64) -> i128 {
+    let raw = i128::from(raw);
+    let start = origin.interval_origin90;
+    if raw < start {
+        raw + DEMUX_PERIOD
+    } else if raw >= start + DEMUX_PERIOD {
+        raw - DEMUX_PERIOD
+    } else {
+        raw
     }
 }
 

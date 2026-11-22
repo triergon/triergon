@@ -121,12 +121,6 @@
         "needs": "ts-fault-facts compares raw PES headers and the packet consequences of the recovery and completion policies. Physical-end witnesses and malformed-carrier details remain candidate trace facts."
       },
       {
-        "name": "demux-clock-header-projections",
-        "entry_points": ["compat::pes::DemuxClock::project_encoded_header", "compat::pes::DemuxClock::project_diagnostic_header", "compat::pes::DemuxClock::selected_program"],
-        "degree": "unit-tests",
-        "needs": "ts-recovery-trace compares projected clocks on emitted packets. Packet output is the reference observation for accepted and refused recovery contexts."
-      },
-      {
         "name": "reader-views",
         "entry_points": ["Track", "Track::configuration_epoch", "Packet", "reader::Ac3AccessUnit::syncframes", "reader::DvbSubtitleUnit::segment_count", "reader::DvbSubtitleUnit::truncated_tail", "reader::IncompleteVideo::elementary_range", "reader::UnframedAudio::carriage", "reader::UnframedAudio::elementary_range"],
         "degree": "step",
