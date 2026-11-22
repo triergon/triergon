@@ -16,6 +16,11 @@ pub struct VvcStreamAccessUnit {
     pub range: Range<u64>,
     /// First start code including its required zero byte, after leading padding.
     pub first_start: u64,
+    /// NAL unit type of the first coded slice in this framed picture.
+    pub first_vcl_type: u8,
+    /// Every framed VCL NAL is IDR_W_RADL or IDR_N_LP. Picture payload
+    /// and parameter-set conformance are not validated by this reader.
+    pub all_vcl_idr: bool,
     pub bytes: Bytes,
 }
 
@@ -253,6 +258,8 @@ impl VvcAnnexBReader {
         let first_start = begin
             .checked_add(self.scan.first_start.ok_or(Error::Truncated)? as u64)
             .ok_or(Error::Overflow)?;
+        let first_vcl_type = self.scan.picture.first_vcl_type.ok_or(Error::Truncated)?;
+        let all_vcl_idr = self.scan.picture.all_vcl_idr;
         let tail = &self.bytes.as_slice()[split..];
         let mut next = BudgetVec::new(self.input.budget());
         next.try_extend_from_slice(tail)?;
@@ -275,6 +282,8 @@ impl VvcAnnexBReader {
             source: self.input.source(),
             range: begin..end,
             first_start,
+            first_vcl_type,
+            all_vcl_idr,
             bytes,
         })
     }
@@ -340,7 +349,9 @@ impl Scan {
             if (following == 1 && !slice_kind(kind)) || (following == 2 && slice_kind(kind)) {
                 let embedded = following == 2 && embedded_header(kind, Some(byte));
                 if self.picture.boundary(kind, embedded, false) {
-                    if !self.picture.vcl || !(nal.zero_byte || (allow_short && embedded)) {
+                    if self.picture.first_vcl_type.is_none()
+                        || !(nal.zero_byte || (allow_short && embedded))
+                    {
                         return Err(Error::Invalid("ambiguous VVC access-unit boundary"));
                     }
                     boundary = Some(nal.start - 3 - usize::from(nal.zero_byte));
@@ -386,7 +397,7 @@ impl Scan {
 
     fn complete(&mut self, end: usize, limits: RawAnnexBLimits) -> Result<()> {
         self.finish_nal(end - self.zeroes, false, limits)?;
-        if !self.picture.vcl {
+        if self.picture.first_vcl_type.is_none() {
             return Err(Error::Invalid("VVC access unit without a slice"));
         }
         Ok(())

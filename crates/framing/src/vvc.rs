@@ -183,7 +183,7 @@ impl<'a> VvcAccessUnits<'a> {
                 next.is_some(),
             )?;
             let Some(next_prefix) = next else {
-                if !picture.vcl {
+                if picture.first_vcl_type.is_none() {
                     return Err(Error::Invalid("VVC access unit without a slice"));
                 }
                 self.at = self.data.len();
@@ -199,7 +199,9 @@ impl<'a> VvcAccessUnits<'a> {
             let boundary = picture.boundary(next_kind, embedded, self.require_aud);
             if boundary {
                 let zero_byte = self.data[next_prefix - 1] == 0;
-                if !picture.vcl || !(zero_byte || (embedded && self.allow_short_embedded_prefix)) {
+                if picture.first_vcl_type.is_none()
+                    || !(zero_byte || (embedded && self.allow_short_embedded_prefix))
+                {
                     return Err(Error::Invalid("ambiguous VVC access-unit boundary"));
                 }
                 self.at = next_prefix - usize::from(zero_byte);
@@ -240,7 +242,8 @@ fn embedded_header(kind: u8, first_payload: Option<u8>) -> bool {
 
 #[derive(Debug, Clone, Copy)]
 struct PictureState {
-    vcl: bool,
+    first_vcl_type: Option<u8>,
+    all_vcl_idr: bool,
     suffix: bool,
     picture_header: bool,
     first: bool,
@@ -249,7 +252,8 @@ struct PictureState {
 impl Default for PictureState {
     fn default() -> Self {
         Self {
-            vcl: false,
+            first_vcl_type: None,
+            all_vcl_idr: true,
             suffix: false,
             picture_header: false,
             first: true,
@@ -261,7 +265,7 @@ impl PictureState {
     fn boundary(&self, kind: u8, embedded: bool, require_aud: bool) -> bool {
         kind == 20
             || (!require_aud
-                && self.vcl
+                && self.first_vcl_type.is_some()
                 && (matches!(kind, 12..=17 | 19 | 23 | 26 | 28..=29) || embedded))
     }
 
@@ -307,7 +311,8 @@ impl PictureState {
             match kind {
                 0..=3 | 7..=10 => {
                     if nal_len < 3
-                        || (self.vcl && (require_aud || !self.picture_header || self.suffix))
+                        || (self.first_vcl_type.is_some()
+                            && (require_aud || !self.picture_header || self.suffix))
                     {
                         return Err(Error::Invalid("ambiguous VVC picture boundary"));
                     }
@@ -315,23 +320,24 @@ impl PictureState {
                     {
                         return Err(Error::Invalid("missing or conflicting VVC picture header"));
                     }
-                    self.vcl = true;
+                    self.first_vcl_type.get_or_insert(kind);
+                    self.all_vcl_idr &= matches!(kind, 7 | 8);
                 }
-                19 if !require_aud && !self.vcl => {
+                19 if !require_aud && self.first_vcl_type.is_none() => {
                     if self.picture_header || nal_len < 3 {
                         return Err(Error::Invalid("duplicate or empty VVC picture header"));
                     }
                     self.picture_header = true;
                 }
-                12..=17 | 19 | 23 | 26 | 28..=29 if self.vcl => {
+                12..=17 | 19 | 23 | 26 | 28..=29 if self.first_vcl_type.is_some() => {
                     return Err(Error::Invalid("missing VVC AUD before prefix NAL"));
                 }
-                18 | 21..=22 | 24..=25 | 27 | 30..=31 if !self.vcl => {
+                18 | 21..=22 | 24..=25 | 27 | 30..=31 if self.first_vcl_type.is_none() => {
                     return Err(Error::Invalid("VVC suffix before picture"));
                 }
                 4..=6 | 11 => return Err(Error::Unsupported("reserved VVC VCL type")),
                 22 if has_next => return Err(Error::Invalid("NAL after VVC end marker")),
-                _ => self.suffix = self.vcl,
+                _ => self.suffix = self.first_vcl_type.is_some(),
             }
         }
         Ok(())

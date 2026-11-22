@@ -145,14 +145,17 @@ An MPEG-TS stream with type `0x33` identifies VVC video. The source reader
 accepts finite PES and unbounded video PES for that stream and retains the
 original carrier ranges, clocks and payload bytes. The access-unit reader groups
 layer zero pictures with explicit headers across PES and carrier boundaries.
-It preserves original bytes, clocks and PES extents and leaves random-access
-status unknown. A source discontinuity discards an unfinished picture.
+It preserves original bytes, clocks and PES extents. It labels a framed picture
+as random access when every VCL NAL has an IDR type (7 or 8); other VVC
+pictures have unknown status. This classification assumes conforming picture
+syntax, which the framing reader does not validate, and does not enable VVC
+seeking. A source discontinuity discards an unfinished picture.
 If the stream resumes inside a picture, the reader reports a VVC framing
 error on that track and continues delivering the other selected tracks.
 
 With the original inputs and prepared probe described in the
-[framing comparison](../framing/README.md#behaviour-and-limits), verify clocks
-and bytes of the original VVC sample in six finite PES layouts by running:
+[framing comparison](../framing/README.md#behaviour-and-limits), verify clocks,
+bytes and keyframe flags of the original VVC sample in six finite PES layouts:
 
 ```sh
 CARGO_INCREMENTAL=0 TRIERGON_VVC_FATE=/path/to/vvc TRIERGON_VVC_FFPROBE=/path/to/ffprobe \
