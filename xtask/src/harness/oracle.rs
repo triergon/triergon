@@ -54,6 +54,7 @@ impl Kind {
             "qt-sound-v0",
             "ddts",
             "isobmff-index",
+            "mp4-source-clock",
             "store",
         ]
         .into_iter()
