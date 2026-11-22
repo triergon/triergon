@@ -27,7 +27,6 @@ pub(super) fn author(root: &Path, out: &Path) -> Result<()> {
     for (name, original, relative) in [
         ("physical-base", base.clone(), None),
         ("physical-short", base.clone(), Some(1)),
-        ("physical-missing", base.clone(), Some(0)),
         ("physical-large-short", geometry, Some(1)),
         (
             "physical-after-mdat",
@@ -117,9 +116,6 @@ fn recovery_corpus(root: &Path, out: &Path) -> Result<()> {
     ] {
         add(RECOVERY, &format!("{name}.mov"), "physical", out)?;
     }
-    // This generated input also exercises the direct profile at physical EOF.
-    // The byte-identical offset-747 case already covers it in both schedules.
-    add(RECOVERY, "physical-missing.mov", "direct", out)?;
     json::write(
         &out.join(RECOVERY).with_file_name("corpus.json"),
         &Value::object([
