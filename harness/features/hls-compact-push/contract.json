@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "id": "hls-compact-push",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "hls-compact-push",
+  "candidate": "playback-views-worker",
+  "worker_operation": "hls-views-",
+  "reference": "ffmpeg-playback-views-native",
+  "contract": [
+    "Read each complete AVC/AAC HLS segment and all five progressive TS188 inputs through a TS PES feed. Drive each standalone AVC and AAC assembler through push_compact and drain both at EOF.",
+    "The reference reads the same forward windows with the TS demuxer and the stock AVC and AAC parsers. Fold all units in per-lane order, video first, including the AVC source Annex B bytes, PES times, IDR and raster, and AAC frame bytes with exact duration.",
+    "Each operation constructs the feed and assemblers, processes and releases the complete input, retains units through drain and folds them. Input loading is outside the operation. Refusal is a single kind 8 record."
+  ],
+  "required_profiles": [
+    "continuous-44100",
+    "duplicate-control-44100",
+    "later-entry-48000",
+    "legal-duplicate-44100",
+    "reordered-48000",
+    "segment-avc-aac"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "awaiting native gate-host measurement"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "awaiting native gate-host measurement"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "awaiting native gate-host measurement"
+    }
+  ],
+  "pending_module_requirements": [
+    "The TS demuxer rejects a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
+    "The standalone AVC reader requires an initial delimiter under H.222.0 section 2.14.1. The reference parser returns the opening access unit whose first NAL is SEI."
+  ],
+  "open_cases": [
+    {
+      "id": "legal-duplicate-44100",
+      "requirement": "The TS demuxer rejects a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "reordered-48000",
+      "requirement": "The standalone AVC reader requires an initial delimiter under H.222.0 section 2.14.1. The reference parser returns the opening access unit whose first NAL is SEI.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,147 @@
+{
+  "schema": 1,
+  "id": "hls-aac-clocks",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "hls-aac-clocks",
+  "candidate": "playback-views-worker",
+  "worker_operation": "hls-views-",
+  "reference": "ffmpeg-playback-views-native",
+  "contract": [
+    "Resolve the AAC segment clock from the AAC access units of each supported segment and all five progressive TS188 inputs. The reference reads frames with the stock TS demuxer and AAC parser and projects the timestamps using the ADTS sample duration.",
+    "Fold exact presentation and decode rationals, anchor origin, the presentation tick on the 90 kHz demux grid, the frame duration rounded down to 90 kHz ticks, and the complete ADTS frame, followed by clean end.",
+    "Input bytes are loaded before the operation. Refusal is a single kind 8 record."
+  ],
+  "required_profiles": [
+    "continuous-44100",
+    "duplicate-control-44100",
+    "later-entry-48000",
+    "legal-duplicate-44100",
+    "media-hevc-aac",
+    "reordered-48000",
+    "segment-avc-aac"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "replay-hevc-aac-00",
+        "replay-hevc-aac-01",
+        "replay-hevc-aac-02",
+        "replay-hevc-aac-03",
+        "replay-hevc-aac-04",
+        "replay-hevc-aac-05",
+        "replay-hevc-aac-06",
+        "replay-hevc-aac-07",
+        "replay-hevc-aac-08",
+        "replay-hevc-aac-09",
+        "entry-hevc-aac-44100-00",
+        "entry-hevc-aac-44100-01",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "the same reads as hls-segments and progressive-ts188, which are measured"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "replay-hevc-aac-00",
+        "replay-hevc-aac-01",
+        "replay-hevc-aac-02",
+        "replay-hevc-aac-03",
+        "replay-hevc-aac-04",
+        "replay-hevc-aac-05",
+        "replay-hevc-aac-06",
+        "replay-hevc-aac-07",
+        "replay-hevc-aac-08",
+        "replay-hevc-aac-09",
+        "entry-hevc-aac-44100-00",
+        "entry-hevc-aac-44100-01",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "the same reads as hls-segments and progressive-ts188, which are measured"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "replay-hevc-aac-00",
+        "replay-hevc-aac-01",
+        "replay-hevc-aac-02",
+        "replay-hevc-aac-03",
+        "replay-hevc-aac-04",
+        "replay-hevc-aac-05",
+        "replay-hevc-aac-06",
+        "replay-hevc-aac-07",
+        "replay-hevc-aac-08",
+        "replay-hevc-aac-09",
+        "entry-hevc-aac-44100-00",
+        "entry-hevc-aac-44100-01",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "the same reads as hls-segments and progressive-ts188, which are measured"
+    }
+  ],
+  "pending_module_requirements": [
+    "The TS demuxer rejects a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control."
+  ],
+  "open_cases": [
+    {
+      "id": "legal-duplicate-44100",
+      "requirement": "The TS demuxer rejects a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ]
+}

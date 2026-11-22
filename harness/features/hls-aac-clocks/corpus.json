@@ -1,0 +1,538 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "replay-avc-aac-00",
+      "profile": "segment-avc-aac",
+      "file": "harness/fixtures/hls/replay-avc-aac-00.ts",
+      "sha256": "a82d7c74de5937692df6ab09c152e822c3b5cb11f7d7cf61cc5e98e9bb633cda",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "segment",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 96,
+        "bytes": 24919,
+        "digest": 9624647299751812407
+      }
+    },
+    {
+      "id": "replay-avc-aac-01",
+      "profile": "segment-avc-aac",
+      "file": "harness/fixtures/hls/replay-avc-aac-01.ts",
+      "sha256": "4b8837f138cc18185c9f8e44808ddd49be3da53e22bdb06c9c13d2c297dd8686",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "segment",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24758,
+        "digest": 3487971898244763102
+      }
+    },
+    {
+      "id": "replay-avc-aac-02",
+      "profile": "segment-avc-aac",
+      "file": "harness/fixtures/hls/replay-avc-aac-02.ts",
+      "sha256": "5c2a0dc296a2bc22f5b39a60082870f18fa5c971adc2aed23c9ab26bc3da8f4c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "segment",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24717,
+        "digest": 18444577732988324331
+      }
+    },
+    {
+      "id": "replay-avc-aac-03",
+      "profile": "segment-avc-aac",
+      "file": "harness/fixtures/hls/replay-avc-aac-03.ts",
+      "sha256": "ba7249f8059dd5afa4d0b89698e01a66a815b1fbce853184474abff940223035",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "segment",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 94,
+        "bytes": 24459,
+        "digest": 11709925267667268026
+      }
+    },
+    {
+      "id": "replay-avc-aac-04",
+      "profile": "segment-avc-aac",
+      "file": "harness/fixtures/hls/replay-avc-aac-04.ts",
+      "sha256": "82904888e533ceb9b87437bf031fdb72f15aafcea1ad656a92a88bd69707450e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "segment",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24789,
+        "digest": 3266312573694392074
+      }
+    },
+    {
+      "id": "replay-avc-aac-05",
+      "profile": "segment-avc-aac",
+      "file": "harness/fixtures/hls/replay-avc-aac-05.ts",
+      "sha256": "f3852e2e68a373f3569e892e857db820a319a785204afff9f61f4598e16119a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "segment",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24785,
+        "digest": 5603127475031005587
+      }
+    },
+    {
+      "id": "replay-avc-aac-06",
+      "profile": "segment-avc-aac",
+      "file": "harness/fixtures/hls/replay-avc-aac-06.ts",
+      "sha256": "f9a0ce0958458bb3b824250fb99593efd35f65c9cff89a72b08a719c61389593",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "segment",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24661,
+        "digest": 3192378543101111142
+      }
+    },
+    {
+      "id": "replay-avc-aac-07",
+      "profile": "segment-avc-aac",
+      "file": "harness/fixtures/hls/replay-avc-aac-07.ts",
+      "sha256": "1cf2292715bfa3da1a8c95f2696b63c47669355b556ccf8c2f2ecd4d3a4f188f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "segment",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 94,
+        "bytes": 24560,
+        "digest": 7335426388825928303
+      }
+    },
+    {
+      "id": "replay-avc-aac-08",
+      "profile": "segment-avc-aac",
+      "file": "harness/fixtures/hls/replay-avc-aac-08.ts",
+      "sha256": "aaa82e6d2480d82bf42189ffa138d3b33641650eb269cea3af0f2a5cf91fa171",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "segment",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24743,
+        "digest": 2070759478445140612
+      }
+    },
+    {
+      "id": "replay-avc-aac-09",
+      "profile": "segment-avc-aac",
+      "file": "harness/fixtures/hls/replay-avc-aac-09.ts",
+      "sha256": "0cd02f5ae6b6254dc8005aeec3af88e8ac1e7ab0c4383722cd323ef48503d233",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "segment",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24809,
+        "digest": 13727039045686935874
+      }
+    },
+    {
+      "id": "replay-hevc-aac-00",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/replay-hevc-aac-00.ts",
+      "sha256": "828aef3657442bdf2f88064fb41edfc2acdfed5b91dbae5fbc08cfd3d55c569c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 96,
+        "bytes": 24919,
+        "digest": 9624647299751812407
+      }
+    },
+    {
+      "id": "replay-hevc-aac-01",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/replay-hevc-aac-01.ts",
+      "sha256": "d48ca1bd740a159a940d00a28fdb30a81d7620687b03c6f3d0feee62009772e4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24758,
+        "digest": 3487971898244763102
+      }
+    },
+    {
+      "id": "replay-hevc-aac-02",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/replay-hevc-aac-02.ts",
+      "sha256": "208134efac5a5a5494186c85c2bbe5a74527c933157e3780f1fe65f704a3b20a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24717,
+        "digest": 18444577732988324331
+      }
+    },
+    {
+      "id": "replay-hevc-aac-03",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/replay-hevc-aac-03.ts",
+      "sha256": "34b7cb62ef56a3fe8b9639614dbd29e9b37a2ed8adf21fc44e389c798e0868bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 94,
+        "bytes": 24459,
+        "digest": 11709925267667268026
+      }
+    },
+    {
+      "id": "replay-hevc-aac-04",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/replay-hevc-aac-04.ts",
+      "sha256": "255d0cc2420e23a9a636cd011b6694868cfa26ede3480136fee0ca18804dba18",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24789,
+        "digest": 3266312573694392074
+      }
+    },
+    {
+      "id": "replay-hevc-aac-05",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/replay-hevc-aac-05.ts",
+      "sha256": "ada4f5323442eb91d567da0aa2aab2d4fc2e2a53af562f5d465fb6f17b0e7e5b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24785,
+        "digest": 5603127475031005587
+      }
+    },
+    {
+      "id": "replay-hevc-aac-06",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/replay-hevc-aac-06.ts",
+      "sha256": "c728a3d55a0e51bdf268f9a7c95eab534643b66afd42e35c7a29747d53a1e35a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24661,
+        "digest": 3192378543101111142
+      }
+    },
+    {
+      "id": "replay-hevc-aac-07",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/replay-hevc-aac-07.ts",
+      "sha256": "61ab2a22246c4f69a7f417274b1f8e9af5c6e2d17e3f2771ef1e69c4e8d32136",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 94,
+        "bytes": 24560,
+        "digest": 7335426388825928303
+      }
+    },
+    {
+      "id": "replay-hevc-aac-08",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/replay-hevc-aac-08.ts",
+      "sha256": "f084338f4f1c15b0d417d1888698923a62e240b48493c4a3c68ae028fcebc8c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24743,
+        "digest": 2070759478445140612
+      }
+    },
+    {
+      "id": "replay-hevc-aac-09",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/replay-hevc-aac-09.ts",
+      "sha256": "095175f175302c7504a82589084c7a6678c8878538d7a33c09a8dff933057055",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 24809,
+        "digest": 13727039045686935874
+      }
+    },
+    {
+      "id": "entry-hevc-aac-44100-00",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/entry-hevc-aac-44100-00.ts",
+      "sha256": "3d93c63efa13a8b068d0eb3f5454703a69f9451953c131bff50ff3d16eca9f78",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 32,
+        "bytes": 8793,
+        "digest": 6387675885610409613
+      }
+    },
+    {
+      "id": "entry-hevc-aac-44100-01",
+      "profile": "media-hevc-aac",
+      "file": "harness/fixtures/hls/entry-hevc-aac-44100-01.ts",
+      "sha256": "b617cac2231d7d9527e8023f97ffebbe6ab05dc0c620d8787b8d3a955b06901b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "media",
+        "hevc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 52,
+        "bytes": 14585,
+        "digest": 6326360939838656446
+      }
+    },
+    {
+      "id": "allocating-control",
+      "profile": "segment-avc-aac",
+      "file": "harness/fixtures/hls/allocating-control.ts",
+      "sha256": "6804ef2778e94087ae7a3df440cebe3896e94c3552160c1bc5f4189a1aba211d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "segment",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1305,
+        "digest": 5762337702160463256
+      }
+    },
+    {
+      "id": "continuous-44100",
+      "profile": "continuous-44100",
+      "file": "harness/features/progressive-ts188/inputs/continuous-44100.ts",
+      "sha256": "d2a98a04558583e3e7a5f1c03e23f5ed6c2e9e41e3cd669b136b1bb66595b25f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "progressive",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 175,
+        "bytes": 17292,
+        "digest": 3660642094327218018
+      }
+    },
+    {
+      "id": "reordered-48000",
+      "profile": "reordered-48000",
+      "file": "harness/features/progressive-ts188/inputs/reordered-48000.ts",
+      "sha256": "ccc8b45b5138dc0d33c72513db7f0aed0a20a9b1546ddd7253b7577674b1f076",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "progressive",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 752,
+        "bytes": 197815,
+        "digest": 7903628104957871109
+      }
+    },
+    {
+      "id": "later-entry-48000",
+      "profile": "later-entry-48000",
+      "file": "harness/features/progressive-ts188/inputs/later-entry-48000.ts",
+      "sha256": "3e45f745f546d6af07a1a50fb46b533de4077656ca83b53135ed48ffc462d41e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "progressive",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 379,
+        "bytes": 99562,
+        "digest": 7369561356057080749
+      }
+    },
+    {
+      "id": "duplicate-control-44100",
+      "profile": "duplicate-control-44100",
+      "file": "harness/features/progressive-ts188/inputs/duplicate-control-44100.ts",
+      "sha256": "7aa124baf0dab938ac55b937726e381e8acf6d4f337f82cda6da0395db35eec9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "progressive",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 3625,
+        "digest": 5928259769310734915
+      }
+    },
+    {
+      "id": "legal-duplicate-44100",
+      "profile": "legal-duplicate-44100",
+      "file": "harness/features/progressive-ts188/inputs/legal-duplicate-44100.ts",
+      "sha256": "6f0025e4b2b6ac10b7fc4a9ec792951e59c4eff5873adcede982dc449f622e9f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "clocks",
+        "progressive",
+        "avc",
+        "aac",
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    }
+  ]
+}

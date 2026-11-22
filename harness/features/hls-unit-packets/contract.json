@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "id": "hls-unit-packets",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "hls-unit-packets",
+  "candidate": "playback-views-worker",
+  "worker_operation": "hls-views-",
+  "reference": "ffmpeg-playback-views-native",
+  "contract": [
+    "Compare AVC and AAC packets through PacketInfo on complete HLS segments and progressive TS188 sessions. Use the AVC/AAC segments and all five progressive inputs.",
+    "The reference demuxes the same forward input with its stock parsers and projects the packet clock from the 90 kHz and exact ADTS sample clocks. Progressive audio retains wire DTS presence.",
+    "Fold video then audio, in decode order within each lane. Fold lane, PID, time-base numerator and denominator, PTS, DTS, duration, random access, size and every payload byte, followed by clean end. A missing field uses a zero presence and zero value word.",
+    "Input bytes are loaded before the operation. Refusal is a single kind 8 record."
+  ],
+  "required_profiles": [
+    "continuous-44100",
+    "duplicate-control-44100",
+    "later-entry-48000",
+    "legal-duplicate-44100",
+    "reordered-48000",
+    "segment-avc-aac"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "the same reads as hls-segments and progressive-ts188, which are measured"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "the same reads as hls-segments and progressive-ts188, which are measured"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "the same reads as hls-segments and progressive-ts188, which are measured"
+    }
+  ],
+  "pending_module_requirements": [
+    "The TS demuxer rejects a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control."
+  ],
+  "open_cases": [
+    {
+      "id": "legal-duplicate-44100",
+      "requirement": "The TS demuxer rejects a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ]
+}
