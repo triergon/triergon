@@ -108,8 +108,8 @@ The [syncframe header comparison](../../harness/features/ac3-frame-header/contra
 checks header geometry, and the [decoded frame
 comparison](../../harness/features/ac3-frame-info/contract.json) checks sample geometry,
 layout and downmix side data. The [audio block
-oracle](../../harness/features/ac3-features/contract.json) checks the coding-tool flags on
-main-body controls with zero-width mantissas.
+oracle](../../harness/features/ac3-features/contract.json) checks the coding-tool flags
+across all six blocks of complete version-8 AC-3 syncframes, including grouped mantissas.
 
 - Specification: ATSC A/52:2018. Tables are generated from the specification text by
   `harness/codecs/ac3/gen_tables.py` (`src/spec_tables.rs`).
