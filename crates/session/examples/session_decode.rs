@@ -209,7 +209,7 @@ impl<F: OutputForm> AudioRun<'_, F> {
         if self.options.indexes.contains(&self.index) {
             while self.output.pull(&mut self.session, self.sink)? {}
             self.refusals += self.session.refusals();
-            self.session.stop();
+            self.session.flush();
             F::load(&mut self.session, self.codec, &self.configuration)?;
         }
         loop {

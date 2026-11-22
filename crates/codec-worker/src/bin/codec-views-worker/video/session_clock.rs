@@ -91,7 +91,7 @@ fn produce(
     let (codec, video) = coding;
     let units = data(input, codec, positions)?;
     let mut plain = VideoSession::with_canvas(QueueLimits::VIDEO, canvas);
-    plain.load(video_decoder(video));
+    plain.load(Some(video_decoder(video)));
     enqueue(&mut plain, &units, 0, false)?;
     let mut canvases = Vec::new();
     while plain.step(None) {
@@ -116,7 +116,7 @@ fn produce(
     if clocked.state() != SessionState::Idle || clocked.feed(&[0], None) != Err(FeedError::Idle) {
         return Err("an unloaded lane accepted a packet".into());
     }
-    clocked.load(video_decoder_in(video, &pool));
+    clocked.load(Some(video_decoder_in(video, &pool)));
     enqueue(&mut clocked, &units, 0, true)?;
 
     for (index, (expected_pts, baseline)) in canvases.iter().enumerate() {
@@ -191,7 +191,7 @@ fn produce(
             signed(picture.pts.ok_or("restart picture PTS absent")?),
         ],
     )?;
-    clocked.stop();
+    clocked.load(None);
     if clocked.state() != SessionState::Idle
         || clocked.latest().is_some()
         || clocked.feed(units[0].1, Some(next)) != Err(FeedError::Idle)
@@ -224,7 +224,7 @@ fn refusal(
         Codec::Hevc => &[0, 0, 1, 0x26, 1, 0xa0][..],
     };
     let mut failed = VideoSession::new(QueueLimits::VIDEO);
-    failed.load(video_decoder(video));
+    failed.load(Some(video_decoder(video)));
     if failed.canvas() != Canvas::default() || failed.feed(&[], None) != Err(FeedError::Invalid) {
         return Err("invalid default canvas or empty access-unit admission".into());
     }
@@ -242,7 +242,7 @@ fn refusal(
 
     let mut skipping =
         VideoSession::with_canvas(QueueLimits::VIDEO, canvas).on_refusal(OnRefusal::Skip);
-    skipping.load(video_decoder(video));
+    skipping.load(Some(video_decoder(video)));
     skipping.feed(invalid, None).map_err(|e| e.to_string())?;
     enqueue(&mut skipping, units, 0, false)?;
     if !skipping.step(Some(START))

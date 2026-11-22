@@ -27,7 +27,7 @@ fn play(
     clock_ns: i64,
 ) -> Result<(), FeedError> {
     let mut video = VideoSession::new(QueueLimits::VIDEO);
-    video.load(video_decoder);
+    video.load(Some(video_decoder));
     let mut audio = AudioSession::new(QueueLimits::AUDIO);
     audio.load(audio_decoder);
 
@@ -108,11 +108,13 @@ input).
 - **Audio timing.** `pull` decodes queued units whose PTS minus `lead_ns` has
   been reached. The caller passes the lead; `audio::DEFAULT_LEAD_NS` is 120 ms.
   A sample-rate change ends the current block.
-- **Lifecycle.** `load` starts a new stream; video `flush` restarts the timeline
-  but keeps the last picture; `stop` clears everything. Each of these advances
+- **Lifecycle.** Both lanes share one vocabulary. `load(Some(decoder))` starts a new
+  stream and `load(None)` unloads the lane (`SessionState::Idle`, and no picture);
+  `flush` is a seek: the queue is discarded and the decoder reset, the lane keeps its
+  decoder, and the video lane keeps its last picture on screen. Both advance
   `generation()`. `end_of_stream` drains the decoder; the state then becomes
   `SessionState::Ended`. A decoder refusal is `SessionState::Failed` until the
-  next load, flush or stop, or under `OnRefusal::Skip` drops that unit; `refusals`
+  next load or flush, or under `OnRefusal::Skip` drops that unit; `refusals`
   and `last_refusal` count and name the refusals of the current stream.
 - **Letterbox.** Each picture goes through one `triergon_pixel::letterbox::Scaler`
   into the lane's `Canvas`; the fit, padding and conversion rules are in
@@ -133,7 +135,7 @@ input).
 
 The [clocked video comparison](../../harness/features/video-session-clock/contract.json)
 checks AVC and HEVC picture order, exact clock release and retained RGBA canvas
-bytes, plus queue and decoder refusals, flush and stop. The existing session
+bytes, plus queue and decoder refusals, flush and unload. The existing session
 grades compare decoded output and the declared mid-GOP reset behaviour.
 The [track reset comparison](../../harness/codecs/session-cases.json) covers
 `TrackDecoder` restarts after actual AAC, AC-3, E-AC-3, DTS, FLAC, MPEG

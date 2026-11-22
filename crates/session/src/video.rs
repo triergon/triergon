@@ -86,22 +86,19 @@ impl VideoSession {
         self.refusals.policy = policy;
         self
     }
-    /// A new stream: old input, decoder state and picture go.
-    pub fn load(&mut self, decoder: Box<DynVideoDecoder>) {
+    /// A new stream: old input, decoder state and picture go and `decoder` takes over;
+    /// `None` unloads the lane ([`SessionState::Idle`]).
+    pub fn load(&mut self, decoder: Option<Box<DynVideoDecoder>>) {
         self.reset(true);
-        self.decoder = Some(decoder);
+        self.decoder = decoder;
     }
-    /// Seek/flush: the fed timeline restarts; the last picture stays on screen.
+    /// Seek: queued input is discarded and the decoder drops its state but its parameter
+    /// sets; the lane keeps its decoder, and the last picture stays on screen.
     pub fn flush(&mut self) {
         self.reset(false);
         if let Some(decoder) = self.decoder.as_mut() {
             decoder.reset();
         }
-    }
-    /// Unload/destroy: no stream and no picture.
-    pub fn stop(&mut self) {
-        self.reset(true);
-        self.decoder = None;
     }
     fn reset(&mut self, clear_picture: bool) {
         self.generation += 1;
@@ -119,8 +116,7 @@ impl VideoSession {
     pub fn canvas(&self) -> Canvas {
         self.scaler.canvas()
     }
-    /// Increases with every [`load`](Self::load), [`flush`](Self::flush) and
-    /// [`stop`](Self::stop).
+    /// Increases with every [`load`](Self::load) and [`flush`](Self::flush).
     pub fn generation(&self) -> u64 {
         self.generation
     }
@@ -196,7 +192,8 @@ impl VideoSession {
             }
         }
     }
-    /// The picture on screen: the last one published, until a load or stop.
+    /// The picture on screen: the last one published, until the next
+    /// [`load`](Self::load).
     pub fn latest(&self) -> Option<&Published> {
         self.latest.as_ref()
     }
@@ -205,8 +202,8 @@ impl VideoSession {
         let pending = self.ahead.is_some() || !self.queue.is_empty();
         self.phase.state(self.decoder.is_some(), pending)
     }
-    /// Access units the decoder refused since the last [`load`](Self::load),
-    /// [`flush`](Self::flush) or [`stop`](Self::stop).
+    /// Access units the decoder refused since the last [`load`](Self::load) or
+    /// [`flush`](Self::flush).
     pub fn refusals(&self) -> u64 {
         self.refusals.count
     }

@@ -123,7 +123,7 @@ impl Session {
         match codec {
             Codec::Avc => {
                 let mut video = VideoSession::new(limits);
-                video.load(video_decoder(VideoCodec::H264));
+                video.load(Some(video_decoder(VideoCodec::H264)));
                 Ok(Self::Video(video))
             }
             Codec::Aac | Codec::Ac3 => {

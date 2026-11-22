@@ -73,7 +73,7 @@ impl StreamSelection {
             .audio
             .map(|codec| audio_decoder(codec, audio_configuration))
             .transpose()?;
-        video.load(video_decoder(self.video));
+        video.load(Some(video_decoder(self.video)));
         audio.load(decoder);
         Ok(())
     }
@@ -195,7 +195,7 @@ pub fn audio_decoder_in(
 
 /// Why a session is not producing output right now. A starved session waits
 /// for input; an ended one has drained its decoder after an explicit end of
-/// stream; a failed one stays failed until the next load/flush/stop.
+/// stream; a failed one stays failed until the next load or flush.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionState {
     /// No session (nothing loaded, or the stream named no codec for this lane).

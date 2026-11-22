@@ -200,7 +200,7 @@ impl<O: Observer> Decode<'_, O> {
         let (vi, vt, vc) = find(self.opts.video)
             .find_map(|(i, track)| video_codec(info(&track).codec()).map(|codec| (i, track, codec)))
             .ok_or(Error::Unsupported("no decodable video track"))?;
-        self.video.load(video_decoder_in(vc, self.pool));
+        self.video.load(Some(video_decoder_in(vc, self.pool)));
         let frame = |track: &dyn TrackInfo| {
             let mut setup = AccessUnits::for_track(self.pool, track, AccessUnitLimits::default())?;
             ready(|work| setup.step(work, cancel))

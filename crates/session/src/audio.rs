@@ -4,7 +4,7 @@
 //! Each access unit is held until the sink clock is within `lead` of its PTS;
 //! `pull` then decodes exactly those units and returns their samples for
 //! the caller's device writer. A paused clock
-//! therefore yields nothing, and flush/stop discard everything queued.
+//! therefore yields nothing, and `flush` and `load` discard everything queued.
 use crate::Discard;
 use crate::SessionState;
 use crate::lane::{OnRefusal, Phase, Refusals};
@@ -163,16 +163,16 @@ impl<F: PcmForm> AudioSession<F> {
         self.refusals.policy = policy;
         self
     }
-    /// A new stream: queued input goes and `decoder` takes over; `None` plays no audio
+    /// A new stream: queued input goes and `decoder` takes over; `None` unloads the lane
     /// ([`SessionState::Idle`]).
     pub fn load(&mut self, decoder: Option<Box<DynAudioDecoder>>) {
         self.reset();
         self.delay = decoder.as_ref().map_or(0, |decoder| decoder.delay());
         self.decoder = decoder;
     }
-    /// Seek, flush or stop: queued audio is discarded and the decoder drops its signal
-    /// history; the lane keeps its decoder and takes input again.
-    pub fn stop(&mut self) {
+    /// Seek: queued audio is discarded and the decoder drops its signal history; the lane
+    /// keeps its decoder and takes input again.
+    pub fn flush(&mut self) {
         self.reset();
         if let Some(decoder) = self.decoder.as_mut() {
             decoder.reset();
@@ -185,7 +185,7 @@ impl<F: PcmForm> AudioSession<F> {
         self.phase = Phase::Open;
         self.refusals.clear();
     }
-    /// Increases with every [`load`](Self::load) and [`stop`](Self::stop).
+    /// Increases with every [`load`](Self::load) and [`flush`](Self::flush).
     pub fn generation(&self) -> u64 {
         self.generation
     }
@@ -300,7 +300,7 @@ impl<F: PcmForm> AudioSession<F> {
         self.phase.state(self.decoder.is_some(), pending)
     }
     /// Access units the decoder refused since the last [`load`](Self::load) or
-    /// [`stop`](Self::stop), the end-of-stream drain included.
+    /// [`flush`](Self::flush), the end-of-stream drain included.
     pub fn refusals(&self) -> u64 {
         self.refusals.count
     }

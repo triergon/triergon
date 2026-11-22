@@ -339,7 +339,7 @@ fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
             );
             assert!(outputs.iter().all(|out| !player.current(out)));
             video.flush();
-            audio.stop();
+            audio.flush();
             assert_eq!(video.latest().unwrap().sequence, second.sequence);
             reference = Some((first, second, pcm));
         } else {
@@ -363,7 +363,7 @@ fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
         }
     }
     player.stop();
-    video.stop();
+    video.load(None);
     audio.load(None);
     assert_eq!(player.state(), State::Stopped);
     assert_eq!(video.state(), SessionState::Idle);

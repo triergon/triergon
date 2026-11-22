@@ -87,7 +87,7 @@ fn pictures_keep_their_own_timestamps_through_reordering_and_wait_for_the_clock(
     let mut video = VideoSession::new(QueueLimits::VIDEO);
     assert_eq!(video.state(), SessionState::Idle);
     assert_eq!(video.feed(&[1, 0], Some(0)), Err(FeedError::Idle));
-    video.load(Box::<Script>::default());
+    video.load(Some(Box::<Script>::default()));
     // Decode order I0 P3 B1 B2 with display PTS 0, 30, 10, 20.
     for (luma, order, pts) in [(10, 0, 0), (40, 3, 30), (20, 1, 10), (30, 2, 20)] {
         video.feed(&[luma, order], Some(pts)).unwrap();
@@ -124,9 +124,9 @@ fn pictures_keep_their_own_timestamps_through_reordering_and_wait_for_the_clock(
 }
 
 #[test]
-fn flush_keeps_the_picture_stop_clears_it_and_generations_advance() {
+fn flush_keeps_the_picture_unload_clears_it_and_generations_advance() {
     let mut video = VideoSession::new(QueueLimits::VIDEO);
-    video.load(Box::<Script>::default());
+    video.load(Some(Box::<Script>::default()));
     let first = video.generation();
     for i in 0..4 {
         video.feed(&[i * 10, i], Some(i64::from(i))).unwrap();
@@ -145,7 +145,7 @@ fn flush_keeps_the_picture_stop_clears_it_and_generations_advance() {
         SessionState::Starved,
         "a flushed lane waits for new input"
     );
-    video.stop();
+    video.load(None);
     assert!(video.latest().is_none());
     assert_eq!(video.state(), SessionState::Idle);
 }
@@ -157,7 +157,7 @@ fn decoder_failure_is_explicit_and_backpressure_bounds_input() {
         bytes: 1 << 20,
         unit_bytes: 64,
     });
-    video.load(Box::<Script>::default());
+    video.load(Some(Box::<Script>::default()));
     for i in 0..3 {
         video.feed(&[1, i], None).unwrap();
     }
@@ -181,7 +181,7 @@ fn a_video_lane_letterboxes_into_its_own_canvas() {
     let canvas = Canvas::new(64, 48).unwrap();
     let mut video = VideoSession::with_canvas(QueueLimits::VIDEO, canvas);
     assert_eq!(video.canvas(), canvas);
-    video.load(Box::<Script>::default());
+    video.load(Some(Box::<Script>::default()));
     video.feed(&[20, 0], None).unwrap();
     video.end_of_stream();
     assert!(video.step(None));
@@ -196,7 +196,7 @@ fn a_video_lane_letterboxes_into_its_own_canvas() {
 fn a_skipping_video_lane_drops_a_refused_unit_and_counts_it() {
     let refusal = Error::Invalid("not an H.264 Annex-B access unit");
     let mut video = VideoSession::new(QueueLimits::VIDEO).on_refusal(OnRefusal::Skip);
-    video.load(Box::<Script>::default());
+    video.load(Some(Box::<Script>::default()));
     video.feed(&[10, 0], Some(0)).unwrap();
     video.feed(&[0xff, 0], Some(5)).unwrap();
     video.feed(&[20, 1], Some(10)).unwrap();
@@ -272,7 +272,7 @@ fn audio_is_paced_by_clock_minus_lead_and_flush_discards_it() {
         audio.pull(Some(-20_000_000), lead, &mut PcmBlock::default()),
         0
     );
-    audio.stop();
+    audio.flush();
     assert_eq!(
         audio.state(),
         SessionState::Starved,
@@ -333,7 +333,7 @@ fn end_of_stream_delivers_the_samples_the_decoder_holds_back() {
     audio.pull(None, 0, &mut block);
     assert!(block.samples.is_empty(), "the decoder drains once");
     // Ended with the queue already empty: the held samples wait for the next pull.
-    audio.stop();
+    audio.flush();
     audio.feed(&[10], Some(0)).unwrap();
     audio.pull(None, 0, &mut PcmBlock::default());
     assert_eq!(audio.state(), SessionState::Starved);
@@ -356,7 +356,7 @@ fn a_refused_flush_fails_the_lane() {
     assert_eq!(audio.pull(None, 0, &mut block), 1);
     assert_eq!(block.samples.len(), 8);
     assert_eq!(audio.state(), SessionState::Failed(refusal));
-    audio.stop();
+    audio.flush();
     audio.end_of_stream();
     assert_eq!(audio.state(), SessionState::Failed(refusal));
 }
@@ -379,7 +379,7 @@ fn a_skipping_audio_lane_drops_refused_units_and_ends_after_a_refused_flush() {
     assert_eq!(audio.state(), SessionState::Starved);
     assert_eq!((audio.refusals(), audio.last_refusal()), (1, Some(refusal)));
     audio.feed(&[48, 30], None).unwrap();
-    audio.stop();
+    audio.flush();
     assert_eq!((audio.refusals(), audio.last_refusal()), (0, None));
 
     let held = Error::Invalid("held samples");

@@ -239,7 +239,7 @@ fn lifecycle(
     if session.state() != SessionState::Ended || session.refusals() != 0 {
         return Err("a drained block did not end the lane".into());
     }
-    session.stop();
+    session.flush();
     if session.state() != SessionState::Starved {
         return Err("stop removed the audio decoder".into());
     }
@@ -299,7 +299,7 @@ fn refusals(
             &[mode, consumed as u64, lane.refusals()],
             &[],
         )?;
-        lane.stop();
+        lane.flush();
         if lane.refusals() != 0 || lane.last_refusal().is_some() {
             return Err("stop kept diagnostics from the old generation".into());
         }
