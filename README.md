@@ -50,7 +50,7 @@ FreeType for fonts, HarfBuzz and FriBidi for shaping, libass for rasterising and
 | [`triergon-shape`](crates/shape) | OpenType shaping with the script shapers, the bidirectional algorithm, Unicode properties |
 | [`triergon-raster`](crates/raster) | Glyph outlines, border stroking, the tile rasteriser, blur, composition and clipping of subtitle bitmaps |
 | [`triergon-ass`](crates/ass) | ASS and SSA scripts and Matroska packets, override tags, per-glyph state over time, karaoke, drawings, rendering to positioned alpha images |
-| [`triergon-pixel`](crates/pixel) | Decoded-picture views, BT.601 RGBA to YUV 4:2:0, letterboxing into a 1920×1080 RGBA canvas |
+| [`triergon-pixel`](crates/pixel) | Decoded-picture views, BT.601 RGBA to YUV 4:2:0, letterboxing into an RGBA canvas |
 | [`triergon-codec`](crates/codec) | Decoder traits, audio frames, channel layouts and orders, the shared inverse MDCT |
 | [`triergon-codec-h264`](crates/codec-h264), [`-hevc`](crates/codec-hevc) | Software video decoders |
 | [`triergon-codec-aac`](crates/codec-aac), [`-ac3`](crates/codec-ac3), [`-dca`](crates/codec-dca), [`-flac`](crates/codec-flac), [`-opus`](crates/codec-opus), [`-vorbis`](crates/codec-vorbis), [`-mp3`](crates/codec-mp3) | Software audio decoders |

@@ -16,7 +16,7 @@ decoders take codec headers, configuration records and NAL unit splitting from
 | Layer | Crates | Role |
 |---|---|---|
 | Foundation | [`triergon-core`](../crates/core), [`triergon-bitstream`](../crates/bitstream) | Budgets, shared byte storage, exact time, input windows, resumable steps, the workspace error, the neutral container model (`ContainerReader`); bit readers, RBSP, CABAC and CRCs |
-| Pixels | [`triergon-pixel`](../crates/pixel) | Decoded-picture views, coded YUV 4:2:0 pictures, BT.601 RGBA to YUV, letterboxing into 1920×1080 RGBA, subtitle palette Y'CbCr to RGB |
+| Pixels | [`triergon-pixel`](../crates/pixel) | Decoded-picture views, coded YUV 4:2:0 pictures, BT.601 RGBA to YUV, letterboxing into an RGBA canvas, subtitle palette Y'CbCr to RGB |
 | Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters: Annex B, H.264 and HEVC NAL units and their type classes, AV1, VP9, ADTS, AC-3 and E-AC-3, DTS core and DTS-HD substreams; FLAC, Opus, Vorbis and MPEG audio headers and their canonical configurations |
 | Formats | [`triergon-matroska`](../crates/matroska), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts), [`triergon-ogg`](../crates/ogg), [`triergon-elementary`](../crates/elementary) | Container readers: tracks, packets, metadata, seeking |
 | Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction, bitmap subtitle decoding, closed captions and teletext |
