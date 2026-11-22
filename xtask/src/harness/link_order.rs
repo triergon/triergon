@@ -69,7 +69,8 @@ fn code_symbols(binary: &Path, demangle: bool) -> Result<Vec<Symbol>, String> {
     if demangle {
         argv.push("-C".to_owned());
     }
-    argv.push(binary.display().to_string());
+    // A path that starts with `-` is still a file, not an option.
+    argv.extend(["--".to_owned(), binary.display().to_string()]);
     let text = crate::process::check_output(&argv)?;
     Ok(text.lines().filter_map(code_symbol).collect())
 }
