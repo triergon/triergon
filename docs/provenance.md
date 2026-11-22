@@ -20,11 +20,11 @@ that documentation of software using FreeType code credit it. Software that incl
 > Portions of this software are copyright © 2026 The FreeType Project
 > (https://freetype.org). All rights reserved.
 
-New code is written from specifications, with every reference treated as a black box, and
-no further code is translated (see [CONTRIBUTING.md](../CONTRIBUTING.md)). The modules
-below are the translations already in the tree, kept under their notices for now; they may
-be rewritten from specifications later. Modules not listed are written from the
-specifications and compared with the references only through their output.
+Code is written from specifications, with every reference treated as a black box, and
+nothing more is translated (see [CONTRIBUTING.md](../CONTRIBUTING.md)). The modules below
+are the translations in the tree, kept under their notices; each may be rewritten from its
+specification, and a rewrite removes it from this list. Modules not listed are written
+from the specifications and compared with the references only through their output.
 
 ## triergon-font
 
@@ -38,7 +38,7 @@ Translated from FreeType 2.15.0:
 | `cff/matrix.rs` | `FT_Matrix_Check` (`base/ftcalc.c`) |
 | `autofit/hints.rs` | `autofit/afhints.c` |
 | `autofit/latin/` | `autofit/aflatin.c`, `autofit/afadjust.c` |
-| `autofit/cjk/` | `autofit/afcjk.c`: the CJK writing system, the only module translated after the specification-first rule, by explicit decision |
+| `autofit/cjk/` | `autofit/afcjk.c`, the CJK writing system |
 | `autofit/style.rs`, `autofit/mod.rs` | `autofit/afglobal.c`, `afshaper.c`, `afloader.c`, `afmodule.c`, `afdummy.c` |
 | `fixed.rs`, `fixed/wrap32.rs` | `base/ftcalc.c`, `base/fttrigon.c` |
 | `synthesis.rs` | `base/ftoutln.c`, `base/ftsynth.c` |
@@ -113,8 +113,8 @@ Translated from libass 0.17.5, stage by stage:
 | `stroke/` | `ass_outline_stroke` |
 | `rasterizer/` | `ass_outline_to_bitmap` with 16×16 tiles |
 | `blur/` | `ass_synth_blur` and its coefficient solver |
-| `compat/libass/glyph.rs`, `geometry.rs`, `limits.rs` | `get_bitmap_glyph`, `calc_transform_matrix`, `double_to_d6` |
-| `compat/libass/compose.rs`, `compat/libass/clip.rs`, `bitmap.rs`, `fp.rs` | `render_and_combine_glyphs`, `ass_composite_construct`, `render_glyph`, and the C semantics of the expressions they use |
+| `compat/libass/glyph.rs`, `geometry.rs`, `limits.rs` (at the crate root) | `get_bitmap_glyph`, `calc_transform_matrix`, `double_to_d6` |
+| `compat/libass/compose.rs`, `compat/libass/clip.rs`, `bitmap.rs`, `fp.rs` (at the crate root) | `render_and_combine_glyphs`, `ass_composite_construct`, `render_glyph`, and the C semantics of the expressions they use |
 
 ## Elsewhere
 
