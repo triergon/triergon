@@ -43,8 +43,11 @@ fn native_clocks(packet: &impl PacketInfo) -> [u64; 3] {
 }
 
 fn access_units<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a>, String> {
-    let [size, program] = args else {
-        return Err("expected SIZE PROGRAM for a single-program default reader".into());
+    let (size, program, admission_only, exact_duration) = match args {
+        [size, program] | [size, program, "loas"] => (size, program, false, false),
+        [size, program, "admission"] => (size, program, true, false),
+        [size, program, "layer1"] => (size, program, false, true),
+        _ => return Err("expected SIZE PROGRAM [admission|loas|layer1]".into()),
     };
     let (size, format) = transport_size(size)?;
     let program: u16 = program.parse().map_err(|_| "invalid program")?;
@@ -52,6 +55,9 @@ fn access_units<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a>, Str
     Ok(Operation {
         name: "mpegts-access-unit-packets",
         run: Box::new(move |work, mut trace| {
+            if admission_only {
+                return ts_admission(input, &pool, work, trace);
+            }
             let reader = reader(input, &pool, format)?;
             let mut driver = Blocking::seekable(reader, Cursor::new(input), &pool);
             while let Some(packet) = driver.next_packet().map_err(|error| error.to_string())? {
@@ -67,10 +73,56 @@ fn access_units<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a>, Str
                     .find(|&i| reader.track(i).is_some_and(|item| item.id() == track))
                     .ok_or("packet track is absent")?;
                 ts_packet(&packet, size, index, work, &mut trace)?;
+                if exact_duration {
+                    let AccessUnit::MpegAudio(frame) = packet.access_unit() else {
+                        return Err("exact MPEG audio duration needs a framed packet".into());
+                    };
+                    let ticks = Time::new(
+                        i128::from(frame.header().samples_per_frame()) * 90_000,
+                        u128::from(frame.header().sample_rate),
+                    )
+                    .map_err(|error| error.to_string())?;
+                    let (num, den) = (ticks.numerator(), ticks.denominator());
+                    fold(&mut work.digest, num as u64);
+                    fold(&mut work.digest, den as u64);
+                    if let Some(trace) = &mut trace {
+                        writeln!(trace, "duration {num}/{den}")
+                            .map_err(|error| error.to_string())?;
+                    }
+                }
             }
             Ok(())
         }),
     })
+}
+
+fn ts_admission(
+    input: &[u8],
+    pool: &Budget,
+    work: &mut Work,
+    trace: Option<&mut dyn Write>,
+) -> Result<(), String> {
+    use triergon::Error;
+    let caps = SourceCapabilities {
+        length: Some(input.len() as u64),
+        random_access: true,
+    };
+    let reason = match AnyReader::open(input, pool, SourceId(1), caps) {
+        Err(Error::Unsupported("source format not recognised")) => 1,
+        Ok(AnyReader::MpegTs(reader)) => {
+            let mut driver = Blocking::seekable(reader, Cursor::new(input), pool);
+            match driver.next_packet() {
+                Err(Error::Unsupported("segment PAT has multiple media programs")) => 2,
+                other => return Err(format!("unexpected program admission: {other:?}")),
+            }
+        }
+        other => return Err(format!("unexpected transport admission: {other:?}")),
+    };
+    work.record(9, &[reason], &[]);
+    if let Some(trace) = trace {
+        writeln!(trace, "9 {reason}").map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 fn ts_packet(

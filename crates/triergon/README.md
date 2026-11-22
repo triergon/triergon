@@ -198,7 +198,10 @@ and compares the selected AAC output from presentation time zero. MPEG-TS uses
 its source access-unit reader. The facade also has
 separate comparisons for strict MPEG-TS access units and seek delivery.
 The MPEG-TS comparison records source admission differences for private
-audio carriage and for video delimiters without a coded picture.
+audio carriage and for video delimiters without a coded picture. It checks
+short-input and multi-program refusals and compares LOAS and MPEG audio
+frame boundaries across PES packets. The MPEG Layer I cases also compare
+exact fractional frame durations.
 The Matroska seek comparison verifies earlier audio and subtitle packets
 against a sequential read and checks their exact Block clocks.
 See the [play corpus](../../harness/codecs/play-manifest.json) and
