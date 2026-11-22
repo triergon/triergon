@@ -509,18 +509,6 @@ impl Imdct {
         })
     }
 
-    /// Output length `N`.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.dct4.len
-    }
-
-    /// Always false: a transform has at least four outputs.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        false
-    }
-
     /// The DCT-IV of size `K = N / 2`:
     /// `w[m] = scale * sum_k x[k] cos(π/K (m + 1/2)(k + 1/2))`.
     ///
