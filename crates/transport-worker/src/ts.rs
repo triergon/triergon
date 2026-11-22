@@ -1144,6 +1144,75 @@ mod tests {
 
     #[test]
     #[ignore = "requires the cached original mpegts/loewe.ts"]
+    fn discovery_refuses_selected_duplicate_and_non_pcr_counter_breaks() {
+        const START: u8 = 0x40;
+        const BODY: u8 = 0x10;
+        let pool = Budget::new(64 * 1024 * 1024).unwrap();
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.research/fate-samples/mpegts/loewe.ts");
+        let request = parse(&pool, &path, &["188".into(), "769".into()]).unwrap();
+        let original = request.input.clone();
+
+        let selected_carrier = |pid, start| {
+            original.as_ref()[1..]
+                .chunks_exact(188)
+                .enumerate()
+                // Allow discovery and the first PES to establish their state.
+                .skip(200)
+                .find(|(_, p)| {
+                    let actual = (u16::from(p[1] & 31) << 8) | u16::from(p[2]);
+                    actual == pid
+                        && p[3] & BODY != 0
+                        && (p[1] & START != 0) == start
+                        && (p[3] & 0x20 == 0 || (1..=182).contains(&p[4]))
+                })
+                .map(|(i, p)| (1 + i * 188, <[u8; 188]>::try_from(p).unwrap()))
+                .expect("pinned selected carrier")
+        };
+        let mut request = request;
+        let mut refuses = |name, bytes: &[u8]| {
+            request.input = Bytes::copy_from_slice(&pool, bytes).unwrap();
+            let Err(error) = super::discovery::operation(&pool, &request, &AtomicBool::new(false))
+            else {
+                panic!("selected continuity fault must be refused");
+            };
+            assert!(
+                error.to_string().contains("discovery continuity fault"),
+                "{name}: {error}"
+            );
+        };
+
+        let (at, same) = selected_carrier(1361, false);
+        let mut duplicate = original.as_ref().to_vec();
+        drop(duplicate.splice(at..at, same));
+        refuses("duplicate HEVC continuation", &duplicate);
+        for start in [true, false] {
+            let (at, mut carrier) = selected_carrier(1362, start);
+            // Rebuild the first adaptation byte to signal discontinuity on
+            // this non-PCR PID, and jump the expected payload counter.
+            let counter = (carrier[3] + 3) & 15;
+            if carrier[3] & 0x20 == 0 {
+                carrier.copy_within(4..186, 6);
+                carrier[4] = 1;
+                carrier[5] = 0;
+            }
+            carrier[3] = 0x30 | counter;
+            carrier[5] |= 0x80;
+            let mut data = original.as_ref().to_vec();
+            data[at..at + 188].copy_from_slice(&carrier);
+            refuses(
+                if start {
+                    "AAC PES start"
+                } else {
+                    "AAC continuation"
+                },
+                &data,
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "requires the cached original mpegts/loewe.ts"]
     fn discovery_refuses_a_replacement_program_map() {
         let pool = Budget::new(64 * 1024 * 1024).unwrap();
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))

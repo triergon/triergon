@@ -2,11 +2,31 @@
 use super::*;
 use triergon_core::SourceCapabilities;
 use triergon_mpegts::compat::{input::Ts188Startup, pes::ReadyContinuation};
-use triergon_mpegts::{ContinuityOutcome, FeedContinuation, psi::DescriptorNamespace};
+use triergon_mpegts::{
+    ContinuityOutcome, FeedContinuation, TransportPacket, psi::DescriptorNamespace,
+};
 
 struct Track {
     observer: DemuxObserver,
     started: bool,
+    next_counter: Option<u8>,
+}
+
+impl Track {
+    fn check_counter(&self, packet: &TransportPacket) -> triergon_core::Result<()> {
+        if packet.payload.is_some()
+            && self
+                .next_counter
+                .is_some_and(|next| next != packet.continuity_counter)
+        {
+            return Err(Error::Invalid("discovery continuity fault"));
+        }
+        Ok(())
+    }
+
+    fn record_payload(&mut self, counter: u8) {
+        self.next_counter = Some((counter + 1) & 15);
+    }
 }
 
 fn drain(
@@ -74,11 +94,10 @@ pub(super) fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -
             _ => return Err("unexpected startup boundary".into()),
         }
     };
-    let mut source = TransportStream::new(
+    let mut source = TransportStream::new_single_program_feed(
         pool.clone(),
-        request.format,
         ParseLimits::default(),
-        request.program,
+        DescriptorNamespace::Unspecified,
     )?;
     let map = loop {
         match source.poll(&mut input, &mut WorkBudget::new(WORK), cancel)? {
@@ -116,6 +135,7 @@ pub(super) fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -
         Ok(Track {
             observer,
             started: false,
+            next_counter: None,
         })
     };
     drop(source);
@@ -184,7 +204,7 @@ pub(super) fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -
             drain(&mut tracks[index], index, &mut clock, &mut totals, cancel)?;
         }
         match step {
-            Step::Ready(TraceEvent::Transport(packet)) => {
+            Step::Ready(TraceEvent::Transport(mut packet)) => {
                 let ordinal = packet
                     .source_offset
                     .checked_sub(offset)
@@ -198,18 +218,40 @@ pub(super) fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -
                     if !track.started && !packet.payload_unit_start {
                         continue;
                     }
+                    if packet.discontinuity_indicator()
+                        && packet
+                            .adaptation
+                            .as_ref()
+                            .is_some_and(|field| field.pcr.is_some())
+                    {
+                        return Err("discovery clock interval changed".into());
+                    }
+                    // Ordinary delivery can precede source continuity events.
+                    // Check the selected replay before the observer accepts bytes.
+                    track.check_counter(&packet)?;
+                    if packet.payload.is_some() {
+                        track.record_payload(packet.continuity_counter);
+                    }
                     track.started = true;
-                    track
-                        .observer
-                        .push(
-                            packet,
-                            SourceContext {
-                                source_event_ordinal: ordinal,
-                                epochs,
-                                byte_run_epoch: None,
-                            },
-                        )
-                        .map_err(|e| e.error)?;
+                    let context = SourceContext {
+                        source_event_ordinal: ordinal,
+                        epochs,
+                        byte_run_epoch: None,
+                    };
+                    // Before the first PMT, the discovery pass already knows
+                    // the selected PIDs but the source has no PES routes yet.
+                    match track.observer.append_ready_continuation(
+                        &mut packet,
+                        context,
+                        &mut WorkBudget::new(WORK),
+                        cancel,
+                    )? {
+                        ReadyContinuation::Buffered => continue,
+                        ReadyContinuation::Unhandled => {
+                            track.observer.push(packet, context).map_err(|e| e.error)?;
+                        }
+                        ReadyContinuation::Complete => {}
+                    }
                     drain(track, index, &mut clock, &mut totals, cancel)?;
                 }
             }
