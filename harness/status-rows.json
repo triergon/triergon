@@ -950,6 +950,9 @@
       ],
       "unmeasured": "bit-readers"
     },
+    {"area": "CABAC engine", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "cabac-engine"},
+    {"area": "Y’CbCr palette", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ycbcr-palette"},
+    {"area": "Vertical glyph rotations", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "libass-rotations"},
     {
       "area": "RBSP and runs",
       "targets": [
