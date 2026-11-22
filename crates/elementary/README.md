@@ -65,7 +65,8 @@ Seeking reports a receipt and, through `Reader::last_seek`, whether the landing 
 exact. FLAC bisects by frame header timestamps within the SEEKTABLE interval (or the
 whole file) and reads forward to the frame holding the target. MPEG audio estimates
 from the Xing table of contents or the bit rate (`SeekBasis::Toc`, `SeekBasis::Bitrate`)
-and counts from the start when the estimate falls past the end. ADTS and AC-3 count
+and counts from the start when the estimate falls past the end. A seek to the start
+of a stream with an information frame starts at the first audio frame. ADTS and AC-3 count
 frames from the start (`SeekMethod::Restart`). A playback seek lands
 `Format::PREROLL` frames early (two for MPEG audio, one for ADTS and AC-3, none for
 FLAC).

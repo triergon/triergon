@@ -248,6 +248,9 @@ impl Syntax for MpegAudio {
     }
 
     fn plan_seek(&self, target: u64, context: SeekContext) -> Plan {
+        if target == 0 && self.info.is_some() {
+            return Plan::Scan;
+        }
         let spf = u64::from(self.samples_per_frame());
         if let (Some(info), Some(frames)) = (self.info, self.audio_frames())
             && let (Some(toc), Some(bytes)) = (info.frame.toc, info.frame.bytes)

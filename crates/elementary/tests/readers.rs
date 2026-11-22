@@ -343,6 +343,19 @@ fn an_mpeg_audio_seek_says_what_its_landing_rests_on() {
 }
 
 #[test]
+fn a_seek_to_zero_starts_after_the_mpeg_information_frame() {
+    let audio = mp3_stream(20);
+    let mut source = mp3_info(20, (audio.len() + 417) as u32, 576, 1260);
+    let first_audio = source.len();
+    source.extend(audio);
+    let (reading, detail) = seek::<MpegAudio>(&source, (0, 1), SeekPolicy::PreviousRandomAccess);
+    assert_eq!(reading.packets[0].offset, first_audio as u64);
+    assert_eq!(reading.packets[0].pts, 0);
+    assert_eq!(reading.packets[0].start_trim, Some(1105));
+    assert_eq!(detail.basis, SeekBasis::Exact);
+}
+
+#[test]
 fn an_adts_seek_counts_frames_from_the_start() {
     let file: Vec<u8> = (0..100)
         .flat_map(|i| adts_frame(i, 150 + i as usize % 40))
