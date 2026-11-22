@@ -317,6 +317,60 @@ fn drain(
     Ok(())
 }
 
+fn avc_slice(nal: &nal::NalUnit) -> bool {
+    matches!(
+        nal.facts().header,
+        nal::NalHeader::Avc {
+            nal_unit_type: 1 | 2 | 5,
+            ..
+        }
+    )
+}
+
+fn send_avc_chunks(
+    decoder: &mut h264::Decoder,
+    input: &[u8],
+    unit: &RawAccessUnit,
+    ordinal: i64,
+    seed: &mut u32,
+) -> bool {
+    let mut refused = false;
+    let mut start = unit.range.start as usize;
+    let mut arrived = start;
+    let end = unit.range.end as usize;
+    let mut nals = unit.nals().iter().peekable();
+    let mut pts = Some(ordinal);
+    while arrived < end {
+        *seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        arrived = (arrived + 1 + (*seed as usize >> 16) % 4096).min(end);
+        let mut chunk_end = start;
+        let mut chunk_pts = None;
+        while let Some(nal) = nals.peek() {
+            let facts = nal.facts();
+            let nal_end =
+                facts.payload_offset as usize + facts.payload_length + facts.trailing_zero_bytes;
+            if nal_end > arrived {
+                break;
+            }
+            if chunk_pts.is_none() && avc_slice(nal) {
+                chunk_pts = pts.take();
+            }
+            nals.next();
+            chunk_end = nal_end;
+        }
+        if arrived == end {
+            chunk_end = end;
+        }
+        if chunk_end > start {
+            refused |= decoder
+                .send_nals(&input[start..chunk_end], chunk_pts)
+                .is_err();
+            start = chunk_end;
+        }
+    }
+    refused
+}
+
 fn decode(
     input: &[u8],
     codec: nal::Codec,
@@ -333,23 +387,18 @@ fn decode(
             match feed {
                 Feed::AccessUnit => refused |= decoder.send(data, Some(pts)).is_err(),
                 Feed::Nal => {
-                    for (index, nal) in unit.nals().iter().enumerate() {
-                        refused |= decoder
-                            .send_nal(nal.bytes().as_ref(), (index == 0).then_some(pts))
-                            .is_err();
+                    let mut timestamp = Some(pts);
+                    for nal in unit.nals() {
+                        let nal_pts = if avc_slice(nal) {
+                            timestamp.take()
+                        } else {
+                            None
+                        };
+                        refused |= decoder.send_nal(nal.bytes().as_ref(), nal_pts).is_err();
                     }
                 }
                 Feed::Split => {
-                    let mut at = 0;
-                    while at < data.len() {
-                        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-                        let length = 1 + (seed as usize >> 16) % 4096;
-                        let end = (at + length).min(data.len());
-                        refused |= decoder
-                            .send_nals(&data[at..end], (at == 0).then_some(pts))
-                            .is_err();
-                        at = end;
-                    }
+                    refused |= send_avc_chunks(&mut decoder, input, &unit, pts, &mut seed);
                 }
             }
             pts += 1;

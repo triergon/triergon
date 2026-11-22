@@ -30,8 +30,9 @@ assert!(pictures > 0);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`send_nals` accepts Annex B data without an implied access-unit boundary; `send_nal`
-takes one NAL unit without start code. `reset` drops the DPB and keeps parameter sets.
+`send_nals` accepts complete Annex B NAL units without an implied access-unit boundary.
+Assemble a complete NAL before sending when reading in arbitrary byte chunks.
+`send_nal` takes one NAL unit without start code. `reset` drops the DPB and keeps parameter sets.
 `examples/decode_h264.rs IN.264 OUT.yuv` writes raw yuv420p and one JSON line per picture.
 
 ## Supported

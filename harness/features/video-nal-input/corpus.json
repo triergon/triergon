@@ -493,9 +493,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 298,
-        "bytes": 14304,
-        "digest": 8648960502474750527
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 14455118361957466765
       }
     },
     {
@@ -509,9 +509,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 298,
-        "bytes": 14304,
-        "digest": 8648960502474750527
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 14455118361957466765
       }
     },
     {
@@ -557,9 +557,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 298,
-        "bytes": 14304,
-        "digest": 7485900798531354861
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 12892029359544230139
       }
     },
     {
@@ -573,9 +573,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 298,
-        "bytes": 14304,
-        "digest": 7485900798531354861
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 12892029359544230139
       }
     },
     {
@@ -589,9 +589,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 23,
-        "bytes": 1104,
-        "digest": 6854694568459875282
+        "packets": 25,
+        "bytes": 1200,
+        "digest": 14419629914327973591
       }
     },
     {
@@ -605,9 +605,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 23,
-        "bytes": 1104,
-        "digest": 6854694568459875282
+        "packets": 25,
+        "bytes": 1200,
+        "digest": 14419629914327973591
       }
     },
     {
@@ -621,9 +621,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 23,
-        "bytes": 1104,
-        "digest": 169191713360748963
+        "packets": 25,
+        "bytes": 1200,
+        "digest": 1569789284656779743
       }
     },
     {
@@ -637,9 +637,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 23,
-        "bytes": 1104,
-        "digest": 169191713360748963
+        "packets": 25,
+        "bytes": 1200,
+        "digest": 1569789284656779743
       }
     },
     {
@@ -685,9 +685,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 48,
-        "bytes": 2304,
-        "digest": 1613710548531554136
+        "packets": 50,
+        "bytes": 2400,
+        "digest": 8134508285259850246
       }
     },
     {
@@ -701,9 +701,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 48,
-        "bytes": 2304,
-        "digest": 1613710548531554136
+        "packets": 50,
+        "bytes": 2400,
+        "digest": 8134508285259850246
       }
     },
     {
@@ -781,9 +781,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 3252254420928489113
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 13668509365366284977
       }
     },
     {
@@ -797,9 +797,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 3252254420928489113
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 13668509365366284977
       }
     },
     {
@@ -845,9 +845,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 15,
-        "bytes": 720,
-        "digest": 12106599267182472891
+        "packets": 17,
+        "bytes": 816,
+        "digest": 11602403082181780925
       }
     },
     {
@@ -861,9 +861,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 15,
-        "bytes": 720,
-        "digest": 12106599267182472891
+        "packets": 17,
+        "bytes": 816,
+        "digest": 11602403082181780925
       }
     },
     {
@@ -877,9 +877,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 13929878251847418972
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 13041257793818669389
       }
     },
     {
@@ -893,9 +893,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 13929878251847418972
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 13041257793818669389
       }
     },
     {
@@ -909,9 +909,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 1217221891325952652
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 328601433297203069
       }
     },
     {
@@ -925,9 +925,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 1217221891325952652
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 328601433297203069
       }
     },
     {
@@ -973,9 +973,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 15,
-        "bytes": 720,
-        "digest": 10032431157320328178
+        "packets": 17,
+        "bytes": 816,
+        "digest": 2758041204010231985
       }
     },
     {
@@ -989,9 +989,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 15,
-        "bytes": 720,
-        "digest": 10032431157320328178
+        "packets": 17,
+        "bytes": 816,
+        "digest": 2758041204010231985
       }
     },
     {
@@ -1261,9 +1261,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 298,
-        "bytes": 14304,
-        "digest": 1125787203516940921
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 16257667590063817985
       }
     },
     {
@@ -1277,9 +1277,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 298,
-        "bytes": 14304,
-        "digest": 1125787203516940921
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 16257667590063817985
       }
     },
     {
@@ -1389,9 +1389,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 9027307000694330555
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 10130540690527079452
       }
     },
     {
@@ -1405,9 +1405,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 9027307000694330555
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 10130540690527079452
       }
     },
     {
@@ -1517,9 +1517,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 298,
-        "bytes": 14304,
-        "digest": 2412556162938604258
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 10794580012200180246
       }
     },
     {
@@ -1533,9 +1533,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 298,
-        "bytes": 14304,
-        "digest": 2412556162938604258
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 10794580012200180246
       }
     },
     {
@@ -1709,9 +1709,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 298,
-        "bytes": 14304,
-        "digest": 6317932862450154846
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 1379238386356234721
       }
     },
     {
@@ -1725,9 +1725,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 298,
-        "bytes": 14304,
-        "digest": 6317932862450154846
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 1379238386356234721
       }
     },
     {
@@ -1775,7 +1775,7 @@
       "expected": {
         "packets": 50,
         "bytes": 2400,
-        "digest": 1441299875788201071
+        "digest": 10106471871810427444
       }
     },
     {
@@ -1791,7 +1791,7 @@
       "expected": {
         "packets": 50,
         "bytes": 2400,
-        "digest": 1441299875788201071
+        "digest": 10106471871810427444
       }
     },
     {
@@ -1901,9 +1901,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 15,
-        "bytes": 720,
-        "digest": 3131403589974463957
+        "packets": 17,
+        "bytes": 816,
+        "digest": 14259532792898478338
       }
     },
     {
@@ -1917,9 +1917,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 15,
-        "bytes": 720,
-        "digest": 3131403589974463957
+        "packets": 17,
+        "bytes": 816,
+        "digest": 14259532792898478338
       }
     },
     {
@@ -1965,9 +1965,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 3252254420928489113
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 13668509365366284977
       }
     },
     {
@@ -1981,9 +1981,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 3252254420928489113
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 13668509365366284977
       }
     },
     {
@@ -1997,9 +1997,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 13929878251847418972
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 13041257793818669389
       }
     },
     {
@@ -2013,9 +2013,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 13929878251847418972
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 13041257793818669389
       }
     },
     {
@@ -2029,9 +2029,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 1217221891325952652
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 328601433297203069
       }
     },
     {
@@ -2045,9 +2045,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 1217221891325952652
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 328601433297203069
       }
     },
     {
@@ -2061,9 +2061,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 6,
-        "bytes": 288,
-        "digest": 6438096957046679665
+        "packets": 8,
+        "bytes": 384,
+        "digest": 12987462638853875012
       }
     },
     {
@@ -2077,9 +2077,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 6,
-        "bytes": 288,
-        "digest": 6438096957046679665
+        "packets": 8,
+        "bytes": 384,
+        "digest": 12987462638853875012
       }
     },
     {
@@ -2125,9 +2125,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 15,
-        "bytes": 720,
-        "digest": 11947233248685950588
+        "packets": 17,
+        "bytes": 816,
+        "digest": 704477649074519095
       }
     },
     {
@@ -2141,9 +2141,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 15,
-        "bytes": 720,
-        "digest": 11947233248685950588
+        "packets": 17,
+        "bytes": 816,
+        "digest": 704477649074519095
       }
     },
     {
@@ -2253,9 +2253,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 15,
-        "bytes": 720,
-        "digest": 8493929552827025065
+        "packets": 17,
+        "bytes": 816,
+        "digest": 12908630881848863061
       }
     },
     {
@@ -2269,9 +2269,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 15,
-        "bytes": 720,
-        "digest": 8493929552827025065
+        "packets": 17,
+        "bytes": 816,
+        "digest": 12908630881848863061
       }
     },
     {
@@ -2285,9 +2285,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 17579985020820741488
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 15383817157337804359
       }
     },
     {
@@ -2301,9 +2301,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 17579985020820741488
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 15383817157337804359
       }
     },
     {
@@ -2509,9 +2509,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 8390106917915875144
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 10422342443934188485
       }
     },
     {
@@ -2525,9 +2525,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 8390106917915875144
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 10422342443934188485
       }
     },
     {
@@ -2541,9 +2541,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 7933769644333832836
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 15945206997401724744
       }
     },
     {
@@ -2557,9 +2557,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 88,
-        "bytes": 4224,
-        "digest": 7933769644333832836
+        "packets": 90,
+        "bytes": 4320,
+        "digest": 15945206997401724744
       }
     },
     {
@@ -2957,9 +2957,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 58,
-        "bytes": 2784,
-        "digest": 10608055354711228350
+        "packets": 60,
+        "bytes": 2880,
+        "digest": 16491608466114424834
       }
     },
     {
@@ -2973,9 +2973,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 58,
-        "bytes": 2784,
-        "digest": 10608055354711228350
+        "packets": 60,
+        "bytes": 2880,
+        "digest": 16491608466114424834
       }
     },
     {
@@ -4621,9 +4621,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 243,
-        "bytes": 11664,
-        "digest": 6480509893382721939
+        "packets": 250,
+        "bytes": 12000,
+        "digest": 16403550319540606340
       }
     },
     {
@@ -4637,9 +4637,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 243,
-        "bytes": 11664,
-        "digest": 6480509893382721939
+        "packets": 250,
+        "bytes": 12000,
+        "digest": 16403550319540606340
       }
     },
     {
@@ -4653,9 +4653,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 243,
-        "bytes": 11664,
-        "digest": 11015972205779253750
+        "packets": 250,
+        "bytes": 12000,
+        "digest": 15508772195111186066
       }
     },
     {
@@ -4669,9 +4669,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 243,
-        "bytes": 11664,
-        "digest": 11015972205779253750
+        "packets": 250,
+        "bytes": 12000,
+        "digest": 15508772195111186066
       }
     },
     {
@@ -4685,9 +4685,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 243,
-        "bytes": 11664,
-        "digest": 18006524412552830466
+        "packets": 250,
+        "bytes": 12000,
+        "digest": 1008589989749918885
       }
     },
     {
@@ -4701,9 +4701,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 243,
-        "bytes": 11664,
-        "digest": 18006524412552830466
+        "packets": 250,
+        "bytes": 12000,
+        "digest": 1008589989749918885
       }
     },
     {
@@ -4973,9 +4973,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 291,
-        "bytes": 13968,
-        "digest": 3705744657995608956
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 4070816920573959333
       }
     },
     {
@@ -4989,9 +4989,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 291,
-        "bytes": 13968,
-        "digest": 3705744657995608956
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 4070816920573959333
       }
     },
     {
@@ -5005,9 +5005,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 291,
-        "bytes": 13968,
-        "digest": 3705744657995608956
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 4070816920573959333
       }
     },
     {
@@ -5021,9 +5021,9 @@
         "nals-split"
       ],
       "expected": {
-        "packets": 291,
-        "bytes": 13968,
-        "digest": 3705744657995608956
+        "packets": 300,
+        "bytes": 14400,
+        "digest": 4070816920573959333
       }
     },
     {
@@ -6623,7 +6623,7 @@
       "expected": {
         "packets": 60,
         "bytes": 2880,
-        "digest": 10837060022249931906
+        "digest": 11506203503831596579
       }
     },
     {
@@ -7037,9 +7037,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 8
       }
     },
     {
@@ -8749,9 +8749,9 @@
         "nal"
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 8
       }
     },
     {
@@ -9427,38 +9427,6 @@
       }
     },
     {
-      "id": "h264-no-eos-nal",
-      "profile": "h264",
-      "file": "harness/features/video-nal-input/authored/h264-no-eos.h264",
-      "sha256": "76460acc3bfc5376661ce04417b4a562ad01f3168ab9df8d1023c0fec840e62e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "h264",
-        "nal"
-      ],
-      "expected": {
-        "packets": 12,
-        "bytes": 576,
-        "digest": 9288016720643709846
-      }
-    },
-    {
-      "id": "h264-no-eos-nals-split",
-      "profile": "h264",
-      "file": "harness/features/video-nal-input/authored/h264-no-eos.h264",
-      "sha256": "76460acc3bfc5376661ce04417b4a562ad01f3168ab9df8d1023c0fec840e62e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "h264",
-        "nals-split"
-      ],
-      "expected": {
-        "packets": 12,
-        "bytes": 576,
-        "digest": 9288016720643709846
-      }
-    },
-    {
       "id": "h264-mid-eos-nal",
       "profile": "h264",
       "file": "harness/features/video-nal-input/authored/h264-mid-eos.h264",
@@ -9552,22 +9520,6 @@
         "packets": 9,
         "bytes": 432,
         "digest": 8740909721790093116
-      }
-    },
-    {
-      "id": "hevc-no-eos-nal",
-      "profile": "hevc",
-      "file": "harness/features/video-nal-input/authored/hevc-no-eos.hevc",
-      "sha256": "f6ce36d642462840df7347d66305ee05b9716a1417d292d7d58390b5a47f2a56",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "hevc",
-        "nal"
-      ],
-      "expected": {
-        "packets": 12,
-        "bytes": 576,
-        "digest": 17985147573791998167
       }
     },
     {
