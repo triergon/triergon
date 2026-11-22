@@ -775,6 +775,9 @@
         }
       ]
     },
+    {"area": "Facade playback pipeline", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "comparison only (runtime, peak live heap and total RSS pending)"},
+    {"area": "Facade MPEG-TS access units", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "facade-mpegts"},
+    {"area": "Facade seeks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "facade-seek"},
     {
       "area": "Codecs",
       "targets": [
