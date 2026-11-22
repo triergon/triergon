@@ -133,14 +133,11 @@ impl ClockState {
             .try_into()
             .map_err(|_| Error::Truncated)?;
         let bits = header_payload(&prefix, self.order)?;
-        let (header, profile) = match clock_header(bits) {
-            Ok(facts) => facts,
-            Err(_) => {
-                self.unknown = true;
-                return Err(Error::Unsupported(
-                    "DTS clock outside selected normal core prefix",
-                ));
-            }
+        let Ok((header, profile)) = clock_header(bits) else {
+            self.unknown = true;
+            return Err(Error::Unsupported(
+                "DTS clock outside selected normal core prefix",
+            ));
         };
         // This is a parser-packet offset, independent of the physical core
         // boundary. An isolated sync word has no extension extent (TS 102 114
