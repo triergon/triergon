@@ -58,6 +58,7 @@ struct Row<'a> {
     /// The runs the row cites instead of its tables' runs, one per target at most.
     runs: Vec<&'a str>,
     cells: Cells<'a>,
+    parity: BTreeMap<&'a str, &'a str>,
 }
 
 struct Rows<'a> {
@@ -225,11 +226,29 @@ impl<'a> Rows<'a> {
             {
                 error(format!("{area}: names no results"));
             }
+            let mut parity = BTreeMap::new();
+            if let Some(value) = row.get("parity") {
+                if let Value::Object(entries) = value {
+                    for (target, cell) in entries {
+                        match cell.as_str() {
+                            Some(cell) if row_targets.contains(&target.as_str())
+                                && !cell.is_empty() && !cell.contains(['|', '\n']) =>
+                            {
+                                parity.insert(target.as_str(), cell);
+                            }
+                            _ => error(format!("{area}: invalid parity cell for {target}")),
+                        }
+                    }
+                } else {
+                    error(format!("{area}: parity cells must be keyed by target"));
+                }
+            }
             rows.push(Row {
                 area,
                 targets: row_targets,
                 runs: row_runs,
                 cells,
+                parity,
             });
         }
         let mut open = BTreeSet::new();
@@ -496,6 +515,7 @@ fn memory_cell(memory: &crate::harness::measured::Memory, revision: &str) -> Str
 struct PageTable<'p> {
     header: usize,
     columns: (usize, usize),
+    parity: Option<usize>,
     rows: Vec<(usize, Vec<&'p str>)>,
 }
 
@@ -526,6 +546,7 @@ fn page_table<'p>(lines: &[&'p str], heading: &str) -> Result<PageTable<'p>, Str
             .ok_or_else(|| format!("{PAGE}: {heading}: no {name} column"))
     };
     let columns = (column("Runtime")?, column("Memory")?);
+    let parity = column("Verified against the reference").ok();
     let rows = (header + 2..lines.len())
         .take_while(|&i| lines[i].starts_with('|'))
         .map(|i| {
@@ -538,13 +559,34 @@ fn page_table<'p>(lines: &[&'p str], heading: &str) -> Result<PageTable<'p>, Str
     Ok(PageTable {
         header,
         columns,
+        parity,
         rows,
     })
 }
 
 /// Each table's rows as [`ROWS`] renders them, beside the page's: per table, the page's
 /// row lines and the rendered cells of each (`None` where open).
-type Rendered<'p> = Vec<(PageTable<'p>, Vec<Option<(String, String)>>)>;
+type Rendered<'p> = Vec<(PageTable<'p>, Vec<RenderedRow>)>;
+
+struct RenderedRow {
+    bounds: Option<(String, String)>,
+    parity: Option<String>,
+}
+
+impl RenderedRow {
+    fn cells(&self, table: &PageTable<'_>) -> impl Iterator<Item = (usize, &str, &'static str)> {
+        let (r, m) = table.columns;
+        self.bounds
+            .as_ref()
+            .into_iter()
+            .flat_map(move |(runtime, memory)| {
+                [(r, runtime.as_str(), "Runtime"), (m, memory.as_str(), "Memory")]
+            })
+            .chain(table.parity.zip(self.parity.as_deref()).map(|(index, cell)| {
+                (index, cell, "Verified against the reference")
+            }))
+    }
+}
 
 fn unmeasured_cells(root: &Path, id: &str, target: &str) -> Result<(String, String), String> {
     use crate::harness::bounds::{Bound, Unmeasured};
@@ -646,19 +688,24 @@ fn render<'p>(
         }
         let mut cells = Vec::new();
         for row in shown {
+            let parity = row.parity.get(table.target).map(|text| (*text).to_owned());
+            if parity.is_some() && page_table.parity.is_none() {
+                errors.push(format!("{PAGE}: {} has no parity column", table.heading));
+            }
             let cell = match row.cells {
                 Cells::Unmeasured(id) => unmeasured_cells(root, id, table.target)
                     .map(Some)
                     .map_err(|error| vec![format!("{}: {error}", row.area)]),
                 _ => rows.cells(index, table, row),
             };
-            match cell {
-                Ok(cell) => cells.push(cell),
+            let bounds = match cell {
+                Ok(cell) => cell,
                 Err(row_errors) => {
                     errors.extend(row_errors);
-                    cells.push(None);
+                    None
                 }
-            }
+            };
+            cells.push(RenderedRow { bounds, parity });
         }
         rendered.push((page_table, cells));
     }
@@ -705,12 +752,8 @@ pub fn check(root: &Path, data: &[(String, Value)]) -> Vec<String> {
     let mut errors = Vec::new();
     for (table, cells) in &rendered {
         for ((line, written), cell) in table.rows.iter().zip(cells) {
-            let Some((runtime, memory)) = cell else {
-                continue;
-            };
-            let (r, m) = table.columns;
-            for (column, shown, name) in [(r, runtime, "Runtime"), (m, memory, "Memory")] {
-                if written.get(column).copied() != Some(shown.as_str()) {
+            for (column, shown, name) in cell.cells(table) {
+                if written.get(column).copied() != Some(shown) {
                     errors.push(format!(
                         "{PAGE}:{}: {} {name} is not what its results give: {shown}",
                         line + 1,
@@ -756,10 +799,11 @@ pub fn tables(root: &Path, write: bool) -> Result<String, String> {
         printed.push(lines[table.header].to_owned());
         printed.push(lines[table.header + 1].to_owned());
         for ((line, written), cell) in table.rows.iter().zip(cells) {
-            if let Some((runtime, memory)) = cell {
+            if cell.bounds.is_some() || cell.parity.is_some() {
                 let mut written: Vec<&str> = written.clone();
-                written[table.columns.0] = runtime;
-                written[table.columns.1] = memory;
+                for (column, shown, _) in cell.cells(table) {
+                    written[column] = shown;
+                }
                 rewritten[*line] = format!("| {} |", written.join(" | "));
             }
             printed.push(rewritten[*line].clone());

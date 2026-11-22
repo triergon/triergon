@@ -1003,7 +1003,7 @@
     },
     {"area": "CRC values", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "crc-values"},
     {"area": "Exact time rescale", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "time-rescale"},
-    {"area": "Decoded picture properties", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "picture-properties"},
+    {"area": "Decoded picture properties", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "picture-properties", "parity": {"aarch64-unknown-linux-gnu": "358 matching views, including two paired refusals. 31 registered profile refusals. [Comparison](../harness/features/picture-properties/contract.json)"}},
     {"area": "H.264 stream inspection", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "h264-stream-inspection"},
     {"area": "HEVC access unit splitting", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hevc-access-units"},
     {"area": "ADTS synchronization search", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "adts-sync"},
@@ -1011,7 +1011,7 @@
     {"area": "AC-3 and E-AC-3 frame information", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ac3-frame-info"},
     {"area": "AC-3 audio block features", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ac3-features"},
     {"area": "Codec channel layouts and downmix", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "codec-layouts"},
-    {"area": "Video NAL input", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "video-nal-input"},
+    {"area": "Video NAL input", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "video-nal-input", "parity": {"aarch64-unknown-linux-gnu": "543 matches, including two paired refusals. Two declared deviations and 52 registered profile refusals. [Comparison](../harness/features/video-nal-input/contract.json)"}},
     {"area": "Video NAL workloads", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "Runtime, peak heap and total RSS collection pending on isolated gate hosts."}
   ],
   "open_cells": [
