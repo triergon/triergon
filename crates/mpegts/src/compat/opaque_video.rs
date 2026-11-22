@@ -6,9 +6,8 @@
 //! Finished. The reference is FFmpeg revision `d32b387f` on the 9.0 branch.
 
 use super::pes::{
-    DemuxBoundary, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxProfile, DemuxScope,
-    DemuxSpan, PesFaultPolicy, RecoveredPes, RegisteredCarriage, SourceContext,
-    TransportFaultRecovery,
+    DemuxBoundary, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope, DemuxSpan,
+    PesFaultPolicy, RecoveredPes, RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
 use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
 use crate::psi::{DescriptorNamespace, ProgramMap};
@@ -544,7 +543,6 @@ impl OpaqueRecovery {
             epochs: context.epochs,
         };
         let observer = DemuxObserver::new_registered(
-            DemuxProfile::PesPackets,
             scope,
             RegisteredCarriage::Avc,
             self.budget.clone(),

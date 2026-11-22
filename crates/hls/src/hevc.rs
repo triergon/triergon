@@ -505,7 +505,7 @@ mod tests {
     use triergon_mpegts::transport::parse_transport;
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
-        compat::pes::{DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, SourceContext},
+        compat::pes::{DemuxClock, DemuxObserver, DemuxScope, SourceContext},
     };
 
     static NO: AtomicBool = AtomicBool::new(false);
@@ -538,7 +538,6 @@ mod tests {
         fn new() -> Self {
             let pool = Budget::new(1 << 20).unwrap();
             let observer = DemuxObserver::new_registered(
-                DemuxProfile::PesPackets,
                 DemuxScope {
                     program: 1,
                     pid: 257,

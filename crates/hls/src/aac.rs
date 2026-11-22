@@ -547,7 +547,7 @@ mod tests {
     use triergon_mpegts::transport::parse_transport;
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
-        compat::pes::{DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, SourceContext},
+        compat::pes::{DemuxClock, DemuxObserver, DemuxScope, SourceContext},
     };
 
     const TRACK: TrackKey = TrackKey::Ts {
@@ -576,7 +576,6 @@ mod tests {
         fn new() -> Self {
             let pool = Budget::new(16 * 1024).unwrap();
             let pes = DemuxObserver::new_registered(
-                DemuxProfile::PesPackets,
                 DemuxScope {
                     program: 1,
                     pid: 257,
@@ -746,7 +745,6 @@ mod tests {
                     check(
                         &fixture.pool,
                         Some(CompactDemuxPacket {
-                            profile: packet.profile,
                             program: packet.program,
                             pid: packet.pid,
                             source_origin: packet.source_origin,

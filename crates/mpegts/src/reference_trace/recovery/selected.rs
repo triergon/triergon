@@ -98,8 +98,6 @@ impl DiagnosticHeader {
 /// A packet the demuxer emits from a selected carrier with a source diagnostic.
 #[derive(Debug)]
 pub struct DiagnosticPacket {
-    /// The demux profile the packet was cut under.
-    pub profile: DemuxProfile,
     /// The program number of the observed scope.
     pub program: u16,
     /// The 13-bit PID of the observed scope.
@@ -150,7 +148,6 @@ impl From<crate::compat::pes::fault::TransportFaultPacket> for DiagnosticPacket 
             time_flags: 2,
         };
         Self {
-            profile: DemuxProfile::PesPackets,
             program: packet.program,
             pid: packet.pid,
             source_origin: packet.source_origin,
@@ -229,7 +226,6 @@ impl RecoveryObserver {
     /// other than stream type `0x1b` and PES stream ID `0xe0` returns `Unsupported`.
     /// Other constructor failures follow [`Self::new`].
     pub fn new_selected_avc_faults(
-        profile: DemuxProfile,
         scope: DemuxScope,
         budget: Budget,
         limits: ParseLimits,
@@ -240,7 +236,6 @@ impl RecoveryObserver {
             ));
         }
         let mut observer = Self::new(
-            profile,
             scope,
             RegisteredCarriage::Avc,
             RejectedPolicy::OpcrWithoutPcr,
@@ -677,7 +672,6 @@ impl RecoveryObserver {
                     let scope = self.inner.scope();
                     return Ok(AssemblyStep::Output(
                         DemuxObservation::FromSelectedDiagnostic(DiagnosticPacket {
-                            profile: DemuxProfile::PesPackets,
                             program: scope.program,
                             pid: scope.pid,
                             source_origin: SourceLocation {

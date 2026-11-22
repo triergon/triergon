@@ -1,6 +1,6 @@
 use crate::compat::pes::{
-    DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, DemuxTimeView,
-    PesFaultPolicy, RecoveredPes, RegisteredCarriage, SourceContext, TransportFaultRecovery,
+    DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, DemuxTimeView, PesFaultPolicy,
+    RecoveredPes, RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
 use crate::reader::SourceEvent;
 use crate::stream::{FaultKind, TraceEvent, TransportStream};
@@ -512,7 +512,6 @@ impl Route {
         }
         let pool = input.budget();
         let demux = DemuxObserver::new_registered(
-            DemuxProfile::PesPackets,
             self.scope,
             self.carriage,
             pool.clone(),

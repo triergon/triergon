@@ -4,9 +4,7 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, SourceLocation,
     Step, WorkBudget,
 };
-use triergon_mpegts::compat::pes::{
-    DemuxClock, DemuxProfile, DemuxScope, RegisteredCarriage, SourceContext,
-};
+use triergon_mpegts::compat::pes::{DemuxClock, DemuxScope, RegisteredCarriage, SourceContext};
 use triergon_mpegts::reference_trace::recovery::{
     DemuxObservation, RecoveredPacket, RecoveryObserver, RejectedPolicy,
 };
@@ -28,7 +26,6 @@ fn context(ordinal: u64) -> SourceContext {
 }
 fn observer(budget: &Budget) -> RecoveryObserver {
     RecoveryObserver::new(
-        DemuxProfile::PesPackets,
         DemuxScope {
             program: 1,
             pid: 256,

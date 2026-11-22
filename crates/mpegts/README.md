@@ -56,6 +56,8 @@ Everything else lives in its module:
 - `mux`: the single-program writer ([Writing TS](#writing-ts)).
 - `compat`: FFmpeg-compatible policies, one module per family: `pes`, `stream`,
   `input`, `adts`, `latm`, `dts`, `annex_b` and `opaque_video`.
+  `compat::pes::DemuxObserver` binds a single program and PID. Choose the
+  constructor for its carriage and supply the scope and assembly limits.
 - `reference_trace` (non-default feature `reference-trace`): the projections that
   exist only to compare traces with FFmpeg, in `recovery` (packets from rejected
   carriers), `catalogue` (programs and streams), `dvb` and `input`.

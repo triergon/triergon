@@ -8,8 +8,8 @@ use triergon_core::{
 };
 use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep};
 use triergon_mpegts::compat::pes::{
-    DemuxClock, DemuxProfile, DemuxScope, DvbSubtitlesDescriptors, PrivateAudioCarriage,
-    PrivateAudioDescriptors, RegisteredCarriage, SourceContext,
+    DemuxClock, DemuxScope, DvbSubtitlesDescriptors, PrivateAudioCarriage, PrivateAudioDescriptors,
+    RegisteredCarriage, SourceContext,
 };
 use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence, ProgramMap, TableStep};
 use triergon_mpegts::reference_trace::recovery::{
@@ -23,7 +23,6 @@ use super::reader::{explain, row};
 
 const SOURCE: SourceId = SourceId(1);
 const WORK: u64 = 64 * 1024;
-const PROFILE: DemuxProfile = DemuxProfile::PesPackets;
 
 mod completion;
 mod opaque;
@@ -375,7 +374,6 @@ impl Recovery {
         let limits = ParseLimits::default();
         match self.policy {
             Policy::Opcr | Policy::Input(_) => RecoveryObserver::new(
-                PROFILE,
                 scope,
                 RegisteredCarriage::Avc,
                 RejectedPolicy::OpcrWithoutPcr,
@@ -383,7 +381,7 @@ impl Recovery {
                 limits,
             ),
             Policy::Selected => {
-                RecoveryObserver::new_selected_avc_faults(PROFILE, scope, pool.clone(), limits)
+                RecoveryObserver::new_selected_avc_faults(scope, pool.clone(), limits)
             }
             Policy::PrivateAudio => {
                 let descriptors = PrivateAudioDescriptors {
@@ -397,7 +395,6 @@ impl Recovery {
                 )
                 .map_err(explain)?;
                 RecoveryObserver::new_private_audio(
-                    PROFILE,
                     scope,
                     carriage,
                     descriptors,
@@ -406,7 +403,6 @@ impl Recovery {
                 )
             }
             Policy::DvbSubtitles => RecoveryObserver::new_dvb_subtitles(
-                PROFILE,
                 scope,
                 self.namespace,
                 DvbSubtitlesDescriptors {

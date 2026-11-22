@@ -287,8 +287,7 @@ mod tests {
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
         compat::pes::{
-            DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, PrivateAudioDescriptors,
-            SourceContext,
+            DemuxClock, DemuxObserver, DemuxScope, PrivateAudioDescriptors, SourceContext,
         },
     };
 
@@ -310,7 +309,6 @@ mod tests {
         fn new(carriage: PrivateAudioCarriage, stream_type: u8) -> Self {
             let pool = Budget::new(16 * 1024).unwrap();
             let observer = DemuxObserver::new_private_audio(
-                DemuxProfile::PesPackets,
                 DemuxScope {
                     program: 1,
                     pid: 257,
