@@ -9,7 +9,8 @@
     "Open Matroska, indexed MP4, progressive MP4 and one MPEG-TS program through the direct player. Use source clocks and read every selected packet. The explicit bounded timing controls use the bounded opener and compatibility index while retaining source PacketInfo clocks. For ordered transport entities, continue the same player to the second entity and explicitly finish the logical source. The reference reads the same concatenated byte stream.",
     "The reference calls avformat_open_input and av_read_frame without stream discovery. Set ignore_editlist=1 for MOV and suppress elementary parsing and filling for MPEG-TS PES. Select the named PIDs of program 1 when the case declares PIDs. Matroska timestamps are in nanoseconds, MP4 in media timescale ticks, and transport in raw 90 kHz PES ticks.",
     "Fold kind 2 with each initial track ID, media kind, framed codec name, source codec tag, configuration, optional language and tri-state default and forced flags. The reference uses the public stream ID or the one-based stream ordinal if it has no positive ID. For Matroska, read the literal CodecID and effective language independently from TrackEntry, keyed by the track number. Retain the native codec identity, decoder configuration and dispositions. The trace retains the native tag and language for diagnosis.",
-    "Fold kind 1 with the shared packet row: track ID, optional PTS and DTS, duration, flags, size and every payload byte. Fold 7 on clean end or 8 on data refusal. Trace the candidate demux clock and trim for diagnosis.",
+    "For MOV, read the first sample description in the source catalogue, comparing the entry body for raw formats and the decoder record for encoded formats. Keep native stream language and dispositions in diagnostics. For a verified regular sample extent, read stts and ctts clocks and stss sync, preserving other native packet flags. For a matched fragment sample, read sync from the resolved trun flags and project clocks when the fragment has an explicit tfdt. Match track, position, extent and every payload byte before applying those source projections.",
+    "Fold kind 1 with the shared packet row: track ID, optional PTS and DTS, duration, flags, size and every payload byte. Fold 7 on clean end or 8 on data refusal. Trace the candidate demux clock and trim for diagnosis. For transport, read stream_type from a complete verified PMT when available. For each native packet matched byte for byte to a complete PES, read the original timestamps and compare the PES row. Preserve native packet fields in the trace.",
     "For raw Annex B, fold kind 4 with the stream rate from the active SPS timing and FFmpeg codec parameters. Fold kind 3 per unit with the queue-boundary timestamp in ns, zero for an unstamped packet. Trace any additional source VUI fields and the reference sample aspect ratio. Raw views run for parity only."
   ],
   "required_profiles": [
@@ -473,742 +474,117 @@
     }
   ],
   "pending_module_requirements": [
-    "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-    "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-    "The explicit BoundedPrefix opener and compatibility index expose the source PacketInfo clocks of the six samples. The comparison still needs to align raw sample-entry metadata with the decoder configuration and defaults exposed by the MOV demuxer."
+    "Owner question under ISO/IEC 14496-12 sections 8.7.3\u20134 and 8.8.8. Require an ordered merge by authored sample occurrence for a source-copy consumer, or compare complete decode order per track and retain native cross-track scheduling separately for a demux-compatible consumer.",
+    "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
+    "Owner question under ISO/IEC 14496-12 sections 8.1.1, 8.8.8 and 8.8.12. Should source delivery require an entire declared sample extent at the definitive endpoint, or expose recovered demux packets separately for salvage callers? Prove membership against the table and exact input extent before changing the fold.",
+    "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.5\u20136 and 2.4.4.9. Compare the initial current PMT catalogue and its update events for a causal streaming consumer, or also require the post-probe demux catalogue for a consumer that needs read-ahead retyping.",
+    "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.8. Retain opaque private PMT declarations for a source copier, or resolve codec identity, configuration and language in the selected descriptor namespace for a consumer that auto-selects a decoder.",
+    "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.18. Compare a literal ISO 639 descriptor row as source evidence, or require that source TrackInfo interprets the descriptor on a video/private route as native demuxers do for a language-selector consumer.",
+    "Owner question under ISO/IEC 14496-12 sections 8.8.7\u20138 and 8.8.12. The two fragment ranges deliver clocks in a different order. Require physical source delivery for a forward-only consumer, or a seekable decode-order replay that can revisit the earlier range.",
+    "Owner question under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. A first fragment has no coded origin or known predecessor. Keep the clock absent for continuation of an unknown source, or explicitly admit a complete movie from zero for a consumer that knows this is the origin."
   ],
   "open_cases": [
     {
-      "id": "mp4-forward-regular-r-ctts-v1",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-r-description-change",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-r-edits-repeat",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-r-end-co64",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-r-front-stco",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-unknown-movie-duration",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-r-multiple-mdats",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "mp4-forward-regular-r-multitrack",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-r-negative-cts",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-r-subtitle-tx3g",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-f-ctts-v1",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-f-description-change",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-f-explicit",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.7.3\u20134 and 8.8.8. Require an ordered merge by authored sample occurrence for a source-copy consumer, or compare complete decode order per track and retain native cross-track scheduling separately for a demux-compatible consumer.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mp4-forward-regular-f-multitrack",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-f-no-second-tfdt",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-encoded-avc-aac-front",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-encoded-hevc-aac-front",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-encoded-avc-aac-native-seek",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-encoded-avc-aac-indexed-seek",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-opaque-tail-terminal",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-pending-terminal",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-regular-terminal",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-regular-unknown-clock-terminal",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-pending-description",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-pending-pair",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.7.3\u20134 and 8.8.8. Require an ordered merge by authored sample occurrence for a source-copy consumer, or compare complete decode order per track and retain native cross-track scheduling separately for a demux-compatible consumer.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mp4-forward-progressive-pending-reverse-ranges",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-pending-two-mdats",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.8.7\u20138 and 8.8.12. The two fragment ranges deliver clocks in a different order. Require physical source delivery for a forward-only consumer, or a seekable decode-order replay that can revisit the earlier range.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mp4-forward-progressive-pending-unknown-clock",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-ten-sequential-batches",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-encoded-avc-aac-front",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-encoded-hevc-aac-front",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-f-ctts-v1",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-f-description-change",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-f-explicit",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-f-multitrack",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mp4-forward-progressive-f-no-second-tfdt",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-pending-terminal",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mp4-forward-progressive-unknown-clock-terminal",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mp4-forward-progressive-first-source-clock-unknown",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-aac-priming",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-aac-tail-trim",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-aac-fractional-edit",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-fragment-aac-edit",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-fragment-aac-late-track",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
+      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. A first fragment has no coded origin or known predecessor. Keep the clock absent for continuation of an unknown source, or explicitly admit a complete movie from zero for a consumer that knows this is the origin.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mp4-forward-progressive-fragment-aac-short",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-fragment-mp3-edit",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-leading-video-edit",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-leading-video-edit-trimmed",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-leading-video-edit-single-sync",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-leading-video-edit-rounded-end",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-forward-progressive-leading-video-edit-overlapping-sync",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-ts188-basic",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-program-eof-avc-aac",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.1.1, 8.8.8 and 8.8.12. Should source delivery require an entire declared sample extent at the definitive endpoint, or expose recovered demux packets separately for salvage callers? Prove membership against the table and exact input extent before changing the fold.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ts-program-program-pmt-retype",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.5\u20136 and 2.4.4.9. Compare the initial current PMT catalogue and its update events for a causal streaming consumer, or also require the post-probe demux catalogue for a consumer that needs read-ahead retyping.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ts-program-program-private-avc-dvb",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-carriage-aac-adts-direct",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-carriage-hevc-direct",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-pts-negative-against-dts",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-transport-partial-final-packet",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.8. Retain opaque private PMT declarations for a source copier, or resolve codec identity, configuration and language in the selected descriptor namespace for a consumer that auto-selects a decoder.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "ts-program-pmt-opaque-language-descriptors",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-avc-aac-00",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-avc-aac-01",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-avc-aac-02",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-avc-aac-03",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-avc-aac-04",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-avc-aac-05",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-avc-aac-06",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-avc-aac-07",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-avc-aac-08",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-avc-aac-09",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-hevc-aac-00",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-hevc-aac-01",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-hevc-aac-02",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-hevc-aac-03",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-hevc-aac-04",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-hevc-aac-05",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-hevc-aac-06",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-hevc-aac-07",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-hevc-aac-08",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-replay-hevc-aac-09",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-entry-hevc-aac-44100-00",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-entry-hevc-aac-44100-01",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-m2ts-replay-avc-aac-00-video",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-m2ts-replay-avc-aac-00-audio",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-m2ts-replay-hevc-aac-00-video",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-m2ts-entry-hevc-aac-44100-01-video",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.18. Compare a literal ISO 639 descriptor row as source evidence, or require that source TrackInfo interprets the descriptor on a video/private route as native demuxers do for a language-selector consumer.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "progressive-pending-empty-endpoint",
-      "requirement": "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-carriage-aac-adts-direct",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-carriage-hevc-direct",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-hls-contiguous-part-a",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-m2ts192-opaque-prefix",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-pes-timestamp-marker",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "requirement": "Owner question under ISO/IEC 14496-12 sections 8.1.1, 8.8.8 and 8.8.12. Should source delivery require an entire declared sample extent at the definitive endpoint, or expose recovered demux packets separately for salvage callers? Prove membership against the table and exact input extent before changing the fold.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "source-pmt-opaque-language-descriptors",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-pmt-version-wrap-retypes-pid",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-program-eof-avc-aac",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.18. Compare a literal ISO 639 descriptor row as source evidence, or require that source TrackInfo interprets the descriptor on a video/private route as native demuxers do for a language-selector consumer.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "source-program-pmt-retype",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
+      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.5\u20136 and 2.4.4.9. Compare the initial current PMT catalogue and its update events for a causal streaming consumer, or also require the post-probe demux catalogue for a consumer that needs read-ahead retyping.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "source-program-private-avc-dvb",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-pts-dts-common-epoch",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-pts-negative-against-dts",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-pts-wrap-forward",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-transport-partial-final-packet",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-ts188-basic",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-contiguous-entities",
-      "requirement": "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-timing-policy-bad-ctts-count-mismatch",
-      "requirement": "The explicit BoundedPrefix opener and compatibility index expose the source PacketInfo clocks of the six samples. The comparison still needs to align raw sample-entry metadata with the decoder configuration and defaults exposed by the MOV demuxer.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-timing-policy-bad-stts-count-mismatch",
-      "requirement": "The explicit BoundedPrefix opener and compatibility index expose the source PacketInfo clocks of the six samples. The comparison still needs to align raw sample-entry metadata with the decoder configuration and defaults exposed by the MOV demuxer.",
+      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.8. Retain opaque private PMT declarations for a source copier, or resolve codec identity, configuration and language in the selected descriptor namespace for a consumer that auto-selects a decoder.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
@@ -1300,6 +676,46 @@
       "compat": "A caller needing bounded prefix recovery selects TimingRunPolicy::BoundedPrefix and the compat::mov index.",
       "cases": [
         "mp4-bad-stts-count-mismatch"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "The mandatory PTS markers belong to the PES header",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.6\u20137 and Table 2-21 require marker_bit to equal 1",
+      "candidate": "Rejects the malformed header, publishes no PES, and reaches clean EOF.",
+      "reference": "Returns the 27 payload bytes and reports PTS 90000 despite the zero PTS marker.",
+      "compat": "A repair-oriented PES reader that accepts malformed timestamp markers would use compat::mpegts::pes_timestamp_marker_recovery.",
+      "cases": [
+        "source-pes-timestamp-marker"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "A bounded PES needs its declared bytes by definitive EOF",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.6\u20137 define PES_packet_length as the bytes following the length field",
+      "candidate": "Publishes no PES for the first entity when it is finalized alone. The contiguous remainder is covered separately.",
+      "reference": "Returns the available 170 payload bytes at EOF although the PES length field declares 520 bytes following the field.",
+      "compat": "A salvage consumer that needs the available part of an incomplete PES would use compat::mpegts::partial_pes_payload_at_eof.",
+      "cases": [
+        "source-hls-contiguous-part-a"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "A zero PES packet length is reserved for video in a transport stream",
+      "clause": "ITU-T H.222.0 (08/2023) section 2.4.3.7 restricts zero PES_packet_length to video elementary streams in transport packets",
+      "candidate": "Delivers the valid AVC packets and omits the AAC PES whose length is zero.",
+      "reference": "Also delivers 27 bytes from the zero-length AAC PES.",
+      "compat": "A demux consumer that accepts legacy audio without a bounded PES length would use compat::mpegts::zero_length_audio_pes.",
+      "cases": [
+        "ts-program-program-eof-avc-aac",
+        "source-program-eof-avc-aac"
       ],
       "targets": [
         "aarch64-unknown-linux-gnu"
