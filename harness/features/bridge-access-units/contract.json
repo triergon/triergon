@@ -267,7 +267,7 @@
       "cause": "Native runtime, live heap and total RSS collection are pending for the access-unit filters."
     },
     {
-      "bound": "rss",
+      "bound": "total_rss",
       "cases": [
         "range-regular-avc-aac-0-h264",
         "range-regular-avc-aac-1-aac",
@@ -386,7 +386,7 @@
   ],
   "pending_module_requirements": [
     "Resolve transport of a channel-configuration-zero program configuration under ISO/IEC 14496-3 ADTS.",
-    "Resolve AVC configuration or sample admission for the two FATE MOV inputs before Annex B conversion.",
+    "Resolve the missing AVC High-profile extension in the two pinned FATE configuration records.",
     "Resolve prefix delivery when a fragmented ISO BMFF sample extends past the source.",
     "Resolve the policy for initializing raw legacy Matroska AAC without a usable CodecPrivate record.",
     "Resolve exact CodecDelay subtraction versus the reference's Matroska tick projection."
@@ -398,11 +398,11 @@
     },
     {
       "id": "range-mp4-init-nonkeyframe-0-h264",
-      "requirement": "Resolve AVC configuration or sample admission for the two FATE MOV inputs before Annex B conversion."
+      "requirement": "Resolve the missing AVC High-profile extension in the two pinned FATE configuration records."
     },
     {
       "id": "range-mov-stream-shorter-than-movie-0-h264",
-      "requirement": "Resolve AVC configuration or sample admission for the two FATE MOV inputs before Annex B conversion."
+      "requirement": "Resolve the missing AVC High-profile extension in the two pinned FATE configuration records."
     },
     {
       "id": "forward-forward-fragment-aac-short-0-h264",

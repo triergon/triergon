@@ -112,7 +112,7 @@
       "cause": "Discovery runs inside matroska-startup-seek. This operation compares the discovery and replay fields."
     },
     {
-      "bound": "rss",
+      "bound": "total_rss",
       "cases": [
         "aac-mpeg2-lc-laced",
         "aac-mpeg2-lc",

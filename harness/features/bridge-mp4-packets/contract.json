@@ -111,7 +111,7 @@
       "cause": "Native runtime, live heap and total RSS collection are pending for the ADTS mux comparison."
     },
     {
-      "bound": "rss",
+      "bound": "total_rss",
       "cases": [
         "range-regular-avc-aac-1-aac",
         "range-variable-aac-duration-1-aac",

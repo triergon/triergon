@@ -43,7 +43,7 @@
       "cause": "The whole-file AV1 specification oracle provides a byte comparison."
     },
     {
-      "bound": "rss",
+      "bound": "total_rss",
       "cases": [
         "range-dav1-0-av1",
         "mp4-six-frames-0-av1",
