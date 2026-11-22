@@ -415,6 +415,14 @@
       "cause": "The PES and access-unit contracts measure the underlying policies. This operation adds fact folds."
     }
   ],
+  "pending_module_requirements": [
+    "Review sole-fault admission for malformed TS and PES headers",
+    "Review packet output across a finite PES length or physical EOF violation",
+    "Review the complete-entity requirement after transport sync loss",
+    "Review the selected-program admission requirement",
+    "Review the required source evidence for an empty packet result",
+    "Review the bounded TS188 or M2TS192 input-position probe"
+  ],
   "open_cases": [
     {
       "id": "pcr-and-stuffing",

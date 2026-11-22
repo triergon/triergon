@@ -758,6 +758,11 @@
       "cause": "Run paired runtime and memory collections on the two isolated gate hosts."
     }
   ],
+  "pending_module_requirements": [
+    "Review the transport continuity projection and resulting opaque payload",
+    "Review the scope of the ordered continuity evidence records",
+    "Review demux packets emitted outside the strict source reader’s admitted run"
+  ],
   "open_cases": [
     {
       "id": "cc-one-duplicate",

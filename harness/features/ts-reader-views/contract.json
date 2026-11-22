@@ -759,6 +759,15 @@
       "cause": "Run paired runtime and memory collections on the two isolated gate hosts."
     }
   ],
+  "pending_module_requirements": [
+    "Review the transport continuity projection and resulting opaque payload",
+    "Review demux packets emitted outside the strict source reader’s admitted run",
+    "Review the selected-program admission requirement",
+    "Review the source epoch versus the visible AVProgram PMT version",
+    "Review private audio identity and registration tag projection",
+    "Review source metadata versus demux DVB subtitle extradata",
+    "Review AC-3 parser output at EOF against the complete syncframe view"
+  ],
   "open_cases": [
     {
       "id": "cc-one-duplicate",

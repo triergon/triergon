@@ -204,6 +204,10 @@
       "cause": "The recovery projection exists for comparison."
     }
   ],
+  "pending_module_requirements": [
+    "Review sole-fault admission for malformed TS and PES headers",
+    "Review packet output across a finite PES length or physical EOF violation"
+  ],
   "open_cases": [
     {
       "id": "pcr-and-stuffing",
