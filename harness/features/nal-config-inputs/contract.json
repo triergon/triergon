@@ -8,9 +8,9 @@
   "worker_operation": "nal-config-",
   "reference": "ffmpeg-framing-views-native",
   "contract": [
-    "Read Annex B configuration with AnnexBConfigParser and compare ordered parameter sets with the side data produced by extract_extradata. Absence of configuration side data is a refusal. AnnexBWriter must emit the four-byte start code before each candidate parameter set. The complete NAL sequences of configuration blobs also run as length-prefixed samples.",
-    "For declared avcC and hvcC layouts, verify the retained record through Configuration::declared_record and DeclaredConfigParser. Fold kind 2 with the retained length and bytes, using the padded input record handed to the reference filter. The reference converts the record through MP4-to-Annex-B initialization. The declared layout is fixture data and candidate-only metadata appears in trace.",
-    "Fold kind 1 with parameter set or NAL type and the length and bytes, including the header. Remove start codes and inter-unit Annex B zero padding. Preserve terminal bytes. Fold kind 7 with unit count or kind 8 on refusal. Kind 3 preserves output that did not convert to Annex B.",
+    "Read Annex B configuration with AnnexBConfigParser and compare ordered parameter sets with the side data produced by extract_extradata. When extraction produces no side data for an isolated HEVC VPS, compare its bytes through a single-array hvcC conversion without inserting other parameter sets. Otherwise absence of configuration side data or a remaining non-parameter NAL is a refusal. AnnexBWriter must emit the four-byte start code before each candidate parameter set. The complete NAL sequences of configuration blobs also run as length-prefixed samples.",
+    "For declared avcC and hvcC layouts, verify the retained record through Configuration::declared_record and DeclaredConfigParser. Fold kind 2 with the retained length and bytes, using the padded input record handed to the reference filter. The reference converts the record through MP4-to-Annex-B initialization; a nonempty record passed through byte for byte supplies no converted units. Both sides refuse ranges that extend outside the record. The candidate also checks the type, completeness and relative ranges of the caller's declaration.",
+    "Fold kind 1 with parameter set or NAL type and the length and bytes, including the header. Remove start codes and Annex B zero padding, including a terminal run of at least three zero bytes. Fold kind 7 with unit count or kind 8 on refusal. Kind 3 preserves output that did not convert to Annex B.",
     "Input loading and reading the caller declarations take place outside the operation. Parser and filter setup, writing, folding and teardown are inside."
   ],
   "required_profiles": [
@@ -24,417 +24,47 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
+  "open_deviations": [
+    {
+      "reading": "Caller-declared arrays preserve opaque wire values",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord array fields, as documented by DeclaredConfigParser; ITU-T H.265 Table 7-1",
+      "candidate": "retains the record and all declared ranges, including an unknown empty array",
+      "reference": "retains the record but refuses conversion at an unknown array declaration",
+      "compat": "HvcDecoderConfigWriter for the decoder's restricted array selection",
+      "cases": [
+        "declared-hevc-config-unknown_empty",
+        "declared-opaque-arrays"
+      ]
+    },
+    {
+      "reading": "The AVC SPS extension remains visible",
+      "clause": "ISO/IEC 14496-15 AVCDecoderConfigurationRecord FRExt syntax, as documented by AvcConfigParser and DeclaredConfigParser",
+      "candidate": "writes the type-13 SPS extension in order",
+      "reference": "omits the SPS extension",
+      "cases": [
+        "declared-sequence-extension"
+      ]
+    },
+    {
+      "reading": "A trailing Annex B start code needs a NAL header",
+      "clause": "ITU-T H.264 clause B.2 and H.265 clause B.3 (the start-code prefix precedes a NAL unit)",
+      "candidate": "refuses the configuration ending in an unpaired prefix",
+      "reference": "extracts the preceding parameter sets despite the trailing prefix",
+      "compat": "compat::nal::ignore_dangling_configuration_prefix",
+      "cases": [
+        "avc-aud0-dangling-prefix",
+        "hevc-aud0-dangling-prefix",
+        "avc-authored-dangling-prefix"
+      ]
+    }
+  ],
   "pending_module_requirements": [
-    "An empty source is refused by the opaque constructor and FFmpeg initializes without extradata",
-    "An Annex B blob is not an ISO declaration layout and the reference exposes its start-coded units directly",
-    "An opaque caller-declared layout can preserve array types that the reference converter refuses",
-    "The reference conversion omits an AVC SPS extension or tolerates a missing extension entry, while the declared input checks its supplied ranges",
-    "A caller-declared record can be opaque to the ISO converter or carry a range that the ISO initialization does not check",
-    "The Annex B configuration reader separates terminal zero padding and the reference side data can retain it",
-    "The Annex B configuration parser requires parameter-set-only input and extract_extradata can skip non-parameter units",
-    "A terminal Annex B start code has no following header and the reference can still extract preceding parameter sets",
-    "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
+    "The caller supplies a layout and ranges independent of the ISO record layout. The converter does not consume those declarations. Compare against an independent reader of the same declared ranges, preserving the original extent and per-range errors."
   ],
   "open_cases": [
     {
-      "id": "declared-avc-no-extra",
-      "requirement": "An empty source is refused by the opaque constructor and FFmpeg initializes without extradata"
-    },
-    {
-      "id": "declared-avc-annexb-extra",
-      "requirement": "An Annex B blob is not an ISO declaration layout and the reference exposes its start-coded units directly"
-    },
-    {
-      "id": "declared-hevc-no-extra",
-      "requirement": "An empty source is refused by the opaque constructor and FFmpeg initializes without extradata"
-    },
-    {
-      "id": "declared-hevc-annexb-extra",
-      "requirement": "An Annex B blob is not an ISO declaration layout and the reference exposes its start-coded units directly"
-    },
-    {
-      "id": "declared-hevc-config-unknown_empty",
-      "requirement": "An opaque caller-declared layout can preserve array types that the reference converter refuses"
-    },
-    {
-      "id": "declared-sequence-extension",
-      "requirement": "The reference conversion omits an AVC SPS extension or tolerates a missing extension entry, while the declared input checks its supplied ranges"
-    },
-    {
-      "id": "declared-avc-profile-extension-missing-entry",
-      "requirement": "The reference conversion omits an AVC SPS extension or tolerates a missing extension entry, while the declared input checks its supplied ranges"
-    },
-    {
-      "id": "avc-aud0-trailing-zeroes",
-      "requirement": "The Annex B configuration reader separates terminal zero padding and the reference side data can retain it"
-    },
-    {
-      "id": "avc-aud0-aud-sei",
-      "requirement": "The Annex B configuration parser requires parameter-set-only input and extract_extradata can skip non-parameter units"
-    },
-    {
-      "id": "avc-aud0-dangling-prefix",
-      "requirement": "A terminal Annex B start code has no following header and the reference can still extract preceding parameter sets"
-    },
-    {
-      "id": "avc-aud1-trailing-zeroes",
-      "requirement": "The Annex B configuration reader separates terminal zero padding and the reference side data can retain it"
-    },
-    {
-      "id": "avc-aud1-aud-sei",
-      "requirement": "The Annex B configuration parser requires parameter-set-only input and extract_extradata can skip non-parameter units"
-    },
-    {
-      "id": "avc-aud1-dangling-prefix",
-      "requirement": "A terminal Annex B start code has no following header and the reference can still extract preceding parameter sets"
-    },
-    {
-      "id": "hevc-aud0-trailing-zeroes",
-      "requirement": "The Annex B configuration reader separates terminal zero padding and the reference side data can retain it"
-    },
-    {
-      "id": "hevc-aud0-aud-sei",
-      "requirement": "The Annex B configuration parser requires parameter-set-only input and extract_extradata can skip non-parameter units"
-    },
-    {
-      "id": "hevc-aud0-dangling-prefix",
-      "requirement": "A terminal Annex B start code has no following header and the reference can still extract preceding parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-06",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-07",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-08",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-09",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-10",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-11",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-12",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-13",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-14",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-15",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-16",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-17",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-18",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-19",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-20",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-21",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-22",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-23",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-24",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-25",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-26",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud0-first-set-cut-27",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-trailing-zeroes",
-      "requirement": "The Annex B configuration reader separates terminal zero padding and the reference side data can retain it"
-    },
-    {
-      "id": "hevc-aud1-aud-sei",
-      "requirement": "The Annex B configuration parser requires parameter-set-only input and extract_extradata can skip non-parameter units"
-    },
-    {
-      "id": "hevc-aud1-dangling-prefix",
-      "requirement": "A terminal Annex B start code has no following header and the reference can still extract preceding parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-06",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-07",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-08",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-09",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-10",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-11",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-12",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-13",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-14",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-15",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-16",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-17",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-18",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-19",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-20",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-21",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-22",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-23",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-24",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-25",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-26",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-aud1-first-set-cut-27",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-trailing-zeroes",
-      "requirement": "The Annex B configuration reader separates terminal zero padding and the reference side data can retain it"
-    },
-    {
-      "id": "hevc-eos-aud-sei",
-      "requirement": "The Annex B configuration parser requires parameter-set-only input and extract_extradata can skip non-parameter units"
-    },
-    {
-      "id": "hevc-eos-dangling-prefix",
-      "requirement": "A terminal Annex B start code has no following header and the reference can still extract preceding parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-06",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-07",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-08",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-09",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-10",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-11",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-12",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-13",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-14",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-15",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-16",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-17",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-18",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-19",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-20",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-21",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-22",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-23",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-24",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-25",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-26",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-eos-first-set-cut-27",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "avc-authored-trailing-zeroes",
-      "requirement": "The Annex B configuration reader separates terminal zero padding and the reference side data can retain it"
-    },
-    {
-      "id": "avc-authored-aud-sei",
-      "requirement": "The Annex B configuration parser requires parameter-set-only input and extract_extradata can skip non-parameter units"
-    },
-    {
-      "id": "avc-authored-dangling-prefix",
-      "requirement": "A terminal Annex B start code has no following header and the reference can still extract preceding parameter sets"
-    },
-    {
-      "id": "avc-annex-prefix-3",
-      "requirement": "The Annex B configuration parser requires parameter-set-only input and extract_extradata can skip non-parameter units"
-    },
-    {
-      "id": "avc-annex-prefix-4",
-      "requirement": "The Annex B configuration parser requires parameter-set-only input and extract_extradata can skip non-parameter units"
-    },
-    {
-      "id": "avc-annex-mixed-padding",
-      "requirement": "The Annex B configuration parser requires parameter-set-only input and extract_extradata can skip non-parameter units"
-    },
-    {
-      "id": "hevc-annex-mixed-padding",
-      "requirement": "The Annex B configuration reader separates terminal zero padding and the reference side data can retain it"
-    },
-    {
-      "id": "hevc-annex-eof-1-payload-zeros",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
-      "id": "hevc-annex-eof-2-payload-zeros",
-      "requirement": "The HEVC configuration reader accepts a fixed-header VPS-only view and extract_extradata emits no configuration without more parameter sets"
-    },
-    {
       "id": "declared-opaque-test-layout",
-      "requirement": "A caller-declared record can be opaque to the ISO converter or carry a range that the ISO initialization does not check"
-    },
-    {
-      "id": "declared-invalid-range",
-      "requirement": "A caller-declared record can be opaque to the ISO converter or carry a range that the ISO initialization does not check"
-    },
-    {
-      "id": "declared-opaque-arrays",
-      "requirement": "An opaque caller-declared layout can preserve array types that the reference converter refuses"
+      "requirement": "The caller supplies a layout and ranges independent of the ISO record layout. The converter does not consume those declarations. Compare against an independent reader of the same declared ranges, preserving the original extent and per-range errors."
     }
   ],
   "open_unmeasured": [
@@ -452,32 +82,16 @@
         "avc-aud0-first-set-cut-10", "avc-aud0-first-set-cut-11", "avc-aud0-first-set-cut-12", "avc-aud0-first-set-cut-13", "avc-aud0-first-set-cut-14",
         "avc-aud0-first-set-cut-15", "avc-aud0-first-set-cut-16", "avc-aud0-first-set-cut-17", "avc-aud0-first-set-cut-18", "avc-aud0-first-set-cut-19",
         "avc-aud0-first-set-cut-20", "avc-aud0-first-set-cut-21", "avc-aud0-first-set-cut-22", "avc-aud0-first-set-cut-23", "avc-aud0-first-set-cut-24",
-        "avc-aud0-first-set-cut-25", "avc-aud0-first-set-cut-26", "avc-aud0-first-set-cut-27", "avc-aud1-three-byte", "avc-aud1-four-byte",
-        "avc-aud1-leading-zeroes", "avc-aud1-trailing-zeroes", "avc-aud1-aud-sei", "avc-aud1-duplicate", "avc-aud1-dangling-prefix",
-        "avc-aud1-first-set-cut-05", "avc-aud1-first-set-cut-06", "avc-aud1-first-set-cut-07", "avc-aud1-first-set-cut-08", "avc-aud1-first-set-cut-09",
-        "avc-aud1-first-set-cut-10", "avc-aud1-first-set-cut-11", "avc-aud1-first-set-cut-12", "avc-aud1-first-set-cut-13", "avc-aud1-first-set-cut-14",
-        "avc-aud1-first-set-cut-15", "avc-aud1-first-set-cut-16", "avc-aud1-first-set-cut-17", "avc-aud1-first-set-cut-18", "avc-aud1-first-set-cut-19",
-        "avc-aud1-first-set-cut-20", "avc-aud1-first-set-cut-21", "avc-aud1-first-set-cut-22", "avc-aud1-first-set-cut-23", "avc-aud1-first-set-cut-24",
-        "avc-aud1-first-set-cut-25", "avc-aud1-first-set-cut-26", "avc-aud1-first-set-cut-27", "hevc-aud0-three-byte", "hevc-aud0-four-byte",
+        "avc-aud0-first-set-cut-25", "avc-aud0-first-set-cut-26", "avc-aud0-first-set-cut-27",
+        "hevc-aud0-three-byte", "hevc-aud0-four-byte",
         "hevc-aud0-leading-zeroes", "hevc-aud0-trailing-zeroes", "hevc-aud0-aud-sei", "hevc-aud0-duplicate", "hevc-aud0-dangling-prefix",
         "hevc-aud0-first-set-cut-06", "hevc-aud0-first-set-cut-07", "hevc-aud0-first-set-cut-08", "hevc-aud0-first-set-cut-09", "hevc-aud0-first-set-cut-10",
         "hevc-aud0-first-set-cut-11", "hevc-aud0-first-set-cut-12", "hevc-aud0-first-set-cut-13", "hevc-aud0-first-set-cut-14", "hevc-aud0-first-set-cut-15",
         "hevc-aud0-first-set-cut-16", "hevc-aud0-first-set-cut-17", "hevc-aud0-first-set-cut-18", "hevc-aud0-first-set-cut-19", "hevc-aud0-first-set-cut-20",
         "hevc-aud0-first-set-cut-21", "hevc-aud0-first-set-cut-22", "hevc-aud0-first-set-cut-23", "hevc-aud0-first-set-cut-24", "hevc-aud0-first-set-cut-25",
-        "hevc-aud0-first-set-cut-26", "hevc-aud0-first-set-cut-27", "hevc-aud1-three-byte", "hevc-aud1-four-byte", "hevc-aud1-leading-zeroes",
-        "hevc-aud1-trailing-zeroes", "hevc-aud1-aud-sei", "hevc-aud1-duplicate", "hevc-aud1-dangling-prefix", "hevc-aud1-first-set-cut-06",
-        "hevc-aud1-first-set-cut-07", "hevc-aud1-first-set-cut-08", "hevc-aud1-first-set-cut-09", "hevc-aud1-first-set-cut-10", "hevc-aud1-first-set-cut-11",
-        "hevc-aud1-first-set-cut-12", "hevc-aud1-first-set-cut-13", "hevc-aud1-first-set-cut-14", "hevc-aud1-first-set-cut-15", "hevc-aud1-first-set-cut-16",
-        "hevc-aud1-first-set-cut-17", "hevc-aud1-first-set-cut-18", "hevc-aud1-first-set-cut-19", "hevc-aud1-first-set-cut-20", "hevc-aud1-first-set-cut-21",
-        "hevc-aud1-first-set-cut-22", "hevc-aud1-first-set-cut-23", "hevc-aud1-first-set-cut-24", "hevc-aud1-first-set-cut-25", "hevc-aud1-first-set-cut-26",
-        "hevc-aud1-first-set-cut-27", "hevc-eos-three-byte", "hevc-eos-four-byte", "hevc-eos-leading-zeroes", "hevc-eos-trailing-zeroes",
-        "hevc-eos-aud-sei", "hevc-eos-duplicate", "hevc-eos-dangling-prefix", "hevc-eos-first-set-cut-06", "hevc-eos-first-set-cut-07",
-        "hevc-eos-first-set-cut-08", "hevc-eos-first-set-cut-09", "hevc-eos-first-set-cut-10", "hevc-eos-first-set-cut-11", "hevc-eos-first-set-cut-12",
-        "hevc-eos-first-set-cut-13", "hevc-eos-first-set-cut-14", "hevc-eos-first-set-cut-15", "hevc-eos-first-set-cut-16", "hevc-eos-first-set-cut-17",
-        "hevc-eos-first-set-cut-18", "hevc-eos-first-set-cut-19", "hevc-eos-first-set-cut-20", "hevc-eos-first-set-cut-21", "hevc-eos-first-set-cut-22",
-        "hevc-eos-first-set-cut-23", "hevc-eos-first-set-cut-24", "hevc-eos-first-set-cut-25", "hevc-eos-first-set-cut-26", "hevc-eos-first-set-cut-27",
+        "hevc-aud0-first-set-cut-26", "hevc-aud0-first-set-cut-27",
         "avc-authored-three-byte", "avc-authored-four-byte", "avc-authored-leading-zeroes", "avc-authored-trailing-zeroes", "avc-authored-aud-sei",
-        "avc-authored-duplicate", "avc-authored-dangling-prefix", "avc-authored-first-set-cut-05", "avc-authored-first-set-cut-06", "avc-authored-first-set-cut-07",
+        "avc-authored-duplicate", "avc-authored-dangling-prefix", "avc-authored-first-set-cut-06", "avc-authored-first-set-cut-07",
         "avc-authored-first-set-cut-08", "avc-annex-prefix-3", "avc-annex-prefix-4", "avc-annex-mixed-padding", "avc-annex-eof-1-payload-zeros",
         "avc-annex-eof-2-payload-zeros", "hevc-annex-prefix-3", "hevc-annex-prefix-4", "hevc-annex-mixed-padding", "hevc-annex-eof-1-payload-zeros",
         "hevc-annex-eof-2-payload-zeros", "declared-opaque-test-layout", "declared-invalid-range", "declared-opaque-arrays"
@@ -488,14 +102,10 @@
       "bound": "runtime",
       "cases": [
         "avc-aud0-first-set-cut-00", "avc-aud0-first-set-cut-01", "avc-aud0-first-set-cut-02", "avc-aud0-first-set-cut-03", "avc-aud0-first-set-cut-04",
-        "avc-aud0-no-sets", "avc-aud1-first-set-cut-00", "avc-aud1-first-set-cut-01", "avc-aud1-first-set-cut-02", "avc-aud1-first-set-cut-03",
-        "avc-aud1-first-set-cut-04", "avc-aud1-no-sets", "avc-authored-first-set-cut-00", "avc-authored-first-set-cut-01", "avc-authored-first-set-cut-02",
-        "avc-authored-first-set-cut-03", "avc-authored-first-set-cut-04", "avc-authored-no-sets", "avc-empty-annex", "hevc-aud0-first-set-cut-00",
+        "avc-aud0-no-sets",
+        "hevc-aud0-first-set-cut-00",
         "hevc-aud0-first-set-cut-01", "hevc-aud0-first-set-cut-02", "hevc-aud0-first-set-cut-03", "hevc-aud0-first-set-cut-04", "hevc-aud0-first-set-cut-05",
-        "hevc-aud0-no-sets", "hevc-aud1-first-set-cut-00", "hevc-aud1-first-set-cut-01", "hevc-aud1-first-set-cut-02", "hevc-aud1-first-set-cut-03",
-        "hevc-aud1-first-set-cut-04", "hevc-aud1-first-set-cut-05", "hevc-aud1-no-sets", "hevc-empty-annex", "hevc-eos-first-set-cut-00",
-        "hevc-eos-first-set-cut-01", "hevc-eos-first-set-cut-02", "hevc-eos-first-set-cut-03", "hevc-eos-first-set-cut-04", "hevc-eos-first-set-cut-05",
-        "hevc-eos-no-sets"
+        "hevc-aud0-no-sets"
       ],
       "cause": "both workers refuse the input"
     },
@@ -513,32 +123,16 @@
         "avc-aud0-first-set-cut-10", "avc-aud0-first-set-cut-11", "avc-aud0-first-set-cut-12", "avc-aud0-first-set-cut-13", "avc-aud0-first-set-cut-14",
         "avc-aud0-first-set-cut-15", "avc-aud0-first-set-cut-16", "avc-aud0-first-set-cut-17", "avc-aud0-first-set-cut-18", "avc-aud0-first-set-cut-19",
         "avc-aud0-first-set-cut-20", "avc-aud0-first-set-cut-21", "avc-aud0-first-set-cut-22", "avc-aud0-first-set-cut-23", "avc-aud0-first-set-cut-24",
-        "avc-aud0-first-set-cut-25", "avc-aud0-first-set-cut-26", "avc-aud0-first-set-cut-27", "avc-aud1-three-byte", "avc-aud1-four-byte",
-        "avc-aud1-leading-zeroes", "avc-aud1-trailing-zeroes", "avc-aud1-aud-sei", "avc-aud1-duplicate", "avc-aud1-dangling-prefix",
-        "avc-aud1-first-set-cut-05", "avc-aud1-first-set-cut-06", "avc-aud1-first-set-cut-07", "avc-aud1-first-set-cut-08", "avc-aud1-first-set-cut-09",
-        "avc-aud1-first-set-cut-10", "avc-aud1-first-set-cut-11", "avc-aud1-first-set-cut-12", "avc-aud1-first-set-cut-13", "avc-aud1-first-set-cut-14",
-        "avc-aud1-first-set-cut-15", "avc-aud1-first-set-cut-16", "avc-aud1-first-set-cut-17", "avc-aud1-first-set-cut-18", "avc-aud1-first-set-cut-19",
-        "avc-aud1-first-set-cut-20", "avc-aud1-first-set-cut-21", "avc-aud1-first-set-cut-22", "avc-aud1-first-set-cut-23", "avc-aud1-first-set-cut-24",
-        "avc-aud1-first-set-cut-25", "avc-aud1-first-set-cut-26", "avc-aud1-first-set-cut-27", "hevc-aud0-three-byte", "hevc-aud0-four-byte",
+        "avc-aud0-first-set-cut-25", "avc-aud0-first-set-cut-26", "avc-aud0-first-set-cut-27",
+        "hevc-aud0-three-byte", "hevc-aud0-four-byte",
         "hevc-aud0-leading-zeroes", "hevc-aud0-trailing-zeroes", "hevc-aud0-aud-sei", "hevc-aud0-duplicate", "hevc-aud0-dangling-prefix",
         "hevc-aud0-first-set-cut-06", "hevc-aud0-first-set-cut-07", "hevc-aud0-first-set-cut-08", "hevc-aud0-first-set-cut-09", "hevc-aud0-first-set-cut-10",
         "hevc-aud0-first-set-cut-11", "hevc-aud0-first-set-cut-12", "hevc-aud0-first-set-cut-13", "hevc-aud0-first-set-cut-14", "hevc-aud0-first-set-cut-15",
         "hevc-aud0-first-set-cut-16", "hevc-aud0-first-set-cut-17", "hevc-aud0-first-set-cut-18", "hevc-aud0-first-set-cut-19", "hevc-aud0-first-set-cut-20",
         "hevc-aud0-first-set-cut-21", "hevc-aud0-first-set-cut-22", "hevc-aud0-first-set-cut-23", "hevc-aud0-first-set-cut-24", "hevc-aud0-first-set-cut-25",
-        "hevc-aud0-first-set-cut-26", "hevc-aud0-first-set-cut-27", "hevc-aud1-three-byte", "hevc-aud1-four-byte", "hevc-aud1-leading-zeroes",
-        "hevc-aud1-trailing-zeroes", "hevc-aud1-aud-sei", "hevc-aud1-duplicate", "hevc-aud1-dangling-prefix", "hevc-aud1-first-set-cut-06",
-        "hevc-aud1-first-set-cut-07", "hevc-aud1-first-set-cut-08", "hevc-aud1-first-set-cut-09", "hevc-aud1-first-set-cut-10", "hevc-aud1-first-set-cut-11",
-        "hevc-aud1-first-set-cut-12", "hevc-aud1-first-set-cut-13", "hevc-aud1-first-set-cut-14", "hevc-aud1-first-set-cut-15", "hevc-aud1-first-set-cut-16",
-        "hevc-aud1-first-set-cut-17", "hevc-aud1-first-set-cut-18", "hevc-aud1-first-set-cut-19", "hevc-aud1-first-set-cut-20", "hevc-aud1-first-set-cut-21",
-        "hevc-aud1-first-set-cut-22", "hevc-aud1-first-set-cut-23", "hevc-aud1-first-set-cut-24", "hevc-aud1-first-set-cut-25", "hevc-aud1-first-set-cut-26",
-        "hevc-aud1-first-set-cut-27", "hevc-eos-three-byte", "hevc-eos-four-byte", "hevc-eos-leading-zeroes", "hevc-eos-trailing-zeroes",
-        "hevc-eos-aud-sei", "hevc-eos-duplicate", "hevc-eos-dangling-prefix", "hevc-eos-first-set-cut-06", "hevc-eos-first-set-cut-07",
-        "hevc-eos-first-set-cut-08", "hevc-eos-first-set-cut-09", "hevc-eos-first-set-cut-10", "hevc-eos-first-set-cut-11", "hevc-eos-first-set-cut-12",
-        "hevc-eos-first-set-cut-13", "hevc-eos-first-set-cut-14", "hevc-eos-first-set-cut-15", "hevc-eos-first-set-cut-16", "hevc-eos-first-set-cut-17",
-        "hevc-eos-first-set-cut-18", "hevc-eos-first-set-cut-19", "hevc-eos-first-set-cut-20", "hevc-eos-first-set-cut-21", "hevc-eos-first-set-cut-22",
-        "hevc-eos-first-set-cut-23", "hevc-eos-first-set-cut-24", "hevc-eos-first-set-cut-25", "hevc-eos-first-set-cut-26", "hevc-eos-first-set-cut-27",
+        "hevc-aud0-first-set-cut-26", "hevc-aud0-first-set-cut-27",
         "avc-authored-three-byte", "avc-authored-four-byte", "avc-authored-leading-zeroes", "avc-authored-trailing-zeroes", "avc-authored-aud-sei",
-        "avc-authored-duplicate", "avc-authored-dangling-prefix", "avc-authored-first-set-cut-05", "avc-authored-first-set-cut-06", "avc-authored-first-set-cut-07",
+        "avc-authored-duplicate", "avc-authored-dangling-prefix", "avc-authored-first-set-cut-06", "avc-authored-first-set-cut-07",
         "avc-authored-first-set-cut-08", "avc-annex-prefix-3", "avc-annex-prefix-4", "avc-annex-mixed-padding", "avc-annex-eof-1-payload-zeros",
         "avc-annex-eof-2-payload-zeros", "hevc-annex-prefix-3", "hevc-annex-prefix-4", "hevc-annex-mixed-padding", "hevc-annex-eof-1-payload-zeros",
         "hevc-annex-eof-2-payload-zeros", "declared-opaque-test-layout", "declared-invalid-range", "declared-opaque-arrays"
@@ -549,14 +143,10 @@
       "bound": "heap",
       "cases": [
         "avc-aud0-first-set-cut-00", "avc-aud0-first-set-cut-01", "avc-aud0-first-set-cut-02", "avc-aud0-first-set-cut-03", "avc-aud0-first-set-cut-04",
-        "avc-aud0-no-sets", "avc-aud1-first-set-cut-00", "avc-aud1-first-set-cut-01", "avc-aud1-first-set-cut-02", "avc-aud1-first-set-cut-03",
-        "avc-aud1-first-set-cut-04", "avc-aud1-no-sets", "avc-authored-first-set-cut-00", "avc-authored-first-set-cut-01", "avc-authored-first-set-cut-02",
-        "avc-authored-first-set-cut-03", "avc-authored-first-set-cut-04", "avc-authored-no-sets", "avc-empty-annex", "hevc-aud0-first-set-cut-00",
+        "avc-aud0-no-sets",
+        "hevc-aud0-first-set-cut-00",
         "hevc-aud0-first-set-cut-01", "hevc-aud0-first-set-cut-02", "hevc-aud0-first-set-cut-03", "hevc-aud0-first-set-cut-04", "hevc-aud0-first-set-cut-05",
-        "hevc-aud0-no-sets", "hevc-aud1-first-set-cut-00", "hevc-aud1-first-set-cut-01", "hevc-aud1-first-set-cut-02", "hevc-aud1-first-set-cut-03",
-        "hevc-aud1-first-set-cut-04", "hevc-aud1-first-set-cut-05", "hevc-aud1-no-sets", "hevc-empty-annex", "hevc-eos-first-set-cut-00",
-        "hevc-eos-first-set-cut-01", "hevc-eos-first-set-cut-02", "hevc-eos-first-set-cut-03", "hevc-eos-first-set-cut-04", "hevc-eos-first-set-cut-05",
-        "hevc-eos-no-sets"
+        "hevc-aud0-no-sets"
       ],
       "cause": "both workers refuse the input"
     },
@@ -574,32 +164,16 @@
         "avc-aud0-first-set-cut-10", "avc-aud0-first-set-cut-11", "avc-aud0-first-set-cut-12", "avc-aud0-first-set-cut-13", "avc-aud0-first-set-cut-14",
         "avc-aud0-first-set-cut-15", "avc-aud0-first-set-cut-16", "avc-aud0-first-set-cut-17", "avc-aud0-first-set-cut-18", "avc-aud0-first-set-cut-19",
         "avc-aud0-first-set-cut-20", "avc-aud0-first-set-cut-21", "avc-aud0-first-set-cut-22", "avc-aud0-first-set-cut-23", "avc-aud0-first-set-cut-24",
-        "avc-aud0-first-set-cut-25", "avc-aud0-first-set-cut-26", "avc-aud0-first-set-cut-27", "avc-aud1-three-byte", "avc-aud1-four-byte",
-        "avc-aud1-leading-zeroes", "avc-aud1-trailing-zeroes", "avc-aud1-aud-sei", "avc-aud1-duplicate", "avc-aud1-dangling-prefix",
-        "avc-aud1-first-set-cut-05", "avc-aud1-first-set-cut-06", "avc-aud1-first-set-cut-07", "avc-aud1-first-set-cut-08", "avc-aud1-first-set-cut-09",
-        "avc-aud1-first-set-cut-10", "avc-aud1-first-set-cut-11", "avc-aud1-first-set-cut-12", "avc-aud1-first-set-cut-13", "avc-aud1-first-set-cut-14",
-        "avc-aud1-first-set-cut-15", "avc-aud1-first-set-cut-16", "avc-aud1-first-set-cut-17", "avc-aud1-first-set-cut-18", "avc-aud1-first-set-cut-19",
-        "avc-aud1-first-set-cut-20", "avc-aud1-first-set-cut-21", "avc-aud1-first-set-cut-22", "avc-aud1-first-set-cut-23", "avc-aud1-first-set-cut-24",
-        "avc-aud1-first-set-cut-25", "avc-aud1-first-set-cut-26", "avc-aud1-first-set-cut-27", "hevc-aud0-three-byte", "hevc-aud0-four-byte",
+        "avc-aud0-first-set-cut-25", "avc-aud0-first-set-cut-26", "avc-aud0-first-set-cut-27",
+        "hevc-aud0-three-byte", "hevc-aud0-four-byte",
         "hevc-aud0-leading-zeroes", "hevc-aud0-trailing-zeroes", "hevc-aud0-aud-sei", "hevc-aud0-duplicate", "hevc-aud0-dangling-prefix",
         "hevc-aud0-first-set-cut-06", "hevc-aud0-first-set-cut-07", "hevc-aud0-first-set-cut-08", "hevc-aud0-first-set-cut-09", "hevc-aud0-first-set-cut-10",
         "hevc-aud0-first-set-cut-11", "hevc-aud0-first-set-cut-12", "hevc-aud0-first-set-cut-13", "hevc-aud0-first-set-cut-14", "hevc-aud0-first-set-cut-15",
         "hevc-aud0-first-set-cut-16", "hevc-aud0-first-set-cut-17", "hevc-aud0-first-set-cut-18", "hevc-aud0-first-set-cut-19", "hevc-aud0-first-set-cut-20",
         "hevc-aud0-first-set-cut-21", "hevc-aud0-first-set-cut-22", "hevc-aud0-first-set-cut-23", "hevc-aud0-first-set-cut-24", "hevc-aud0-first-set-cut-25",
-        "hevc-aud0-first-set-cut-26", "hevc-aud0-first-set-cut-27", "hevc-aud1-three-byte", "hevc-aud1-four-byte", "hevc-aud1-leading-zeroes",
-        "hevc-aud1-trailing-zeroes", "hevc-aud1-aud-sei", "hevc-aud1-duplicate", "hevc-aud1-dangling-prefix", "hevc-aud1-first-set-cut-06",
-        "hevc-aud1-first-set-cut-07", "hevc-aud1-first-set-cut-08", "hevc-aud1-first-set-cut-09", "hevc-aud1-first-set-cut-10", "hevc-aud1-first-set-cut-11",
-        "hevc-aud1-first-set-cut-12", "hevc-aud1-first-set-cut-13", "hevc-aud1-first-set-cut-14", "hevc-aud1-first-set-cut-15", "hevc-aud1-first-set-cut-16",
-        "hevc-aud1-first-set-cut-17", "hevc-aud1-first-set-cut-18", "hevc-aud1-first-set-cut-19", "hevc-aud1-first-set-cut-20", "hevc-aud1-first-set-cut-21",
-        "hevc-aud1-first-set-cut-22", "hevc-aud1-first-set-cut-23", "hevc-aud1-first-set-cut-24", "hevc-aud1-first-set-cut-25", "hevc-aud1-first-set-cut-26",
-        "hevc-aud1-first-set-cut-27", "hevc-eos-three-byte", "hevc-eos-four-byte", "hevc-eos-leading-zeroes", "hevc-eos-trailing-zeroes",
-        "hevc-eos-aud-sei", "hevc-eos-duplicate", "hevc-eos-dangling-prefix", "hevc-eos-first-set-cut-06", "hevc-eos-first-set-cut-07",
-        "hevc-eos-first-set-cut-08", "hevc-eos-first-set-cut-09", "hevc-eos-first-set-cut-10", "hevc-eos-first-set-cut-11", "hevc-eos-first-set-cut-12",
-        "hevc-eos-first-set-cut-13", "hevc-eos-first-set-cut-14", "hevc-eos-first-set-cut-15", "hevc-eos-first-set-cut-16", "hevc-eos-first-set-cut-17",
-        "hevc-eos-first-set-cut-18", "hevc-eos-first-set-cut-19", "hevc-eos-first-set-cut-20", "hevc-eos-first-set-cut-21", "hevc-eos-first-set-cut-22",
-        "hevc-eos-first-set-cut-23", "hevc-eos-first-set-cut-24", "hevc-eos-first-set-cut-25", "hevc-eos-first-set-cut-26", "hevc-eos-first-set-cut-27",
+        "hevc-aud0-first-set-cut-26", "hevc-aud0-first-set-cut-27",
         "avc-authored-three-byte", "avc-authored-four-byte", "avc-authored-leading-zeroes", "avc-authored-trailing-zeroes", "avc-authored-aud-sei",
-        "avc-authored-duplicate", "avc-authored-dangling-prefix", "avc-authored-first-set-cut-05", "avc-authored-first-set-cut-06", "avc-authored-first-set-cut-07",
+        "avc-authored-duplicate", "avc-authored-dangling-prefix", "avc-authored-first-set-cut-06", "avc-authored-first-set-cut-07",
         "avc-authored-first-set-cut-08", "avc-annex-prefix-3", "avc-annex-prefix-4", "avc-annex-mixed-padding", "avc-annex-eof-1-payload-zeros",
         "avc-annex-eof-2-payload-zeros", "hevc-annex-prefix-3", "hevc-annex-prefix-4", "hevc-annex-mixed-padding", "hevc-annex-eof-1-payload-zeros",
         "hevc-annex-eof-2-payload-zeros", "declared-opaque-test-layout", "declared-invalid-range", "declared-opaque-arrays"
@@ -610,14 +184,10 @@
       "bound": "total_rss",
       "cases": [
         "avc-aud0-first-set-cut-00", "avc-aud0-first-set-cut-01", "avc-aud0-first-set-cut-02", "avc-aud0-first-set-cut-03", "avc-aud0-first-set-cut-04",
-        "avc-aud0-no-sets", "avc-aud1-first-set-cut-00", "avc-aud1-first-set-cut-01", "avc-aud1-first-set-cut-02", "avc-aud1-first-set-cut-03",
-        "avc-aud1-first-set-cut-04", "avc-aud1-no-sets", "avc-authored-first-set-cut-00", "avc-authored-first-set-cut-01", "avc-authored-first-set-cut-02",
-        "avc-authored-first-set-cut-03", "avc-authored-first-set-cut-04", "avc-authored-no-sets", "avc-empty-annex", "hevc-aud0-first-set-cut-00",
+        "avc-aud0-no-sets",
+        "hevc-aud0-first-set-cut-00",
         "hevc-aud0-first-set-cut-01", "hevc-aud0-first-set-cut-02", "hevc-aud0-first-set-cut-03", "hevc-aud0-first-set-cut-04", "hevc-aud0-first-set-cut-05",
-        "hevc-aud0-no-sets", "hevc-aud1-first-set-cut-00", "hevc-aud1-first-set-cut-01", "hevc-aud1-first-set-cut-02", "hevc-aud1-first-set-cut-03",
-        "hevc-aud1-first-set-cut-04", "hevc-aud1-first-set-cut-05", "hevc-aud1-no-sets", "hevc-empty-annex", "hevc-eos-first-set-cut-00",
-        "hevc-eos-first-set-cut-01", "hevc-eos-first-set-cut-02", "hevc-eos-first-set-cut-03", "hevc-eos-first-set-cut-04", "hevc-eos-first-set-cut-05",
-        "hevc-eos-no-sets"
+        "hevc-aud0-no-sets"
       ],
       "cause": "both workers refuse the input"
     }

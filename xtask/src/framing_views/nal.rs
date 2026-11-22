@@ -113,6 +113,17 @@ impl Corpus {
             ("arguments", Value::strings(args.iter().copied())),
         ]));
     }
+
+    fn retain_distinct(&mut self) {
+        let mut seen = BTreeSet::new();
+        self.cases.retain(|case| {
+            // A different protocol argument can change the reading even for
+            // identical bytes. Keep it, and keep each required profile.
+            let key = ["profile", "sha256", "arguments"]
+                .map(|name| json::to_python(case.get(name).unwrap(), None));
+            seen.insert(key)
+        });
+    }
 }
 
 struct Corpora<'a> {
@@ -774,6 +785,7 @@ pub(crate) fn fixtures(paths: &Paths, manifests: bool) -> Result<String> {
     raw_controls("avc-authored", Codec::Avc, &[AVC_CONTROL], &mut corpora)?;
     samples(paths, &mut corpora)?;
     hevc_controls(&mut corpora)?;
+    corpora.config.retain_distinct();
     let mut total = 0;
     for (id, corpus) in IDS
         .into_iter()

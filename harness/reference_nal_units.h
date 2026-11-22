@@ -1,8 +1,10 @@
 /* NAL framing and configuration through public FFmpeg bitstream filters. */
 #include <errno.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <libavutil/log.h>
 #include <libavcodec/bsf.h>
+#include <libavutil/opt.h>
 #include <libavutil/mem.h>
 
 typedef struct {
@@ -234,11 +236,15 @@ static void nal_config_units(ViewWork *work, enum AVCodecID codec, NalView bytes
     NalView unit;
     int state;
     while ((state = nal_annexb_next(&bytes, four, &unit)) > 0) {
-        // Annex B inter-unit zero padding (including a detached zero_byte)
-        // is outside the payload. Keep the terminal bytes as returned.
-        if (extracted && bytes.size)
-            while (unit.size && !unit.data[unit.size - 1])
-                --unit.size;
+        // H.264 clause B.2 and H.265 clause B.3 place 00 00 00 at a NAL
+        // boundary. Preserve one or two terminal zero bytes at EOF.
+        if (extracted) {
+            size_t end = unit.size;
+            while (end && !unit.data[end - 1])
+                --end;
+            if (bytes.size || unit.size - end >= 3)
+                unit.size = end;
+        }
         uint64_t words[] = {nal_type(codec, unit), unit.size};
         nal_record(work, 1, words, 2, unit);
         ++count;
@@ -249,6 +255,48 @@ static void nal_config_units(ViewWork *work, enum AVCodecID codec, NalView bytes
     }
     uint64_t end[] = {count, 0};
     nal_record(work, 7, end, decoder ? 2 : 1, (NalView){0});
+}
+
+static int nal_declared_extents_fit(const char *layout, size_t size)
+{
+    // Columns after the type and completeness hold only byte offsets.
+    unsigned column = 0;
+    while (*layout) {
+        const char *end = layout + strcspn(layout, ",;");
+        if (column >= 2) {
+            char *parsed;
+            const unsigned long offset = strtoul(layout, &parsed, 10);
+            if (parsed != end || parsed == layout || offset > size)
+                return 0;
+        }
+        column = *end == ';' ? 0 : column + 1;
+        layout = *end ? end + 1 : end;
+    }
+    return 1;
+}
+
+/* Extraction requires a decoder configuration. An isolated VPS can instead
+ * be observed through the record writer without asking the reference to
+ * interpret its RBSP or supplying other parameter sets. */
+static int nal_single_vps(NalView source, AVBSFContext **conversion)
+{
+    NalView vps;
+    if (nal_annexb_next(&source, 0, &vps) != 1 || source.size ||
+        vps.size < 2 || vps.size > UINT16_MAX || nal_type(AV_CODEC_ID_HEVC, vps) != 32)
+        return AVERROR_INVALIDDATA;
+    const uint8_t prefix[] = {
+        1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30, 0xf0, 0, 0xfc, 0xfd, 0xf8, 0xf8,
+        0, 0, 0x0f, 1, 32, 0, 1, (uint8_t)(vps.size >> 8), (uint8_t)vps.size,
+    };
+    uint8_t *record = av_malloc(sizeof(prefix) + vps.size);
+    if (!record)
+        return AVERROR(ENOMEM);
+    memcpy(record, prefix, sizeof(prefix));
+    memcpy(record + sizeof(prefix), vps.data, vps.size);
+    const int status = nal_bsf_open(nal_bsf_name(AV_CODEC_ID_HEVC), AV_CODEC_ID_HEVC,
+                                   (NalView){record, sizeof(prefix) + vps.size}, conversion);
+    av_free(record);
+    return status;
 }
 
 static int nal_config_run(const ViewCase *input, ViewWork *work)
@@ -264,19 +312,46 @@ static int nal_config_run(const ViewCase *input, ViewWork *work)
             uint64_t size = source.size;
             nal_record(work, 2, &size, 1, source);
         }
-        status = nal_bsf_open(nal_bsf_name(codec), codec, source, &bsf);
-        if (status >= 0)
+        status = nal_declared_extents_fit(input->argv[3], source.size)
+                 ? nal_bsf_open(nal_bsf_name(codec), codec, source, &bsf)
+                 : AVERROR_INVALIDDATA;
+        if (status >= 0) {
             converted = (NalView){bsf->par_out->extradata, (size_t)bsf->par_out->extradata_size};
+            if (!source.size && !converted.size)
+                status = AVERROR_INVALIDDATA;
+            else if (converted.size == source.size &&
+                     !memcmp(converted.data, source.data, source.size))
+                converted = (NalView){0};
+        }
     } else {
         status = nal_bsf_open("extract_extradata", codec, (NalView){0}, &bsf);
+        if (status >= 0)
+            status = av_opt_set_int(bsf->priv_data, "remove", 1, 0);
         if (status >= 0) {
             packet = av_packet_alloc();
             status = packet ? nal_send(bsf, packet, source) : AVERROR(ENOMEM);
         }
         if (status >= 0)
             status = av_bsf_receive_packet(bsf, packet);
-        if (status >= 0)
+        if (status >= 0) {
             converted.data = av_packet_get_side_data(packet, AV_PKT_DATA_NEW_EXTRADATA, &converted.size);
+            /* A parameter-set configuration consumes the input. The filter
+             * publishes any other NALs in its remaining packet. */
+            NalView remaining = {packet->data, (size_t)packet->size};
+            size_t prefix;
+            const size_t first = nal_start(remaining, 0, &prefix);
+            if (first < remaining.size && first + prefix < remaining.size) {
+                status = AVERROR_INVALIDDATA;
+            }
+        }
+        if (codec == AV_CODEC_ID_HEVC &&
+            (status == AVERROR_INVALIDDATA || status == AVERROR(EAGAIN) ||
+             (status >= 0 && !converted.size))) {
+            av_bsf_free(&bsf);
+            status = nal_single_vps(source, &bsf);
+            if (status >= 0)
+                converted = (NalView){bsf->par_out->extradata, (size_t)bsf->par_out->extradata_size};
+        }
     }
     int refusal = status == AVERROR_INVALIDDATA ||
         (!declared && (status == AVERROR(EAGAIN) || (status >= 0 && !converted.size)));
