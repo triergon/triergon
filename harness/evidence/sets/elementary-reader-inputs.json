@@ -2,12 +2,184 @@
  "name": "elementary-reader-inputs",
  "path": "elementary-reader-inputs",
  "retention": "retained",
- "reason": "Pinned authored FLAC, MPEG audio, ADTS, AC-3 and E-AC-3 streams, including crafted damaged streams. Each matches its elementary packet comparison pin in harness/codecs/reader-manifest.json.",
- "key": "evidence/elementary-reader-inputs/a0c4df2d21151426fa88e0798f3aff4d5518d3e80048c353af60b21746c6b3d5.tar.gz",
- "sha256": "a0c4df2d21151426fa88e0798f3aff4d5518d3e80048c353af60b21746c6b3d5",
- "bytes": 5843924,
+ "reason": "Pinned elementary reader, metadata, seek and media probe inputs. Authored metadata envelopes, damaged frames and competing signatures supplement the retained audio streams.",
+ "key": "evidence/elementary-reader-inputs/18aed96d4c2e90259c15c315ee349c3415c43b2a137d4684ca22867fd28d9a0c.tar.gz",
+ "sha256": "18aed96d4c2e90259c15c315ee349c3415c43b2a137d4684ca22867fd28d9a0c",
+ "bytes": 8918169,
  "unpacked_at": "repository",
  "files": [
+  {
+   "path": ".research/elementary-reader-authored/aac-id3v2.aac",
+   "sha256": "05851b61309b39324df55a50792e30486350402e65b1c40a49400a10398442ac"
+  },
+  {
+   "path": ".research/elementary-reader-authored/aac-junk-1.bin",
+   "sha256": "bd07984d722aa57ca4cb1805bd5a4c5f0ddb60c9d03d014a9b516cf7bd799e1c"
+  },
+  {
+   "path": ".research/elementary-reader-authored/aac-junk-1024.bin",
+   "sha256": "fa1f7b70372ba127d2c30c689ef2772b9fa3a4372a3351006af34cc6c0f6e87e"
+  },
+  {
+   "path": ".research/elementary-reader-authored/aac-junk-128.bin",
+   "sha256": "1e5910e6e2f45a978cf4742b206e33349787d3a98cf0bb4f08a007a0bb86c510"
+  },
+  {
+   "path": ".research/elementary-reader-authored/aac-junk-32.bin",
+   "sha256": "f733eb477f0c6a89286aca2e1725ee30547c1e3050274e102191b4a55cde43cf"
+  },
+  {
+   "path": ".research/elementary-reader-authored/aac-junk-4096.bin",
+   "sha256": "10baef2e6b0689d318f3c10b79847a55805b3cb3f1b8a8a056ce6aa34362e22e"
+  },
+  {
+   "path": ".research/elementary-reader-authored/aac-junk-7.bin",
+   "sha256": "77545e7151e23652ed3e6a743eade1a5fc474a460e8ca2bfd392a43652861ac4"
+  },
+  {
+   "path": ".research/elementary-reader-authored/aac-short-second.bin",
+   "sha256": "edec0d24b21a5f8435b253eccc9afec9e1d7875106277f10babdffd3c5ac2ccd"
+  },
+  {
+   "path": ".research/elementary-reader-authored/ac3-id3v2.ac3",
+   "sha256": "12daad683b5ce61d8d4bdcbffef13d2537cf1d73740f648c6ce009c6d2677d99"
+  },
+  {
+   "path": ".research/elementary-reader-authored/ac3-junk-1.bin",
+   "sha256": "6d3aa99040841fa4167449bc68cbb07a75ca3b2042a86bc10015e0709da7991f"
+  },
+  {
+   "path": ".research/elementary-reader-authored/ac3-junk-1024.bin",
+   "sha256": "bf28b96ef9937096c4fad8d50084bcb42899570ebe26fd90ffa1c4fa31f20682"
+  },
+  {
+   "path": ".research/elementary-reader-authored/ac3-junk-128.bin",
+   "sha256": "00a5f4d07d42975a359f3028816f21505a5f809ce7136876f2e5be3925459665"
+  },
+  {
+   "path": ".research/elementary-reader-authored/ac3-junk-32.bin",
+   "sha256": "db23e687543be2277a190be7c247eebf90151e537256011e85b971580eb30606"
+  },
+  {
+   "path": ".research/elementary-reader-authored/ac3-junk-4096.bin",
+   "sha256": "84ca3c4b220144eaa1b3b47726431a8f4e4deff4ef43b005c6b542f78526143a"
+  },
+  {
+   "path": ".research/elementary-reader-authored/ac3-junk-7.bin",
+   "sha256": "2c2bec157e4c86d9be075a982a3b5905bc9d59e0c95fabcc8aa6d323f0b79e0e"
+  },
+  {
+   "path": ".research/elementary-reader-authored/apev2.mp3",
+   "sha256": "108ef0c01f1cd0ff9d3bb305fe1e42cedd7c4b19abe8935f20b391e069b5a270"
+  },
+  {
+   "path": ".research/elementary-reader-authored/eac3-id3v2.eac3",
+   "sha256": "47078a7e2909cc068c0833827a86613eb906352d9a7fa05c756841f3fe9286ef"
+  },
+  {
+   "path": ".research/elementary-reader-authored/eac3-junk-1.bin",
+   "sha256": "7393b9cd821348bad06c3dbee3b9257fe0d58414060ccd71395f96d1c3fe226e"
+  },
+  {
+   "path": ".research/elementary-reader-authored/eac3-junk-1024.bin",
+   "sha256": "d98c29efc4174230eb50017c1f3271d65f705ed48dbfeb18aab7beccbe521288"
+  },
+  {
+   "path": ".research/elementary-reader-authored/eac3-junk-128.bin",
+   "sha256": "3b8ca24b66db069cc8bd051bc7884bfd2292d8fc20d42fe58e698735d75d07db"
+  },
+  {
+   "path": ".research/elementary-reader-authored/eac3-junk-32.bin",
+   "sha256": "3b659ae84857709a103fe329540d4795aa82499d973e379da10f7c67242c74fa"
+  },
+  {
+   "path": ".research/elementary-reader-authored/eac3-junk-4096.bin",
+   "sha256": "3b32fe76596d5a1b3fe17a4169f1f5594bd981f52033f54e2db7ede909311559"
+  },
+  {
+   "path": ".research/elementary-reader-authored/eac3-junk-7.bin",
+   "sha256": "3ea964d24a1502b383798fe43f7a8a9da03667e94645e2f22eec939e2877a492"
+  },
+  {
+   "path": ".research/elementary-reader-authored/flac-extra.flac",
+   "sha256": "a7a7c8ad5895cb5b7cbbf2787166c3f8b4f2a4ca9cb31fcfca68adbe57a7260b"
+  },
+  {
+   "path": ".research/elementary-reader-authored/flac-id3v2.flac",
+   "sha256": "d30e8541719d053ff75b29133ac2fbc70bd143182dd58c1405f8b84771be58d5"
+  },
+  {
+   "path": ".research/elementary-reader-authored/flac-junk-1.bin",
+   "sha256": "220ee12e955e3ce20a8f81afc9cb81ed7481f0b99ace605c9669f303e2c8c78d"
+  },
+  {
+   "path": ".research/elementary-reader-authored/flac-junk-1024.bin",
+   "sha256": "e13842f607fb90dd112cbc688d3d59861a89e16ee5ba297d5b598456e9593572"
+  },
+  {
+   "path": ".research/elementary-reader-authored/flac-junk-128.bin",
+   "sha256": "5cdccc238d038bc387b74b7d701295d4b73b80d30742edab5d0a6a2a595058c6"
+  },
+  {
+   "path": ".research/elementary-reader-authored/flac-junk-32.bin",
+   "sha256": "eb4b9757e5fa5c149d15a7b9d1aeca19413432d4a6a6a0f04d6825937976c6d2"
+  },
+  {
+   "path": ".research/elementary-reader-authored/flac-junk-4096.bin",
+   "sha256": "19d47ec32a7f16da607e3ce3bd5f19b3b71492cd39619105d1619d5b7fe24483"
+  },
+  {
+   "path": ".research/elementary-reader-authored/flac-junk-7.bin",
+   "sha256": "dc276dd5e74804692aaab556a411fbe6111644083abf4514280cf420358a2b23"
+  },
+  {
+   "path": ".research/elementary-reader-authored/id3v1-plain.mp3",
+   "sha256": "83f1700fa8926d9c63d5ce3992c355277a996ad39ef2d4bbd006acdbdc8ad504"
+  },
+  {
+   "path": ".research/elementary-reader-authored/id3v1-track.mp3",
+   "sha256": "f3665b5e97344435bf620b91d32d12e5d011bc001220a2495befe6d135b3dfbf"
+  },
+  {
+   "path": ".research/elementary-reader-authored/mp3-id3v2.mp3",
+   "sha256": "3970772488b2e9fab0cec2471340b9ea9baa7a3b0c0c0d27cd6ede8e22483215"
+  },
+  {
+   "path": ".research/elementary-reader-authored/mp3-junk-1.bin",
+   "sha256": "004adfd409c732ce2b919fd8e8fa5b3730a3f7e0836d6933901eb928d49c516e"
+  },
+  {
+   "path": ".research/elementary-reader-authored/mp3-junk-1024.bin",
+   "sha256": "5a00b43a17da12fb53a64ec84c1a117ea6188d3fbc807e3d14ca0110d6fff4ab"
+  },
+  {
+   "path": ".research/elementary-reader-authored/mp3-junk-128.bin",
+   "sha256": "83da48def753b5d5c96f7320a3df29087e8633e4e4fed6efedf9a47243bf1a6b"
+  },
+  {
+   "path": ".research/elementary-reader-authored/mp3-junk-32.bin",
+   "sha256": "817e3078f69b22951f22eea04f3ca9ac595bcfe7ee986a520061392fbec07d46"
+  },
+  {
+   "path": ".research/elementary-reader-authored/mp3-junk-4096.bin",
+   "sha256": "76d7252852d26232c3bf1f024928a65a925309eac91c8b0cb54d00f2072da303"
+  },
+  {
+   "path": ".research/elementary-reader-authored/mp3-junk-7.bin",
+   "sha256": "e294bb9ca8ab9c53695a12186a7963b891496466e29c5ad9d5906631f9217a5c"
+  },
+  {
+   "path": ".research/elementary-reader-authored/mp3-short-second.bin",
+   "sha256": "76911a3ad025ea38417b2d3b038404d81bdf25554d376e637d740148cc0b2165"
+  },
+  {
+   "path": ".research/elementary-reader-authored/ts-both-spacings.bin",
+   "sha256": "0f3b96ed86a7cebc364cab2b8b45d4aecc5fc91f69eeb5702e1c31113ca27e62"
+  },
+  {
+   "path": ".research/elementary-reader-authored/two-signatures.bin",
+   "sha256": "3ed4d56430cfaf774a6c708dd26f8d135d534fb30d93197a75534a2cec645c0c"
+  },
   {
    "path": ".research/elementary/ac3_51.ac3",
    "sha256": "41d6db5aab063d28f14a57b335a5dfb40deca9fb9b0dd5c6799acb9e079f7469"
