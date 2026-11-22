@@ -1073,11 +1073,7 @@ fn grade(rules: &Rules, comparison: &Comparison<'_>, found: &[Difference], case:
     let considered: Vec<&Disposition> = rules
         .dispositions
         .iter()
-        .filter(|d| {
-            reviewed
-                .filter(|r| r.difference_sha256 == digest)
-                .is_none_or(|r| r.dispositions.contains(&d.id))
-        })
+        .filter(|d| reviewed.is_none_or(|r| r.dispositions.contains(&d.id)))
         .collect();
     let (mut proposed, _, _) = attribute(comparison, found, &considered, seek);
     // A difference several scopes cover is proposed under the one disposition among
