@@ -216,8 +216,10 @@ impl Cursor {
     }
 }
 
-/// Only the at-most-two-byte encoding selector is examined here. Its cursor
-/// survives work=1; the subsequent scalar cursor performs actual validation.
+/// The encoding a text's leading bytes select: a byte-order mark for
+/// [`Encoding::Utf16Bom`] and [`Encoding::Tx3gInBand`], nothing for the
+/// others. It reads at most two bytes, one unit each; the [`Cursor`] that
+/// follows validates the text.
 #[derive(Debug)]
 pub(crate) struct Probe {
     range: Range<usize>,
@@ -240,10 +242,10 @@ impl Probe {
         bytes: &[u8],
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Poll<(Encoding, Range<usize>)>> {
+    ) -> Result<Option<(Encoding, Range<usize>)>> {
         match self.requested {
             Encoding::Utf8 | Encoding::Utf16Be | Encoding::Utf16Le | Encoding::Multibyte(_) => {
-                return Ok(Poll::Ready((self.requested, self.range.clone())));
+                return Ok(Some((self.requested, self.range.clone())));
             }
             Encoding::Opaque => return Err(Error::Unsupported("declared charset conversion")),
             Encoding::Utf16Bom | Encoding::Tx3gInBand => {}
@@ -252,7 +254,7 @@ impl Probe {
         while self.read < maximum {
             cancelled(cancel)?;
             if !work.try_charge(1) {
-                return Ok(Poll::Yield);
+                return Ok(None);
             }
             self.bytes[self.read] = *bytes
                 .get(self.range.start + self.read)
@@ -268,6 +270,6 @@ impl Probe {
             (Encoding::Tx3gInBand, _, _) => (Encoding::Utf8, self.range.clone()),
             _ => return Err(Error::Invalid("encoding selector")),
         };
-        Ok(Poll::Ready(resolved))
+        Ok(Some(resolved))
     }
 }

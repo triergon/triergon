@@ -160,9 +160,8 @@ impl Session {
                         .ok_or(Error::Invalid("missing encoding probe"))?
                         .poll(input.payload.as_ref(), work, cancel)?
                     {
-                        Poll::Yield => return Ok(Action::Yield),
-                        Poll::End => return Err(Error::Invalid("encoding probe ended")),
-                        Poll::Ready((encoding, range)) => {
+                        None => return Ok(Action::Yield),
+                        Some((encoding, range)) => {
                             self.encoding = encoding;
                             self.decode_range = range.clone();
                             self.validator = Some(Cursor::new(range, encoding));

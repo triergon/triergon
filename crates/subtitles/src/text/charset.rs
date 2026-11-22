@@ -324,14 +324,13 @@ impl CharsetJob {
                     .ok_or(Error::Invalid("charset probe absent"))?
                     .poll(self.source.as_ref(), work, cancel)?
                 {
-                    Poll::Yield => return Ok(CharsetStatus::Pending),
-                    Poll::Ready((encoding, range)) => {
+                    None => return Ok(CharsetStatus::Pending),
+                    Some((encoding, range)) => {
                         self.cursor = Some(Cursor::new(range.clone(), encoding));
                         self.range = range;
                         self.effective = Some(encoding);
                         self.phase = Phase::Count;
                     }
-                    Poll::End => return Err(Error::Truncated),
                 },
                 Phase::Count => match self.next(work, cancel)? {
                     Poll::Yield => return Ok(CharsetStatus::Pending),

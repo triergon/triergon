@@ -467,15 +467,14 @@ impl ConfigJob {
                 }
                 Phase::FontName => {
                     if let Some(probe) = self.name_probe.as_mut() {
-                        match probe.poll(self.raw.as_ref(), work, cancel)? {
-                            Poll::Yield => return Ok(ConfigStatus::Pending),
-                            Poll::Ready((encoding, range)) => {
-                                self.name_cursor = Some(Cursor::new(range, encoding));
-                                self.name_probe = None;
-                                continue;
-                            }
-                            Poll::End => return Err(Error::Truncated),
-                        }
+                        let Some((encoding, range)) =
+                            probe.poll(self.raw.as_ref(), work, cancel)?
+                        else {
+                            return Ok(ConfigStatus::Pending);
+                        };
+                        self.name_cursor = Some(Cursor::new(range, encoding));
+                        self.name_probe = None;
+                        continue;
                     }
                     match self
                         .name_cursor
