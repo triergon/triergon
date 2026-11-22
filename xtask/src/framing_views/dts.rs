@@ -1,5 +1,5 @@
 //! Shared authored streams and pinned FATE derivatives for the DTS comparisons.
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -28,6 +28,9 @@ type Result<T> = std::result::Result<T, String>;
 struct Corpus {
     directory: PathBuf,
     cases: [Vec<Value>; IDS.len()],
+    /// The streams [`Corpus::core`] has registered, by SHA-256 and frame limit: a
+    /// stream met again under another name is compared once, under its first name.
+    streams: BTreeSet<(String, String)>,
 }
 
 impl Corpus {
@@ -68,6 +71,9 @@ impl Corpus {
     }
 
     fn core(&mut self, id: &str, profile: &str, bytes: &[u8], limit: &str) -> Result<()> {
+        if !self.streams.insert((sha256::hex(bytes), limit.to_owned())) {
+            return Ok(());
+        }
         let source = self.input(id, bytes, false)?;
         self.case(0, &source, id, profile, &["4096", limit, "frames"]);
         for packing in PACKINGS {
@@ -415,6 +421,7 @@ fn authored_at(root: &Path, output: &Path) -> Result<Corpus> {
     let mut corpus = Corpus {
         directory,
         cases: std::array::from_fn(|_| Vec::new()),
+        streams: BTreeSet::new(),
     };
     authored(root, &mut corpus)?;
     Ok(corpus)

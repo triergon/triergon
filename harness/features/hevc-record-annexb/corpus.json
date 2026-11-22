@@ -1,0 +1,1126 @@
+{
+  "schema": 1,
+  "directory": ".research/nal-corpus",
+  "cases": [
+    {
+      "id": "hvcc-hevc-flush-all",
+      "profile": "script",
+      "file": "hvcc-hevc-flush.hvcc",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 7440494933846520982
+      }
+    },
+    {
+      "id": "hvcc-hevc-flush-decoder",
+      "profile": "script",
+      "file": "hvcc-hevc-flush.hvcc",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 9294414064727531050
+      }
+    },
+    {
+      "id": "hvcc-hevc-no-extra-all",
+      "profile": "script",
+      "file": "hvcc-hevc-no-extra.hvcc",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "hvcc-hevc-no-extra-decoder",
+      "profile": "script",
+      "file": "hvcc-hevc-no-extra.hvcc",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 6727
+      }
+    },
+    {
+      "id": "hvcc-hevc-annexb-extra-all",
+      "profile": "script",
+      "file": "hvcc-hevc-annexb-extra.hvcc",
+      "sha256": "432b5f17b813ba8333da2e7b8849a3d3f3542ca6d3f2250668729ddb79472ce4",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 56057877717
+      }
+    },
+    {
+      "id": "hvcc-hevc-annexb-extra-decoder",
+      "profile": "script",
+      "file": "hvcc-hevc-annexb-extra.hvcc",
+      "sha256": "432b5f17b813ba8333da2e7b8849a3d3f3542ca6d3f2250668729ddb79472ce4",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1737794209227
+      }
+    },
+    {
+      "id": "hvcc-hevc-width1-all",
+      "profile": "script",
+      "file": "hvcc-hevc-width1.hvcc",
+      "sha256": "073d2ee4caccabd2413b115b8bd831bd64b945a557e56d6aa9e64ad26f532dff",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 7440494933846520982
+      }
+    },
+    {
+      "id": "hvcc-hevc-width1-decoder",
+      "profile": "script",
+      "file": "hvcc-hevc-width1.hvcc",
+      "sha256": "073d2ee4caccabd2413b115b8bd831bd64b945a557e56d6aa9e64ad26f532dff",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 9294414064727531050
+      }
+    },
+    {
+      "id": "hvcc-hevc-width2-all",
+      "profile": "script",
+      "file": "hvcc-hevc-width2.hvcc",
+      "sha256": "bf742a4a1dc441c8b3e9034206289fe1ae7b3da3c87f1a8d89321c2b9863cb61",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 7440494933846520982
+      }
+    },
+    {
+      "id": "hvcc-hevc-width2-decoder",
+      "profile": "script",
+      "file": "hvcc-hevc-width2.hvcc",
+      "sha256": "bf742a4a1dc441c8b3e9034206289fe1ae7b3da3c87f1a8d89321c2b9863cb61",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 9294414064727531050
+      }
+    },
+    {
+      "id": "hvcc-hevc-width3-all",
+      "profile": "script",
+      "file": "hvcc-hevc-width3.hvcc",
+      "sha256": "4afbef08ff71d60bb11b00270dab5266062a936efcd4b5b939634876a8d2d7af",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 7440494933846520982
+      }
+    },
+    {
+      "id": "hvcc-hevc-width3-decoder",
+      "profile": "script",
+      "file": "hvcc-hevc-width3.hvcc",
+      "sha256": "4afbef08ff71d60bb11b00270dab5266062a936efcd4b5b939634876a8d2d7af",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 9294414064727531050
+      }
+    },
+    {
+      "id": "hvcc-hevc-config-empty-all",
+      "profile": "script",
+      "file": "hvcc-hevc-config-empty.hvcc",
+      "sha256": "d0d04640bb683dc5256caac626ae92322a579a62fd62faf386ed9f1b2b7637ed",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "hvcc-hevc-config-empty-decoder",
+      "profile": "script",
+      "file": "hvcc-hevc-config-empty.hvcc",
+      "sha256": "d0d04640bb683dc5256caac626ae92322a579a62fd62faf386ed9f1b2b7637ed",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 6727
+      }
+    },
+    {
+      "id": "hvcc-hevc-config-sei-all",
+      "profile": "script",
+      "file": "hvcc-hevc-config-sei.hvcc",
+      "sha256": "724091327d234f17614aadfed1ecf6a9f993f2b6a6d6e95016dac7cea3d452c1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 12176307181357693498
+      }
+    },
+    {
+      "id": "hvcc-hevc-config-sei-decoder",
+      "profile": "script",
+      "file": "hvcc-hevc-config-sei.hvcc",
+      "sha256": "724091327d234f17614aadfed1ecf6a9f993f2b6a6d6e95016dac7cea3d452c1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 8530641147897466118
+      }
+    },
+    {
+      "id": "hvcc-hevc-config-duplicate-all",
+      "profile": "script",
+      "file": "hvcc-hevc-config-duplicate.hvcc",
+      "sha256": "88be471b1279f482c9038f23bc5f5ea7018d3b588e476f34c33c030098d70997",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 16291508535476510674
+      }
+    },
+    {
+      "id": "hvcc-hevc-config-duplicate-decoder",
+      "profile": "script",
+      "file": "hvcc-hevc-config-duplicate.hvcc",
+      "sha256": "88be471b1279f482c9038f23bc5f5ea7018d3b588e476f34c33c030098d70997",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 12,
+        "digest": 6974674609613937262
+      }
+    },
+    {
+      "id": "hvcc-hevc-config-unknown_empty-all",
+      "profile": "script",
+      "file": "hvcc-hevc-config-unknown_empty.hvcc",
+      "sha256": "d5eed303f6efff43db6003e34bc51ac1c34b587ae16b1f1e33a0c4a81d2cd794",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-hevc-config-unknown_empty-decoder",
+      "profile": "script",
+      "file": "hvcc-hevc-config-unknown_empty.hvcc",
+      "sha256": "d5eed303f6efff43db6003e34bc51ac1c34b587ae16b1f1e33a0c4a81d2cd794",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 303
+      }
+    },
+    {
+      "id": "hvcc-remux-hevc-aud0-all",
+      "profile": "reference-written",
+      "file": "hvcc-remux-hevc-aud0.hvcc",
+      "sha256": "b9467aaeec131d696d4be15d08f30664e32e95ed03d31994e867c3cbd84cac1d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 72,
+        "digest": 7899958590711559467
+      }
+    },
+    {
+      "id": "hvcc-remux-hevc-aud0-decoder",
+      "profile": "reference-written",
+      "file": "hvcc-remux-hevc-aud0.hvcc",
+      "sha256": "b9467aaeec131d696d4be15d08f30664e32e95ed03d31994e867c3cbd84cac1d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 72,
+        "digest": 5091043353834172469
+      }
+    },
+    {
+      "id": "hvcc-remux-hevc-aud1-all",
+      "profile": "reference-written",
+      "file": "hvcc-remux-hevc-aud1.hvcc",
+      "sha256": "b9467aaeec131d696d4be15d08f30664e32e95ed03d31994e867c3cbd84cac1d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 72,
+        "digest": 7899958590711559467
+      }
+    },
+    {
+      "id": "hvcc-remux-hevc-aud1-decoder",
+      "profile": "reference-written",
+      "file": "hvcc-remux-hevc-aud1.hvcc",
+      "sha256": "b9467aaeec131d696d4be15d08f30664e32e95ed03d31994e867c3cbd84cac1d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 72,
+        "digest": 5091043353834172469
+      }
+    },
+    {
+      "id": "hvcc-remux-hevc-eos-all",
+      "profile": "reference-written",
+      "file": "hvcc-remux-hevc-eos.hvcc",
+      "sha256": "b9467aaeec131d696d4be15d08f30664e32e95ed03d31994e867c3cbd84cac1d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 72,
+        "digest": 7899958590711559467
+      }
+    },
+    {
+      "id": "hvcc-remux-hevc-eos-decoder",
+      "profile": "reference-written",
+      "file": "hvcc-remux-hevc-eos.hvcc",
+      "sha256": "b9467aaeec131d696d4be15d08f30664e32e95ed03d31994e867c3cbd84cac1d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 72,
+        "digest": 5091043353834172469
+      }
+    },
+    {
+      "id": "hvcc-out-of-order-all",
+      "profile": "authored",
+      "file": "hvcc-out-of-order.hvcc",
+      "sha256": "87c37f5a9b7ec513e4c2229ca26a7ab3f4fe4f28438557ebec3b8bbee02f21b7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 10437923626143883033
+      }
+    },
+    {
+      "id": "hvcc-out-of-order-decoder",
+      "profile": "authored",
+      "file": "hvcc-out-of-order.hvcc",
+      "sha256": "87c37f5a9b7ec513e4c2229ca26a7ab3f4fe4f28438557ebec3b8bbee02f21b7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 9980983157397996551
+      }
+    },
+    {
+      "id": "hvcc-aud-array-all",
+      "profile": "authored",
+      "file": "hvcc-aud-array.hvcc",
+      "sha256": "0b46e6fbad3025af489c57f559b59ef0984909c44fa03644729805242166ec0a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-aud-array-decoder",
+      "profile": "authored",
+      "file": "hvcc-aud-array.hvcc",
+      "sha256": "0b46e6fbad3025af489c57f559b59ef0984909c44fa03644729805242166ec0a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 283
+      }
+    },
+    {
+      "id": "hvcc-unknown-array-all",
+      "profile": "authored",
+      "file": "hvcc-unknown-array.hvcc",
+      "sha256": "ce2e6ec04e5dc77f09bf8a135ef48e0dcecd0847e7ab5b9d32d49c5a77b255a8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-unknown-array-decoder",
+      "profile": "authored",
+      "file": "hvcc-unknown-array.hvcc",
+      "sha256": "ce2e6ec04e5dc77f09bf8a135ef48e0dcecd0847e7ab5b9d32d49c5a77b255a8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 311
+      }
+    },
+    {
+      "id": "hvcc-unknown-empty-all",
+      "profile": "authored",
+      "file": "hvcc-unknown-empty.hvcc",
+      "sha256": "e960f316d1d3caf68a106888153a3e0faa08986a4370b2a24add63a93ff2933f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-unknown-empty-decoder",
+      "profile": "authored",
+      "file": "hvcc-unknown-empty.hvcc",
+      "sha256": "e960f316d1d3caf68a106888153a3e0faa08986a4370b2a24add63a93ff2933f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 311
+      }
+    },
+    {
+      "id": "hvcc-empty-array-all",
+      "profile": "authored",
+      "file": "hvcc-empty-array.hvcc",
+      "sha256": "7ad859b40874c5c3d170c677de46e216dfbefb726bf13fe16937e575aefdb767",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "hvcc-empty-array-decoder",
+      "profile": "authored",
+      "file": "hvcc-empty-array.hvcc",
+      "sha256": "7ad859b40874c5c3d170c677de46e216dfbefb726bf13fe16937e575aefdb767",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 6727
+      }
+    },
+    {
+      "id": "hvcc-zero-arrays-all",
+      "profile": "authored",
+      "file": "hvcc-zero-arrays.hvcc",
+      "sha256": "82a729806b93056167b7321177a54df74e10d1c3ce229c255a761af09298626c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "hvcc-zero-arrays-decoder",
+      "profile": "authored",
+      "file": "hvcc-zero-arrays.hvcc",
+      "sha256": "82a729806b93056167b7321177a54df74e10d1c3ce229c255a761af09298626c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 6727
+      }
+    },
+    {
+      "id": "hvcc-zero-length-nal-all",
+      "profile": "authored",
+      "file": "hvcc-zero-length-nal.hvcc",
+      "sha256": "d3789938b9ac51f1e48fe68016271f362d9b219c4332ba6c38a3436ca4a9705d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-zero-length-nal-decoder",
+      "profile": "authored",
+      "file": "hvcc-zero-length-nal.hvcc",
+      "sha256": "d3789938b9ac51f1e48fe68016271f362d9b219c4332ba6c38a3436ca4a9705d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-duplicate-array-all",
+      "profile": "authored",
+      "file": "hvcc-duplicate-array.hvcc",
+      "sha256": "07181b3e401901b001d1180d32ecb9ecc5deda7a033b10e8ff9290bbd6480d61",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 7440495784958856977
+      }
+    },
+    {
+      "id": "hvcc-duplicate-array-decoder",
+      "profile": "authored",
+      "file": "hvcc-duplicate-array.hvcc",
+      "sha256": "07181b3e401901b001d1180d32ecb9ecc5deda7a033b10e8ff9290bbd6480d61",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9,
+        "digest": 9294440449209946895
+      }
+    },
+    {
+      "id": "hvcc-declaration-mismatch-all",
+      "profile": "authored",
+      "file": "hvcc-declaration-mismatch.hvcc",
+      "sha256": "5fbac5751e6ab8d653783ebe8e4d04134481920c8133d62d26b95fef01d92107",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 13647387433969903150
+      }
+    },
+    {
+      "id": "hvcc-declaration-mismatch-decoder",
+      "profile": "authored",
+      "file": "hvcc-declaration-mismatch.hvcc",
+      "sha256": "5fbac5751e6ab8d653783ebe8e4d04134481920c8133d62d26b95fef01d92107",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 6,
+        "digest": 17240640831456862098
+      }
+    },
+    {
+      "id": "hvcc-complete-all",
+      "profile": "authored",
+      "file": "hvcc-complete.hvcc",
+      "sha256": "64ccdd52ad5ec01f716b3e3a462c4e7964c98eb8fe13e00f61c966b9198a9769",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 56947229401
+      }
+    },
+    {
+      "id": "hvcc-complete-decoder",
+      "profile": "authored",
+      "file": "hvcc-complete.hvcc",
+      "sha256": "64ccdd52ad5ec01f716b3e3a462c4e7964c98eb8fe13e00f61c966b9198a9769",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1765364111431
+      }
+    },
+    {
+      "id": "hvcc-incomplete-all",
+      "profile": "authored",
+      "file": "hvcc-incomplete.hvcc",
+      "sha256": "492447b997b7ae257e812cb8fad27ab98b835fb071095422d543e3187b778e43",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 56947229401
+      }
+    },
+    {
+      "id": "hvcc-incomplete-decoder",
+      "profile": "authored",
+      "file": "hvcc-incomplete.hvcc",
+      "sha256": "492447b997b7ae257e812cb8fad27ab98b835fb071095422d543e3187b778e43",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 1765364111431
+      }
+    },
+    {
+      "id": "hvcc-array-limit-all",
+      "profile": "authored",
+      "file": "hvcc-array-limit.hvcc",
+      "sha256": "ad92bd0bb66e6bea5c63ddd2a2ace104245064a058b6c0613120ac097fa8609c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 192,
+        "digest": 7847010321978623961
+      }
+    },
+    {
+      "id": "hvcc-array-limit-decoder",
+      "profile": "authored",
+      "file": "hvcc-array-limit.hvcc",
+      "sha256": "ad92bd0bb66e6bea5c63ddd2a2ace104245064a058b6c0613120ac097fa8609c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 192,
+        "digest": 3449647023113171783
+      }
+    },
+    {
+      "id": "hvcc-array-limit-plus-one-all",
+      "profile": "authored",
+      "file": "hvcc-array-limit-plus-one.hvcc",
+      "sha256": "cd2f89b9ad10486a4b83f8116ae2f71a6316eaa543212e610baf50e3ae96e79b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 195,
+        "digest": 10398419988648774613
+      }
+    },
+    {
+      "id": "hvcc-array-limit-plus-one-decoder",
+      "profile": "authored",
+      "file": "hvcc-array-limit-plus-one.hvcc",
+      "sha256": "cd2f89b9ad10486a4b83f8116ae2f71a6316eaa543212e610baf50e3ae96e79b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 195,
+        "digest": 8756370395049635531
+      }
+    },
+    {
+      "id": "hvcc-nal-count-limit-all",
+      "profile": "authored",
+      "file": "hvcc-nal-count-limit.hvcc",
+      "sha256": "e988339256f6f6bdaf236b3df77de20207bc6fe240f2ee7bc16097e390a1e383",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 257,
+        "bytes": 768,
+        "digest": 9292257764130168025
+      }
+    },
+    {
+      "id": "hvcc-nal-count-limit-decoder",
+      "profile": "authored",
+      "file": "hvcc-nal-count-limit.hvcc",
+      "sha256": "e988339256f6f6bdaf236b3df77de20207bc6fe240f2ee7bc16097e390a1e383",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 257,
+        "bytes": 768,
+        "digest": 11358829582391934535
+      }
+    },
+    {
+      "id": "hvcc-nal-count-limit-plus-one-all",
+      "profile": "authored",
+      "file": "hvcc-nal-count-limit-plus-one.hvcc",
+      "sha256": "83824f8b192f4acc44480b4f7aeda32804dd30a4265c95fb3351abed4e28abd8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 258,
+        "bytes": 771,
+        "digest": 17412347654497054933
+      }
+    },
+    {
+      "id": "hvcc-nal-count-limit-plus-one-decoder",
+      "profile": "authored",
+      "file": "hvcc-nal-count-limit-plus-one.hvcc",
+      "sha256": "83824f8b192f4acc44480b4f7aeda32804dd30a4265c95fb3351abed4e28abd8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 258,
+        "bytes": 771,
+        "digest": 4827199151831706059
+      }
+    },
+    {
+      "id": "hvcc-nal-size-limit-all",
+      "profile": "authored",
+      "file": "hvcc-nal-size-limit.hvcc",
+      "sha256": "f9862c1a668a4d2502c097412941e72162e89b04615d38cff2f9fbfa349d2b70",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 65535,
+        "digest": 334648054894513305
+      }
+    },
+    {
+      "id": "hvcc-nal-size-limit-decoder",
+      "profile": "authored",
+      "file": "hvcc-nal-size-limit.hvcc",
+      "sha256": "f9862c1a668a4d2502c097412941e72162e89b04615d38cff2f9fbfa349d2b70",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 65535,
+        "digest": 10374089701729912455
+      }
+    },
+    {
+      "id": "hvcc-record-size-limit-all",
+      "profile": "authored",
+      "file": "hvcc-record-size-limit.hvcc",
+      "sha256": "7ebe3aaba59c78353bb01d458db8c9a132b941953b89d1e2446c8a10409da038",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 131042,
+        "digest": 14995112149531885429
+      }
+    },
+    {
+      "id": "hvcc-record-size-limit-decoder",
+      "profile": "authored",
+      "file": "hvcc-record-size-limit.hvcc",
+      "sha256": "7ebe3aaba59c78353bb01d458db8c9a132b941953b89d1e2446c8a10409da038",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 131042,
+        "digest": 3679874792749657899
+      }
+    },
+    {
+      "id": "hvcc-record-size-limit-plus-one-all",
+      "profile": "authored",
+      "file": "hvcc-record-size-limit-plus-one.hvcc",
+      "sha256": "30529c11837bc11d46c04c146bf41fbef7027baea75092ce117c4e5ccb2fda05",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 131043,
+        "digest": 16175061095684150231
+      }
+    },
+    {
+      "id": "hvcc-record-size-limit-plus-one-decoder",
+      "profile": "authored",
+      "file": "hvcc-record-size-limit-plus-one.hvcc",
+      "sha256": "30529c11837bc11d46c04c146bf41fbef7027baea75092ce117c4e5ccb2fda05",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 131043,
+        "digest": 3364803976050763529
+      }
+    },
+    {
+      "id": "hvcc-truncated-array-header-all",
+      "profile": "authored",
+      "file": "hvcc-truncated-array-header.hvcc",
+      "sha256": "8579bef0e5107ad3eb1f5eb6725f6b0a17a1b9f4f9a7d7a6e111a743898fde3a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-truncated-array-header-decoder",
+      "profile": "authored",
+      "file": "hvcc-truncated-array-header.hvcc",
+      "sha256": "8579bef0e5107ad3eb1f5eb6725f6b0a17a1b9f4f9a7d7a6e111a743898fde3a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 248
+      }
+    },
+    {
+      "id": "hvcc-truncated-length-all",
+      "profile": "authored",
+      "file": "hvcc-truncated-length.hvcc",
+      "sha256": "1d0071a4ed6338ea08b66eb19503d23f7b348272a1cd632a032769c6064b0914",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-truncated-length-decoder",
+      "profile": "authored",
+      "file": "hvcc-truncated-length.hvcc",
+      "sha256": "1d0071a4ed6338ea08b66eb19503d23f7b348272a1cd632a032769c6064b0914",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-truncated-payload-all",
+      "profile": "authored",
+      "file": "hvcc-truncated-payload.hvcc",
+      "sha256": "4246f7de097d7aa85128e96d43be7578f06810c29899611d84acc57105e8780a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-truncated-payload-decoder",
+      "profile": "authored",
+      "file": "hvcc-truncated-payload.hvcc",
+      "sha256": "4246f7de097d7aa85128e96d43be7578f06810c29899611d84acc57105e8780a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-opaque-arrays-all",
+      "profile": "authored",
+      "file": "hvcc-opaque-arrays.hvcc",
+      "sha256": "9d651df4b4401428c6bff2428fb446707fb55edf0d0e8b2cab6e8b13357b5c24",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "all"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hvcc-opaque-arrays-decoder",
+      "profile": "authored",
+      "file": "hvcc-opaque-arrays.hvcc",
+      "sha256": "9d651df4b4401428c6bff2428fb446707fb55edf0d0e8b2cab6e8b13357b5c24",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "decoder"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 303
+      }
+    }
+  ]
+}

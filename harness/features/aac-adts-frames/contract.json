@@ -1,0 +1,493 @@
+{
+  "schema": 1,
+  "id": "aac-adts-frames",
+  "gate": "required",
+  "operation": "aac-adts-frames",
+  "candidate": "framing-views-worker",
+  "worker_operation": "adts-",
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-framing-views-native",
+  "contract": [
+    "Walk physical ADTS extents with inspect_adts_header and parse each with AacAdtsParser. The reference opens a raw AAC demuxer without stream discovery, reads each packet and filters it with aac_adtstoasc.",
+    "Fold kind 2 with the length and exact bytes of the candidate ASC header projection and reference ASC, initially or when the filter reports an update. Fold kind 1 with source offset, input frame length, object type, sampling index, channel configuration, protection-absent flag, payload length and exact payload bytes. The reference projects the configuration fields from the active ASC and the protection flag from the demuxed header.",
+    "Fold kind 7 with the frame count on clean end or kind 8 with the source offset on refusal or leftover input. Operate on preloaded bytes and include parser, demuxer and filter setup and teardown."
+  ],
+  "required_profiles": [
+    "authored",
+    "fate"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "aligned",
+        "protected-single",
+        "rate-0",
+        "rate-1",
+        "rate-2",
+        "rate-3",
+        "rate-4",
+        "rate-5",
+        "rate-6",
+        "rate-7",
+        "rate-8",
+        "rate-9",
+        "rate-10",
+        "rate-11",
+        "rate-12",
+        "channel-1",
+        "channel-2",
+        "channel-3",
+        "channel-4",
+        "channel-5",
+        "channel-6",
+        "channel-7",
+        "header-flags",
+        "buffer-fullness",
+        "maximum-frame",
+        "ps-change-while-off",
+        "ps-ipd-after-iid34",
+        "ps-no-sbr-element",
+        "aac-sce-in-stereo",
+        "al18_44",
+        "al_sbr_cm_48_2",
+        "al_sbr_sr_48_2_fsaac48",
+        "ct_File2",
+        "ct_File3",
+        "ct_File4",
+        "ct_File5",
+        "ct_File6",
+        "ct_File7",
+        "ct_faac-adts",
+        "ct_sbr_bc-ps_bc",
+        "ct_sbr_bc-ps_i",
+        "ct_sbr_bic-ps_i",
+        "ct_sbr_i-ps_bic",
+        "ct_sbr_i-ps_i"
+      ],
+      "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+    },
+    {
+      "bound": "runtime",
+      "cases": [
+        "truncated-crc-0",
+        "truncated-crc-1",
+        "truncated-crc-2",
+        "truncated-crc-3",
+        "truncated-crc-4",
+        "truncated-crc-5",
+        "truncated-crc-6",
+        "truncated-crc-7",
+        "truncated-crc-8",
+        "truncated-crc-9",
+        "truncated-1",
+        "truncated-2",
+        "truncated-3",
+        "truncated-4",
+        "truncated-5",
+        "truncated-6",
+        "truncated-7",
+        "short-extent-unprotected",
+        "short-extent-protected",
+        "two-blocks-protected",
+        "frequency-13",
+        "frequency-14",
+        "frequency-15",
+        "bad-sync"
+      ],
+      "cause": "both workers refuse the input"
+    },
+    {
+      "bound": "runtime",
+      "cases": [
+        "truncated-crc-10",
+        "truncated-8",
+        "empty-payload-unprotected",
+        "two-blocks-unprotected",
+        "empty-payload-protected",
+        "layer-1",
+        "profile-0",
+        "profile-2",
+        "profile-3",
+        "channel-0",
+        "crc-0000",
+        "crc-0001",
+        "crc-8000",
+        "crc-ffff",
+        "al04_44",
+        "al05_44",
+        "al06_44",
+        "al07_96",
+        "al15_44",
+        "al17_44",
+        "al22_chCfg0PCE_44",
+        "al_sbr_cm_48_5.1",
+        "al_sbr_ps_04_new",
+        "al_sbr_ps_06_new",
+        "am00_88",
+        "am05_44",
+        "ap05_48",
+        "foo"
+      ],
+      "cause": "open parity differences require resolution"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "aligned",
+        "protected-single",
+        "rate-0",
+        "rate-1",
+        "rate-2",
+        "rate-3",
+        "rate-4",
+        "rate-5",
+        "rate-6",
+        "rate-7",
+        "rate-8",
+        "rate-9",
+        "rate-10",
+        "rate-11",
+        "rate-12",
+        "channel-1",
+        "channel-2",
+        "channel-3",
+        "channel-4",
+        "channel-5",
+        "channel-6",
+        "channel-7",
+        "header-flags",
+        "buffer-fullness",
+        "maximum-frame",
+        "ps-change-while-off",
+        "ps-ipd-after-iid34",
+        "ps-no-sbr-element",
+        "aac-sce-in-stereo",
+        "al18_44",
+        "al_sbr_cm_48_2",
+        "al_sbr_sr_48_2_fsaac48",
+        "ct_File2",
+        "ct_File3",
+        "ct_File4",
+        "ct_File5",
+        "ct_File6",
+        "ct_File7",
+        "ct_faac-adts",
+        "ct_sbr_bc-ps_bc",
+        "ct_sbr_bc-ps_i",
+        "ct_sbr_bic-ps_i",
+        "ct_sbr_i-ps_bic",
+        "ct_sbr_i-ps_i"
+      ],
+      "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "truncated-crc-0",
+        "truncated-crc-1",
+        "truncated-crc-2",
+        "truncated-crc-3",
+        "truncated-crc-4",
+        "truncated-crc-5",
+        "truncated-crc-6",
+        "truncated-crc-7",
+        "truncated-crc-8",
+        "truncated-crc-9",
+        "truncated-1",
+        "truncated-2",
+        "truncated-3",
+        "truncated-4",
+        "truncated-5",
+        "truncated-6",
+        "truncated-7",
+        "short-extent-unprotected",
+        "short-extent-protected",
+        "two-blocks-protected",
+        "frequency-13",
+        "frequency-14",
+        "frequency-15",
+        "bad-sync"
+      ],
+      "cause": "both workers refuse the input"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "truncated-crc-10",
+        "truncated-8",
+        "empty-payload-unprotected",
+        "two-blocks-unprotected",
+        "empty-payload-protected",
+        "layer-1",
+        "profile-0",
+        "profile-2",
+        "profile-3",
+        "channel-0",
+        "crc-0000",
+        "crc-0001",
+        "crc-8000",
+        "crc-ffff",
+        "al04_44",
+        "al05_44",
+        "al06_44",
+        "al07_96",
+        "al15_44",
+        "al17_44",
+        "al22_chCfg0PCE_44",
+        "al_sbr_cm_48_5.1",
+        "al_sbr_ps_04_new",
+        "al_sbr_ps_06_new",
+        "am00_88",
+        "am05_44",
+        "ap05_48",
+        "foo"
+      ],
+      "cause": "open parity differences require resolution"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "aligned",
+        "protected-single",
+        "rate-0",
+        "rate-1",
+        "rate-2",
+        "rate-3",
+        "rate-4",
+        "rate-5",
+        "rate-6",
+        "rate-7",
+        "rate-8",
+        "rate-9",
+        "rate-10",
+        "rate-11",
+        "rate-12",
+        "channel-1",
+        "channel-2",
+        "channel-3",
+        "channel-4",
+        "channel-5",
+        "channel-6",
+        "channel-7",
+        "header-flags",
+        "buffer-fullness",
+        "maximum-frame",
+        "ps-change-while-off",
+        "ps-ipd-after-iid34",
+        "ps-no-sbr-element",
+        "aac-sce-in-stereo",
+        "al18_44",
+        "al_sbr_cm_48_2",
+        "al_sbr_sr_48_2_fsaac48",
+        "ct_File2",
+        "ct_File3",
+        "ct_File4",
+        "ct_File5",
+        "ct_File6",
+        "ct_File7",
+        "ct_faac-adts",
+        "ct_sbr_bc-ps_bc",
+        "ct_sbr_bc-ps_i",
+        "ct_sbr_bic-ps_i",
+        "ct_sbr_i-ps_bic",
+        "ct_sbr_i-ps_i"
+      ],
+      "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "truncated-crc-0",
+        "truncated-crc-1",
+        "truncated-crc-2",
+        "truncated-crc-3",
+        "truncated-crc-4",
+        "truncated-crc-5",
+        "truncated-crc-6",
+        "truncated-crc-7",
+        "truncated-crc-8",
+        "truncated-crc-9",
+        "truncated-1",
+        "truncated-2",
+        "truncated-3",
+        "truncated-4",
+        "truncated-5",
+        "truncated-6",
+        "truncated-7",
+        "short-extent-unprotected",
+        "short-extent-protected",
+        "two-blocks-protected",
+        "frequency-13",
+        "frequency-14",
+        "frequency-15",
+        "bad-sync"
+      ],
+      "cause": "both workers refuse the input"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "truncated-crc-10",
+        "truncated-8",
+        "empty-payload-unprotected",
+        "two-blocks-unprotected",
+        "empty-payload-protected",
+        "layer-1",
+        "profile-0",
+        "profile-2",
+        "profile-3",
+        "channel-0",
+        "crc-0000",
+        "crc-0001",
+        "crc-8000",
+        "crc-ffff",
+        "al04_44",
+        "al05_44",
+        "al06_44",
+        "al07_96",
+        "al15_44",
+        "al17_44",
+        "al22_chCfg0PCE_44",
+        "al_sbr_cm_48_5.1",
+        "al_sbr_ps_04_new",
+        "al_sbr_ps_06_new",
+        "am00_88",
+        "am05_44",
+        "ap05_48",
+        "foo"
+      ],
+      "cause": "open parity differences require resolution"
+    }
+  ],
+  "pending_module_requirements": [
+    "The raw AAC demuxer and filter emit a short final payload while the buffer parser refuses a truncated declared extent",
+    "The filter refuses a header-only frame while the buffer parser exposes the empty payload and flags it in the wire view",
+    "The filter emits a payload for multiple unprotected raw blocks while the AAC-LC buffer parser selects a single block",
+    "The reference accepts nonzero ADTS layer bits while the buffer parser requires layer zero",
+    "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC",
+    "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload",
+    "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
+  ],
+  "open_cases": [
+    {
+      "id": "truncated-crc-10",
+      "requirement": "The raw AAC demuxer and filter emit a short final payload while the buffer parser refuses a truncated declared extent"
+    },
+    {
+      "id": "truncated-8",
+      "requirement": "The raw AAC demuxer and filter emit a short final payload while the buffer parser refuses a truncated declared extent"
+    },
+    {
+      "id": "empty-payload-unprotected",
+      "requirement": "The filter refuses a header-only frame while the buffer parser exposes the empty payload and flags it in the wire view"
+    },
+    {
+      "id": "two-blocks-unprotected",
+      "requirement": "The filter emits a payload for multiple unprotected raw blocks while the AAC-LC buffer parser selects a single block"
+    },
+    {
+      "id": "empty-payload-protected",
+      "requirement": "The filter refuses a header-only frame while the buffer parser exposes the empty payload and flags it in the wire view"
+    },
+    {
+      "id": "layer-1",
+      "requirement": "The reference accepts nonzero ADTS layer bits while the buffer parser requires layer zero"
+    },
+    {
+      "id": "profile-0",
+      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
+    },
+    {
+      "id": "profile-2",
+      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
+    },
+    {
+      "id": "profile-3",
+      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
+    },
+    {
+      "id": "channel-0",
+      "requirement": "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload"
+    },
+    {
+      "id": "crc-0000",
+      "requirement": "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload"
+    },
+    {
+      "id": "crc-0001",
+      "requirement": "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload"
+    },
+    {
+      "id": "crc-8000",
+      "requirement": "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload"
+    },
+    {
+      "id": "crc-ffff",
+      "requirement": "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload"
+    },
+    {
+      "id": "al04_44",
+      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
+    },
+    {
+      "id": "al05_44",
+      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
+    },
+    {
+      "id": "al06_44",
+      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
+    },
+    {
+      "id": "al07_96",
+      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
+    },
+    {
+      "id": "al15_44",
+      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
+    },
+    {
+      "id": "al17_44",
+      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
+    },
+    {
+      "id": "al22_chCfg0PCE_44",
+      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
+    },
+    {
+      "id": "al_sbr_cm_48_5.1",
+      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
+    },
+    {
+      "id": "al_sbr_ps_04_new",
+      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
+    },
+    {
+      "id": "al_sbr_ps_06_new",
+      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
+    },
+    {
+      "id": "am00_88",
+      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
+    },
+    {
+      "id": "am05_44",
+      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
+    },
+    {
+      "id": "ap05_48",
+      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
+    },
+    {
+      "id": "foo",
+      "requirement": "The raw AAC demuxer and filter emit a short final payload while the buffer parser refuses a truncated declared extent"
+    }
+  ]
+}

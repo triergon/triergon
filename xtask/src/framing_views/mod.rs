@@ -1,7 +1,12 @@
 //! Inputs and reference pins for the framing and ISO BMFF views workers.
 
+mod adts;
+pub(crate) mod config;
 pub(crate) mod dts;
+pub(crate) mod nal;
+mod obu;
 
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::harness::{features, manifest, oracle_compare, report, worker};
@@ -9,6 +14,93 @@ use crate::json::{self, Value};
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     match args {
+        [cmd, flag, family]
+            if cmd == "fixtures" && flag == "--write-manifests" && family == "config" =>
+        {
+            println!(
+                "{}",
+                config::fixtures(
+                    &crate::corpus::Paths {
+                        root: root.into(),
+                        out: root.into()
+                    },
+                    true
+                )?
+            );
+            Ok(())
+        }
+        [cmd, family]
+            if cmd == "fixtures"
+                && (family == "config" || config::IDS.contains(&family.as_str())) =>
+        {
+            println!(
+                "{}",
+                config::fixtures(
+                    &crate::corpus::Paths {
+                        root: root.into(),
+                        out: root.into()
+                    },
+                    false
+                )?
+            );
+            config::ensure_fetched(root)?;
+            if family == "config" {
+                for id in config::IDS {
+                    command(root, &[cmd.clone(), id.into()], "framing-views")?;
+                }
+                Ok(())
+            } else {
+                command(root, args, "framing-views")
+            }
+        }
+        [cmd, flag, family]
+            if cmd == "fixtures" && flag == "--write-manifests" && family == "streams" =>
+        {
+            stream_fixtures(root, true)
+        }
+        [cmd, family] if cmd == "fixtures" && family == "streams" => stream_fixtures(root, false),
+        [cmd, id]
+            if cmd == "fixtures"
+                && [obu::IDS, adts::IDS]
+                    .into_iter()
+                    .flatten()
+                    .any(|name| name == id) =>
+        {
+            stream_fixtures(root, false)?;
+            command(root, args, "framing-views")
+        }
+        [cmd, flag, id] if cmd == "fixtures" && flag == "--write-manifests" && id == "nal" => {
+            println!(
+                "{}",
+                nal::fixtures(
+                    &crate::corpus::Paths {
+                        root: root.into(),
+                        out: root.into()
+                    },
+                    true
+                )?
+            );
+            Ok(())
+        }
+        [cmd, id] if cmd == "fixtures" && (id == "nal" || nal::IDS.contains(&id.as_str())) => {
+            println!(
+                "{}",
+                nal::fixtures(
+                    &crate::corpus::Paths {
+                        root: root.into(),
+                        out: root.into()
+                    },
+                    false
+                )?
+            );
+            if id == "nal" {
+                for id in nal::IDS {
+                    command(root, &[cmd.clone(), id.into()], "framing-views")?;
+                }
+                return Ok(());
+            }
+            command(root, args, "framing-views")
+        }
         [cmd, id] if cmd == "fixtures" && id == "dts" => {
             dts::fixtures(root)?;
             for id in dts::IDS {
@@ -164,4 +256,126 @@ fn reference_pins(
         cases.push(case);
     }
     crate::harness::validation::put(listing, "cases", Value::Array(cases))
+}
+
+type Result<T, E = String> = std::result::Result<T, E>;
+const STREAM_DIRECTORY: &str = "stream-parser-fixtures";
+const DECODER: &str = ".research/reference-decode/install/bin/ffmpeg";
+
+struct StreamCorpus {
+    directory: PathBuf,
+    cases: Vec<Value>,
+}
+
+impl StreamCorpus {
+    fn write(&self, name: &str, bytes: &[u8]) -> Result<String> {
+        let path = self.directory.join(name);
+        if fs::read(&path).as_deref().ok() != Some(bytes) {
+            let pending = path.with_extension(format!("{}.partial", std::process::id()));
+            fs::write(&pending, bytes).map_err(|e| format!("{}: {e}", pending.display()))?;
+            fs::rename(&pending, &path).map_err(|e| format!("{}: {e}", path.display()))?;
+        }
+        Ok(crate::sha256::hex(bytes))
+    }
+
+    fn case(
+        &mut self,
+        id: &str,
+        profile: &str,
+        file: &str,
+        pin: &str,
+        rights: &str,
+        args: &[&str],
+    ) {
+        self.cases.push(Value::object([
+            ("id", Value::str(id)),
+            ("profile", Value::str(profile)),
+            ("file", Value::str(file)),
+            ("sha256", Value::str(pin)),
+            ("rights", Value::str(rights)),
+            ("arguments", Value::strings(args.iter().copied())),
+        ]));
+    }
+}
+
+fn verify_hash(path: &Path, pin: &str) -> Result<()> {
+    let actual = crate::sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    if actual != pin {
+        return Err(format!(
+            "{}: expected SHA-256 {pin}, found {actual}",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+/// Author the stream parser input controls for static gate preflight.
+pub(crate) fn stream_controls(paths: &crate::corpus::Paths) -> Result<()> {
+    let mut corpus = StreamCorpus {
+        directory: paths.fixtures(STREAM_DIRECTORY)?,
+        cases: Vec::new(),
+    };
+    obu::authored(paths, &mut corpus)?;
+    adts::authored(paths, &mut corpus)
+}
+
+fn stream_fixtures(root: &Path, drafts: bool) -> Result<()> {
+    let paths = crate::corpus::Paths {
+        root: root.into(),
+        out: root.into(),
+    };
+    let directory = paths.fixtures(STREAM_DIRECTORY)?;
+    let mut av1 = StreamCorpus {
+        directory: directory.clone(),
+        cases: Vec::new(),
+    };
+    obu::authored(&paths, &mut av1)?;
+    obu::encoded(root, &mut av1)?;
+    let mut adts = StreamCorpus {
+        directory,
+        cases: Vec::new(),
+    };
+    adts::authored(&paths, &mut adts)?;
+    adts::fate(root, &mut adts)?;
+    for (ids, corpus) in [(obu::IDS, av1), (adts::IDS, adts)] {
+        for id in ids {
+            if drafts {
+                json::write(
+                    &corpus.directory.join(format!("{id}-draft.json")),
+                    &Value::object([
+                        ("schema", Value::int(1)),
+                        (
+                            "directory",
+                            Value::str(format!(".research/{STREAM_DIRECTORY}")),
+                        ),
+                        ("cases", Value::Array(corpus.cases.clone())),
+                    ]),
+                )?;
+            } else {
+                let path = root.join(format!("harness/features/{id}/corpus.json"));
+                let (listing, _) = manifest::read(root, &path)?;
+                let expected = listing
+                    .get("cases")
+                    .and_then(Value::as_array)
+                    .ok_or("missing cases")?;
+                if expected.len() != corpus.cases.len()
+                    || expected
+                        .iter()
+                        .zip(&corpus.cases)
+                        .any(|(listed, generated)| {
+                            ["id", "profile", "file", "sha256", "rights", "arguments"]
+                                .into_iter()
+                                .any(|field| listed.get(field) != generated.get(field))
+                        })
+                {
+                    return Err(format!(
+                        "{}: stream parser corpus membership changed",
+                        path.display()
+                    ));
+                }
+                println!("verified {} cases for {id}", expected.len());
+            }
+        }
+    }
+    Ok(())
 }

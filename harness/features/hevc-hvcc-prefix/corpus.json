@@ -1,0 +1,1755 @@
+{
+  "schema": 1,
+  "directory": ".research",
+  "cases": [
+    {
+      "id": "hvcc-prefix-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-0.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-1.bin",
+      "sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-2.bin",
+      "sha256": "494d799e953876ac6022c3f7da5e0f3c04b549be12d1c283c9f877ad2d227a8d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-3.bin",
+      "sha256": "91d0199e7097f9f8d2ae567a51f4443591cf0d0ad5c236b26b1750be9cce08ad",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-4",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-4.bin",
+      "sha256": "6f62dbf032f6c70f9db9c56c1a7c22dffb7ac73ceba4be9acbc31fcd61d87f2f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-5",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-5.bin",
+      "sha256": "bff5cb6c5f60eaa3d7cdffae0bfc36247defe3ae1674ce446b604f2cf0f3d1c3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-6",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-6.bin",
+      "sha256": "7f28724962fcf17b904d4d34d4f2386d60818828366c0cfe9a69cc6cc84ad390",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-7",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-7.bin",
+      "sha256": "c2a72cba3e302f3208e12b16f68def8e22fb63f887ea77620389cc0eac338d00",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-8",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-8.bin",
+      "sha256": "a470d77a31378abf202ec764d11f5159cb960cc52ae8b1eae284f5e9f2805219",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-9",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-9.bin",
+      "sha256": "83eac7861378aa94e39e10df853729e18ee6934652df7dcd9ffe854ce4e95188",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-10",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-10.bin",
+      "sha256": "e77897d43d877869f982d46500e6ab64d3384d3214f85d3c77598d3bade9b1f1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-11",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-11.bin",
+      "sha256": "f01e7a29b02c2524c6503c5ecc039458a6d30a5ffdf45f4bd7226c8355a2dfc3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-12",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-12.bin",
+      "sha256": "af56b5663ccbb7cfd7533516e3eb74a2244d2c4bdae3759b19a60313a0767f4e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-13",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-13.bin",
+      "sha256": "4a488e72e89baed363ec2b05df0ad84b971c4f9087245efeffb7d46a6b28fb33",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-14",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-14.bin",
+      "sha256": "5db01447a532fd0d79cf0f6ba91a5498b9adff36bcbca18a968c9e50fa7858ae",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-15",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-15.bin",
+      "sha256": "1c242c74e1438add0967f9cee4a65ee17d14483617a1866ee82e6ea973b7dc36",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-16",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-16.bin",
+      "sha256": "07491987d9edb5bb825a26be7bf8d2fc8cbd63c59b91292763cacc99a71338ab",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-17",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-17.bin",
+      "sha256": "42bf3416ed29b6817689f0d9994ba58528432625856b145fbe863c4156ee5c7f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-18",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-18.bin",
+      "sha256": "6f0a627ef30cf1e78bfca225332c7effd945fcebbab19f17c2c67b6d36b4351c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-19",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-19.bin",
+      "sha256": "4f44fdcaa8579e4f6287020f4b0ccc05886f486a2df2bc232228b20d35977577",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-20",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-20.bin",
+      "sha256": "1cdfc06f59bd9c0931e0e428d9961f3b49d233c0d247c17441bddc1e3a2a114e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-21",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-21.bin",
+      "sha256": "5f0b2c6e8795ba1d06d57c460b3a90dc8b9773f5b160ea1cea3d2918756b2c25",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-22",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-22.bin",
+      "sha256": "1b9854389540fd510d1b02521cdd3d65c7f0784bb6d396d3f119fc3fb9004d46",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-prefix-23",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-prefix-23.bin",
+      "sha256": "cd75862a259c101ea53246c93aaa5373a0719bba62663e21af81ce57c21cc9b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-opaque-tail",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-opaque-tail.bin",
+      "sha256": "4197c91b8a668fb5d97b08a3eb20f4b8361ff64d9998d0ecdd751399647d7fba",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-version-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-version-zero.bin",
+      "sha256": "1126b7e1d61b62f96043f9af2dcd4934b3e5bee4315b6cb9a7dbe7602592b800",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "2c918c2c496ed10136957c7e66e171c451caf7c1d70d87d14f6642c1a1a3db0d"
+      }
+    },
+    {
+      "id": "hvcc-version-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-version-one.bin",
+      "sha256": "cd75862a259c101ea53246c93aaa5373a0719bba62663e21af81ce57c21cc9b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-version-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-version-mid.bin",
+      "sha256": "116cd22a748add58dad44b8c92a2d7307e9a9b377289310bcbc0a666cbecd860",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "a097411abc095eea24b23e6d79dcb5a44b0bfb42158d9a9a68b160f61d8ed2ef"
+      }
+    },
+    {
+      "id": "hvcc-version-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-version-max.bin",
+      "sha256": "883e67c943c7618f49d685e08ca792a07c4b645dae1a5b00f29a0cb90145d7a8",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "89c123ceb1ac4056240a25c7b01d7ec1223837ccfd2d1165f33cffd7dc3c3396"
+      }
+    },
+    {
+      "id": "hvcc-space-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-space-zero.bin",
+      "sha256": "e378742ce7002e6e6010b7e22e884be7e2f1f0b7bcd0eae7dec8df7446efe78e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "4b28f63c291e62bc0519402085414a969d4e47cba298cd2f28a69c6c1acc7744"
+      }
+    },
+    {
+      "id": "hvcc-space-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-space-one.bin",
+      "sha256": "4e8ba15b4db993c43783472cfa72f05eec370ffc142a499b97761159cbc41da6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "11f774295cf0d0b572f1e5e8eae31100827cafe7b677be3259ad9b6144f659f3"
+      }
+    },
+    {
+      "id": "hvcc-space-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-space-mid.bin",
+      "sha256": "4e8ba15b4db993c43783472cfa72f05eec370ffc142a499b97761159cbc41da6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "11f774295cf0d0b572f1e5e8eae31100827cafe7b677be3259ad9b6144f659f3"
+      }
+    },
+    {
+      "id": "hvcc-space-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-space-max.bin",
+      "sha256": "49279dd3bf06df9b3b32f184189c5fd4cc53d5612758f6f0eb389470f2554be7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "60680025db8315566cbb9fd11d117d532583aec59505e7324b0113e7da7793bd"
+      }
+    },
+    {
+      "id": "hvcc-tier-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-tier-zero.bin",
+      "sha256": "3ef4a16c3cf443a9f967ed7a32b8995b0ea832a70f4e304cf88bffcef2951481",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fd2f0ceb7761bc5a52ea44f03eef0612b4438f3d95f75365181e46fd407f020d"
+      }
+    },
+    {
+      "id": "hvcc-tier-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-tier-one.bin",
+      "sha256": "cd75862a259c101ea53246c93aaa5373a0719bba62663e21af81ce57c21cc9b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-tier-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-tier-mid.bin",
+      "sha256": "3ef4a16c3cf443a9f967ed7a32b8995b0ea832a70f4e304cf88bffcef2951481",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fd2f0ceb7761bc5a52ea44f03eef0612b4438f3d95f75365181e46fd407f020d"
+      }
+    },
+    {
+      "id": "hvcc-tier-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-tier-max.bin",
+      "sha256": "cd75862a259c101ea53246c93aaa5373a0719bba62663e21af81ce57c21cc9b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-profile-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-profile-zero.bin",
+      "sha256": "dd87508b0bd3c29fed7e9c9f18fd392cf9f7b82cbfe0a865978cf5e536ad4b71",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "6b6620a878d1622f28706dc121d519dc29e6b1d4637895f8391a1549e51917a6"
+      }
+    },
+    {
+      "id": "hvcc-profile-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-profile-one.bin",
+      "sha256": "4ade8dcf1017dbb6c525abced64d0a5affd8ba636ed70eee06c44caf91e5f5bc",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "2afcdd4a68013e7e5c3c65208f58f26076cec239e885c80bd828de719408d9eb"
+      }
+    },
+    {
+      "id": "hvcc-profile-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-profile-mid.bin",
+      "sha256": "9db5910a8ead2ee2e8fea82d1b5a22406cfac95b2d324c13f300725a80ea59ac",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "31c87630d392987ac969d98c9db112afbd2352e20b672f687b9370274e2783cf"
+      }
+    },
+    {
+      "id": "hvcc-profile-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-profile-max.bin",
+      "sha256": "becc53a7de4c1ebbac12f2115e40553bcea7668c5165401f006d13923ec8e72b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "0806df08e65a131437b2c9e4c8221979ff463e610fb4ddfb0a36b67cf48e59bc"
+      }
+    },
+    {
+      "id": "hvcc-compatibility-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-compatibility-zero.bin",
+      "sha256": "323bf10a9371ad620963d6f575809ef87fe090c68b134a4985e8dbf9417bacc8",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "5e606c6369b858b3ef1de3891ca26da0aa3dbed140bba5f28452c9b84fe4246f"
+      }
+    },
+    {
+      "id": "hvcc-compatibility-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-compatibility-one.bin",
+      "sha256": "c4b444695d313ef69bdbc4e908bdfd5ec29492dd582e6d2bd0927e68c2da211c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "48cc44c45157dd5351e8228361eaf1fe5f9e45f1ef5c25459579cde7816ce7a5"
+      }
+    },
+    {
+      "id": "hvcc-compatibility-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-compatibility-mid.bin",
+      "sha256": "04b6af25d6a5082fa53455f553cf4929f1daf1793f2ff1844abe885fdb053e27",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "5b5444cacc5e1de1c4ece2d5a7ef49f742369b8037bf7e5b09df33bb3a791719"
+      }
+    },
+    {
+      "id": "hvcc-compatibility-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-compatibility-max.bin",
+      "sha256": "296c8d3b80d6ebdc67bfa338c994ae29945d86061509fd794119eec3db820f9e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "c8b8cf83943529fcc1ce42ce39ab197c41c2edbc4416a23bef6ccffe4138032b"
+      }
+    },
+    {
+      "id": "hvcc-constraints-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-constraints-zero.bin",
+      "sha256": "652eaea7f8163c8f9000b14877ee15222ef6751a32c52e0e0570a04601ab4e58",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "cecaa3f0b3d04ddd2a7061844a103c3c3a40e5094d5d6a9dc084746d5e0c0611"
+      }
+    },
+    {
+      "id": "hvcc-constraints-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-constraints-one.bin",
+      "sha256": "d46cec44e899f5515208bb4926ab16e18ebf2788e034add5872e059c9b3f0b95",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "7c188fa2438e061b37add1680c485074e01f15fa5a776172aa22bf42c4c8a7de"
+      }
+    },
+    {
+      "id": "hvcc-constraints-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-constraints-mid.bin",
+      "sha256": "50323aa75ddc39441b8da70f665bc5429b20571aff00f551257a81eb4f37a4e1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fddfbe51faf3b55a5dd5e9e6915bb012a5e7d6e35ed4a41dcbb47983800150db"
+      }
+    },
+    {
+      "id": "hvcc-constraints-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-constraints-max.bin",
+      "sha256": "f9cbe1ff70576a7833646deb3af34e702fcd1fdbccb50ec125838d900590c409",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "9a78c272e91703cd617c515e19fcc0138c1241e0f614aa8d7c782e1f5395b576"
+      }
+    },
+    {
+      "id": "hvcc-level-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-level-zero.bin",
+      "sha256": "7fd4808b843c06b088223adc3f555ba52585437aa31215a3efc0d1d2b82a79e1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "a9ddb34af32d042fd560e11f43a963c39e2793d9aa84ed92b1d84a145dd614e9"
+      }
+    },
+    {
+      "id": "hvcc-level-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-level-one.bin",
+      "sha256": "673f04c763c94563fe81811d9a9240ad9c524bdb7422a0782995de9f410f9230",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "7386f84e6a3876b12807b1527e7afc154d1d1e06e97f45ea928ec1d41a68f4b6"
+      }
+    },
+    {
+      "id": "hvcc-level-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-level-mid.bin",
+      "sha256": "b0ea560159c8005629e0a618824480b8869903097ae8829875f20e8ada8a9ca6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "15660ffe5e63e308a44d15046237d1531bcfcc0aa219f0a285727b48ec85a495"
+      }
+    },
+    {
+      "id": "hvcc-level-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-level-max.bin",
+      "sha256": "458dcd5a9d3847ff83eb59ca155236b9878b23878e6b0a27fe9cf0ae5b0481eb",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fe724600f585b3945fe59b26f1e355080a0599198c7176d6ffe0b66991f1ae10"
+      }
+    },
+    {
+      "id": "hvcc-segmentation-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-segmentation-zero.bin",
+      "sha256": "244b6c589aa54925fd79a589ac63613d91ee253ff3f4a5f6492073e6e7bda05d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "73fcc2e9881b29b0cfa584bb6649776ce897e01c3f3eb2bcc0c618ed3c3e1837"
+      }
+    },
+    {
+      "id": "hvcc-segmentation-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-segmentation-one.bin",
+      "sha256": "5ae868a2b23cec212cf74ecdf3070bdf774ebd56907d09b771d19cf944943252",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "10ad16d6a1f37d703fe7b3df7dc63bae1041ac3cb1002e24ec86cab27317b423"
+      }
+    },
+    {
+      "id": "hvcc-segmentation-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-segmentation-mid.bin",
+      "sha256": "f9a12c23e1608d2c4c667a271c4201f3956cad6e6e092d36ef21d7350d6b3d94",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "7112459b5982ead779cece385cd1bd2629252a3a1d4537e5aa9c9c287f43d15e"
+      }
+    },
+    {
+      "id": "hvcc-segmentation-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-segmentation-max.bin",
+      "sha256": "12f1aab1566dcf55f573f711ca4163789925a60f47dd2a7d89bf79d950b63387",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "8a25c8eae1469a588e28325b8b16d0bf59c1516df27c83198c47a05642e0e6b8"
+      }
+    },
+    {
+      "id": "hvcc-parallelism-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-parallelism-zero.bin",
+      "sha256": "0aaa38b1922d73aef54ce58cc2b80fd13c599d9b18283c0adb7779f4fe4a97f4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "2a071b52c23ef2246c78d2e487abc75afe7c0426a3867b20e4023c279bb2f428"
+      }
+    },
+    {
+      "id": "hvcc-parallelism-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-parallelism-one.bin",
+      "sha256": "cd75862a259c101ea53246c93aaa5373a0719bba62663e21af81ce57c21cc9b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-parallelism-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-parallelism-mid.bin",
+      "sha256": "cd75862a259c101ea53246c93aaa5373a0719bba62663e21af81ce57c21cc9b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-parallelism-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-parallelism-max.bin",
+      "sha256": "3c4af3e31c19986437a13555dc0c0f8377c9d4db3ac3af86113651be0b4fb7a0",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "5af80ea2a78a671e33fc3dcac80b484147394d42764555861b88c4c85ab21456"
+      }
+    },
+    {
+      "id": "hvcc-chroma-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-chroma-zero.bin",
+      "sha256": "9bfb9b3914fd033064d579a97258074a4a1909f96b43640e13f915cf00f65af6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "151d7955533c3629acb5ddcff00e28348a54ef0e859ef54cf6a0ffc10484ffb4"
+      }
+    },
+    {
+      "id": "hvcc-chroma-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-chroma-one.bin",
+      "sha256": "4df7c8890cf75bceb805580c32d1d3b430408141037ad996d444a4c4dd7dccd5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "1c84fac606e2e74f4cc4dec642cbdb6c0c4e521875fbc14b0a831e713f8c3f7e"
+      }
+    },
+    {
+      "id": "hvcc-chroma-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-chroma-mid.bin",
+      "sha256": "4df7c8890cf75bceb805580c32d1d3b430408141037ad996d444a4c4dd7dccd5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "1c84fac606e2e74f4cc4dec642cbdb6c0c4e521875fbc14b0a831e713f8c3f7e"
+      }
+    },
+    {
+      "id": "hvcc-chroma-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-chroma-max.bin",
+      "sha256": "e302bdb3dc6e260f4c19b8ebbddf94ca1346007f27b0e604114a58ec74771743",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "bdbfed95fbbda77fbccdb147fb8fc4f59c34c99933f9d522fd364f4d7d8807a4"
+      }
+    },
+    {
+      "id": "hvcc-luma-depth-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-luma-depth-zero.bin",
+      "sha256": "b47dc254b5b6019a7dd7e38ee1c76d7ab34f37790bc78dc4c7f1f4f9ca33ec68",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "325190f21c1ca60e3dccb93a65b5b352f618c5c216186c6f4847140b2c73be51"
+      }
+    },
+    {
+      "id": "hvcc-luma-depth-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-luma-depth-one.bin",
+      "sha256": "63c8b0a84187c1f086052d551e96f7c7d2039b44311a3f0c7fcb3283314c8685",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "5e848d4055fd2198eb4ed809d57198bb766df414d092c6d96e7a80f60d2a6f73"
+      }
+    },
+    {
+      "id": "hvcc-luma-depth-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-luma-depth-mid.bin",
+      "sha256": "41b2295b076405afdbe109b891248c8b946a8118ed02eb907434657ea4825a26",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "5bfeb9f560dfeee5dd8d90fa7ea3a1799c8a4b77c4ece9485c07c65c1f374e1b"
+      }
+    },
+    {
+      "id": "hvcc-luma-depth-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-luma-depth-max.bin",
+      "sha256": "416c368517e1dc363cbb277ace93f123cf574301067d02e70ed42d03d497aa46",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "9c832a41f7e28d941cb5b088dcefc76d5863b1e1b292c4b1e20ed9dc0ad5e34d"
+      }
+    },
+    {
+      "id": "hvcc-chroma-depth-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-chroma-depth-zero.bin",
+      "sha256": "c1e28fb2ebf0d2b7f0996770629422f590dd041b68276114c79c4dd06476400a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "a32b8313450a6b0ba8587ef6404bd93c67b25ff6aa08c05c47ebb40a7a803414"
+      }
+    },
+    {
+      "id": "hvcc-chroma-depth-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-chroma-depth-one.bin",
+      "sha256": "89c4ab4a5f0f1c8454865cb6373c8ce59fe87b70936578c274a01a3476e9a33c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "7964ae2d4e855b1126e15ccdfa087dd8489a00c1a87b64503958c00a7c146830"
+      }
+    },
+    {
+      "id": "hvcc-chroma-depth-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-chroma-depth-mid.bin",
+      "sha256": "cd75862a259c101ea53246c93aaa5373a0719bba62663e21af81ce57c21cc9b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-chroma-depth-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-chroma-depth-max.bin",
+      "sha256": "b789255b8b7d29c315c24e7e4e9ebfc33180e92f02f431b7f62a2a9c7ac70fd1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "e9ca8a4ba73c434b3d37660ebf910e23420337d4a1087e654367563a276a25fa"
+      }
+    },
+    {
+      "id": "hvcc-average-rate-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-average-rate-zero.bin",
+      "sha256": "042783f996eb3cc0e70394f3eabfb33b7c31d7121b100b2f4892dd14eac858cf",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "e7ce4d4c309fed50a98feef0b8af3c85e08b2b9f820a0d680dbfe019d849a249"
+      }
+    },
+    {
+      "id": "hvcc-average-rate-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-average-rate-one.bin",
+      "sha256": "0a39125cb58f4d2d8ffd1731c30735e4bbc38f3cc7e4db1062bd8c77f6436c5a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "ffc4e7384d00ce96a1340a404dddfe4327f3031da7ef3854177b75a3110f2af1"
+      }
+    },
+    {
+      "id": "hvcc-average-rate-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-average-rate-mid.bin",
+      "sha256": "a797f96cc5913bf44ee0491585e06d97cbc3195685881d6982891f0ffbf12d26",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "7556d045643f7afd968903aeff8c7b549d6d84acda026a44e06dfacae3ca9814"
+      }
+    },
+    {
+      "id": "hvcc-average-rate-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-average-rate-max.bin",
+      "sha256": "f4d7354616e826b60bc9d7eb76f1fce91ea17cb441f8135cf17e3017be855a90",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "c5fb9bbbb6fcc76d51d18c05fb067f28d9edadbf3032315cf79f6754fb057efe"
+      }
+    },
+    {
+      "id": "hvcc-constant-rate-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-constant-rate-zero.bin",
+      "sha256": "d850b708396b057d7f48be3d60f2de7ae6d75e310643ebb774f6843b5cc6670c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "0d7b3a1c04a8f3c5c0f1327877b4b75a6c6e1032128d91e1539d7ab3e49a258f"
+      }
+    },
+    {
+      "id": "hvcc-constant-rate-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-constant-rate-one.bin",
+      "sha256": "4aabbdfddf372e802f4807d70a5ce8344d8baa04f73f475656b4363acd848166",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "6ac3ca283a9c3de7168211452196ade4fc0c2b89ae20dc56c6557af41e4a8e50"
+      }
+    },
+    {
+      "id": "hvcc-constant-rate-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-constant-rate-mid.bin",
+      "sha256": "4aabbdfddf372e802f4807d70a5ce8344d8baa04f73f475656b4363acd848166",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "6ac3ca283a9c3de7168211452196ade4fc0c2b89ae20dc56c6557af41e4a8e50"
+      }
+    },
+    {
+      "id": "hvcc-constant-rate-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-constant-rate-max.bin",
+      "sha256": "846ce8a5d26bd9f490be04733e6abccddf066891066d2481a017653d50bb5383",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fc463cdc553e92c500f3badd44ee4ff4a798491fec7366d06e13bb6940523e0d"
+      }
+    },
+    {
+      "id": "hvcc-layers-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-layers-zero.bin",
+      "sha256": "32ab713b4bf67ca981919f2dcc36697504f34961d46beb20b6fa891be08d0857",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "e0147ada2d67f54ea77542e9446100e6d0229b2556deb5614a4edc3118c6cf67"
+      }
+    },
+    {
+      "id": "hvcc-layers-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-layers-one.bin",
+      "sha256": "2a30f2178d3ae8dd7143b9c3fc3bd87ceca95a63ca30ca46dc533bb0bfaa90d7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "ee61a0146e8714c578d5cfdfe8f5b9adc2981ead4b081fe5be5cbef7c63ffaa1"
+      }
+    },
+    {
+      "id": "hvcc-layers-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-layers-mid.bin",
+      "sha256": "2b10f3b61c1e8f25b1ad73189768d2adf1b31561c4f2812aa0162b2882c94267",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "b27314df4664e4506a58974a537df1004ad105151dd638702b1fde012adafd8c"
+      }
+    },
+    {
+      "id": "hvcc-layers-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-layers-max.bin",
+      "sha256": "4595ed870d8b9c8e8f2fcec1893ad93a11766a04acc23db11c403768c4158fc9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "794bcf56f3f1f3c02dd7e2262ee5c496ee4ddcd300f4b403ffdd454bd2f5c235"
+      }
+    },
+    {
+      "id": "hvcc-nested-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-nested-zero.bin",
+      "sha256": "bd3fa7f0568e015e2aa2deaec2ca58fd5085a2fac0762bb3c1b3d6b1d8f6603f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "210af24afb20f624ae0fca5047bd2d0d4e33620f885796f6f94829f5043469f2"
+      }
+    },
+    {
+      "id": "hvcc-nested-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-nested-one.bin",
+      "sha256": "cd75862a259c101ea53246c93aaa5373a0719bba62663e21af81ce57c21cc9b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-nested-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-nested-mid.bin",
+      "sha256": "bd3fa7f0568e015e2aa2deaec2ca58fd5085a2fac0762bb3c1b3d6b1d8f6603f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "210af24afb20f624ae0fca5047bd2d0d4e33620f885796f6f94829f5043469f2"
+      }
+    },
+    {
+      "id": "hvcc-nested-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-nested-max.bin",
+      "sha256": "cd75862a259c101ea53246c93aaa5373a0719bba62663e21af81ce57c21cc9b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-length-size-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-length-size-zero.bin",
+      "sha256": "1d98a59bb46c23e3b9a11d513fe7f35fd680850313c6078b442e0ff5f3149a5b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "1b63d55edbd19e76a1c75bb02fd96c3057aff283cf560f630ce58caf2313ec45"
+      }
+    },
+    {
+      "id": "hvcc-length-size-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-length-size-one.bin",
+      "sha256": "8159b2acdedb76171be21b7f84f9c8e3efb99ac81dad0b8639a9b6ab65b67876",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "73dcb95d4f15c602afaa053718b6ae619003cd0edbf37c825103e51e46779d6b"
+      }
+    },
+    {
+      "id": "hvcc-length-size-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-length-size-mid.bin",
+      "sha256": "8159b2acdedb76171be21b7f84f9c8e3efb99ac81dad0b8639a9b6ab65b67876",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "73dcb95d4f15c602afaa053718b6ae619003cd0edbf37c825103e51e46779d6b"
+      }
+    },
+    {
+      "id": "hvcc-length-size-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-length-size-max.bin",
+      "sha256": "cd75862a259c101ea53246c93aaa5373a0719bba62663e21af81ce57c21cc9b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-arrays-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-arrays-zero.bin",
+      "sha256": "cd75862a259c101ea53246c93aaa5373a0719bba62663e21af81ce57c21cc9b3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "80979a8d4744248b5029331b9cadf927d56326b30490c4ea1e5f67dc990bcc3b"
+      }
+    },
+    {
+      "id": "hvcc-arrays-one",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-arrays-one.bin",
+      "sha256": "23ce1bef7a78a69ddb8e457213991ac32bdb7371ab7751662df48af457b2e07e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "f977f90a518f3be754056bb19b40c9071ed76c41136ee678cfcbbe44087baa04"
+      }
+    },
+    {
+      "id": "hvcc-arrays-mid",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-arrays-mid.bin",
+      "sha256": "5445d2046541588e3b0dd23bda218290c1aaf837e4f348fafd88475c5c40e50c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "82e9434102ac2ec2e2e149abbd4f27407996d3b446f36246635275aa1b1164b2"
+      }
+    },
+    {
+      "id": "hvcc-arrays-max",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-arrays-max.bin",
+      "sha256": "b1c52e024ad617e9c83750cf81f06a1f79f2cc0d9e2d28bdee47c33a1de105c5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "ed2455f103a0cff67065f25f68bb057b26fed2752cb5bc48727f4b855cd957cf"
+      }
+    },
+    {
+      "id": "hvcc-issue-segmentation",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-issue-segmentation.bin",
+      "sha256": "6cc1c8b510a14aa1abd351489bdbe1308ef786536def0ed63d830eff43bc62d7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "4561624c530c5694da1458f02eff525422cc1d2e2dec5914d956b187cdd4044d"
+      }
+    },
+    {
+      "id": "hvcc-issue-parallelism",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-issue-parallelism.bin",
+      "sha256": "59d698dd7e30fd8ffebe7e461fbdc4c2ab525ccabaf2a58f3ae4ab5463ceae32",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "6f1c30a3c9abad3204025eda939723a8997feb7952aeb0dc4ae61cf82c2f3aba"
+      }
+    },
+    {
+      "id": "hvcc-issue-chroma",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-issue-chroma.bin",
+      "sha256": "cfdf7ad16533017ce755347dcf6f45db908ad4fc0d082e07c05d13e791726309",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "14120212251c90344b404435e79e5b389ad4ac89a47df71d46ece2727447a5cf"
+      }
+    },
+    {
+      "id": "hvcc-issue-luma-depth",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-issue-luma-depth.bin",
+      "sha256": "d48ab870b486419144000c45c12994033dfecc0d05703a773e835e149ca04522",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "8052ad141f3be745aebf523f66253271f0a4149982ab80e796c9d9d78de3db77"
+      }
+    },
+    {
+      "id": "hvcc-issue-chroma-depth",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-issue-chroma-depth.bin",
+      "sha256": "67cf857743d76e04228a4df86c8de7341fc98f5585f1f51464b8b48b2ca1b57d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "705dc16d4c3894c4a175f7f2830d3d69efe200c43495be7cd80c30b4fc43b9f3"
+      }
+    },
+    {
+      "id": "hvcc-issue-three-byte-length",
+      "profile": "authored",
+      "file": "config-view-fixtures/hvcc-issue-three-byte-length.bin",
+      "sha256": "0cf93cbfaef66ed264f46099b03d5a3254a0ef19b1c53eceb5d594f779843199",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "389321dd06021f8122e6e14a8c0a2d9adf0e87ef8bc4546870529ef081bfbc3c"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-flush",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-flush.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-drain-flush",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-drain-flush.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-update",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-update.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-update-width",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-update-width.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-empty-update",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-empty-update.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-bad-update",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-bad-update.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-zero_length",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-zero_length.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-short_prefix",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-short_prefix.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-short_nal",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-short_nal.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-trailing_prefix",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-trailing_prefix.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-empty_packet",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-empty_packet.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-no-extra",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-no-extra.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-annexb-extra",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-annexb-extra.bin",
+      "sha256": "432b5f17b813ba8333da2e7b8849a3d3f3542ca6d3f2250668729ddb79472ce4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-width1",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-width1.bin",
+      "sha256": "073d2ee4caccabd2413b115b8bd831bd64b945a557e56d6aa9e64ad26f532dff",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "17105e31f65a17544343c15801ea066a3d8e7e335780f15fc3dbfc3d4e62ae8e"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-width2",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-width2.bin",
+      "sha256": "bf742a4a1dc441c8b3e9034206289fe1ae7b3da3c87f1a8d89321c2b9863cb61",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "7dd6d195155f8671466228687eda366d210ac7d5fc00a36ee68a0dd7f7b74789"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-width3",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-width3.bin",
+      "sha256": "4afbef08ff71d60bb11b00270dab5266062a936efcd4b5b939634876a8d2d7af",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "5cc3d3a185b0914548f2a4bd66179728dcb6960e3c4a03e86e604e6ad2807716"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-width4",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-width4.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type0",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type0.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type1",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type1.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type15",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type15.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type16",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type16.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type17",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type17.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type18",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type18.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type19",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type19.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type20",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type20.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type21",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type21.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type22",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type22.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type23",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type23.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type24",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type24.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type35",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type35.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type39",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type39.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-type40",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-type40.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-irap_repeat",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-irap_repeat.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-inband_both",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-inband_both.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-only_vps",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-only_vps.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-aud_sei",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-aud_sei.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-multiple_irap",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-multiple_irap.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-ps_after",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-ps_after.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-non_then_irap",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-non_then_irap.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-config-empty",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-config-empty.bin",
+      "sha256": "d0d04640bb683dc5256caac626ae92322a579a62fd62faf386ed9f1b2b7637ed",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "766128746266299fccf692cebf79b3fc4e8204c3ecbfb2a38fcf5ae1d1e213ff"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-config-sei",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-config-sei.bin",
+      "sha256": "724091327d234f17614aadfed1ecf6a9f993f2b6a6d6e95016dac7cea3d452c1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-config-duplicate",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-config-duplicate.bin",
+      "sha256": "88be471b1279f482c9038f23bc5f5ea7018d3b588e476f34c33c030098d70997",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-config-unknown_empty",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-config-unknown_empty.bin",
+      "sha256": "d5eed303f6efff43db6003e34bc51ac1c34b587ae16b1f1e33a0c4a81d2cd794",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "485053778e244b13fe9cd1fbad005aa093c322cbddaf644dc7c352dc88e37cd3"
+      }
+    },
+    {
+      "id": "hvcc-script-vps-alone",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-vps-alone.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-sps-alone",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-sps-alone.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-pps-alone",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-pps-alone.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-vps-non",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-vps-non.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-sps-non",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-sps-non.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-pps-non",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-pps-non.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-aud-vps",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-aud-vps.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-sei-sps-irap",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-sei-sps-irap.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-irap-vps",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-irap-vps.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-non-vps-irap",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-non-vps-irap.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-pps-sps-irap",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-pps-sps-irap.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-all-flags",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-all-flags.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    },
+    {
+      "id": "hvcc-script-hevc-configured-annexb",
+      "profile": "packet-framing",
+      "file": "config-view-fixtures/hvcc-script-hevc-configured-annexb.bin",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "fa32f06afed1f383608e5844708959f948e237c8d389503e02c80505ba10fc36"
+      }
+    }
+  ]
+}

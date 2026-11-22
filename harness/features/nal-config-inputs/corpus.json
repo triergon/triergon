@@ -1,0 +1,4148 @@
+{
+  "schema": 1,
+  "directory": ".research/nal-corpus",
+  "cases": [
+    {
+      "id": "declared-avc-width1",
+      "profile": "declared",
+      "file": "declared-avc-width1.record",
+      "sha256": "997b1b90150b419972a825d285e32dfb4cb48f3dc1f4a67783142a4178b8fc19",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "1",
+        "7,-,5,13,6,8,13;8,-,13,20,14,16,20;"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 29,
+        "digest": 24971768671176427
+      }
+    },
+    {
+      "id": "declared-avc-width2",
+      "profile": "declared",
+      "file": "declared-avc-width2.record",
+      "sha256": "db5eeb3b0610aedb582534ec79bec7dbebfb48106d2e48a8d66f5e13438f6d58",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "2",
+        "7,-,5,13,6,8,13;8,-,13,20,14,16,20;"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 29,
+        "digest": 3696438831925871340
+      }
+    },
+    {
+      "id": "declared-avc-width3",
+      "profile": "declared",
+      "file": "declared-avc-width3.record",
+      "sha256": "9bfdb4eb5f594009a54bcac163e5e7284dcbf3d06f0886a46d83f2766e37e547",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "3",
+        "7,-,5,13,6,8,13;8,-,13,20,14,16,20;"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 29,
+        "digest": 7367905895180566253
+      }
+    },
+    {
+      "id": "declared-avc-width4",
+      "profile": "declared",
+      "file": "declared-avc-width4.record",
+      "sha256": "994c21e11e4741eeb5e373d801a9b00ead5c62e25c1acc7ddc9df3c579f1c0e7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,13,6,8,13;8,-,13,20,14,16,20;"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 29,
+        "digest": 11039372958435261166
+      }
+    },
+    {
+      "id": "declared-avc-config-empty",
+      "profile": "declared",
+      "file": "declared-avc-config-empty.record",
+      "sha256": "3995fafb3f10067469033a47ebf90b2a91efe95e4570d257da150d35f6337d48",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,6;8,-,6,7;"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 1827003181117832
+      }
+    },
+    {
+      "id": "declared-avc-config-sps_only",
+      "profile": "declared",
+      "file": "declared-avc-config-sps_only.record",
+      "sha256": "4b38091bf3f67618ac72f6bacc7dda5dea7de086410f108e8778eda88dec4c82",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,13,6,8,13;8,-,13,14;"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 19,
+        "digest": 17862903295248064505
+      }
+    },
+    {
+      "id": "declared-avc-config-pps_only",
+      "profile": "declared",
+      "file": "declared-avc-config-pps_only.record",
+      "sha256": "d42dc0ccb0012c9c80999404214e9a127238e661687f4769517123c33765f998",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,6;8,-,6,13,7,9,13;"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 17,
+        "digest": 12975423838337350953
+      }
+    },
+    {
+      "id": "declared-avc-config-duplicate",
+      "profile": "declared",
+      "file": "declared-avc-config-duplicate.record",
+      "sha256": "74bb32dd4249b10eabf9e378ac224c35d820493fd0d042e9e5032d246c21f889",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,20,6,8,13,13,15,20;8,-,20,33,21,23,27,27,29,33;"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 51,
+        "digest": 16518882647375709590
+      }
+    },
+    {
+      "id": "declared-avc-config-multi",
+      "profile": "declared",
+      "file": "declared-avc-config-multi.record",
+      "sha256": "50989018d1ca9e2f1ed42a9c06476e86acc5b1d289422b40717f528a51d6a9b2",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,20,6,8,13,13,15,20;8,-,20,33,21,23,27,27,29,33;"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 51,
+        "digest": 4313667114434736376
+      }
+    },
+    {
+      "id": "declared-avc-no-extra",
+      "profile": "declared",
+      "file": "declared-avc-no-extra.record",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "0,-,0,1;"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "declared-avc-annexb-extra",
+      "profile": "declared",
+      "file": "declared-avc-annexb-extra.record",
+      "sha256": "b341c9a2d7be269495c47bc6cef86a1e802a0b5f9613758ae59148944d211c3b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,18,6,8,18;"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 14,
+        "digest": 3035888407655635785
+      }
+    },
+    {
+      "id": "declared-hevc-flush",
+      "profile": "declared",
+      "file": "declared-hevc-flush.record",
+      "sha256": "f8c20b9a7a258d479dceca07b4e171598aabc0f016518db2f91e56b610a65a6d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "hevc",
+        "4",
+        "32,1,23,31,26,28,31;33,1,31,39,34,36,39;34,1,39,47,42,44,47;"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 56,
+        "digest": 18282504282562926490
+      }
+    },
+    {
+      "id": "declared-hevc-no-extra",
+      "profile": "declared",
+      "file": "declared-hevc-no-extra.record",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "hevc",
+        "4",
+        "0,-,0,1;"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 217
+      }
+    },
+    {
+      "id": "declared-hevc-annexb-extra",
+      "profile": "declared",
+      "file": "declared-hevc-annexb-extra.record",
+      "sha256": "432b5f17b813ba8333da2e7b8849a3d3f3542ca6d3f2250668729ddb79472ce4",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "hevc",
+        "4",
+        ""
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 10,
+        "digest": 13981344075270285614
+      }
+    },
+    {
+      "id": "declared-hevc-width1",
+      "profile": "declared",
+      "file": "declared-hevc-width1.record",
+      "sha256": "073d2ee4caccabd2413b115b8bd831bd64b945a557e56d6aa9e64ad26f532dff",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "hevc",
+        "1",
+        "32,1,23,31,26,28,31;33,1,31,39,34,36,39;34,1,39,47,42,44,47;"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 56,
+        "digest": 11666897492147039933
+      }
+    },
+    {
+      "id": "declared-hevc-width2",
+      "profile": "declared",
+      "file": "declared-hevc-width2.record",
+      "sha256": "bf742a4a1dc441c8b3e9034206289fe1ae7b3da3c87f1a8d89321c2b9863cb61",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "hevc",
+        "2",
+        "32,1,23,31,26,28,31;33,1,31,39,34,36,39;34,1,39,47,42,44,47;"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 56,
+        "digest": 1574270373145967708
+      }
+    },
+    {
+      "id": "declared-hevc-width3",
+      "profile": "declared",
+      "file": "declared-hevc-width3.record",
+      "sha256": "4afbef08ff71d60bb11b00270dab5266062a936efcd4b5b939634876a8d2d7af",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "hevc",
+        "3",
+        "32,1,23,31,26,28,31;33,1,31,39,34,36,39;34,1,39,47,42,44,47;"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 56,
+        "digest": 9928387327854447099
+      }
+    },
+    {
+      "id": "declared-hevc-config-empty",
+      "profile": "declared",
+      "file": "declared-hevc-config-empty.record",
+      "sha256": "d0d04640bb683dc5256caac626ae92322a579a62fd62faf386ed9f1b2b7637ed",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "hevc",
+        "4",
+        ""
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 23,
+        "digest": 11122087197676751518
+      }
+    },
+    {
+      "id": "declared-hevc-config-sei",
+      "profile": "declared",
+      "file": "declared-hevc-config-sei.record",
+      "sha256": "724091327d234f17614aadfed1ecf6a9f993f2b6a6d6e95016dac7cea3d452c1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "hevc",
+        "4",
+        "32,1,23,31,26,28,31;39,1,31,39,34,36,39;40,1,39,47,42,44,47;"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 56,
+        "digest": 95108831057522122
+      }
+    },
+    {
+      "id": "declared-hevc-config-duplicate",
+      "profile": "declared",
+      "file": "declared-hevc-config-duplicate.record",
+      "sha256": "88be471b1279f482c9038f23bc5f5ea7018d3b588e476f34c33c030098d70997",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "hevc",
+        "4",
+        "32,1,23,36,26,28,31,31,33,36;33,1,36,44,39,41,44;34,1,44,52,47,49,52;"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 64,
+        "digest": 845117061626016290
+      }
+    },
+    {
+      "id": "declared-hevc-config-unknown_empty",
+      "profile": "declared",
+      "file": "declared-hevc-config-unknown_empty.record",
+      "sha256": "d5eed303f6efff43db6003e34bc51ac1c34b587ae16b1f1e33a0c4a81d2cd794",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "hevc",
+        "4",
+        "55,1,23,26;"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 26,
+        "digest": 5120024440446011924
+      }
+    },
+    {
+      "id": "declared-sequence-extension",
+      "profile": "declared",
+      "file": "declared-sequence-extension.record",
+      "sha256": "31e0e86947b7cde98813c96498ef399e82033a08cce2ec4f3bbd535f0915bada",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,13,6,8,13;8,-,13,20,14,16,20;13,-,20,28,24,26,28;"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 37,
+        "digest": 14375341657422972299
+      }
+    },
+    {
+      "id": "declared-avc-profile-extension-0-bytes",
+      "profile": "declared",
+      "file": "declared-avc-profile-extension-0-bytes.record",
+      "sha256": "be9751501ea90ae7168cc662834dfd50d18923c37cddcdf11f62a6964fd4cbb9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,13,6,8,13;8,-,13,20,14,16,20;"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 29,
+        "digest": 13865886018624130892
+      }
+    },
+    {
+      "id": "declared-avc-profile-extension-1-bytes",
+      "profile": "declared",
+      "file": "declared-avc-profile-extension-1-bytes.record",
+      "sha256": "eed570cdc19073efe9f8d7e92b2a546170acb93704a41f71ceb1cfc55cdffb8d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,13,6,8,13;8,-,13,20,14,16,20;"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 30,
+        "digest": 17546590706254460248
+      }
+    },
+    {
+      "id": "declared-avc-profile-extension-2-bytes",
+      "profile": "declared",
+      "file": "declared-avc-profile-extension-2-bytes.record",
+      "sha256": "4afabc4a1b014e96eb257aa25e6569cc449468dbb5b5b62a45a356b651d824ee",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,13,6,8,13;8,-,13,20,14,16,20;"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 31,
+        "digest": 7930832011414855631
+      }
+    },
+    {
+      "id": "declared-avc-profile-extension-3-bytes",
+      "profile": "declared",
+      "file": "declared-avc-profile-extension-3-bytes.record",
+      "sha256": "90e9b4a06a460e45ad9880d30dd2c95e05ffcc463b810399191340b22a7742b0",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,13,6,8,13;8,-,13,20,14,16,20;"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 32,
+        "digest": 13524011789808778842
+      }
+    },
+    {
+      "id": "declared-avc-profile-extension-4-bytes",
+      "profile": "declared",
+      "file": "declared-avc-profile-extension-4-bytes.record",
+      "sha256": "57d9c3b1cc66e42f091be4554be5e41556c38600cc7c9fcbefc3f210a23d9bef",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,13,6,8,13;8,-,13,20,14,16,20;13,-,20,24;"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 33,
+        "digest": 1456892420456951109
+      }
+    },
+    {
+      "id": "declared-avc-profile-extension-missing-entry",
+      "profile": "declared",
+      "file": "declared-avc-profile-extension-missing-entry.record",
+      "sha256": "99435b3d2efd38d1397033b91a6c5dc7a8a0366917496fbc43a4a9cea2aeba17",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,13,6,8,13;8,-,13,20,14,16,20;13,-,20,26,24,26,26;"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 33,
+        "digest": 6618613364519964516
+      }
+    },
+    {
+      "id": "avc-aud0-three-byte",
+      "profile": "annexb",
+      "file": "avc-aud0-three-byte.annexb",
+      "sha256": "b4d1b5b93cc0a1f83cc0653480b5a9c5e074cc6ba075f3262e9b095e5838ab83",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 90,
+        "digest": 11604997065088279250
+      }
+    },
+    {
+      "id": "avc-aud0-four-byte",
+      "profile": "annexb",
+      "file": "avc-aud0-four-byte.annexb",
+      "sha256": "c076e3bed216c5bc494eefe7f185f225d704ef2ba0e88810aec1e7a3349badca",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 90,
+        "digest": 11604997065088279250
+      }
+    },
+    {
+      "id": "avc-aud0-leading-zeroes",
+      "profile": "annexb",
+      "file": "avc-aud0-leading-zeroes.annexb",
+      "sha256": "fd257544325bb47b7e5abc6535a679ea3d6e397f5521fe1a9fa88ef0f714c9cd",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 90,
+        "digest": 11604997065088279250
+      }
+    },
+    {
+      "id": "avc-aud0-trailing-zeroes",
+      "profile": "annexb",
+      "file": "avc-aud0-trailing-zeroes.annexb",
+      "sha256": "d0f56449f7bd08712bc1e379a5068665ef6e3ae18e9aa34ed26753cb729bdf55",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 94,
+        "digest": 14018837720457907030
+      }
+    },
+    {
+      "id": "avc-aud0-aud-sei",
+      "profile": "annexb",
+      "file": "avc-aud0-aud-sei.annexb",
+      "sha256": "837c424abf881346d0df76c5e086528226b119efea321f7ef9671c17a9dc9248",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 90,
+        "digest": 11604997065088279250
+      }
+    },
+    {
+      "id": "avc-aud0-duplicate",
+      "profile": "annexb",
+      "file": "avc-aud0-duplicate.annexb",
+      "sha256": "99ad3cea99bcb5ae91f6f631bb695aa9b215251b6e7d6956a47a7ce81a6eacd4",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 114,
+        "digest": 5248970319056396841
+      }
+    },
+    {
+      "id": "avc-aud0-no-sets",
+      "profile": "annexb",
+      "file": "avc-aud0-no-sets.annexb",
+      "sha256": "2c6da1bb41b0ec219389650c0de6367ac135d64f899261bf4c534db0c0abad9e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud0-dangling-prefix",
+      "profile": "annexb",
+      "file": "avc-aud0-dangling-prefix.annexb",
+      "sha256": "291b15b1788d30016bd5b660722cfe1842d11d183a54207188c8bc43f2fc2e1e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 90,
+        "digest": 11604997065088279250
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-00",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-00.annexb",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-01",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-01.annexb",
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-02",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-02.annexb",
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-03",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-03.annexb",
+      "sha256": "709e80c88487a2411e1ee4dfb9f22a861492d20c4765150c0c794abd70f8147c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-04",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-04.annexb",
+      "sha256": "b40711a88c7039756fb8a73827eabe2c0fe5a0346ca7e0a104adc0fc764f528d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-05",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-05.annexb",
+      "sha256": "d0caae7217b057be40b732a9f13844074328d0457f7aca99d18db3bbed214b4f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 35222790
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-06",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-06.annexb",
+      "sha256": "f7892e26bcad03051c4204ccbc226935d72b305de028b2a32646d7bb8fd5fa0b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 1092919571
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-07",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-07.annexb",
+      "sha256": "92494cf25763d603f391878902f4c75beff94f1fd2edaa15a62c95e164f0336c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 33909129312
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-08",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-08.annexb",
+      "sha256": "f078e720cd5062684749b0e4013416270c9d95f6babad88456fb720b40cbd1a0",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 1052070515423
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-09",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-09.annexb",
+      "sha256": "006becdb388ec94193ace7301f70c45511c304377936b0e62340c68bead8aa3c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 5,
+        "digest": 32641698750976
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-10",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-10.annexb",
+      "sha256": "3d9e03c27ad331e7e74542bd9fbaf8c286bcad20c2e3ecbaf42732bb494a971a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 6,
+        "digest": 1012745552519694
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-11",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-11.annexb",
+      "sha256": "346413ba82e7e19e581fadaf6810127f0a14d988fd50025a817f034fb4af3ff6",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 31421551750329993
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-12",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-12.annexb",
+      "sha256": "c170878b3c86946ce5f8e2e853b90add39d45229421988d70eee9c9043d16e4e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 8,
+        "digest": 974887732547240562
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-13",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-13.annexb",
+      "sha256": "cd01a948f012f4f7b602d02b298749923450cf26411d36ad0f2dbf89a7f48810",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 9,
+        "digest": 11800184112151488609
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-14",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-14.annexb",
+      "sha256": "3351ba805a2e5166ee5d0c7aead31481155a950c2f7e05a2d5bcdc7047445432",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 10,
+        "digest": 16105232860003274744
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-15",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-15.annexb",
+      "sha256": "00b2c4f3fc7098d72288b2be32a651d4c687d281b9a08633a0292c2d60f6a44d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 11,
+        "digest": 7170930893679107867
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-16",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-16.annexb",
+      "sha256": "c3dd0dbbecb333688dade02192aff2e4d94eb9661b0e2e04a17d5674fc847c6f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 12,
+        "digest": 1565357018242422010
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-17",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-17.annexb",
+      "sha256": "5b359c115807f82409d86329b88717a2d8de83528c513508a789bcfb7f8d234e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 13,
+        "digest": 12636109504232249820
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-18",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-18.annexb",
+      "sha256": "e6ce37d643a4942b14ded8d93c707c6f5d215e9d014fb9f8e8b11985d38d2e57",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 17000457679814108697
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-19",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-19.annexb",
+      "sha256": "d7307fb52b91838f7078ec8e077b9da02b3ec7cd94d2709339794c97696d0942",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 15,
+        "digest": 15667074954432935070
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-20",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-20.annexb",
+      "sha256": "12955179f9b539a9afb3f5382e9940ef7f203cac9db396dd57baef3c681d07a3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 16,
+        "digest": 56630273540089687
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-21",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-21.annexb",
+      "sha256": "3f0ed77884f9e8856ab3b87fd202ba4f4d3ac41de73858b688f84831e06190e9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 17,
+        "digest": 18441953970138824796
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-22",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-22.annexb",
+      "sha256": "75ee2975071cc4f1a2e8d43ac6e05bc27c352a361a5f9ec4a68d41681e1f4199",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 18,
+        "digest": 621552927717601884
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-23",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-23.annexb",
+      "sha256": "f40f9b3a85308373530ab8cbf377366ced0f6142952e0d4336e09d040345354d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 6246082902540794423
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-24",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-24.annexb",
+      "sha256": "65da215e86ba640e9b2b555eda4f16f0e1823f28aae04a6f69897fcb64f6bbd5",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 20,
+        "digest": 11305705305428720798
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-25",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-25.annexb",
+      "sha256": "6aca91ed02209dee38f4ec1dc7507fb5dd189ae9eb0f2e4af4a5d3abd4957374",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 21,
+        "digest": 11130352823226461617
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-26",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-26.annexb",
+      "sha256": "8c39424d7b76898994f756cb7dc63b8e3d6480d342ffc6a0c6131b6983428654",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 22,
+        "digest": 7901805210710903340
+      }
+    },
+    {
+      "id": "avc-aud0-first-set-cut-27",
+      "profile": "annexb",
+      "file": "avc-aud0-first-set-cut-27.annexb",
+      "sha256": "909ddb90caf2915b0e577cbfe345260423e5f809a00dccc5a8ef59d221d18a1c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 23,
+        "digest": 13139076778536183805
+      }
+    },
+    {
+      "id": "avc-aud1-three-byte",
+      "profile": "annexb",
+      "file": "avc-aud1-three-byte.annexb",
+      "sha256": "b4d1b5b93cc0a1f83cc0653480b5a9c5e074cc6ba075f3262e9b095e5838ab83",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 90,
+        "digest": 11604997065088279250
+      }
+    },
+    {
+      "id": "avc-aud1-four-byte",
+      "profile": "annexb",
+      "file": "avc-aud1-four-byte.annexb",
+      "sha256": "c076e3bed216c5bc494eefe7f185f225d704ef2ba0e88810aec1e7a3349badca",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 90,
+        "digest": 11604997065088279250
+      }
+    },
+    {
+      "id": "avc-aud1-leading-zeroes",
+      "profile": "annexb",
+      "file": "avc-aud1-leading-zeroes.annexb",
+      "sha256": "fd257544325bb47b7e5abc6535a679ea3d6e397f5521fe1a9fa88ef0f714c9cd",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 90,
+        "digest": 11604997065088279250
+      }
+    },
+    {
+      "id": "avc-aud1-trailing-zeroes",
+      "profile": "annexb",
+      "file": "avc-aud1-trailing-zeroes.annexb",
+      "sha256": "d0f56449f7bd08712bc1e379a5068665ef6e3ae18e9aa34ed26753cb729bdf55",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 94,
+        "digest": 14018837720457907030
+      }
+    },
+    {
+      "id": "avc-aud1-aud-sei",
+      "profile": "annexb",
+      "file": "avc-aud1-aud-sei.annexb",
+      "sha256": "837c424abf881346d0df76c5e086528226b119efea321f7ef9671c17a9dc9248",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 90,
+        "digest": 11604997065088279250
+      }
+    },
+    {
+      "id": "avc-aud1-duplicate",
+      "profile": "annexb",
+      "file": "avc-aud1-duplicate.annexb",
+      "sha256": "99ad3cea99bcb5ae91f6f631bb695aa9b215251b6e7d6956a47a7ce81a6eacd4",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 114,
+        "digest": 5248970319056396841
+      }
+    },
+    {
+      "id": "avc-aud1-no-sets",
+      "profile": "annexb",
+      "file": "avc-aud1-no-sets.annexb",
+      "sha256": "2c6da1bb41b0ec219389650c0de6367ac135d64f899261bf4c534db0c0abad9e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud1-dangling-prefix",
+      "profile": "annexb",
+      "file": "avc-aud1-dangling-prefix.annexb",
+      "sha256": "291b15b1788d30016bd5b660722cfe1842d11d183a54207188c8bc43f2fc2e1e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 90,
+        "digest": 11604997065088279250
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-00",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-00.annexb",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-01",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-01.annexb",
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-02",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-02.annexb",
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-03",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-03.annexb",
+      "sha256": "709e80c88487a2411e1ee4dfb9f22a861492d20c4765150c0c794abd70f8147c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-04",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-04.annexb",
+      "sha256": "b40711a88c7039756fb8a73827eabe2c0fe5a0346ca7e0a104adc0fc764f528d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-05",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-05.annexb",
+      "sha256": "d0caae7217b057be40b732a9f13844074328d0457f7aca99d18db3bbed214b4f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 35222790
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-06",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-06.annexb",
+      "sha256": "f7892e26bcad03051c4204ccbc226935d72b305de028b2a32646d7bb8fd5fa0b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 1092919571
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-07",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-07.annexb",
+      "sha256": "92494cf25763d603f391878902f4c75beff94f1fd2edaa15a62c95e164f0336c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 33909129312
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-08",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-08.annexb",
+      "sha256": "f078e720cd5062684749b0e4013416270c9d95f6babad88456fb720b40cbd1a0",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 1052070515423
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-09",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-09.annexb",
+      "sha256": "006becdb388ec94193ace7301f70c45511c304377936b0e62340c68bead8aa3c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 5,
+        "digest": 32641698750976
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-10",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-10.annexb",
+      "sha256": "3d9e03c27ad331e7e74542bd9fbaf8c286bcad20c2e3ecbaf42732bb494a971a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 6,
+        "digest": 1012745552519694
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-11",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-11.annexb",
+      "sha256": "346413ba82e7e19e581fadaf6810127f0a14d988fd50025a817f034fb4af3ff6",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 31421551750329993
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-12",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-12.annexb",
+      "sha256": "c170878b3c86946ce5f8e2e853b90add39d45229421988d70eee9c9043d16e4e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 8,
+        "digest": 974887732547240562
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-13",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-13.annexb",
+      "sha256": "cd01a948f012f4f7b602d02b298749923450cf26411d36ad0f2dbf89a7f48810",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 9,
+        "digest": 11800184112151488609
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-14",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-14.annexb",
+      "sha256": "3351ba805a2e5166ee5d0c7aead31481155a950c2f7e05a2d5bcdc7047445432",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 10,
+        "digest": 16105232860003274744
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-15",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-15.annexb",
+      "sha256": "00b2c4f3fc7098d72288b2be32a651d4c687d281b9a08633a0292c2d60f6a44d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 11,
+        "digest": 7170930893679107867
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-16",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-16.annexb",
+      "sha256": "c3dd0dbbecb333688dade02192aff2e4d94eb9661b0e2e04a17d5674fc847c6f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 12,
+        "digest": 1565357018242422010
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-17",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-17.annexb",
+      "sha256": "5b359c115807f82409d86329b88717a2d8de83528c513508a789bcfb7f8d234e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 13,
+        "digest": 12636109504232249820
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-18",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-18.annexb",
+      "sha256": "e6ce37d643a4942b14ded8d93c707c6f5d215e9d014fb9f8e8b11985d38d2e57",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 17000457679814108697
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-19",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-19.annexb",
+      "sha256": "d7307fb52b91838f7078ec8e077b9da02b3ec7cd94d2709339794c97696d0942",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 15,
+        "digest": 15667074954432935070
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-20",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-20.annexb",
+      "sha256": "12955179f9b539a9afb3f5382e9940ef7f203cac9db396dd57baef3c681d07a3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 16,
+        "digest": 56630273540089687
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-21",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-21.annexb",
+      "sha256": "3f0ed77884f9e8856ab3b87fd202ba4f4d3ac41de73858b688f84831e06190e9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 17,
+        "digest": 18441953970138824796
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-22",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-22.annexb",
+      "sha256": "75ee2975071cc4f1a2e8d43ac6e05bc27c352a361a5f9ec4a68d41681e1f4199",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 18,
+        "digest": 621552927717601884
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-23",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-23.annexb",
+      "sha256": "f40f9b3a85308373530ab8cbf377366ced0f6142952e0d4336e09d040345354d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 19,
+        "digest": 6246082902540794423
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-24",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-24.annexb",
+      "sha256": "65da215e86ba640e9b2b555eda4f16f0e1823f28aae04a6f69897fcb64f6bbd5",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 20,
+        "digest": 11305705305428720798
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-25",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-25.annexb",
+      "sha256": "6aca91ed02209dee38f4ec1dc7507fb5dd189ae9eb0f2e4af4a5d3abd4957374",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 21,
+        "digest": 11130352823226461617
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-26",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-26.annexb",
+      "sha256": "8c39424d7b76898994f756cb7dc63b8e3d6480d342ffc6a0c6131b6983428654",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 22,
+        "digest": 7901805210710903340
+      }
+    },
+    {
+      "id": "avc-aud1-first-set-cut-27",
+      "profile": "annexb",
+      "file": "avc-aud1-first-set-cut-27.annexb",
+      "sha256": "909ddb90caf2915b0e577cbfe345260423e5f809a00dccc5a8ef59d221d18a1c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 23,
+        "digest": 13139076778536183805
+      }
+    },
+    {
+      "id": "hevc-aud0-three-byte",
+      "profile": "annexb",
+      "file": "hevc-aud0-three-byte.annexb",
+      "sha256": "bdc21f7208c365969cd785c5a0c080bd2fedb0eb55786bb43f0368f297c462ab",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-aud0-four-byte",
+      "profile": "annexb",
+      "file": "hevc-aud0-four-byte.annexb",
+      "sha256": "fb7ac8f281ac74221e79713a510c9efbd4e233913ee4ae2d6515527da7bea0e0",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-aud0-leading-zeroes",
+      "profile": "annexb",
+      "file": "hevc-aud0-leading-zeroes.annexb",
+      "sha256": "38e4e92fad84c6afef42e9cdc2ac2e65277d421a26abffb7636a42e84f0fe1e1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-aud0-trailing-zeroes",
+      "profile": "annexb",
+      "file": "hevc-aud0-trailing-zeroes.annexb",
+      "sha256": "ee6f0cac93d618f0f86eed3b780688c57aa847d7a4c4020982432d1650400e47",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 148,
+        "digest": 12603870066055477051
+      }
+    },
+    {
+      "id": "hevc-aud0-aud-sei",
+      "profile": "annexb",
+      "file": "hevc-aud0-aud-sei.annexb",
+      "sha256": "1bae8c70310ac90d1c90278395bbd9b9da185ad0d4b9323394a2ec854576e95a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-aud0-duplicate",
+      "profile": "annexb",
+      "file": "hevc-aud0-duplicate.annexb",
+      "sha256": "482e6fbb00200a6ca0eb4d8d246586d62e42c6a3913edb16330caee49d95bb8d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 168,
+        "digest": 7608841804893712747
+      }
+    },
+    {
+      "id": "hevc-aud0-no-sets",
+      "profile": "annexb",
+      "file": "hevc-aud0-no-sets.annexb",
+      "sha256": "2955b23e52ff481e6dfd6e2523cf52146f3c93ef367af7b283c8f76fe2ee5b62",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-dangling-prefix",
+      "profile": "annexb",
+      "file": "hevc-aud0-dangling-prefix.annexb",
+      "sha256": "ae5e66d5755f44423168e7e81826defff13dfb9d713529949785cc3d8c323027",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-00",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-00.annexb",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-01",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-01.annexb",
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-02",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-02.annexb",
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-03",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-03.annexb",
+      "sha256": "709e80c88487a2411e1ee4dfb9f22a861492d20c4765150c0c794abd70f8147c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-04",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-04.annexb",
+      "sha256": "b40711a88c7039756fb8a73827eabe2c0fe5a0346ca7e0a104adc0fc764f528d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-05",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-05.annexb",
+      "sha256": "dfe1672e66d2ae77660cc6a9b58604abef2ae95fc69517e95762eebaa156cdea",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-06",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-06.annexb",
+      "sha256": "7a73258612f1d2c6950c623327153062f95f5dc17c51fdc1dddda0c1db5eb2b6",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-07",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-07.annexb",
+      "sha256": "a4aa704ce988eedcee695a4aa72a1dc4e1037cdfe62769c1c3215f3cb214dc0e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-08",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-08.annexb",
+      "sha256": "2b32270db2edd1e2a7f167cfae58c5b20ec9f228540e100fb7704de82cc0baea",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-09",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-09.annexb",
+      "sha256": "e4e0968c7ea1d7838571dbc43c2b120d5e3c5e3130f7ff4884f8eeb1119ac319",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-10",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-10.annexb",
+      "sha256": "0e72761f8080b8f3648662051ed5fffda6250734682b3cd17fa8b10ec6464f8f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-11",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-11.annexb",
+      "sha256": "e9438b0c2ef89c9a090f5e59c9f1852eedda771def5a1641d82bd31bc15ed345",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-12",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-12.annexb",
+      "sha256": "d2c2b98fdb7a087814cc66f81eacb48d9db6808857442c642968f4e4e0831440",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-13",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-13.annexb",
+      "sha256": "ab3974d59811d800ba6a40cccdeb0fc95d72aa266316f1517162125fe1564cca",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-14",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-14.annexb",
+      "sha256": "183d0b091da41258d4017f14a2696ad23d278c228f4f7da07f9da24703c45fcb",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-15",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-15.annexb",
+      "sha256": "f6c3cd29c16e17fedd0f7df4425038d310f32d6c369047ff7de043bf7ec6145f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-16",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-16.annexb",
+      "sha256": "89b5d9522f2157d4659442a8d76711e230423850e6429d1fe5115784882787c9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-17",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-17.annexb",
+      "sha256": "fdda1830f51bc412a13c98b485980c0793aef89a2befe3f62a19be3c3c19c4d3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-18",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-18.annexb",
+      "sha256": "7e5bc38c861d0e237674c64feb4e613517c8c3d876a4b10525f810ebb4f824d8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-19",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-19.annexb",
+      "sha256": "3807177f6b22b2adff041afdf0a8f2940848ef1962e1e69445be579683c19f89",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-20",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-20.annexb",
+      "sha256": "902812a65d594330cfb84611223735e8ffdc12b77e3ccf0c92a26531811a72d3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-21",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-21.annexb",
+      "sha256": "5d6ea321d230e5167d78aa71519c5e82d8e8c019653175899f65b0ec0b8511db",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-22",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-22.annexb",
+      "sha256": "a57b01faae4cb27648120152c4b6369792f2ce1d4d05c687eeaeed9cee53bce2",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-23",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-23.annexb",
+      "sha256": "a38e1cf39f80eacd4a7b9a46c8404b29d9ee226bc4e0fe0ea5f7ce8744496703",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-24",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-24.annexb",
+      "sha256": "f9bbe6ae397a6a96fd2405d7dc0dc9dae4cae18ad002d50b1d18345684cc8cd6",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-25",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-25.annexb",
+      "sha256": "11c781830d78e27e3dcd5f9f7ba1f13f52a8a1bfeec0a44c39da1d65a66571b8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-26",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-26.annexb",
+      "sha256": "8ea42ad869ed4ed30e50d59976511d5ec7e98d9f9dc1723d1f606cdc4ba31efc",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud0-first-set-cut-27",
+      "profile": "annexb",
+      "file": "hevc-aud0-first-set-cut-27.annexb",
+      "sha256": "9e831173d1a41c881bd7986e73a963f535d9302810c9da6c84863f406d0e0a8f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-three-byte",
+      "profile": "annexb",
+      "file": "hevc-aud1-three-byte.annexb",
+      "sha256": "bdc21f7208c365969cd785c5a0c080bd2fedb0eb55786bb43f0368f297c462ab",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-aud1-four-byte",
+      "profile": "annexb",
+      "file": "hevc-aud1-four-byte.annexb",
+      "sha256": "fb7ac8f281ac74221e79713a510c9efbd4e233913ee4ae2d6515527da7bea0e0",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-aud1-leading-zeroes",
+      "profile": "annexb",
+      "file": "hevc-aud1-leading-zeroes.annexb",
+      "sha256": "38e4e92fad84c6afef42e9cdc2ac2e65277d421a26abffb7636a42e84f0fe1e1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-aud1-trailing-zeroes",
+      "profile": "annexb",
+      "file": "hevc-aud1-trailing-zeroes.annexb",
+      "sha256": "ee6f0cac93d618f0f86eed3b780688c57aa847d7a4c4020982432d1650400e47",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 148,
+        "digest": 12603870066055477051
+      }
+    },
+    {
+      "id": "hevc-aud1-aud-sei",
+      "profile": "annexb",
+      "file": "hevc-aud1-aud-sei.annexb",
+      "sha256": "1bae8c70310ac90d1c90278395bbd9b9da185ad0d4b9323394a2ec854576e95a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-aud1-duplicate",
+      "profile": "annexb",
+      "file": "hevc-aud1-duplicate.annexb",
+      "sha256": "482e6fbb00200a6ca0eb4d8d246586d62e42c6a3913edb16330caee49d95bb8d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 168,
+        "digest": 7608841804893712747
+      }
+    },
+    {
+      "id": "hevc-aud1-no-sets",
+      "profile": "annexb",
+      "file": "hevc-aud1-no-sets.annexb",
+      "sha256": "2955b23e52ff481e6dfd6e2523cf52146f3c93ef367af7b283c8f76fe2ee5b62",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-dangling-prefix",
+      "profile": "annexb",
+      "file": "hevc-aud1-dangling-prefix.annexb",
+      "sha256": "ae5e66d5755f44423168e7e81826defff13dfb9d713529949785cc3d8c323027",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-00",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-00.annexb",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-01",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-01.annexb",
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-02",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-02.annexb",
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-03",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-03.annexb",
+      "sha256": "709e80c88487a2411e1ee4dfb9f22a861492d20c4765150c0c794abd70f8147c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-04",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-04.annexb",
+      "sha256": "b40711a88c7039756fb8a73827eabe2c0fe5a0346ca7e0a104adc0fc764f528d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-05",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-05.annexb",
+      "sha256": "dfe1672e66d2ae77660cc6a9b58604abef2ae95fc69517e95762eebaa156cdea",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-06",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-06.annexb",
+      "sha256": "7a73258612f1d2c6950c623327153062f95f5dc17c51fdc1dddda0c1db5eb2b6",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-07",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-07.annexb",
+      "sha256": "a4aa704ce988eedcee695a4aa72a1dc4e1037cdfe62769c1c3215f3cb214dc0e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-08",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-08.annexb",
+      "sha256": "2b32270db2edd1e2a7f167cfae58c5b20ec9f228540e100fb7704de82cc0baea",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-09",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-09.annexb",
+      "sha256": "e4e0968c7ea1d7838571dbc43c2b120d5e3c5e3130f7ff4884f8eeb1119ac319",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-10",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-10.annexb",
+      "sha256": "0e72761f8080b8f3648662051ed5fffda6250734682b3cd17fa8b10ec6464f8f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-11",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-11.annexb",
+      "sha256": "e9438b0c2ef89c9a090f5e59c9f1852eedda771def5a1641d82bd31bc15ed345",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-12",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-12.annexb",
+      "sha256": "d2c2b98fdb7a087814cc66f81eacb48d9db6808857442c642968f4e4e0831440",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-13",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-13.annexb",
+      "sha256": "ab3974d59811d800ba6a40cccdeb0fc95d72aa266316f1517162125fe1564cca",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-14",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-14.annexb",
+      "sha256": "183d0b091da41258d4017f14a2696ad23d278c228f4f7da07f9da24703c45fcb",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-15",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-15.annexb",
+      "sha256": "f6c3cd29c16e17fedd0f7df4425038d310f32d6c369047ff7de043bf7ec6145f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-16",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-16.annexb",
+      "sha256": "89b5d9522f2157d4659442a8d76711e230423850e6429d1fe5115784882787c9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-17",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-17.annexb",
+      "sha256": "fdda1830f51bc412a13c98b485980c0793aef89a2befe3f62a19be3c3c19c4d3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-18",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-18.annexb",
+      "sha256": "7e5bc38c861d0e237674c64feb4e613517c8c3d876a4b10525f810ebb4f824d8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-19",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-19.annexb",
+      "sha256": "3807177f6b22b2adff041afdf0a8f2940848ef1962e1e69445be579683c19f89",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-20",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-20.annexb",
+      "sha256": "902812a65d594330cfb84611223735e8ffdc12b77e3ccf0c92a26531811a72d3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-21",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-21.annexb",
+      "sha256": "5d6ea321d230e5167d78aa71519c5e82d8e8c019653175899f65b0ec0b8511db",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-22",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-22.annexb",
+      "sha256": "a57b01faae4cb27648120152c4b6369792f2ce1d4d05c687eeaeed9cee53bce2",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-23",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-23.annexb",
+      "sha256": "a38e1cf39f80eacd4a7b9a46c8404b29d9ee226bc4e0fe0ea5f7ce8744496703",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-24",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-24.annexb",
+      "sha256": "f9bbe6ae397a6a96fd2405d7dc0dc9dae4cae18ad002d50b1d18345684cc8cd6",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-25",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-25.annexb",
+      "sha256": "11c781830d78e27e3dcd5f9f7ba1f13f52a8a1bfeec0a44c39da1d65a66571b8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-26",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-26.annexb",
+      "sha256": "8ea42ad869ed4ed30e50d59976511d5ec7e98d9f9dc1723d1f606cdc4ba31efc",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-aud1-first-set-cut-27",
+      "profile": "annexb",
+      "file": "hevc-aud1-first-set-cut-27.annexb",
+      "sha256": "9e831173d1a41c881bd7986e73a963f535d9302810c9da6c84863f406d0e0a8f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-three-byte",
+      "profile": "annexb",
+      "file": "hevc-eos-three-byte.annexb",
+      "sha256": "bdc21f7208c365969cd785c5a0c080bd2fedb0eb55786bb43f0368f297c462ab",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-eos-four-byte",
+      "profile": "annexb",
+      "file": "hevc-eos-four-byte.annexb",
+      "sha256": "fb7ac8f281ac74221e79713a510c9efbd4e233913ee4ae2d6515527da7bea0e0",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-eos-leading-zeroes",
+      "profile": "annexb",
+      "file": "hevc-eos-leading-zeroes.annexb",
+      "sha256": "38e4e92fad84c6afef42e9cdc2ac2e65277d421a26abffb7636a42e84f0fe1e1",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-eos-trailing-zeroes",
+      "profile": "annexb",
+      "file": "hevc-eos-trailing-zeroes.annexb",
+      "sha256": "ee6f0cac93d618f0f86eed3b780688c57aa847d7a4c4020982432d1650400e47",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 148,
+        "digest": 12603870066055477051
+      }
+    },
+    {
+      "id": "hevc-eos-aud-sei",
+      "profile": "annexb",
+      "file": "hevc-eos-aud-sei.annexb",
+      "sha256": "1bae8c70310ac90d1c90278395bbd9b9da185ad0d4b9323394a2ec854576e95a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-eos-duplicate",
+      "profile": "annexb",
+      "file": "hevc-eos-duplicate.annexb",
+      "sha256": "482e6fbb00200a6ca0eb4d8d246586d62e42c6a3913edb16330caee49d95bb8d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 168,
+        "digest": 7608841804893712747
+      }
+    },
+    {
+      "id": "hevc-eos-no-sets",
+      "profile": "annexb",
+      "file": "hevc-eos-no-sets.annexb",
+      "sha256": "2955b23e52ff481e6dfd6e2523cf52146f3c93ef367af7b283c8f76fe2ee5b62",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-dangling-prefix",
+      "profile": "annexb",
+      "file": "hevc-eos-dangling-prefix.annexb",
+      "sha256": "ae5e66d5755f44423168e7e81826defff13dfb9d713529949785cc3d8c323027",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 144,
+        "digest": 15103602681473024191
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-00",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-00.annexb",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-01",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-01.annexb",
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-02",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-02.annexb",
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-03",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-03.annexb",
+      "sha256": "709e80c88487a2411e1ee4dfb9f22a861492d20c4765150c0c794abd70f8147c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-04",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-04.annexb",
+      "sha256": "b40711a88c7039756fb8a73827eabe2c0fe5a0346ca7e0a104adc0fc764f528d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-05",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-05.annexb",
+      "sha256": "dfe1672e66d2ae77660cc6a9b58604abef2ae95fc69517e95762eebaa156cdea",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-06",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-06.annexb",
+      "sha256": "7a73258612f1d2c6950c623327153062f95f5dc17c51fdc1dddda0c1db5eb2b6",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-07",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-07.annexb",
+      "sha256": "a4aa704ce988eedcee695a4aa72a1dc4e1037cdfe62769c1c3215f3cb214dc0e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-08",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-08.annexb",
+      "sha256": "2b32270db2edd1e2a7f167cfae58c5b20ec9f228540e100fb7704de82cc0baea",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-09",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-09.annexb",
+      "sha256": "e4e0968c7ea1d7838571dbc43c2b120d5e3c5e3130f7ff4884f8eeb1119ac319",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-10",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-10.annexb",
+      "sha256": "0e72761f8080b8f3648662051ed5fffda6250734682b3cd17fa8b10ec6464f8f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-11",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-11.annexb",
+      "sha256": "e9438b0c2ef89c9a090f5e59c9f1852eedda771def5a1641d82bd31bc15ed345",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-12",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-12.annexb",
+      "sha256": "d2c2b98fdb7a087814cc66f81eacb48d9db6808857442c642968f4e4e0831440",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-13",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-13.annexb",
+      "sha256": "ab3974d59811d800ba6a40cccdeb0fc95d72aa266316f1517162125fe1564cca",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-14",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-14.annexb",
+      "sha256": "183d0b091da41258d4017f14a2696ad23d278c228f4f7da07f9da24703c45fcb",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-15",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-15.annexb",
+      "sha256": "f6c3cd29c16e17fedd0f7df4425038d310f32d6c369047ff7de043bf7ec6145f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-16",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-16.annexb",
+      "sha256": "89b5d9522f2157d4659442a8d76711e230423850e6429d1fe5115784882787c9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-17",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-17.annexb",
+      "sha256": "fdda1830f51bc412a13c98b485980c0793aef89a2befe3f62a19be3c3c19c4d3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-18",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-18.annexb",
+      "sha256": "7e5bc38c861d0e237674c64feb4e613517c8c3d876a4b10525f810ebb4f824d8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-19",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-19.annexb",
+      "sha256": "3807177f6b22b2adff041afdf0a8f2940848ef1962e1e69445be579683c19f89",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-20",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-20.annexb",
+      "sha256": "902812a65d594330cfb84611223735e8ffdc12b77e3ccf0c92a26531811a72d3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-21",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-21.annexb",
+      "sha256": "5d6ea321d230e5167d78aa71519c5e82d8e8c019653175899f65b0ec0b8511db",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-22",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-22.annexb",
+      "sha256": "a57b01faae4cb27648120152c4b6369792f2ce1d4d05c687eeaeed9cee53bce2",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-23",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-23.annexb",
+      "sha256": "a38e1cf39f80eacd4a7b9a46c8404b29d9ee226bc4e0fe0ea5f7ce8744496703",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-24",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-24.annexb",
+      "sha256": "f9bbe6ae397a6a96fd2405d7dc0dc9dae4cae18ad002d50b1d18345684cc8cd6",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-25",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-25.annexb",
+      "sha256": "11c781830d78e27e3dcd5f9f7ba1f13f52a8a1bfeec0a44c39da1d65a66571b8",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-26",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-26.annexb",
+      "sha256": "8ea42ad869ed4ed30e50d59976511d5ec7e98d9f9dc1723d1f606cdc4ba31efc",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-eos-first-set-cut-27",
+      "profile": "annexb",
+      "file": "hevc-eos-first-set-cut-27.annexb",
+      "sha256": "9e831173d1a41c881bd7986e73a963f535d9302810c9da6c84863f406d0e0a8f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-authored-three-byte",
+      "profile": "annexb",
+      "file": "avc-authored-three-byte.annexb",
+      "sha256": "5a17dc185d74dd2133cf43321c055c802da7583693ae25dd72f69b204f392c47",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 9,
+        "digest": 7284963874755252862
+      }
+    },
+    {
+      "id": "avc-authored-four-byte",
+      "profile": "annexb",
+      "file": "avc-authored-four-byte.annexb",
+      "sha256": "26b197e69785dd3dfe17dce8fff6ee1ddbe1eaa76dd106451a3b6a9fa0f4ef82",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 9,
+        "digest": 7284963874755252862
+      }
+    },
+    {
+      "id": "avc-authored-leading-zeroes",
+      "profile": "annexb",
+      "file": "avc-authored-leading-zeroes.annexb",
+      "sha256": "240cf62f9c5ab8f06184f51bf254644fe0a4690bcfd3f537fcee6ab93d1e0c06",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 9,
+        "digest": 7284963874755252862
+      }
+    },
+    {
+      "id": "avc-authored-trailing-zeroes",
+      "profile": "annexb",
+      "file": "avc-authored-trailing-zeroes.annexb",
+      "sha256": "bdd9c26c0e890aab075706ee73368641be0e077604a116ccd00d130e83c08063",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 13,
+        "digest": 12861013379706409986
+      }
+    },
+    {
+      "id": "avc-authored-aud-sei",
+      "profile": "annexb",
+      "file": "avc-authored-aud-sei.annexb",
+      "sha256": "70220caac1afa2760102e9f8fbfc170bada8de1750e7b99236bf873720735dba",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 9,
+        "digest": 7284963874755252862
+      }
+    },
+    {
+      "id": "avc-authored-duplicate",
+      "profile": "annexb",
+      "file": "avc-authored-duplicate.annexb",
+      "sha256": "9264f89077459270197639fb7cec2a26186cae09463455824ff125cb0eb3538f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 14,
+        "digest": 9821932691562465315
+      }
+    },
+    {
+      "id": "avc-authored-no-sets",
+      "profile": "annexb",
+      "file": "avc-authored-no-sets.annexb",
+      "sha256": "2c6da1bb41b0ec219389650c0de6367ac135d64f899261bf4c534db0c0abad9e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-authored-dangling-prefix",
+      "profile": "annexb",
+      "file": "avc-authored-dangling-prefix.annexb",
+      "sha256": "08bd8fe3fa58a9fbbfecaefb32eea4e16da16771b6814a4a7f3ab09c44255294",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 9,
+        "digest": 7284963874755252862
+      }
+    },
+    {
+      "id": "avc-authored-first-set-cut-00",
+      "profile": "annexb",
+      "file": "avc-authored-first-set-cut-00.annexb",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-authored-first-set-cut-01",
+      "profile": "annexb",
+      "file": "avc-authored-first-set-cut-01.annexb",
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-authored-first-set-cut-02",
+      "profile": "annexb",
+      "file": "avc-authored-first-set-cut-02.annexb",
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-authored-first-set-cut-03",
+      "profile": "annexb",
+      "file": "avc-authored-first-set-cut-03.annexb",
+      "sha256": "709e80c88487a2411e1ee4dfb9f22a861492d20c4765150c0c794abd70f8147c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-authored-first-set-cut-04",
+      "profile": "annexb",
+      "file": "avc-authored-first-set-cut-04.annexb",
+      "sha256": "b40711a88c7039756fb8a73827eabe2c0fe5a0346ca7e0a104adc0fc764f528d",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "avc-authored-first-set-cut-05",
+      "profile": "annexb",
+      "file": "avc-authored-first-set-cut-05.annexb",
+      "sha256": "d0caae7217b057be40b732a9f13844074328d0457f7aca99d18db3bbed214b4f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 35222790
+      }
+    },
+    {
+      "id": "avc-authored-first-set-cut-06",
+      "profile": "annexb",
+      "file": "avc-authored-first-set-cut-06.annexb",
+      "sha256": "dcfa6c1261c2b1133da3d6153b226746a5ecc6a40b5a03ec41af1c753603048a",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 1092886897
+      }
+    },
+    {
+      "id": "avc-authored-first-set-cut-07",
+      "profile": "annexb",
+      "file": "avc-authored-first-set-cut-07.annexb",
+      "sha256": "5420fba32340d57814992e1b4570d638af7e73c7197c964cc5b75c8bee2d9933",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 33908116418
+      }
+    },
+    {
+      "id": "avc-authored-first-set-cut-08",
+      "profile": "annexb",
+      "file": "avc-authored-first-set-cut-08.annexb",
+      "sha256": "6cf6bda7751685e9091d9c277dd624a1d857009af4bfaa3d10771816bbde1a2f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 1052039115709
+      }
+    },
+    {
+      "id": "avc-annex-prefix-3",
+      "profile": "annexb",
+      "file": "avc-annex-prefix-3.annexb",
+      "sha256": "87c7f793ce71325757d3e0fc894cee06ff31dabd0e9ebab008523e9586e3e6e9",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 13,
+        "digest": 16835925066282296929
+      }
+    },
+    {
+      "id": "avc-annex-prefix-4",
+      "profile": "annexb",
+      "file": "avc-annex-prefix-4.annexb",
+      "sha256": "8a1e5f0bf2c102b6d3df2863abdfff7ca4a95c0aa0427717528619c15bc024ad",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 14,
+        "digest": 6032271189588457046
+      }
+    },
+    {
+      "id": "avc-annex-mixed-padding",
+      "profile": "annexb",
+      "file": "avc-annex-mixed-padding.annexb",
+      "sha256": "edfcfbfde552080092acb61ad48c0f624cd37aee1f435d5d49bed8c8758edf7c",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 13,
+        "digest": 16835925066282296929
+      }
+    },
+    {
+      "id": "avc-annex-eof-1-payload-zeros",
+      "profile": "annexb",
+      "file": "avc-annex-eof-1-payload-zeros.annexb",
+      "sha256": "e891866e23d90c067ca8b74107691c416f46510f75de685c958f6bb2d145e5fd",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 3,
+        "digest": 33909963460
+      }
+    },
+    {
+      "id": "avc-annex-eof-2-payload-zeros",
+      "profile": "annexb",
+      "file": "avc-annex-eof-2-payload-zeros.annexb",
+      "sha256": "00dd480e8cd9e61d6a2e4a4eed3d02cb32ab4a4d6d788480ba04f69c70ba6389",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 1052096364401
+      }
+    },
+    {
+      "id": "avc-empty-annex",
+      "profile": "annexb",
+      "file": "avc-empty-annex.annexb",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "avc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-annex-prefix-3",
+      "profile": "annexb",
+      "file": "hevc-annex-prefix-3.annexb",
+      "sha256": "72417961bb34368cb5c330cc0c78a37901a09988476d621c2de33df3a7e361f7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 19,
+        "digest": 15292503003507879892
+      }
+    },
+    {
+      "id": "hevc-annex-prefix-4",
+      "profile": "annexb",
+      "file": "hevc-annex-prefix-4.annexb",
+      "sha256": "3b55b233df1b49c9202d6eb50f7e8e1f516ceca714414516a54243f80bdef188",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 19,
+        "digest": 15292503003507879892
+      }
+    },
+    {
+      "id": "hevc-annex-mixed-padding",
+      "profile": "annexb",
+      "file": "hevc-annex-mixed-padding.annexb",
+      "sha256": "ed78e07229408fa8ef470b26a5cc84454a24ae1d59f461f85119564471c6a177",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 23,
+        "digest": 9726284638715969240
+      }
+    },
+    {
+      "id": "hevc-annex-eof-1-payload-zeros",
+      "profile": "annexb",
+      "file": "hevc-annex-eof-1-payload-zeros.annexb",
+      "sha256": "53a13ef4bf0879e8d5535cacd447f69a2e8bc03b3d5016059d0e6ce376d3e995",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-annex-eof-2-payload-zeros",
+      "profile": "annexb",
+      "file": "hevc-annex-eof-2-payload-zeros.annexb",
+      "sha256": "89804075e60ca8b074e6bc2c22e4a7d6e872c1d7e6e383b8cc738ab826fdc5a7",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "hevc-empty-annex",
+      "profile": "annexb",
+      "file": "hevc-empty-annex.annexb",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "annexb",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "declared-opaque-test-layout",
+      "profile": "declared",
+      "file": "declared-opaque-test-layout.record",
+      "sha256": "ea56f0a391a7d63dfb559f3d1a26691504d6cce60127294e99599ff519f55161",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,0,1,6,2,4,6;31,-,6,10,7,9,10;"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 11,
+        "digest": 6676127231470940522
+      }
+    },
+    {
+      "id": "declared-invalid-range",
+      "profile": "declared",
+      "file": "declared-invalid-range.record",
+      "sha256": "3995fafb3f10067469033a47ebf90b2a91efe95e4570d257da150d35f6337d48",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "avc",
+        "4",
+        "7,-,5,8,6,7,8;"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 1827003181117832
+      }
+    },
+    {
+      "id": "declared-opaque-arrays",
+      "profile": "declared",
+      "file": "declared-opaque-arrays.record",
+      "sha256": "9d651df4b4401428c6bff2428fb446707fb55edf0d0e8b2cab6e8b13357b5c24",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "declared",
+        "hevc",
+        "4",
+        "32,1,23,36,26,28,31,31,33,36;55,0,36,45,39,41,45;33,0,45,52,48,50,52;"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 54,
+        "digest": 3994016792612557086
+      }
+    }
+  ]
+}

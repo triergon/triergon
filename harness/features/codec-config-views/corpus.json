@@ -1,0 +1,2648 @@
+{
+  "schema": 1,
+  "directory": ".research",
+  "cases": [
+    {
+      "id": "hevc-aud0",
+      "profile": "reference-written",
+      "file": "config-view-fixtures/hevc-aud0.bin",
+      "sha256": "f47f05122ff1949ee7bd2d1d6611a876e07997bdef60c0cf5075bd6fe5f01321",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "hvcc-written"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 87705665
+      }
+    },
+    {
+      "id": "hevc-aud1",
+      "profile": "reference-written",
+      "file": "config-view-fixtures/hevc-aud1.bin",
+      "sha256": "2a2a7c105432a4ab1ad4cd4e18af255e6901816621c63d6ea3dad74b6e194757",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "hvcc-written"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 87705665
+      }
+    },
+    {
+      "id": "hevc-eos",
+      "profile": "reference-written",
+      "file": "config-view-fixtures/hevc-eos.bin",
+      "sha256": "b48a0f2217f39137cae4596cef84c83ecd5da4534dfc830854f8258ad6ce6bfe",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "hvcc-written"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 87705665
+      }
+    },
+    {
+      "id": "vpcc-profile-0",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-profile-0.bin",
+      "sha256": "0ac9abffc36202d619a122263bb373bb00fc203e0cfa80d736ebe73e24d4dcfd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-profile-1",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-profile-1.bin",
+      "sha256": "376f0b4cc29781a4c319399cf37639585b9ae25abfc163dd2aa62989a3b83492",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-profile-2",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-profile-2.bin",
+      "sha256": "cd404bda80dbf2d84281556e74ae164fc962503b05fa4d23f32e077687bae8f4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831146
+      }
+    },
+    {
+      "id": "vpcc-profile-3",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-profile-3.bin",
+      "sha256": "76892becf7ac74b2ecd6e2898c7fb7d35cdffd62117dfea8594ad18a95499d43",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831137
+      }
+    },
+    {
+      "id": "vpcc-unknown-cicp-preserved",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-unknown-cicp-preserved.bin",
+      "sha256": "4b420bf42df12b570127432fd8e4c1ab84656f0124b38c6390caf78f89b58881",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2802340
+      }
+    },
+    {
+      "id": "vpcc-flags-preserved",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-flags-preserved.bin",
+      "sha256": "cd65e8bee0ff6e7bb25c444a249df38332884cb01885c004ae9197db0c4fd59e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2801347
+      }
+    },
+    {
+      "id": "vpcc-nonempty-initialization",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-nonempty-initialization.bin",
+      "sha256": "bd00c470f3cb8969be1e5000ad6b13b769f1071337ac55902c414f582bfb1c8e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "vpcc-raw-range-issues",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-raw-range-issues.bin",
+      "sha256": "5a30ecfec0d75bbb329155dc40f83619056d242f2a630c05d64e87695413d878",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2832129
+      }
+    },
+    {
+      "id": "vpcc-rgb-with-subsampling",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-rgb-with-subsampling.bin",
+      "sha256": "93667783695b3718380f8a6202b21013f684aa295752ae83051a887886e74539",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2801346
+      }
+    },
+    {
+      "id": "vpcc-version-zero-unsupported",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-version-zero-unsupported.bin",
+      "sha256": "27b0eba46ae3d3ca43a28f0b36cb0133a33ece9d4c2187d504b85abed92e0dd7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2772549
+      }
+    },
+    {
+      "id": "vpcc-future-version-unsupported",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-future-version-unsupported.bin",
+      "sha256": "f8877784f2cf71514329059bd050011141e56c2f270ee46bc9c589412af51386",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2772549
+      }
+    },
+    {
+      "id": "vpcc-short-initialization",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-initialization.bin",
+      "sha256": "c8f4e3fcdaa2c6a0a8fc30cc9f47bd05384fdae298d997cabad567025a9e4986",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "vpcc-extra-record-tail",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-extra-record-tail.bin",
+      "sha256": "3c3729ddc995192e840c1a3bcf5f6b1aeff81fac345666bab3f3220a3d4c2b64",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2801347
+      }
+    },
+    {
+      "id": "vpcc-short-record-0",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-record-0.bin",
+      "sha256": "67abdd721024f0ff4e0b3f4c2fc13bc5bad42d0b7851d456d88d203d15aaa450",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "vpcc-short-record-1",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-record-1.bin",
+      "sha256": "957b88b12730e646e0f33d3618b77dfa579e8231e3c59c7104be7165611c8027",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "vpcc-short-record-2",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-record-2.bin",
+      "sha256": "8b06d71008bfca591d40f15f058bece45644ec17704c14a362494b17524d7d6c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "vpcc-short-record-3",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-record-3.bin",
+      "sha256": "41750a119644cb6765aad0f5b90035557129867f0dfe7a1a463ab68121e395e2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "vpcc-short-record-4",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-record-4.bin",
+      "sha256": "bde6becdc6adc0f653c54c0488730759564906b92233a0821365c03772e0e893",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "vpcc-short-record-5",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-record-5.bin",
+      "sha256": "fecb365aa0dfe7735dd18f9df97dfdbd71e1fc644a69c49698af201ebc0b6322",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2801346
+      }
+    },
+    {
+      "id": "vpcc-short-record-6",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-record-6.bin",
+      "sha256": "c41ab89ca21f148ad407032653d832a3fcfbf155e681b40b0d69d4af2c8567a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2801347
+      }
+    },
+    {
+      "id": "vpcc-short-record-7",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-record-7.bin",
+      "sha256": "dfae462610d0451c00b65920b00cc6588d364ae5f922024e8fa774f07191a116",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2801347
+      }
+    },
+    {
+      "id": "vpcc-short-fullbox-0",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-fullbox-0.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2772549
+      }
+    },
+    {
+      "id": "vpcc-short-fullbox-1",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-fullbox-1.bin",
+      "sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "vpcc-short-fullbox-2",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-fullbox-2.bin",
+      "sha256": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "vpcc-short-fullbox-3",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-short-fullbox-3.bin",
+      "sha256": "fb50dc0717ff266cf9baf82b1ce7a1c2ef6d9247859680b11a19fb7077f5f222",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "vpcc-level-0",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-0.bin",
+      "sha256": "b5c7df10e34cd159b228770a3782c196ddc3fea9439ca286eb4cebba7b7cdeb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-10",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-10.bin",
+      "sha256": "0ac9abffc36202d619a122263bb373bb00fc203e0cfa80d736ebe73e24d4dcfd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-11",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-11.bin",
+      "sha256": "b29d5e651802712c3093d0a13ede8c28dc6d0ff65c7155b855458f7515461671",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-20",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-20.bin",
+      "sha256": "b980c60d7a918a2a93d7c70806b6f89ea72bcf5042ee657110b308c49e801d96",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-21",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-21.bin",
+      "sha256": "89cbb021cc8286cffcf355b92c3fdf8b7cc3fdc6373b748e864a9aa13fc93241",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-30",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-30.bin",
+      "sha256": "417383ff163de12b810de8d0c3e7419faacf3a471611197d529dacb053308da4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-31",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-31.bin",
+      "sha256": "80cb790b86ec94be3aa09e5ac8b041a35e80f22b8061734a6f956dafadc734b6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-40",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-40.bin",
+      "sha256": "d85b2f92d3d96af3bd5285ef8f4e88a80da882ee4ae44f849bc6097d77e3d140",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-41",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-41.bin",
+      "sha256": "4d7a2b36a572a690bebd3453b16d24d41b9d0febe641e4f91b61e0661d9d530b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-50",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-50.bin",
+      "sha256": "57742eeec9959242cb3b1eb65a4d607cefd780e302ab125edc32e69a436ca5a9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-51",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-51.bin",
+      "sha256": "c92e35b85f275bec553279911023528c508329feeeea75c6707d03bf72e49cc9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-52",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-52.bin",
+      "sha256": "26d2bb583d69317283b33374920098c39e746e6f540a99a042877214044d8996",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-60",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-60.bin",
+      "sha256": "2de798936d65253c96b155d3d4049b073a2b4eac646890b15276c07573e1a742",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-61",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-61.bin",
+      "sha256": "fc13bddee6c84c58d39bee8d038aaaf9f3169b592d911d01f4d7707bd35f78e7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-level-62",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-level-62.bin",
+      "sha256": "9425fe14176556829cef243dbca09b0ec4105f3dbb7c77c16cbbfde8261846b9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-depth-nine",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-depth-nine.bin",
+      "sha256": "36598f804322c0041c99b4b6575a1f68e7c504ef786b5da4248f1ff9428707d1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-chroma-reserved",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-chroma-reserved.bin",
+      "sha256": "cac9387f20328847eb2753548cd8140c1ddacdf1eb8d8da990e1df284b534b01",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2831138
+      }
+    },
+    {
+      "id": "vpcc-limited-range",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-limited-range.bin",
+      "sha256": "3b76ca670d61fcb1cc2b23ae28568a9aaec09d24b8edcfed305cf80ba96e0ffb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2801347
+      }
+    },
+    {
+      "id": "vpcc-cicp-0",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-cicp-0.bin",
+      "sha256": "c6759c3e1a0cb7142ad807d8663d93abc09f39a14c323e9b7bfc9150dc76f3d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2800354
+      }
+    },
+    {
+      "id": "vpcc-cicp-1",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-cicp-1.bin",
+      "sha256": "3b76ca670d61fcb1cc2b23ae28568a9aaec09d24b8edcfed305cf80ba96e0ffb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2801347
+      }
+    },
+    {
+      "id": "vpcc-cicp-2",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-cicp-2.bin",
+      "sha256": "7bad880ef0fa5b60a16814fea1a960545c3a7077e7c4f824c79e04e566588ab4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2802340
+      }
+    },
+    {
+      "id": "vpcc-cicp-3",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-cicp-3.bin",
+      "sha256": "6d529218f353458368b66374b0f4c2941b8562f165902d23754351469a19ee6b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2803333
+      }
+    },
+    {
+      "id": "vpcc-cicp-4",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-cicp-4.bin",
+      "sha256": "029815227dd5d1cd0eb9806d9b8944b675dc27fa5b0eb644d8d52a52905a2988",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2804326
+      }
+    },
+    {
+      "id": "vpcc-cicp-9",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-cicp-9.bin",
+      "sha256": "9147cff4db7a3fbd76baaad09b57ec41b6d88bf2e60f8dbd4b8fd82f083cb89c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2809291
+      }
+    },
+    {
+      "id": "vpcc-cicp-16",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-cicp-16.bin",
+      "sha256": "591a5d76a4f135a7063155fa91615bc621e33e6efa04f9540c35b2bcbf85da69",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2802788
+      }
+    },
+    {
+      "id": "vpcc-cicp-18",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-cicp-18.bin",
+      "sha256": "bc699afc35449e5d56490c5dec85f722ae39dca00ccd39f7fc9aae18be6631cb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2802836
+      }
+    },
+    {
+      "id": "vpcc-cicp-22",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-cicp-22.bin",
+      "sha256": "05f37f7a6237eeadf23795ac76b795bf12b1e2617c657cdf8d403240a53a7ff1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2821560
+      }
+    },
+    {
+      "id": "vpcc-cicp-255",
+      "profile": "vpcc",
+      "file": "config-view-fixtures/vpcc-cicp-255.bin",
+      "sha256": "e4d49df0ea2ef701feaa61885cb000b1f45ac35cb3ac6756cca1e69247de94ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vpcc"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 2802340
+      }
+    },
+    {
+      "id": "asc-aac-lc-mono-32000",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-aac-lc-mono-32000.bin",
+      "sha256": "6468d720a43cc899841290aca7eb4e6b413300fc68492fa6aaa7861109f3fc0b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676170014
+      }
+    },
+    {
+      "id": "asc-aac-lc-stereo-32000",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-aac-lc-stereo-32000.bin",
+      "sha256": "3d4edda15b4c7bcf0bc6bda3eda89f639ca62be421fe2360ce1e2db99592d09f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-he-aac-mono-32000",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-he-aac-mono-32000.bin",
+      "sha256": "688c451526c4c9cb4b6bb1e75c0dc61efc14ee82498d39ee444c5dd0b1cfec61",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "32"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 81053134624638
+      }
+    },
+    {
+      "id": "asc-he-aac-stereo-32000",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-he-aac-stereo-32000.bin",
+      "sha256": "3503fc0fbcbaea9f0fa8516048a4b26bdefae2001c0970a18f711d37f2077bc6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "32"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 81053134624638
+      }
+    },
+    {
+      "id": "asc-he-aac-v2-stereo-32000",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-he-aac-v2-stereo-32000.bin",
+      "sha256": "c15dabc1efaf53226fa52b9381f80cddffaa1c7115009f39d624d4b904493bdb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "32"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 81053134624638
+      }
+    },
+    {
+      "id": "asc-aac-lc-mono-44100",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-aac-lc-mono-44100.bin",
+      "sha256": "11414c9fb6860a9e7b7f30b42fb5dc14b2b6ee108e5cd5fe4a7bd8b7483b0394",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676170014
+      }
+    },
+    {
+      "id": "asc-aac-lc-stereo-44100",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-aac-lc-stereo-44100.bin",
+      "sha256": "ba3d722a88cacce18f22962612eda4d50e7a61cd9b7db60694043efed2a61448",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-he-aac-mono-44100",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-he-aac-mono-44100.bin",
+      "sha256": "c0961dfa3f5607271a6abb471a0bc54b0ae7183a6d4fc326b4d89ca54a9fbc57",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "32"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 81053134624638
+      }
+    },
+    {
+      "id": "asc-he-aac-stereo-44100",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-he-aac-stereo-44100.bin",
+      "sha256": "b39114ee700e02947643f8af9653cb79be8688a5494021686589e36031d01f37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "32"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 81053134624638
+      }
+    },
+    {
+      "id": "asc-he-aac-v2-stereo-44100",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-he-aac-v2-stereo-44100.bin",
+      "sha256": "f58bdca2ecd944f9fcf616d95e841d4f2dcfcc66b0a09cb71b48b6cfbd4e016a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "32"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 81053134624638
+      }
+    },
+    {
+      "id": "asc-aac-lc-mono-48000",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-aac-lc-mono-48000.bin",
+      "sha256": "cc03fc678ee0f27c779bd58ce6d310cc6c441436b52bd1c9cacc1494a26d8beb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676170014
+      }
+    },
+    {
+      "id": "asc-aac-lc-stereo-48000",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-aac-lc-stereo-48000.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-he-aac-mono-48000",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-he-aac-mono-48000.bin",
+      "sha256": "6a4593800d760f4d35a0d841a826405dd18b01ebba5b43982f0a7af4b5436d4b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "32"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 81053134624638
+      }
+    },
+    {
+      "id": "asc-he-aac-stereo-48000",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-he-aac-stereo-48000.bin",
+      "sha256": "79ef97e4d01895aaa8ea728aeb7ec646651fe0dbc905f1c2928e13fc32104016",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "32"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 81053134624638
+      }
+    },
+    {
+      "id": "asc-he-aac-v2-stereo-48000",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-he-aac-v2-stereo-48000.bin",
+      "sha256": "e6abbe756c1313b7a04e8d68b8e62707f7e34e4cc431e276353c7623434bc6b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "32"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 81053134624638
+      }
+    },
+    {
+      "id": "asc-sampling-index-0",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-0.bin",
+      "sha256": "430c0c4e4652189800774c572e360ae56f0245079e763c995751ba15ba25c454",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-1",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-1.bin",
+      "sha256": "2e65be18773ac0ec751aed0677e62c3da0749e23445fc59e5a02180073ec6cd9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-2",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-2.bin",
+      "sha256": "5e2cfbf97b97eb5b62f35ad23a5a1ff2d13d79ce5374f02d2d1adcdf14529135",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-3",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-3.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-4",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-4.bin",
+      "sha256": "ba3d722a88cacce18f22962612eda4d50e7a61cd9b7db60694043efed2a61448",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-5",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-5.bin",
+      "sha256": "3d4edda15b4c7bcf0bc6bda3eda89f639ca62be421fe2360ce1e2db99592d09f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-6",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-6.bin",
+      "sha256": "cb51b9fc96b6d21e3933df7e791af1ca24582a8b6d2ab3e43835e279ee501cc8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-7",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-7.bin",
+      "sha256": "efae79664faedd7970c46ff244413dbe70a5d096c0a0ec17953edf735006ef03",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-8",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-8.bin",
+      "sha256": "04950f6ebfd8a69f60415b1cbf08a128799dfa698907dc0bcc596d9618b9dd3a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-9",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-9.bin",
+      "sha256": "57d500ca05b6ba881445ca73cd3edd691c461c7be1b5556cb328eb063e8b903e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-10",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-10.bin",
+      "sha256": "66ccdeadef729277d7d3d36f241e6806b9d848b591bfdcd04fea98e9a8fab2ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-11",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-11.bin",
+      "sha256": "b0fdd859a79e22e670398a33ec09f6595a272f10e7bdbe01eca0fbaca66f8001",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-12",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-12.bin",
+      "sha256": "d2e51b03551aa3120853055629bdbf909c6e5ed790b8d3d1b5a8135587853f90",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-sampling-index-13",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-13.bin",
+      "sha256": "3209e970f7f2787f0c6834dc2cd247d4f2d869feb2ad99e32935e920f0519afd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 69684515632
+      }
+    },
+    {
+      "id": "asc-sampling-index-14",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-14.bin",
+      "sha256": "8f6314042f2a1bd8faa382a8f2aa242db4178e22803571025c68610b894d6711",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 69684515632
+      }
+    },
+    {
+      "id": "asc-sampling-index-15",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sampling-index-15.bin",
+      "sha256": "df1909191fb9abe952e07aa28f04bdce4ab37be42940c61635d35120b9712544",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "40"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 91671703600
+      }
+    },
+    {
+      "id": "asc-channel-0",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-0.bin",
+      "sha256": "f36ceeb1b4ef3f83e0c3d853d41ddfed0a06b9b06aff0d9adeb12c901cdbfdff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 69684515632
+      }
+    },
+    {
+      "id": "asc-channel-1",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-1.bin",
+      "sha256": "cc03fc678ee0f27c779bd58ce6d310cc6c441436b52bd1c9cacc1494a26d8beb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676170014
+      }
+    },
+    {
+      "id": "asc-channel-2",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-2.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-channel-3",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-3.bin",
+      "sha256": "761f2addd0db0b7693e1ac783d4b2ef6fba8c06940a044f2ae29df2228c9dad7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676229598
+      }
+    },
+    {
+      "id": "asc-channel-4",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-4.bin",
+      "sha256": "60beab26b577cf19703124d42b92c3a0b2847b83a44ae18a98eaa071c4512d78",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676259390
+      }
+    },
+    {
+      "id": "asc-channel-5",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-5.bin",
+      "sha256": "504e861e8664e984f337416d15af16249211eaec14c8349eb7c75b85b6bba6bd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676289182
+      }
+    },
+    {
+      "id": "asc-channel-6",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-6.bin",
+      "sha256": "44808eef969e26393ecec81dd8b1c16d33f73313f23aa497c1278344c7506fa3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676318974
+      }
+    },
+    {
+      "id": "asc-channel-7",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-7.bin",
+      "sha256": "ad2bc421cae77fc26c1feaaa8bccfa618f6f376b452899051d92584c9f7c430b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676378558
+      }
+    },
+    {
+      "id": "asc-channel-8",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-8.bin",
+      "sha256": "c1b0886adebc51f9e4d20544bced1209e8d9cc741e1e7f8ff3d75e2f9e27507f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 69684515632
+      }
+    },
+    {
+      "id": "asc-channel-9",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-9.bin",
+      "sha256": "3ef9aba4b9fca3167dd4e3f6e06af2739a559be1d68209ba8e899d94a5638220",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 69684515632
+      }
+    },
+    {
+      "id": "asc-channel-10",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-10.bin",
+      "sha256": "64ce5d97a0a9f3a930f54878d218cafba77935547fe3e22ea065d130b36d712d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 69684515632
+      }
+    },
+    {
+      "id": "asc-channel-11",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-11.bin",
+      "sha256": "3450938788cf65f5420c05663d906ebb5a057a333dd08d39aa54d23fa969745c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676348766
+      }
+    },
+    {
+      "id": "asc-channel-12",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-12.bin",
+      "sha256": "5f17f7ecc8081fc14e614224da7f9788ef0fde69f482871f5abc33593dd47ed4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676378558
+      }
+    },
+    {
+      "id": "asc-channel-13",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-13.bin",
+      "sha256": "e74ca170492bb70b3acdecc85761c6ecca4f07cdc37d70a38838755c1e25b3f8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676855230
+      }
+    },
+    {
+      "id": "asc-channel-14",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-14.bin",
+      "sha256": "def8867cf826d68d2712b81978d2e56c15d36937f91bc8b837bcca37d70d0cf6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676378558
+      }
+    },
+    {
+      "id": "asc-channel-15",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-channel-15.bin",
+      "sha256": "f36e7de8fb81fc867238bc65c890488953be102e6dc9c9ac011bf607833fdae0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 69684515632
+      }
+    },
+    {
+      "id": "asc-object-0",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-object-0.bin",
+      "sha256": "f14d90dc2815f1fc7536fc66ca8f73562feeedd1b075627a4b656f5fa8eb26ff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 69684515632
+      }
+    },
+    {
+      "id": "asc-object-1",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-object-1.bin",
+      "sha256": "1d53ad639ca1f2619683a6f1f49f72817d30905834db8d17360aefee902e6683",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-object-3",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-object-3.bin",
+      "sha256": "532a1a6e14904de6949513c3fa9e2835bbfb5ba9458d38f365d18362a118ab30",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-object-4",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-object-4.bin",
+      "sha256": "48a3a921e31522e5f183910042fc8d0789fc9da3c73489169575ad1afae7e3f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-object-6",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-object-6.bin",
+      "sha256": "5009871b7b54d3327d1f631c5bc27d4e33582865d09ae8319c9685fbad06a2bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 69684515632
+      }
+    },
+    {
+      "id": "asc-object-17",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-object-17.bin",
+      "sha256": "dfbae42c137caa4f65ea7d398578dd3cd4c632a9724c2a9f3aaae71150312827",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-object-23",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-object-23.bin",
+      "sha256": "6e14cecb79728829751cf6e21b0a2e8e5c537ed42384d4b66a763e428325876e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-object-30",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-object-30.bin",
+      "sha256": "402bee9e0f45a5fe8a24e39ab2318b8fef29e476d519cc3f5820a7d9e8e81b54",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 69684515632
+      }
+    },
+    {
+      "id": "asc-escaped-object-0",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-escaped-object-0.bin",
+      "sha256": "0d1e4c2976055b74a74ad9c60063b2ee8ba5fafcbbc27fcd78cc647174e429cf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "22"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 75237647405
+      }
+    },
+    {
+      "id": "asc-escaped-object-10",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-escaped-object-10.bin",
+      "sha256": "5f088dcb1ac80e31b392fe256063f3f06f2fcdce9dc253a1e5e534d5047c690b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "22"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 75237647405
+      }
+    },
+    {
+      "id": "asc-escaped-object-63",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-escaped-object-63.bin",
+      "sha256": "3d8ee345318798247f15ef32b523598cdcd15f086b7c9f424d4bd0ea4ab9f7d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "22"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 75237647405
+      }
+    },
+    {
+      "id": "asc-pce-front",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-pce-front.bin",
+      "sha256": "8100c13cba8fd515998471d4fc18c6144a935ead96746ffa3c02f77afb2467da",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "64"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 109226051474302
+      }
+    },
+    {
+      "id": "asc-pce-side",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-pce-side.bin",
+      "sha256": "0d2629c8b0b7779553256cb6419503553586f9b908be0eac9ea1128251a7b526",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "72"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 116269280746302
+      }
+    },
+    {
+      "id": "asc-pce-back",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-pce-back.bin",
+      "sha256": "76c2266cdadc1291428c7598623cdf0ab0375881aa7fc12b6d4bc5d4c44699fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "72"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 116269280746302
+      }
+    },
+    {
+      "id": "asc-pce-lfe",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-pce-lfe.bin",
+      "sha256": "4f77676efba39e74f445259b16a33215ef02e1ffed962ab6e6384c30f1c8a135",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "72"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 116269280716510
+      }
+    },
+    {
+      "id": "asc-pce-data",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-pce-data.bin",
+      "sha256": "5547343aa38b601e76009161829ce63b60c4decfa372a56aec5a8a7bbdd89735",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "72"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 116269280686718
+      }
+    },
+    {
+      "id": "asc-pce-coupling",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-pce-coupling.bin",
+      "sha256": "ad278dabfb7b3d4ff967722ebd6bb1f8e1862f8fabeda0187070541830c4edb0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "72"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 116269280686718
+      }
+    },
+    {
+      "id": "asc-pce-empty",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-pce-empty.bin",
+      "sha256": "dcd66f3bc7e556d09c9572139f0ea2d6922098e240d9ceea56de8849eb3c3adf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "72"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 116269280627134
+      }
+    },
+    {
+      "id": "asc-pce-every-kind",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-pce-every-kind.bin",
+      "sha256": "53265307689e4679e714792dfc2e8ae0bd4bb85825a7de653dc9df6df8cb34ef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "104"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 144442197685342
+      }
+    },
+    {
+      "id": "asc-pce-max-elements",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-pce-max-elements.bin",
+      "sha256": "02492c0d376cb4ec2cdd1a56c5429a4c417b1e2d7ae9dacb7f7e4a3feb325ace",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "416"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 436137648432
+      }
+    },
+    {
+      "id": "asc-pce-declared-93",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-pce-declared-93.bin",
+      "sha256": "169b2c7069654e16438dc0b8a2de7d6a16b9069b1db50f0821447ad0ee846b74",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "93"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 207876503988
+      }
+    },
+    {
+      "id": "asc-pce-physical",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-pce-physical.bin",
+      "sha256": "169b2c7069654e16438dc0b8a2de7d6a16b9069b1db50f0821447ad0ee846b74",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "2456"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 2305048625712
+      }
+    },
+    {
+      "id": "asc-fixed-bits-0",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-0.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 53319532037487
+      }
+    },
+    {
+      "id": "asc-fixed-bits-1",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-1.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "1"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 1747502138973
+      }
+    },
+    {
+      "id": "asc-fixed-bits-2",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-2.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "2"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 1775014753084
+      }
+    },
+    {
+      "id": "asc-fixed-bits-3",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-3.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "3"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 1802527367195
+      }
+    },
+    {
+      "id": "asc-fixed-bits-4",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-4.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "4"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 1830039981306
+      }
+    },
+    {
+      "id": "asc-fixed-bits-5",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-5.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "5"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 1857552595417
+      }
+    },
+    {
+      "id": "asc-fixed-bits-6",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-6.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "6"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 1885065209528
+      }
+    },
+    {
+      "id": "asc-fixed-bits-7",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-7.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "7"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 1912577823639
+      }
+    },
+    {
+      "id": "asc-fixed-bits-8",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-8.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "8"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 1940090437750
+      }
+    },
+    {
+      "id": "asc-fixed-bits-9",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-9.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "9"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 1967603051861
+      }
+    },
+    {
+      "id": "asc-fixed-bits-10",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-10.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "10"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 1995115665972
+      }
+    },
+    {
+      "id": "asc-fixed-bits-11",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-11.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "11"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 2022628280083
+      }
+    },
+    {
+      "id": "asc-fixed-bits-12",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-12.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "12"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 63554224546361
+      }
+    },
+    {
+      "id": "asc-fixed-bits-13",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-13.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "13"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 64407115583802
+      }
+    },
+    {
+      "id": "asc-fixed-bits-14",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-14.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "14"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 65260006621243
+      }
+    },
+    {
+      "id": "asc-fixed-bits-15",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-15.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "15"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66112897658684
+      }
+    },
+    {
+      "id": "asc-fixed-bits-16",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-fixed-bits-16.bin",
+      "sha256": "b65f22439176f7827a0d82a66b34477888f0287450985d8e3dc836d7e32ce79b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 66966676199806
+      }
+    },
+    {
+      "id": "asc-physical-bytes-0",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-physical-bytes-0.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "0"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 52880217715390
+      }
+    },
+    {
+      "id": "asc-physical-bytes-1",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-physical-bytes-1.bin",
+      "sha256": "4a64a107f0cb32536e5bce6c98c393db21cca7f4ea187ba8c4dca8b51d4ea80a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "8"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 62355452976
+      }
+    },
+    {
+      "id": "asc-sync-extent-16",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-16.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "16"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 68066293230774
+      }
+    },
+    {
+      "id": "asc-sync-extent-24",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-24.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "24"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 74889421530302
+      }
+    },
+    {
+      "id": "asc-sync-extent-27",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-27.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "27"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 77448094642625
+      }
+    },
+    {
+      "id": "asc-sync-extent-31",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-31.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "31"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 80859658792389
+      }
+    },
+    {
+      "id": "asc-sync-extent-32",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-32.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "32"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 81712549829830
+      }
+    },
+    {
+      "id": "asc-sync-extent-36",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-36.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "36"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 85124114009385
+      }
+    },
+    {
+      "id": "asc-sync-extent-37",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-37.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "37"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 85977005046826
+      }
+    },
+    {
+      "id": "asc-sync-extent-38",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-38.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "38"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 86829896084267
+      }
+    },
+    {
+      "id": "asc-sync-extent-47",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-47.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "47"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 94505915421236
+      }
+    },
+    {
+      "id": "asc-sync-extent-48",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-48.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "48"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 95358806458677
+      }
+    },
+    {
+      "id": "asc-sync-extent-49",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-49.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "49"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 96211697496118
+      }
+    },
+    {
+      "id": "asc-sync-extent-56",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-56.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "56"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 102182822261886
+      }
+    },
+    {
+      "id": "asc-sync-extent-64",
+      "profile": "asc",
+      "file": "config-view-fixtures/asc-sync-extent-64.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc",
+        "64"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 3516296975206
+      }
+    },
+    {
+      "id": "asc-mov-shorter",
+      "profile": "asc-mov",
+      "file": "config-view-fixtures/asc-mov-shorter.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc-mov",
+        "16"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 57374732049
+      }
+    },
+    {
+      "id": "asc-mov-equal",
+      "profile": "asc-mov",
+      "file": "config-view-fixtures/asc-mov-equal.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc-mov",
+        "56"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 7,
+        "digest": 1769049150863511176
+      }
+    },
+    {
+      "id": "asc-mov-longer",
+      "profile": "asc-mov",
+      "file": "config-view-fixtures/asc-mov-longer.bin",
+      "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "asc-mov",
+        "64"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 8,
+        "digest": 287954238042188529
+      }
+    },
+    {
+      "id": "asc-frame-lc",
+      "profile": "asc-frame",
+      "file": "codec-derived/aac/al18_44.adts",
+      "sha256": "17e6246f5e46613e903000b4387672586252b12128b3af882d8fa9b98ce127ba",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "asc-frame",
+        "1208"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 42470528
+      }
+    },
+    {
+      "id": "asc-frame-explicit-sbr",
+      "profile": "asc-frame",
+      "file": "codec-derived/aac/al_sbr_cm_48_2.adts",
+      "sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "asc-frame",
+        "2b118800"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 46219483
+      }
+    },
+    {
+      "id": "asc-frame-implicit-sbr",
+      "profile": "asc-frame",
+      "file": "codec-derived/aac/al_sbr_cm_48_2.adts",
+      "sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "asc-frame",
+        "1310"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 46219483
+      }
+    },
+    {
+      "id": "csi-miami-5-1-256-spx-small",
+      "profile": "eac3",
+      "file": "codec-derived/ac3/csi_miami_5.1_256_spx_small.eac3",
+      "sha256": "84f50317a49a98509bf174ace814b39860e6ab2a1d61bdbd10ada9081f2bb2b3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 0,
+        "digest": 14467607205503017121
+      }
+    },
+    {
+      "id": "csi-miami-stereo-128-spx",
+      "profile": "eac3",
+      "file": "codec-derived/ac3/csi_miami_stereo_128_spx.eac3",
+      "sha256": "f96b45fa4d249522cd83dea009cd528ce552ec9d947e03cdecab44652bc86ecb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 248
+      }
+    },
+    {
+      "id": "csi-miami-stereo-128-spx-small",
+      "profile": "eac3",
+      "file": "codec-derived/ac3/csi_miami_stereo_128_spx_small.eac3",
+      "sha256": "adc397f12472353237f7dc8139c2223937abc23eff9cd80ac2e3471814a04c3a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 489,
+        "bytes": 0,
+        "digest": 13972095887177294401
+      }
+    },
+    {
+      "id": "matrix2-commentary1-stereo-192-small",
+      "profile": "eac3",
+      "file": "codec-derived/ac3/matrix2_commentary1_stereo_192_small.eac3",
+      "sha256": "ea095d557bd6787266f4b7276a2be818a7fbc924997748be89d9ead962a3391c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 131,
+        "bytes": 0,
+        "digest": 4268225701926998171
+      }
+    },
+    {
+      "id": "serenity-english-5-1-1536-small",
+      "profile": "eac3",
+      "file": "codec-derived/ac3/serenity_english_5.1_1536_small.eac3",
+      "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 195,
+        "bytes": 0,
+        "digest": 5681558808020792368
+      }
+    },
+    {
+      "id": "the-great-wall-7-1",
+      "profile": "eac3",
+      "file": "codec-derived/ac3/the_great_wall_7.1.eac3",
+      "sha256": "d698981ddc1c10e65d234dd6a02ff2b0f4c88787595c9d3e5adf7f097f2c9e50",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "eac3"
+      ],
+      "expected": {
+        "packets": 315,
+        "bytes": 0,
+        "digest": 12013776376403536199
+      }
+    }
+  ]
+}

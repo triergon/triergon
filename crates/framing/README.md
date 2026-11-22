@@ -214,8 +214,8 @@ descriptors are 16 bytes.
 - VP9: only vpcC version 1. No frame header or superframe parsing.
 - AAC: other object types, unsupported extension modes and frequency indices
   13/14 are refused. ADTS wrapping refuses configurations above 7 because the
-  header carries three channel-configuration bits. ADTS CRC is carried but not verified; multi-block and
-  protected frames are not parsed. The writer obeys the 8191-byte frame limit.
+  header carries three channel-configuration bits. Single-block ADTS frames retain the CRC word when present.
+  The parser does not verify the CRC and refuses multi-block frames. The writer obeys the 8191-byte frame limit.
 - AC-3/E-AC-3: input must be aligned big-endian syncframes. There is no resync
   search, no word-swapped or IEC 61937 input, and no CRC or audio-block check.
   bsid 9/10 and E-AC-3 mixing definition 3 are refused. `sample_span()` is the
@@ -266,6 +266,41 @@ complete packet fields and side data, malformed input, flush and drain actions,
 and retained packet access after close. Add `--benchmark --memory` to collect
 paired runtime and memory measurements through the shared harness; qualification
 requires the pinned gate build on native AArch64 Linux.
+
+The framing views harness compares incremental AVC and HEVC length-prefixed
+units, Annex B configuration and caller-declared record layouts, and both
+hvcC-to-Annex-B writers. The reader comparison covers one- through four-byte
+length fields at three window sizes. The configuration comparison checks
+ordered unit types and bytes, retained opaque source bytes, and four-byte
+start codes from `AnnexBWriter`. The HEVC writer comparison also checks the
+decoder writer's refusal type.
+
+Prepare the inputs with `cargo xtask framing-views fixtures nal`. The
+[NAL comparison results](../../docs/status.md#linux-aarch64) link the three
+contracts and describe the open differences and measurement coverage.
+
+The framing views harness also compares AV1 OBUs returned by FFmpeg's
+`filter_units` and ADTS frame boundaries, ASC and payloads returned by the
+raw AAC demuxer and `aac_adtstoasc`. The AV1 comparison covers low-overhead
+and externally sized OBUs at three input window sizes. Independent wire
+oracles check AV1 offsets and exact LEB128 spellings, and all ADTS header
+fields, optional CRC words and original payloads.
+
+Prepare these inputs with `cargo xtask framing-views fixtures streams`.
+The [stream parser results](../../docs/status.md#linux-aarch64) link both
+reference comparisons and their wire oracles.
+
+The configuration comparisons check fixed hvcC and vpcC fields and complete
+E-AC-3 bitstream information against wire oracles. The pinned FFmpeg workers
+check the range and CICP values a VP9 movie publishes, the HEVC profile, level
+and pixel format from the first packet of a muxed stream, AAC channel decisions
+at both ASC extents, and E-AC-3 packet geometry, layout and decoder side data.
+The AAC cases also check the bytes MOV supplies from a decoder descriptor and
+the rate, channels and sample count from a first access unit.
+
+Prepare the inputs with `cargo xtask framing-views fixtures config`. The
+[configuration comparisons](../../docs/status.md#linux-aarch64) list the
+parity results and open cases.
 
 Set `TRIERGON_PACKET_EVENTS` to a private output directory when running
 `cargo test -p triergon-framing --features reference-trace --test packet_view`

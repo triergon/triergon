@@ -1,0 +1,4822 @@
+{
+  "schema": 1,
+  "directory": ".research",
+  "cases": [
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-0-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-0-stream-0.bin",
+      "sha256": "69dc947483a59d0f008c31819286517c2448680888384c6370586ea82e0b825e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "5864dbd00c1c84169e2ce5bd216201778c889363dd5a0ded465e8049391aac9d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-0-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-0-stream-1.bin",
+      "sha256": "ea75c55bc9e8295d62e7b0a78254424540fed685c7f04be76b990f4e1722dc9e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-0-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-0-stream-2.bin",
+      "sha256": "56f8eafe82b4f810d3dbdf926aaafe79dfc8cbd1b72837e43e9278b4304e2c46",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "05dc10d193c2669b19f40b98174586cf801a977ab6a8dd42e00061665ffd1fc4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-0-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-0-stream-3.bin",
+      "sha256": "0866eda7003636b7f20845081d87be36f809bfb0c621ddd72c5c133cf3e90196",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-1-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-1-stream-0.bin",
+      "sha256": "b2b3b39f67f3f560e0aadbfbbbdb9ea7dc576d47c0eaf7af1977e4bd86ce48e0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "5864dbd00c1c84169e2ce5bd216201778c889363dd5a0ded465e8049391aac9d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-1-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-1-stream-1.bin",
+      "sha256": "d5466c9592f296843d815437ab51dd8f0949824f13888ebca9af8d41803717d2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-1-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-1-stream-2.bin",
+      "sha256": "a7e9756750f8b058338dcd9ca4b3b293af6f0417c568cc8a28990054d2608230",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "05dc10d193c2669b19f40b98174586cf801a977ab6a8dd42e00061665ffd1fc4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-1-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-1-stream-3.bin",
+      "sha256": "af3bd35ca6715fa9dea32cb8c1c04b83fa38eea8f42bd9ab46505fb064ea1293",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-2-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-2-stream-0.bin",
+      "sha256": "71ef1ffa5144f6b3b522abe64ee9c7e233d47fa43496ed6429aba64d3072749d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "5864dbd00c1c84169e2ce5bd216201778c889363dd5a0ded465e8049391aac9d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-2-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-2-stream-1.bin",
+      "sha256": "11790f8e9f60acaf862bf324ab3a2a41fc35e8b42a2759cb0febdf8bd480de25",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-2-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-2-stream-2.bin",
+      "sha256": "658f65cc1290494e70383eac6bf807a58da49a86b24f57b9d7223538a1d55a03",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "05dc10d193c2669b19f40b98174586cf801a977ab6a8dd42e00061665ffd1fc4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-2-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-2-stream-3.bin",
+      "sha256": "f4467e0267a9bc24e6d32708af6186594bee1def9cc9eaf0af41bd70c4fa32db",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-3-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-3-stream-0.bin",
+      "sha256": "ba94dfdc271823b6a102fa712e05d32e5961823951e3a5de4dea8098c83fd406",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-3-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-3-stream-1.bin",
+      "sha256": "91a578823f82af75dcab1bea11ef094a0475d9f770e204a1806abc2b8c9803c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-3-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-3-stream-2.bin",
+      "sha256": "964ee8636630c5a2d3ce92e339a7fb360dbfd16e0ae46004e98301878b3dea20",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f1215482a062cc76ce9cb5b868215aa70ae60efee7a67067ac664a746d8fd23f"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-3-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-0-blocks-3-stream-3.bin",
+      "sha256": "94de6de1fa33c44bbd1357f696e36b4170f8ac56becf2c4d21473231583dccaa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-0-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-0-stream-0.bin",
+      "sha256": "e2115cf151f2e54d1b8ae9fdcd098c1b944fc995c2035f2d11631d017bf3d3ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "5864dbd00c1c84169e2ce5bd216201778c889363dd5a0ded465e8049391aac9d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-0-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-0-stream-1.bin",
+      "sha256": "619d289d134a98c95ee283d5f568b3c6bf82343be25917bf147d4108ac7e323c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-0-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-0-stream-2.bin",
+      "sha256": "3780437998833d82ceafb786e51e751319116b4a5b17b20ec4a7ad6e939c0d64",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "05dc10d193c2669b19f40b98174586cf801a977ab6a8dd42e00061665ffd1fc4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-0-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-0-stream-3.bin",
+      "sha256": "18140f340b107ac89cb7f01011a0fa9f3441a9a065c2b1c357250b4c0c60f0e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-1-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-1-stream-0.bin",
+      "sha256": "43bb62d64aa9867e9923fdf02c6638f7833b6a772264e89bc283aba6410d600d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "5864dbd00c1c84169e2ce5bd216201778c889363dd5a0ded465e8049391aac9d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-1-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-1-stream-1.bin",
+      "sha256": "27789483e5ac1bf64844bba77b7d4f018f402a654c8b1de867f10af82e66a239",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-1-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-1-stream-2.bin",
+      "sha256": "717b0bae2296ed2994488e0742eb094fcdeab6393d740341178f890f1f5f5f00",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "05dc10d193c2669b19f40b98174586cf801a977ab6a8dd42e00061665ffd1fc4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-1-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-1-stream-3.bin",
+      "sha256": "8c9c2dde70bddea33d8444d6052768ae9e0a7c489648b36583044716b1640c96",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-2-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-2-stream-0.bin",
+      "sha256": "99725346e0f169855e6f9b8858b46d00b7d336bc329cd113c45badd7ccfd5bae",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "5864dbd00c1c84169e2ce5bd216201778c889363dd5a0ded465e8049391aac9d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-2-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-2-stream-1.bin",
+      "sha256": "1571b8ef902403c5e14c5a08dc42519b389cd442764f675cc0ba3e693112ceb3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-2-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-2-stream-2.bin",
+      "sha256": "ccfde8575241d956ae6fee0fea4c1687a1ec35813c0ecdb5c3954769b698c3d4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "05dc10d193c2669b19f40b98174586cf801a977ab6a8dd42e00061665ffd1fc4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-2-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-2-stream-3.bin",
+      "sha256": "35a601b22ea45905e3a05e293978c6f2528e9debb18176d1659c4185b1267679",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-3-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-3-stream-0.bin",
+      "sha256": "542dfbe1fa86dcbd72f0fd24fa9447c1ea3a2b2522fdd4f5c79a866533bafaec",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-3-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-3-stream-1.bin",
+      "sha256": "b0987c67d41bae87709c75caf4f8d6e9c3098e12c783543d091329ded3ceea0a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-3-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-3-stream-2.bin",
+      "sha256": "7e16bf8e074dba1fbec256e1adbbd5da4e2620a6fe72ee2166ee86da8613a220",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f1215482a062cc76ce9cb5b868215aa70ae60efee7a67067ac664a746d8fd23f"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-3-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-1-blocks-3-stream-3.bin",
+      "sha256": "8d09c5a7f36c19f157147a72f33441e4dfc1f68eff83a519c3fea5008905ef4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-0-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-0-stream-0.bin",
+      "sha256": "793a9f4857041c2c56e92640488178e57b7530451ac3aef59884ff32308b9f43",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "5864dbd00c1c84169e2ce5bd216201778c889363dd5a0ded465e8049391aac9d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-0-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-0-stream-1.bin",
+      "sha256": "d69c779f300c2d606ac9db9ff21dadf450f7d174f09f8f5c38e78a6bbcaebf06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-0-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-0-stream-2.bin",
+      "sha256": "bc6445d4becefc78900cedd377aaaa89d3a4283a31e72b3da4e2c33306953bf4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "05dc10d193c2669b19f40b98174586cf801a977ab6a8dd42e00061665ffd1fc4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-0-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-0-stream-3.bin",
+      "sha256": "6d6e13640a66d577fa3515963aec154c7bda85ad3099ff0cabce3fa256d364ed",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-1-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-1-stream-0.bin",
+      "sha256": "6826387e6bc56fb1fad9412fe82480fce7b00e8a5d73ce764ca2cb0aa7b8b87d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "5864dbd00c1c84169e2ce5bd216201778c889363dd5a0ded465e8049391aac9d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-1-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-1-stream-1.bin",
+      "sha256": "31ce2caeb92e11847032b78161a5f163f93be1ee34d40fcd9fff10497def8855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-1-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-1-stream-2.bin",
+      "sha256": "57e50c5b0188dc3b6c3c3244b46b6493d402b65663a8a75d04b2b11cd5c3cd80",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "05dc10d193c2669b19f40b98174586cf801a977ab6a8dd42e00061665ffd1fc4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-1-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-1-stream-3.bin",
+      "sha256": "209bf00b1359b225a7d462b407f9070a3ecb097acc1195f3918516f76cf06e8a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-2-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-2-stream-0.bin",
+      "sha256": "6f0f9a064a058b210222c154235b3d717f6676c2c64f36769b9d577fddb736b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "5864dbd00c1c84169e2ce5bd216201778c889363dd5a0ded465e8049391aac9d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-2-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-2-stream-1.bin",
+      "sha256": "21d1b23cf1ca6e7e3f191bbe9d8c3563a4c4ba1513d1d8ef57b5d0fa4a11959b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-2-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-2-stream-2.bin",
+      "sha256": "517f28a39379592e504445b8d5f37a0e8f80165e55ff8a7913b98a7b6b6fab1c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "05dc10d193c2669b19f40b98174586cf801a977ab6a8dd42e00061665ffd1fc4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-2-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-2-stream-3.bin",
+      "sha256": "33f4bd407a4a952af1339cc706a8c336b6fa128f6c7649e09461e887501b16e5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-3-stream-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-3-stream-0.bin",
+      "sha256": "3704f6fba28c1f4a7703b8aff4c92e51e814157fae07a5b50e6c097cfb3d345e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-3-stream-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-3-stream-1.bin",
+      "sha256": "181ddfe149c8455b8573429ffea4b56b94231c19f4c98c2b4c5ed53d592d8e3c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-3-stream-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-3-stream-2.bin",
+      "sha256": "6b3b0339d825ad4375775f40bb64a33727870450eaa4681a478a8cd4b73316fb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f1215482a062cc76ce9cb5b868215aa70ae60efee7a67067ac664a746d8fd23f"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-3-stream-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-fs-2-blocks-3-stream-3.bin",
+      "sha256": "8411404dc1391f48329eb611988b339364ac0839d5ac6022637c49136b0d27a9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-reduced-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-reduced-0.bin",
+      "sha256": "87b58e3c115ac44971dd762895bb8821a8aab208daaa9509414ed6189516b57d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-reduced-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-reduced-1.bin",
+      "sha256": "feaca8899099d27af273218f8026e8e61d04533cc7a5014c1a4bc94583047d3d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-reduced-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-reduced-2.bin",
+      "sha256": "57707dbc2a222057eebe74d702049122e4c508ed1d68fe9f1301188ac6659a34",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-0-map-False",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-0-map-False.bin",
+      "sha256": "cd5a05930019c4c080cc67babb26b4369576eb4c7feb86ea43b467a3e0437076",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0b115b7a76630753aada658d909de555a15cd48bcdf41c92abbd15a86fd7f0bf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-0-map-True",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-0-map-True.bin",
+      "sha256": "3e88d5253525d3afb73894e53c4ea16bb104bad68c8f6fe626e4e8ac20106eb1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "cb93125dc5803c08500f7e840bf6449f9e2b647dda0587fdd3b5529be7cbe8c9"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-1-map-False",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-1-map-False.bin",
+      "sha256": "028325b8f351dd1f5f1da7a75a52fe637f9179a3a5a39a92ae2532a47fabfa55",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c263d63bc1fe20462faaf0755ae0722c320d7cf68e0d3cbab684fc2c456bc90d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-1-map-True",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-1-map-True.bin",
+      "sha256": "886f4c2471927c9b97dc3afba37484ec7ddde441efadb097c265890024174c28",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0def0d635e62271c24a3f04ca555186e2ba982e57764710292d5921c93defbb4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-2-map-False",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-2-map-False.bin",
+      "sha256": "8ae5211e44825e0f71ce774e0b2ebae5522e6f40a0e0dd741609fedb2e0a8f5e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c263d63bc1fe20462faaf0755ae0722c320d7cf68e0d3cbab684fc2c456bc90d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-2-map-True",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-2-map-True.bin",
+      "sha256": "17d33cae309f2a4ed9a5d7bfa11c36fee24f9594fbd36bca7a791aeb41c0a751",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0def0d635e62271c24a3f04ca555186e2ba982e57764710292d5921c93defbb4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-3-map-False",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-3-map-False.bin",
+      "sha256": "a4528a416d13aeb79328304c7327ad5720792afcb7db9fc4b3de22929c3926a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c263d63bc1fe20462faaf0755ae0722c320d7cf68e0d3cbab684fc2c456bc90d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-3-map-True",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-3-map-True.bin",
+      "sha256": "c14602cb774a73ad5bc03dc248b31805a3f122129e4ea99f2c39b6b7b3fbfcf5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0def0d635e62271c24a3f04ca555186e2ba982e57764710292d5921c93defbb4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-4-map-False",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-4-map-False.bin",
+      "sha256": "b02e80fa2145383b42cc129c1693cdd9c9e12b8911a14be11a4ee3c698527008",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c263d63bc1fe20462faaf0755ae0722c320d7cf68e0d3cbab684fc2c456bc90d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-4-map-True",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-4-map-True.bin",
+      "sha256": "06db46b952b459a26b557bde201f99b17d9a422b1610488ee1e5867b39652ad0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0def0d635e62271c24a3f04ca555186e2ba982e57764710292d5921c93defbb4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-5-map-False",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-5-map-False.bin",
+      "sha256": "c34562d3487ecf15816ecbe49fc4b5517391f4f9fe8dbd2f85d98e9e9aa33642",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c263d63bc1fe20462faaf0755ae0722c320d7cf68e0d3cbab684fc2c456bc90d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-5-map-True",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-5-map-True.bin",
+      "sha256": "4f5304eeda3d67de3f06f444d6bba62535c69b8172bc9767afaefbbbae0b188d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0def0d635e62271c24a3f04ca555186e2ba982e57764710292d5921c93defbb4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-6-map-False",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-6-map-False.bin",
+      "sha256": "05440e6903920aae2d1086f535229cc8502ac64dd6fe641e6134b8686cd8c9d2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c263d63bc1fe20462faaf0755ae0722c320d7cf68e0d3cbab684fc2c456bc90d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-6-map-True",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-6-map-True.bin",
+      "sha256": "38a65d8a41879442ba923da62697a3d486bdf843e1bf4f49fb68b6597b1b64f5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0def0d635e62271c24a3f04ca555186e2ba982e57764710292d5921c93defbb4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-7-map-False",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-7-map-False.bin",
+      "sha256": "c8ccbf32d130e792efec05108e2b244ec748c01b24fbbcb86bc939e2e558cd03",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c263d63bc1fe20462faaf0755ae0722c320d7cf68e0d3cbab684fc2c456bc90d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-mode-7-map-True",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-mode-7-map-True.bin",
+      "sha256": "ee3d7bb95d64e75f2b51a498ccdc80f0550cfb0bfcb2c7df2c216e336b80981d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0def0d635e62271c24a3f04ca555186e2ba982e57764710292d5921c93defbb4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-bsid-11",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-bsid-11.bin",
+      "sha256": "b5f5db1f967a26fa04d25484005d2ed17235a8e0729fb00e8e543e90b2a313fc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-bsid-12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-bsid-12.bin",
+      "sha256": "d290d1e2bb67cd51a0d6e013b2ad00035cd2121491388a049f2efa81e0ef542f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-bsid-13",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-bsid-13.bin",
+      "sha256": "60d27be10b048604fbd06832ed81d58e3d942a916128a0b7a24873b9a6b2987b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-bsid-14",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-bsid-14.bin",
+      "sha256": "bb721117ec0f2e106c7ce62bf86a6e9e675edb3a7eab7c9f606bfc6adddb0519",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-bsid-15",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-bsid-15.bin",
+      "sha256": "9cda91a19193de6b1df54084e235c386356e54a4f1d067d4ea53397f6bb75cce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-bsid-16",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-bsid-16.bin",
+      "sha256": "dd6b61c8884789f5ab77907023e003e4d0f3c65c73f9f3c2230dba98de8d328d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-original-carriage-eac3-max-frame",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-original-carriage-eac3-max-frame.bin",
+      "sha256": "db05ecca00202599a7e9367507f33a976a37f38e5d8e4ea31386f9648e051446",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "59d5a8212a424e7d0dedd839fba51b7492a766d2d85209dfbbde3ee9d194d2fa"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-0-blocks-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-0-blocks-0.bin",
+      "sha256": "e808c6e89fd2afc43a9cab95958da564e6669a7a4121f6768d7369fcbff7dd8e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-0-blocks-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-0-blocks-1.bin",
+      "sha256": "769fdc739d20e10ae8a7a7d973579d3060b63834b6d8fc26b321924a8143f196",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-0-blocks-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-0-blocks-2.bin",
+      "sha256": "c1be4cf8d065110b0fc8aab2ba15dc73a0befe6812eda440a26a6ffdd9979728",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-0-blocks-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-0-blocks-3.bin",
+      "sha256": "9c73edf8f4f77b2ce06046cbc90bf422c19cad804b1dd188e2e60b99e611b168",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d6d757a2dd7dc67a30face6e3ddcfa80698ba645b841a8163c1c1f224a345b97"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-1-blocks-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-1-blocks-0.bin",
+      "sha256": "736e4a11b6c4b831ffc4451d42b74718e1f64d1e7e28a71aa31a82bc2ce3a9c1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-1-blocks-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-1-blocks-1.bin",
+      "sha256": "3c8498481723865d356cb4b8e53afa3da776b56de827abf96344a75dda24d4fb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-1-blocks-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-1-blocks-2.bin",
+      "sha256": "18641a3c7e4f74b236f48c46c214d8a415056c5d75d0b0183790bcf35180de1f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-1-blocks-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-1-blocks-3.bin",
+      "sha256": "bcc419d46f5b35078ecbdd7b9f90621eb1c3ac871e399a7d447b1add3979d880",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d6d757a2dd7dc67a30face6e3ddcfa80698ba645b841a8163c1c1f224a345b97"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-7-blocks-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-7-blocks-0.bin",
+      "sha256": "13f7c24d8993a2453896aacd722d10d75652fa049a305fd013e0ade310bdf22a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-7-blocks-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-7-blocks-1.bin",
+      "sha256": "96f5cd76e1508ce6454f99b1f8a74eaf483caf5c89f7674a5d5502317417dc13",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-7-blocks-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-7-blocks-2.bin",
+      "sha256": "d0bad73e7b228928829796e6d0f979a7a2b7eeb36c44988b75694190e5583597",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-0-sid-7-blocks-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-0-sid-7-blocks-3.bin",
+      "sha256": "5d0676523fdabbfd41dcfdd3044029a33f4ed7f06042ee5a05a652355cd090e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d6d757a2dd7dc67a30face6e3ddcfa80698ba645b841a8163c1c1f224a345b97"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-0-blocks-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-0-blocks-0.bin",
+      "sha256": "dd5f0008e3fe7c99e2d0318d4349ad2801c34df008817ef8f4635e31fb242e42",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-0-blocks-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-0-blocks-1.bin",
+      "sha256": "2448e237f3ab7df0032f607a8df21f8ba54a19816885849c41a048f5a407463e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-0-blocks-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-0-blocks-2.bin",
+      "sha256": "2d318c9cf295d624ea9b0757190851a53dac303dc00332447592d8fc307643c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-0-blocks-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-0-blocks-3.bin",
+      "sha256": "9c9a45cef973d0a08978e49aabffa6ad3664d8a33a92478e4c359ea3ebe6332c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-1-blocks-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-1-blocks-0.bin",
+      "sha256": "83d91a30e77679287eb1003954d78e1066144dbd745e6f4aedcb197fd62aa21b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-1-blocks-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-1-blocks-1.bin",
+      "sha256": "03252cec0d39258b48944832af2eff63be9b5ee534e822e9365d735e63c8f9a7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-1-blocks-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-1-blocks-2.bin",
+      "sha256": "c5206f68c873eb08de0dbd1b87fdeec964bce53ca8ba4155025d408ca3be2878",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-1-blocks-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-1-blocks-3.bin",
+      "sha256": "15d47faccf7b6a88c3dc916361d4277bc27401b1dfe6ae28bd452e9fb280f283",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-7-blocks-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-7-blocks-0.bin",
+      "sha256": "4b03b3f62b97082a1dc3b2ca54af7cb27659a65574e5a1de7c41094db80f57fe",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-7-blocks-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-7-blocks-1.bin",
+      "sha256": "6e6cee25178b657cebcda8902fbc7d1a73f9791e03880d52e5dacf1fe9698fc0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-7-blocks-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-7-blocks-2.bin",
+      "sha256": "7890231bca546d89dfea175ec10496b7732557ab4630bdf56ab55defa6d1829d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-1-sid-7-blocks-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-1-sid-7-blocks-3.bin",
+      "sha256": "bbb200f664ad13cd84a862c1cd59e644b1c86a4ff231785a1395407f2951ba08",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4f72fbfc750bfdbd07aa18e1c1e084cfdfb4cf7a7af4ecc4b884f59669644f71"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-0-blocks-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-0-blocks-0.bin",
+      "sha256": "b72facadacf0ced088c17f6cdbf5254e2974fe954f59b1dd1ae6a5011b5bf075",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "32722fdec15f85f6b1a01838898a63fb1cd508cbfef96839e3fb66d2f60a5d61"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-0-blocks-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-0-blocks-1.bin",
+      "sha256": "e81ab9a9d5af425d8a535c3ceb8a8d3fe03db312615412a1c5abf9ab8793a3c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "32722fdec15f85f6b1a01838898a63fb1cd508cbfef96839e3fb66d2f60a5d61"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-0-blocks-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-0-blocks-2.bin",
+      "sha256": "5a9356194edb986205decfd5fa3bbd5521c2da961117b733f553a0accca20856",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "32722fdec15f85f6b1a01838898a63fb1cd508cbfef96839e3fb66d2f60a5d61"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-0-blocks-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-0-blocks-3.bin",
+      "sha256": "5c623dc2a2d3e0f9146d5f9a81dca9bd798bfeb2babf0ae1a50876de3d0f6dc2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "1a69ded936ef9fab0b17c73997ce4ca08ff48833b64e6afc352423154f83ef14"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-1-blocks-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-1-blocks-0.bin",
+      "sha256": "181368540122728f6ea63a7a7325548dd882e8a86a877ceb6775549627355afa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "32722fdec15f85f6b1a01838898a63fb1cd508cbfef96839e3fb66d2f60a5d61"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-1-blocks-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-1-blocks-1.bin",
+      "sha256": "3c447571773b86b14ec4dcaec92f2a07fc4221c52a9a1c58f09aef58ed09d802",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "32722fdec15f85f6b1a01838898a63fb1cd508cbfef96839e3fb66d2f60a5d61"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-1-blocks-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-1-blocks-2.bin",
+      "sha256": "079a1ac3522a3bbc040fa6e641cbbd5c57024e230a1f1353a990f8338220b572",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "32722fdec15f85f6b1a01838898a63fb1cd508cbfef96839e3fb66d2f60a5d61"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-1-blocks-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-1-blocks-3.bin",
+      "sha256": "bd44e69f7a636ca49c51decd6060200e12bf3309d7fa173ce79e633bf7332ad7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "1a69ded936ef9fab0b17c73997ce4ca08ff48833b64e6afc352423154f83ef14"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-7-blocks-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-7-blocks-0.bin",
+      "sha256": "be4a1f1217120bd213ad833daf589529e6c511e3b6c3409994fc5a291ef2d484",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "32722fdec15f85f6b1a01838898a63fb1cd508cbfef96839e3fb66d2f60a5d61"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-7-blocks-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-7-blocks-1.bin",
+      "sha256": "926bb8712710eb40641a3d665d1ba700c1062a2102c6a3ca99ee67ac17c85820",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "32722fdec15f85f6b1a01838898a63fb1cd508cbfef96839e3fb66d2f60a5d61"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-7-blocks-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-7-blocks-2.bin",
+      "sha256": "f220b0024799509f50be09dacb5b069a9d7baecf51b547f27b86bbe5f80e5b90",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "32722fdec15f85f6b1a01838898a63fb1cd508cbfef96839e3fb66d2f60a5d61"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-stream-2-sid-7-blocks-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-stream-2-sid-7-blocks-3.bin",
+      "sha256": "e6011bbb2067cacba6973248ee08588b90f94a94d6a9d50696d64f8223539314",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "1a69ded936ef9fab0b17c73997ce4ca08ff48833b64e6afc352423154f83ef14"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-0-blocks-0-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-0-blocks-0-sid0.bin",
+      "sha256": "e808c6e89fd2afc43a9cab95958da564e6669a7a4121f6768d7369fcbff7dd8e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-0-blocks-1-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-0-blocks-1-sid0.bin",
+      "sha256": "769fdc739d20e10ae8a7a7d973579d3060b63834b6d8fc26b321924a8143f196",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-0-blocks-2-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-0-blocks-2-sid0.bin",
+      "sha256": "c1be4cf8d065110b0fc8aab2ba15dc73a0befe6812eda440a26a6ffdd9979728",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-0-blocks-3-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-0-blocks-3-sid0.bin",
+      "sha256": "9c73edf8f4f77b2ce06046cbc90bf422c19cad804b1dd188e2e60b99e611b168",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d6d757a2dd7dc67a30face6e3ddcfa80698ba645b841a8163c1c1f224a345b97"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-1-blocks-0-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-1-blocks-0-sid0.bin",
+      "sha256": "9feb204b55c932f327b31b89492a77766405f52449429f05a82bdd8d7b4141c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-1-blocks-1-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-1-blocks-1-sid0.bin",
+      "sha256": "fcc97adae7693caa0426d91101b826d27339c3494ebf3186794653f3c493ba06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-1-blocks-2-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-1-blocks-2-sid0.bin",
+      "sha256": "bd47f1d33d89bee73ff444f4e468f31a46ac09ea41d84ea520f4df0b88919713",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-1-blocks-3-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-1-blocks-3-sid0.bin",
+      "sha256": "e3d9bf2feb9d206a0584a46a39d821875808aa69d59c65512e9a0e7690e7fe44",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d6d757a2dd7dc67a30face6e3ddcfa80698ba645b841a8163c1c1f224a345b97"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-2-blocks-0-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-2-blocks-0-sid0.bin",
+      "sha256": "ee84ac4fcd137eca14bd9ca232b9b349cab1e39941203a7ede55ca7d5b95360c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-2-blocks-1-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-2-blocks-1-sid0.bin",
+      "sha256": "b5a33b97efe8b96f75ba719f2ede117c1ac46bef649a1676debc9b0e1954be4a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-2-blocks-2-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-2-blocks-2-sid0.bin",
+      "sha256": "5a4a925a54a3b08078a77479f5d39e4f88c04750aa0ef55f2ca8cac68dbb8641",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7e5bc6cdf7d642bf2775e7e4ac6c6865c3bb42502ad4088c9b8426a75259c87d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-rate-2-blocks-3-sid0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-rate-2-blocks-3-sid0.bin",
+      "sha256": "977283753c824ff2debc29125add5113e46a4a56920c286ded9f68f959a98731",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d6d757a2dd7dc67a30face6e3ddcfa80698ba645b841a8163c1c1f224a345b97"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-reduced-rate-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-reduced-rate-0.bin",
+      "sha256": "77a3fb26d1bd52281303d7835dad2cf953e92da0164b2867c43e74aee72f1c1f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f7bab4041f0dc338b19d1203c57f6bb2405694ffe7ca3f9d9d86b6efb8c83edc"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-reduced-rate-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-reduced-rate-1.bin",
+      "sha256": "70652128052f7828e7ccff75f650ababbead659cde54b485cdfda833790a3a00",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f7bab4041f0dc338b19d1203c57f6bb2405694ffe7ca3f9d9d86b6efb8c83edc"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-reduced-rate-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-reduced-rate-2.bin",
+      "sha256": "b4a1a0d510b19a9f02faf4992518a678613e5c285b974b35eebc47a1d4431edf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f7bab4041f0dc338b19d1203c57f6bb2405694ffe7ca3f9d9d86b6efb8c83edc"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-0-map-absent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-0-map-absent.bin",
+      "sha256": "ee1569abcf45ea6dfc584aa0ea1ead084b81a092f053d4d68d2a479cf6cf7d30",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4c22a3643ec77e751df34b5008d7fad03cb7835cc08be83de98fc223c02d3c2d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-0-map-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-0-map-zero.bin",
+      "sha256": "af19e0ad1c4548e3d159cc9d068e76875273b38b7d89c618d32cde882bd61058",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a0420135ab155e0c836d905b1066bd6ac258a1d0eee851260ada3742f46cf3ad"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-0-map-consistent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-0-map-consistent.bin",
+      "sha256": "6194a0759f7a513b81e6f8f93dbbcb6c790cd8dda6f154b53fc396e27a138355",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "ee87febf06bfc04c45d9167c01e5ed02d653fd440c202fdbfeba1264bd17ea5b"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-0-map-all",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-0-map-all.bin",
+      "sha256": "a30376a005894f2a43dd328370e3140fb0509bc85457755e9a8c55019d7f2114",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "32724f3cdbc60a89657a99a99b8ae5de6aaa26cb7751e7daa96c6f40b0da42bf"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-information-mode-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-information-mode-0.bin",
+      "sha256": "97faf21ad0ab3e0ba6122b4330c562eee2a33c626a49391b59895fde59152dc6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "1832121df3da76733050afb23ca5b03426d7272b8db9f441e50fcc4b186854fd"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-0-definition-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-0-definition-0.bin",
+      "sha256": "2e6c99b1451bdcb74758f661964cad8e267d4195ef913b9a6d2dfaf47c42ed6b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "9e89c3d8e7d7d39fb279c03ac62cca1ebf11fe41b2967c5aedac587c97b3173c"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-0-definition-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-0-definition-1.bin",
+      "sha256": "c9f755d402f53b761be192660f636fad319a6922c1d8e1722c2c32b4241a1a15",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "47e88876dce00385ca0c6866f4c85dbe4721bece7c31d5c234ae8eb1d7f4515e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-0-definition-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-0-definition-2.bin",
+      "sha256": "5913822b545b16b1e3a91bf83488695bb350115496d1c00b23c72efba580a247",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "6389df207ce62d60ed6a39c099b984859cc2d2ecab29361808b9182d2e6d639d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-1-map-absent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-1-map-absent.bin",
+      "sha256": "b6bba8332377d13605d128f9af34ed422ed019bb91091b5b67e7672e2629ab3b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "516255fc8b3ea8d5bca41a19dfe3a74596019159481a0aa7185f0af29c75049e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-1-map-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-1-map-zero.bin",
+      "sha256": "e04fb7735d4f81db4ff100fb5dd4ca652a6c6ba1e9e7e887ce0161364b9f7708",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f87d749cf8853f0261c4943b75e860072b5c73c8e7a36b41576239edc9a8d672"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-1-map-consistent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-1-map-consistent.bin",
+      "sha256": "5ba729cd1c6b57e18709106a9596d1c0d068d422446d5e908623c9d530046c64",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "cb8e27ec462c76ae3d19baaa32c109c5120edce9fe673f47ab3105472da73593"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-1-map-all",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-1-map-all.bin",
+      "sha256": "0df84874b9af76209f74bb56150a19db7d94f5c250b44ce37b2f4ac74bbfc2ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4e5e9f09479492a1b9cd4851cd50fc8637b81e98c3ccd27cf116336672268f7b"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-information-mode-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-information-mode-1.bin",
+      "sha256": "3064a7af768462b1406b249323e22fce31fe5d5192407e8bfa27087cf842ead0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d395666358af4dcf54620637b397edc7d82ef288ab89a2928d91c3a715f30394"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-1-definition-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-1-definition-0.bin",
+      "sha256": "6892d2a7216017508ae015e366e9092009e6e1bfa9ed1ae23cd0438dc4baecd7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "21827a68dfe684f6ea41cb955b17f2d0480e5575c6dce47206174830b860d202"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-1-definition-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-1-definition-1.bin",
+      "sha256": "1d02ddd5b72929b9fcd940b54ccd8d03a71e60b0c6c538a147773caadbeea16e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "105e0cd233a9490438361ff6d45e4da718e65f8333c2d134c489479d83e3acc4"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-1-definition-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-1-definition-2.bin",
+      "sha256": "c6830a3eae90bfd6caed1bfba08c7b4916ef3abad83e6911d51938d3e11b40cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f34445617e3bf939480720967655e43e43c43f3f2b74750ab604231f8ebb4843"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-2-map-absent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-2-map-absent.bin",
+      "sha256": "c870dc0b14b6686b2fac1016aa79dc5c483064b1e6f903dca891c1b5e4f18fd1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "516255fc8b3ea8d5bca41a19dfe3a74596019159481a0aa7185f0af29c75049e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-2-map-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-2-map-zero.bin",
+      "sha256": "ad03c380a870a604a4c208bb58a96eabe3a933721d5df06b08968cade5f8c3db",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f87d749cf8853f0261c4943b75e860072b5c73c8e7a36b41576239edc9a8d672"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-2-map-consistent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-2-map-consistent.bin",
+      "sha256": "128471b8b0c7ed8ba65a30ede6c947e722e27a773b19159280103fba8dec53af",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "756997c77b37f604bc04eb47cb9fdd295de1581286722a9842d020c03ddcb8aa"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-2-map-all",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-2-map-all.bin",
+      "sha256": "0bad5a952d9c38ee0dd3ddcbcc3ed0ed6e36e7f39f07fdaa19d18508c2bb429a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4e5e9f09479492a1b9cd4851cd50fc8637b81e98c3ccd27cf116336672268f7b"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-information-mode-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-information-mode-2.bin",
+      "sha256": "b2a7d09d0fe553d0e15152c03e312d181cfa8606b353d2434eb4e772e7554b6b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a32d0c0f642bc897a4ccec211474e7d201f737f6ef06823db83379977f10a85e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-2-definition-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-2-definition-0.bin",
+      "sha256": "d8ca7d5ae49943474426f19784141768da04a1e1686a5e98b72d9dd2a22d82dc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0a26af4d56444b86dc74ab8536f93395b31a998edebc14b735038d72ddfa184b"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-2-definition-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-2-definition-1.bin",
+      "sha256": "d27fe998efa7f31f3ce0e42ae693afb13531ab0ca4f56309ad8c8b838c7288f3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "5e9e3a7986b7ae21c81a85166c5157ca9eba03a8851816d7e01bcbf35dda6b7f"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-2-definition-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-2-definition-2.bin",
+      "sha256": "cf621399307f744322557fde427903bc6e8aeddf2797f01477bfd74a78d553b2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "63d0151c590ef99ba214bb5d24db6a5a13aab5ee61129c891d336276cc510689"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-3-map-absent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-3-map-absent.bin",
+      "sha256": "96a9770c910d68ff394ebe9d7bc5bb03cbbb3cf4df4929d88e2c33e7e4bf49df",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "516255fc8b3ea8d5bca41a19dfe3a74596019159481a0aa7185f0af29c75049e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-3-map-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-3-map-zero.bin",
+      "sha256": "906961071788c8dc65b6a998c1eda3fcab1f5356af7e2d0ed7b5f8956a620208",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f87d749cf8853f0261c4943b75e860072b5c73c8e7a36b41576239edc9a8d672"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-3-map-consistent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-3-map-consistent.bin",
+      "sha256": "2b23cc047352abd240bc1ed38e5bfde7da5d833ea2930b38c9dc188faeadec9e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c36150c8c2c0fb86df80b84c584127dcf8ce48dc6be68b29391a2a29f491fa87"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-3-map-all",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-3-map-all.bin",
+      "sha256": "30b4731a5e3636ab86f10eed55e8ec88c48ca3fea87e6c7e92db698211589a21",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4e5e9f09479492a1b9cd4851cd50fc8637b81e98c3ccd27cf116336672268f7b"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-information-mode-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-information-mode-3.bin",
+      "sha256": "f3c4b29b03cb9389ae0ad52b7b4e60b9e383e5d874a3eee7fab803eed0ff393c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d395666358af4dcf54620637b397edc7d82ef288ab89a2928d91c3a715f30394"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-3-definition-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-3-definition-0.bin",
+      "sha256": "8bf19c6fc66d621e54941597f061ee445e1fa40d42342460ce7900ba8bdc7db3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "06110fb22152bd891438bd81f1c61aec6a5221e5cc230216bbc3f10541ab679c"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-3-definition-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-3-definition-1.bin",
+      "sha256": "7caf7a060cede337f01c20d6bfa1850178159d3fa368c3f18100e8943a1c0afd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "2a4f3e933b1a91c504a3f0038e1e68598eb21dbc010cef50d8861b1a8d374e43"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-3-definition-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-3-definition-2.bin",
+      "sha256": "791ec5389db7960c47bd7251aab2dfc0360db2f65e8e810e9bf430fac03b106b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "3835eefa8ec770471e94e4858f9f7ea175e56cf1a5ad5f1b339d8c5b66311dba"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-4-map-absent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-4-map-absent.bin",
+      "sha256": "0b33b0a22339a3c38d6359faf4c2121a823b058ee505dd61723beeb9b1a2bf06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "516255fc8b3ea8d5bca41a19dfe3a74596019159481a0aa7185f0af29c75049e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-4-map-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-4-map-zero.bin",
+      "sha256": "5497c1122719365ff81b5e0bec4c28549129dde768a247800aacf44f301214ce",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f87d749cf8853f0261c4943b75e860072b5c73c8e7a36b41576239edc9a8d672"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-4-map-consistent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-4-map-consistent.bin",
+      "sha256": "547e102229b63b14dd1863d833424e3c271e982819d0d7daa25dca709a8dcf92",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c36150c8c2c0fb86df80b84c584127dcf8ce48dc6be68b29391a2a29f491fa87"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-4-map-all",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-4-map-all.bin",
+      "sha256": "036f163a3f232ef4b1ce3978b6de05cbc223d905c2d26ddb183e1804cf9a9a60",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4e5e9f09479492a1b9cd4851cd50fc8637b81e98c3ccd27cf116336672268f7b"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-information-mode-4",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-information-mode-4.bin",
+      "sha256": "1056d813baf40795b922c3935864d5ed014e16a729bc1407fef750543e2be588",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d395666358af4dcf54620637b397edc7d82ef288ab89a2928d91c3a715f30394"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-4-definition-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-4-definition-0.bin",
+      "sha256": "c85232479ec8d21473318d2ec44b9bc195a1946d427a07cf21279084be83ec25",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "06110fb22152bd891438bd81f1c61aec6a5221e5cc230216bbc3f10541ab679c"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-4-definition-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-4-definition-1.bin",
+      "sha256": "2384840ee936f98306b5b16fe6cb2075460f7150ea8776bea83665946d5bce7c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "2a4f3e933b1a91c504a3f0038e1e68598eb21dbc010cef50d8861b1a8d374e43"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-4-definition-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-4-definition-2.bin",
+      "sha256": "75f93639e1b17670bbeaacc9bac1b2b98f1614afa989f241f6cce616de80e53b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "3835eefa8ec770471e94e4858f9f7ea175e56cf1a5ad5f1b339d8c5b66311dba"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-5-map-absent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-5-map-absent.bin",
+      "sha256": "6d09c602a22c7a76031a1e24dcb425980571c18dc22d54d5b64b36e5a6782d9c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "516255fc8b3ea8d5bca41a19dfe3a74596019159481a0aa7185f0af29c75049e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-5-map-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-5-map-zero.bin",
+      "sha256": "1b74cd305ceaa4335f7ac28ebf5359f7d82a89cfc90daf2aa5c45ca0425046dc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f87d749cf8853f0261c4943b75e860072b5c73c8e7a36b41576239edc9a8d672"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-5-map-consistent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-5-map-consistent.bin",
+      "sha256": "490e59d0a1260db0b11150e4d36d87a351f2ed855a5f3a0b34086fc48f0e4bfc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f2dee7ce370f49a889414e5a2e2082a7dbae6e054efdce4891245f85368ba67e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-5-map-all",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-5-map-all.bin",
+      "sha256": "d86511932f59395c24d50ddf27cc1da082251652be6de9e591a8d4a3dbd8dd9a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4e5e9f09479492a1b9cd4851cd50fc8637b81e98c3ccd27cf116336672268f7b"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-information-mode-5",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-information-mode-5.bin",
+      "sha256": "61459bd5559d293d1691681835fb8c718b4e134b6f17f29b40a68fbe51e104fc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d395666358af4dcf54620637b397edc7d82ef288ab89a2928d91c3a715f30394"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-5-definition-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-5-definition-0.bin",
+      "sha256": "84d2c1dd2a84b4c1f0674e099329abeaad9d7bc3cd192fe3913438c379fc8ac4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "1615a41cf0168c299185df9a1790d7c15976b580bc33d28d6cda28a081914729"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-5-definition-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-5-definition-1.bin",
+      "sha256": "d5450a3cec326a97f4edf5db0247bfadfce8c604bdc4393062e8a1feab15aa3b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a8bda8a0a3e873690a13a678d5e46563893074b74c0b8eb0ad8d3a23ebc5bc48"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-5-definition-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-5-definition-2.bin",
+      "sha256": "e7f4125ed3aba68639fb2588217d48dd9049aa593687168c666566f06a172a3a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "1a5370b4bed78cfca6a8abf9267aabad919755d26f2ec9d791609e14e346f6b8"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-6-map-absent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-6-map-absent.bin",
+      "sha256": "d559c55595840721255126dcb848dc152b91b1101067ec643c8916dd296ab72b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "516255fc8b3ea8d5bca41a19dfe3a74596019159481a0aa7185f0af29c75049e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-6-map-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-6-map-zero.bin",
+      "sha256": "e0047b365b775736e707496734475dba218c9e9fce74703e4fd484046902fe0c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f87d749cf8853f0261c4943b75e860072b5c73c8e7a36b41576239edc9a8d672"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-6-map-consistent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-6-map-consistent.bin",
+      "sha256": "3d46cde6e200e22c99024af17e4ebcb6e8438d220d6b80dfca6964005ca709e8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f2dee7ce370f49a889414e5a2e2082a7dbae6e054efdce4891245f85368ba67e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-6-map-all",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-6-map-all.bin",
+      "sha256": "7ce67f991baa91b7ca7e6fa7c9a154e69976ea3c60492f6383945614c62b2ea8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4e5e9f09479492a1b9cd4851cd50fc8637b81e98c3ccd27cf116336672268f7b"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-information-mode-6",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-information-mode-6.bin",
+      "sha256": "cbc1886dbaed4e0fe401c1814b13deca007d3cd23659db615939c4d7ee3fb156",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b644386f9fc84c3b62f2c2506e8124814fb1825c27d07d8139ce1e0da76e71a3"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-6-definition-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-6-definition-0.bin",
+      "sha256": "172705f94b9e39c5024ad9d81fb7865aa59ecb43dbbde3af1e64da9ac3bafc43",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "8fefa45876d999337994d519ea2cb4c72142d1f3806b6fd42247e048e6646e12"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-6-definition-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-6-definition-1.bin",
+      "sha256": "a0513eb6c1420259fc53e3eafe09e6ada0ef4c413087ca1777ad344a3918d127",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7a92e95a46fe6d10ae7dea2fc537190284f9580422ab12ca9e00b34ec4cdeebd"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-6-definition-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-6-definition-2.bin",
+      "sha256": "6bc610376a742cb8b0c79c2ae986b0ec148aac98c2fc5392df6f068f1f6bcf94",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "deb34965ec9bacdc3e8a9a8c7d251ddaa016dfe1ab6ba03da235a564d87aa72f"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-7-map-absent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-7-map-absent.bin",
+      "sha256": "1707d0a19655fb56bba387a30cbae24c84a008e29f673231d3c7eb9bbc1a1125",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "516255fc8b3ea8d5bca41a19dfe3a74596019159481a0aa7185f0af29c75049e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-7-map-zero",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-7-map-zero.bin",
+      "sha256": "1be97583af40fb4f5290b328d1e6bea763a623e10fd44dfb5c8cc12a711d1655",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f87d749cf8853f0261c4943b75e860072b5c73c8e7a36b41576239edc9a8d672"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-7-map-consistent",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-7-map-consistent.bin",
+      "sha256": "03a25f6a6afa14bd115acda45d4cdfbe5b2a9d66c2bd2c3cb7c1847504c22033",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "206aa888c5d96c16fb62ee4a08087d93cf092d710b442f8dcab3bdf15b783d1d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mode-7-map-all",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mode-7-map-all.bin",
+      "sha256": "bcd0aa6775161d72ea9ac0b3e67a0cbe8b6657345d17f9850d6d52afd2339cdf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "4e5e9f09479492a1b9cd4851cd50fc8637b81e98c3ccd27cf116336672268f7b"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-information-mode-7",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-information-mode-7.bin",
+      "sha256": "3d5a3a800a637e2756fb04666f024e7a7612870a84e6036ee2dfe0aa0e804ed6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b644386f9fc84c3b62f2c2506e8124814fb1825c27d07d8139ce1e0da76e71a3"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-7-definition-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-7-definition-0.bin",
+      "sha256": "6616194dd8cbf287977edcfc836c39e0156836f55521fc5908678fd4d4448873",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "55ca291752033e2ecb69be12f701c7c251219e27b92d03fbb3e6509264900a7f"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-7-definition-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-7-definition-1.bin",
+      "sha256": "e2cece92c0e72218256b0a721ebeccc28336ab09faf90b8800ed67eb2cf4def8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "fc486eb1aecc3bcede5f29fd983f0ea3009bf199157fa25983cb5cfdaaa9bf51"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-mode-7-definition-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-mode-7-definition-2.bin",
+      "sha256": "2384c765f769c9cd4c4866db92ad05d70fe09478352816ae0f7d0ac87c3a538f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "e91cfff77e83da8988c843f74cf535ad10de1287045ab59593c0721a0c5e3549"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-blocks-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-blocks-1.bin",
+      "sha256": "6043eea02ef536bd6506fbf89251d9c7177b8dd608af4729331266379ed8a409",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "febe06085e1531d00abcf85b9f9f9cf00101230ff3ab67f987e4502a5f5a565c"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-converted-blocks-1-flag-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-converted-blocks-1-flag-0.bin",
+      "sha256": "7137d90fe14dda88ce785dada35d0effb0384b2e258e30fa9c4ecd4166fd93b9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "e77444a22acbb7f280efecc8c43ece43e52ec1acf22a914f30bd680195dbc621"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-converted-blocks-1-flag-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-converted-blocks-1-flag-1.bin",
+      "sha256": "2f331b8d3b8dbcd9f742b74b9d2f9b02c417806091129d073c62bf35f2d08c62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0dbecd499a332636a107da600c7c20e0b17dbd2b91f05ad3f6525c8a07e12f17"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-blocks-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-blocks-2.bin",
+      "sha256": "c25d27656e56788b21ae891fa4fe885ad9a00fde14a5834bbe4bbf47227005c2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d094ef289704ef03c04aad48305c3df36c853010cad493051a6e8714ac9fe3b1"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-converted-blocks-2-flag-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-converted-blocks-2-flag-0.bin",
+      "sha256": "4484dd9e86c9b5dfd66f78da5724e6909c55a6372f47f097236b0fd8d26592e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "e77444a22acbb7f280efecc8c43ece43e52ec1acf22a914f30bd680195dbc621"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-converted-blocks-2-flag-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-converted-blocks-2-flag-1.bin",
+      "sha256": "2dbee33171cf23e32773a7c121b9a3eb9baf5a65e30c7b050f845ec19221b990",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0dbecd499a332636a107da600c7c20e0b17dbd2b91f05ad3f6525c8a07e12f17"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-blocks-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-blocks-3.bin",
+      "sha256": "2ed08bd32dc06a70ee1f22349fca0afaffcb81e2fca9ae48b1122d8724b9aa5b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "dfdb2de02cddd723e8eead2f558238c2764d518fc41c6c39952c1e5a53217f2d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-converted-blocks-3-flag-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-converted-blocks-3-flag-0.bin",
+      "sha256": "4908979045fc69cb81d333f8a54617a2e6b538b4a5bcd52b564a9abcc4683cbf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "e77444a22acbb7f280efecc8c43ece43e52ec1acf22a914f30bd680195dbc621"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-converted-blocks-3-flag-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-converted-blocks-3-flag-1.bin",
+      "sha256": "0bd9aca4ec5e1b365e1f78de869b69ed58082b761e10dcb449e4264b24912529",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0dbecd499a332636a107da600c7c20e0b17dbd2b91f05ad3f6525c8a07e12f17"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-mix-blocks-6",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-mix-blocks-6.bin",
+      "sha256": "1de671c57b736bd0f7e7130396a8dde613bc678b94c36725759af203223b7bf2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "fff87588f24f4d05b6f5a0a6449225400eebca0283330ee5d8f49dfac494686e"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-converted-blocks-6-flag-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-converted-blocks-6-flag-0.bin",
+      "sha256": "85e3dd0d044c8f3d6630b699721d2aecad1325b9454ac86316dc742f49001eaa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "59776bd462134101258c9993882d0ec4f441a810dbc50172ada84afdf86ddbca"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-converted-blocks-6-flag-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-converted-blocks-6-flag-1.bin",
+      "sha256": "85e3dd0d044c8f3d6630b699721d2aecad1325b9454ac86316dc742f49001eaa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "59776bd462134101258c9993882d0ec4f441a810dbc50172ada84afdf86ddbca"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-1-aux--",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-1-aux--.bin",
+      "sha256": "2acd1b75a9dba4e9a1f513b67bd5bafbc965ba2598dcd01d0fdc00e1c5b5c404",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "29f3427ff4b60654ac64f807dbcc675cd0a559060a49f726fb41326c4ee924b1"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-1-aux-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-1-aux-0.bin",
+      "sha256": "b502d3a17def05258ce0d48f1eb70d863ccddda562adfb3f3f2679a958c1468d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d4598266a8dcbbd8e7d46c5c31ae086cb69c46083d86bebc4b701e57cbb97ef6"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-1-aux-31",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-1-aux-31.bin",
+      "sha256": "11093dd561436b428ebe5d958c518147470fa270f14ff7d4f42bbcc5e987a811",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "318797967b2ad61aeeecc2b5497f5f6cba971529cb7808e3ff7102f375d274e9"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-2-aux--",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-2-aux--.bin",
+      "sha256": "7943729a2bd464b74966155efc0250f32964f14099a6065f6bad38b79ba3b9ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "3b29f7207e6dc03a05d1f0b58649bbeaaa9a41cce6eb0951f252675648c13e60"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-2-aux-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-2-aux-0.bin",
+      "sha256": "56e73c63dbb4cfe9c310a6ebb5980ed08a32f78a241eac3a7c09d44cd2ed223a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a755e7ccad92f0c1a252f46572a0642def392f3606412ffe76cb382da89b6326"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-2-aux-31",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-2-aux-31.bin",
+      "sha256": "08346a152d9938f2b36e9fef04130b18597c21dc84c40620bc312521e2bc2b4b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "e462b7b25dbfca5f3330f6c96ac8b896d8c3dac2d7e87c04d4db37cbda7eede3"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-63-aux--",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-63-aux--.bin",
+      "sha256": "d05131c88d07ac83a9ba6b34118b25467db96bd94ed3a8c0fb1ab7cdff67bdc0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d3e9406adf4770295a8b2a3b6fe66f03760daf698ad26cdba89f88bad4e09ddd"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-63-aux-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-63-aux-0.bin",
+      "sha256": "c0ff549060c24e9ac5811693e521727f408a06e55cb57d8e5aa84e8fee4b5212",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b55bff7c9438eb8c20dbce4a5424e62fcb73bd4439414cc9c6f54c0a381d127b"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-63-aux-31",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-63-aux-31.bin",
+      "sha256": "1f852d054602a8f76e9a6badb8646839281581be8a13ecae5ce83cf4e37842bb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "74afe42bbc65b67a0cb55840c9dbbf26d75854e217725dc7ac5604a74fd28883"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-64-aux--",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-64-aux--.bin",
+      "sha256": "578b692defa9787d42a878bb67982da80f976221f613ba131d3066d1cf17d5d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "20c2dade7d4957bdd80419cd14e467f33bed4a604a2a39eda053e41800eea974"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-64-aux-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-64-aux-0.bin",
+      "sha256": "fb7470bc896fb0ca975a75168123ee89a75e939226b49d54c26417d09b29f04f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c97c46fba383742b573683befd933c41031049ced6f45633f317fe385a00f10a"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-additional-64-aux-31",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-additional-64-aux-31.bin",
+      "sha256": "4854de837148c94815b02069c3440c840c3dfa2fd7ec4736a982a2b1bb037e2c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "d484cb8192398a27bb272c2b8c9e6dbb2694d1de7216d160529d99edf49b2c76"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-maximum-frame-4096",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-maximum-frame-4096.bin",
+      "sha256": "62402de125abfac457dfc81e569f3813a92c44b4b4928b5dee1d6a0e29d31b2e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "6abef053e4ab58a24290d958998575e1af3fc807a7eaa89f57026edb2425930d"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-reserved-stream-type",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-reserved-stream-type.bin",
+      "sha256": "bb7021ab800da9079215987ca78d82d4cf813116dd720e8246890196711ece19",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-unsupported-flexible-mix",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-unsupported-flexible-mix.bin",
+      "sha256": "9922ad75e2386b354b2b7d893f4b9b9efabcb6b25a368cd8275c1e5ff656664b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-unsupported-bsid-9",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-unsupported-bsid-9.bin",
+      "sha256": "64bc586b5aa8393e2174ba662f92bc3762100ba4f41381a47b30695950a7088a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-unsupported-bsid-10",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-unsupported-bsid-10.bin",
+      "sha256": "d769894b950f67cfac372fa1dcdeaa049f642d3898b88a4276a2675c62f31a13",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-unsupported-bsid-17",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-unsupported-bsid-17.bin",
+      "sha256": "787c8feb2313f068652644850f776eb47bfffeb1ba0b16fee2b6d9e34a4b8783",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-carriage-base",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-carriage-base.bin",
+      "sha256": "8429600f020cb7d5759c3d26631d07939ab6130b56f06440538350b9385704da",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "7cc5fada4c2e8df35d0f253c754a5b6c5e1235ff39bc955f4ece6a0f36440100"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-carriage-short-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-carriage-short-0.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "13316410c3243a6b30a5a799aabf36a1e1a8f2aec49fd3af6869c33441dabea7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-carriage-short-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-carriage-short-1.bin",
+      "sha256": "e7cf46a078fed4fafd0b5e3aff144802b853f8ae459a4f0c14add3314b7cc3a6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-carriage-short-5",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-carriage-short-5.bin",
+      "sha256": "e161d446deeee799a1ec02710f882de97a7f1ad6e2e68af8e74f7c7251da53c7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-carriage-short-6",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-carriage-short-6.bin",
+      "sha256": "61aadeb1a9f779ff5449a7b1687b015ea7e7880c19f34480a61a8bc039acd3e1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-carriage-short-7",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-carriage-short-7.bin",
+      "sha256": "672d8466aeb26d6b674f2618dc358ad9fd57d08b684661ed8221f601cbc24dd0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-carriage-short-12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-carriage-short-12.bin",
+      "sha256": "9a9b50eaf1777a7e3e25bf2fd59f80878ee3cb142dd31bba6f8c0c7df8dc94ec",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-carriage-short-31",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-carriage-short-31.bin",
+      "sha256": "f9bc86bd1a79eb197a2b123af9cc1cb381fb1af9b674dfb21c0efe9d514699a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-v1-carriage-surplus",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-v1-carriage-surplus.bin",
+      "sha256": "f60654cea9ac77a662551f7c2255b183aaa63ceca5e1cc004418d115be943c31",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f16bb49fc5f9dca53186c0b1968422246ca697b87e72fd285d7bf2559ce698df"
+      }
+    },
+    {
+      "id": "eac3-bsi-boundary-v1-additional-one-byte-overlaps-tail",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-boundary-v1-additional-one-byte-overlaps-tail.bin",
+      "sha256": "afc0214e2b3a98f187368d443011e47e558a616895bd86b3a052d59580ea85e8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-boundary-v1-additional-sixtyfour-overlaps-tail",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-boundary-v1-additional-sixtyfour-overlaps-tail.bin",
+      "sha256": "3192a24ebf3f8e6da16949e61e7a0a9fd8ccd05be81b21050f01f807c66a50f8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-boundary-v1-informational-production-overlaps-tail",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-boundary-v1-informational-production-overlaps-tail.bin",
+      "sha256": "948698bc837cf1d7a80c16874fa1bcb037baad15e05ec6be1eed66394540a513",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-bsi-boundary-v1-auxiliary-length-overlaps-selected-prefix",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-bsi-boundary-v1-auxiliary-length-overlaps-selected-prefix.bin",
+      "sha256": "8b36cf16a9a4bc7f1a25fc70e82f9c51f555a7326bf6c935afadaaaef144b8f5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-0--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-0--full.bin",
+      "sha256": "5bf4248aa9e43e16aaf6c6db18196dd8329d1b4595e40ff26550ab92f36cec18",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-0--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-0--prefix12.bin",
+      "sha256": "87c55873241773f0aed1b28122dde788545c9aaa79e15cda8e02aa4dbeed44e7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-0--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-0--bsi.bin",
+      "sha256": "52b40e7f8579d7d676acee9c0ba0d446e6155194f761a51f90d539ceb028b475",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-1--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-1--full.bin",
+      "sha256": "c57ffa6fe83a1025858fe5f7900943495be98085dcf7f592ac3fc676fd05f65f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-1--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-1--prefix12.bin",
+      "sha256": "57f6a5c144193ba10b3c9cb9a7e8fd54c9bbab9c333a7424eec8948398a1f9a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-1--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-1--bsi.bin",
+      "sha256": "c7c5ef0d10bdc7b70e39c0228cf447c47743648e5d823129bc930e7badcec6d5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-2--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-2--full.bin",
+      "sha256": "b65b05c76c893c1aa05a46e7dcc8a7841010613bc8da4df53b316ce1e12de04a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-2--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-2--prefix12.bin",
+      "sha256": "bcdf13386df35a8995874e49013c9b24f5e7ef75810336623ecf792298282cab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-2--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-2--bsi.bin",
+      "sha256": "3e474253f6d64aec8e0df568def16c4cc29c7aa8cc6d1a751999655c764f4b34",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-3--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-3--full.bin",
+      "sha256": "95dd1eb169a565003221d9cea9ddca805fe8da0fb72428b629d09c7dd5c8696e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-3--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-3--prefix12.bin",
+      "sha256": "da125eee05bae3e1458d4f96b755aa67f7acf1369dfa69ba18952a11c2c44229",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-3--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-3--bsi.bin",
+      "sha256": "129152582da6b6e80c8d7f7ed54b35f4852aa8323023c630196dc06850bd713c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-4--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-4--full.bin",
+      "sha256": "f11622a74f96dfb494ca42efdf1e4058f163877bef1bea7f933144655dbe8e78",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-4--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-4--prefix12.bin",
+      "sha256": "981109c73c00647f645c0938ea9ca2383c0586b4ece973dab7226519b69cc432",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-4--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-4--bsi.bin",
+      "sha256": "1baf05a0f31d754a4c0bef3518a31e4c094726916d2586745b243658b8f212fc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-5--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-5--full.bin",
+      "sha256": "1b7946cb3be69bcbf30b6f904a5115ac9c0c004f0fcbf9ceb9eb3c61c01aaa58",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-5--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-5--prefix12.bin",
+      "sha256": "a5870183f964620f40e14d0ceeaccf1717d2456a38093b5234636bdf9110b0e4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-5--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-5--bsi.bin",
+      "sha256": "18e57248a46d043a3c172d82dca56038f26a690e4347178b48ac500f9c2012bd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-6--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-6--full.bin",
+      "sha256": "8b7aca897434a7535ea3b07b1fa2013b664010030cfc8c6d004f3c30db8d6ddb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-6--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-6--prefix12.bin",
+      "sha256": "8832b3e8b7ee1caddaee554765ce2bb639c3041e4262fc4f970b279d974da42b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-6--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-6--bsi.bin",
+      "sha256": "556cd2e826af067c33ad6e50b5740db565a17440c47eb1554d5ca7cdd9c0909c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-7--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-7--full.bin",
+      "sha256": "044b7c8557a6fb9a141c8f88264a65949cc3c3264c562ad24bf625b62f421199",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-7--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-7--prefix12.bin",
+      "sha256": "b178cf9e607335c028477d9e3a455b77a41400d0fc18a74ea13be3b11b195be5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-sid-7--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-sid-7--bsi.bin",
+      "sha256": "7ad0bd489ca9f33bc267ede68cfd31c79130bc28349f2b802a17d32b110d774a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-0--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-0--full.bin",
+      "sha256": "5bf4248aa9e43e16aaf6c6db18196dd8329d1b4595e40ff26550ab92f36cec18",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "b5eaa18c3ed0070cd60658c0d3f08ad9cc3c7ae558ac6db6b99ad534a1d80dbf"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-0--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-0--prefix12.bin",
+      "sha256": "87c55873241773f0aed1b28122dde788545c9aaa79e15cda8e02aa4dbeed44e7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-0--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-0--bsi.bin",
+      "sha256": "52b40e7f8579d7d676acee9c0ba0d446e6155194f761a51f90d539ceb028b475",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-1--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-1--full.bin",
+      "sha256": "82468f9cc4416455f5dd2f99ce006ee436079150243baaaec862129063d3987b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-1--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-1--prefix12.bin",
+      "sha256": "1bf984f59debddb33982fb736bfe90d54f923be675265bf1420cc85d0e6acca6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-1--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-1--bsi.bin",
+      "sha256": "9c8ea7859c487f8f5531d3c3c1c07bca287e669d398cbb44d6cc80b511ea7198",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-2--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-2--full.bin",
+      "sha256": "d7a5336d78df7dc923ff6a79d92c8f0feea85537ead8340ea44e40628d663a05",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f1215482a062cc76ce9cb5b868215aa70ae60efee7a67067ac664a746d8fd23f"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-2--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-2--prefix12.bin",
+      "sha256": "d5fe6da11cc2aeb898392ae8bef39437757dd60c18e1a32e7d2beade3d1d0d01",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-2--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-2--bsi.bin",
+      "sha256": "88a7dac5f5c81350e2d03741fcbc81b1e4588763bafedb8a53c1b12af0de274f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-3--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-3--full.bin",
+      "sha256": "4460ed1a8f41b49acf5d281671e331ceeb4390bc18ce0bcaac6257d7d02742f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-3--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-3--prefix12.bin",
+      "sha256": "f90d5962e55787ec8f4fc2ec61697014601a06161d43ab28a373a62326e912a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-type-3--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-type-3--bsi.bin",
+      "sha256": "f04c41f7f464ac1ecc1b64e5b93923b04f3ab5d407ca753314df6f19baa380c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-absent-compr-absent--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-absent-compr-absent--full.bin",
+      "sha256": "82468f9cc4416455f5dd2f99ce006ee436079150243baaaec862129063d3987b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "def0285da3eeba4074a5a5356b6310fe0edcbad3b77e9807d97287a57f388941"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-absent-compr-absent--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-absent-compr-absent--prefix12.bin",
+      "sha256": "1bf984f59debddb33982fb736bfe90d54f923be675265bf1420cc85d0e6acca6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-absent-compr-absent--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-absent-compr-absent--bsi.bin",
+      "sha256": "9c8ea7859c487f8f5531d3c3c1c07bca287e669d398cbb44d6cc80b511ea7198",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-zero-compr-absent--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-zero-compr-absent--full.bin",
+      "sha256": "8338a8bf3ffc5088dd7b5f92192d6caeddc1578fbba9e598af7bb3dfd6fef875",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f196cc40e373913a9e4bcdea208d4bc26e99652d1676cf4451018dbbe4b00ffd"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-zero-compr-absent--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-zero-compr-absent--prefix12.bin",
+      "sha256": "674c68e6bd0eeca798da9c06253f8578efea70d18d021a594d1060da126f9da9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-zero-compr-absent--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-zero-compr-absent--bsi.bin",
+      "sha256": "b4b7ef0342f094bf1a1ec18fd44dbb594f260f728dcf18a8c61b847813b67dd1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-three-compr-absent--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-three-compr-absent--full.bin",
+      "sha256": "4d5736208c6d7458d2e4a8e8ef49cdae9949958003fd1d8144aec4ff739d2074",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "6b8e2f7f897295227853a942dea5b8efe0e7ae4d53b5d07ada97dbad94e4d52d"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-three-compr-absent--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-three-compr-absent--prefix12.bin",
+      "sha256": "e4aa4a0517ced6b3bd0f9e27e4e84256e20139819364c27b6cefc4cd61162f0d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-three-compr-absent--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-three-compr-absent--bsi.bin",
+      "sha256": "db8d2fb1eadc0282b15e3708fae077def90196401ac80e51f4deaafed1292b81",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-all-compr-absent--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-all-compr-absent--full.bin",
+      "sha256": "210b81ebf0ee581f24d600a3e1f3fed6778e8d77411fe74c771c3d54ead7299c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f44d7e03dfadc48b91fc0c9728acaeba32997d6533178c67ccdb98af91b1bca6"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-all-compr-absent--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-all-compr-absent--prefix12.bin",
+      "sha256": "4ffe2caed20db5b8120d64ba2f2184ef15a3bb4548ced4a03baf71c1819749bd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-all-compr-absent--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-all-compr-absent--bsi.bin",
+      "sha256": "1b6b3d5c5deec50c55e48155c1459a9ce9f9149ece449d682255fe2f5eee4f79",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-absent-compr-zero--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-absent-compr-zero--full.bin",
+      "sha256": "fa496287faadb58b17dbbda9999bf2d494fe0455a1203b7dc05ebcc93976fdab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c263d63bc1fe20462faaf0755ae0722c320d7cf68e0d3cbab684fc2c456bc90d"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-absent-compr-zero--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-absent-compr-zero--prefix12.bin",
+      "sha256": "6c500b43bc4999e8afa5175fa09755aed5c7ede150552558751b00aeac6ea197",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-absent-compr-zero--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-absent-compr-zero--bsi.bin",
+      "sha256": "e0480673be4f845d1e252874ab9bd65bc765ef769f0dd4e798acc9cf4573fbcc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-zero-compr-zero--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-zero-compr-zero--full.bin",
+      "sha256": "e0c53846a3595193f3eefe285790d6aa0026cb75046e18065eed6da179107ca7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f862456f78fd89d6e4317bab2fff3da14e71e3eb2d119dca79ddb701106fba4d"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-zero-compr-zero--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-zero-compr-zero--prefix12.bin",
+      "sha256": "f035d4aeeb26688cf1f28e2813886e9deacdb50de78dc7998d210b58d99802f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-zero-compr-zero--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-zero-compr-zero--bsi.bin",
+      "sha256": "555700d1da55a3fec3c8a005b0a2c685d6e041c5418d01660923c34ce91ec804",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-three-compr-zero--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-three-compr-zero--full.bin",
+      "sha256": "ebe7337b03321f520416433ebc6082a5cf9434f37d087eedac64339814b1b350",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0372769b6f1c4bdba62be289fb8440f569897de4de35cb6b8e3b35b9616f5be3"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-three-compr-zero--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-three-compr-zero--prefix12.bin",
+      "sha256": "6a675dc64e39a82c42fea080b53909e17ece82b310d9e7411a8c2db58f470c33",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-three-compr-zero--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-three-compr-zero--bsi.bin",
+      "sha256": "6e4e8d1b5995682737931f73adb791cef60f3da1ea9b5346aa1584b05dea6fb3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-all-compr-zero--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-all-compr-zero--full.bin",
+      "sha256": "f1b1f4223f8c95077b09e23bf824f892b893156f85072ec159670358200a8185",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "0def0d635e62271c24a3f04ca555186e2ba982e57764710292d5921c93defbb4"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-all-compr-zero--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-all-compr-zero--prefix12.bin",
+      "sha256": "a6c614d2229a4ae7a6dee5a7aac44c8ce2edf826c66871c63dfe9d4fad5703e0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-map-all-compr-zero--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-map-all-compr-zero--bsi.bin",
+      "sha256": "ecb35181d431ddd8d5c025297280f196aeefe5380983c79718605f26dea91d6e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-dual-mono-map-absent--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-dual-mono-map-absent--full.bin",
+      "sha256": "6ceccab8a4966faa202deda5b8a0d32cc2e5217e0305eeb4152a88e420a2f6cb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "2e530d474586fc9caf659772951410c71ef05d543b1e990301393c98d17c279e"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-dual-mono-map-absent--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-dual-mono-map-absent--prefix12.bin",
+      "sha256": "a52babccabcfa109713695307e24d67bf403462ace2a1f6d0d1425fadf123ca1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-dual-mono-map-absent--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-dual-mono-map-absent--bsi.bin",
+      "sha256": "464079511e1cce94f87beb043b83111182a878c3027ed5fa6e3d9ba8e25b0953",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-dual-mono-map-three--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-dual-mono-map-three--full.bin",
+      "sha256": "17627250d3e6e8e21dc50c2e42521b8bcff4b7aaa958e55a8dfaa04393cd77f3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f8bc55d0cd985722f55618130b6cd554adb859fb3798283601168987eb09a0e7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-dual-mono-map-three--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-dual-mono-map-three--prefix12.bin",
+      "sha256": "d8eb091fc59a05c9150dbe2dd3f5b356b10519164a126913a0abb4b558a54275",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-dual-mono-map-three--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-dual-mono-map-three--bsi.bin",
+      "sha256": "c1b272eb32e82f8ff80d947913fc39cb7a2bfbf11caf21d04adcf0bbafd4c4a8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-dual-mono-map-all--full",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-dual-mono-map-all--full.bin",
+      "sha256": "3a5aa84c01070d871b3e897356197455a446e76f02baee357fda80fb4343431b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "30bdf9739679785f8e088642502319995f28eaea12564dcaca4d9ba298a43151"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-dual-mono-map-all--prefix12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-dual-mono-map-all--prefix12.bin",
+      "sha256": "11b6f0ee117668f70d0657a8200294aa56a4f6af2c833f66b35b58debfed9074",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-diagnosis-v2-dual-mono-map-all--bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-diagnosis-v2-dual-mono-map-all--bsi.bin",
+      "sha256": "ff9bb160cd29af08253b11429ee8912502092dd2efed1338104bfd8a228d8b60",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-limit-exact-bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-limit-exact-bsi.bin",
+      "sha256": "69dc947483a59d0f008c31819286517c2448680888384c6370586ea82e0b825e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "39",
+        "32"
+      ],
+      "expected": {
+        "trace_sha256": "5864dbd00c1c84169e2ce5bd216201778c889363dd5a0ded465e8049391aac9d"
+      }
+    },
+    {
+      "id": "eac3-limit-short-bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-limit-short-bsi.bin",
+      "sha256": "69dc947483a59d0f008c31819286517c2448680888384c6370586ea82e0b825e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "38",
+        "32"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-limit-short-frame",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-limit-short-frame.bin",
+      "sha256": "69dc947483a59d0f008c31819286517c2448680888384c6370586ea82e0b825e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "39",
+        "31"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-limit-zero-bsi",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-limit-zero-bsi.bin",
+      "sha256": "69dc947483a59d0f008c31819286517c2448680888384c6370586ea82e0b825e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "0",
+        "32"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-limit-zero-frame",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-limit-zero-frame.bin",
+      "sha256": "69dc947483a59d0f008c31819286517c2448680888384c6370586ea82e0b825e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "39",
+        "0"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-0.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "13316410c3243a6b30a5a799aabf36a1e1a8f2aec49fd3af6869c33441dabea7"
+      }
+    },
+    {
+      "id": "eac3-truncated-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-1.bin",
+      "sha256": "e7cf46a078fed4fafd0b5e3aff144802b853f8ae459a4f0c14add3314b7cc3a6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-2.bin",
+      "sha256": "b6eafc2cf80c605c9d124e2dc0c0d8be502dcae004b6b423fd29509a9ef6e1c5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-3.bin",
+      "sha256": "fc265cb80ca37ba2f7a44068fdc36cf4058b4202891bf56317242a17e980f825",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-4",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-4.bin",
+      "sha256": "9c8da8524decf9eed7fe8dbb52a38e3f38c4c83ad27425262aad86bb5867dff6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-5",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-5.bin",
+      "sha256": "1a5a406dd536d8d0cbef1f9a94cf47d4869b0d6f2cad5910092f96ef27941829",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-6",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-6.bin",
+      "sha256": "3ed6e46492bf2b78cbb8d83522cc17660dd3deea5620cad305a26f870702487f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-7",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-7.bin",
+      "sha256": "e5ed26080bf8f03154182b5df621caafad236b3ef3005638d4d41e3fc7b216f4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-8",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-8.bin",
+      "sha256": "29bf65436b73de6b8b658482f38fa393cb3ccafdd1700f971a22e574ad83ae2d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-9",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-9.bin",
+      "sha256": "906183d22438d5204403033bc8799569bede0fcd85e1e1fe9d8ec232389e27d3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-10",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-10.bin",
+      "sha256": "c4978eab51be9c2730b613da42349b08e3583250ea199d65755a0d4542464170",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-11",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-11.bin",
+      "sha256": "ddfd80852a7e854cf7c36564297ae4298e43965a533bab263f96d31ebbdda613",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-12",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-12.bin",
+      "sha256": "827a3a232427743d1880f3f920fcc8b18e7cade1af4a52c1f2b568b6f17bb6e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-13",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-13.bin",
+      "sha256": "d9d4fb1b782e888c5a9ddeb5e3155b55f8d79bae8c449e4f249f783ed72c242b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-14",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-14.bin",
+      "sha256": "7f49bccd6a07a09f7c1033954e0a332c6deac6c15ee65f29149c578879e8b1ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-15",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-15.bin",
+      "sha256": "4e884e5a1b2be66bd34bf273d8fb46e186af4dc20dffeed4e4b4e88be4553ba6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-16",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-16.bin",
+      "sha256": "a3e02a716ceac8f03fc7c67d704d1972ac171ad71e3f9e5874fe22cccd6f4c7d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-17",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-17.bin",
+      "sha256": "818e7b94a3e7c5b2d0333cf2d119429d584a71eb1d127224f9a8f0e7de0167d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-18",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-18.bin",
+      "sha256": "a1b2d1dc0e664eb9b9dcb7c2679e55557b756322df7a443ffccf7b250e0a749e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-19",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-19.bin",
+      "sha256": "5f0ad3b71a31ca522e60ab3153dbe82f4fcb0374be41ad487c67e26dab7c12c0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-20",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-20.bin",
+      "sha256": "b182857ef589e132a4095708d8b5e11d7fead4dddc378e65e15be4c372f5df67",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-21",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-21.bin",
+      "sha256": "b0db06593974f8ab94bdb267172ed8a05c13336f656607e927975b881a82bd96",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-22",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-22.bin",
+      "sha256": "5e1c1df26ef26d7f31241b663ffbf4e12c7f4dcf605372241037cb2509476eeb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-23",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-23.bin",
+      "sha256": "6cb4970613bae607e3d65060b8b10c5f76163456c4471518a92b3d4c5fef8064",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-24",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-24.bin",
+      "sha256": "cc1035774799280b445fb788a80ca86a423533f8c41a4f155bb9fe0efff93472",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-25",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-25.bin",
+      "sha256": "b09e939af608cb8451cbc808737083e62c8288c7d8dabb59afb5e7893e88cbea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-26",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-26.bin",
+      "sha256": "a15e7e70910c8286501b74ba1a291b4f2934f799d06c2e9274b90cd999d79065",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-27",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-27.bin",
+      "sha256": "3fb09b768bd9262705c2ec324badd4862b489194361942e7f41c1a3e0b5bafe2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-28",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-28.bin",
+      "sha256": "1f27f168b1ccf8ba1a8145cc1b93434de9db0f446717aefdf87f0fc6362b0403",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-29",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-29.bin",
+      "sha256": "8739fffbe76f3c5e48b144b997c7113312c64369a803b5871251940ed1b20cac",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-30",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-30.bin",
+      "sha256": "5caf6257996d5168fd61acf0bd0d20d2b59798c8340567a06ad092cb3beec19d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "eac3-truncated-31",
+      "profile": "authored",
+      "file": "config-view-fixtures/eac3-truncated-31.bin",
+      "sha256": "c76b229651269722c5384843ac41a7d8ac3b3bd590e278012c22f3150be45206",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "csi-miami-5-1-256-spx-small",
+      "profile": "fate",
+      "file": "codec-derived/ac3/csi_miami_5.1_256_spx_small.eac3",
+      "sha256": "84f50317a49a98509bf174ace814b39860e6ab2a1d61bdbd10ada9081f2bb2b3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "a7ecf0a4289ef19e51f57a0c35718e09ffc6ec01e8390de3e526de3f20ed58d7"
+      }
+    },
+    {
+      "id": "csi-miami-stereo-128-spx",
+      "profile": "fate",
+      "file": "codec-derived/ac3/csi_miami_stereo_128_spx.eac3",
+      "sha256": "f96b45fa4d249522cd83dea009cd528ce552ec9d947e03cdecab44652bc86ecb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    },
+    {
+      "id": "csi-miami-stereo-128-spx-small",
+      "profile": "fate",
+      "file": "codec-derived/ac3/csi_miami_stereo_128_spx_small.eac3",
+      "sha256": "adc397f12472353237f7dc8139c2223937abc23eff9cd80ac2e3471814a04c3a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f01d36beab3c55254605e40f6c2f7f49b32d89292289b2eb815634b4b9bc9c38"
+      }
+    },
+    {
+      "id": "matrix2-commentary1-stereo-192-small",
+      "profile": "fate",
+      "file": "codec-derived/ac3/matrix2_commentary1_stereo_192_small.eac3",
+      "sha256": "ea095d557bd6787266f4b7276a2be818a7fbc924997748be89d9ead962a3391c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "c1b917559e98ecb8939bff145ce0c97cbbea977b4ce61e006dfed5894cd9513e"
+      }
+    },
+    {
+      "id": "serenity-english-5-1-1536-small",
+      "profile": "fate",
+      "file": "codec-derived/ac3/serenity_english_5.1_1536_small.eac3",
+      "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "313c33ac67fd8f85049e366230b7f7dd68d05b30b24bac6eed4aede4d7f4be38"
+      }
+    },
+    {
+      "id": "the-great-wall-7-1",
+      "profile": "fate",
+      "file": "codec-derived/ac3/the_great_wall_7.1.eac3",
+      "sha256": "d698981ddc1c10e65d234dd6a02ff2b0f4c88787595c9d3e5adf7f097f2c9e50",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "32768",
+        "4096"
+      ],
+      "expected": {
+        "trace_sha256": "f20d961db0814769179475eefc5d1075b03dab5a12ff4a53e5f1676def9f89f7"
+      }
+    }
+  ]
+}
