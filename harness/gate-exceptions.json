@@ -307,7 +307,7 @@
       "triergon-isobmff": 0,
       "triergon-matroska": 0,
       "triergon-mpegts": 0,
-      "triergon-ogg": 1,
+      "triergon-ogg": 0,
       "triergon-pixel": 0,
       "triergon-playback": 4,
       "triergon-raster": 0,

@@ -9,6 +9,8 @@ use triergon::{CodecId, PacketInfo, TrackInfo};
 
 use super::{Work, record, tags};
 
+mod ogg_wire;
+
 const ABSENT: u64 = u64::MAX;
 
 fn codec(codec: CodecId) -> u64 {
@@ -150,6 +152,7 @@ pub(super) fn ogg_tracks(
     }
     let mut attachments = Vec::new();
     for track in reader.tracks() {
+        ogg_wire::check(input, track)?;
         let code = codec(track.codec());
         let config = track.configuration();
         let (identification, setup) = match track.codec() {

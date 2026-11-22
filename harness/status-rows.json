@@ -254,7 +254,7 @@
       ],
       "text": "FLAC and MPEG audio use the file codec workloads. Push packet windows compare with blocking packet output. ADTS, AC-3 and E-AC-3 reader bounds and elementary seek bounds are unmeasured."
     },
-    {"area": "Ogg track properties", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ogg-tracks"},
+    {"area": "Ogg track properties", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ogg-tracks", "parity": {"aarch64-unknown-linux-gnu": "41 of 53 cases match, with 12 declared deviations. The comparison also checks original comment packets, coded rate fractions and typed header errors."}},
     {"area": "Ogg page parsing and writing", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ogg-pages"},
     {"area": "Elementary stream metadata", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "elementary-metadata"},
     {"area": "Elementary wire metadata", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "elementary-metadata-wire"},

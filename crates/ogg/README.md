@@ -127,5 +127,9 @@ The reviewed differences are in
 [reader-differences.json](../../harness/codecs/reader-differences.json); results in
 [docs/status.md](../../docs/status.md).
 
+The [track properties comparison](../../harness/features/ogg-tracks/contract.json)
+checks retained comment bytes against original page lacing, along with
+configuration, channel counts, frame rates, end clocks and typed header errors.
+
 The `read_packets` helper reads every packet of a whole file in memory, headers
 included, for tests and tools.
