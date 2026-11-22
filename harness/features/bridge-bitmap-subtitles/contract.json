@@ -12,8 +12,8 @@
     "Fold each published bitmap event, its presentation clock, rectangle count, geometry, forced flag, every declared ARGB palette entry and every visible index row. DVD also compares start and end display offsets. The DVB queue exposes its presentation clock without a display duration; Matroska block DTS is absent at the source boundary, so the reference's inferred DTS is diagnostic only.",
     "Compare DVB through the bitmap queue boundary: the first eight decoder rectangles in order, zero for the unanchored queue clock, and the first encoded 33-bit epoch for transport DVB. The trace retains the uncapped decoded event and its clock.",
     "Unprobed Matroska PGS playback compares clocks before generic stream discovery and timestamp fill-in.",
+    "Compare MP4 DVD packet clocks on the sample-table timeline with edit mapping disabled in the reference.",
     "Matroska PGS startup cases fold the projected packet clock, duration and complete bytes before decode. The reference consumes public pre-probe packet clocks and applies the same caller-selected prefix boundary and duration-based clock projection. Raw packet clocks remain in the trace. Include explicit selections for both DVB service descriptor arrangements.",
-    "Matroska PGS startup cases also fold the startup clock projection, packet duration and codec bytes for every selected packet, against the demuxer's packet view. Include single-service DVB files and explicit service-selection cases for both descriptor arrangements. Alternate decoder-only configuration modes are covered by the standalone subtitle contracts.",
     "Preload the container on both sides. Opening and reading the container, decoding, folding and teardown are inside the operation."
   ],
   "required_profiles": [
