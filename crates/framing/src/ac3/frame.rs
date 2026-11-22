@@ -952,11 +952,10 @@ impl Ac3FrameReader {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    // Reading the six bytes' layout again instead measured +0.2% per frame.
-                    let info = self
-                        .layout
-                        .take()
-                        .ok_or(Error::Invalid("missing audio frame layout"))?;
+                    let info = match self.layout.take() {
+                        Some(info) => info,
+                        None => layout(&self.prefix[..6])?,
+                    };
                     self.header = Some(probe_with_layout(&self.prefix[..self.used], info)?);
                     self.phase = Phase::Reserve;
                 }
