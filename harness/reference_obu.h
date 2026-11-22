@@ -48,9 +48,35 @@ static int obu_leb(const uint8_t **data, size_t *remaining, size_t *length)
     return AVERROR_INVALIDDATA;
 }
 
+/* Find the complete low-overhead prefix before a truncated unit. The filter is
+ * packet-atomic, so submit the complete prefix separately to observe its output. */
+static size_t obu_complete_prefix(const uint8_t *data, size_t size)
+{
+    size_t remaining = size;
+    while (remaining) {
+        const size_t start = size - remaining;
+        const uint8_t header = *data++;
+        --remaining;
+        if (!(header & 2))
+            return 0;
+        if (header & 4) {
+            if (!remaining)
+                return start;
+            ++data;
+            --remaining;
+        }
+        size_t length;
+        if (obu_leb(&data, &remaining, &length) < 0)
+            return start;
+        data += length;
+        remaining -= length;
+    }
+    return 0;
+}
+
 /* Interpret the filter's returned wire bytes using the AV1 OBU header layout. */
 static int obu_output(ViewWork *work, uint64_t index,
-                      const uint8_t *data, size_t size)
+                      const uint8_t *data, size_t size, int complete)
 {
     uint64_t count = 0;
     while (size) {
@@ -76,9 +102,22 @@ static int obu_output(ViewWork *work, uint64_t index,
         data += length;
         size -= length;
     }
-    const uint64_t end[] = {index, count};
-    stream_record(work, 7, end, 2, NULL, 0);
+    if (complete) {
+        const uint64_t end[] = {index, count};
+        stream_record(work, 7, end, 2, NULL, 0);
+    }
     return 0;
+}
+
+static int obu_filter(AVBSFContext *filter, AVPacket *packet,
+                      const uint8_t *data, size_t size)
+{
+    int status = av_new_packet(packet, (int)size);
+    if (status < 0)
+        return status;
+    memcpy(packet->data, data, size);
+    status = av_bsf_send_packet(filter, packet);
+    return status < 0 ? status : av_bsf_receive_packet(filter, packet);
 }
 
 static int obu_run(const ViewCase *input, ViewWork *work)
@@ -104,22 +143,28 @@ static int obu_run(const ViewCase *input, ViewWork *work)
             stream_record(work, 7, end, 2, NULL, 0);
             continue;
         }
-        int status = AVERROR_INVALIDDATA;
-        if (unit->size) {
-            if (av_new_packet(packet, (int)unit->size) < 0)
-                goto done;
-            memcpy(packet->data, unit->data, unit->size);
-            status = av_bsf_send_packet(filter, packet);
-            if (status >= 0)
-                status = av_bsf_receive_packet(filter, packet);
-        }
+        int status = unit->size ? obu_filter(filter, packet, unit->data, unit->size)
+                                : AVERROR_INVALIDDATA;
         if (status == AVERROR(ENOMEM))
             goto done;
         if (status >= 0)
-            status = obu_output(work, i, packet->data, (size_t)packet->size);
+            status = obu_output(work, i, packet->data, (size_t)packet->size, 1);
         if (status < 0) {
             if (work->trace)
                 fprintf(stderr, "OBU unit %zu: %d\n", i, status);
+            if (status == AVERROR_INVALIDDATA && !source->single) {
+                const size_t prefix = obu_complete_prefix(unit->data, unit->size);
+                if (prefix) {
+                    av_packet_unref(packet);
+                    av_bsf_flush(filter);
+                    const int recovered = obu_filter(filter, packet, unit->data, prefix);
+                    if (recovered == AVERROR(ENOMEM))
+                        goto done;
+                    if (recovered >= 0 &&
+                        obu_output(work, i, packet->data, (size_t)packet->size, 0) < 0)
+                        goto done;
+                }
+            }
             stream_record(work, 8, &index, 1, NULL, 0);
         }
         av_packet_unref(packet);

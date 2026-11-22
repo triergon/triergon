@@ -367,6 +367,25 @@ fn stream_fixtures(root: &Path, drafts: bool) -> Result<()> {
     adts::fate(root, &mut adts)?;
     for (ids, corpus) in [(obu::IDS, av1), (adts::IDS, adts)] {
         for id in ids {
+            let cases: Vec<_> = corpus
+                .cases
+                .iter()
+                .filter(|case| {
+                    // The wire oracle exercises every authored OBU at all
+                    // three window sizes. The packet filter has no such input
+                    // boundary, so one representative suffices for each.
+                    id != obu::IDS[0]
+                        || !case
+                            .get("profile")
+                            .and_then(Value::as_str)
+                            .is_some_and(|profile| profile.starts_with("authored-"))
+                        || case
+                            .get("id")
+                            .and_then(Value::as_str)
+                            .is_some_and(|id| id.ends_with("-w1"))
+                })
+                .cloned()
+                .collect();
             if drafts {
                 json::write(
                     &corpus.directory.join(format!("{id}-draft.json")),
@@ -376,7 +395,7 @@ fn stream_fixtures(root: &Path, drafts: bool) -> Result<()> {
                             "directory",
                             Value::str(format!(".research/{STREAM_DIRECTORY}")),
                         ),
-                        ("cases", Value::Array(corpus.cases.clone())),
+                        ("cases", Value::Array(cases)),
                     ]),
                 )?;
             } else {
@@ -386,15 +405,12 @@ fn stream_fixtures(root: &Path, drafts: bool) -> Result<()> {
                     .get("cases")
                     .and_then(Value::as_array)
                     .ok_or("missing cases")?;
-                if expected.len() != corpus.cases.len()
-                    || expected
-                        .iter()
-                        .zip(&corpus.cases)
-                        .any(|(listed, generated)| {
-                            ["id", "profile", "file", "sha256", "rights", "arguments"]
-                                .into_iter()
-                                .any(|field| listed.get(field) != generated.get(field))
-                        })
+                if expected.len() != cases.len()
+                    || expected.iter().zip(&cases).any(|(listed, generated)| {
+                        ["id", "profile", "file", "sha256", "rights", "arguments"]
+                            .into_iter()
+                            .any(|field| listed.get(field) != generated.get(field))
+                    })
                 {
                     return Err(format!(
                         "{}: stream parser corpus membership changed",

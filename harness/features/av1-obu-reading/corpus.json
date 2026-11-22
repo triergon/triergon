@@ -20,40 +20,6 @@
       }
     },
     {
-      "id": "empty-low-w7",
-      "profile": "authored-low-overhead",
-      "file": "empty-low.ivf",
-      "sha256": "3559ce9697511470d05a34d78658f33a8094984ca7e417a19dc6125fdefbd579",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 6727
-      }
-    },
-    {
-      "id": "empty-low-w4096",
-      "profile": "authored-low-overhead",
-      "file": "empty-low.ivf",
-      "sha256": "3559ce9697511470d05a34d78658f33a8094984ca7e417a19dc6125fdefbd579",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 6727
-      }
-    },
-    {
       "id": "type-0-w1",
       "profile": "authored-low-overhead",
       "file": "type-0.ivf",
@@ -62,40 +28,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "14"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 1003564311836755437
-      }
-    },
-    {
-      "id": "type-0-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-0.ivf",
-      "sha256": "6d875e52e222c7aeebe08eaaaf3d22a0224727f55a85fa86f828c0aa9c826c63",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "14"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 1003564311836755437
-      }
-    },
-    {
-      "id": "type-0-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-0.ivf",
-      "sha256": "6d875e52e222c7aeebe08eaaaf3d22a0224727f55a85fa86f828c0aa9c826c63",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "14"
       ],
       "expected": {
@@ -122,40 +54,6 @@
       }
     },
     {
-      "id": "type-1-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-1.ivf",
-      "sha256": "e98836a6fd67bcb009207e397f273dbaffeba6cb8a6e96a6e860a70c37ee7b07",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 6974366535572246412
-      }
-    },
-    {
-      "id": "type-1-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-1.ivf",
-      "sha256": "e98836a6fd67bcb009207e397f273dbaffeba6cb8a6e96a6e860a70c37ee7b07",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 6974366535572246412
-      }
-    },
-    {
       "id": "type-2-w1",
       "profile": "authored-low-overhead",
       "file": "type-2.ivf",
@@ -164,40 +62,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 821334069985932
-      }
-    },
-    {
-      "id": "type-2-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-2.ivf",
-      "sha256": "454441cb2a384ad77ca34386607f7d09f612be236bc80250280b7c16e92057c6",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 821334069985932
-      }
-    },
-    {
-      "id": "type-2-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-2.ivf",
-      "sha256": "454441cb2a384ad77ca34386607f7d09f612be236bc80250280b7c16e92057c6",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -224,40 +88,6 @@
       }
     },
     {
-      "id": "type-3-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-3.ivf",
-      "sha256": "21893c7fdd2859f20889b84d2a756b9e0e1bd2b69ce0cf8c570c599ae214252e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 469226909333676746
-      }
-    },
-    {
-      "id": "type-3-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-3.ivf",
-      "sha256": "21893c7fdd2859f20889b84d2a756b9e0e1bd2b69ce0cf8c570c599ae214252e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 469226909333676746
-      }
-    },
-    {
       "id": "type-4-w1",
       "profile": "authored-low-overhead",
       "file": "type-4.ivf",
@@ -266,40 +96,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 6440029133069167721
-      }
-    },
-    {
-      "id": "type-4-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-4.ivf",
-      "sha256": "96bc1d4d81b6e4dd212d125d58cea1574fcc48983980f0324436c45d6836d47b",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 6440029133069167721
-      }
-    },
-    {
-      "id": "type-4-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-4.ivf",
-      "sha256": "96bc1d4d81b6e4dd212d125d58cea1574fcc48983980f0324436c45d6836d47b",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -326,40 +122,6 @@
       }
     },
     {
-      "id": "type-5-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-5.ivf",
-      "sha256": "09d4300d564a7e5a762c472783a7e1b8b6698063675e7b4eb6099df583860d30",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 12410831356804658696
-      }
-    },
-    {
-      "id": "type-5-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-5.ivf",
-      "sha256": "09d4300d564a7e5a762c472783a7e1b8b6698063675e7b4eb6099df583860d30",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 12410831356804658696
-      }
-    },
-    {
       "id": "type-6-w1",
       "profile": "authored-low-overhead",
       "file": "type-6.ivf",
@@ -368,40 +130,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 18381633580540149671
-      }
-    },
-    {
-      "id": "type-6-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-6.ivf",
-      "sha256": "e97cc32537d9deee54e905e8045231f1334eeae07208000484b60bd11fbbcef8",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 18381633580540149671
-      }
-    },
-    {
-      "id": "type-6-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-6.ivf",
-      "sha256": "e97cc32537d9deee54e905e8045231f1334eeae07208000484b60bd11fbbcef8",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -428,40 +156,6 @@
       }
     },
     {
-      "id": "type-7-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-7.ivf",
-      "sha256": "0d96110cc3c25c5ab30a593a030be84c3b0b037a88fc705051fb949ab2878b31",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 5905691730566089030
-      }
-    },
-    {
-      "id": "type-7-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-7.ivf",
-      "sha256": "0d96110cc3c25c5ab30a593a030be84c3b0b037a88fc705051fb949ab2878b31",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 5905691730566089030
-      }
-    },
-    {
       "id": "type-8-w1",
       "profile": "authored-low-overhead",
       "file": "type-8.ivf",
@@ -470,40 +164,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 11876493954301580005
-      }
-    },
-    {
-      "id": "type-8-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-8.ivf",
-      "sha256": "3b981596bf05571e7aea74ca7755a4e55ed352023a3a2894d7dc2e2f456b360b",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 11876493954301580005
-      }
-    },
-    {
-      "id": "type-8-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-8.ivf",
-      "sha256": "3b981596bf05571e7aea74ca7755a4e55ed352023a3a2894d7dc2e2f456b360b",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -530,40 +190,6 @@
       }
     },
     {
-      "id": "type-9-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-9.ivf",
-      "sha256": "ef1a7786f2142582394230f1e1594c6cd852078832cd21fbd1b22ce5528d3603",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 17847296178037070980
-      }
-    },
-    {
-      "id": "type-9-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-9.ivf",
-      "sha256": "ef1a7786f2142582394230f1e1594c6cd852078832cd21fbd1b22ce5528d3603",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 17847296178037070980
-      }
-    },
-    {
       "id": "type-10-w1",
       "profile": "authored-low-overhead",
       "file": "type-10.ivf",
@@ -572,40 +198,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 5371354328063010339
-      }
-    },
-    {
-      "id": "type-10-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-10.ivf",
-      "sha256": "77d9d9402a01b5aa4ce36f79c9b4e0bfc305bb29ab7f58d20775c33f455fd8e5",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 5371354328063010339
-      }
-    },
-    {
-      "id": "type-10-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-10.ivf",
-      "sha256": "77d9d9402a01b5aa4ce36f79c9b4e0bfc305bb29ab7f58d20775c33f455fd8e5",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -632,40 +224,6 @@
       }
     },
     {
-      "id": "type-11-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-11.ivf",
-      "sha256": "cac872f791ad94c961e4045c5528fbd7db4464dd4dfe653f64294eeccbfa2f1d",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 11342156551798501314
-      }
-    },
-    {
-      "id": "type-11-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-11.ivf",
-      "sha256": "cac872f791ad94c961e4045c5528fbd7db4464dd4dfe653f64294eeccbfa2f1d",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 11342156551798501314
-      }
-    },
-    {
       "id": "type-12-w1",
       "profile": "authored-low-overhead",
       "file": "type-12.ivf",
@@ -674,40 +232,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 17312958775533992289
-      }
-    },
-    {
-      "id": "type-12-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-12.ivf",
-      "sha256": "a95c41238a83d78ee8aac2d4f95d3b8f38acbb96917b62308b738c641ffc095f",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 17312958775533992289
-      }
-    },
-    {
-      "id": "type-12-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-12.ivf",
-      "sha256": "a95c41238a83d78ee8aac2d4f95d3b8f38acbb96917b62308b738c641ffc095f",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -734,40 +258,6 @@
       }
     },
     {
-      "id": "type-13-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-13.ivf",
-      "sha256": "7f2ff466a03328ab25be4c2e759239590e7d9a905d4131ea183802e364693f61",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 4837016925559931648
-      }
-    },
-    {
-      "id": "type-13-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-13.ivf",
-      "sha256": "7f2ff466a03328ab25be4c2e759239590e7d9a905d4131ea183802e364693f61",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 4837016925559931648
-      }
-    },
-    {
       "id": "type-14-w1",
       "profile": "authored-low-overhead",
       "file": "type-14.ivf",
@@ -776,40 +266,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 10807819149295422623
-      }
-    },
-    {
-      "id": "type-14-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-14.ivf",
-      "sha256": "81767ddb1a49ef73fe7abb9bdb217f64cc9c0a529edd0b5e3d907861afdf92ee",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 10807819149295422623
-      }
-    },
-    {
-      "id": "type-14-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-14.ivf",
-      "sha256": "81767ddb1a49ef73fe7abb9bdb217f64cc9c0a529edd0b5e3d907861afdf92ee",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -836,40 +292,6 @@
       }
     },
     {
-      "id": "type-15-w7",
-      "profile": "authored-low-overhead",
-      "file": "type-15.ivf",
-      "sha256": "6567f9809a993a5aacda01c07df36dc9d443e07f697bbbb7ec42e6798f71d7c0",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 16778621373030913598
-      }
-    },
-    {
-      "id": "type-15-w4096",
-      "profile": "authored-low-overhead",
-      "file": "type-15.ivf",
-      "sha256": "6567f9809a993a5aacda01c07df36dc9d443e07f697bbbb7ec42e6798f71d7c0",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 16778621373030913598
-      }
-    },
-    {
       "id": "extension-0-w1",
       "profile": "authored-low-overhead",
       "file": "extension-0.ivf",
@@ -878,40 +300,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25541527931618275
-      }
-    },
-    {
-      "id": "extension-0-w7",
-      "profile": "authored-low-overhead",
-      "file": "extension-0.ivf",
-      "sha256": "99b8ff85ee2d8b8282532003eeebf9858db3abdbde1484b0dd39b7cc0b45be4f",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25541527931618275
-      }
-    },
-    {
-      "id": "extension-0-w4096",
-      "profile": "authored-low-overhead",
-      "file": "extension-0.ivf",
-      "sha256": "99b8ff85ee2d8b8282532003eeebf9858db3abdbde1484b0dd39b7cc0b45be4f",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -938,40 +326,6 @@
       }
     },
     {
-      "id": "extension-1-w7",
-      "profile": "authored-low-overhead",
-      "file": "extension-1.ivf",
-      "sha256": "a87a3f7da90f6d2061fcfca7fec57685d0c7708f751392ba6fb655704d853c99",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "extension-1-w4096",
-      "profile": "authored-low-overhead",
-      "file": "extension-1.ivf",
-      "sha256": "a87a3f7da90f6d2061fcfca7fec57685d0c7708f751392ba6fb655704d853c99",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
       "id": "extension-7-w1",
       "profile": "authored-low-overhead",
       "file": "extension-7.ivf",
@@ -980,40 +334,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "extension-7-w7",
-      "profile": "authored-low-overhead",
-      "file": "extension-7.ivf",
-      "sha256": "3f29dee362157206ed4a2c6eeaed55831172a77a119c37fd48cdcf434229eba9",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "extension-7-w4096",
-      "profile": "authored-low-overhead",
-      "file": "extension-7.ivf",
-      "sha256": "3f29dee362157206ed4a2c6eeaed55831172a77a119c37fd48cdcf434229eba9",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -1040,40 +360,6 @@
       }
     },
     {
-      "id": "extension-8-w7",
-      "profile": "authored-low-overhead",
-      "file": "extension-8.ivf",
-      "sha256": "32e1a029cc8562f674c1e247a314b7905a5f0ecc72928fac0c4454324218a551",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25541528819121956
-      }
-    },
-    {
-      "id": "extension-8-w4096",
-      "profile": "authored-low-overhead",
-      "file": "extension-8.ivf",
-      "sha256": "32e1a029cc8562f674c1e247a314b7905a5f0ecc72928fac0c4454324218a551",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25541528819121956
-      }
-    },
-    {
       "id": "extension-24-w1",
       "profile": "authored-low-overhead",
       "file": "extension-24.ivf",
@@ -1082,40 +368,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25541530594129318
-      }
-    },
-    {
-      "id": "extension-24-w7",
-      "profile": "authored-low-overhead",
-      "file": "extension-24.ivf",
-      "sha256": "925b41a739bfc4ce71b50d60c49d9be6f9279f82d1551f7b00491467a32272d1",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25541530594129318
-      }
-    },
-    {
-      "id": "extension-24-w4096",
-      "profile": "authored-low-overhead",
-      "file": "extension-24.ivf",
-      "sha256": "925b41a739bfc4ce71b50d60c49d9be6f9279f82d1551f7b00491467a32272d1",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -1142,40 +394,6 @@
       }
     },
     {
-      "id": "extension-224-w7",
-      "profile": "authored-low-overhead",
-      "file": "extension-224.ivf",
-      "sha256": "ef1526ecaf5a9a4087e30b3c988816a4c2de80453ec33895f1b73321169f7f64",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25541720519917052
-      }
-    },
-    {
-      "id": "extension-224-w4096",
-      "profile": "authored-low-overhead",
-      "file": "extension-224.ivf",
-      "sha256": "ef1526ecaf5a9a4087e30b3c988816a4c2de80453ec33895f1b73321169f7f64",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25541720519917052
-      }
-    },
-    {
       "id": "extension-255-w1",
       "profile": "authored-low-overhead",
       "file": "extension-255.ivf",
@@ -1184,40 +402,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "extension-255-w7",
-      "profile": "authored-low-overhead",
-      "file": "extension-255.ivf",
-      "sha256": "ff25a806a360507b4a7d8fa7548989f084582b61e7aeec10d0967c422fda4bf0",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "extension-255-w4096",
-      "profile": "authored-low-overhead",
-      "file": "extension-255.ivf",
-      "sha256": "ff25a806a360507b4a7d8fa7548989f084582b61e7aeec10d0967c422fda4bf0",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -1244,40 +428,6 @@
       }
     },
     {
-      "id": "zero-bit-issues-1-0-w7",
-      "profile": "authored-low-overhead",
-      "file": "zero-bit-issues-1-0.ivf",
-      "sha256": "7b954ce437abc66853f89ed7bf4b815e0b2ce2ddb0fbe0f128d20ce6535d35d8",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "zero-bit-issues-1-0-w4096",
-      "profile": "authored-low-overhead",
-      "file": "zero-bit-issues-1-0.ivf",
-      "sha256": "7b954ce437abc66853f89ed7bf4b815e0b2ce2ddb0fbe0f128d20ce6535d35d8",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
       "id": "zero-bit-issues-0-1-w1",
       "profile": "authored-low-overhead",
       "file": "zero-bit-issues-0-1.ivf",
@@ -1286,40 +436,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "zero-bit-issues-0-1-w7",
-      "profile": "authored-low-overhead",
-      "file": "zero-bit-issues-0-1.ivf",
-      "sha256": "47f68a874b222298dc3ac67e929f61ec1254bcb612ce8105ad724db5325f14ff",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "zero-bit-issues-0-1-w4096",
-      "profile": "authored-low-overhead",
-      "file": "zero-bit-issues-0-1.ivf",
-      "sha256": "47f68a874b222298dc3ac67e929f61ec1254bcb612ce8105ad724db5325f14ff",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -1346,40 +462,6 @@
       }
     },
     {
-      "id": "zero-bit-issues-1-1-w7",
-      "profile": "authored-low-overhead",
-      "file": "zero-bit-issues-1-1.ivf",
-      "sha256": "fc2799cda9b512742836e8885d9dd17141e72724006acf6b78c961b12c809cf5",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "zero-bit-issues-1-1-w4096",
-      "profile": "authored-low-overhead",
-      "file": "zero-bit-issues-1-1.ivf",
-      "sha256": "fc2799cda9b512742836e8885d9dd17141e72724006acf6b78c961b12c809cf5",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
       "id": "leb-value-0-width-1-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-0-width-1.ivf",
@@ -1388,40 +470,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-1-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-1.ivf",
-      "sha256": "fe6b0de79c4d9566cb7cc3534337ea8204e790486d98617067f78be88e8d2b24",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-1-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-1.ivf",
-      "sha256": "fe6b0de79c4d9566cb7cc3534337ea8204e790486d98617067f78be88e8d2b24",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -1448,40 +496,6 @@
       }
     },
     {
-      "id": "leb-value-0-width-2-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-2.ivf",
-      "sha256": "ef065dd3d879ce8d78f864cb7ba3ca8171e5e88081cd602ec7706810788eeba4",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-2-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-2.ivf",
-      "sha256": "ef065dd3d879ce8d78f864cb7ba3ca8171e5e88081cd602ec7706810788eeba4",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
       "id": "leb-value-0-width-3-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-0-width-3.ivf",
@@ -1490,40 +504,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-3-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-3.ivf",
-      "sha256": "684c522624d7b0e57f8773632afdc39bc49683a1a015e7c5440bde52f6d16350",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-3-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-3.ivf",
-      "sha256": "684c522624d7b0e57f8773632afdc39bc49683a1a015e7c5440bde52f6d16350",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -1550,40 +530,6 @@
       }
     },
     {
-      "id": "leb-value-0-width-4-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-4.ivf",
-      "sha256": "9c39a737eae12fdbc676802b7fc1ea57656ee49fd17a9dae57257441c03544aa",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-4-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-4.ivf",
-      "sha256": "9c39a737eae12fdbc676802b7fc1ea57656ee49fd17a9dae57257441c03544aa",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
       "id": "leb-value-0-width-5-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-0-width-5.ivf",
@@ -1592,40 +538,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-5-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-5.ivf",
-      "sha256": "cdd7d4d1e40eced5c9f7df204252e74bba003550e64502167afafd5ebbcd1030",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-5-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-5.ivf",
-      "sha256": "cdd7d4d1e40eced5c9f7df204252e74bba003550e64502167afafd5ebbcd1030",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -1652,40 +564,6 @@
       }
     },
     {
-      "id": "leb-value-0-width-6-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-6.ivf",
-      "sha256": "52d6b16cfe7fd64c8f9042d940a4f421c3116f55f6654316fd89e63c89fc160e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-6-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-6.ivf",
-      "sha256": "52d6b16cfe7fd64c8f9042d940a4f421c3116f55f6654316fd89e63c89fc160e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
       "id": "leb-value-0-width-7-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-0-width-7.ivf",
@@ -1694,40 +572,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-7-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-7.ivf",
-      "sha256": "7424d63698a4eb7de41d8d874caa4aa1662dfc9efd1a20277572d0ebcce03848",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-7-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-7.ivf",
-      "sha256": "7424d63698a4eb7de41d8d874caa4aa1662dfc9efd1a20277572d0ebcce03848",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -1754,40 +598,6 @@
       }
     },
     {
-      "id": "leb-value-0-width-8-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-8.ivf",
-      "sha256": "2b23eb5a4018e0fa450002bb3841b48839594167b0372ea9ea6bdea27a354c90",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
-      "id": "leb-value-0-width-8-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-0-width-8.ivf",
-      "sha256": "2b23eb5a4018e0fa450002bb3841b48839594167b0372ea9ea6bdea27a354c90",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 832421653472665
-      }
-    },
-    {
       "id": "leb-value-1-width-1-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-1-width-1.ivf",
@@ -1796,40 +606,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-1-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-1.ivf",
-      "sha256": "ae2126eda0be46d86c1b4bbd2fde0568d1c739af7d020f712d1efc7b20a88cff",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-1-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-1.ivf",
-      "sha256": "ae2126eda0be46d86c1b4bbd2fde0568d1c739af7d020f712d1efc7b20a88cff",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -1856,40 +632,6 @@
       }
     },
     {
-      "id": "leb-value-1-width-2-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-2.ivf",
-      "sha256": "ac152bb0217af5a8ca9cadf1f970da4327f4637e8a75dd654e52e75960fc334a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-2-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-2.ivf",
-      "sha256": "ac152bb0217af5a8ca9cadf1f970da4327f4637e8a75dd654e52e75960fc334a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
       "id": "leb-value-1-width-3-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-1-width-3.ivf",
@@ -1898,40 +640,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-3-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-3.ivf",
-      "sha256": "4c4f0b794cfa3bd0dca4ed3b17b54414be162a48a1d73c9b677f7d953d3429e0",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-3-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-3.ivf",
-      "sha256": "4c4f0b794cfa3bd0dca4ed3b17b54414be162a48a1d73c9b677f7d953d3429e0",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -1958,40 +666,6 @@
       }
     },
     {
-      "id": "leb-value-1-width-4-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-4.ivf",
-      "sha256": "7060dca25188a5744914acfd6cebf067781b2609e9d5f5a2148608ccb34fe59a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-4-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-4.ivf",
-      "sha256": "7060dca25188a5744914acfd6cebf067781b2609e9d5f5a2148608ccb34fe59a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
       "id": "leb-value-1-width-5-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-1-width-5.ivf",
@@ -2000,40 +674,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-5-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-5.ivf",
-      "sha256": "b33e8b68efc4cf43396741925dd6f7429827c874e7f6ec6f386c2c873bd11bcd",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-5-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-5.ivf",
-      "sha256": "b33e8b68efc4cf43396741925dd6f7429827c874e7f6ec6f386c2c873bd11bcd",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -2060,40 +700,6 @@
       }
     },
     {
-      "id": "leb-value-1-width-6-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-6.ivf",
-      "sha256": "dd56993e2b8d94136cdd7eeb38925f05706b67fb3660b9ac8f2fc7f54874eb6a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-6-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-6.ivf",
-      "sha256": "dd56993e2b8d94136cdd7eeb38925f05706b67fb3660b9ac8f2fc7f54874eb6a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
       "id": "leb-value-1-width-7-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-1-width-7.ivf",
@@ -2102,40 +708,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-7-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-7.ivf",
-      "sha256": "ddd8ee7e7df9bf24e135fc67f11cccb6c3baa9f0b2272f3d1901379885debafb",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-7-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-7.ivf",
-      "sha256": "ddd8ee7e7df9bf24e135fc67f11cccb6c3baa9f0b2272f3d1901379885debafb",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -2162,40 +734,6 @@
       }
     },
     {
-      "id": "leb-value-1-width-8-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-8.ivf",
-      "sha256": "5ffa543f1c6f1d9e8c59755bac809f9eee4519a43bab85c6cad809b3d5148b1a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
-      "id": "leb-value-1-width-8-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-1-width-8.ivf",
-      "sha256": "5ffa543f1c6f1d9e8c59755bac809f9eee4519a43bab85c6cad809b3d5148b1a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25805071258374296
-      }
-    },
-    {
       "id": "leb-value-127-width-1-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-127-width-1.ivf",
@@ -2204,40 +742,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-1-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-1.ivf",
-      "sha256": "10beb7b75930dcaee4c5b76c7849a11293352c9a2fced5445ecf20322101d849",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-1-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-1.ivf",
-      "sha256": "10beb7b75930dcaee4c5b76c7849a11293352c9a2fced5445ecf20322101d849",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -2264,40 +768,6 @@
       }
     },
     {
-      "id": "leb-value-127-width-2-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-2.ivf",
-      "sha256": "a917accf0c7e695adbf70fc54fbef3c73185a82bf1f35273a7f38a5ccd934d6a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-2-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-2.ivf",
-      "sha256": "a917accf0c7e695adbf70fc54fbef3c73185a82bf1f35273a7f38a5ccd934d6a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
       "id": "leb-value-127-width-3-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-127-width-3.ivf",
@@ -2306,40 +776,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-3-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-3.ivf",
-      "sha256": "4e4d54fcd6d24e0a4ba367eda5e0b689b0d6850381b21d2ce5cf90cfe4d96be1",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-3-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-3.ivf",
-      "sha256": "4e4d54fcd6d24e0a4ba367eda5e0b689b0d6850381b21d2ce5cf90cfe4d96be1",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -2366,40 +802,6 @@
       }
     },
     {
-      "id": "leb-value-127-width-4-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-4.ivf",
-      "sha256": "bbe751b30a76f8b63aabd26e62e35af975755b050977cf6373a3372e77c189b5",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-4-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-4.ivf",
-      "sha256": "bbe751b30a76f8b63aabd26e62e35af975755b050977cf6373a3372e77c189b5",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
       "id": "leb-value-127-width-5-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-127-width-5.ivf",
@@ -2408,40 +810,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-5-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-5.ivf",
-      "sha256": "8ff2c04e41bb15c9525ea417f0e608cc70cf6c0c1c494830b99368ee1d09504c",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-5-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-5.ivf",
-      "sha256": "8ff2c04e41bb15c9525ea417f0e608cc70cf6c0c1c494830b99368ee1d09504c",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -2468,40 +836,6 @@
       }
     },
     {
-      "id": "leb-value-127-width-6-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-6.ivf",
-      "sha256": "25783a23d198efe82fb7e5a4b7dbf92d597ad6668318e9d7053324d4d6823be9",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-6-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-6.ivf",
-      "sha256": "25783a23d198efe82fb7e5a4b7dbf92d597ad6668318e9d7053324d4d6823be9",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
       "id": "leb-value-127-width-7-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-127-width-7.ivf",
@@ -2510,40 +844,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-7-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-7.ivf",
-      "sha256": "3604bb3657d0d886000a2d0eee5f4b7b1c823216e21d11898d30f5c41a664efb",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-7-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-7.ivf",
-      "sha256": "3604bb3657d0d886000a2d0eee5f4b7b1c823216e21d11898d30f5c41a664efb",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -2570,40 +870,6 @@
       }
     },
     {
-      "id": "leb-value-127-width-8-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-8.ivf",
-      "sha256": "e055de534757c8fb982f48ac16d7d032f47f91b3656092687d85248e1002cac2",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
-      "id": "leb-value-127-width-8-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-127-width-8.ivf",
-      "sha256": "e055de534757c8fb982f48ac16d7d032f47f91b3656092687d85248e1002cac2",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 127,
-        "digest": 5425674192491735127
-      }
-    },
-    {
       "id": "leb-value-128-width-2-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-128-width-2.ivf",
@@ -2612,40 +878,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
-      "id": "leb-value-128-width-2-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-2.ivf",
-      "sha256": "8733a1dfb4db77afb62f1067c67b644d9e8b71cfbab04d04fa82fe223203b030",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
-      "id": "leb-value-128-width-2-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-2.ivf",
-      "sha256": "8733a1dfb4db77afb62f1067c67b644d9e8b71cfbab04d04fa82fe223203b030",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -2672,40 +904,6 @@
       }
     },
     {
-      "id": "leb-value-128-width-3-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-3.ivf",
-      "sha256": "8c1f097985ebf4e1ddef6c20ee249f768644fb80be0abae0d7dd0227de63e24e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
-      "id": "leb-value-128-width-3-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-3.ivf",
-      "sha256": "8c1f097985ebf4e1ddef6c20ee249f768644fb80be0abae0d7dd0227de63e24e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
       "id": "leb-value-128-width-4-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-128-width-4.ivf",
@@ -2714,40 +912,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
-      "id": "leb-value-128-width-4-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-4.ivf",
-      "sha256": "f2c7bdb458830c0da433153330e6f2ea861a39cc90bcea1cd707a88007ab3fe8",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
-      "id": "leb-value-128-width-4-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-4.ivf",
-      "sha256": "f2c7bdb458830c0da433153330e6f2ea861a39cc90bcea1cd707a88007ab3fe8",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -2774,40 +938,6 @@
       }
     },
     {
-      "id": "leb-value-128-width-5-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-5.ivf",
-      "sha256": "91c1bb5c6f2367eb72f4ab1fe0a892d92c1842e66605b61956b2695a71e93fce",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
-      "id": "leb-value-128-width-5-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-5.ivf",
-      "sha256": "91c1bb5c6f2367eb72f4ab1fe0a892d92c1842e66605b61956b2695a71e93fce",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
       "id": "leb-value-128-width-6-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-128-width-6.ivf",
@@ -2816,40 +946,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
-      "id": "leb-value-128-width-6-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-6.ivf",
-      "sha256": "b61496081fce14cfacb4f2d765aa906b2b3087709c4f28a9fe66dd41f1f13a30",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
-      "id": "leb-value-128-width-6-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-6.ivf",
-      "sha256": "b61496081fce14cfacb4f2d765aa906b2b3087709c4f28a9fe66dd41f1f13a30",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -2876,40 +972,6 @@
       }
     },
     {
-      "id": "leb-value-128-width-7-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-7.ivf",
-      "sha256": "8a058bf7ffebc8bb9de438646e79241b40313041c7f1c6bfab8ddc94b4670ff6",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
-      "id": "leb-value-128-width-7-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-7.ivf",
-      "sha256": "8a058bf7ffebc8bb9de438646e79241b40313041c7f1c6bfab8ddc94b4670ff6",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
       "id": "leb-value-128-width-8-w1",
       "profile": "authored-low-overhead",
       "file": "leb-value-128-width-8.ivf",
@@ -2918,40 +980,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
-      "id": "leb-value-128-width-8-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-8.ivf",
-      "sha256": "2ea637105d82e723dd087e00ca49536a6a33c19c5cbc960acf99d4f934cd4272",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 128,
-        "digest": 6112097574519307545
-      }
-    },
-    {
-      "id": "leb-value-128-width-8-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-value-128-width-8.ivf",
-      "sha256": "2ea637105d82e723dd087e00ca49536a6a33c19c5cbc960acf99d4f934cd4272",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -2978,40 +1006,6 @@
       }
     },
     {
-      "id": "external-unsized-extension-None-w7",
-      "profile": "authored-single",
-      "file": "external-unsized-extension-None.ivf",
-      "sha256": "90f1a60685724b953e5468dbfedb3266a6cf41f49439f0b5ff6100fd5499321c",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 6439999171828617385
-      }
-    },
-    {
-      "id": "external-unsized-extension-None-w4096",
-      "profile": "authored-single",
-      "file": "external-unsized-extension-None.ivf",
-      "sha256": "90f1a60685724b953e5468dbfedb3266a6cf41f49439f0b5ff6100fd5499321c",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 6439999171828617385
-      }
-    },
-    {
       "id": "external-unsized-extension-0-w1",
       "profile": "authored-single",
       "file": "external-unsized-extension-0.ivf",
@@ -3020,40 +1014,6 @@
       "arguments": [
         "single",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 7227661955617167146
-      }
-    },
-    {
-      "id": "external-unsized-extension-0-w7",
-      "profile": "authored-single",
-      "file": "external-unsized-extension-0.ivf",
-      "sha256": "7c6726ad6220c5c0c828bc82b9521e554d64d5ab46462a39d907015b3d45ec00",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 5,
-        "digest": 7227661955617167146
-      }
-    },
-    {
-      "id": "external-unsized-extension-0-w4096",
-      "profile": "authored-single",
-      "file": "external-unsized-extension-0.ivf",
-      "sha256": "7c6726ad6220c5c0c828bc82b9521e554d64d5ab46462a39d907015b3d45ec00",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "4096",
         "0"
       ],
       "expected": {
@@ -3080,40 +1040,6 @@
       }
     },
     {
-      "id": "external-unsized-extension-255-w7",
-      "profile": "authored-single",
-      "file": "external-unsized-extension-255.ivf",
-      "sha256": "b7b976505fcc1745f0b169bbf745fede56ccef68863d3a4761841c06668e1d7a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "external-unsized-extension-255-w4096",
-      "profile": "authored-single",
-      "file": "external-unsized-extension-255.ivf",
-      "sha256": "b7b976505fcc1745f0b169bbf745fede56ccef68863d3a4761841c06668e1d7a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
       "id": "external-unsized-empty-payload-w1",
       "profile": "authored-single",
       "file": "external-unsized-empty-payload.ivf",
@@ -3122,40 +1048,6 @@
       "arguments": [
         "single",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 821334069062411
-      }
-    },
-    {
-      "id": "external-unsized-empty-payload-w7",
-      "profile": "authored-single",
-      "file": "external-unsized-empty-payload.ivf",
-      "sha256": "03b88e27325adc82f5080dd778234e1a03339aab64a761347996c31313b64a53",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 821334069062411
-      }
-    },
-    {
-      "id": "external-unsized-empty-payload-w4096",
-      "profile": "authored-single",
-      "file": "external-unsized-empty-payload.ivf",
-      "sha256": "03b88e27325adc82f5080dd778234e1a03339aab64a761347996c31313b64a53",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "4096",
         "0"
       ],
       "expected": {
@@ -3182,40 +1074,6 @@
       }
     },
     {
-      "id": "external-sized-eight-byte-spelling-w7",
-      "profile": "authored-single",
-      "file": "external-sized-eight-byte-spelling.ivf",
-      "sha256": "ab93f30f21f2450d63eb23e817d9362abb696452e89b2bbe061429396775653e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 2,
-        "digest": 791760926188659103
-      }
-    },
-    {
-      "id": "external-sized-eight-byte-spelling-w4096",
-      "profile": "authored-single",
-      "file": "external-sized-eight-byte-spelling.ivf",
-      "sha256": "ab93f30f21f2450d63eb23e817d9362abb696452e89b2bbe061429396775653e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 2,
-        "digest": 791760926188659103
-      }
-    },
-    {
       "id": "three-obu-order-w1",
       "profile": "authored-low-overhead",
       "file": "three-obu-order.ivf",
@@ -3224,40 +1082,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "three-obu-order-w7",
-      "profile": "authored-low-overhead",
-      "file": "three-obu-order.ivf",
-      "sha256": "702bfabb134452ad5cf1bee25d969dbe84279cf74f73597947ff65eec1e8ef2b",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "three-obu-order-w4096",
-      "profile": "authored-low-overhead",
-      "file": "three-obu-order.ivf",
-      "sha256": "702bfabb134452ad5cf1bee25d969dbe84279cf74f73597947ff65eec1e8ef2b",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -3284,40 +1108,6 @@
       }
     },
     {
-      "id": "one-empty-w7",
-      "profile": "authored-single",
-      "file": "one-empty.ivf",
-      "sha256": "3559ce9697511470d05a34d78658f33a8094984ca7e417a19dc6125fdefbd579",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "one-empty-w4096",
-      "profile": "authored-single",
-      "file": "one-empty.ivf",
-      "sha256": "3559ce9697511470d05a34d78658f33a8094984ca7e417a19dc6125fdefbd579",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
       "id": "low-unsized-w1",
       "profile": "authored-low-overhead",
       "file": "low-unsized.ivf",
@@ -3326,40 +1116,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25540675011951683
-      }
-    },
-    {
-      "id": "low-unsized-w7",
-      "profile": "authored-low-overhead",
-      "file": "low-unsized.ivf",
-      "sha256": "0b6fb730f2f4fa3f0af05decb52a5e37c637c84fdbaeedf4634504deba53a25a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 25540675011951683
-      }
-    },
-    {
-      "id": "low-unsized-w4096",
-      "profile": "authored-low-overhead",
-      "file": "low-unsized.ivf",
-      "sha256": "0b6fb730f2f4fa3f0af05decb52a5e37c637c84fdbaeedf4634504deba53a25a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -3386,40 +1142,6 @@
       }
     },
     {
-      "id": "extension-truncated-w7",
-      "profile": "authored-low-overhead",
-      "file": "extension-truncated.ivf",
-      "sha256": "c7ab0c37e9cc80aaff9f655f2f666381086fbffecb02056f712fec8c5dba980b",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "extension-truncated-w4096",
-      "profile": "authored-low-overhead",
-      "file": "extension-truncated.ivf",
-      "sha256": "c7ab0c37e9cc80aaff9f655f2f666381086fbffecb02056f712fec8c5dba980b",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
       "id": "size-missing-w1",
       "profile": "authored-low-overhead",
       "file": "size-missing.ivf",
@@ -3428,40 +1150,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "size-missing-w7",
-      "profile": "authored-low-overhead",
-      "file": "size-missing.ivf",
-      "sha256": "700b99d86ef4e39d2beb10da44dcf3748c11cc7b84eeeca1fb5d6a36ae568f38",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "size-missing-w4096",
-      "profile": "authored-low-overhead",
-      "file": "size-missing.ivf",
-      "sha256": "700b99d86ef4e39d2beb10da44dcf3748c11cc7b84eeeca1fb5d6a36ae568f38",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -3488,40 +1176,6 @@
       }
     },
     {
-      "id": "leb-truncated-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-truncated.ivf",
-      "sha256": "69c1ba354ee282c674ce7f36584c7054529dcda26fd23b8361f1fe96686d0539",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "leb-truncated-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-truncated.ivf",
-      "sha256": "69c1ba354ee282c674ce7f36584c7054529dcda26fd23b8361f1fe96686d0539",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
       "id": "eighth-continuation-w1",
       "profile": "authored-low-overhead",
       "file": "eighth-continuation.ivf",
@@ -3530,40 +1184,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "eighth-continuation-w7",
-      "profile": "authored-low-overhead",
-      "file": "eighth-continuation.ivf",
-      "sha256": "952b4863768f1be224a368d87b43ee6d099d8495c0135f46445d4d4f9c454658",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "eighth-continuation-w4096",
-      "profile": "authored-low-overhead",
-      "file": "eighth-continuation.ivf",
-      "sha256": "952b4863768f1be224a368d87b43ee6d099d8495c0135f46445d4d4f9c454658",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -3590,40 +1210,6 @@
       }
     },
     {
-      "id": "leb-over-u32-w7",
-      "profile": "authored-low-overhead",
-      "file": "leb-over-u32.ivf",
-      "sha256": "ed4a4168a4bad201bca45c411b6d8327c82e9c14f895683f20564a9151590f31",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "leb-over-u32-w4096",
-      "profile": "authored-low-overhead",
-      "file": "leb-over-u32.ivf",
-      "sha256": "ed4a4168a4bad201bca45c411b6d8327c82e9c14f895683f20564a9151590f31",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
       "id": "policy-u32-max-w1",
       "profile": "authored-low-overhead",
       "file": "policy-u32-max.ivf",
@@ -3632,40 +1218,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "policy-u32-max-w7",
-      "profile": "authored-low-overhead",
-      "file": "policy-u32-max.ivf",
-      "sha256": "dc3b8793acc1887a5e571368d4516d8c9f475fdcb10940995c41945e34023559",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "policy-u32-max-w4096",
-      "profile": "authored-low-overhead",
-      "file": "policy-u32-max.ivf",
-      "sha256": "dc3b8793acc1887a5e571368d4516d8c9f475fdcb10940995c41945e34023559",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -3692,40 +1244,6 @@
       }
     },
     {
-      "id": "payload-truncated-w7",
-      "profile": "authored-low-overhead",
-      "file": "payload-truncated.ivf",
-      "sha256": "5446084260bf28902cb20bd005ace677b32559c6a8c890cb5dc035d7f61c549e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "payload-truncated-w4096",
-      "profile": "authored-low-overhead",
-      "file": "payload-truncated.ivf",
-      "sha256": "5446084260bf28902cb20bd005ace677b32559c6a8c890cb5dc035d7f61c549e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
       "id": "external-extra-tail-w1",
       "profile": "authored-single",
       "file": "external-extra-tail.ivf",
@@ -3734,40 +1252,6 @@
       "arguments": [
         "single",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "external-extra-tail-w7",
-      "profile": "authored-single",
-      "file": "external-extra-tail.ivf",
-      "sha256": "4e3ff223adba50b958e0fbf5caa85fdef9a54e87375543a45cb0c3a57e6ef5e9",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "external-extra-tail-w4096",
-      "profile": "authored-single",
-      "file": "external-extra-tail.ivf",
-      "sha256": "4e3ff223adba50b958e0fbf5caa85fdef9a54e87375543a45cb0c3a57e6ef5e9",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "4096",
         "0"
       ],
       "expected": {
@@ -3794,40 +1278,6 @@
       }
     },
     {
-      "id": "external-too-short-w7",
-      "profile": "authored-single",
-      "file": "external-too-short.ivf",
-      "sha256": "5446084260bf28902cb20bd005ace677b32559c6a8c890cb5dc035d7f61c549e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "external-too-short-w4096",
-      "profile": "authored-single",
-      "file": "external-too-short.ivf",
-      "sha256": "5446084260bf28902cb20bd005ace677b32559c6a8c890cb5dc035d7f61c549e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
       "id": "second-partial-leb-w1",
       "profile": "authored-low-overhead",
       "file": "second-partial-leb.ivf",
@@ -3839,43 +1289,9 @@
         "0"
       ],
       "expected": {
-        "packets": 1,
+        "packets": 2,
         "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "second-partial-leb-w7",
-      "profile": "authored-low-overhead",
-      "file": "second-partial-leb.ivf",
-      "sha256": "385eec303000595aeb5d96835607af9f453799171f47235edcbfb5d7814868e3",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
-      }
-    },
-    {
-      "id": "second-partial-leb-w4096",
-      "profile": "authored-low-overhead",
-      "file": "second-partial-leb.ivf",
-      "sha256": "385eec303000595aeb5d96835607af9f453799171f47235edcbfb5d7814868e3",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
+        "digest": 26494647418932
       }
     },
     {
@@ -3887,40 +1303,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 66,
-        "bytes": 0,
-        "digest": 12953977697426822092
-      }
-    },
-    {
-      "id": "obu-count-limit-w7",
-      "profile": "authored-low-overhead",
-      "file": "obu-count-limit.ivf",
-      "sha256": "ac2d3a3b53c0a23e9226ed81729cf9db0b701a0de51a30d60994c4a3f3981f8b",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 66,
-        "bytes": 0,
-        "digest": 12953977697426822092
-      }
-    },
-    {
-      "id": "obu-count-limit-w4096",
-      "profile": "authored-low-overhead",
-      "file": "obu-count-limit.ivf",
-      "sha256": "ac2d3a3b53c0a23e9226ed81729cf9db0b701a0de51a30d60994c4a3f3981f8b",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -3947,40 +1329,6 @@
       }
     },
     {
-      "id": "sequence-w7",
-      "profile": "authored-low-overhead",
-      "file": "sequence.ivf",
-      "sha256": "1bb61d199a67d0b8621f5512b8b4c728c10a83e6ae18659d1ea1cbb40a7eb271",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 6,
-        "digest": 6475181840883305595
-      }
-    },
-    {
-      "id": "sequence-w4096",
-      "profile": "authored-low-overhead",
-      "file": "sequence.ivf",
-      "sha256": "1bb61d199a67d0b8621f5512b8b4c728c10a83e6ae18659d1ea1cbb40a7eb271",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 6,
-        "digest": 6475181840883305595
-      }
-    },
-    {
       "id": "sequence-nonminimal-w1",
       "profile": "authored-low-overhead",
       "file": "sequence-nonminimal.ivf",
@@ -3989,40 +1337,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 6,
-        "digest": 6475181840883305595
-      }
-    },
-    {
-      "id": "sequence-nonminimal-w7",
-      "profile": "authored-low-overhead",
-      "file": "sequence-nonminimal.ivf",
-      "sha256": "5c689eac6dbe5fb1ca89afeb7c13e3f327d70c7cae11cff82ac3ba97a2ce9135",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 6,
-        "digest": 6475181840883305595
-      }
-    },
-    {
-      "id": "sequence-nonminimal-w4096",
-      "profile": "authored-low-overhead",
-      "file": "sequence-nonminimal.ivf",
-      "sha256": "5c689eac6dbe5fb1ca89afeb7c13e3f327d70c7cae11cff82ac3ba97a2ce9135",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
@@ -4049,40 +1363,6 @@
       }
     },
     {
-      "id": "sequence-single-w7",
-      "profile": "authored-single",
-      "file": "sequence-single.ivf",
-      "sha256": "c2bc3726f7de811548405299c4317afa4a86221366f3d348d96c8bc7755266e2",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 6,
-        "digest": 13290296465047304309
-      }
-    },
-    {
-      "id": "sequence-single-w4096",
-      "profile": "authored-single",
-      "file": "sequence-single.ivf",
-      "sha256": "c2bc3726f7de811548405299c4317afa4a86221366f3d348d96c8bc7755266e2",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "single",
-        "4096",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 6,
-        "digest": 13290296465047304309
-      }
-    },
-    {
       "id": "delimiter-extension-w1",
       "profile": "authored-low-overhead",
       "file": "delimiter-extension.ivf",
@@ -4091,40 +1371,6 @@
       "arguments": [
         "low-overhead",
         "1",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 821361611229194
-      }
-    },
-    {
-      "id": "delimiter-extension-w7",
-      "profile": "authored-low-overhead",
-      "file": "delimiter-extension.ivf",
-      "sha256": "3080052ab0de4e4c5394a31ed1e80fd4323a6602beb80feda82bc5648289420c",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "7",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 821361611229194
-      }
-    },
-    {
-      "id": "delimiter-extension-w4096",
-      "profile": "authored-low-overhead",
-      "file": "delimiter-extension.ivf",
-      "sha256": "3080052ab0de4e4c5394a31ed1e80fd4323a6602beb80feda82bc5648289420c",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "low-overhead",
-        "4096",
         "0"
       ],
       "expected": {
