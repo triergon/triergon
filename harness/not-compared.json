@@ -46,18 +46,6 @@
     ],
     "triergon-bridge": [
       {
-        "name": "access-units",
-        "entry_points": ["access::AccessUnits", "access::AccessUnits::for_track", "access::AccessUnits::with_record", "access::AccessUnits::packet", "access::AccessUnitsSetup", "access::AccessUnitJob", "access::AccessUnit"],
-        "degree": "unit-tests",
-        "needs": "a worker operation framing each track through AccessUnits and folding the units against the reference's bitstream-filtered packets"
-      },
-      {
-        "name": "mp4-packet-bridges",
-        "entry_points": ["aac::AacBridge", "av1::Av1Bridge", "av1::Av1BridgeSetup"],
-        "degree": "unit-tests",
-        "needs": "mp4-range cases folded after the ADTS and temporal-unit bridges against the reference's aac_adtstoasc inverse and av1_frame_merge output"
-      },
-      {
         "name": "text-subtitle-bridge",
         "entry_points": ["text::TextBridge", "text::TextSource"],
         "degree": "unit-tests",
@@ -86,12 +74,6 @@
         "entry_points": ["matroska::MatroskaReplayPrefix", "matroska::MatroskaReplayPrefix::feed_packet"],
         "degree": "step",
         "needs": "a coverage run showing matroska-audio-clocks executing feed_packet on every case with a buffered prefix, and startup cases whose buffered prefix holds video"
-      },
-      {
-        "name": "matroska-discovery-views",
-        "entry_points": ["matroska::MatroskaDiscovery", "matroska::MatroskaCompactDiscovery::for_av_feed", "matroska::MatroskaCompactDiscovery::buffered_events", "matroska::MatroskaCompactDiscovery::confirm_stream_ready", "matroska::MatroskaDiscoveryCutoff", "matroska::MatroskaFeedPayload::segments", "matroska::MatroskaHevcDolbyPacket::demux_duration_ns", "matroska::MatroskaVideoSeekGate::landed"],
-        "degree": "step",
-        "needs": "an operation folding discovery's readiness per track (the PGS cutoff, composition width and height, segment kind and length) and the feed payload segments against the reference's avformat_find_stream_info results and packets; matroska-startup-seek folds the video packets only"
       }
     ],
     "triergon-capture": [
