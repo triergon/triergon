@@ -205,87 +205,114 @@
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     }
   ],
-  "pending_module_requirements": [
-    "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context.",
-    "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets.",
-    "The dependency profile does not admit referenced recovery or reserved referenced fields in these inputs."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "qt-v1-after-terminator",
-      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+      "reading": "An absent, nonempty or nonfinal wave terminator",
+      "clause": "Apple QuickTime File Format ‘Sound sample description extensions’, ‘siDecompressionParam atom (wave)’ and ‘Terminator atom’: a terminator marks the end and contains no payload; the strict wave profile requires it",
+      "candidate": "refuses the three wave layouts",
+      "reference": "opens and reads 458 packet payload bytes in each case",
+      "compat": "compat::mov::encoded EncodedContextProfile keeps wave faults as observations",
+      "cases": [
+        "qt-v1-after-terminator",
+        "qt-v1-missing-terminator",
+        "qt-v1-terminator-body"
+      ]
     },
     {
-      "id": "qt-v1-duplicate-esds",
-      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+      "reading": "Missing, repeated or conflicting decoder-identification atoms",
+      "clause": "Apple QuickTime File Format ‘Sound sample description extensions’, ‘siDecompressionParam atom (wave)’ plus ‘Format atom (frma)’ and ‘MPEG-4 elementary sound stream descriptor atom (esds)’: frma identifies the stored format and esds supplies the decoder description",
+      "candidate": "requires a single consistent format and decoder descriptor for the MPEG-4 sound entry",
+      "reference": "opens and reads 458 packet payload bytes for each layout",
+      "compat": "compat::mov::encoded EncodedContextProfile keeps wave faults as observations",
+      "cases": [
+        "qt-v1-duplicate-esds",
+        "qt-v1-duplicate-frma",
+        "qt-v1-missing-frma",
+        "qt-v1-wrong-frma"
+      ]
     },
     {
-      "id": "qt-v1-duplicate-frma",
-      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+      "reading": "Compressed sound without the framed table mode required by the view",
+      "clause": "Apple QuickTime File Format ‘Sound sample description version 1 (stsd)’ ‘Redefined sample tables’ explains compression ID -2 and sample tables whose units are compressed frames",
+      "candidate": "refuses the sound entry outside its framed version 1 profile",
+      "reference": "opens the entry as AAC and reads 458 packet payload bytes",
+      "compat": "compat::mov::encoded EncodedContextProfile keeps wave faults as observations",
+      "cases": [
+        "qt-v1-unframed-compression"
+      ]
     },
     {
-      "id": "qt-v1-missing-frma",
-      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+      "reading": "Group entries beyond the source samples or the description namespace",
+      "clause": "ISO/IEC 14496-12:2015 §§8.9.2.1–.3 and 8.9.3.1–.3 and §8.9.4: regular sample-group indices must resolve in stbl, and total run coverage cannot exceed sample_count",
+      "candidate": "refuses the overlong map, out-of-range description and fragment-local index in a regular table",
+      "reference": "opens and reads 4379 packet payload bytes in each case",
+      "compat": "compat::mov::encoded EncodedContextProfile keeps group faults as observations",
+      "cases": [
+        "coverage-over",
+        "dangling-description",
+        "fragment-namespace"
+      ]
     },
     {
-      "id": "qt-v1-missing-terminator",
-      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+      "reading": "Two group description boxes for one grouping type",
+      "clause": "ISO/IEC 14496-12:2015 §§8.9.2.1–.3 and 8.9.3.1–.3: at most one sgpd per grouping_type in a sample table",
+      "candidate": "refuses the duplicate group description context",
+      "reference": "opens and reads 4379 packet payload bytes",
+      "compat": "compat::mov::encoded EncodedContextProfile keeps group faults as observations",
+      "cases": [
+        "duplicate-description"
+      ]
     },
     {
-      "id": "qt-v1-terminator-body",
-      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+      "reading": "A group map leaves a sample without an explicit association",
+      "clause": "ISO/IEC 14496-12:2015 §§8.9.2.1–.3 and 8.9.3.1–.3 allows the default group or no group for unlisted samples. The strict encoded recovery profile requires explicit complete coverage",
+      "candidate": "refuses the short map with Unsupported before projecting recovery",
+      "reference": "opens and reads 4379 packet payload bytes",
+      "compat": "compat::mov::encoded EncodedContextProfile keeps the unadmitted map visible as an observation",
+      "cases": [
+        "coverage-under"
+      ]
     },
     {
-      "id": "qt-v1-unframed-compression",
-      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+      "reading": "A zero-sample recovery run",
+      "clause": "ISO/IEC 14496-12:2015 §§8.9.2.1–.3 and 8.9.3.1–.3 defines sample_count as the length of a consecutive sample run. The strict recovery profile requires nonempty runs",
+      "candidate": "refuses the zero-count run",
+      "reference": "opens and reads 4379 packet payload bytes",
+      "compat": "compat::mov::encoded EncodedContextProfile keeps group faults as observations",
+      "cases": [
+        "empty-run"
+      ]
     },
     {
-      "id": "qt-v1-wrong-frma",
-      "requirement": "The encoded metadata profile rejects an unsupported or structurally inconsistent QuickTime sound-v1 wave context."
+      "reading": "Group syntax outside the supported roll and prol recovery layout",
+      "clause": "ISO/IEC 14496-12:2015 §§8.9.2.1–.3 and 8.9.3.1–.3 defines grouping_type_parameter for version-1 sbgp, grouping extensions, and per-entry lengths when sgpd default_length is zero",
+      "candidate": "refuses the unsupported grouping parameter, unknown type, or variable entry sizing before making a recovery claim",
+      "reference": "opens and reads 4379 packet payload bytes for each layout",
+      "compat": "compat::mov::encoded EncodedContextProfile retains unsupported group contexts",
+      "cases": [
+        "grouping-parameter",
+        "unknown-group-unadmitted",
+        "variable-length-unadmitted"
+      ]
     },
     {
-      "id": "coverage-over",
-      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
+      "reading": "Referenced roll group on the dependency-only path",
+      "clause": "ISO/IEC 14496-12:2015 §§8.6.4, 8.9.2 and 10.1: dependency flags and roll recovery are separate sample facts",
+      "candidate": "refuses the referenced recovery group in the dependency-only profile",
+      "reference": "opens and reads 4379 packet payload bytes",
+      "compat": "compat::mov::encoded EncodedRecoveryProfile is the recovery-aware path",
+      "cases": [
+        "dep-real-roll-unadmitted"
+      ]
     },
     {
-      "id": "coverage-under",
-      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
-    },
-    {
-      "id": "dangling-description",
-      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
-    },
-    {
-      "id": "duplicate-description",
-      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
-    },
-    {
-      "id": "empty-run",
-      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
-    },
-    {
-      "id": "fragment-namespace",
-      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
-    },
-    {
-      "id": "grouping-parameter",
-      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
-    },
-    {
-      "id": "unknown-group-unadmitted",
-      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
-    },
-    {
-      "id": "variable-length-unadmitted",
-      "requirement": "The encoded recovery profile rejects the sample-group mapping, scope or description structure before reading packets."
-    },
-    {
-      "id": "dep-real-roll-unadmitted",
-      "requirement": "The dependency profile does not admit referenced recovery or reserved referenced fields in these inputs."
-    },
-    {
-      "id": "dep-reserved-referenced-field",
-      "requirement": "The dependency profile does not admit referenced recovery or reserved referenced fields in these inputs."
+      "reading": "A reserved sample dependency field on a referenced sample",
+      "clause": "ISO/IEC 14496-12:2015 §8.6.4.3: sample_depends_on value 3 is reserved",
+      "candidate": "refuses the table with the reserved referenced field",
+      "reference": "opens and reads 4379 packet payload bytes",
+      "cases": [
+        "dep-reserved-referenced-field"
+      ]
     }
   ]
 }
