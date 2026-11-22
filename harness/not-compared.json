@@ -235,7 +235,7 @@
         "name": "reference-trace-catalogue",
         "entry_points": ["reference_trace::catalogue::Catalogue", "reference_trace::catalogue::CatalogueCodec", "reference_trace::catalogue::PsiCompatibility", "reference_trace::catalogue::PsiCompatibilityPolicies", "reference_trace::catalogue::PsiCompatibilityEvidence"],
         "degree": "unit-tests",
-        "needs": "ts-catalogue compares the selected-program projection and explicit PSI policies. Open cases cover registration descriptors, MPEG audio, DVB subtitle routes and language dispositions."
+        "needs": "ts-catalogue compares program and selected stream order, registration tags, MPEG audio, language dispositions and DVB services. Source ranges and individual PSI compatibility evidence records remain candidate trace facts."
       },
       {
         "name": "reference-trace-recovery",
