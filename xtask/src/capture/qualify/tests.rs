@@ -6,7 +6,6 @@ fn only_an_open_conversion_may_fail_capture_parity() {
     let open = OpenCase {
         id: "picture".into(),
         parts: vec!["conversion".into()],
-        refusal: None,
         quality_only: false,
     };
     assert_eq!(
@@ -30,7 +29,6 @@ fn a_quality_exception_requires_the_rest_of_the_encoder_comparison_to_pass() {
     let open = OpenCase {
         id: "picture".into(),
         parts: vec!["encoder".into()],
-        refusal: None,
         quality_only: true,
     };
     let verdict = |quality_only| {
@@ -375,5 +373,25 @@ fn open_cases_are_listed_per_target_and_must_be_cases() {
         listed_open(&Value::Object(vec![]), "x", &ids)
             .unwrap()
             .is_empty()
+    );
+}
+
+#[test]
+fn a_registered_refusal_requires_both_diagnostics_and_conversion() {
+    let verdict = |conversion, matching| {
+        Value::object([
+            ("outcome", Value::str("refusal")),
+            ("conversion", Value::Bool(conversion)),
+            ("matching_refusal", Value::Bool(matching)),
+        ])
+    };
+    assert_eq!(failing_parity("c21", &verdict(true, true), None).count(), 0);
+    assert_eq!(
+        failing_parity("c21", &verdict(true, false), None).collect::<Vec<_>>(),
+        ["capture: c21: matching_refusal parity fails"]
+    );
+    assert_eq!(
+        failing_parity("c21", &verdict(false, true), None).collect::<Vec<_>>(),
+        ["capture: c21: conversion parity fails"]
     );
 }

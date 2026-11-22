@@ -92,7 +92,8 @@ with the same input and checked output for each worker.
 The configuration cases exercise nondefault geometry, GOP, VBV and multiplex
 settings. PCR is carried on every picture. A VBV buffer below one picture at the
 average rate (`bit_rate` / 30) is refused at open (`CaptureError::Encoder`), as the
-reference refuses it.
+reference refuses it. The comparison checks both diagnostics and that neither
+worker emits a stream.
 
 `tests/session.rs` covers the start sequence and timing, keepalive, sink failure,
 bottom-up input, geometry and rate extremes, and error mapping.

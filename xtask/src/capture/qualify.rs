@@ -182,6 +182,7 @@ fn operation(case: &Value, iterations: u32) -> Result<Operation, String> {
     arguments.extend(Config::read(case)?.arguments());
     Ok(Operation {
         prefix: String::new(),
+        reference_prefix: None,
         arguments: arguments.into_iter().map(OsString::from).collect(),
         candidate_options: vec![],
         work: Work {
@@ -370,7 +371,8 @@ impl MeasuredCase {
 
     fn memory_deferred(&self) -> bool {
         let deferred = self.field("not_measured");
-        deferred.get("heap").is_some() && deferred.get("total_rss").is_some()
+        is_refusal(self.correctness())
+            || (deferred.get("heap").is_some() && deferred.get("total_rss").is_some())
     }
 
     /// A copy of the case's input at `directory`, with the hash its timing recorded.
@@ -529,7 +531,10 @@ fn correctness_and_timing(
     if deferred.truthy() {
         record.push(("not_measured".into(), deferred));
     }
-    if matches!(a.stage, Stage::Parity) || unmeasured.skips(&id, "timing") {
+    if matches!(a.stage, Stage::Parity)
+        || is_refusal(&correctness)
+        || unmeasured.skips(&id, "timing")
+    {
         record.push((
             "runtime".into(),
             Value::object([("status", Value::str("not-measured"))]),
@@ -644,6 +649,9 @@ fn finish_case(
             Value::Bool(pipeline && runtime_gate && heap_gate && rss_gate),
         ),
     ];
+    if is_refusal(&correctness) {
+        verdict.push(("outcome".into(), Value::str("refusal")));
+    }
     if deferred.truthy() {
         verdict.push(("not_measured".into(), deferred));
     }
@@ -677,6 +685,20 @@ struct Prepared {
 impl Prepared {
     fn open_case(&self, id: &str) -> Option<&OpenCase> {
         self.open.iter().find(|entry| entry.id == id)
+    }
+
+    fn summarize_refusals(&self) {
+        let (mut refusals, mut matching) = (0, 0);
+        for case in &self.cases {
+            if is_refusal(case.correctness()) {
+                refusals += 1;
+                matching +=
+                    usize::from(case.correctness().get("pipeline") == Some(&Value::Bool(true)));
+            }
+        }
+        if refusals != 0 {
+            println!("capture: {matching}/{refusals} matching refusals");
+        }
     }
 
     fn parity_failures(&self) -> Vec<String> {
@@ -858,6 +880,7 @@ pub fn run_memory(root: &Path, runs: &[&Options]) -> Vec<Result<(), String>> {
     for (index, a) in runs.iter().enumerate() {
         match prepare(root, a) {
             Ok(prepared) => {
+                prepared.summarize_refusals();
                 measuring.push((index, prepared.parity_failures(), prepared.still_open()));
                 ready.push((*a, prepared));
             }
@@ -886,6 +909,7 @@ pub fn run_memory(root: &Path, runs: &[&Options]) -> Vec<Result<(), String>> {
 
 pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     let prepared = prepare(root, a)?;
+    prepared.summarize_refusals();
     let failing = prepared.parity_failures();
     let still_open = prepared.still_open();
     if matches!(a.stage, Stage::Timing | Stage::Parity) {
@@ -1136,7 +1160,6 @@ const PARITY_PARTS: [&str; 3] = ["conversion", "mux", "encoder"];
 struct OpenCase {
     id: String,
     parts: Vec<String>,
-    refusal: Option<String>,
     quality_only: bool,
 }
 
@@ -1146,14 +1169,11 @@ impl OpenCase {
             && self.parts.iter().any(|name| name == part)
             && (!self.quality_only
                 || correctness.get("encoder_quality_only") == Some(&Value::Bool(true)))
-            && self.refusal.as_ref().is_none_or(|reason| {
-                correctness.get("candidate_valid") == Some(&Value::Bool(true))
-                    && correctness
-                        .get("reference_refusal")
-                        .and_then(Value::as_str)
-                        .is_some_and(|diagnostic| diagnostic.contains(reason))
-            })
     }
+}
+
+fn is_refusal(correctness: &Value) -> bool {
+    correctness.get("outcome").and_then(Value::as_str) == Some("refusal")
 }
 
 /// A listed open comparison leaves all other parts required.
@@ -1162,11 +1182,18 @@ fn failing_parity<'a>(
     correctness: &'a Value,
     open: Option<&'a OpenCase>,
 ) -> impl Iterator<Item = String> + 'a {
-    PARITY_PARTS
-        .into_iter()
+    let refusal = is_refusal(correctness);
+    let parts: &[&str] = if refusal {
+        &["conversion", "matching_refusal"]
+    } else {
+        &PARITY_PARTS
+    };
+    parts
+        .iter()
+        .copied()
         .filter(move |part| {
             let passes = matches!(correctness.get(part), Some(Value::Bool(true)));
-            let exception = open.is_some_and(|entry| entry.admits(part, correctness));
+            let exception = !refusal && open.is_some_and(|entry| entry.admits(part, correctness));
             !(passes || exception)
         })
         .map(move |part| format!("capture: {id}: {part} parity fails"))
@@ -1177,6 +1204,9 @@ fn failing_parity<'a>(
 fn failing_bounds(summary: &[Value]) -> Vec<String> {
     let mut lines = Vec::new();
     for line in summary {
+        if is_refusal(line) {
+            continue;
+        }
         let verdict = |key: &str| line.get(key).is_some_and(Value::truthy);
         let quality_only = line
             .get("correctness")
@@ -1239,16 +1269,6 @@ fn listed_open(contract: &Value, target: &str, ids: &[&str]) -> Result<Vec<OpenC
                 })
                 .collect::<Result<_, _>>()?,
         };
-        let refusal = entry
-            .get("reference_refusal")
-            .map(|value| {
-                value
-                    .as_str()
-                    .filter(|reason| !reason.is_empty())
-                    .map(str::to_owned)
-                    .ok_or_else(|| format!("open case {id}: invalid reference refusal"))
-            })
-            .transpose()?;
         let quality_only = match entry.get("quality_only") {
             None => false,
             Some(Value::Bool(true)) if parts == ["encoder"] => true,
@@ -1262,7 +1282,6 @@ fn listed_open(contract: &Value, target: &str, ids: &[&str]) -> Result<Vec<OpenC
             open.push(OpenCase {
                 id: id.to_owned(),
                 parts,
-                refusal,
                 quality_only,
             });
         }

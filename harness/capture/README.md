@@ -30,7 +30,9 @@ recorded reference results are hash-pinned.
 
 Use `capture qualify --stage parity` to compare the outputs without measuring
 performance. The contract lists bounds awaiting an isolated gate-host run and
-cases where the comparison records a known difference.
+cases where the comparison records a known difference. The registered one-bit
+VBV case compares conversion, both workers' open-time diagnostics and the absence
+of stream output. It counts as a matching refusal when those checks pass.
 
 The gate times and measures memory in separate runs: the same command with
 `--stage timing --out TIMING` under `taskset -c 1`, then with `--stage memory --timing

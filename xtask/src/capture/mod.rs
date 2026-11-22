@@ -166,14 +166,17 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 ],
                 &[],
             )?;
-            compare::run(&compare::Options {
-                candidate: a.required("candidate")?.to_owned(),
-                reference: a.required("reference")?.to_owned(),
-                ffmpeg_bin: a.required("ffmpeg-bin")?.to_owned(),
-                case: a.required("case")?.to_owned(),
-                input: a.required("input")?.to_owned(),
-                out: a.required("out")?.to_owned(),
-            })?;
+            compare::run(
+                root,
+                &compare::Options {
+                    candidate: a.required("candidate")?.to_owned(),
+                    reference: a.required("reference")?.to_owned(),
+                    ffmpeg_bin: a.required("ffmpeg-bin")?.to_owned(),
+                    case: a.required("case")?.to_owned(),
+                    input: a.required("input")?.to_owned(),
+                    out: a.required("out")?.to_owned(),
+                },
+            )?;
         }
         "qualify" => {
             let runs = rest

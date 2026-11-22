@@ -49,14 +49,19 @@ fn row(r: &Value) -> Result<String, String> {
     let rt = get(r, "runtime")?;
     let m = get(r, "memory")?;
     let id = python::str(get(get(r, "case")?, "id")?);
-    if c.get("reference_refusal").is_some() {
+    if c.get("outcome").and_then(Value::as_str) == Some("refusal") {
         let conversion = if c.get("conversion") == Some(&Value::Bool(true)) {
             "pass"
         } else {
             "FAIL"
         };
+        let refusal = if c.get("matching_refusal") == Some(&Value::Bool(true)) {
+            "matching refusal"
+        } else {
+            "FAIL (refusal mismatch)"
+        };
         return Ok(format!(
-            "| {id} | {conversion} | reference refused | reference refused | n/a | n/a | n/a | n/a | n/a | not measured |"
+            "| {id} | {conversion} | n/a | {refusal} | n/a | n/a | n/a | n/a | n/a | not measured |"
         ));
     }
     let heap = m.get("heap_peak_bytes").filter(|h| h.truthy());

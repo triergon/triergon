@@ -21,12 +21,13 @@
 
 use std::fs;
 use std::path::Path;
+use std::time::Duration;
 
 use super::config::{Config, Mux};
 use super::ts::{self, Facts};
 use crate::codecs::correctness::file_sha;
 use crate::json::{self, Value};
-use crate::process::{check_output, run_text};
+use crate::process::{Text, check_output, run_text};
 use crate::{numpy, python};
 
 /// The requested-rate factors of the encoder rule's equal-bits search, as
@@ -199,7 +200,7 @@ fn decode(ffmpeg: &str, path: &str, out: &str) -> Result<(i64, String), String> 
             out,
         ]
         .map(String::from),
-        std::time::Duration::from_secs(u64::MAX / 4),
+        Duration::from_secs(u64::MAX / 4),
     )
     .map_err(|e| format!("{e:?}"))?;
     Ok((done.code, done.stderr))
@@ -347,67 +348,69 @@ fn verify_reference_pin(
     Ok(())
 }
 
-/// Keep the precise reference refusal together with the independently decoded
-/// candidate stream and the conversion verdict.
-fn report_refusal(
-    a: &Options,
-    report: &mut Vec<(String, Value)>,
-    refusal: &str,
-    conversion: bool,
-    frames: i64,
-    expected_sequence: [i64; 4],
-    pmt_pid: u16,
-) -> Result<(), String> {
-    let [width, height, ..] = expected_sequence;
-    let frame_size = (width * height * 3 / 2) as usize;
-    let stream = join(&a.out, "candidate.ts");
-    let output = join(&a.out, "candidate.decoded.yuv");
-    let (code, stderr) = decode(&join(&a.ffmpeg_bin, "ffmpeg"), &stream, &output)?;
-    let facts = ts::parse(&read(&stream)?, pmt_pid)?;
-    let headers = sequence_fields(&facts);
-    let decoded = fs::metadata(output).map_err(|e| e.to_string())?.len() as usize;
-    let valid = code == 0
-        && stderr.is_empty()
-        && decoded == frames as usize * frame_size
-        && facts.pes.len() == frames as usize
-        && !headers.is_empty()
-        && headers.iter().all(|header| *header == expected_sequence)
-        && ts::check_mux(&facts, pmt_pid)?.is_empty();
-    let outcome = Value::object([
-        ("conversion", Value::Bool(conversion)),
-        ("mux", Value::Bool(false)),
-        ("encoder", Value::Bool(false)),
-        ("pipeline", Value::Bool(false)),
-        ("candidate_valid", Value::Bool(valid)),
-        (
-            "candidate_frames",
-            Value::int((decoded / frame_size) as u64),
-        ),
-        ("candidate_decode_exit", Value::int(code)),
-        ("candidate_decode_stderr", Value::str(stderr)),
-        (
-            "candidate_sequence",
-            Value::Array(headers.iter().map(|row| ints(row)).collect()),
-        ),
-        ("reference_refusal", Value::str(refusal)),
-    ]);
-    report.push(("refusal".into(), outcome.clone()));
-    let path = join(&a.out, "report.json");
-    fs::write(
-        &path,
-        json::to_python(&Value::Object(std::mem::take(report)), Some(1)),
+/// A registered refusal must finish with the expected exit and no stream or
+/// stdout. The role-specific stderr is kept in the report.
+fn refusal_result(run: Text, stream_bytes: u64, expected: &Value) -> (Value, bool) {
+    let diagnostic = expected.get("diagnostic").and_then(Value::as_str);
+    let matched = expected
+        .get("exit_code")
+        .is_some_and(|value| python::equals_int(value, run.code.into()))
+        && diagnostic.is_some_and(|line| {
+            run.stderr.lines().any(|actual| {
+                actual == line
+                    || (expected.get("diagnostic_suffix") == Some(&Value::Bool(true))
+                        && actual.ends_with(line))
+            })
+        })
+        && expected
+            .get("last_line")
+            .is_none_or(|last| last.as_str() == run.stderr.lines().last())
+        && run.stdout.is_empty()
+        && stream_bytes == 0;
+    (
+        Value::object([
+            ("exit_code", Value::int(run.code)),
+            ("stdout", Value::str(run.stdout)),
+            ("stderr", Value::str(run.stderr)),
+            ("stream_bytes", Value::int(stream_bytes)),
+        ]),
+        matched,
     )
-    .map_err(|e| format!("{path}: {e}"))?;
-    println!("{}", json::to_python(&outcome, None));
-    Ok(())
 }
 
-pub fn run(a: &Options) -> Result<(), String> {
+fn registered_refusal(root: &Path, case: &Value) -> Result<Option<Value>, String> {
+    let contract = json::read(&root.join("harness/capture/contract.json"))?;
+    let Some(entries) = contract.get("required_refusals") else {
+        return Ok(None);
+    };
+    let mut matching = entries
+        .as_array()
+        .ok_or("required_refusals is not a list")?
+        .iter()
+        .filter(|entry| entry.get("id").is_some() && entry.get("id") == case.get("id"));
+    let Some(entry) = matching.next() else {
+        return Ok(None);
+    };
+    if matching.next().is_some()
+        || entry.get("sha256").is_none()
+        || entry.get("sha256") != case.get("input_sha256")
+        || !json::read(&root.join("harness/capture/cases.json"))?
+            .get("cases")
+            .and_then(Value::as_array)
+            .is_some_and(|cases| cases.contains(case))
+    {
+        return Err("required refusal does not identify exactly one registered case".into());
+    }
+    Ok(Some(entry.clone()))
+}
+
+pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     let case = if Path::new(&a.case).exists() {
         json::read(Path::new(&a.case))?
     } else {
         python::loads(&a.case).ok_or("--case is neither a file nor JSON")?
     };
+    let refusal = registered_refusal(root, &case)?;
     let (w, w_text) = int_field(&case, "width")?;
     let (h, h_text) = int_field(&case, "height")?;
     let (_, flip_text) = int_field(&case, "flip")?;
@@ -453,7 +456,9 @@ pub fn run(a: &Options) -> Result<(), String> {
     ];
     let mut roles = Vec::new();
     let mut outputs = Vec::new();
-    let mut reference_refusal = None;
+    let mut refusal_outputs = Vec::new();
+    let mut reference_refused = false;
+    let mut matching_refusal = true;
     for (role, worker) in [("candidate", &a.candidate), ("reference", &a.reference)] {
         let yuv = join(&a.out, &format!("{role}.convert.yuv"));
         let mut argv = vec![worker.clone(), "convert".into()];
@@ -465,21 +470,27 @@ pub fn run(a: &Options) -> Result<(), String> {
         argv.extend(geometry.iter().cloned());
         argv.extend([rate_text.clone(), a.input.clone(), ts_path.clone()]);
         argv.extend(extra_args.iter().cloned());
-        let out = match check_output(&argv) {
-            Ok(out) => out,
-            Err(error)
-                if role == "reference"
-                    && config.vbv_bits.is_some()
-                    && error.contains("returned non-zero exit status 2.")
-                    && error.contains("VBV buffer too small for bitrate")
-                    && error.lines().last() == Some("reference_capture: avcodec_open2") =>
-            {
-                reference_refusal = Some(error);
-                roles.push((role, yuv, ts_path));
-                break;
+        if let Some(spec) = &refusal {
+            match fs::remove_file(&ts_path) {
+                Ok(()) => (),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+                Err(e) => return Err(format!("{ts_path}: {e}")),
             }
-            Err(error) => return Err(error),
-        };
+            let run = run_text(&argv, Duration::from_secs(30)).map_err(|e| format!("{e:?}"))?;
+            let bytes = match fs::metadata(&ts_path) {
+                Ok(file) => file.len(),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => 0,
+                Err(e) => return Err(format!("{ts_path}: {e}")),
+            };
+            let (result, matched) =
+                refusal_result(run, bytes, spec.get(role).ok_or("missing refusal role")?);
+            matching_refusal &= matched;
+            reference_refused |= role == "reference" && matched;
+            refusal_outputs.push((role.to_owned(), result));
+            roles.push((role, yuv, ts_path));
+            continue;
+        }
+        let out = check_output(&argv)?;
         let result = json::parse(&out).map_err(|e| format!("{role} pipeline output: {e}"))?;
         let bytes = result.get("bytes").and_then(python::int).filter(|&n| n > 0);
         let digest = result
@@ -503,7 +514,12 @@ pub fn run(a: &Options) -> Result<(), String> {
     // Conversion rule.
     let cand = read(&roles[0].1)?;
     let reference = read(&roles[1].1)?;
-    verify_reference_pin(&case, &reference, &roles[1].2, reference_refusal.as_deref())?;
+    let diagnostic = reference_refused
+        .then(|| refusal_outputs[1].1.get("stderr").and_then(Value::as_str))
+        .flatten();
+    if refusal.is_none() || diagnostic.is_some() {
+        verify_reference_pin(&case, &reference, &roles[1].2, diagnostic)?;
+    }
     let mut conv = vec![("bytes_equal".to_owned(), Value::Bool(cand == reference))];
     let (conv_pass, conv_max, conv_exact) = if cand.len() != reference.len() {
         conv.push(("error".into(), Value::str("size")));
@@ -527,17 +543,20 @@ pub fn run(a: &Options) -> Result<(), String> {
     };
     conv.push(("pass".into(), Value::Bool(conv_pass)));
     report.push(("conversion".into(), Value::Object(conv)));
-    if let Some(refusal) = reference_refusal {
-        report.push(("outputs".into(), Value::Object(outputs)));
-        return report_refusal(
-            a,
-            &mut report,
-            &refusal,
-            conv_pass,
-            n,
-            expected_sequence,
-            pmt_pid,
-        );
+    if refusal.is_some() {
+        let outcome = Value::object([
+            ("outcome", Value::str("refusal")),
+            ("conversion", Value::Bool(conv_pass)),
+            ("matching_refusal", Value::Bool(matching_refusal)),
+            ("pipeline", Value::Bool(conv_pass && matching_refusal)),
+            ("refusals", Value::Object(refusal_outputs)),
+        ]);
+        report.push(("refusal".into(), outcome.clone()));
+        let path = join(&a.out, "report.json");
+        fs::write(&path, json::to_python(&Value::Object(report), Some(1)))
+            .map_err(|e| format!("{path}: {e}"))?;
+        println!("{}", json::to_python(&outcome, None));
+        return Ok(());
     }
     // Mux rule.
     let mut mux: Vec<(String, Value)> = Vec::new();
@@ -972,6 +991,38 @@ mod tests {
         assert_eq!(vbv(&[100, 400, 50], 300, 200), 330.0);
         assert_eq!(slice("abcdefghij", 26, Some(-8)), "");
         assert_eq!(slice("abcdefghij", 2, Some(-3)), "cdefg");
+    }
+
+    #[test]
+    fn registered_refusal_requires_the_role_diagnostic_and_empty_output() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let cases = json::read(&root.join("harness/capture/cases.json")).unwrap();
+        let case = cases
+            .get("cases")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case.get("id").and_then(Value::as_str) == Some("c21-vbv-min-16"))
+            .unwrap();
+        let spec = registered_refusal(root, case).unwrap().unwrap();
+        let candidate = spec.get("candidate").unwrap();
+        let reference = spec.get("reference").unwrap();
+        let diagnostic = "capture-worker: unsupported VBV buffer size 1 bits";
+        let reference_diagnostic =
+            "[mpeg1video @ 0x1] VBV buffer too small for bitrate\nreference_capture: avcodec_open2";
+        let run = |code, stdout: &str, stderr: &str| Text {
+            code,
+            stdout: stdout.to_owned(),
+            stderr: stderr.to_owned(),
+        };
+        assert!(refusal_result(run(2, "", diagnostic), 0, candidate).1);
+        assert!(refusal_result(run(2, "", reference_diagnostic), 0, reference).1);
+        assert!(!refusal_result(run(0, "", diagnostic), 0, candidate).1);
+        assert!(!refusal_result(run(2, "", "bad input"), 0, candidate).1);
+        assert!(!refusal_result(run(2, "{}", diagnostic), 0, candidate).1);
+        assert!(!refusal_result(run(2, "", diagnostic), 188, candidate).1);
+        assert!(!refusal_result(run(2, "", diagnostic), 0, reference).1);
     }
 
     #[test]

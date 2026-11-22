@@ -110,16 +110,18 @@
   "required_cases": "harness/capture/cases.json",
   "configuration_cases": "Per case, bitrate sets the average; optional gop, max_rate and vbv_bits override defaults. Parse both sequence headers and check visible size, signalled rate, signalled VBV and I/P cadence. In configured mux cases check the declared IDs, PIDs, names and stream type in PAT, PMT, SDT and PES, and PCR on every picture. FFmpeg receives pcr_period=33 ms and chooses MPEG-1 video stream type 0x02.",
   "configuration_pins": "The RGBA generator produces authored inputs pinned by input_sha256. Reference conversion and TS output are pinned by SHA-256 per recorded target, or by the encoder refusal for the minimum VBV case.",
-  "open_cases": [
-    {"id": "c21-vbv-min-16", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "parts": ["mux", "encoder"], "reference_refusal": "VBV buffer too small for bitrate", "cause": "Both encoders refuse to open with this buffer. The session refuses a VBV buffer below one picture at the average rate, as ISO/IEC 11172-2 Annex C removes every picture whole; FFmpeg refuses the same rate settings. The comparison has no outcome for a candidate refusal yet, so the case stays open."}
+  "required_refusals": [
+    {
+      "id": "c21-vbv-min-16",
+      "sha256": "7faf0251d08325475860b87b92ca91bfe3ea9aa1e1626db8122f49c021935638",
+      "candidate": {"exit_code": 2, "diagnostic": "capture-worker: unsupported VBV buffer size 1 bits"},
+      "reference": {"exit_code": 2, "diagnostic": "VBV buffer too small for bitrate", "diagnostic_suffix": true, "last_line": "reference_capture: avcodec_open2"}
+    }
   ],
   "open_unmeasured": [
     {"bound": "runtime", "cases": ["c16-gop1-16", "c17-gop2-176", "c18-gop12-352", "c19-gop300-176", "c20-max-rate-720", "c22-vbv-16x-1080", "c23-padded-968", "c24-mux-program-42", "c25-mux-program-65535", "c26-vbv-ref-floor-16", "c27-gop12-low-rate"], "cause": "Awaiting paired measurements on isolated gate hosts."},
     {"bound": "heap", "cases": ["c16-gop1-16", "c17-gop2-176", "c18-gop12-352", "c19-gop300-176", "c20-max-rate-720", "c22-vbv-16x-1080", "c23-padded-968", "c24-mux-program-42", "c25-mux-program-65535", "c26-vbv-ref-floor-16", "c27-gop12-low-rate"], "cause": "Awaiting paired measurements on isolated gate hosts."},
-    {"bound": "total_rss", "cases": ["c16-gop1-16", "c17-gop2-176", "c18-gop12-352", "c19-gop300-176", "c20-max-rate-720", "c22-vbv-16x-1080", "c23-padded-968", "c24-mux-program-42", "c25-mux-program-65535", "c26-vbv-ref-floor-16", "c27-gop12-low-rate"], "cause": "Awaiting paired measurements on isolated gate hosts."},
-    {"bound": "runtime", "cases": ["c21-vbv-min-16"], "cause": "FFmpeg refuses encoder open at this buffer size, so there is no equivalent session to measure."},
-    {"bound": "heap", "cases": ["c21-vbv-min-16"], "cause": "FFmpeg refuses encoder open at this buffer size, so there is no equivalent session to measure."},
-    {"bound": "total_rss", "cases": ["c21-vbv-min-16"], "cause": "FFmpeg refuses encoder open at this buffer size, so there is no equivalent session to measure."}
+    {"bound": "total_rss", "cases": ["c16-gop1-16", "c17-gop2-176", "c18-gop12-352", "c19-gop300-176", "c20-max-rate-720", "c22-vbv-16x-1080", "c23-padded-968", "c24-mux-program-42", "c25-mux-program-65535", "c26-vbv-ref-floor-16", "c27-gop12-low-rate"], "cause": "Awaiting paired measurements on isolated gate hosts."}
   ],
   "decisions": {
     "date_utc": "2026-11-02",
