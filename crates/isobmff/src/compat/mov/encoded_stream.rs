@@ -409,13 +409,13 @@ impl<'a> EncodedStreamJob<'a> {
             descriptors_left: limits.max_descriptors,
         })
     }
-    fn inspect_box(&mut self) -> Result<()> {
-        if self.view != DescriptionView::Regular {
-            self.inspected_boxes = self.inspected_boxes.checked_add(1).ok_or(Error::Overflow)?;
-            if self.inspected_boxes > self.limits.max_child_boxes {
+    fn inspect_box(view: DescriptionView, inspected: &mut u32, maximum: u32) -> Result<()> {
+        if view != DescriptionView::Regular {
+            *inspected = inspected.checked_add(1).ok_or(Error::Overflow)?;
+            if *inspected > maximum {
                 return Err(Error::Limit {
-                    requested: self.inspected_boxes as usize,
-                    maximum: self.limits.max_child_boxes as usize,
+                    requested: *inspected as usize,
+                    maximum: maximum as usize,
                 });
             }
         }
@@ -542,22 +542,17 @@ impl<'a> EncodedStreamJob<'a> {
             if work.remaining() == 0 {
                 return Ok(CursorStatus::Yield);
             }
-            let wave_step = if let Some(children) =
-                self.wave_fields.as_mut().and_then(|w| w.children.as_mut())
+            if let Some(w) = &mut self.wave_fields
+                && let Some(children) = &mut w.children
             {
-                Some(children.poll(work)?)
-            } else {
-                None
-            };
-            if let Some(step) = wave_step {
-                match step {
+                match children.poll(work)? {
                     Next::Yield => return Ok(CursorStatus::Yield),
                     Next::Item(raw) => {
-                        self.inspect_box()?;
-                        let w = self
-                            .wave_fields
-                            .as_mut()
-                            .ok_or(Error::Invalid("wave state absent"))?;
+                        Self::inspect_box(
+                            self.view,
+                            &mut self.inspected_boxes,
+                            self.limits.max_child_boxes,
+                        )?;
                         let ordinal = if let Some(report) = &mut self.wave_source {
                             report.child_count =
                                 report.child_count.checked_add(1).ok_or(Error::Overflow)?;
@@ -647,10 +642,6 @@ impl<'a> EncodedStreamJob<'a> {
                         }
                     }
                     Next::End => {
-                        let w = self
-                            .wave_fields
-                            .as_mut()
-                            .ok_or(Error::Invalid("wave state absent"))?;
                         if w.terminator.is_none()
                             || (self.sound_source.is_some()
                                 && (w.format.is_none() || w.marker.is_none()))
@@ -671,7 +662,11 @@ impl<'a> EncodedStreamJob<'a> {
                 match children.poll(work)? {
                     Next::Yield => return Ok(CursorStatus::Yield),
                     Next::Item(raw) => {
-                        self.inspect_box()?;
+                        Self::inspect_box(
+                            self.view,
+                            &mut self.inspected_boxes,
+                            self.limits.max_child_boxes,
+                        )?;
                         if raw.header().kind == *b"wave" && self.requires_wave {
                             if self.wave_fields.is_some() {
                                 return Err(Error::Invalid("encoded duplicate wave context"));
