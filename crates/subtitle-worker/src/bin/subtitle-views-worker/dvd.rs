@@ -74,15 +74,12 @@ fn index_view(records: &mut Records<'_, '_>, input: &[u8], sub: &[u8]) -> Result
         .map(|track| index.entries(track).peekable())
         .collect();
     // Present the earliest queue head while preserving file order within a track.
-    loop {
-        let Some((track, _)) = queues
-            .iter_mut()
-            .enumerate()
-            .filter_map(|(track, entries)| Some((track, entries.peek()?.milliseconds)))
-            .min_by_key(|&(_, pts)| pts)
-        else {
-            break;
-        };
+    while let Some((track, _)) = queues
+        .iter_mut()
+        .enumerate()
+        .filter_map(|(track, entries)| Some((track, entries.peek()?.milliseconds)))
+        .min_by_key(|&(_, pts)| pts)
+    {
         let entry = queues[track].next().ok_or("missing index entry")?;
         let pos = entry.filepos;
         let Some(data) = usize::try_from(pos).ok().and_then(|at| sub.get(at..)) else {
