@@ -170,10 +170,6 @@ impl Lane {
         build
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "moving the build out of its slot to publish measured +0.35 to +0.72% more instructions"
-    )]
     fn probe_picture(
         &mut self,
         range: Range<u64>,
@@ -183,7 +179,9 @@ impl Lane {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<LaneStep> {
-        let build = self.build.as_mut().expect("pending picture");
+        let Some(build) = self.build.as_mut() else {
+            return Err(Error::Invalid("MPEG-TS AU has no source extent"));
+        };
         let pieces = self.pieces.as_slice();
         // Track the same source extent and anchor as a delivered packet without
         // retaining PES owners or computing decode times for discarded pictures.
