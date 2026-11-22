@@ -851,7 +851,7 @@ pub fn tables(root: &Path, write: bool) -> Result<String, String> {
         .iter()
         .filter_map(|set| Some((text(set, "name")?, set)))
         .collect();
-    let document = json::read(&root.join(ROWS)).map_err(|e| format!("{ROWS}: {e}"))?;
+    let document = json::read(&root.join(ROWS))?;
     let rows = Rows::parse(&document).map_err(|errors| errors.join("\n"))?;
     let page = fs::read_to_string(root.join(PAGE)).map_err(|e| format!("{PAGE}: {e}"))?;
     let page = add_rows(&rows, &page)?;

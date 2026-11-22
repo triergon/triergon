@@ -108,7 +108,7 @@ fn another_compiler_is_refused() {
 fn a_compiler_ahead_on_the_search_path_is_seen() {
     let directory = scratch("path");
     let fake = directory.join("rustc");
-    crate::walk::write_script(
+    crate::files::write_script(
         &fake,
         "#!/bin/sh\necho rustc 1.101.0-nightly\necho release: 1.101.0-nightly\n",
     );

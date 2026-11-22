@@ -136,7 +136,7 @@ fn detects_unsafe_syntax_only_at_word_starts() {
 
 #[test]
 fn design_names_each_contract_with_an_invalid_timeout() {
-    let root = walk::scratch("contract-fields");
+    let root = files::scratch("contract-fields");
     for (id, contract) in [
         ("absent", r#"{"id": "absent"}"#),
         ("long", r#"{"id": "long", "timeout_seconds": 120}"#),
@@ -156,7 +156,7 @@ fn design_names_each_contract_with_an_invalid_timeout() {
 
 #[test]
 fn reports_missing_links_outside_build_output() {
-    let root = walk::scratch("links");
+    let root = files::scratch("links");
     fs::create_dir_all(root.join("docs")).unwrap();
     fs::create_dir_all(root.join("target")).unwrap();
     fs::write(
@@ -172,7 +172,7 @@ fn reports_missing_links_outside_build_output() {
 
 #[test]
 fn link_components_must_match_case_exactly() {
-    let root = walk::scratch("links-case");
+    let root = files::scratch("links-case");
     fs::create_dir_all(root.join("docs/Sub")).unwrap();
     fs::write(root.join("docs/Sub/Note.md"), "").unwrap();
     fs::write(root.join("README.md"), "").unwrap();
@@ -194,7 +194,7 @@ fn link_components_must_match_case_exactly() {
 
 #[test]
 fn design_reports_invalid_json_and_gate_changes() {
-    let root = walk::scratch("design");
+    let root = files::scratch("design");
     fs::create_dir_all(root.join("harness/sub")).unwrap();
     fs::create_dir_all(root.join("harness/fate")).unwrap();
     fs::create_dir_all(root.join("harness/features")).unwrap();
@@ -307,7 +307,7 @@ fn stated_policy(root: &Path) {
 
 #[test]
 fn the_runtime_ceiling_is_stated_once_and_bounds_every_status_row() {
-    let root = walk::scratch("ceiling");
+    let root = files::scratch("ceiling");
     fs::create_dir_all(root.join("harness")).unwrap();
     fs::write(
         root.join("harness/policy.json"),

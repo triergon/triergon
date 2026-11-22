@@ -7,6 +7,7 @@ use crate::{harness, json, prepare, process, python, sha256};
 use json::Value;
 
 use super::correctness::{Rules, channel_stats};
+use crate::files::read;
 
 const OPERATION: &str = "audio-aac-access-units";
 const COMPAT_OPERATION: &str = "audio-aac-access-units-compat";
@@ -32,14 +33,6 @@ fn number(object: &Value, key: &str) -> Result<u32, String> {
         .and_then(python::int)
         .and_then(|n| u32::try_from(n).ok())
         .ok_or_else(|| format!("invalid {key}"))
-}
-
-fn read(path: &Path) -> Result<Vec<u8>, String> {
-    fs::read(path).map_err(|error| format!("{}: {error}", path.display()))
-}
-
-fn file_sha(path: &Path) -> Result<String, String> {
-    sha256::file_hex(path).map_err(|error| format!("{}: {error}", path.display()))
 }
 
 struct Comparison {
@@ -82,9 +75,9 @@ impl Comparison {
             ),
         };
         let ffprobe = root.join(".research/reference-decode").join(FFPROBE);
-        let candidate_sha = file_sha(&candidate)?;
-        let reference_sha = file_sha(&reference)?;
-        let probe_sha = file_sha(&ffprobe)?;
+        let candidate_sha = crate::files::sha256(&candidate)?;
+        let reference_sha = crate::files::sha256(&reference)?;
+        let probe_sha = crate::files::sha256(&ffprobe)?;
         if candidate_sha != string(candidate_record, "sha256")?
             || reference_sha != string(&reference_record, "sha256")?
             || probe_sha
@@ -101,9 +94,12 @@ impl Comparison {
             ("ffprobe_sha256", Value::str(probe_sha)),
             (
                 "numeric_rules_sha256",
-                Value::str(file_sha(&root.join(NUMERIC_RULES))?),
+                Value::str(crate::files::sha256(&root.join(NUMERIC_RULES))?),
             ),
-            ("contract_sha256", Value::str(file_sha(&contract_path)?)),
+            (
+                "contract_sha256",
+                Value::str(crate::files::sha256(&contract_path)?),
+            ),
         ]);
         Ok(Self {
             candidate,
@@ -161,7 +157,7 @@ pub(super) fn measurement_parity(
     let parity = json::parse(std::str::from_utf8(&bytes).map_err(|error| error.to_string())?)
         .map_err(|error| format!("{}: {error}", parity_path.display()))?;
     if parity.get("comparison") != Some(&comparison.binding)
-        || string(&parity, "workloads_sha256")? != file_sha(workload_path)?
+        || string(&parity, "workloads_sha256")? != crate::files::sha256(workload_path)?
     {
         return Err("AAC parity inputs, tools or rules changed".into());
     }
@@ -429,7 +425,7 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
         };
         let (candidate_row, candidate_pcm) = raw(&comparison.candidate, "candidate")?;
         let (reference_row, reference_pcm) = raw(&comparison.reference, "reference")?;
-        if file_sha(&input_path)? != input_sha {
+        if crate::files::sha256(&input_path)? != input_sha {
             return Err(format!("{id}: AAC input changed during parity"));
         }
         let (layout, surround_pair_labels) = compare_speakers(
@@ -475,7 +471,10 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
     json::write(&workload_path, &workloads)?;
     let parity = Value::object([
         ("comparison", comparison.binding),
-        ("workloads_sha256", Value::str(file_sha(&workload_path)?)),
+        (
+            "workloads_sha256",
+            Value::str(crate::files::sha256(&workload_path)?),
+        ),
         ("cases", Value::Array(results)),
     ]);
     json::write(&out.join(PARITY_FILE), &parity)?;

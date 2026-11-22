@@ -1287,7 +1287,7 @@ impl super::memory::Host for FakeHost {
             &mut raw,
             &[],
             "instrument_sha256",
-            Value::str(linux::file_sha(&self.root.join("allocations.so")).unwrap()),
+            Value::str(crate::files::sha256(&self.root.join("allocations.so")).unwrap()),
         );
         set(&mut raw, &["work"], "expected_peak_bytes", peak);
         if self.corrupt && case == "guard-munmap-failure" {
@@ -1358,7 +1358,7 @@ impl super::memory::Host for FakeHost {
 
 #[test]
 fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
-    let dir = crate::walk::scratch("qualification");
+    let dir = crate::files::scratch("qualification");
     let harness = dir.join("target/harness");
     std::fs::create_dir_all(&harness).unwrap();
     for name in [
@@ -1387,7 +1387,7 @@ fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
             ("realpath", Value::str(path(name))),
             (
                 "sha256",
-                Value::str(linux::file_sha(std::path::Path::new(&path(name))).unwrap()),
+                Value::str(crate::files::sha256(std::path::Path::new(&path(name))).unwrap()),
             ),
         ])
     };
@@ -1410,7 +1410,7 @@ fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
                 (
                     "interpreter_sha256",
                     Value::str(
-                        linux::file_sha(std::path::Path::new(&path("ld-linux-aarch64.so.1")))
+                        crate::files::sha256(std::path::Path::new(&path("ld-linux-aarch64.so.1")))
                             .unwrap(),
                     ),
                 ),
@@ -1421,7 +1421,9 @@ fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
                         ("path", Value::str(path(file))),
                         (
                             "sha256",
-                            Value::str(linux::file_sha(std::path::Path::new(&path(file))).unwrap()),
+                            Value::str(
+                                crate::files::sha256(std::path::Path::new(&path(file))).unwrap(),
+                            ),
                         ),
                     ]),
                 ),
@@ -1496,7 +1498,7 @@ fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
 #[test]
 fn a_shared_object_resolves_with_the_given_interpreter() {
     use std::process::Command;
-    let dir = crate::walk::scratch("linked-object");
+    let dir = crate::files::scratch("linked-object");
     let source = dir.join("observer.c");
     // Like the observer, it links libc, so the loader lists a real closure.
     std::fs::write(
@@ -1537,7 +1539,7 @@ fn a_shared_object_resolves_with_the_given_interpreter() {
 #[test]
 fn the_built_observer_counts_every_hook_and_operator_new_form() {
     use std::process::Command;
-    let dir = crate::walk::scratch("observer-probe");
+    let dir = crate::files::scratch("observer-probe");
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap();

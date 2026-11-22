@@ -457,7 +457,7 @@ mod tests {
             .parent()
             .unwrap()
             .to_path_buf();
-        let out = crate::walk::scratch("dts-hd-controls");
+        let out = crate::files::scratch("dts-hd-controls");
         super::generate(
             &crate::corpus::Paths {
                 root,

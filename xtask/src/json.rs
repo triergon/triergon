@@ -433,10 +433,10 @@ impl fmt::Display for Error {
     }
 }
 
-/// The JSON document in the file at `path`.
+/// The JSON document in the file at `path`; an error names the file.
 pub fn read(path: &std::path::Path) -> Result<Value, String> {
-    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    parse(&text).map_err(|e| e.to_string())
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    parse(&text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Writes `value` to `path` indented by two spaces as Python's `json.dump` does, with a

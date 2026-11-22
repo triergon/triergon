@@ -7,7 +7,8 @@ use std::process::Command;
 use crate::json::Value;
 use crate::{sha256, test_skips};
 
-use super::{R, git, owned, status};
+use super::{R, owned, status};
+use crate::process::git;
 
 /// The test inputs outside the repository that crate tests read when present.
 const TEST_INPUTS: [&str; 4] = [

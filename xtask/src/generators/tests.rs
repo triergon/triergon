@@ -60,7 +60,7 @@ fn compare_selects_features_by_their_contracts_gate() {
 #[test]
 fn a_feature_takes_its_cases_and_pins_from_cases_from() {
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-    let root = crate::walk::scratch("generator-cases-from");
+    let root = crate::files::scratch("generator-cases-from");
     let features = root.join("harness/features");
     std::fs::create_dir_all(features.join("font-outlines")).unwrap();
     std::fs::create_dir_all(features.join("font-hinting-none")).unwrap();
@@ -130,7 +130,7 @@ fn a_feature_takes_its_cases_and_pins_from_cases_from() {
 #[test]
 fn a_contract_without_a_known_gate_fails_the_check() {
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-    let root = crate::walk::scratch("generator-gate");
+    let root = crate::files::scratch("generator-gate");
     let feature = root.join("harness/features/font-outlines");
     std::fs::create_dir_all(&feature).unwrap();
     std::fs::create_dir_all(root.join("harness/fonts")).unwrap();
@@ -173,7 +173,7 @@ fn alternate_references_get_their_own_pin_note() {
 
 #[test]
 fn recording_resolves_each_reference_before_writing_any_pins() {
-    let root = crate::walk::scratch("generator-reference-selection");
+    let root = crate::files::scratch("generator-reference-selection");
     let features = root.join("harness/features");
     for (feature, reference) in [("font-one", "reference-one"), ("font-two", "reference-two")] {
         let directory = features.join(feature);

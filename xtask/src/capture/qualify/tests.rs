@@ -101,7 +101,7 @@ fn warmups(candidate_digest: u64) -> Value {
 
 #[test]
 fn a_memory_run_reads_only_the_cases_its_timing_run_recorded() {
-    let dir = crate::walk::scratch("capture-timing-records");
+    let dir = crate::files::scratch("capture-timing-records");
     let input = dir.join("noise-64x48-2.rgba");
     fs::create_dir_all(dir.join("timing/noise")).unwrap();
     fs::write(&input, b"pixels").unwrap();
@@ -112,7 +112,10 @@ fn a_memory_run_reads_only_the_cases_its_timing_run_recorded() {
     let record = Value::object([
         ("case", case.clone()),
         ("input", Value::str(python::path(&input))),
-        ("input_sha256", Value::str(file_sha(&input).unwrap())),
+        (
+            "input_sha256",
+            Value::str(crate::files::sha256(&input).unwrap()),
+        ),
         (
             "correctness_summary",
             Value::object([("pipeline", Value::Bool(true))]),
@@ -154,7 +157,7 @@ fn a_memory_run_reads_only_the_cases_its_timing_run_recorded() {
 #[test]
 fn a_memory_run_measures_the_cases_of_a_reused_timing_run() {
     use crate::harness::reuse;
-    let root = crate::walk::scratch("capture-reused-timing");
+    let root = crate::files::scratch("capture-reused-timing");
     let case =
         json::parse(r#"{"id": "c01", "content": "noise", "width": 64, "height": 48, "frames": 2}"#)
             .unwrap();
@@ -191,7 +194,10 @@ fn a_memory_run_measures_the_cases_of_a_reused_timing_run() {
     let record = Value::object([
         ("case", case.clone()),
         ("input", Value::str(python::path(&timed))),
-        ("input_sha256", Value::str(file_sha(&timed).unwrap())),
+        (
+            "input_sha256",
+            Value::str(crate::files::sha256(&timed).unwrap()),
+        ),
         (
             "correctness_summary",
             Value::object([("pipeline", Value::Bool(true))]),
@@ -216,7 +222,7 @@ fn a_memory_run_measures_the_cases_of_a_reused_timing_run() {
     // That run's outputs, packed, kept and in this host's cache.
     let pack = root.join("pack.tar.gz");
     crate::evidence::pack_command(&earlier.join("run"), &pack).unwrap();
-    let sha = file_sha(&pack).unwrap();
+    let sha = crate::files::sha256(&pack).unwrap();
     let cache = root.join(".research/evidence-cache");
     fs::create_dir_all(&cache).unwrap();
     fs::rename(&pack, cache.join(format!("{sha}.tar.gz"))).unwrap();

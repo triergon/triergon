@@ -260,7 +260,7 @@ mod tests {
     use super::*;
 
     fn inventory_of(definition: &str) -> Value {
-        let root = crate::walk::scratch("fate");
+        let root = crate::files::scratch("fate");
         fs::create_dir_all(root.join("tests/fate")).unwrap();
         fs::write(root.join("tests/fate/authored.mak"), definition).unwrap();
         let report = inventory(&root).unwrap();

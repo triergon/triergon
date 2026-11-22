@@ -87,27 +87,6 @@ pub fn written(root: &Path, path: &Path) -> Option<R<Value>> {
     })
 }
 
-/// The generator for a `cargo xtask` command.
-pub fn named(command: &str) -> Option<&'static Generator> {
-    GENERATORS
-        .into_iter()
-        .find(|generator| generator.command == command)
-}
-
-/// Views commands verify or record pins in checked-in corpus manifests.
-pub fn views(command: &str, root: &Path, args: &[String]) -> Option<R<()>> {
-    let run = match command {
-        "codec-views" => crate::codec_views::main,
-        "matroska-views" => crate::matroska_views::main,
-        "play-views" => crate::play_views::main,
-        "playback-views" => crate::playback_views::main,
-        "subtitle-views" => crate::subtitle_views::main,
-        "transport-views" => crate::transport_views::main,
-        _ => return None,
-    };
-    Some(run(root, args))
-}
-
 fn pins_path(root: &Path, id: &str) -> PathBuf {
     root.join("harness/features").join(id).join("pins.json")
 }
@@ -118,8 +97,7 @@ fn contract_path(root: &Path, id: &str) -> PathBuf {
 
 /// The contract of feature `id`.
 fn contract(root: &Path, id: &str) -> R<Value> {
-    let path = contract_path(root, id);
-    json::read(&path).map_err(|e| format!("{}: {e}", path.display()))
+    json::read(&contract_path(root, id))
 }
 
 fn required_gate(root: &Path, id: &str) -> R<Gate> {
@@ -136,7 +114,7 @@ fn reference_name<'a>(document: &'a Value, feature: &str) -> R<&'a str> {
 /// The pins of `id`: case id to expected work.
 fn pins(root: &Path, id: &str) -> R<Vec<(String, Value)>> {
     let path = pins_path(root, id);
-    let document = json::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let document = json::read(&path)?;
     let contract = contract(root, id)?;
     if document.get("reference").and_then(Value::as_str) != Some(reference_name(&contract, id)?) {
         return Err(format!(
@@ -272,18 +250,14 @@ impl Generator {
     /// The pin file holding `pins` in case order.
     fn pin_file(&self, reference: &str, document: &Value, pins: Vec<(String, Value)>) -> Value {
         let (original_reference, original_note) = self.pin_note;
-        let note = document
-            .get("pin_note")
-            .and_then(Value::as_str)
-            .map_or_else(|| {                if reference == original_reference {
-                    original_note.to_owned()
-                } else {
-                    format!(
-                        "Folds recorded with {reference} by `cargo xtask {} manifest --record`.",
-                        self.command
-                    )
-                }
-            }, str::to_owned);
+        let note = match document.get("pin_note").and_then(Value::as_str) {
+            Some(note) => note.to_owned(),
+            None if reference == original_reference => original_note.to_owned(),
+            None => format!(
+                "Folds recorded with {reference} by `cargo xtask {} manifest --record`.",
+                self.command
+            ),
+        };
         Value::object([
             ("schema", Value::int(1)),
             ("reference", Value::str(reference)),

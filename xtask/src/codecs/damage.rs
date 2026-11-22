@@ -7,7 +7,7 @@ use crate::json::{self, Value};
 use crate::process::{Stop, run_text};
 use crate::python;
 
-use super::correctness::{PROBE_TIMEOUT, RUN_TIMEOUT, file_sha};
+use super::correctness::{PROBE_TIMEOUT, RUN_TIMEOUT};
 
 pub(super) const CRC: &str = "harness/codecs/crc-damage.json";
 pub(super) const PACKED: &str = "harness/codecs/packed-dts.json";
@@ -104,7 +104,7 @@ fn pinned_source(
     pin: &str,
 ) -> Result<std::path::PathBuf, String> {
     let source = root.join(field(vector, key)?);
-    if file_sha(&source)? != field(vector, pin)? {
+    if crate::files::sha256(&source)? != field(vector, pin)? {
         return Err(format!("{}: source SHA-256 mismatch", source.display()));
     }
     Ok(source)
@@ -225,7 +225,7 @@ pub(super) fn record(
             Stop::Timeout(argv) => format!("generator timed out: {argv:?}"),
             Stop::Fatal(message) => message,
         })?;
-        let pin = file_sha(&output)?;
+        let pin = crate::files::sha256(&output)?;
         fs::remove_file(&output).map_err(|e| e.to_string())?;
         let Value::Object(fields) = vector else {
             return Err("expected variant vector".into());

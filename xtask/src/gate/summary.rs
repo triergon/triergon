@@ -50,8 +50,7 @@ pub(super) fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i3
     let mut records_by_shard = Vec::new();
     let mut identities: Vec<(String, String)> = Vec::new();
     for directory in directories {
-        let shard = json::read(&directory.join(SHARD))
-            .map_err(|e| format!("{}: {e}", directory.join(SHARD).display()))?;
+        let shard = json::read(&directory.join(SHARD))?;
         let mut records = Vec::new();
         if let Ok(entries) = fs::read_dir(directory.join("steps")) {
             // Step records only: no other file, and no file a copying tool adds.

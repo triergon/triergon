@@ -374,10 +374,6 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             };
             test(root, &output, profile, options.full)
         }
-        "--help" | "-h" => {
-            println!("{USAGE}");
-            Ok(0)
-        }
         _ => Err(USAGE.into()),
     }
 }
@@ -387,16 +383,4 @@ fn status(command: &mut Command) -> R<i32> {
         .status()
         .map(|s| s.code().unwrap_or(1))
         .map_err(|e| format!("{command:?}: {e}"))
-}
-
-fn git(root: &Path, args: &[&str]) -> R<String> {
-    let out = Command::new("git")
-        .args(args)
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("git: {e}"))?;
-    if !out.status.success() {
-        return Err(format!("git {}: {}", args.join(" "), out.status));
-    }
-    Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
 }

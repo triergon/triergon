@@ -174,10 +174,6 @@ fn record_additional(root: &Path, replace: bool) -> Result<(), String> {
 
 /// Run the full packet-framing contract without a separate measurement engine.
 pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
-    if args == ["--help"] {
-        println!("{USAGE}");
-        return Ok(0);
-    }
     if args.first().is_some_and(|s| s == "manifest") {
         let replace = match args {
             [_, record] if record == "--record" => false,

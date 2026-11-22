@@ -582,12 +582,6 @@ fn early_stop(values: &[(f64, f64)], pairs: Pairs) -> Option<stats::Interval> {
     .flatten()
 }
 
-fn digest(path: &Path) -> Result<String, String> {
-    Ok(crate::sha256::hex(
-        &fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?,
-    ))
-}
-
 fn status_only(
     status: &str,
     samples: &[Value],
@@ -866,9 +860,9 @@ fn benchmark_once(
     }
     let hashes: Vec<(&str, String)> = workers
         .iter()
-        .map(|(n, w)| Ok((*n, digest(w)?)))
+        .map(|(n, w)| Ok((*n, crate::files::sha256(w)?)))
         .collect::<Result<_, String>>()?;
-    let input_sha = match digest(input) {
+    let input_sha = match crate::files::sha256(input) {
         Ok(hash) => hash,
         Err(error) => {
             return Ok(status_only(
@@ -989,7 +983,7 @@ fn benchmark_once(
             vec![("contaminants", Value::strings(busy))],
         ));
     }
-    let input_after = match digest(input) {
+    let input_after = match crate::files::sha256(input) {
         Ok(hash) => hash,
         Err(error) => {
             return Ok(status_only(
@@ -1005,7 +999,7 @@ fn benchmark_once(
         .into_iter()
         .chain(workers.iter().map(|(_, w)| w.as_path()))
         .zip(hashes.iter().chain(&hashes))
-        .all(|(w, (_, h))| digest(w).is_ok_and(|d| &d == h))
+        .all(|(w, (_, h))| crate::files::sha256(w).is_ok_and(|d| &d == h))
         && input_after == input_sha;
     if !unchanged {
         return Ok(status_only(
@@ -1391,14 +1385,14 @@ impl Lock {
         let interval = match record.get("status").and_then(Value::as_str) {
             Some("measured") => {
                 let hashes = Value::object([
-                    ("candidate", Value::str(digest(candidate)?)),
-                    ("reference", Value::str(digest(reference)?)),
+                    ("candidate", Value::str(crate::files::sha256(candidate)?)),
+                    ("reference", Value::str(crate::files::sha256(reference)?)),
                 ]);
                 validate(
                     &record,
                     &Expected {
                         worker_hashes: &hashes,
-                        input_sha256: Some(&Value::str(digest(input)?)),
+                        input_sha256: Some(&Value::str(crate::files::sha256(input)?)),
                         minimum_pairs: pairs.planned as i128,
                         work: &operation.work,
                         require_linux: is_linux(),

@@ -751,7 +751,7 @@ mod tests {
 
     #[test]
     fn strict_video_summary_requires_the_registered_result() {
-        let dir = crate::walk::scratch("summary-video");
+        let dir = crate::files::scratch("summary-video");
         fs::create_dir_all(&dir).unwrap();
         let run = dir.join("run.jsonl");
         let out = dir.join("summary.json");

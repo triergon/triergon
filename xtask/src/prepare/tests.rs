@@ -59,7 +59,7 @@ fn capture_profiles_differ_only_in_size_optimization() {
 
 #[test]
 fn verifies_the_unpacked_tree_against_the_archive() {
-    let dir = crate::walk::scratch("tree");
+    let dir = crate::files::scratch("tree");
     fs::create_dir_all(dir.join("src")).unwrap();
     fs::write(dir.join("src/a.c"), b"int a;").unwrap();
     let mut header = vec![0u8; 512];

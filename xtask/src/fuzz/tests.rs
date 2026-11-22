@@ -166,8 +166,8 @@ fn replay_rejects_edits_outside_the_current_input() {
     let recipe = |edits: &str, result: &[u8]| {
         json::parse(&format!(
             r#"{{"schema": 1, "seed_sha256": "{}", "edits": {edits}, "result_sha256": "{}"}}"#,
-            digest_bytes(&seed),
-            digest_bytes(result)
+            sha256::hex(&seed),
+            sha256::hex(result)
         ))
         .unwrap()
     };
@@ -244,7 +244,7 @@ fn booleans_never_equal_numbers_and_long_decimals_stay_exact() {
 #[cfg(unix)]
 #[test]
 fn a_finished_worker_leaves_no_descendants_behind() {
-    let dir = crate::walk::scratch("fuzz-group");
+    let dir = crate::files::scratch("fuzz-group");
     let marker = dir.join("child.pid");
     let script = format!(
         "sleep 30 >/dev/null 2>&1 & echo $! > {}; printf '{{}}'",
@@ -280,7 +280,7 @@ fn labels_are_bounded_lowercase_identifiers() {
 #[cfg(unix)]
 #[test]
 fn a_campaign_keeps_raw_streams_and_flags_input_tampering() {
-    let root = crate::walk::scratch("fuzz-campaign");
+    let root = crate::files::scratch("fuzz-campaign");
     fs::create_dir_all(root.join(".research")).unwrap();
     fs::create_dir_all(root.join("xtask/src/harness")).unwrap();
     for file in [
@@ -293,14 +293,14 @@ fn a_campaign_keeps_raw_streams_and_flags_input_tampering() {
     }
     let worker = |name: &str, body: &str| {
         let path = root.join(name);
-        crate::walk::write_script(&path, &format!("#!/bin/sh\n{body}\n"));
+        crate::files::write_script(&path, &format!("#!/bin/sh\n{body}\n"));
         path
     };
     let candidate = worker("candidate", "printf '{\"n\": 1.50}'");
     let reference = worker("reference", "printf '{\"n\": 1.5}'");
     let tamper = worker("tamper", "printf x >> \"$2\"; printf '{\"n\": 1.5}'");
     fs::write(root.join("seed.bin"), b"seed bytes").unwrap();
-    let sha = |p: &Path| digest_bytes(&fs::read(p).unwrap());
+    let sha = |p: &Path| sha256::hex(&fs::read(p).unwrap());
     let manifest = |comparator: &Path| {
         format!(
             r#"{{"schema": 1, "workers": {{"candidate": {{"path": "{}", "sha256": "{}"}}, "reference": {{"path": "{}", "sha256": "{}"}}}},
@@ -367,7 +367,7 @@ fn a_campaign_keeps_raw_streams_and_flags_input_tampering() {
 #[cfg(unix)]
 #[test]
 fn seed_arguments_fill_the_arguments_slot_and_hangs_time_out() {
-    let root = crate::walk::scratch("fuzz-arguments");
+    let root = crate::files::scratch("fuzz-arguments");
     fs::create_dir_all(root.join(".research")).unwrap();
     fs::create_dir_all(root.join("xtask/src/harness")).unwrap();
     for file in [
@@ -380,7 +380,7 @@ fn seed_arguments_fill_the_arguments_slot_and_hangs_time_out() {
     }
     let worker = |name: &str, body: &str| {
         let path = root.join(name);
-        crate::walk::write_script(&path, &format!("#!/bin/sh\n{body}\n"));
+        crate::files::write_script(&path, &format!("#!/bin/sh\n{body}\n"));
         path
     };
     // `fold INPUT ARGUMENTS...`: echo the arguments; a mutated input hangs.
@@ -390,7 +390,7 @@ fn seed_arguments_fill_the_arguments_slot_and_hangs_time_out() {
         root.join("seed.bin").display()
     );
     let (candidate, debug) = (worker("candidate", &body), worker("debug", &body));
-    let sha = |p: &Path| digest_bytes(&fs::read(p).unwrap());
+    let sha = |p: &Path| sha256::hex(&fs::read(p).unwrap());
     let manifest = format!(
         r#"{{"schema": 1, "workers": {{"candidate": {{"path": "{}", "sha256": "{}"}}, "debug": {{"path": "{}", "sha256": "{}"}}}},
             "source_files": {{"seed.bin": "{}"}},

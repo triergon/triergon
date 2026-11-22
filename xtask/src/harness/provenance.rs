@@ -20,6 +20,7 @@ pub fn shared_inputs(root: &Path) -> Result<Vec<String>, String> {
         "harness/fate/index.json",
         "harness/oracles.py",
         "xtask/src/corpus.rs",
+        "xtask/src/files.rs",
         "xtask/src/harness/acceptance.rs",
         "xtask/src/harness/build.rs",
         "xtask/src/harness/comparison.rs",
@@ -468,7 +469,7 @@ pub fn source_identity_error(root: &Path, identity: &Value) -> Option<String> {
             Some(1.0) => {
                 // Historical collections keep the original whole-workspace rule.
                 let mut sources = Vec::new();
-                for path in crate::walk::files(&root.join("crates"), &|rel| {
+                for path in crate::files::walk(&root.join("crates"), &|rel| {
                     rel.extension().is_some_and(|e| e == "rs")
                         && rel
                             .parent()

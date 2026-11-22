@@ -57,7 +57,7 @@ pub fn set(root: &Path, name: &str) -> Result<Value, String> {
     if !root.join(&path).is_file() {
         return Err(format!("{name} is not in the evidence index ({path})"));
     }
-    let set = json::read(&root.join(&path)).map_err(|e| format!("{path}: {e}"))?;
+    let set = json::read(&root.join(&path))?;
     if s(&set, "name") != Some(name) {
         return Err(format!("{path} does not hold set {name}"));
     }

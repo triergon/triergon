@@ -528,7 +528,7 @@ fn observe(
                 ("stderr", Value::str(String::from_utf8_lossy(&stderr))),
             ]));
         };
-        let sha = linux::file_sha(library)?;
+        let sha = crate::files::sha256(library)?;
         if !matches!(output, Value::Object(_)) {
             return Ok(obj(vec![
                 ("status", Value::str("observer-invalid")),
@@ -587,10 +587,6 @@ fn observe(
         ));
     }
     observation
-}
-
-fn file_sha(path: &Path) -> R<String> {
-    linux::file_sha(path)
 }
 
 fn probe_errors(heap: &Value, rss: &Value, errors: &mut Vec<String>, linux: bool) {
@@ -711,7 +707,7 @@ fn darwin_qualification(host: &dyn Host, root: &Path, candidate: &Path, referenc
             )),
         }
     }
-    let mut recorded = |path: &Path| match file_sha(path) {
+    let mut recorded = |path: &Path| match crate::files::sha256(path) {
         Ok(sha) => Value::str(sha),
         Err(error) => {
             errors.push(format!("{}: identity unavailable: {error}", path.display()));
@@ -775,12 +771,15 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
     let mut attempt = || -> R<()> {
         binding = host.environment()?;
         let worker_hashes = Value::object([
-            ("candidate", Value::str(file_sha(candidate)?)),
-            ("reference", Value::str(file_sha(reference)?)),
+            ("candidate", Value::str(crate::files::sha256(candidate)?)),
+            ("reference", Value::str(crate::files::sha256(reference)?)),
         ]);
         identities = vec![
-            ("observer_sha256", Value::str(file_sha(&library)?)),
-            ("probe_sha256", Value::str(file_sha(&probe)?)),
+            (
+                "observer_sha256",
+                Value::str(crate::files::sha256(&library)?),
+            ),
+            ("probe_sha256", Value::str(crate::files::sha256(&probe)?)),
             ("worker_hashes", worker_hashes),
         ];
         let roots = [
@@ -876,7 +875,10 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
                 details.push((format!("{role}:{target}"), parsed.clone()));
                 let owner = Value::object([
                     ("realpath", Value::str(&target)),
-                    ("sha256", Value::str(file_sha(Path::new(&target))?)),
+                    (
+                        "sha256",
+                        Value::str(crate::files::sha256(Path::new(&target))?),
+                    ),
                 ]);
                 if target == path {
                     let imports = parsed
@@ -1560,7 +1562,7 @@ fn measure(
             ("certificate", certificate.clone()),
         ]);
     }
-    let input_sha = match file_sha(invocation.input) {
+    let input_sha = match crate::files::sha256(invocation.input) {
         Ok(hash) => hash,
         Err(error) => {
             return obj(vec![
@@ -1691,7 +1693,7 @@ fn measure(
         push(&mut result, "host_memory", memory);
     }
     push(&mut result, "input_sha256", Value::str(&input_sha));
-    match file_sha(invocation.input) {
+    match crate::files::sha256(invocation.input) {
         Ok(hash) if hash == input_sha => (),
         Ok(_) => push(&mut result, "status", Value::str("input-changed")),
         Err(error) => {

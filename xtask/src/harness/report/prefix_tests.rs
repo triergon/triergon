@@ -8,7 +8,7 @@ use std::path::Path;
 
 #[test]
 fn ordered_input_hashes_are_checked_before_running_the_workers() {
-    let root = crate::walk::scratch("ordered-input-hashes");
+    let root = crate::files::scratch("ordered-input-hashes");
     std::fs::create_dir_all(&root).unwrap();
     let input = b"known entity bytes";
     let hash = crate::sha256::hex(input);
@@ -257,7 +257,7 @@ fn dvd_palette_options_use_the_selected_corpus_and_keep_absence() {
     let manifest = json::read(&root.join("harness/features/subtitle-dvd/corpus.json")).unwrap();
     let cases = manifest.get("cases").and_then(Value::as_array).unwrap();
     let case = |id| cases.iter().find(|case| s(case, "id") == Some(id)).unwrap();
-    let scratch = crate::walk::scratch("dvd-ifo");
+    let scratch = crate::files::scratch("dvd-ifo");
     let corpus = scratch.join("relocated");
     std::fs::create_dir_all(corpus.join("dvd")).unwrap();
     let resolve = |id| {

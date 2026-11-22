@@ -29,7 +29,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use super::correctness::file_sha;
 use crate::json::{self, Value};
 use crate::process::{Stop, run_text};
 use crate::{python, sha256};
@@ -2275,7 +2274,7 @@ pub fn run(options: &Options) -> Result<(), String> {
         ];
         let status = if !Path::new(&path).is_file() {
             "input-missing".to_owned()
-        } else if file_sha(Path::new(&path))? != sha {
+        } else if crate::files::sha256(Path::new(&path))? != sha {
             "input-hash-mismatch".to_owned()
         } else {
             match grade_case(options, format, &path, (&name, &sha), mode) {

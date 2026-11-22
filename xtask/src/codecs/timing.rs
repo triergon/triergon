@@ -14,6 +14,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use crate::files::write;
 use crate::harness::gate_build;
 use crate::harness::policy;
 use crate::harness::timing::{self, GATE_PAIRS, Operation, Pairs, Work};
@@ -43,16 +44,6 @@ pub struct Options {
     pub early_stop: bool,
 }
 
-fn sha(path: &Path) -> Result<String, String> {
-    Ok(sha256::hex(
-        &fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?,
-    ))
-}
-
-fn write(path: &Path, text: String) -> Result<(), String> {
-    fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
-}
-
 fn set(object: &mut Value, key: &str, value: Value) {
     if let Value::Object(members) = object {
         match members.iter_mut().find(|(k, _)| k == key) {
@@ -66,7 +57,7 @@ fn write_claims(path: &Path, claims: &Value) -> Result<(), String> {
     let pending = path.with_extension(format!("{}.part", std::process::id()));
     write(
         &pending,
-        json::to_python(&python::sort_keys(claims), Some(1)) + "\n",
+        (json::to_python(&python::sort_keys(claims), Some(1)) + "\n").as_bytes(),
     )?;
     fs::rename(&pending, path).map_err(|e| format!("{}: {e}", path.display()))
 }
@@ -117,8 +108,7 @@ fn iterations(workload: &Value) -> Result<u32, String> {
 }
 
 pub fn run(options: &Options) -> Result<(), String> {
-    let manifest = json::read(&options.workloads)
-        .map_err(|e| format!("{}: {e}", options.workloads.display()))?;
+    let manifest = json::read(&options.workloads)?;
     let workloads = manifest
         .get("workloads")
         .and_then(Value::as_array)
@@ -156,7 +146,7 @@ pub fn run(options: &Options) -> Result<(), String> {
     for reason in &refusals {
         println!("no gate result: {reason}");
     }
-    let reference_sha = sha(&options.reference)?;
+    let reference_sha = crate::files::sha256(&options.reference)?;
     let only: Option<Vec<&str>> = options.only.as_deref().map(|o| o.split(',').collect());
     let mut unmeasured = Vec::new();
     let mut bounds = Vec::new();
@@ -169,13 +159,13 @@ pub fn run(options: &Options) -> Result<(), String> {
             .root
             .join(get_str(w, "path").ok_or("workload without path")?);
         let input_sha = w.get("sha256").cloned().unwrap_or(Value::Null);
-        if input_sha.as_str() != Some(sha(&path)?.as_str()) {
+        if input_sha.as_str() != Some(crate::files::sha256(&path)?.as_str()) {
             return Err(format!("input hash differs from the workload: {id}"));
         }
         let name = get_str(w, "operation").ok_or("workload without operation")?;
         let candidate = options.candidates.of(name);
         let hashes = Value::object([
-            ("candidate", Value::str(sha(candidate)?)),
+            ("candidate", Value::str(crate::files::sha256(candidate)?)),
             ("reference", Value::str(reference_sha.as_str())),
         ]);
         let iterations = iterations(w).map_err(|error| format!("{id}: {error}"))?;
@@ -300,7 +290,11 @@ pub fn run(options: &Options) -> Result<(), String> {
             .map_err(|e| format!("{}: {e}", raw.display()))?;
         set(&mut entry, "status", Value::str(state.as_str()));
         set(&mut entry, "raw", Value::str(python::path(&raw)));
-        set(&mut entry, "raw_sha256", Value::str(sha(&raw)?));
+        set(
+            &mut entry,
+            "raw_sha256",
+            Value::str(crate::files::sha256(&raw)?),
+        );
         set(
             &mut entry,
             "ratio",

@@ -4,7 +4,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use crate::json::{self, Value};
 use crate::sha256;
@@ -100,21 +99,12 @@ impl Tree {
 
     /// The committed tree alone.
     pub(super) fn committed(root: &Path) -> R<Self> {
-        let output = Command::new("git")
-            .args(["ls-files", "-z"])
-            .current_dir(root)
-            .output()
-            .map_err(|e| format!("git ls-files: {e}"))?;
-        if !output.status.success() {
-            return Err("git ls-files failed".into());
-        }
         Ok(Self {
             root: root.to_path_buf(),
-            committed: output
-                .stdout
-                .split(|&b| b == 0)
+            committed: crate::process::git(root, &["ls-files", "-z"])?
+                .split('\0')
                 .filter(|path| !path.is_empty())
-                .map(|path| String::from_utf8_lossy(path).into_owned())
+                .map(str::to_owned)
                 .collect(),
             generated: None,
             fetched: BTreeMap::new(),

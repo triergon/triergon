@@ -1,5 +1,4 @@
 //! Bind a supplied session worker to the library checkout and the target Cargo built.
-use super::sha;
 use crate::harness::{build, gate_build};
 use crate::json::{self, Value};
 use crate::{process, sha256};
@@ -22,7 +21,10 @@ const WORKER: build::Candidate = build::Candidate {
 fn overlay(root: &Path) -> Result<Value, String> {
     let mut files = Vec::new();
     for name in OVERLAY {
-        files.push((name.to_owned(), Value::str(sha(&root.join(name))?)));
+        files.push((
+            name.to_owned(),
+            Value::str(crate::files::sha256(&root.join(name))?),
+        ));
     }
     Ok(Value::Object(files))
 }
@@ -123,7 +125,7 @@ pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String>
     let identity = Value::object([
         ("revision", Value::str(revision.trim())),
         ("target", Value::str(target)),
-        ("sha256", Value::str(sha(dest)?)),
+        ("sha256", Value::str(crate::files::sha256(dest)?)),
         ("build_dir", Value::str(cache.display().to_string())),
         ("artifact", Value::str(binary.display().to_string())),
         ("overlay", files),
@@ -135,7 +137,7 @@ pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String>
 
 pub(super) fn verify(root: &Path, worker: &Path) -> Result<Value, String> {
     let identity = json::read(&identity_path(worker))?;
-    if identity.get("sha256").and_then(Value::as_str) != Some(&sha(worker)?)
+    if identity.get("sha256").and_then(Value::as_str) != Some(&crate::files::sha256(worker)?)
         || identity.get("target").and_then(Value::as_str) != Some(gate_build::worker_target()?)
         || identity.get("overlay") != Some(&overlay(root)?)
     {

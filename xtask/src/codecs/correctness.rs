@@ -207,10 +207,6 @@ fn unknown(lane: &str) -> String {
 }
 
 /// SHA-256 of a file.
-pub fn file_sha(path: &Path) -> Result<String, String> {
-    sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))
-}
-
 /// Every path below `dir` as `Path.rglob('*')` lists it, sorted: symbolic
 /// links are listed but not entered.
 fn rglob(dir: &Path) -> Vec<PathBuf> {
@@ -266,7 +262,7 @@ pub fn manifest(out: &Path, lanes: &[String]) -> Result<(), String> {
                     ("name", Value::str(name.as_str())),
                     ("path", Value::str(python::path(&path))),
                     ("bytes", Value::int(bytes)),
-                    ("sha256", Value::str(file_sha(&path)?)),
+                    ("sha256", Value::str(crate::files::sha256(&path)?)),
                 ]));
             }
         }
@@ -1433,7 +1429,9 @@ pub fn grade(a: &Grade) -> Result<(), String> {
             ));
         } else if variant_manifest(&lane).is_some() && !path.is_file() {
             row.push(("status".into(), Value::str("input-missing")));
-        } else if Some(file_sha(&path)?.as_str()) != v.get("sha256").and_then(Value::as_str) {
+        } else if Some(crate::files::sha256(&path)?.as_str())
+            != v.get("sha256").and_then(Value::as_str)
+        {
             row.push(("status".into(), Value::str("input-hash-mismatch")));
         } else if play::lane(&lane) {
             row.push((

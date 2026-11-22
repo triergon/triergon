@@ -6,7 +6,7 @@ fn root() -> &'static Path {
 
 #[test]
 fn private_reference_archive_does_not_replace_the_result_used_for_pins() {
-    let out = crate::walk::scratch("transport-reference-result");
+    let out = crate::files::scratch("transport-reference-result");
     fs::create_dir_all(&out).unwrap();
     let done = worker::Finished {
             code: 0,
@@ -396,7 +396,7 @@ fn stable_hash_excludes_log_addresses_and_keeps_completion_facts() {
 
 #[test]
 fn program_carrier_preserves_packets_and_checks_sync_before_writing() {
-    let dir = crate::walk::scratch("program-carrier");
+    let dir = crate::files::scratch("program-carrier");
     fs::create_dir_all(&dir).unwrap();
     let src = dir.join("input.ts");
     let dst = dir.join("output.m2ts");
@@ -430,7 +430,7 @@ fn authored_dvb_ac3_descriptor_rejects_missing_flags_byte() {
 
 #[test]
 fn raw_recording_requires_a_fresh_directory_outside_the_repository() {
-    let out = crate::walk::scratch("transport-private-observations");
+    let out = crate::files::scratch("transport-private-observations");
     let repo = out.join("repo");
     fs::create_dir_all(&repo).unwrap();
     assert!(private_directory(&repo, &repo.join("raw")).is_err());
@@ -478,7 +478,7 @@ fn pes_input_pin_separates_reference_folds_from_source_associations() {
 
 #[test]
 fn regenerating_the_au_corpus_preserves_every_pin_and_file_hash() {
-    let out = crate::walk::scratch("transport-fixtures");
+    let out = crate::files::scratch("transport-fixtures");
     let paths = Paths {
         root: root().to_path_buf(),
         out: out.clone(),

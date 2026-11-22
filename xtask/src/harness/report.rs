@@ -85,10 +85,6 @@ impl Options {
     }
 }
 
-fn digest(path: &Path) -> Result<String, String> {
-    sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))
-}
-
 fn measure_pinned(
     check: impl Fn() -> Result<Option<&'static str>, String>,
     measure: impl FnOnce() -> Result<Value, String>,
@@ -235,7 +231,7 @@ fn auxiliary_input_failure(
         if !path.is_file() {
             return Ok(Some(missing));
         }
-        if digest(&path)?
+        if crate::files::sha256(&path)?
             != s(input, "sha256").ok_or_else(|| format!("{kind} without input hash"))?
         {
             return Ok(Some(changed));
@@ -393,7 +389,7 @@ pub fn fate_coverage(
                 let asset = if path.is_file() {
                     Value::object([
                         ("status", Value::str("present-external-rights-unreviewed")),
-                        ("sha256", Value::str(digest(&path)?)),
+                        ("sha256", Value::str(crate::files::sha256(&path)?)),
                     ])
                 } else {
                     Value::object([("status", Value::str("missing"))])
@@ -422,7 +418,7 @@ const REVIEWED_INPUTS: [&str; 2] = ["harness/fonts/corpus.json", "harness/fate/s
 pub(super) fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
     REVIEWED_INPUTS
         .iter()
-        .map(|path| json::read(&root.join(path)).map_err(|e| format!("{path}: {e}")))
+        .map(|path| json::read(&root.join(path)))
         .collect()
 }
 
@@ -701,7 +697,7 @@ impl PrefixFeature {
             .ok_or("oracle feature has no reference worker")?;
         let record = super::comparison::reference_named(identity, name)?;
         let reference = root.join(validation::text(&record, "path")?);
-        if super::linux::file_sha(&reference)? != validation::hash(&record, "sha256")? {
+        if crate::files::sha256(&reference)? != validation::hash(&record, "sha256")? {
             return Err(format!("{name} changed since build identity; rebuild"));
         }
         Ok(reference)
@@ -722,7 +718,7 @@ impl PrefixFeature {
 
     pub(crate) fn verified_input(&self, case: &Value) -> Result<PathBuf, String> {
         let path = self.input(case)?;
-        if digest(&path)? != validation::hash(case, "sha256")? {
+        if crate::files::sha256(&path)? != validation::hash(case, "sha256")? {
             return Err(format!("input changed: {}", path.display()));
         }
         if let Some(status) = additional_input_failure(&self.corpus, case, Some(&self.prefix))? {
@@ -760,7 +756,7 @@ fn input_failure(
     sha: &str,
     prefix: Option<&str>,
 ) -> Result<Option<&'static str>, String> {
-    if digest(input)? != sha {
+    if crate::files::sha256(input)? != sha {
         return Ok(Some("input-hash-mismatch"));
     }
     let failure = additional_input_failure(corpus, case, prefix)?;
@@ -1127,7 +1123,7 @@ fn collect_with_inputs(
     {
         return Err("qualification iterations do not match the contract".into());
     }
-    let contract_sha = digest(&options.contract)?;
+    let contract_sha = crate::files::sha256(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
     let target = gate_target()?;
     let open = open_cases(&contract, &manifest, &target)?;
@@ -1282,7 +1278,7 @@ fn collect_with_inputs(
             skipped
         } else if !path.is_file() {
             Value::object([("status", Value::str("missing-sample"))])
-        } else if digest(&path)? != sha {
+        } else if crate::files::sha256(&path)? != sha {
             Value::object([("status", Value::str("input-hash-mismatch"))])
         } else if !rights_reviewed(&reviewed, case) {
             Value::object([("status", Value::str("rights-unreviewed"))])

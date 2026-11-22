@@ -4,7 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::harness::{comparison, linux, report, validation, worker};
+use crate::files::read;
+use crate::harness::{comparison, report, validation, worker};
 use crate::json::{self, Value};
 use crate::sha256;
 
@@ -122,10 +123,6 @@ fn floats(path: &Path, count: usize) -> R<Vec<f64>> {
         .copied()
         .map(|bytes| f64::from(f32::from_le_bytes(bytes)))
         .collect())
-}
-
-fn read(path: &Path) -> R<Vec<u8>> {
-    fs::read(path).map_err(|error| format!("{}: {error}", path.display()))
 }
 
 fn run(program: &Path, input: &Path, output: &Path) -> R<i64> {
@@ -368,7 +365,7 @@ pub(super) fn main(root: &Path, output: &Path, record: bool) -> R<i32> {
     let candidate = validation::candidate_worker(root, &identity, CANDIDATE)?;
     let ref_record = comparison::reference_named(&identity, REFERENCE)?;
     let reference = root.join(validation::text(&ref_record, "path")?);
-    if linux::file_sha(&reference)? != validation::hash(&ref_record, "sha256")? {
+    if crate::files::sha256(&reference)? != validation::hash(&ref_record, "sha256")? {
         return Err(format!("{REFERENCE} changed since build identity; rebuild"));
     }
 
@@ -395,7 +392,7 @@ pub(super) fn main(root: &Path, output: &Path, record: bool) -> R<i32> {
     }
     let reference_ok = report::ratchet("dsp-imdct", &rows, &open);
     let stable =
-        linux::file_sha(&comparison.reference)? == validation::hash(&ref_record, "sha256")?;
+        crate::files::sha256(&comparison.reference)? == validation::hash(&ref_record, "sha256")?;
     let _candidate = validation::candidate_worker(root, &identity, CANDIDATE)?;
     let passed = definitions_ok && reference_ok && stable;
     json::write(
@@ -406,12 +403,15 @@ pub(super) fn main(root: &Path, output: &Path, record: bool) -> R<i32> {
             ("accepted", Value::Bool(passed)),
             (
                 "rules_sha256",
-                Value::str(linux::file_sha(&root.join(RULES))?),
+                Value::str(crate::files::sha256(&root.join(RULES))?),
             ),
-            ("manifest_sha256", Value::str(linux::file_sha(&manifest)?)),
+            (
+                "manifest_sha256",
+                Value::str(crate::files::sha256(&manifest)?),
+            ),
             (
                 "candidate_sha256",
-                Value::str(linux::file_sha(&comparison.candidate)?),
+                Value::str(crate::files::sha256(&comparison.candidate)?),
             ),
             (
                 "reference_sha256",

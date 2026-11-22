@@ -88,7 +88,10 @@ fn invalid_worker_options_are_refused_before_build_admission() {
         args(&["--unknown"]),
         args(&["framing-worker"]),
     ] {
-        assert_eq!(main(root, &arguments).unwrap_err(), USAGE);
+        assert_eq!(
+            main(root, &arguments).unwrap_err(),
+            crate::usage_of("build-workers")
+        );
     }
     for name in ["unknown-worker", "--comparison-build", ""] {
         let error = main(root, &args(&["--only", name])).unwrap_err();

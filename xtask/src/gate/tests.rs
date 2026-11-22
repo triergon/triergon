@@ -221,11 +221,11 @@ fn capture_memory_steps_alone_share_a_batch() {
 #[cfg(unix)]
 #[test]
 fn a_batch_runs_once_and_records_each_step_by_its_result() {
-    let dir = crate::walk::scratch("gate-batch");
+    let dir = crate::files::scratch("gate-batch");
     // Writes a gate result in each --out but the one named `silent`, failing in
     // the one named `fails`, and prints its arguments and a verdict line per case.
     let program = dir.join("qualify.sh");
-    crate::walk::write_script(
+    crate::files::write_script(
         &program,
         r#"#!/bin/sh
 echo "$@"
@@ -372,7 +372,7 @@ fn shards_are_balanced_deterministically_and_hold_every_item() {
 
 #[test]
 fn a_test_result_is_keyed_by_every_source_the_working_tree_holds() {
-    let root = crate::walk::scratch("gate-test-sources");
+    let root = crate::files::scratch("gate-test-sources");
     let git = |args: &[&str]| {
         assert!(
             Command::new("git")
@@ -686,7 +686,7 @@ fn a_measurement_with_an_unmeasured_case_names_it() {
 fn isobmff_step_checks_the_registered_partial_collection() {
     use crate::isobmff_bench::{field, full_part_selection};
     let root = crate::root();
-    let output = crate::walk::scratch("gate-isobmff-completion");
+    let output = crate::files::scratch("gate-isobmff-completion");
     let shard = full_part_selection(&root, (1, 3)).unwrap();
     let seek = crate::isobmff_seek::measurement_selection(&root, None).unwrap();
     for (cmd, feature, part, (contract, selected), filename) in [
@@ -787,7 +787,7 @@ fn isobmff_step_checks_the_registered_partial_collection() {
 #[test]
 fn a_reused_measurement_passes_only_with_the_verdict_a_gate_run_recorded() {
     use crate::harness::reuse;
-    let root = crate::walk::scratch("gate-reused-check");
+    let root = crate::files::scratch("gate-reused-check");
     let output = root.join("benchmark/f");
     let timed = timed_step(&["external-vector", "--output", output.to_str().unwrap()]);
     let key = reuse::Key {

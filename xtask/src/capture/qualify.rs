@@ -28,7 +28,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use super::config::Config;
-use crate::codecs::correctness::file_sha;
+use crate::files::write;
 use crate::harness::bounds::Unmeasured;
 use crate::harness::gate_build;
 use crate::harness::memory;
@@ -164,10 +164,6 @@ const SOURCE_FILES: &[&str] = &[
     "harness/reference_capture.h",
     "harness/rss-bound-api.h",
 ];
-
-fn write(path: &Path, text: String) -> Result<(), String> {
-    fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
-}
 
 fn case_args(case: &Value, keys: &[&str]) -> Vec<String> {
     keys.iter()
@@ -316,11 +312,17 @@ fn source_manifest(root: &Path) -> Result<Vec<(String, Value)>, String> {
                 continue;
             }
             let relative = file.strip_prefix(root).unwrap_or(&file);
-            manifest.push((python::path(relative), Value::str(file_sha(&file)?)));
+            manifest.push((
+                python::path(relative),
+                Value::str(crate::files::sha256(&file)?),
+            ));
         }
     }
     for file in SOURCE_FILES {
-        manifest.push(((*file).to_owned(), Value::str(file_sha(&root.join(file))?)));
+        manifest.push((
+            (*file).to_owned(),
+            Value::str(crate::files::sha256(&root.join(file))?),
+        ));
     }
     Ok(manifest)
 }
@@ -385,7 +387,7 @@ impl MeasuredCase {
         fs::create_dir_all(copy.parent().expect("under the directory"))
             .map_err(|e| format!("{}: {e}", directory.display()))?;
         fs::copy(&self.input, &copy).map_err(|e| format!("{}: {e}", copy.display()))?;
-        if file_sha(&copy).ok().as_deref() != self.field("input_sha256").as_str() {
+        if crate::files::sha256(&copy).ok().as_deref() != self.field("input_sha256").as_str() {
             return Err(format!("{}: differs from the timed input", copy.display()));
         }
         Ok(copy)
@@ -397,9 +399,7 @@ impl MeasuredCase {
     fn read(timing: &Path, case: &Value, input: &Path) -> Result<Self, String> {
         let id = python::str(case.get("id").unwrap_or(&Value::Null));
         let path = timing.join(&id).join(TIMING_RECORD);
-        let Value::Object(record) =
-            json::read(&path).map_err(|e| format!("{}: {e}", path.display()))?
-        else {
+        let Value::Object(record) = json::read(&path)? else {
             return Err(format!("{}: not a timing record", path.display()));
         };
         let measured = Self {
@@ -410,7 +410,7 @@ impl MeasuredCase {
         if !crate::harness::diff::equal(measured.field("case"), case) {
             return Err(format!("{}: records another case", path.display()));
         }
-        if file_sha(input).ok().as_deref() != measured.field("input_sha256").as_str() {
+        if crate::files::sha256(input).ok().as_deref() != measured.field("input_sha256").as_str() {
             return Err(format!(
                 "{}: its input changed since timing",
                 input.display()
@@ -491,7 +491,10 @@ fn correctness_and_timing(
     let mut record = vec![
         ("case".to_owned(), case.clone()),
         ("input".to_owned(), Value::str(path_text.as_str())),
-        ("input_sha256".to_owned(), Value::str(file_sha(&path)?)),
+        (
+            "input_sha256".to_owned(),
+            Value::str(crate::files::sha256(&path)?),
+        ),
     ];
     let compare = Command::new(exe)
         .args([
@@ -660,7 +663,7 @@ fn finish_case(
     fs::create_dir_all(&directory).map_err(|e| format!("{}: {e}", directory.display()))?;
     write(
         &directory.join("result.json"),
-        json::to_python(&Value::Object(record), Some(1)),
+        json::to_python(&Value::Object(record), Some(1)).as_bytes(),
     )?;
     let mut line = vec![("id".to_owned(), Value::str(id.as_str()))];
     line.extend(verdict);
@@ -931,7 +934,7 @@ fn finish(
     failing.extend(failing_bounds(&summary));
     write(
         &a.out.join("summary.json"),
-        json::to_python(&Value::Array(summary), Some(1)),
+        json::to_python(&Value::Array(summary), Some(1)).as_bytes(),
     )?;
     finish_requirements(&failing, still_open)
 }
@@ -954,7 +957,7 @@ fn prepare(root: &Path, a: &Options) -> Result<Prepared, String> {
     for dir in [&a.out, &a.inputs] {
         fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
-    let manifest = json::read(&a.cases).map_err(|e| format!("{}: {e}", a.cases.display()))?;
+    let manifest = json::read(&a.cases)?;
     let contract = json::read(&root.join("harness/capture/contract.json"))?;
     let target = gate_build::worker_target()?;
     let registered_path = root.join("harness/capture/cases.json");
@@ -1011,9 +1014,13 @@ fn prepare(root: &Path, a: &Options) -> Result<Prepared, String> {
     let digest = sha256::hex(
         json::to_python(&python::sort_keys(&Value::Object(source.clone())), None).as_bytes(),
     );
-    let sha = |path: &str| file_sha(Path::new(path)).map(Value::str);
+    let sha = |path: &str| crate::files::sha256(Path::new(path)).map(Value::str);
     let observer = sha(&a.observer)?;
-    if observer != Value::str(file_sha(&root.join("target/harness/allocations.so"))?) {
+    if observer
+        != Value::str(crate::files::sha256(
+            &root.join("target/harness/allocations.so"),
+        )?)
+    {
         return Err("capture requires the observer built in target/harness".into());
     }
     let gate = policy::Runtime::load(root)?;
@@ -1044,14 +1051,14 @@ fn prepare(root: &Path, a: &Options) -> Result<Prepared, String> {
             },
         ),
         ("observer_sha256", observer),
-        ("cases_sha256", Value::str(file_sha(&a.cases)?)),
+        ("cases_sha256", Value::str(crate::files::sha256(&a.cases)?)),
         ("host", uname()),
         ("stage", Value::str(a.stage.name())),
         ("utc", Value::float(python::time())),
     ]);
     write(
         &a.out.join("identity.json"),
-        json::to_python(&identity, Some(1)),
+        json::to_python(&identity, Some(1)).as_bytes(),
     )?;
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     // Every case's correctness and timing first, then the memory of all cases in
@@ -1072,7 +1079,7 @@ fn prepare(root: &Path, a: &Options) -> Result<Prepared, String> {
                 if matches!(a.stage, Stage::Parity | Stage::Timing) {
                     write(
                         &a.out.join(&case.id).join(TIMING_RECORD),
-                        json::to_python(&Value::Object(case.record.clone()), Some(1)),
+                        json::to_python(&Value::Object(case.record.clone()), Some(1)).as_bytes(),
                     )?;
                 }
                 measured.push(case);
@@ -1136,8 +1143,7 @@ fn timed_cases(
     identity: &Value,
     cases: &[Value],
 ) -> Result<Vec<MeasuredCase>, String> {
-    let recorded = timing.join("identity.json");
-    let recorded = json::read(&recorded).map_err(|e| format!("{}: {e}", recorded.display()))?;
+    let recorded = json::read(&timing.join("identity.json"))?;
     let reused = crate::harness::reuse::was_reused(timing);
     if !crate::harness::diff::equal(
         &comparable(&recorded, reused),

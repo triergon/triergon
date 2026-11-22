@@ -976,10 +976,6 @@ fn exit_code(verdict: &Value, rows: &[Value], requirement: Option<&str>) -> i32 
 /// heap or total RSS bound fails without the contract listing it in `open_bounds`,
 /// returns 1.
 pub fn main(root: &Path, args: &[String]) -> R<i32> {
-    if args.len() == 1 && matches!(args[0].as_str(), "--help" | "-h") {
-        println!("{USAGE}");
-        return Ok(0);
-    }
     let root = root.canonicalize().map_err(|error| error.to_string())?;
     let root = root.as_path();
     let options = Options::parse(root, args)?;

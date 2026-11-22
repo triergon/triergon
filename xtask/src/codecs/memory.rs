@@ -16,7 +16,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use super::correctness::file_sha;
 use crate::harness::{gate_build, memory, policy, worker};
 use crate::json::{self, Value};
 use crate::python;
@@ -160,8 +159,7 @@ pub fn run_limit(manifest: &Value, target: &str) -> Result<Duration, String> {
 
 pub fn run(options: &Options) -> Result<(), String> {
     let ceilings = policy::Memory::load(&options.repository)?;
-    let manifest = json::read(&options.workloads)
-        .map_err(|e| format!("{}: {e}", options.workloads.display()))?;
+    let manifest = json::read(&options.workloads)?;
     let limit = run_limit(&manifest, &crate::harness::report::gate_target()?)?;
     let workloads = manifest
         .get("workloads")
@@ -195,14 +193,17 @@ pub fn run(options: &Options) -> Result<(), String> {
     }
     let only: Option<Vec<&str>> = options.only.as_deref().map(|o| o.split(',').collect());
     let mut identity = Value::object([
-        ("candidate_sha256", Value::str(file_sha(candidates[0])?)),
+        (
+            "candidate_sha256",
+            Value::str(crate::files::sha256(candidates[0])?),
+        ),
         (
             "reference_sha256",
-            Value::str(file_sha(&options.reference)?),
+            Value::str(crate::files::sha256(&options.reference)?),
         ),
         (
             "workloads_sha256",
-            Value::str(file_sha(&options.workloads)?),
+            Value::str(crate::files::sha256(&options.workloads)?),
         ),
         ("build_refusals", Value::strings(refusals.clone())),
         ("cpus", gate_build::cpus()),
@@ -214,7 +215,7 @@ pub fn run(options: &Options) -> Result<(), String> {
     let by_operation = options
         .candidates
         .by_operation()
-        .map(|(operation, worker)| Ok((operation, Value::str(file_sha(worker)?))))
+        .map(|(operation, worker)| Ok((operation, Value::str(crate::files::sha256(worker)?))))
         .collect::<Result<Vec<_>, String>>()?;
     if let Value::Object(fields) = &mut identity {
         if !by_operation.is_empty() {
@@ -247,7 +248,9 @@ pub fn run(options: &Options) -> Result<(), String> {
                 w.get("sha256").cloned().unwrap_or(Value::Null),
             ),
         ];
-        let ready = if Some(file_sha(&input)?.as_str()) != w.get("sha256").and_then(Value::as_str) {
+        let ready = if Some(crate::files::sha256(&input)?.as_str())
+            != w.get("sha256").and_then(Value::as_str)
+        {
             Err(Value::object([(
                 "status",
                 Value::str("input-hash-mismatch"),

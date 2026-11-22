@@ -6,13 +6,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::files;
 use crate::json::{self, Value};
-use crate::walk;
+use crate::process::git;
 
 /// Every relative link target in a tracked-style Markdown file must exist.
 pub fn links(root: &Path) -> Vec<String> {
     let mut errors = Vec::new();
-    for path in walk::files(root, &|rel| rel.extension().is_some_and(|e| e == "md")) {
+    for path in files::walk(root, &|rel| rel.extension().is_some_and(|e| e == "md")) {
         let rel = path.strip_prefix(root).expect("walked under root");
         let text = match fs::read_to_string(&path) {
             Ok(text) => text,
@@ -85,11 +86,13 @@ pub fn link_targets(text: &str) -> Vec<&str> {
 pub fn design(root: &Path) -> Result<String, Vec<String>> {
     let mut errors = Vec::new();
     let mut data = Vec::new();
-    for path in walk::files(&root.join("harness"), &|rel| {
+    for path in files::walk(&root.join("harness"), &|rel| {
         rel.extension().is_some_and(|e| e == "json")
     }) {
         let rel = path.strip_prefix(root).expect("walked under root");
-        match json::read(&path) {
+        // Named from the root, as every finding of this check is.
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string());
+        match text.and_then(|text| json::parse(&text).map_err(|e| e.to_string())) {
             Ok(document) => data.push((rel.display().to_string(), document)),
             Err(error) => errors.push(format!("{}: {error}", rel.display())),
         }
@@ -173,7 +176,7 @@ fn open_bounds_error(root: &Path, contract_path: &Path, contract: &Value) -> Opt
 /// `measurement_reference`, oracle pins and case-specific bound exceptions.
 fn contract_fields(root: &Path) -> Vec<String> {
     let features = root.join("harness/features");
-    walk::files(&features, &|rel| rel.ends_with("contract.json"))
+    files::walk(&features, &|rel| rel.ends_with("contract.json"))
         .into_iter()
         .flat_map(|path| {
             let rel = path
@@ -616,23 +619,6 @@ fn cite_inline<'a>(mut text: &'a str, external: &[&str], cited: &mut Vec<&'a str
     }
 }
 
-fn git(root: &Path, args: &[&str]) -> Result<String, String> {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("cannot run git: {e}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "git {} failed:\n{}",
-            args.join(" "),
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-    let text = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
-    Ok(text.trim_end().to_owned())
-}
-
 /// The workspace has only owned packages, no build scripts, and no unsafe code.
 pub fn safety(root: &Path) -> Result<String, String> {
     let output = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
@@ -727,7 +713,7 @@ pub fn safety(root: &Path) -> Result<String, String> {
     // The library crates are scanned as text as well; xtask relies on its
     // `forbid` attribute because its own tests spell out the patterns. A worker
     // binary's C entry point is the one unsafe item admitted.
-    for source in walk::files(&root.join("crates"), &|rel| {
+    for source in files::walk(&root.join("crates"), &|rel| {
         rel.extension().is_some_and(|e| e == "rs")
     }) {
         let text = fs::read_to_string(&source).map_err(|e| format!("{}: {e}", source.display()))?;

@@ -417,7 +417,7 @@ fn partial_measurement_sets_cannot_request_acceptance() {
 
 #[test]
 fn streamed_report_retains_raw_samples_aliases_and_proof_fields() {
-    let out = crate::walk::scratch("isobmff-report");
+    let out = crate::files::scratch("isobmff-report");
     fs::create_dir_all(out.join("case-0000")).unwrap();
     let raw = Value::object([
         ("status", Value::str("measured")),
@@ -570,7 +570,7 @@ fn streamed_report_retains_raw_samples_aliases_and_proof_fields() {
 fn streamed_report_keeps_the_complete_ordered_membership() {
     let suite = Suite::load(&root()).unwrap();
     let rows: Vec<_> = suite.cases.iter().map(Case::description).collect();
-    let out = crate::walk::scratch("isobmff-report-membership");
+    let out = crate::files::scratch("isobmff-report-membership");
     let summary = Value::object([
         ("qualified", Value::Bool(false)),
         ("collection_complete", Value::Bool(false)),
@@ -597,7 +597,7 @@ fn streamed_report_keeps_the_complete_ordered_membership() {
 fn installed_workers_match_all_1020_traces() {
     let root = root();
     let suite = Suite::load(&root).unwrap();
-    let out = crate::walk::scratch("isobmff-parity");
+    let out = crate::files::scratch("isobmff-parity");
     fs::create_dir_all(&out).unwrap();
     let mut mismatches = Vec::new();
     for case in &suite.cases {

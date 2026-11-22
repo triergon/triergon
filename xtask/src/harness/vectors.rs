@@ -23,10 +23,6 @@ use crate::json::{self, Value};
 
 type R<T> = Result<T, String>;
 
-fn sha(path: &Path) -> R<String> {
-    super::linux::file_sha(path)
-}
-
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -52,8 +48,8 @@ fn workers(root: &Path) -> R<(PathBuf, PathBuf, Value)> {
         root.join("target/harness/ffmpeg-worker"),
     );
     let binaries = Value::object([
-        ("candidate", Value::str(sha(&candidate)?)),
-        ("reference", Value::str(sha(&reference)?)),
+        ("candidate", Value::str(crate::files::sha256(&candidate)?)),
+        ("reference", Value::str(crate::files::sha256(&reference)?)),
     ]);
     if !same(identity.get("binaries"), Some(&binaries)) {
         return Err("worker changed since build identity".into());
@@ -116,7 +112,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
 fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
     let contract_path = root.join(CONTRACT);
     let contract = json::read(&contract_path)?;
-    let contract_sha = sha(&contract_path)?;
+    let contract_sha = crate::files::sha256(&contract_path)?;
     let timeout = super::worker::contract_timeout(&contract)?;
     let spec = contract
         .get("required_additional_vectors")
@@ -137,7 +133,7 @@ fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
         return Err("external vector path escapes the sample cache".into());
     }
     let path = root.join(".research/fate-samples").join(&file);
-    if !path.is_file() || Some(sha(&path)?.as_str()) != s(&spec, "sha256") {
+    if !path.is_file() || Some(crate::files::sha256(&path)?.as_str()) != s(&spec, "sha256") {
         return Err("required original external vector missing or changed".into());
     }
     fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
@@ -378,7 +374,7 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
         }
         fs::write(&path, data).map_err(|e| e.to_string())?;
     }
-    let sample_sha = sha(&path)?;
+    let sample_sha = crate::files::sha256(&path)?;
     let receipt_path = cache.join(format!("fate-{label}.json"));
     if receipt_path.exists()
         && s(&json::read(&receipt_path)?, "sample_sha256") != Some(sample_sha.as_str())
@@ -428,7 +424,7 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
         ),
         (
             "upstream_ffmpeg_sha256",
-            Value::str(sha(&source.join("ffmpeg"))?),
+            Value::str(crate::files::sha256(&source.join("ffmpeg"))?),
         ),
         ("reference_build", build),
     ];
@@ -437,8 +433,8 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
         let identity = json::read(&root.join("target/harness/identity.json"))?;
         let fresh = || -> R<bool> {
             let binaries = Value::object([
-                ("candidate", Value::str(sha(&candidate)?)),
-                ("reference", Value::str(sha(&reference)?)),
+                ("candidate", Value::str(crate::files::sha256(&candidate)?)),
+                ("reference", Value::str(crate::files::sha256(&reference)?)),
             ]);
             Ok(host.source_error(root, &identity).is_none()
                 && same(identity.get("binaries"), Some(&binaries)))
@@ -529,7 +525,10 @@ pub fn trace_identities(
     let elapsed = (started.elapsed().as_secs_f64() * 10.0).round() / 10.0;
     let record = Value::object([
         ("schema", Value::int(1)),
-        ("candidate_sha256", Value::str(sha(&candidate)?)),
+        (
+            "candidate_sha256",
+            Value::str(crate::files::sha256(&candidate)?),
+        ),
         ("verdicts", Value::Object(verdicts.clone())),
         ("calls", Value::Array(calls.clone())),
         ("elapsed_s", Value::float(elapsed)),
@@ -633,7 +632,7 @@ fn matroska_traces(
             let reference =
                 root.join(s(&reference_record(identity, rule)?, "path").unwrap_or_default());
             let path = root.join(corpus).join(s(case, "file").unwrap_or_default());
-            if Some(sha(&path)?.as_str()) != s(case, "sha256") {
+            if Some(crate::files::sha256(&path)?.as_str()) != s(case, "sha256") {
                 return Err(format!("input changed: {}", path.display()));
             }
             let run = Run {
@@ -674,7 +673,7 @@ fn matroska_traces(
         .unwrap_or(Value::Null);
     let file = s(&hdr, "file").unwrap_or_default();
     let path = root.join(".research/fate-samples").join(file);
-    if Some(sha(&path)?.as_str()) != s(&hdr, "sha256") {
+    if Some(crate::files::sha256(&path)?.as_str()) != s(&hdr, "sha256") {
         return Err("HDR vector changed".into());
     }
     let run = Run {

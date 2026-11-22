@@ -31,7 +31,7 @@ fn host_memory_records_available_memory_and_reclaim_changes() {
 #[cfg(unix)]
 #[test]
 fn eviction_leaves_the_workers_unchanged() {
-    let root = crate::walk::scratch("memory-worker-eviction");
+    let root = crate::files::scratch("memory-worker-eviction");
     fs::create_dir_all(&root).unwrap();
     let workers = [root.join("candidate"), root.join("reference")];
     for (worker, bytes) in workers.iter().zip([&b"candidate"[..], b"reference"]) {
@@ -53,7 +53,7 @@ fn eviction_leaves_the_workers_unchanged() {
 fn memory_preparation_replaces_both_files_and_keeps_certificate_paths() {
     use std::os::unix::fs::MetadataExt;
 
-    let root = crate::walk::scratch("memory-worker-copies");
+    let root = crate::files::scratch("memory-worker-copies");
     fs::create_dir_all(&root).unwrap();
     let candidate = root.join("candidate");
     let reference = root.join("longer-reference-name");
@@ -94,7 +94,9 @@ fn memory_preparation_replaces_both_files_and_keeps_certificate_paths() {
     assert_eq!(fs::read(&paths[1]).unwrap(), fs::read(&reference).unwrap());
 
     let roles = ["candidate", "reference"];
-    let hashes = paths.each_ref().map(|path| file_sha(path).unwrap());
+    let hashes = paths
+        .each_ref()
+        .map(|path| crate::files::sha256(path).unwrap());
     let certificate =
         Value::object([
             (
@@ -217,7 +219,7 @@ fn collections_return_in_job_order() {
 
 #[test]
 fn unreadable_memory_input_returns_a_failed_row() {
-    let root = crate::walk::scratch("unreadable-memory-input");
+    let root = crate::files::scratch("unreadable-memory-input");
     let input = root.join("missing.ts");
     let certificate = Value::object([("status", Value::str("qualified-selected-workers"))]);
     let result = measure(

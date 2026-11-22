@@ -13,7 +13,6 @@ use crate::worker_tests::items;
 use crate::{process, python, sha256};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
-const USAGE: &str = "cargo xtask core-time [--output DIR] [--profiles debug release] [--toolchain NAME] [--target TRIPLE]";
 const BASE: &str = "tools/generate-time-oracle.py";
 const EDGE: &str = "tools/generate-time-edge-oracle.py";
 const SCOPE: &str =
@@ -455,10 +454,10 @@ fn run(root: &Path, args: &[String]) -> Result<()> {
                 }
             }
             "-h" | "--help" => {
-                println!("{USAGE}");
+                println!("{}", crate::usage_of("core-time"));
                 return Ok(());
             }
-            _ => return Err(USAGE.into()),
+            _ => return Err(crate::usage_of("core-time").into()),
         }
     }
     let root = &root.canonicalize()?;

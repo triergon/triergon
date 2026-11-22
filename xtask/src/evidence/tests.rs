@@ -6,7 +6,7 @@ fn pack<W: Write>(dir: &Path, out: W) -> Result<W, String> {
 
 #[test]
 fn packs_are_deterministic_and_round_trip() {
-    let dir = crate::walk::scratch("evidence");
+    let dir = crate::files::scratch("evidence");
     let long = "a".repeat(120);
     fs::create_dir_all(dir.join("x/.hidden")).unwrap();
     fs::create_dir_all(dir.join(&long)).unwrap();
@@ -36,7 +36,7 @@ fn packs_are_deterministic_and_round_trip() {
 /// a ustar prefix, a hidden file, an empty file and an executable one.
 #[test]
 fn pack_bytes_are_fixed() {
-    let dir = crate::walk::scratch("evidence-golden");
+    let dir = crate::files::scratch("evidence-golden");
     let long = "a".repeat(120);
     let paxed = format!("d/{}", "e".repeat(150));
     let tree: [(&str, Vec<u8>, u32); 6] = [
@@ -84,7 +84,7 @@ fn pack_bytes_are_fixed() {
 
 #[test]
 fn zstd_sets_unpack_through_the_system_zstd() {
-    let dir = crate::walk::scratch("evidence-zstd");
+    let dir = crate::files::scratch("evidence-zstd");
     fs::create_dir_all(dir.join("in/a")).unwrap();
     fs::write(dir.join("in/a/f.json"), b"{}\n").unwrap();
     fs::write(dir.join("in/b.bin"), vec![3u8; 70_000]).unwrap();
@@ -122,7 +122,7 @@ fn zstd_sets_unpack_through_the_system_zstd() {
 /// its names start with `./`; a reused step restores its own directory alone.
 #[test]
 fn a_kept_shard_pack_restores_one_step_directory() {
-    let root = crate::walk::scratch("evidence-restore");
+    let root = crate::files::scratch("evidence-restore");
     let run = root.join("run");
     for (file, text) in [
         ("capture-c01-timing/identity.json", "{}"),
@@ -192,7 +192,7 @@ fn a_kept_shard_pack_restores_one_step_directory() {
 
 #[test]
 fn the_pack_name_picks_its_compression() {
-    let dir = crate::walk::scratch("evidence-pack-zstd");
+    let dir = crate::files::scratch("evidence-pack-zstd");
     fs::create_dir_all(dir.join("in/a")).unwrap();
     fs::write(dir.join("in/a/f.json"), b"{}\n").unwrap();
     fs::write(dir.join("in/b.json"), "[1, 2, 3]\n".repeat(50_000)).unwrap();
@@ -249,7 +249,7 @@ fn stored_gzip_blocks_split_at_the_block_size_whatever_the_writes() {
 
 #[test]
 fn an_entry_takes_the_key_its_pack_lies_at() {
-    let dir = crate::walk::scratch("evidence-entry");
+    let dir = crate::files::scratch("evidence-entry");
     fs::create_dir_all(dir.join("set/memory/f")).unwrap();
     fs::write(dir.join("set/run.log"), b"done\n").unwrap();
     let out = dir.join("set.tar.gz");
@@ -306,7 +306,7 @@ fn graded_pack(dir: &Path) -> PathBuf {
 
 #[test]
 fn an_entry_records_each_results_target_and_what_it_measured() {
-    let dir = crate::walk::scratch("evidence-measured");
+    let dir = crate::files::scratch("evidence-measured");
     let out = graded_pack(&dir);
     let (_, printed) = entry(&crate::root(), "graded", &out, None).unwrap();
     let entry = json::parse(&printed).unwrap();
@@ -328,7 +328,7 @@ fn an_entry_records_each_results_target_and_what_it_measured() {
 
 #[test]
 fn measuring_an_indexed_set_records_what_its_pack_holds() {
-    let root = crate::walk::scratch("evidence-measure");
+    let root = crate::files::scratch("evidence-measure");
     let out = graded_pack(&root);
     let sha = sha256::file_hex(&out).unwrap();
     let cache = root.join(".research/evidence-cache");
@@ -391,7 +391,7 @@ fn promotion_moves_an_expiring_set_under_evidence() {
 
 #[test]
 fn a_set_is_read_from_its_own_file_by_name() {
-    let root = crate::walk::scratch("evidence-sets");
+    let root = crate::files::scratch("evidence-sets");
     fs::create_dir_all(root.join(SETS)).unwrap();
     for (file, name) in [("b", "b"), ("a", "a"), ("c", "other")] {
         fs::write(

@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use crate::harness::diff::{equal, python_str_len};
 use crate::json::{self, Value};
 use crate::pyrandom::PyRandom;
-use crate::sha256::hex as digest_bytes;
+use crate::sha256;
 
 type R<T> = Result<T, String>;
 
@@ -151,7 +151,7 @@ fn differences(actual: &Value, expected: &Value) -> Vec<Value> {
 /// Apply a recorded edit list to `seed`, checking every bound and both hashes.
 pub fn replay(seed: &[u8], recipe: &Value, maximum_bytes: usize) -> R<Vec<u8>> {
     if py_int(recipe.get("schema")) != Some(1)
-        || s(recipe, "seed_sha256") != Some(digest_bytes(seed).as_str())
+        || s(recipe, "seed_sha256") != Some(sha256::hex(seed).as_str())
     {
         return Err("mutation recipe does not bind this seed".into());
     }
@@ -198,7 +198,7 @@ pub fn replay(seed: &[u8], recipe: &Value, maximum_bytes: usize) -> R<Vec<u8>> {
         let (offset, remove) = (offset as usize, remove as usize);
         result.splice(offset..offset + remove, inserted);
     }
-    if s(recipe, "result_sha256") != Some(digest_bytes(&result).as_str()) {
+    if s(recipe, "result_sha256") != Some(sha256::hex(&result).as_str()) {
         return Err("mutation result hash disagrees with its recipe".into());
     }
     Ok(result)
@@ -313,9 +313,9 @@ pub fn mutation(
     }
     let recipe = Value::object([
         ("schema", Value::int(1)),
-        ("seed_sha256", Value::str(digest_bytes(seed))),
+        ("seed_sha256", Value::str(sha256::hex(seed))),
         ("edits", Value::Array(edits)),
-        ("result_sha256", Value::str(digest_bytes(&data))),
+        ("result_sha256", Value::str(sha256::hex(&data))),
     ]);
     if replay(seed, &recipe, maximum_bytes)? != data {
         return Err("generated mutation is not reproducible".into());
@@ -458,14 +458,8 @@ pub fn observe(
             "command".to_owned(),
             Value::strings(command.iter().map(|c| c.to_string_lossy().into_owned())),
         ),
-        (
-            "stdout_sha256".to_owned(),
-            Value::str(digest_bytes(&stdout)),
-        ),
-        (
-            "stderr_sha256".to_owned(),
-            Value::str(digest_bytes(&stderr)),
-        ),
+        ("stdout_sha256".to_owned(), Value::str(sha256::hex(&stdout))),
+        ("stderr_sha256".to_owned(), Value::str(sha256::hex(&stderr))),
         (
             "output_truncated".to_owned(),
             Value::Bool(state == "output-limit"),
@@ -674,7 +668,7 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
             *role,
             Value::object([
                 ("path", Value::str(relative(path))),
-                ("sha256", Value::str(sha(path)?)),
+                ("sha256", Value::str(crate::files::sha256(path)?)),
             ]),
         ));
     }
@@ -751,7 +745,7 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
     files.extend(crate::harness::manifest::sources(root, &lane.manifest));
     let sources = files
         .iter()
-        .map(|path| Ok((relative(path), Value::str(sha(path)?))))
+        .map(|path| Ok((relative(path), Value::str(crate::files::sha256(path)?))))
         .collect::<R<Vec<_>>>()?;
     let manifest = Value::object([
         ("schema", Value::int(1)),
@@ -799,12 +793,6 @@ fn label(value: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'_' | b'-'))
 }
 
-fn sha(path: &Path) -> R<String> {
-    Ok(digest_bytes(
-        &fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?,
-    ))
-}
-
 fn write(path: &Path, value: &Value) -> R<()> {
     let temporary = path.with_extension("tmp");
     json::write(&temporary, value)?;
@@ -819,7 +807,7 @@ fn input_identity(path: &Path, expected: &str, expected_bytes: usize, maximum: u
             ("sha256", Value::Null),
             ("error", Value::str("input-size-limit")),
         ]),
-        Ok(meta) => match sha(path) {
+        Ok(meta) => match crate::files::sha256(path) {
             Ok(actual) => Value::object([
                 (
                     "matches",
@@ -888,7 +876,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
     };
     let manifest_bytes =
         fs::read(&args.manifest).map_err(|e| format!("{}: {e}", args.manifest.display()))?;
-    let manifest_digest = digest_bytes(&manifest_bytes);
+    let manifest_digest = sha256::hex(&manifest_bytes);
     let manifest = strict_json(&manifest_bytes)?;
     if py_int(manifest.get("schema")) != Some(1) {
         return Err("unknown mutation manifest schema".into());
@@ -923,7 +911,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         .map(|(role, w)| (role.clone(), resolve(s(w, "path").unwrap_or_default())))
         .collect();
     for ((role, path), (_, worker)) in worker_paths.iter().zip(workers) {
-        if Some(sha(path)?.as_str()) != s(worker, "sha256") {
+        if Some(crate::files::sha256(path)?.as_str()) != s(worker, "sha256") {
             return Err(format!("worker hash mismatch: {role}"));
         }
     }
@@ -932,7 +920,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         _ => return Err("explicit source/input-tool provenance hashes are required".into()),
     };
     for (path, digest) in &sources {
-        if Some(sha(&resolve(path))?.as_str()) != digest.as_str() {
+        if Some(crate::files::sha256(&resolve(path))?.as_str()) != digest.as_str() {
             return Err(format!("source provenance mismatch: {path}"));
         }
     }
@@ -941,7 +929,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         let id = s(row, "id").unwrap_or_default().to_owned();
         let data =
             fs::read(resolve(s(row, "path").unwrap_or_default())).map_err(|e| e.to_string())?;
-        if Some(digest_bytes(&data).as_str()) != s(row, "sha256")
+        if Some(sha256::hex(&data).as_str()) != s(row, "sha256")
             || data.len() > args.maximum_input_bytes
         {
             return Err(format!("seed hash or input-size mismatch: {id}"));
@@ -1035,11 +1023,11 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
     ];
     let mut controller = Vec::new();
     for relative in controller_files {
-        let digest = sha(&root.join(relative))?;
+        let digest = crate::files::sha256(&root.join(relative))?;
         let destination = output.join("controller-source").join(relative);
         fs::create_dir_all(destination.parent().expect("parent")).map_err(|e| e.to_string())?;
         fs::copy(root.join(relative), &destination).map_err(|e| e.to_string())?;
-        if sha(&destination)? != digest {
+        if crate::files::sha256(&destination)? != digest {
             return Err(format!(
                 "controller changed during preservation: {relative}"
             ));
@@ -1084,7 +1072,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         ("time_or_memory_measurement", Value::Bool(false)),
     ]);
     write(&output.join("identity.json"), &identity)?;
-    if sha(&args.manifest)? != manifest_digest {
+    if crate::files::sha256(&args.manifest)? != manifest_digest {
         return Err("campaign manifest changed after its initial read".into());
     }
     let mut rng = PyRandom::new(args.seed);
@@ -1106,7 +1094,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
             let path = case.join("input.bin");
             fs::write(&path, &data).map_err(|e| e.to_string())?;
             fs::write(case.join("initial-input.bin"), &data).map_err(|e| e.to_string())?;
-            let input_sha = digest_bytes(&data);
+            let input_sha = sha256::hex(&data);
             let mut entries = Vec::new();
             for operation in operations {
                 let op = s(operation, "id").unwrap_or_default();
@@ -1153,8 +1141,8 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
                                     command.iter().map(|c| c.to_string_lossy().into_owned()),
                                 ),
                             ),
-                            ("stdout_sha256", Value::str(digest_bytes(b""))),
-                            ("stderr_sha256", Value::str(digest_bytes(b""))),
+                            ("stdout_sha256", Value::str(sha256::hex(b""))),
+                            ("stderr_sha256", Value::str(sha256::hex(b""))),
                             ("skipped", Value::Bool(true)),
                         ]);
                         (record, vec![], vec![])
@@ -1287,17 +1275,19 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         );
     }
     for ((role, path), (_, worker)) in worker_paths.iter().zip(workers) {
-        if Some(sha(path)?.as_str()) != s(worker, "sha256") {
+        if Some(crate::files::sha256(path)?.as_str()) != s(worker, "sha256") {
             return Err(format!("worker changed during campaign: {role}"));
         }
     }
     for (path, digest) in &sources {
-        if Some(sha(&resolve(path))?.as_str()) != digest.as_str() {
+        if Some(crate::files::sha256(&resolve(path))?.as_str()) != digest.as_str() {
             return Err(format!("source provenance changed during campaign: {path}"));
         }
     }
     for row in seeds {
-        if Some(sha(&resolve(s(row, "path").unwrap_or_default()))?.as_str()) != s(row, "sha256") {
+        if Some(crate::files::sha256(&resolve(s(row, "path").unwrap_or_default()))?.as_str())
+            != s(row, "sha256")
+        {
             return Err(format!(
                 "seed changed during campaign: {}",
                 s(row, "id").unwrap_or_default()
@@ -1305,11 +1295,11 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         }
     }
     for (relative, digest) in &controller {
-        if Some(sha(&root.join(relative))?.as_str()) != digest.as_str() {
+        if Some(crate::files::sha256(&root.join(relative))?.as_str()) != digest.as_str() {
             return Err(format!("controller changed during campaign: {relative}"));
         }
     }
-    if sha(&args.manifest)? != manifest_digest {
+    if crate::files::sha256(&args.manifest)? != manifest_digest {
         return Err("campaign manifest changed during execution".into());
     }
     let report = Value::object([
@@ -1333,7 +1323,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
             "findings_index",
             Value::object([
                 ("path", Value::str("findings.jsonl")),
-                ("sha256", Value::str(sha(&index)?)),
+                ("sha256", Value::str(crate::files::sha256(&index)?)),
             ]),
         ),
         ("source_workers_and_seeds_unchanged", Value::Bool(true)),

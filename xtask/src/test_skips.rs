@@ -191,7 +191,7 @@ impl ParityInputs {
             return Ok(None);
         }
         for (path, pin) in present {
-            if crate::harness::linux::file_sha(&path)? != pin {
+            if crate::files::sha256(&path)? != pin {
                 return Err(format!(
                     "{}: input hash differs from its pin",
                     path.display()
@@ -482,7 +482,7 @@ exit 3";
 
     #[test]
     fn only_missing_files_with_exact_gate_pins_can_leave_a_case_out() {
-        let root = crate::walk::scratch("parity-skips");
+        let root = crate::files::scratch("parity-skips");
         let pin = crate::sha256::hex(b"file");
         let case = Value::object([
             ("file", Value::str("absent")),

@@ -72,7 +72,7 @@ const PAGE_TEXT: &str = "# Status
 /// A repository with two runs on Linux AArch64's (sharded) and ARMv7's, an older ARMv7
 /// result without its target, and the page as the rows render it.
 fn repository(name: &str) -> PathBuf {
-    let root = crate::walk::scratch(name);
+    let root = crate::files::scratch(name);
     let sets = root.join(crate::evidence::SETS);
     fs::create_dir_all(&sets).unwrap();
     let set = |name: &str, results: &[String]| {
@@ -144,7 +144,7 @@ fn repository(name: &str) -> PathBuf {
 }
 
 fn data(root: &Path) -> Vec<(String, Value)> {
-    crate::walk::files(&root.join("harness"), &|rel| {
+    crate::files::walk(&root.join("harness"), &|rel| {
         rel.extension().is_some_and(|e| e == "json")
     })
     .into_iter()

@@ -8,7 +8,8 @@ use std::time::Instant;
 use crate::json::{self, Value};
 
 use super::plan::CAPTURE_QUALIFY;
-use super::{Item, Placement, R, SHARD, Stage, Step, git, owned, parse_part, shard_items, status};
+use super::{Item, Placement, R, SHARD, Stage, Step, owned, parse_part, shard_items, status};
+use crate::process::git;
 
 /// The CPUs a memory collection uses: every online CPU but CPU 0.
 fn memory_cpus() -> R<String> {

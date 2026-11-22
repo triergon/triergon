@@ -299,7 +299,7 @@ fn each_worker_can_use_its_own_operation_prefix() {
 
 #[test]
 fn timed_workers_are_equal_length_copies_removed_afterwards() {
-    let dir = crate::walk::scratch("timed-workers");
+    let dir = crate::files::scratch("timed-workers");
     fs::create_dir_all(dir.join("other")).unwrap();
     fs::write(dir.join("media-worker"), b"candidate").unwrap();
     fs::write(dir.join("other/ffmpeg-worker"), b"reference").unwrap();
@@ -319,7 +319,7 @@ fn timed_workers_are_equal_length_copies_removed_afterwards() {
 
 #[test]
 fn timed_workers_keep_other_output_in_the_staging_directory() {
-    let dir = crate::walk::scratch("timed-workers-output");
+    let dir = crate::files::scratch("timed-workers-output");
     let candidate = dir.join("candidate");
     let reference = dir.join("reference");
     fs::write(&candidate, b"candidate").unwrap();
@@ -336,7 +336,7 @@ fn timed_workers_keep_other_output_in_the_staging_directory() {
 
 #[test]
 fn timed_workers_keep_another_commands_empty_reservation() {
-    let dir = crate::walk::scratch("timed-workers-reserved-slot");
+    let dir = crate::files::scratch("timed-workers-reserved-slot");
     let mut timed = TimedWorkers::reserve(dir.join("staging")).unwrap();
     let grade = timed.directory.join("b");
     fs::create_dir(&grade).unwrap();

@@ -39,7 +39,7 @@ const VECTOR: &str = ".research/fate-samples/mkv/required.mkv";
 
 #[test]
 fn fetched_cases_share_a_pinned_input_and_reuse_the_download_cache() {
-    let root = crate::walk::scratch("fate-corpus");
+    let root = crate::files::scratch("fate-corpus");
     let feature = root.join("harness/features/range");
     let cache = root.join("downloads");
     let relative = "mov/prefix.mp4";
@@ -80,7 +80,7 @@ fn fetched_cases_share_a_pinned_input_and_reuse_the_download_cache() {
 
 #[test]
 fn cached_original_is_verified_without_network() {
-    let root = crate::walk::scratch("vectors");
+    let root = crate::files::scratch("vectors");
     contract(&root, "mkv/required.mkv", b"original vector");
     fs::create_dir_all(root.join(".research/fate-samples/mkv")).unwrap();
     fs::write(root.join(VECTOR), b"original vector").unwrap();
@@ -95,7 +95,7 @@ fn cached_original_is_verified_without_network() {
 
 #[test]
 fn changed_cache_is_preserved_and_refused() {
-    let root = crate::walk::scratch("vectors");
+    let root = crate::files::scratch("vectors");
     contract(&root, "mkv/required.mkv", b"original vector");
     fs::create_dir_all(root.join(".research/fate-samples/mkv")).unwrap();
     fs::write(root.join(VECTOR), b"changed").unwrap();
@@ -117,7 +117,7 @@ fn wrong_downloads_are_never_published() {
             ..Fake::default()
         },
     ] {
-        let root = crate::walk::scratch("vectors");
+        let root = crate::files::scratch("vectors");
         contract(&root, "mkv/required.mkv", b"original vector");
         let error = required_vectors(&root, &net, None, VECTOR_LIMIT).unwrap_err();
         assert!(error.contains("download hash mismatch"), "{error}");
@@ -128,7 +128,7 @@ fn wrong_downloads_are_never_published() {
 
 #[test]
 fn https_failure_falls_back_to_the_exact_rsync_path() {
-    let root = crate::walk::scratch("vectors");
+    let root = crate::files::scratch("vectors");
     contract(&root, "mkv/required.mkv", b"original vector");
     let net = Fake {
         rsync: Some(b"original vector".to_vec()),
@@ -153,7 +153,7 @@ fn https_failure_falls_back_to_the_exact_rsync_path() {
 
 #[test]
 fn oversize_and_failed_transfers_are_refused() {
-    let root = crate::walk::scratch("vectors");
+    let root = crate::files::scratch("vectors");
     contract(&root, "mkv/required.mkv", &[0; 2048]);
     let net = Fake {
         rsync: Some(vec![0; 2048]),
@@ -173,9 +173,9 @@ fn oversize_and_failed_transfers_are_refused() {
 #[cfg(unix)]
 #[test]
 fn rsync_receiver_cannot_write_past_the_limit() {
-    let dir = crate::walk::scratch("rsync-limit");
+    let dir = crate::files::scratch("rsync-limit");
     let fake = dir.join("rsync");
-    crate::walk::write_script(
+    crate::files::write_script(
         &fake,
         "#!/bin/sh\nfor last; do :; done\nhead -c 8192 /dev/zero > \"$last\"\n",
     );
@@ -200,7 +200,7 @@ fn rsync_receiver_cannot_write_past_the_limit() {
 #[test]
 fn contract_paths_cannot_escape_the_cache() {
     for file in ["../outside.mkv", "/abs.mkv", "a/../../b", "a\\\\b"] {
-        let root = crate::walk::scratch("vectors");
+        let root = crate::files::scratch("vectors");
         contract(&root, file, b"x");
         assert_eq!(
             required_vectors(&root, &Fake::default(), None, VECTOR_LIMIT).unwrap_err(),
@@ -230,7 +230,7 @@ fn spec_catalog_matches_the_manifest() {
 #[test]
 fn every_specification_including_zlib_is_checked_for_drift() {
     for damaged in ["rfc1950", "rfc1951", "rfc9559"] {
-        let root = crate::walk::scratch("specs");
+        let root = crate::files::scratch("specs");
         fs::create_dir_all(root.join(".research/specs")).unwrap();
         fs::create_dir_all(root.join("specs")).unwrap();
         let rows: Vec<String> = SPECS
@@ -342,7 +342,7 @@ fn pinned_reaches_a_github_asset_through_the_api() {
 
 #[test]
 fn pinned_falls_back_past_failing_and_wrong_sources_and_fills_the_cache() {
-    let cache = crate::walk::scratch("download-cache");
+    let cache = crate::files::scratch("download-cache");
     let pin = sha256::hex(PINNED);
     let net = Sources::new(vec![
         ("https://down", Err("curl https://down: exit status: 22")),
@@ -359,7 +359,7 @@ fn pinned_falls_back_past_failing_and_wrong_sources_and_fills_the_cache() {
 
 #[test]
 fn pinned_uses_a_verified_cache_entry_without_network() {
-    let cache = crate::walk::scratch("download-cache");
+    let cache = crate::files::scratch("download-cache");
     let pin = sha256::hex(PINNED);
     fs::write(cache.join(&pin), PINNED).unwrap();
     let net = Sources::new(vec![]);
@@ -371,7 +371,7 @@ fn pinned_uses_a_verified_cache_entry_without_network() {
 
 #[test]
 fn pinned_replaces_a_damaged_cache_entry() {
-    let cache = crate::walk::scratch("download-cache");
+    let cache = crate::files::scratch("download-cache");
     let pin = sha256::hex(PINNED);
     fs::write(cache.join(&pin), b"damaged").unwrap();
     let net = Sources::new(vec![("https://x", Ok(PINNED))]);

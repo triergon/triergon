@@ -460,10 +460,7 @@ pub fn main(root: &Path, args: &[String]) -> R<()> {
         [mode, spec, output] if mode == "observe" => {
             observe(root, &read_json(Path::new(spec))?, Path::new(output))
         }
-        _ => Err(
-            "usage: cargo xtask transport-fate check | inventory OUTPUT | observe SPEC OUTPUT_DIR"
-                .into(),
-        ),
+        _ => Err(crate::usage_of("transport-fate")),
     }
 }
 
@@ -475,7 +472,7 @@ mod tests {
     fn observations_keep_failed_original_packet_operations() {
         use std::os::unix::fs::PermissionsExt;
         let repository = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let root = crate::walk::scratch("transport-fate-observe");
+        let root = crate::files::scratch("transport-fate-observe");
         fs::create_dir_all(root.join("harness/fate")).unwrap();
         fs::create_dir_all(root.join("xtask/src")).unwrap();
         for file in INDEXES
@@ -608,7 +605,7 @@ printf '{"operation":"%s","iterations":1,"packets":2,"bytes":8,"digest":19,"eof"
     }
     #[test]
     fn pins_reject_changed_and_oversized_inputs() {
-        let root = crate::walk::scratch("transport-fate-pin");
+        let root = crate::files::scratch("transport-fate-pin");
         fs::create_dir_all(&root).unwrap();
         fs::write(root.join("input"), b"original").unwrap();
         let pin = Value::object([

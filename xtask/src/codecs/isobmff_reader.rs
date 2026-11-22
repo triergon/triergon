@@ -20,7 +20,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use super::correctness::file_sha;
 use super::readers::{
     COLUMNS, DIFFERENCES_SCHEMA, Key, Pair, align, differences_text, list_sha256,
 };
@@ -73,7 +72,7 @@ pub fn inputs(root: &Path) -> Result<Vec<(PathBuf, String)>, String> {
 pub fn verify_inputs(root: &Path) -> Result<String, String> {
     let inputs = inputs(root)?;
     for (path, pin) in &inputs {
-        let actual = file_sha(path)?;
+        let actual = crate::files::sha256(path)?;
         if actual != *pin {
             return Err(format!(
                 "{}: SHA-256 {actual}, pinned {pin}",
@@ -1269,7 +1268,7 @@ pub fn run(options: &Options) -> Result<i32, String> {
         }
         let status = if !Path::new(&path).is_file() {
             "input-missing"
-        } else if file_sha(Path::new(&path))? != case.sha256 {
+        } else if crate::files::sha256(Path::new(&path))? != case.sha256 {
             "input-hash-mismatch"
         } else {
             match compare_case(options, &rules, case, &path) {
@@ -1346,7 +1345,7 @@ mod tests {
         // one is committed, with the bytes its pin names.
         for case in cases.iter().filter(|c| !c.path.starts_with(".research/")) {
             assert_eq!(
-                file_sha(&root.join(&case.path)).unwrap(),
+                crate::files::sha256(&root.join(&case.path)).unwrap(),
                 case.sha256,
                 "{}",
                 case.name

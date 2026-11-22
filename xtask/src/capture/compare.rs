@@ -25,7 +25,7 @@ use std::time::Duration;
 
 use super::config::{Config, Mux};
 use super::ts::{self, Facts};
-use crate::codecs::correctness::file_sha;
+use crate::files::read;
 use crate::json::{self, Value};
 use crate::process::{Text, check_output, run_text};
 use crate::{numpy, python};
@@ -51,10 +51,6 @@ fn join(directory: &str, name: &str) -> String {
     } else {
         format!("{directory}/{name}")
     }
-}
-
-fn read(path: &str) -> Result<Vec<u8>, String> {
-    fs::read(path).map_err(|e| format!("{path}: {e}"))
 }
 
 /// Mean squared difference over one plane, as numpy computes it (an exact
@@ -339,7 +335,9 @@ fn verify_reference_pin(
     }
     let matched = match (refusal, expected("refusal")) {
         (Some(actual), Some(expected)) => actual.contains(expected),
-        (None, None) => expected("stream_sha256") == Some(&file_sha(Path::new(stream))?),
+        (None, None) => {
+            expected("stream_sha256") == Some(&crate::files::sha256(Path::new(stream))?)
+        }
         _ => false,
     };
     if !matched {
@@ -427,7 +425,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     fs::create_dir_all(&a.out).map_err(|e| format!("{}: {e}", a.out))?;
     let ffmpeg = join(&a.ffmpeg_bin, "ffmpeg");
     let ffprobe = join(&a.ffmpeg_bin, "ffprobe");
-    let input_hash = file_sha(Path::new(&a.input))?;
+    let input_hash = crate::files::sha256(Path::new(&a.input))?;
     if let Some(expected) = case.get("input_sha256")
         && expected.as_str() != Some(&input_hash)
     {
@@ -441,11 +439,11 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         ("input_sha256".to_owned(), Value::str(input_hash)),
         (
             "candidate_sha256".to_owned(),
-            Value::str(file_sha(Path::new(&a.candidate))?),
+            Value::str(crate::files::sha256(Path::new(&a.candidate))?),
         ),
         (
             "reference_sha256".to_owned(),
-            Value::str(file_sha(Path::new(&a.reference))?),
+            Value::str(crate::files::sha256(Path::new(&a.reference))?),
         ),
     ];
     let geometry = [
@@ -512,8 +510,8 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         roles.push((role, yuv, ts_path));
     }
     // Conversion rule.
-    let cand = read(&roles[0].1)?;
-    let reference = read(&roles[1].1)?;
+    let cand = read(Path::new(&roles[0].1))?;
+    let reference = read(Path::new(&roles[1].1))?;
     let diagnostic = reference_refused
         .then(|| refusal_outputs[1].1.get("stderr").and_then(Value::as_str))
         .flatten();
@@ -563,7 +561,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     let mut parsed: Vec<Role> = Vec::new();
     let mut table_sets = Vec::new();
     for (role, _, ts_path) in &roles {
-        let facts = ts::parse(&read(ts_path)?, pmt_pid)?;
+        let facts = ts::parse(&read(Path::new(ts_path))?, pmt_pid)?;
         let problems = ts::check_mux(&facts, pmt_pid)?;
         let mut tables: Vec<(u16, String)> = facts
             .tables
@@ -727,7 +725,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     let mut common_bits = Vec::new();
     let mut underflow = Vec::new();
     for (index, e) in encoded.iter().enumerate() {
-        let decoded = read(&e.decoded)?;
+        let decoded = read(Path::new(&e.decoded))?;
         let dec = planes(&decoded, wu, hu, e.frames)?;
         let own = if index == 0 { &src_cand } else { &src_ref };
         let series = |plane: usize, src: &[[&[u8]; 3]]| -> Vec<f64> {
@@ -835,7 +833,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             check_output(&argv)?;
             let out = format!("{ts_path}.yuv");
             decode(&ffmpeg, &ts_path, &out)?;
-            let decoded = read(&out)?;
+            let decoded = read(Path::new(&out))?;
             let dec = planes(&decoded, wu, hu, common)?;
             let ratios: Vec<f64> = (0..common)
                 .map(|i| power(psnr(dec[i][0], src_cand[i][0])))
@@ -844,7 +842,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             if mse <= 0.0 {
                 return Err("math domain error".into());
             }
-            let bits: i64 = ts::parse(&read(&ts_path)?, pmt_pid)?
+            let bits: i64 = ts::parse(&read(Path::new(&ts_path))?, pmt_pid)?
                 .pes
                 .iter()
                 .take(common)

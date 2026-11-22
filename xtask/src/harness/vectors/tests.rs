@@ -3,7 +3,7 @@ use std::cell::RefCell;
 
 #[test]
 fn prefix_traces_require_the_reference_and_secondary_input_pins() {
-    let root = crate::walk::scratch("prefix-traces");
+    let root = crate::files::scratch("prefix-traces");
     let corpus = root.join("relocated");
     fs::create_dir(&corpus).unwrap();
     fs::write(root.join("reference"), b"reference").unwrap();
@@ -79,7 +79,7 @@ fn prefix_traces_require_the_reference_and_secondary_input_pins() {
 fn oracle_prefix_traces_record_every_call_and_check_the_oracle_pin() {
     use std::os::unix::fs::PermissionsExt;
 
-    let root = crate::walk::scratch("oracle-prefix-traces");
+    let root = crate::files::scratch("oracle-prefix-traces");
     let feature = root.join("harness/features/spec");
     for directory in [
         &feature,
@@ -210,7 +210,7 @@ fn fake(parity: Option<&'static str>, make: Option<(i64, &'static str)>) -> Fake
 }
 
 fn setup(with_workers: bool) -> PathBuf {
-    let root = crate::walk::scratch("fate-run");
+    let root = crate::files::scratch("fate-run");
     let cache = root.join(".research/reference");
     fs::create_dir_all(cache.join("FFmpeg-frozen-fixture")).unwrap();
     fs::write(

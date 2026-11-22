@@ -30,6 +30,22 @@ pub fn output(command: &mut Command) -> Result<String, String> {
     String::from_utf8(out.stdout).map_err(|e| e.to_string())
 }
 
+/// The standard output of `git ARGS` run in `root`, without trailing whitespace; fails
+/// unless git exits successfully, with what it printed on standard error.
+pub fn git(root: &std::path::Path, args: &[&str]) -> Result<String, String> {
+    let shown = format!("git {}", args.join(" "));
+    let out = Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .map_err(|e| format!("{shown}: {e}"))?;
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        return Err(format!("{shown}: {}\n{}", out.status, stderr.trim_end()));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim_end().to_owned())
+}
+
 /// Why a run stopped short: a timeout (recorded with the command line) or an
 /// error that ends the whole command.
 #[derive(Debug)]

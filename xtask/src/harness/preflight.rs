@@ -336,7 +336,7 @@ fn built_reference(root: &Path, identity: &Value, name: &str) -> R<String> {
     let record = validation::field(validation::field(identity, "comparison_references")?, name)
         .map_err(|_| "not built: prepare its reference and rebuild the workers".to_owned())?;
     let path = root.join(validation::text(record, "path")?);
-    if linux::file_sha(&path)? != validation::hash(record, "sha256")? {
+    if crate::files::sha256(&path)? != validation::hash(record, "sha256")? {
         return Err(format!(
             "{} changed since the build identity",
             path.display()
@@ -785,7 +785,7 @@ fn capture_inputs(root: &Path, cases: &Path) -> R<String> {
 /// `harness/rss-bound/reviews/SOURCE-RELEASE.json`, by the first 12 hexadecimal
 /// digits of the source's SHA-256 and the kernel release. `prove.sh` takes the same.
 pub fn committed_review(root: &Path) -> PathBuf {
-    let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c"))
+    let source = crate::files::sha256(&root.join("harness/rss-bound/triergon_rss_bound.c"))
         .unwrap_or_else(|_| "unreadable-module".into());
     let prefix = source.get(..12).unwrap_or(&source);
     root.join(format!(
@@ -803,7 +803,7 @@ fn module_review(root: &Path, review: &Path) -> R<String> {
         ));
     }
     let document = json::read(review)?;
-    let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c"))?;
+    let source = crate::files::sha256(&root.join("harness/rss-bound/triergon_rss_bound.c"))?;
     let text = |key: &str| document.get(key).and_then(Value::as_str);
     if text("module_source_sha256") != Some(source.as_str()) {
         return Err(format!("does not cover module source {}", &source[..12]));
@@ -915,7 +915,8 @@ mod tests {
     #[test]
     fn the_module_source_in_the_tree_has_a_committed_review() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c")).unwrap();
+        let source =
+            crate::files::sha256(&root.join("harness/rss-bound/triergon_rss_bound.c")).unwrap();
         let reviews = std::fs::read_dir(root.join("harness/rss-bound/reviews")).unwrap();
         let reviewed = reviews.flatten().any(|entry| {
             let review = json::read(&entry.path()).unwrap();
@@ -935,7 +936,7 @@ mod tests {
 
     #[test]
     fn a_reference_preflight_names_must_have_been_built() {
-        let root = crate::walk::scratch("preflight-references");
+        let root = crate::files::scratch("preflight-references");
         std::fs::create_dir_all(root.join("target/harness")).unwrap();
         std::fs::write(root.join("target/harness/ffmpeg-decode-worker"), b"decode").unwrap();
         let identity = Value::object([(

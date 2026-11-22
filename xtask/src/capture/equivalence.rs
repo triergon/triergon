@@ -16,7 +16,6 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::codecs::correctness::file_sha;
 use crate::codecs::equivalence::{Job, cargo_build, finish, run_jobs, take_output};
 use crate::harness::worker;
 use crate::json::{self, Value};
@@ -186,7 +185,7 @@ pub fn run(
         }
         record.push((
             format!("{id}/input"),
-            Value::object([("sha256", Value::str(file_sha(&path)?))]),
+            Value::object([("sha256", Value::str(crate::files::sha256(&path)?))]),
         ));
         fs::remove_file(&path).map_err(|e| e.to_string())?;
     }

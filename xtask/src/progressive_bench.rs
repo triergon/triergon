@@ -84,12 +84,6 @@ fn text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("missing {key}"))
 }
 
-fn digest(path: &Path) -> Result<String, String> {
-    fs::read(path)
-        .map(|bytes| sha256::hex(&bytes))
-        .map_err(|e| format!("{}: {e}", path.display()))
-}
-
 fn validate(root: &Path, options: &Options) -> Result<(), String> {
     let contract = json::read(&options.contract)?;
     let manifest = json::read(&options.manifest)?;
@@ -159,7 +153,7 @@ fn validate(root: &Path, options: &Options) -> Result<(), String> {
         ("controls_sha256", "controls.json"),
         ("timing_corpus_sha256", "corpus.json"),
     ] {
-        if text(&provenance, field)? != digest(&root.join(FEATURE).join(file))? {
+        if text(&provenance, field)? != crate::files::sha256(&root.join(FEATURE).join(file))? {
             return Err(format!("progressive provenance differs: {file}"));
         }
     }
@@ -167,10 +161,6 @@ fn validate(root: &Path, options: &Options) -> Result<(), String> {
 }
 
 pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
-    if args == ["--help"] {
-        println!("{USAGE}");
-        return Ok(0);
-    }
     let options = options(root, args)?;
     validate(root, &options)?;
     report::create_output(&options.output)?;
@@ -255,7 +245,7 @@ fn bound_workers(root: &Path, identity: &Value) -> Result<(PathBuf, PathBuf, Val
         root.join("target/harness")
             .canonicalize()
             .map_err(|e| e.to_string())?,
-    ) || text(&reference_record, "sha256")? != digest(&reference)?
+    ) || text(&reference_record, "sha256")? != crate::files::sha256(&reference)?
     {
         return Err("progressive reference changed; rebuild".into());
     }
@@ -279,15 +269,21 @@ fn proof_binding(root: &Path, identity: &Value, reference: &Value) -> Result<Val
         ("reference", reference.clone()),
         (
             "contract_sha256",
-            Value::str(digest(&root.join(FEATURE).join("contract.json"))?),
+            Value::str(crate::files::sha256(
+                &root.join(FEATURE).join("contract.json"),
+            )?),
         ),
         (
             "corpus_manifest_sha256",
-            Value::str(digest(&root.join(FEATURE).join("corpus.json"))?),
+            Value::str(crate::files::sha256(
+                &root.join(FEATURE).join("corpus.json"),
+            )?),
         ),
         (
             "controls_sha256",
-            Value::str(digest(&root.join(FEATURE).join("controls.json"))?),
+            Value::str(crate::files::sha256(
+                &root.join(FEATURE).join("controls.json"),
+            )?),
         ),
     ]))
 }
@@ -596,7 +592,7 @@ fn check_controls(root: &Path, selected: &Options) -> Result<Option<Value>, Stri
         }
         results.push(Value::object([
             ("id", Value::str(id)),
-            ("input_sha256", Value::str(digest(&input)?)),
+            ("input_sha256", Value::str(crate::files::sha256(&input)?)),
             ("outcomes", Value::object(outcomes)),
         ]));
     }
@@ -635,7 +631,7 @@ fn check_controls(root: &Path, selected: &Options) -> Result<Option<Value>, Stri
                     .to_string_lossy(),
             ),
         ),
-        ("sha256", Value::str(digest(&path)?)),
+        ("sha256", Value::str(crate::files::sha256(&path)?)),
         ("passed", Value::Bool(true)),
     ])))
 }

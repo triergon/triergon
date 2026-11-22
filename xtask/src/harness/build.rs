@@ -13,9 +13,6 @@ use crate::json::{self, Value};
 
 type R<T> = Result<T, String>;
 
-const USAGE: &str =
-    "usage: cargo xtask build-workers [--comparison-build] [--only WORKER] [--all-references]";
-
 fn options(args: &[String]) -> R<(bool, Option<&str>, bool)> {
     let mut comparison_build = false;
     let mut only = None;
@@ -25,10 +22,14 @@ fn options(args: &[String]) -> R<(bool, Option<&str>, bool)> {
         match flag.as_str() {
             "--comparison-build" if !comparison_build => comparison_build = true,
             "--only" if only.is_none() => {
-                only = Some(args.next().ok_or(USAGE)?.as_str());
+                only = Some(
+                    args.next()
+                        .ok_or_else(|| crate::usage_of("build-workers"))?
+                        .as_str(),
+                );
             }
             "--all-references" if !all_references => all_references = true,
-            _ => return Err(USAGE.into()),
+            _ => return Err(crate::usage_of("build-workers")),
         }
     }
     Ok((comparison_build, only, all_references))
@@ -37,10 +38,6 @@ fn options(args: &[String]) -> R<(bool, Option<&str>, bool)> {
 pub fn main(root: &Path, args: &[String]) -> R<PathBuf> {
     let (comparison_build, only, all_references) = options(args)?;
     build_selected(root, comparison_build, only, all_references)
-}
-
-fn sha(path: &Path) -> R<String> {
-    linux::file_sha(path)
 }
 
 fn output(program: &str, args: &[&str], env: &[(&str, String)]) -> R<String> {
@@ -741,7 +738,7 @@ pub(crate) fn candidate_worker(root: &Path, identity: &Value, name: &str) -> R<P
         .and_then(|workers| workers.get(name))
         .ok_or_else(|| format!("{name} is not in the build identity; rebuild"))?;
     let path = root.join(gate_build::release_dir()?).join(name);
-    if record.get("sha256").and_then(Value::as_str) != Some(sha(&path)?.as_str()) {
+    if record.get("sha256").and_then(Value::as_str) != Some(crate::files::sha256(&path)?.as_str()) {
         return Err(format!("{name} changed since build identity; rebuild"));
     }
     let current = candidate_graph(root, name)?;
@@ -913,7 +910,10 @@ fn candidate_records(root: &Path, built: &[Built]) -> R<Value> {
             *name,
             Value::object([
                 ("path", Value::str(&path)),
-                ("sha256", Value::str(sha(&root.join(&path))?)),
+                (
+                    "sha256",
+                    Value::str(crate::files::sha256(&root.join(&path))?),
+                ),
                 (
                     "rustc",
                     Value::str(gate_build::toolchain_compiler(root, &toolchain)?),
@@ -1650,8 +1650,14 @@ fn build_selected(
     });
     let probe = out.join("memory-check");
     let mut instrumentation = vec![
-        ("observer_sha256".to_owned(), Value::str(sha(&observer)?)),
-        ("probe_sha256".to_owned(), Value::str(sha(&probe)?)),
+        (
+            "observer_sha256".to_owned(),
+            Value::str(crate::files::sha256(&observer)?),
+        ),
+        (
+            "probe_sha256".to_owned(),
+            Value::str(crate::files::sha256(&probe)?),
+        ),
     ];
     let candidate = root.join(gate_build::release_dir()?).join("media-worker");
     let mut libraries: Vec<(String, Value)> = Vec::new();
@@ -1691,7 +1697,12 @@ fn build_selected(
                 "harness/allocations-linux.c",
                 "harness/portable-memory-check.c",
             ]
-            .map(|n| (n, Value::str(sha(&root.join(n)).unwrap_or_default()))),
+            .map(|n| {
+                (
+                    n,
+                    Value::str(crate::files::sha256(&root.join(n)).unwrap_or_default()),
+                )
+            }),
         );
         instrumentation.extend([
             ("platform".into(), Value::str("Linux")),
@@ -1723,7 +1734,10 @@ fn build_selected(
             let proof_file = root.join(&proof_path);
             let profile = Value::object([
                 ("proof_path", Value::str(&proof_path)),
-                ("proof_sha256", Value::str(sha(&proof_file)?)),
+                (
+                    "proof_sha256",
+                    Value::str(crate::files::sha256(&proof_file)?),
+                ),
                 ("proof", json::read(&proof_file)?),
             ]);
             let (observer_sha, probe_sha) = (
@@ -1809,7 +1823,7 @@ fn build_selected(
                 .map(|p| {
                     Ok((
                         p.file_name().unwrap().to_string_lossy().into_owned(),
-                        Value::str(sha(p)?),
+                        Value::str(crate::files::sha256(p)?),
                     ))
                 })
                 .collect::<R<_>>()?,
@@ -1819,7 +1833,7 @@ fn build_selected(
     };
     let combined_record = Value::object([
         ("path", Value::str("target/harness/ffmpeg-combined-worker")),
-        ("sha256", Value::str(sha(&combined)?)),
+        ("sha256", Value::str(crate::files::sha256(&combined)?)),
         (
             "kind",
             Value::str("pinned FFmpeg plus native scope-1 combined-encoding restoration"),
@@ -1840,14 +1854,14 @@ fn build_selected(
                     "path",
                     Value::str(format!("target/harness/{}", reference.binary)),
                 ),
-                ("sha256", Value::str(sha(path)?)),
+                ("sha256", Value::str(crate::files::sha256(path)?)),
                 ("kind", Value::str(reference.kind)),
                 ("instrumented", Value::Bool(reference.instrumented)),
                 ("compiler_command", strings(command)),
                 ("source", Value::str(reference.source)),
                 (
                     "source_sha256",
-                    Value::str(sha(&root.join(reference.source))?),
+                    Value::str(crate::files::sha256(&root.join(reference.source))?),
                 ),
                 ("reference_build", json::read(build)?),
                 (
@@ -1920,7 +1934,7 @@ fn build_selected(
                         "ffmpeg-native",
                         Value::object([
                             ("path", Value::str("target/harness/ffmpeg-worker")),
-                            ("sha256", Value::str(sha(&worker)?)),
+                            ("sha256", Value::str(crate::files::sha256(&worker)?)),
                             ("kind", Value::str("pinned native FFmpeg")),
                         ]),
                     ),
@@ -1944,8 +1958,8 @@ fn build_selected(
         (
             "binaries",
             Value::object([
-                ("candidate", Value::str(sha(&candidate)?)),
-                ("reference", Value::str(sha(&worker)?)),
+                ("candidate", Value::str(crate::files::sha256(&candidate)?)),
+                ("reference", Value::str(crate::files::sha256(&worker)?)),
             ]),
         ),
         ("source_hashes", files_of("source_hashes")),
@@ -1958,21 +1972,29 @@ fn build_selected(
             Value::object([
                 (
                     "manifest_sha256",
-                    Value::str(sha(&root.join("Cargo.toml"))?),
+                    Value::str(crate::files::sha256(&root.join("Cargo.toml"))?),
                 ),
-                ("lock_sha256", Value::str(sha(&root.join("Cargo.lock"))?)),
+                (
+                    "lock_sha256",
+                    Value::str(crate::files::sha256(&root.join("Cargo.lock"))?),
+                ),
             ]),
         ),
         ("reference_archives", archives),
         ("reference_build", pinned_build.unwrap_or(Value::Null)),
         (
             "reference_source_sha256",
-            Value::str(sha(&root.join("harness/reference.c"))?),
+            Value::str(crate::files::sha256(&root.join("harness/reference.c"))?),
         ),
-        ("lock_sha256", Value::str(sha(&root.join("Cargo.lock"))?)),
+        (
+            "lock_sha256",
+            Value::str(crate::files::sha256(&root.join("Cargo.lock"))?),
+        ),
         (
             "ffprobe_sha256",
-            which("ffprobe").map_or(Ok(Value::Null), |p| sha(&p).map(Value::str))?,
+            which("ffprobe").map_or(Ok(Value::Null), |p| {
+                crate::files::sha256(&p).map(Value::str)
+            })?,
         ),
     ];
     for (key, value) in updates {
@@ -1991,7 +2013,9 @@ fn build_selected(
         let tool_hashes = Value::object(["nm", "readelf", "ps"].map(|n| {
             (
                 n,
-                which(n).map_or(Value::Null, |p| sha(&p).map_or(Value::Null, Value::str)),
+                which(n).map_or(Value::Null, |p| {
+                    crate::files::sha256(&p).map_or(Value::Null, Value::str)
+                }),
             )
         }));
         let platform = Value::object([
@@ -2060,7 +2084,7 @@ fn build_selected(
     json::write(&path, &Value::Object(identity))?;
     if linux {
         let observations = Value::object([
-            ("identity_sha256", Value::str(sha(&path)?)),
+            ("identity_sha256", Value::str(crate::files::sha256(&path)?)),
             ("raw_loader_observations", Value::Object(libraries)),
         ]);
         json::write(&out.join("linux-loader-observations.json"), &observations)?;

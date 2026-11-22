@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn check_discovers_a_required_contract_with_a_committed_manifest() {
-        let root = crate::walk::scratch("required-contracts");
+        let root = crate::files::scratch("required-contracts");
         let create = |id: &str, gate: &str| {
             let directory = root.join("harness/features").join(id);
             fs::create_dir_all(&directory).unwrap();

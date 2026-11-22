@@ -1,12 +1,28 @@
-//! Deterministic directory walks over the repository.
+//! Files: reading, writing and hashing them with the path in every error, and
+//! deterministic walks over the repository.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// The bytes of the file at `path`.
+pub fn read(path: &Path) -> Result<Vec<u8>, String> {
+    fs::read(path).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Writes `data` to `path`, replacing the file.
+pub fn write(path: &Path, data: &[u8]) -> Result<(), String> {
+    fs::write(path, data).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// The lower-case hex SHA-256 of the file at `path`, read in pieces.
+pub fn sha256(path: &Path) -> Result<String, String> {
+    crate::sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))
+}
+
 /// Regular files under `root` whose path relative to `root` passes `keep`, in
 /// sorted order. Build output (`target`), symbolic links and hidden directories
 /// other than `.github` are not entered.
-pub fn files(root: &Path, keep: &dyn Fn(&Path) -> bool) -> Vec<PathBuf> {
+pub fn walk(root: &Path, keep: &dyn Fn(&Path) -> bool) -> Vec<PathBuf> {
     let mut out = Vec::new();
     visit(root, root, keep, &mut out);
     out.sort();

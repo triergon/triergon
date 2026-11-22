@@ -13,7 +13,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::codecs::correctness::file_sha;
 use crate::harness::diff::equal;
 use crate::harness::policy::{Memory, Runtime};
 use crate::harness::timing::{self, Operation};
@@ -925,8 +924,8 @@ impl Build {
             }
         }
         let workers = Value::object([
-            ("candidate", Value::str(file_sha(&candidate)?)),
-            ("reference", Value::str(file_sha(&reference)?)),
+            ("candidate", Value::str(crate::files::sha256(&candidate)?)),
+            ("reference", Value::str(crate::files::sha256(&reference)?)),
         ]);
         if workers.get("candidate").and_then(Value::as_str)
             != Some(text(candidate_record, "sha256")?)

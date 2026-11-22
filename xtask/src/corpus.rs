@@ -9,6 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::ebml::{cat, element as e, float64, header, int8, uint as u, vint};
+use crate::files::write;
 use crate::json::{self, Value};
 use crate::pyrandom::PyRandom;
 use crate::sha256;
@@ -40,10 +41,6 @@ impl Paths {
         json::write(&path, value)?;
         Ok(path)
     }
-}
-
-fn write(path: &Path, data: &[u8]) -> Result<(), String> {
-    fs::write(path, data).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Generate every corpus family; returns one summary line per family.
@@ -996,8 +993,7 @@ pub struct Source {
 
 impl Source {
     pub fn load(root: &Path) -> Result<Self, String> {
-        let trace =
-            json::read(&root.join(SOURCE_TRACE)).map_err(|e| format!("{SOURCE_TRACE}: {e}"))?;
+        let trace = json::read(&root.join(SOURCE_TRACE))?;
         let data = trace
             .get("data")
             .cloned()
@@ -2920,7 +2916,7 @@ mod tests {
             .parent()
             .unwrap()
             .to_path_buf();
-        let out = crate::walk::scratch("capsules");
+        let out = crate::files::scratch("capsules");
         let paths = Paths {
             root: root.clone(),
             out: out.clone(),
@@ -2945,7 +2941,7 @@ mod tests {
             .parent()
             .unwrap()
             .to_path_buf();
-        let out = crate::walk::scratch("corpus");
+        let out = crate::files::scratch("corpus");
         generate_all(&Paths {
             root: root.clone(),
             out: out.clone(),

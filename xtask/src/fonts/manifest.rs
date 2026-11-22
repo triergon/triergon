@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn edited_or_mismatched_pins_fail_the_check() {
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let root = crate::walk::scratch("font-pins");
+        let root = crate::files::scratch("font-pins");
         let feature = root.join("harness/features/font-outlines");
         std::fs::create_dir_all(&feature).unwrap();
         std::fs::create_dir_all(root.join("harness/fonts")).unwrap();

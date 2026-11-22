@@ -37,7 +37,7 @@ fn every_ffmpeg_profile_has_a_build_and_names_are_unique() {
 
 #[test]
 fn a_recipe_change_changes_the_key_of_every_build_that_links_it() {
-    let root = crate::walk::scratch("reference-keys");
+    let root = crate::files::scratch("reference-keys");
     repository(&root);
     let keys = |root: &Path| -> Vec<String> {
         BUILDS.iter().map(|b| b.key(root).unwrap().sha256).collect()
@@ -60,7 +60,7 @@ fn a_recipe_change_changes_the_key_of_every_build_that_links_it() {
 
 #[test]
 fn a_build_is_made_once_then_packed_and_restored_unchanged() {
-    let root = crate::walk::scratch("reference-cache");
+    let root = crate::files::scratch("reference-cache");
     repository(&root);
     let freetype = build("freetype").unwrap();
     let dir = root.join(freetype.directory);
@@ -96,7 +96,7 @@ fn a_build_is_made_once_then_packed_and_restored_unchanged() {
 
 #[test]
 fn a_miss_builds_from_nothing_and_only_a_clean_tree_is_packed() {
-    let root = crate::walk::scratch("reference-clean");
+    let root = crate::files::scratch("reference-clean");
     repository(&root);
     let freetype = build("freetype").unwrap();
     let dir = root.join(freetype.directory);

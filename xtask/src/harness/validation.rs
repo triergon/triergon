@@ -3,7 +3,7 @@
 use std::path::{Component, Path, PathBuf};
 
 use super::comparison::{reference_named, reference_record, rule_for};
-use super::{diff, gate_build, linux, provenance};
+use super::{diff, gate_build, provenance};
 use crate::json::Value;
 
 pub(super) fn field<'a>(value: &'a Value, key: &str) -> Result<&'a Value, String> {
@@ -212,7 +212,7 @@ pub(super) fn current_workers(root: &Path, identity: &Value) -> Result<(PathBuf,
     let candidate = root.join(gate_build::release_dir()?).join("media-worker");
     let reference = root.join("target/harness/ffmpeg-worker");
     for (role, path) in [("candidate", &candidate), ("reference", &reference)] {
-        if linux::file_sha(path)? != hash(field(identity, "binaries")?, role)? {
+        if crate::files::sha256(path)? != hash(field(identity, "binaries")?, role)? {
             return Err(format!(
                 "{role} worker changed since build identity; rebuild"
             ));
@@ -227,7 +227,8 @@ pub(super) fn current_workers(root: &Path, identity: &Value) -> Result<(PathBuf,
             .join(text(record, "path")?)
             .canonicalize()
             .map_err(|e| e.to_string())?;
-        if !path.starts_with(&directory) || linux::file_sha(&path)? != hash(record, "sha256")? {
+        if !path.starts_with(&directory) || crate::files::sha256(&path)? != hash(record, "sha256")?
+        {
             return Err("comparison reference changed since build identity; rebuild".into());
         }
     }
@@ -253,7 +254,7 @@ pub(crate) fn candidate_worker(
     }
     let record = field(field(identity, "additional_candidates")?, name)?;
     let path = root.join(gate_build::release_dir()?).join(name);
-    let actual = linux::file_sha(&path)?;
+    let actual = crate::files::sha256(&path)?;
     if actual != hash(record, "sha256")? {
         return Err(format!("{name} changed since build identity; rebuild"));
     }
@@ -321,7 +322,7 @@ mod tests {
         ] {
             fs::write(root.join(path), bytes).unwrap();
         }
-        let digest = |path: &str| Value::str(linux::file_sha(&root.join(path)).unwrap());
+        let digest = |path: &str| Value::str(crate::files::sha256(&root.join(path)).unwrap());
         let identity = Value::object([
             ("schema", Value::int(1)),
             (
@@ -426,7 +427,7 @@ mod tests {
             "additional_candidates",
             Value::object([(
                 "custom-worker",
-                Value::object([("sha256", Value::str(linux::file_sha(&custom).unwrap()))]),
+                Value::object([("sha256", Value::str(crate::files::sha256(&custom).unwrap()))]),
             )]),
         )
         .unwrap();
@@ -446,7 +447,7 @@ mod tests {
             ("target/harness/other-worker", "0".repeat(64)),
             (
                 candidate.as_str(),
-                linux::file_sha(&root.join(&candidate)).unwrap(),
+                crate::files::sha256(&root.join(&candidate)).unwrap(),
             ),
         ] {
             put(

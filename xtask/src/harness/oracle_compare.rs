@@ -10,7 +10,6 @@ use crate::sha256;
 
 type R<T> = Result<T, String>;
 
-const USAGE: &str = "usage: cargo xtask oracle-compare [--contract FILE] [--output DIR]";
 const PIN: &str = "trace_sha256";
 
 pub fn kind(document: &Value) -> R<oracle::Kind> {
@@ -241,7 +240,7 @@ pub(crate) fn compare_with_inputs(
     optional: Option<&crate::test_skips::ParityInputs>,
 ) -> R<i32> {
     let contract = json::read(file)?;
-    let contract_sha = super::linux::file_sha(file)?;
+    let contract_sha = crate::files::sha256(file)?;
     let oracle = TraceOracle::new(&contract)?;
     let id = validation::text(&contract, "id")?;
     let candidate_name = validation::text(&contract, "candidate")?;
@@ -253,7 +252,7 @@ pub(crate) fn compare_with_inputs(
     let open = report::open_cases(&contract, &listing, &target)?;
     let identity = json::read(&root.join("target/harness/identity.json"))?;
     let candidate = validation::candidate_worker(root, &identity, candidate_name)?;
-    let binary_sha = super::linux::file_sha(&candidate)?;
+    let binary_sha = crate::files::sha256(&candidate)?;
     report::create_output(output)?;
     let cases = listing
         .get("cases")
@@ -315,7 +314,7 @@ pub(crate) fn compare_with_inputs(
         ]));
     }
     validation::candidate_worker(root, &identity, candidate_name)?;
-    if super::linux::file_sha(file)? != contract_sha
+    if crate::files::sha256(file)? != contract_sha
         || manifest::read(root, &manifest_file)?.1 != manifest_sha
     {
         return Err("oracle contract or corpus changed during comparison".into());
@@ -350,17 +349,17 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             "--contract" => &mut contract,
             "--output" => &mut output,
             "--help" | "-h" => {
-                println!("{USAGE}");
+                println!("{}", crate::usage_of("oracle-compare"));
                 return Ok(0);
             }
-            _ => return Err(USAGE.into()),
+            _ => return Err(crate::usage_of("oracle-compare")),
         };
         if field.is_some() {
-            return Err(USAGE.into());
+            return Err(crate::usage_of("oracle-compare"));
         }
         *field = args.next().map(|path| root.join(path));
         if field.is_none() {
-            return Err(USAGE.into());
+            return Err(crate::usage_of("oracle-compare"));
         }
     }
     let output = output.unwrap_or_else(|| {

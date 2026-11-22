@@ -75,7 +75,7 @@ fn section(
     name: &'static str,
 ) -> Result<impl Fn(&str) -> Result<f64, String>, String> {
     let path = root.join(FILE);
-    let policy = json::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let policy = json::read(&path)?;
     Ok(move |key: &str| {
         policy
             .get(name)

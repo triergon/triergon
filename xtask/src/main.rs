@@ -18,6 +18,7 @@ mod exceptions;
 mod fate;
 mod fetch;
 mod ffprobe;
+mod files;
 mod fonts;
 mod framing_bench;
 mod framing_views;
@@ -54,7 +55,6 @@ mod toml;
 mod transport_fate;
 mod transport_fixtures;
 mod transport_views;
-mod walk;
 mod worker_tests;
 mod zlib;
 
@@ -62,7 +62,12 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-const USAGE: &str = "usage: cargo xtask <command>
+/// What `cargo xtask help` prints: every command, its arguments and what it does.
+/// Each entry is a line that starts with two spaces and the command's name, then lines
+/// indented by 17; `cargo xtask COMMAND --help` prints the command's entry, or its own
+/// usage text where [`COMMANDS`] names one.
+const HELP: &str = "usage: cargo xtask COMMAND [ARGUMENT]...
+       cargo xtask COMMAND --help
 
 commands:
   check          [PART]   everything CI runs: format, tests, lints, builds and the checks
@@ -76,9 +81,9 @@ commands:
                  index tests), all a pull request that changes nothing else needs
   check-simd     clippy and tests of the std::simd paths (HEVC, AAC) on the pinned nightly
   prepare-check  [PART]   once before `check`: the pinned FFmpeg, FreeType, HarfBuzz,
-                 FriBidi and libass references, the fixtures, the required vectors, the font
-                 corpus and the workers (built with the reference first on PATH); with
-                 PART, only what that part of `check` reads
+                 FriBidi and libass references, the fixtures, the required vectors, the
+                 font corpus and the workers (built with the reference first on PATH);
+                 with PART, only what that part of `check` reads
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
@@ -88,269 +93,415 @@ commands:
   status         [--write]   docs/status.md's tables with their Runtime and Memory cells
                  rendered from the evidence index as harness/status-rows.json maps them;
                  --write writes them into the page
-  core-time      compare exact arithmetic against the independent fraction oracle
+  core-time      [--output DIR] [--profiles debug release] [--toolchain NAME]
+                 [--target TRIPLE]   compare exact arithmetic against the independent
+                 fraction oracle
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
-  session-queues compare baseline and candidate session queues; --help for usage
-  progressive    compare all five forward-only AVC/AAC TS188 feeds; --help for measurement options
-  fixture        write one corpus variant (see `cargo xtask fixture --help`)
-  subtitle-fixtures record|verify FEATURE REFERENCE [options]   record or verify subtitle folds
+  fixture        FAMILY [OPTION]... --output FILE   write one corpus variant
+  session-queues build LIBRARY_TREE NEW_WORKER
+                 | check|time|memory BASE_WORKER CANDIDATE_WORKER NEW_OUTPUT_DIR
+                 compare baseline and candidate session queues
+  progressive    [--output DIR] [--benchmark] [--memory] [OPTION]...   compare all five
+                 forward-only AVC/AAC TS188 feeds, and optionally time and measure them
+  subtitle-fixtures record|verify FEATURE REFERENCE [--target TRIPLE] [--corpus DIR]
+                 [--manifest FILE] [--cases-stdin]   record or verify subtitle folds
   prepare-ffmpeg [--jobs N] [--profile PROFILE]
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
-                 matroska (default), formats, framing-views, video, subtitles, transport-dts, transport-mpeg-video (git revision on the 9.0 branch);
+                 matroska (default), formats, framing-views, video, subtitles,
+                 transport-dts, transport-mpeg-video (git revision on the 9.0 branch);
                  decode, capture, capture-small (the 9.0.2 release)
-  oracle-compare [--contract FILE] [--output DIR]  compare candidate traces with an independent oracle
-  framing-views fixtures|manifest --record [FEATURE]
-  isobmff-views fixtures|manifest --record [FEATURE]
-  codec-views fixtures|manifest --record [FEATURE]
-  matroska-views fixtures|manifest --record [FEATURE]
-  subtitle-views fixtures|manifest --record [FEATURE]
-  transport-views fixtures|manifest --record [FEATURE]
-  playback-views fixtures|manifest --record [FEATURE]
-  play-views fixtures|manifest --record [FEATURE]
   prepare-mpg123 [--jobs N]   build the pinned static free-format MPEG audio reference
-  references     keys|pack|fetch|upload   the keys of the pinned reference builds, and
-                 their packs in .research/reference-cache and the evidence archive, which
-                 the prepare commands restore instead of building (see `cargo xtask
-                 references --help`)
-  fetch-specs    [--record] cache the specification texts and verify specs/sources.json
+  references     keys | pack|fetch|upload [NAME]...   the keys of the pinned reference
+                 builds, and their packs in .research/reference-cache and the evidence
+                 archive, which the prepare commands restore instead of building
+  oracle-compare [--contract FILE] [--output DIR]
+                 compare candidate traces with an independent oracle
+  codec-views    fixtures media|audio | fixtures --write-manifests FEATURE | VIEWS
+                 the inputs of the codec views worker's features and their reference
+                 pins. For every views command, VIEWS is `fixtures [FEATURE]`, which
+                 checks each feature's inputs against its manifest, or `manifest
+                 --record [FEATURE [--cases ID...]]`, which records the built
+                 reference's folds
+  framing-views  fixtures [--write-manifests] config|streams|nal | fixtures dts
+                 | manifest --record dts | VIEWS   the framing views worker's inputs
+  isobmff-views  author-indexes | author-packets DIR | author-seek DIR | VIEWS
+                 the ISO BMFF views worker's inputs
+  matroska-views generate | draft DIR | VIEWS   the Matroska views worker's inputs
+  play-views     seek --record [--cases ID...] | seek WORKER OUTPUT | VIEWS
+                 the play views worker's seek cases
+  playback-views author-probes | VIEWS   the playback views worker's probe controls
+  subtitle-views fixtures corpus | fixtures --write-to DIR | VIEWS
+                 the subtitle views worker's inputs
+  transport-views fixtures catalogue-packets | fixtures --write-manifest source-signatures
+                 | VIEWS   the transport views worker's inputs
+  fetch-specs    [--record]   cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
   external-vector --output DIR [--pairs N] [--iterations N] [--benchmark] [--memory]
                  [--baseline-worker W] [--full] [--no-early-stop]
                  qualify the mandatory external metadata vector through the same gates
-  fate-run       --case NAME [--demux-only]   run one supported upstream FATE case
+  fate-run       [--case NAME] [--demux-only]   run one supported upstream FATE case
+                 (fate-matroska-xiph-lacing by default)
   trace-identities --output F [--compare F] [--candidate W] [--corpus FEATURE=DIR]...
                  record the digest of every candidate trace over all recorded cases: the
                  Matroska cases for media-worker, every case of each feature that runs W
                  through a worker operation prefix otherwise
-  evidence pack DIR OUT       deterministic .tar.gz or .tar.zst of DIR; prints its SHA-256
-  evidence fetch SET [DIR]    fetch, verify and unpack an archived evidence set
-                              (harness/evidence/sets/SET.json; TRIERGON_EVIDENCE_ARCHIVE)
-  evidence restorable         the name and key of each kept set holding results a gate run
-                              restores when it reuses them
-  evidence measure [SET]...   record each gate result's target and what it measured in the
-                              index entries of SET, or of every kept set lacking them, read
-                              from the archived packs (TRIERGON_EVIDENCE_ARCHIVE)
-  playback-golds DIR [--check]
-                 convert the FFprobe captures of evidence set playback-terminal-matrix-ffprobe,
-                 unpacked in DIR, into the playback terminal-media records; --check compares
-                 them with the committed records
-  fuzz           --manifest F --output DIR [--rounds N] [--seed N] [--maximum-input-bytes N]
-                 [--maximum-output-bytes N] [--timeout-seconds S]
-                 deterministic, replayable mutation campaign through JSON workers
-  fuzz           --contract F [--manifest F] [--corpus DIR] [--case TEXT]... [--reference]
-                 --output DIR [--rounds N] ...
-                 the same campaign over the cases of a feature with a worker operation
-                 prefix: its release candidate and a dev build of it, with --reference also
-                 its reference; the bound on input size is raised to the largest case
+  evidence       pack DIR OUT | upload SET OUT | entry SET OUT [--key KEY] | promote SET
+                 | fetch SET [DIR] | restorable | measure [SET]...
+                 the evidence archive (TRIERGON_EVIDENCE_ARCHIVE) and its index
+                 (harness/evidence/sets/SET.json): pack writes the deterministic .tar.gz
+                 or .tar.zst of DIR and prints its SHA-256; upload uploads a pack under
+                 qualification/ and prints its index entry, which entry prints without
+                 uploading; promote moves a set under evidence/ and records it as kept;
+                 fetch downloads, verifies and unpacks a set; restorable prints the name
+                 and key of each kept set holding results a gate run restores when it
+                 reuses them; measure records each gate result's target and what it
+                 measured in the index entries of SET, or of every kept set lacking
+                 them, read from the archived packs
+  playback-golds DIR [--check]   convert the FFprobe captures of evidence set
+                 playback-terminal-matrix-ffprobe, unpacked in DIR, into the playback
+                 terminal-media records; --check compares them with the committed records
+  fuzz           --manifest F | --contract F [--manifest F] [--corpus DIR] [--case TEXT]...
+                 [--reference]; --output DIR [--rounds N] [--seed N]
+                 [--maximum-input-bytes N] [--maximum-output-bytes N] [--timeout-seconds S]
+                 deterministic, replayable mutation campaign through JSON workers; with
+                 --contract, over the cases of a feature with a worker operation prefix:
+                 its release candidate and a dev build of it, with --reference also its
+                 reference, the bound on input size raised to the largest case
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
-  isobmff-bench   compare all 1020 open/index traces; optionally measure 972 labels or --subset52
-  isobmff-seek    [fixtures --out DIR] compare every ISO BMFF seek and range-plan case;
-                 optionally time and measure them; use --help for options
-  framing        compare the whole-packet framing corpus; use --help for options
+  isobmff-bench  [--benchmark] [--memory] [OPTION]...   compare all 1020 open/index
+                 traces; optionally measure 972 labels or --subset52
+  isobmff-seek   [fixtures --out DIR] [--benchmark] [--memory] [OPTION]...   compare
+                 every ISO BMFF seek and range-plan case; optionally time and measure them
+  framing        [fixtures] [--output DIR] [--benchmark] [--memory] [OPTION]...
+                 compare the whole-packet framing corpus
   grade          TIMING MEMORY --contract F --manifest F --output DIR
-                 [--additional-report F] [--require-slice-acceptance|--require-acceptance] [--full]
-                 join complete reports, recompute runtime and memory bounds, then apply gates
-  preflight      [--feature ID]... [--corpus ID=DIR]... [--isobmff] [--codecs F]... [--review F]
-                 [--kernel]
-                 before a gate run measures: workers, references, inputs, RSS module review
-                 and state; see `cargo xtask preflight --help`
-  gate           plan|preflight|run|summary   the full gate as one plan of steps, split
-                 into shards that run on separate hosts, and their joined result (see
-                 `cargo xtask gate --help`)
+                 [--additional-report F] [--require-slice-acceptance|--require-acceptance]
+                 [--full]   join complete reports, recompute runtime and memory bounds,
+                 then apply gates
+  preflight      [--feature ID]... [--corpus ID=DIR]... [--isobmff] [--codecs F]...
+                 [--review F] [--kernel]   before a gate run measures: workers,
+                 references, inputs, RSS module review and state
+  gate           plan|check|preflight|run|summary|test [OPTION]...   the full gate as one
+                 plan of steps, split into shards that run on separate hosts, and their
+                 joined result
   build-workers  [--comparison-build] [--only WORKER] [--all-references]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the
-                 gate build is refused unless it is for paired comparisons only; a profile
-                 reference whose profile is not prepared is skipped and printed, and with
-                 --all-references it fails the build
-  link-order     BINARY [OUT] [--trained FILE]   the symbol ordering file that lays a
-                 program's functions out in a trained order, then module order, as the
-                 workers are linked (docs/quality.md); corpus OUT, separate, train and
-                 check generate the training corpus, check it is apart from the gate,
-                 record the workers' trained orders and check the committed ones
+                 gate build is refused unless it is for paired comparisons only; a
+                 profile reference whose profile is not prepared is skipped and printed,
+                 and with --all-references it fails the build
+  link-order     BINARY [OUT] [--trained FILE] | corpus OUT | separate [--corpus DIR]
+                 | train [--corpus DIR] [--only WORKER] | check   the symbol ordering
+                 file that lays a program's functions out in a trained order, then
+                 module order, as the workers are linked (docs/quality.md); corpus,
+                 separate, train and check generate the training corpus, check it is
+                 apart from the gate, record the workers' trained orders and check the
+                 committed ones
   memory-admission CANDIDATE REFERENCE
-                 check the native Linux memory observer (AArch64 or 32-bit ARMv7)
-                 for two built workers and print the certificate
+                 check the native Linux memory observer (AArch64 or 32-bit ARMv7) for two
+                 built workers and print the certificate
   worker-tests   [FILTER]   integration tests of the built workers against the reference
                  workers and the independent oracles (tests whose name contains FILTER)
-  report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
-                 [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
-                 [--benchmark] [--memory] [--pairs N] [--memory-pairs N] [--iterations N] [--seed N]
-                 [--baseline-worker W] [--full] [--no-early-stop]
-                 correctness, paired runtime and memory report of the built workers for one contract;
-                 with a baseline worker of another build, timing and memory pair against it;
-                 a gate collection a kept evidence set holds is reused unless --full; a gate
-                 session stops at an early look once settled unless --no-early-stop
+  report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR]
+                 [--fate-cache DIR] [--additional-report F]... [--require-acceptance]
+                 [--require-slice-acceptance] [--benchmark] [--memory] [--pairs N]
+                 [--memory-pairs N] [--iterations N] [--seed N] [--baseline-worker W]
+                 [--full] [--no-early-stop]
+                 correctness, paired runtime and memory report of the built workers for
+                 one contract; with a baseline worker of another build, timing and memory
+                 pair against it; a gate collection a kept evidence set holds is reused
+                 unless --full; a gate session stops at an early look once settled unless
+                 --no-early-stop
   compare        --candidate W --reference W --input FILE --output DIR
                  [--operation plain|seek|colour|catalogue] [--content] [--no-short-reads]
                  compare one input across a candidate and a reference worker
-  same-code      CANDIDATE REFERENCE
-                 compare two worker binaries function by function; fails if any
-                 function differs beyond its position
-  count          CANDIDATE REFERENCE ARGUMENT...
-                 count instructions of two workers on one workload with perf stat;
-                 fails above the quick-check limit
+  same-code      CANDIDATE REFERENCE   compare two worker binaries function by function;
+                 fails if any function differs beyond its position
+  count          CANDIDATE REFERENCE ARGUMENT...   count instructions of two workers on
+                 one workload with perf stat; fails above the quick-check limit
   screen         REPORTS   grade one paired timing round, with each contract's report
                  under REPORTS/<contract>, against the quick-check tolerances
   transport-fate check | inventory OUTPUT | observe SPEC OUTPUT_DIR
                  check TS identity coverage or record pinned original-input observations
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed
-  codecs         aac-access-units|manifest|grade|summarize|time|equivalence
-                 codec crates against the
-                 pinned FFmpeg decoders (see `cargo xtask codecs --help`)
-  capture        compare|qualify|summarize|equivalence   capture pipeline against the
-                 FFmpeg capture reference (see `cargo xtask capture --help`)
-  fonts          prepare|fetch|manifest|compare|assemble|probe   the pinned FreeType
-                 reference, the font corpus and the font features' manifests; compare
-                 reports the required font features, --all every one; probe compares
-                 assembled TrueType probe faces (see `cargo xtask fonts --help`)
-  shape          prepare|manifest|compare|ucd   triergon-shape against the pinned
-                 HarfBuzz and FriBidi reference (see `cargo xtask shape --help`)
-  raster         prepare|manifest|compare   triergon-raster against the pinned libass
-                 reference (see `cargo xtask raster --help`)
-  ass            prepare|manifest|compare   triergon-ass's parsing against the same
-                 libass build (see `cargo xtask ass --help`)";
+  codecs         COMMAND [OPTION]...   the codec crates against the pinned FFmpeg
+                 decoders: dsp, aac-access-units, aac-ps-tables, aac-sources, derive,
+                 manifest, variant-pins, grade, compare-hevc, summarize, readers,
+                 isobmff-reader, time, memory, equivalence and fuzz
+  capture        compare|qualify|summarize|equivalence [OPTION]...   the capture
+                 pipeline against the FFmpeg capture reference
+  fonts          prepare|fetch|store|tables|manifest|compare|assemble|probe [OPTION]...
+                 the pinned FreeType reference, the font corpus and the font features'
+                 manifests; compare reports the required font features, --all every one;
+                 probe compares assembled TrueType probe faces
+  shape          prepare|manifest|compare|ucd|conformance|assemble|probe [OPTION]...
+                 triergon-shape against the pinned HarfBuzz and FriBidi reference
+  raster         prepare|manifest|compare [OPTION]...   triergon-raster against the
+                 pinned libass reference
+  ass            prepare|manifest|compare|equivalence [OPTION]...   triergon-ass's
+                 parsing and rendering against the same libass build";
+
+/// What runs a command, and so how it exits.
+enum Run {
+    /// Takes no arguments: exits 0, or prints its error and exits 1.
+    Plain(fn(&Path) -> Task),
+    /// Exits 0, or prints its error and exits 1.
+    Task(fn(&Path, &[String]) -> Task),
+    /// A measuring command: exits with its code, or prints its error and exits 2.
+    Measure(fn(&Path, &[String]) -> R<i32>),
+    /// A runner with its own usage text: exits with its code, or prints its error and
+    /// exits 1; for arguments it cannot use, it prints the usage and exits 2.
+    Runner(fn(&Path, &[String]) -> R<i32>),
+    /// Gives its own exit.
+    Exit(fn(&Path, &[String]) -> ExitCode),
+}
+
+/// A command of [`HELP`]: its name, its own usage text if it has one, and what runs it.
+struct Subcommand {
+    name: &'static str,
+    usage: Option<&'static str>,
+    run: Run,
+}
+
+impl Subcommand {
+    const fn new(name: &'static str, usage: Option<&'static str>, run: Run) -> Self {
+        Self { name, usage, run }
+    }
+
+    const fn plain(name: &'static str, run: fn(&Path) -> Task) -> Self {
+        Self::new(name, None, Run::Plain(run))
+    }
+
+    const fn task(name: &'static str, run: fn(&Path, &[String]) -> Task) -> Self {
+        Self::new(name, None, Run::Task(run))
+    }
+
+    const fn measure(name: &'static str, run: fn(&Path, &[String]) -> R<i32>) -> Self {
+        Self::new(name, None, Run::Measure(run))
+    }
+
+    const fn runner(
+        name: &'static str,
+        run: fn(&Path, &[String]) -> R<i32>,
+        usage: &'static str,
+    ) -> Self {
+        Self::new(name, Some(usage), Run::Runner(run))
+    }
+
+    const fn exit(name: &'static str, run: fn(&Path, &[String]) -> ExitCode) -> Self {
+        Self::new(name, None, Run::Exit(run))
+    }
+
+    const fn usage(self, usage: &'static str) -> Self {
+        Self::new(self.name, Some(usage), self.run)
+    }
+}
+
+/// Every command of [`HELP`], in its order.
+const COMMANDS: &[Subcommand] = &[
+    Subcommand::task("check", |root, args| match args {
+        [] => check(root, None),
+        [part] => Part::named(part).and_then(|part| check(root, Some(part))),
+        _ => Err(usage_of("check")),
+    }),
+    Subcommand::plain("check-simd", |root| {
+        simd_lints(root).and_then(|()| simd_tests(root))
+    }),
+    Subcommand::task("prepare-check", |_, args| match args {
+        [] => prepare_check(None),
+        [part] => Part::named(part).and_then(|part| prepare_check(Some(part))),
+        _ => Err(usage_of("prepare-check")),
+    }),
+    Subcommand::plain("check-links", check_links),
+    Subcommand::plain("check-design", check_design),
+    Subcommand::plain("check-safety", check_safety),
+    Subcommand::plain("check-revisions", check_revisions),
+    Subcommand::task("status", |root, args| {
+        let write = match args {
+            [] => false,
+            [flag] if flag == "--write" => true,
+            _ => return Err(usage_of("status")),
+        };
+        status::tables(root, write).map(|text| println!("{text}"))
+    }),
+    Subcommand::task("core-time", core_time::main),
+    Subcommand::plain("fixtures", fixtures),
+    Subcommand::task("fixture", fixture).usage(FIXTURE_USAGE),
+    Subcommand::task("session-queues", session_queues::main),
+    Subcommand::measure("progressive", progressive_bench::main).usage(progressive_bench::USAGE),
+    Subcommand::task("subtitle-fixtures", subtitle_fixtures::main),
+    Subcommand::task("prepare-ffmpeg", prepare_ffmpeg),
+    Subcommand::task("prepare-mpg123", mpg123::prepare),
+    Subcommand::task("references", references::main).usage(references::USAGE),
+    Subcommand::measure("oracle-compare", harness::oracle_compare::main),
+    Subcommand::task("codec-views", codec_views::main),
+    Subcommand::task("framing-views", framing_views::main),
+    Subcommand::task("isobmff-views", isobmff_views::main),
+    Subcommand::task("matroska-views", matroska_views::main),
+    Subcommand::task("play-views", play_views::main),
+    Subcommand::task("playback-views", playback_views::main),
+    Subcommand::task("subtitle-views", subtitle_views::main),
+    Subcommand::task("transport-views", transport_views::main),
+    Subcommand::task("fetch-specs", |root, args| {
+        let record = match args {
+            [] => false,
+            [flag] if flag == "--record" => true,
+            _ => return Err(usage_of("fetch-specs")),
+        };
+        fetch::specs(root, record, &fetch::Network).map(|summary| println!("{summary}"))
+    }),
+    Subcommand::plain("fetch-vectors", |root| {
+        let verified = fetch::vectors(root, &fetch::Network, fetch::VECTOR_LIMIT)?;
+        println!("Verified required vectors: {}", verified.join(", "));
+        Ok(())
+    }),
+    Subcommand::measure("external-vector", external_vector),
+    Subcommand::measure("fate-run", fate_run),
+    Subcommand::measure("trace-identities", trace_identities),
+    Subcommand::task("evidence", evidence),
+    Subcommand::task("playback-golds", |root, args| {
+        playback_golds::main(root, args).map(|summary| println!("{summary}"))
+    }),
+    Subcommand::measure("fuzz", fuzz_campaign),
+    Subcommand::task("graph", graph),
+    Subcommand::runner("isobmff-bench", isobmff_bench::main, isobmff_bench::USAGE),
+    Subcommand::runner("isobmff-seek", isobmff_seek::main, isobmff_seek::USAGE),
+    Subcommand::runner("framing", framing_bench::main, framing_bench::USAGE),
+    Subcommand::runner("grade", harness::grade::main, harness::grade::USAGE),
+    Subcommand::runner(
+        "preflight",
+        harness::preflight::main,
+        harness::preflight::USAGE,
+    ),
+    Subcommand::runner("gate", gate::main, gate::USAGE),
+    Subcommand::task("build-workers", |root, args| {
+        harness::build::main(root, args).map(|path| println!("{}", path.display()))
+    }),
+    Subcommand::task("link-order", link_order).usage(LINK_ORDER_USAGE),
+    Subcommand::task("memory-admission", |root, args| match args {
+        [candidate, reference] => {
+            harness::memory::admission(root, Path::new(candidate), Path::new(reference))
+        }
+        _ => Err(usage_of("memory-admission")),
+    }),
+    Subcommand::task("worker-tests", |root, args| match args {
+        [] => worker_tests::run(root, None),
+        [filter] => worker_tests::run(root, Some(filter)),
+        _ => Err(usage_of("worker-tests")),
+    }),
+    Subcommand::measure("report", report),
+    Subcommand::task("compare", compare),
+    Subcommand::exit("same-code", |_, args| match args {
+        [candidate, reference] => passing(harness::screen::same_code(
+            Path::new(candidate),
+            Path::new(reference),
+        )),
+        _ => task(Err(usage_of("same-code"))),
+    }),
+    Subcommand::exit("count", |_, args| match args {
+        [candidate, reference, arguments @ ..] if !arguments.is_empty() => passing(
+            harness::screen::count(Path::new(candidate), Path::new(reference), arguments),
+        ),
+        _ => task(Err(usage_of("count"))),
+    }),
+    Subcommand::exit("screen", |root, args| match args {
+        [reports] => passing(harness::screen::screen(root, Path::new(reports))),
+        _ => task(Err(usage_of("screen"))),
+    }),
+    Subcommand::task("transport-fate", transport_fate::main),
+    Subcommand::task("fate-inventory", |_, args| fate_inventory(args)),
+    Subcommand::runner("codecs", codecs::main, codecs::USAGE),
+    Subcommand::runner("capture", capture::main, capture::USAGE),
+    Subcommand::exit("fonts", |root, args| {
+        generator_main(root, &fonts::GENERATOR, args)
+    })
+    .usage(fonts::USAGE),
+    Subcommand::exit("shape", |root, args| {
+        generator_main(root, &shape::GENERATOR, args)
+    })
+    .usage(shape::USAGE),
+    Subcommand::exit("raster", |root, args| {
+        generator_main(root, &raster::GENERATOR, args)
+    })
+    .usage(raster::USAGE),
+    Subcommand::exit("ass", |root, args| {
+        generator_main(root, &ass::GENERATOR, args)
+    })
+    .usage(ass::USAGE),
+];
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
         return code;
     }
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let root = root();
-    if let Some(generator) = args.first().and_then(|command| generators::named(command)) {
-        return generator_main(&root, generator, &args[1..]);
+    let help = |flag: &str| matches!(flag, "help" | "--help" | "-h");
+    match args.as_slice() {
+        [] => {
+            eprintln!("{HELP}");
+            ExitCode::FAILURE
+        }
+        [flag] if help(flag) => {
+            println!("{HELP}");
+            ExitCode::SUCCESS
+        }
+        [name, flag] | [flag, name] if help(flag) && command(name).is_some() => {
+            println!("{}", usage_of(name));
+            ExitCode::SUCCESS
+        }
+        [name, args @ ..] => match command(name) {
+            Some(command) => {
+                let root = root();
+                match command.run {
+                    Run::Plain(_) if !args.is_empty() => task(Err(usage_of(name))),
+                    Run::Plain(run) => task(run(&root)),
+                    Run::Task(run) => task(run(&root, args)),
+                    Run::Measure(run) => exit_with(run(&root, args), 2),
+                    Run::Runner(run) => {
+                        failing(run(&root, args), command.usage.unwrap_or_default())
+                    }
+                    Run::Exit(run) => run(&root, args),
+                }
+            }
+            None => task(Err(format!(
+                "{name}: no such command; `cargo xtask help` lists them"
+            ))),
+        },
     }
-    if let Some(result) = args
-        .first()
-        .and_then(|command| generators::views(command, &root, &args[1..]))
-    {
-        return exit_with(result.map(|()| 0), 1);
-    }
-    let result = match args.first().map(String::as_str) {
-        Some("check") => match &args[1..] {
-            [] => check(&root, None),
-            [part] => Part::named(part).and_then(|part| check(&root, Some(part))),
-            _ => Err(USAGE.to_owned()),
-        },
-        Some("session-queues") => session_queues::main(&root, &args[1..]),
-        Some("progressive") => return exit(progressive_bench::main(&root, &args[1..])),
-        Some("check-simd") => simd_lints(&root).and_then(|()| simd_tests(&root)),
-        Some("prepare-check") => match &args[1..] {
-            [] => prepare_check(None),
-            [part] => Part::named(part).and_then(|part| prepare_check(Some(part))),
-            _ => Err(USAGE.to_owned()),
-        },
-        Some("check-links") => check_links(&root),
-        Some("check-design") => check_design(&root),
-        Some("check-safety") => check_safety(&root),
-        Some("check-revisions") => check_revisions(&root),
-        Some("status") => match &args[1..] {
-            [] => status::tables(&root, false),
-            [flag] if flag == "--write" => status::tables(&root, true),
-            _ => Err("usage: cargo xtask status [--write]".into()),
-        }
-        .map(|text| println!("{text}")),
-        Some("core-time") => core_time::main(&root, &args[1..]),
-        Some("fixtures") => fixtures(&root),
-        Some("fixture") => fixture(&root, &args[1..]),
-        Some("subtitle-fixtures") => subtitle_fixtures::main(&root, &args[1..]),
-        Some("fate-inventory") => fate_inventory(&args[1..]),
-        Some("transport-fate") => transport_fate::main(&root, &args[1..]),
-        Some("compare") => compare(&root, &args[1..]),
-        Some("link-order") => link_order(&root, &args[1..]),
-        Some("same-code") => match &args[1..] {
-            [candidate, reference] => {
-                return passing(harness::screen::same_code(
-                    Path::new(candidate),
-                    Path::new(reference),
-                ));
-            }
-            _ => Err("usage: cargo xtask same-code CANDIDATE REFERENCE".into()),
-        },
-        Some("count") => match &args[1..] {
-            [candidate, reference, arguments @ ..] if !arguments.is_empty() => {
-                return passing(harness::screen::count(
-                    Path::new(candidate),
-                    Path::new(reference),
-                    arguments,
-                ));
-            }
-            _ => Err("usage: cargo xtask count CANDIDATE REFERENCE ARGUMENT...".into()),
-        },
-        Some("screen") => match &args[1..] {
-            [reports] => return passing(harness::screen::screen(&root, Path::new(reports))),
-            _ => Err("usage: cargo xtask screen REPORTS".into()),
-        },
-        Some("framing-views") => framing_views::main(&root, &args[1..]),
-        Some("isobmff-views") => isobmff_views::main(&root, &args[1..]),
-        Some("oracle-compare") => return exit(harness::oracle_compare::main(&root, &args[1..])),
-        Some("report") => return report(&root, &args[1..]),
-        Some("framing") => {
-            return failing(framing_bench::main(&root, &args[1..]), framing_bench::USAGE);
-        }
-        Some("grade") => {
-            return failing(
-                harness::grade::main(&root, &args[1..]),
-                harness::grade::USAGE,
-            );
-        }
-        Some("isobmff-bench") => {
-            return failing(isobmff_bench::main(&root, &args[1..]), isobmff_bench::USAGE);
-        }
-        Some("isobmff-seek") => {
-            return failing(isobmff_seek::main(&root, &args[1..]), isobmff_seek::USAGE);
-        }
-        Some("prepare-mpg123") => mpg123::prepare(&root, &args[1..]),
-        Some("external-vector") => return external_vector(&root, &args[1..]),
-        Some("fate-run") => return fate_run(&root, &args[1..]),
-        Some("graph") => graph(&root, &args[1..]),
-        Some("fuzz") => return fuzz_campaign(&root, &args[1..]),
-        Some("evidence") => evidence(&root, &args[1..]),
-        Some("playback-golds") => {
-            playback_golds::main(&root, &args[1..]).map(|summary| println!("{summary}"))
-        }
-        Some("trace-identities") => return trace_identities(&root, &args[1..]),
-        Some("gate") => return failing(gate::main(&root, &args[1..]), gate::USAGE),
-        Some("preflight") => {
-            return failing(
-                harness::preflight::main(&root, &args[1..]),
-                harness::preflight::USAGE,
-            );
-        }
-        Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
-        Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
-        Some("build-workers") => {
-            harness::build::main(&root, &args[1..]).map(|path| println!("{}", path.display()))
-        }
-        Some("memory-admission") => match &args[1..] {
-            [candidate, reference] => {
-                harness::memory::admission(&root, Path::new(candidate), Path::new(reference))
-            }
-            _ => Err("usage: cargo xtask memory-admission CANDIDATE REFERENCE".into()),
-        },
-        Some("worker-tests") => match &args[1..] {
-            [] => worker_tests::run(&root, None),
-            [filter] => worker_tests::run(&root, Some(filter)),
-            _ => Err(USAGE.to_owned()),
-        },
-        Some("prepare-ffmpeg") => prepare_ffmpeg(&root, &args[1..]),
-        Some("references") => references::main(&root, &args[1..]),
-        Some("fetch-specs") => match &args[1..] {
-            [] => fetch::specs(&root, false, &fetch::Network).map(|s| println!("{s}")),
-            [flag] if flag == "--record" => {
-                fetch::specs(&root, true, &fetch::Network).map(|s| println!("{s}"))
-            }
-            _ => Err(USAGE.to_owned()),
-        },
-        Some("fetch-vectors") => fetch::vectors(&root, &fetch::Network, fetch::VECTOR_LIMIT)
-            .map(|verified| println!("Verified required vectors: {}", verified.join(", "))),
-        Some("-h" | "--help" | "help") => {
-            println!("{USAGE}");
-            Ok(())
-        }
-        _ => Err(USAGE.to_owned()),
+}
+
+fn command(name: &str) -> Option<&'static Subcommand> {
+    COMMANDS.iter().find(|command| command.name == name)
+}
+
+/// The lines of command `name`'s entry in [`HELP`], without their indentation.
+fn entry(name: &str) -> Vec<String> {
+    let mut lines = HELP.lines().skip_while(|line| *line != "commands:").skip(1);
+    let Some(first) = lines.find(|line| {
+        line.strip_prefix("  ")
+            .and_then(|line| line.strip_prefix(name))
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
+    }) else {
+        return Vec::new();
     };
+    let synopsis = first[2 + name.len()..].trim_start();
+    std::iter::once(format!("{name} {synopsis}").trim_end().to_owned())
+        .chain(lines.map_while(|line| Some(line.strip_prefix(&" ".repeat(17))?.to_owned())))
+        .collect()
+}
+
+/// What `cargo xtask NAME --help` prints: the command's own usage, or its entry in
+/// [`HELP`]. A command refuses arguments it cannot use with this text.
+fn usage_of(name: &str) -> String {
+    match command(name).and_then(|command| command.usage) {
+        Some(usage) => usage.to_owned(),
+        None => format!("usage: cargo xtask {}", entry(name).join("\n       ")),
+    }
+}
+
+/// A command's exit: 0 on success; an error is printed and exits 1.
+fn task(result: Task) -> ExitCode {
     exit_with(result.map(|()| 0), 1)
 }
 
@@ -426,7 +577,7 @@ fn evidence(root: &Path, args: &[String]) -> Task {
             let key = match rest {
                 [] => None,
                 [flag, key] if flag == "--key" => Some(key.as_str()),
-                _ => return Err("usage: evidence entry SET ARCHIVE [--key KEY]".into()),
+                _ => return Err(usage_of("evidence")),
             };
             println!("{}", evidence::entry(root, set, Path::new(archive), key)?.1);
             Ok(())
@@ -445,12 +596,7 @@ fn evidence(root: &Path, args: &[String]) -> Task {
             }
             Ok(())
         }
-        _ => Err(
-            "usage: evidence pack DIR OUT | evidence upload SET ARCHIVE \
-                  | evidence entry SET ARCHIVE [--key KEY] | evidence promote SET | evidence fetch SET [DIR] \
-                  | evidence restorable | evidence measure [SET]..."
-                .into(),
-        ),
+        _ => Err(usage_of("evidence")),
     }
 }
 
@@ -463,6 +609,7 @@ fn root() -> PathBuf {
 }
 
 type Task = Result<(), String>;
+type R<T> = Result<T, String>;
 
 fn check_links(root: &Path) -> Task {
     let errors = checks::links(root);
@@ -512,11 +659,6 @@ fn exit_with(result: Result<i32, String>, error: u8) -> ExitCode {
     }
 }
 
-/// A measuring command's exit code; an error is printed and exits 2.
-fn exit(result: Result<i32, String>) -> ExitCode {
-    exit_with(result, 2)
-}
-
 /// Success when a check holds; failure when it does not, or an error is printed.
 fn passing(result: Result<bool, String>) -> ExitCode {
     exit_with(result.map(|holds| i32::from(!holds)), 1)
@@ -533,7 +675,7 @@ fn failing(result: Result<i32, String>, usage: &str) -> ExitCode {
     }
 }
 
-fn external_vector(root: &Path, args: &[String]) -> ExitCode {
+fn external_vector(root: &Path, args: &[String]) -> Result<i32, String> {
     let mut options = harness::vectors::ExternalOptions {
         output: PathBuf::new(),
         pairs: 30,
@@ -545,98 +687,81 @@ fn external_vector(root: &Path, args: &[String]) -> ExitCode {
         early_stop: true,
     };
     let mut rest = args.iter();
-    let parsed = (|| -> Task {
-        while let Some(flag) = rest.next() {
-            let mut value = || {
-                rest.next()
-                    .cloned()
-                    .ok_or_else(|| format!("{flag} needs a value"))
-            };
-            match flag.as_str() {
-                "--output" => options.output = PathBuf::from(value()?),
-                "--pairs" => {
-                    options.pairs = value()?.parse().map_err(|_| "--pairs: not a number")?;
-                }
-                "--iterations" => {
-                    options.iterations =
-                        value()?.parse().map_err(|_| "--iterations: not a number")?;
-                }
-                "--benchmark" => options.benchmark = true,
-                "--memory" => options.memory = true,
-                "--full" => options.full = true,
-                "--no-early-stop" => options.early_stop = false,
-                "--baseline-worker" => options.baseline_worker = Some(PathBuf::from(value()?)),
-                _ => return Err(USAGE.to_owned()),
+    while let Some(flag) = rest.next() {
+        let mut value = || {
+            rest.next()
+                .cloned()
+                .ok_or_else(|| format!("{flag} needs a value"))
+        };
+        match flag.as_str() {
+            "--output" => options.output = PathBuf::from(value()?),
+            "--pairs" => options.pairs = value()?.parse().map_err(|_| "--pairs: not a number")?,
+            "--iterations" => {
+                options.iterations = value()?.parse().map_err(|_| "--iterations: not a number")?;
             }
+            "--benchmark" => options.benchmark = true,
+            "--memory" => options.memory = true,
+            "--full" => options.full = true,
+            "--no-early-stop" => options.early_stop = false,
+            "--baseline-worker" => options.baseline_worker = Some(PathBuf::from(value()?)),
+            _ => return Err(usage_of("external-vector")),
         }
-        if options.output.as_os_str().is_empty() {
-            Err("--output is required".into())
-        } else {
-            Ok(())
-        }
-    })();
-    exit(parsed.and_then(|()| harness::vectors::external_vector(root, &options)))
+    }
+    if options.output.as_os_str().is_empty() {
+        return Err("--output is required".into());
+    }
+    harness::vectors::external_vector(root, &options)
 }
 
-fn fate_run(root: &Path, args: &[String]) -> ExitCode {
+fn fate_run(root: &Path, args: &[String]) -> Result<i32, String> {
     let (mut case, mut demux_only) = ("fate-matroska-xiph-lacing".to_owned(), false);
     let mut rest = args.iter();
-    let parsed = (|| -> Task {
-        while let Some(flag) = rest.next() {
-            match flag.as_str() {
-                "--case" => case = rest.next().cloned().ok_or("--case needs a value")?,
-                "--demux-only" => demux_only = true,
-                _ => return Err(USAGE.to_owned()),
-            }
+    while let Some(flag) = rest.next() {
+        match flag.as_str() {
+            "--case" => case = rest.next().cloned().ok_or("--case needs a value")?,
+            "--demux-only" => demux_only = true,
+            _ => return Err(usage_of("fate-run")),
         }
-        Ok(())
-    })();
-    exit(parsed.and_then(|()| {
-        harness::vectors::fate_run(root, &case, demux_only, &harness::vectors::NativeFate)
-    }))
+    }
+    harness::vectors::fate_run(root, &case, demux_only, &harness::vectors::NativeFate)
 }
 
-fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
+fn trace_identities(root: &Path, args: &[String]) -> Result<i32, String> {
     let (mut output, mut compare, mut candidate) = (None, None, None);
     let mut corpora = std::collections::BTreeMap::new();
     let mut rest = args.iter();
-    let parsed = (|| -> Task {
-        while let Some(flag) = rest.next() {
-            let value = rest.next().ok_or_else(|| format!("{flag} needs a value"))?;
-            match flag.as_str() {
-                "--output" => output = Some(PathBuf::from(value)),
-                "--compare" => compare = Some(PathBuf::from(value)),
-                "--candidate" => candidate = Some(PathBuf::from(value)),
-                "--corpus" => {
-                    let (feature, directory) = value
-                        .split_once('=')
-                        .filter(|(feature, directory)| !feature.is_empty() && !directory.is_empty())
-                        .ok_or("--corpus needs FEATURE=DIR")?;
-                    if corpora
-                        .insert(feature.to_owned(), root.join(directory))
-                        .is_some()
-                    {
-                        return Err(format!("corpus specified twice for {feature}"));
-                    }
+    while let Some(flag) = rest.next() {
+        let value = rest.next().ok_or_else(|| format!("{flag} needs a value"))?;
+        match flag.as_str() {
+            "--output" => output = Some(PathBuf::from(value)),
+            "--compare" => compare = Some(PathBuf::from(value)),
+            "--candidate" => candidate = Some(PathBuf::from(value)),
+            "--corpus" => {
+                let (feature, directory) = value
+                    .split_once('=')
+                    .filter(|(feature, directory)| !feature.is_empty() && !directory.is_empty())
+                    .ok_or("--corpus needs FEATURE=DIR")?;
+                if corpora
+                    .insert(feature.to_owned(), root.join(directory))
+                    .is_some()
+                {
+                    return Err(format!("corpus specified twice for {feature}"));
                 }
-                _ => return Err(USAGE.to_owned()),
             }
+            _ => return Err(usage_of("trace-identities")),
         }
-        Ok(())
-    })();
-    exit(parsed.and_then(|()| {
-        let output = output.ok_or("--output is required")?;
-        let candidate = match candidate {
-            Some(candidate) => candidate,
-            None => root
-                .join(harness::gate_build::release_dir()?)
-                .join("media-worker"),
-        };
-        harness::vectors::trace_identities(root, &candidate, &output, compare.as_deref(), &corpora)
-    }))
+    }
+    let output = output.ok_or("--output is required")?;
+    let candidate = match candidate {
+        Some(candidate) => candidate,
+        None => root
+            .join(harness::gate_build::release_dir()?)
+            .join("media-worker"),
+    };
+    harness::vectors::trace_identities(root, &candidate, &output, compare.as_deref(), &corpora)
 }
 
-fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
+fn fuzz_campaign(root: &Path, args: &[String]) -> Result<i32, String> {
     let mut campaign = fuzz::Campaign {
         manifest: PathBuf::new(),
         output: PathBuf::new(),
@@ -651,38 +776,35 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
     let (mut contract, mut manifest, mut corpus, mut cases, mut reference) =
         (None, None, None, Vec::new(), false);
     let mut rest = args.iter();
-    let parsed = (|| -> Task {
-        while let Some(flag) = rest.next() {
-            if flag == "--reference" {
-                reference = true;
-                continue;
-            }
-            let value = rest.next().ok_or_else(|| format!("{flag} needs a value"))?;
-            let number = || {
-                value
-                    .parse::<u64>()
-                    .map_err(|_| format!("{flag}: not a number: {value}"))
-            };
-            match flag.as_str() {
-                "--contract" => contract = Some(PathBuf::from(value)),
-                "--manifest" => manifest = Some(PathBuf::from(value)),
-                "--corpus" => corpus = Some(PathBuf::from(value)),
-                "--case" => cases.push(value.clone()),
-                "--output" => campaign.output = PathBuf::from(value),
-                "--rounds" => campaign.rounds = number()? as usize,
-                "--seed" => campaign.seed = number()?,
-                "--maximum-input-bytes" => campaign.maximum_input_bytes = number()? as usize,
-                "--maximum-output-bytes" => campaign.maximum_output_bytes = number()? as usize,
-                "--timeout-seconds" => {
-                    campaign.timeout_seconds =
-                        Some(value.parse().map_err(|_| format!("{flag}: not a number"))?);
-                }
-                _ => return Err(USAGE.to_owned()),
-            }
+    while let Some(flag) = rest.next() {
+        if flag == "--reference" {
+            reference = true;
+            continue;
         }
-        Ok(())
-    })();
-    exit(parsed.and_then(|()| match contract {
+        let value = rest.next().ok_or_else(|| format!("{flag} needs a value"))?;
+        let number = || {
+            value
+                .parse::<u64>()
+                .map_err(|_| format!("{flag}: not a number: {value}"))
+        };
+        match flag.as_str() {
+            "--contract" => contract = Some(PathBuf::from(value)),
+            "--manifest" => manifest = Some(PathBuf::from(value)),
+            "--corpus" => corpus = Some(PathBuf::from(value)),
+            "--case" => cases.push(value.clone()),
+            "--output" => campaign.output = PathBuf::from(value),
+            "--rounds" => campaign.rounds = number()? as usize,
+            "--seed" => campaign.seed = number()?,
+            "--maximum-input-bytes" => campaign.maximum_input_bytes = number()? as usize,
+            "--maximum-output-bytes" => campaign.maximum_output_bytes = number()? as usize,
+            "--timeout-seconds" => {
+                campaign.timeout_seconds =
+                    Some(value.parse().map_err(|_| format!("{flag}: not a number"))?);
+            }
+            _ => return Err(usage_of("fuzz")),
+        }
+    }
+    match contract {
         Some(contract) => {
             let feature = fuzz::Feature {
                 manifest: manifest.unwrap_or_else(|| contract.with_file_name("corpus.json")),
@@ -698,7 +820,7 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
             fuzz::campaign(root, &campaign)
         }
         None => Err("--corpus, --case and --reference need --contract".into()),
-    }))
+    }
 }
 
 fn graph(root: &Path, args: &[String]) -> Task {
@@ -709,7 +831,7 @@ fn graph(root: &Path, args: &[String]) -> Task {
     Ok(())
 }
 
-fn report(root: &Path, args: &[String]) -> ExitCode {
+fn report(root: &Path, args: &[String]) -> Result<i32, String> {
     report_with_inputs(root, args, None)
 }
 
@@ -717,73 +839,70 @@ fn report_with_inputs(
     root: &Path,
     args: &[String],
     optional: Option<&test_skips::ParityInputs>,
-) -> ExitCode {
+) -> Result<i32, String> {
     let mut options = harness::report::Options::defaults(root);
     let mut corpus = None;
     let mut rest = args.iter();
-    let parsed = (|| -> Task {
-        while let Some(flag) = rest.next() {
-            let mut value = || {
-                rest.next()
-                    .map(PathBuf::from)
-                    .ok_or_else(|| format!("{flag} needs a value"))
-            };
-            match flag.as_str() {
-                "--contract" => options.contract = value()?,
-                "--manifest" => options.manifest = value()?,
-                "--corpus" => corpus = Some(value()?),
-                "--output" => options.output = value()?,
-                "--fate-cache" => options.fate_cache = Some(value()?),
-                "--baseline-worker" => options.baseline_worker = Some(value()?),
-                "--additional-report" => options.additional_reports.push(value()?),
-                "--require-acceptance" => options.require_acceptance = true,
-                "--require-slice-acceptance" => options.require_slice_acceptance = true,
-                "--benchmark" => options.benchmark = true,
-                "--memory" => options.memory = true,
-                "--full" => options.full = true,
-                "--no-early-stop" => options.early_stop = false,
-                "--pairs" | "--memory-pairs" | "--iterations" | "--seed" => {
-                    let text = value()?.display().to_string();
-                    let number: u64 = text
-                        .parse()
-                        .map_err(|_| format!("{flag}: not a number: {text}"))?;
-                    match flag.as_str() {
-                        "--pairs" => options.pairs = number as usize,
-                        "--memory-pairs" => {
-                            options.memory_pairs =
-                                Some(usize::try_from(number).map_err(|e| e.to_string())?);
-                        }
-                        "--iterations" => {
-                            options.iterations =
-                                Some(u32::try_from(number).map_err(|e| e.to_string())?);
-                        }
-                        _ => options.seed = number,
-                    }
-                }
-                _ => return Err(USAGE.to_owned()),
-            }
-        }
-        // Without --corpus, a manifest that records its directory names it.
-        options.corpus = match corpus {
-            Some(corpus) => corpus,
-            None => json::read(&options.contract)
-                .ok()
-                .and_then(|contract| {
-                    contract
-                        .get("corpus_directory")
-                        .and_then(json::Value::as_str)
-                        .map(|directory| root.join(directory))
-                })
-                .or_else(|| {
-                    harness::manifest::read(root, &options.manifest)
-                        .ok()
-                        .and_then(|(manifest, _)| harness::report::recorded_corpus(root, &manifest))
-                })
-                .unwrap_or_else(|| std::mem::take(&mut options.corpus)),
+    while let Some(flag) = rest.next() {
+        let mut value = || {
+            rest.next()
+                .map(PathBuf::from)
+                .ok_or_else(|| format!("{flag} needs a value"))
         };
-        Ok(())
-    })();
-    exit(parsed.and_then(|()| harness::report::run_with_inputs(root, &options, optional)))
+        match flag.as_str() {
+            "--contract" => options.contract = value()?,
+            "--manifest" => options.manifest = value()?,
+            "--corpus" => corpus = Some(value()?),
+            "--output" => options.output = value()?,
+            "--fate-cache" => options.fate_cache = Some(value()?),
+            "--baseline-worker" => options.baseline_worker = Some(value()?),
+            "--additional-report" => options.additional_reports.push(value()?),
+            "--require-acceptance" => options.require_acceptance = true,
+            "--require-slice-acceptance" => options.require_slice_acceptance = true,
+            "--benchmark" => options.benchmark = true,
+            "--memory" => options.memory = true,
+            "--full" => options.full = true,
+            "--no-early-stop" => options.early_stop = false,
+            "--pairs" | "--memory-pairs" | "--iterations" | "--seed" => {
+                let text = value()?.display().to_string();
+                let number: u64 = text
+                    .parse()
+                    .map_err(|_| format!("{flag}: not a number: {text}"))?;
+                match flag.as_str() {
+                    "--pairs" => options.pairs = number as usize,
+                    "--memory-pairs" => {
+                        options.memory_pairs =
+                            Some(usize::try_from(number).map_err(|e| e.to_string())?);
+                    }
+                    "--iterations" => {
+                        options.iterations =
+                            Some(u32::try_from(number).map_err(|e| e.to_string())?);
+                    }
+                    _ => options.seed = number,
+                }
+            }
+            _ => return Err(usage_of("report")),
+        }
+    }
+    // Without --corpus, a manifest that records its directory names it.
+    options.corpus = match corpus {
+        Some(corpus) => corpus,
+        None => json::read(&options.contract)
+            .ok()
+            .and_then(|contract| {
+                contract
+                    .get("corpus_directory")
+                    .and_then(json::Value::as_str)
+                    .map(|directory| root.join(directory))
+            })
+            .or_else(|| {
+                harness::manifest::read(root, &options.manifest)
+                    .ok()
+                    .and_then(|(manifest, _)| harness::report::recorded_corpus(root, &manifest))
+            })
+            .unwrap_or_else(|| std::mem::take(&mut options.corpus)),
+    };
+    harness::report::run_with_inputs(root, &options, optional)
 }
 
 fn compare(root: &Path, args: &[String]) -> Task {
@@ -802,7 +921,7 @@ fn compare(root: &Path, args: &[String]) -> Task {
                         .clone(),
                 );
             }
-            _ => return Err(USAGE.to_owned()),
+            _ => return Err(usage_of("compare")),
         }
     }
     let path = |key: &str| {
@@ -849,7 +968,7 @@ fn fate_inventory(args: &[String]) -> Task {
             "--source" => source = Some(value),
             "--output" => output = Some(value),
             "--configured-list" => configured = Some(value),
-            _ => return Err(USAGE.to_owned()),
+            _ => return Err(usage_of("fate-inventory")),
         }
     }
     let (source, output) = (
@@ -880,9 +999,10 @@ fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
         match flag.as_str() {
             "--jobs" => jobs = value.parse().map_err(|_| "jobs must be 1..8")?,
             "--profile" => {
-                profile = prepare::Profile::parse(value).ok_or_else(|| USAGE.to_owned())?;
+                profile =
+                    prepare::Profile::parse(value).ok_or_else(|| usage_of("prepare-ffmpeg"))?;
             }
-            _ => return Err(USAGE.to_owned()),
+            _ => return Err(usage_of("prepare-ffmpeg")),
         }
     }
     let built = references::ffmpeg_build(profile).prepare(root, || {
@@ -1291,7 +1411,7 @@ fn run_reports(
     let mut result = ExitCode::SUCCESS;
     for args in reports {
         println!("$ cargo xtask report {}", args.join(" "));
-        let code = report_with_inputs(root, args, optional);
+        let code = exit_with(report_with_inputs(root, args, optional), 2);
         if result == ExitCode::SUCCESS {
             result = code;
         }
@@ -1452,7 +1572,7 @@ fn smoke_campaigns<'a>(
         }
         println!("$ cargo xtask fuzz {}", args.join(" "));
         let args: Vec<String> = args.iter().map(ToString::to_string).collect();
-        if fuzz_campaign(root, &args) != ExitCode::SUCCESS {
+        if fuzz_campaign(root, &args)? != 0 {
             return Err(format!("the {feature} campaign found problems: {output}"));
         }
         std::fs::remove_dir_all(root.join(&output)).map_err(|e| format!("{output}: {e}"))?;
@@ -1556,7 +1676,7 @@ impl Part {
             "parity" => Ok(Self::Parity),
             "docs" => Ok(Self::Docs),
             _ => Err(format!(
-                "{name}: no such part of check (lint, test, variants, parity or docs)\n{USAGE}"
+                "{name}: no such part of check (lint, test, variants, parity or docs)"
             )),
         }
     }
@@ -1733,7 +1853,9 @@ fn rustdoc(root: &Path, args: &[&str]) -> Task {
 
 #[cfg(test)]
 mod tests {
-    use super::{REFERENCE_TRACE_CRATES, shell_library_path, with_target};
+    use super::{
+        COMMANDS, HELP, REFERENCE_TRACE_CRATES, shell_library_path, usage_of, with_target,
+    };
     use std::ffi::OsStr;
     use std::path::Path;
 
@@ -1757,6 +1879,22 @@ mod tests {
         }
         declaring.sort();
         assert_eq!(declaring, REFERENCE_TRACE_CRATES);
+    }
+
+    #[test]
+    fn every_command_has_one_entry_in_the_help_in_its_order() {
+        let listed: Vec<&str> = HELP
+            .lines()
+            .skip_while(|line| *line != "commands:")
+            .filter_map(|line| line.strip_prefix("  "))
+            .filter(|line| !line.starts_with(' '))
+            .filter_map(|line| line.split(' ').next())
+            .collect();
+        let named: Vec<&str> = COMMANDS.iter().map(|command| command.name).collect();
+        assert_eq!(listed, named);
+        for name in named {
+            assert!(usage_of(name).starts_with(&format!("usage: cargo xtask {name}")));
+        }
     }
 
     #[test]

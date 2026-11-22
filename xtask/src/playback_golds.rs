@@ -12,6 +12,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
+use crate::files::read;
 use crate::json::{self, Value};
 use crate::sha256;
 
@@ -69,7 +70,7 @@ pub fn main(root: &Path, args: &[String]) -> R<String> {
     let (dir, check) = match args {
         [dir] => (Path::new(dir), false),
         [dir, flag] if flag == "--check" => (Path::new(dir), true),
-        _ => return Err("usage: cargo xtask playback-golds DIR [--check]".into()),
+        _ => return Err(crate::usage_of("playback-golds")),
     };
     let (golds, manifest) = generate(root, dir)?;
     let outputs = [(GOLDS, golds), (MANIFEST, manifest)];
@@ -92,10 +93,6 @@ pub fn main(root: &Path, args: &[String]) -> R<String> {
         fs::write(&path, data).map_err(|e| format!("{}: {e}", path.display()))?;
     }
     Ok(format!("wrote {GOLDS} and {MANIFEST} from {SET}"))
-}
-
-fn read(path: &Path) -> R<Vec<u8>> {
-    fs::read(path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 fn text<'a>(value: &'a Value, key: &str) -> R<&'a str> {
