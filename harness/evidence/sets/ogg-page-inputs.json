@@ -1,0 +1,236 @@
+{
+ "name": "ogg-page-inputs",
+ "path": "ogg-page-inputs",
+ "retention": "retained",
+ "reason": "Pinned bitexact Ogg remuxes for page reading and writing, authored page boundaries, and Ogg track header variants.",
+ "key": "evidence/ogg-page-inputs/809653e230f11d66b95aa7fc631f32890bb8d94150b1b191cbf9a2aab209c314.tar.gz",
+ "sha256": "809653e230f11d66b95aa7fc631f32890bb8d94150b1b191cbf9a2aab209c314",
+ "bytes": 2426814,
+ "unpacked_at": "repository",
+ "files": [
+  {
+   "path": ".research/ogg-page-inputs/bad-comment.opus",
+   "sha256": "ed2109dc21aa31249511a3b61e48b093efdcf53c962c4dd3dc5783434c075184"
+  },
+  {
+   "path": ".research/ogg-page-inputs/comment-fields.opus",
+   "sha256": "983ac4be67c352363cf884f2d6085c20ef190b7e0c62fb1c91aa4ec7c6ff79cb"
+  },
+  {
+   "path": ".research/ogg-page-inputs/comment-long.opus",
+   "sha256": "ad8a5761fcf69d349581d46201162b349d8f00d222d1b02f78b0a992f009a427"
+  },
+  {
+   "path": ".research/ogg-page-inputs/comment-picture.opus",
+   "sha256": "485cd9ce0dd5cdea9699db50e114e517c03c981623f5d1d8d625e63c79f9728f"
+  },
+  {
+   "path": ".research/ogg-page-inputs/opus-family-255.opus",
+   "sha256": "687b49edfc3f89422b63a150d4b53be9d535e203b95914866d65e6c37368c55a"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-1.0-test_small.ogg",
+   "sha256": "83d63952ef8fbf2d1f3d58c207a4ce9bbcab5af78ddc415f69dcbe1cba41205d"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-1.0.1-test_small.ogg",
+   "sha256": "f5ad15dcc5baf2ba2c528a59fd39473a4c33a4fc00678f05235dbb99577e6853"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-6.ogg",
+   "sha256": "b771866c242c2bb16930455592998b27ecf41a6a4fe8cbb6d3b838db398a8f49"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-a_flac.oga",
+   "sha256": "7d5814e0de62f61c98b17046102f769ac5bc60b681fdf6ebf49dcc18cc58ac29"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-a_opus.opus",
+   "sha256": "e5064256fe3ed0bc6913f6d4c7c1c1b2e2927e249406df5dd63e91785dc7e633"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-a_vorbis.ogg",
+   "sha256": "c66242b9d700b6d5e858e0632f060dfd5f469a42c7a16072758901d1137886d7"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-b_opus.opus",
+   "sha256": "8d92aa6fa763903c39a51e7b65fd8d724bc3f4e91a190224bd4081a897fbb2ca"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-b_vorbis.ogg",
+   "sha256": "e4ef73e8b0196b0910856c3173037d01b7be89214f77051b5ed53daa0a98a795"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-bear.ogv",
+   "sha256": "cdf14f0f03cfa08a94c1f2825b43e3df194c3f0af02018fe8695e91d6947cc3c"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-beta3-test_small.ogg",
+   "sha256": "669c176aaae60304722b67641b47b15dca82e74ba4cfe9a592e8c1e79d792974"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-beta4-test_small.ogg",
+   "sha256": "b3a820729f082a94a5665e4d1839b3b82894dac39121d3a7039ecb8a0ed23609"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-chain-test1_small.ogg",
+   "sha256": "5a37f1636469dbd21898638d26ed280b1e08708dd20a205d725d6c61c3fd8866"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-chain-test2_small.ogg",
+   "sha256": "372a632e3b09d34a4bcf5ef62d38c7b2ffc1d69ac790505b7e93aca959d96476"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-chain_opus.opus",
+   "sha256": "8f7b2746bf120a926b10fdc7ce1b4c4c26e824bc9153075fbf9e2a309516af63"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-chain_speex.spx",
+   "sha256": "fca1bec8d702f74eec8c5eda8fb3ff19af35bdf20856e2e9609659670d74ed28"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-chain_vorbis.ogg",
+   "sha256": "ff01ea0558245c6070568feeedba54b0b6871bcb0679546fa20cb15dba8d76a9"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-crc_bad.opus",
+   "sha256": "3f59e00db00fb93ac28be08ad497a6b1103c587cf3870475b756bcaa060bd55a"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-empty_theora_packets.ogv",
+   "sha256": "de42934c0ad6049dada4c27132982a09213c24d2d82d80f2959a183e94f1b97b"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-flac_51_24.oga",
+   "sha256": "30c04c9a4703ad9001bda221ddbb3df196831ead8d4553764fce90ab3ddd71f1"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-highrate-test_small.ogg",
+   "sha256": "76012270064a45c890471eb5e402457960151b2f75e6b9a34d2113a1c4198b40"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-lost_page.opus",
+   "sha256": "4c448e8cf384543a38d5fe1de89600aca075abd7348a2fa1101d8a6b78232ef1"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-lsp-test2_small.ogg",
+   "sha256": "d7786e56a16217393ab296657caff736b07a2928d76c77e61488140c6e673509"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-lsp-test3_small.ogg",
+   "sha256": "c96f62d9bdedcb5f2be4225b0ddbd6417ec8dd5f8dfd2675605cb04b5dd9a717"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-lsp-test4_small.ogg",
+   "sha256": "baa7074fd303a9249ecd10e5a10e3a85078f103e2c1b5e4edcf016b913f2a869"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-lsp-test_small.ogg",
+   "sha256": "32604665148892cdacd1ffbcd35e2f5ef94be612041520b92e4ebde3ef34d47b"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-mc_opus.opus",
+   "sha256": "a0161f3d07c11bf2ab58676c9987c5a86fe57fd9c1b340de583b59dd7e1632ef"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-mono_small.ogg",
+   "sha256": "780c650019188ce6233d146e4a0950dbccc78fe2fd02ce150d581a8acb21f0c2"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-moog_small.ogg",
+   "sha256": "1a0578175e3fe41738600737362466a2821e3c6a5f27c99d7fbf6f011322b2c3"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-mux2.opus",
+   "sha256": "377e3715b1eb46a85ecbaec1281e8f53c894eb941c15eb7361c713904388f55c"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-offset_test.ogv",
+   "sha256": "4e21bcb866dd67db275dd73420f435b98ce5dc70fc7f3feb6eec3d68dcf58385"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-ogg-flac-chained-meta.ogg",
+   "sha256": "44af2531dea6c00babcb0b809630804a35b0d8511cbdd070649d34807fef1794"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-ogg-opus-chained-meta.ogg",
+   "sha256": "1214339a3e2baaebcb10444bb22ce8a82dc34cb22c489f1abcf9e2c0f3f7e9e1"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-ogg-vorbis-chained-meta.ogg",
+   "sha256": "7a20792a10505397e5972a5ca659f4f95a374fbe81432098b96209ddcf1a40a3"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-rc1-test_small.ogg",
+   "sha256": "df9a0af029dd674bd005183e57d5a7f2ca66cae68f4e64203073657815fa044e"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-rc2-test2_small.ogg",
+   "sha256": "5b0c5b501d2dfcf8dd8d90f61992c8195d8db6e09c6c56d5fdceca1cd709fbdf"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-rc2-test_small.ogg",
+   "sha256": "1f4b4283f877c9b711b697074c0be8ebe5c607ef98a5147f1ecbe1209f32680b"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-rc3-test_small.ogg",
+   "sha256": "cdcbe09a5d1856898681de2a9e45d24664ecc2bdbce5ba0ce108d1736089ef17"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-sleepzor_small.ogg",
+   "sha256": "b6d818e397ccb60b851221f8e90d9140189eec0b817206a85f7d13bd6a9ee547"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-speex_nb.spx",
+   "sha256": "a951cd4f212cffe8d7e7fb9de3de854bd5a51adde75e33286e0903fb5204f40e"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-speex_uwb_stereo.spx",
+   "sha256": "b0af25c6dd5949eb2bbf572739ead920fd0c4394bbff39ad54e6b4dec5bf548c"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-speex_wb.spx",
+   "sha256": "b7aa16121d8e913bd8150dbdb608f51fc3c4b9947b88992b6e04644986212837"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-test-short2_small.ogg",
+   "sha256": "c2f1176a4f61131ac142cbe15ce8505b14e80d7d12240cec6d49ff5dbab66957"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-truncated.opus",
+   "sha256": "d6cd426ec565d2c9aebaa8688f347878f60d3c940e77a99c7fd5afba3d337308"
+  },
+  {
+   "path": ".research/ogg-page-inputs/page-a-vorbis_chapter_extension_demo.ogg",
+   "sha256": "35f94cf84914c11b54e76b30685d88727079acd371841eda156139782309e4de"
+  },
+  {
+   "path": ".research/ogg-page-inputs/theora-0-0.ogv",
+   "sha256": "fdd1e73680c694c3bde4402a52e9f3f8ba54e35b29c3cb1fcd44a97308236bc7"
+  },
+  {
+   "path": ".research/ogg-page-inputs/theora-30000-1001.ogv",
+   "sha256": "531c1874ff1d13d429d3b3369b01bdef3a76af64de1787cc07fa4a144e9dbe6c"
+  },
+  {
+   "path": ".research/ogg-page-inputs/wire-flags.ogg",
+   "sha256": "85974b6413a6b877ba4f7dd9dba293c17d1d177c4ea10c73c658e6f662772163"
+  },
+  {
+   "path": ".research/ogg-page-inputs/wire-short-26.ogg",
+   "sha256": "414b5e0fec3b50aa7ad977377de95eb9becc73a6035288af490833ba20f389d2"
+  },
+  {
+   "path": ".research/ogg-page-inputs/wire-short-28.ogg",
+   "sha256": "ca163d04273a33e59ee25565991bd8441ea99c93e73fb79f6685db27817fdf2f"
+  },
+  {
+   "path": ".research/ogg-page-inputs/wire-short-4.ogg",
+   "sha256": "68d9ed2adb24458ff173db06b41b9d1b6e228764c457030d63fad11b02bfae1e"
+  },
+  {
+   "path": ".research/ogg-page-inputs/wire-short-65537.ogg",
+   "sha256": "c2d9a3e0332d5dff9f600402dbd1396fd64e88bfd1bd1b92a51a60c1413ed758"
+  }
+ ]
+}
