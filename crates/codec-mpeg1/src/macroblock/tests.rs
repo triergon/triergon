@@ -200,7 +200,7 @@ fn skips_reused_for_a_repeated_picture_match_the_computed_path() {
     for _ in 0..12 {
         // Both apply the same rate plan. Only `computed` recalculates every
         // macroblock's analysis and residual before choosing a skip.
-        computed.skipped_at.fill(None);
+        computed.skipped_at.fill(0);
         reused.encode(&input, &mut a).unwrap();
         computed.encode(&input, &mut b).unwrap();
         assert_eq!(a, b);

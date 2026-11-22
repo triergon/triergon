@@ -26,7 +26,6 @@ mod tables;
 use analysis::Decision;
 use bits::BitWriter;
 use block::Quantizer;
-use core::num::NonZeroU8;
 pub use error::{Error, Result};
 use motion::Mv;
 use planes::Planes;
@@ -138,8 +137,8 @@ pub struct Encoder {
     /// tells a repeated picture.
     previous_chroma: BudgetVec<u8>,
     /// Per macroblock, the quantiser at which the previous picture skipped it
-    /// after its residual quantised to zero.
-    skipped_at: BudgetVec<Option<NonZeroU8>>,
+    /// after its residual quantised to zero; 0 (no quantiser) where it did not.
+    skipped_at: BudgetVec<u8>,
     /// Macroblocks skipped again from `skipped_at` without coding a residual.
     #[cfg(test)]
     reused_skips: usize,
@@ -206,7 +205,7 @@ impl Encoder {
                 0,
                 2 * g.chroma_stride() * g.macroblock_height() * 8,
             )?,
-            skipped_at: BudgetVec::try_filled(budget, None, mbs)?,
+            skipped_at: BudgetVec::try_filled(budget, 0, mbs)?,
             #[cfg(test)]
             reused_skips: 0,
             unchanged: BudgetVec::try_filled(budget, 0, mbs)?,
