@@ -10,6 +10,7 @@
   "contract": [
     "Compare delivered packets from advance with pop, advance_ready with pop, and a pump with a sink that retires each feed immediately.",
     "Compare MOV packets in the demux view and the first video track of each Matroska startup and backward-seek capsule. Fold track, PTS, DTS, duration, flags, size and payload.",
+    "For a Matroska seek, the reference supplements the public backward seek with the earlier video packets in its landing Cluster from a sequential demux pass. Verify the byte position, payload and flags of the landing in both reference passes before comparing the prefix and full seek suffix.",
     "For the edited forward MOV cases also fold position, time base and encoded trim."
   ],
   "required_profiles": [
@@ -1205,910 +1206,168 @@
       "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
     }
   ],
-  "pending_module_requirements": [
-    "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-    "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek."
-  ],
-  "open_cases": [
-    {
-      "id": "fifo-startup-avc-high-b",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-startup-avc-high-b0",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-startup-avc-high-b1",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-startup-avc-pgs-early-canvas",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-startup-hevc-b0",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-startup-hevc-b1",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-startup-hevc-b3",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-startup-hevc-mixed",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-startup-hevc-no-default-duration",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-startup-hevc-repeated-configuration",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-startup-hevc-vps-timed-no-default",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-avc-seek-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-avc-seek-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-default-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-default-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-cues-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-cues-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-startup-avc-high-b",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-startup-avc-high-b0",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-startup-avc-high-b1",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-startup-avc-pgs-early-canvas",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-startup-hevc-b0",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-startup-hevc-b1",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-startup-hevc-b3",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-startup-hevc-mixed",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-startup-hevc-no-default-duration",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-startup-hevc-repeated-configuration",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-startup-hevc-vps-timed-no-default",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-avc-seek-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-avc-seek-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-default-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-default-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-cues-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-cues-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-startup-avc-high-b",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-startup-avc-high-b0",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-startup-avc-high-b1",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-startup-avc-pgs-early-canvas",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-startup-hevc-b0",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-startup-hevc-b1",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-startup-hevc-b3",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-startup-hevc-mixed",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-startup-hevc-no-default-duration",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-startup-hevc-repeated-configuration",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-startup-hevc-vps-timed-no-default",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-avc-seek-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-avc-seek-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-default-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-default-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-cues-0-fresh",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-cues-0-eof",
-      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-avc-seek-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-avc-seek-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-avc-seek-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-avc-seek-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-avc-seek-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-avc-seek-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-default-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-default-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-default-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-default-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-default-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-default-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-cues-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-cues-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-cues-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-cues-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-cues-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fifo-seek-hevc-seek-no-cues-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-avc-seek-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-avc-seek-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-avc-seek-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-avc-seek-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-avc-seek-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-avc-seek-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-default-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-default-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-default-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-default-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-default-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-default-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-cues-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-cues-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-cues-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-cues-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-cues-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ready-seek-hevc-seek-no-cues-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-avc-seek-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-avc-seek-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-avc-seek-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-avc-seek-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-avc-seek-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-avc-seek-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-default-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-default-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-default-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-default-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-default-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-default-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-cues-700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-cues-700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-cues-1420-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-cues-1420-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-cues-2700-fresh",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pump-seek-hevc-seek-no-cues-2700-eof",
-      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+  "open_deviations": [
+    {
+      "reading": "AVC delivery retains the full DefaultDuration",
+      "clause": "RFC 9559 section 5.1.4.1.13 expresses DefaultDuration in nanoseconds.",
+      "candidate": "Keeps DefaultDuration at native precision, for example 41666666 ns.",
+      "reference": "Publishes 41000000 ns on the corresponding packets in its millisecond clock.",
+      "compat": "compat::matroska::demux_packet_duration for consumers needing the reference millisecond durations.",
+      "cases": [
+        "fifo-startup-avc-high-b",
+        "fifo-startup-avc-high-b0",
+        "fifo-startup-avc-high-b1",
+        "fifo-startup-avc-pgs-early-canvas",
+        "fifo-seek-avc-seek-0-fresh",
+        "fifo-seek-avc-seek-0-eof",
+        "ready-startup-avc-high-b",
+        "ready-startup-avc-high-b0",
+        "ready-startup-avc-high-b1",
+        "ready-startup-avc-pgs-early-canvas",
+        "ready-seek-avc-seek-0-fresh",
+        "ready-seek-avc-seek-0-eof",
+        "pump-startup-avc-high-b",
+        "pump-startup-avc-high-b0",
+        "pump-startup-avc-high-b1",
+        "pump-startup-avc-pgs-early-canvas",
+        "pump-seek-avc-seek-0-fresh",
+        "pump-seek-avc-seek-0-eof",
+        "fifo-seek-avc-seek-700-fresh",
+        "fifo-seek-avc-seek-700-eof",
+        "fifo-seek-avc-seek-1420-fresh",
+        "fifo-seek-avc-seek-1420-eof",
+        "fifo-seek-avc-seek-2700-fresh",
+        "fifo-seek-avc-seek-2700-eof",
+        "ready-seek-avc-seek-700-fresh",
+        "ready-seek-avc-seek-700-eof",
+        "ready-seek-avc-seek-1420-fresh",
+        "ready-seek-avc-seek-1420-eof",
+        "ready-seek-avc-seek-2700-fresh",
+        "ready-seek-avc-seek-2700-eof",
+        "pump-seek-avc-seek-700-fresh",
+        "pump-seek-avc-seek-700-eof",
+        "pump-seek-avc-seek-1420-fresh",
+        "pump-seek-avc-seek-1420-eof",
+        "pump-seek-avc-seek-2700-fresh",
+        "pump-seek-avc-seek-2700-eof"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "HEVC delivery has source PTS and no DefaultDuration",
+      "clause": "RFC 9559 section 11.2 makes the signed Block time a presentation timestamp.",
+      "candidate": "Leaves DTS absent because the Matroska Block carries only PTS. Leaves the packet duration absent.",
+      "reference": "Synthesizes a DTS from the presentation clock on packets including the first HEVC packet at zero. Leaves the duration absent.",
+      "compat": "compat::matroska::demux_packet_clocks for consumers using the reference DTS fill-in and duration quantization.",
+      "cases": [
+        "fifo-startup-hevc-no-default-duration",
+        "fifo-startup-hevc-vps-timed-no-default",
+        "fifo-seek-hevc-seek-no-default-0-fresh",
+        "fifo-seek-hevc-seek-no-default-0-eof",
+        "ready-startup-hevc-no-default-duration",
+        "ready-startup-hevc-vps-timed-no-default",
+        "ready-seek-hevc-seek-no-default-0-fresh",
+        "ready-seek-hevc-seek-no-default-0-eof",
+        "pump-startup-hevc-no-default-duration",
+        "pump-startup-hevc-vps-timed-no-default",
+        "pump-seek-hevc-seek-no-default-0-fresh",
+        "pump-seek-hevc-seek-no-default-0-eof",
+        "fifo-seek-hevc-seek-no-default-700-fresh",
+        "fifo-seek-hevc-seek-no-default-700-eof",
+        "fifo-seek-hevc-seek-no-default-1420-fresh",
+        "fifo-seek-hevc-seek-no-default-1420-eof",
+        "fifo-seek-hevc-seek-no-default-2700-fresh",
+        "fifo-seek-hevc-seek-no-default-2700-eof",
+        "ready-seek-hevc-seek-no-default-700-fresh",
+        "ready-seek-hevc-seek-no-default-700-eof",
+        "ready-seek-hevc-seek-no-default-1420-fresh",
+        "ready-seek-hevc-seek-no-default-1420-eof",
+        "ready-seek-hevc-seek-no-default-2700-fresh",
+        "ready-seek-hevc-seek-no-default-2700-eof",
+        "pump-seek-hevc-seek-no-default-700-fresh",
+        "pump-seek-hevc-seek-no-default-700-eof",
+        "pump-seek-hevc-seek-no-default-1420-fresh",
+        "pump-seek-hevc-seek-no-default-1420-eof",
+        "pump-seek-hevc-seek-no-default-2700-fresh",
+        "pump-seek-hevc-seek-no-default-2700-eof"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "HEVC delivery has source PTS and a nanosecond DefaultDuration",
+      "clause": "RFC 9559 section 11.2 makes the signed Block time a presentation timestamp. RFC 9559 section 5.1.4.1.13 expresses DefaultDuration in nanoseconds.",
+      "candidate": "Leaves DTS absent because the Matroska Block carries only PTS. Keeps DefaultDuration at native precision, for example 41666666 ns.",
+      "reference": "Synthesizes a DTS from the presentation clock on packets including the first HEVC packet at zero. Publishes 41000000 ns on the corresponding packets in its millisecond clock.",
+      "compat": "compat::matroska::demux_packet_clocks for consumers using the reference DTS fill-in and duration quantization.",
+      "cases": [
+        "fifo-startup-hevc-b0",
+        "fifo-startup-hevc-b1",
+        "fifo-startup-hevc-b3",
+        "fifo-startup-hevc-mixed",
+        "fifo-startup-hevc-repeated-configuration",
+        "fifo-seek-hevc-seek-0-fresh",
+        "fifo-seek-hevc-seek-0-eof",
+        "fifo-seek-hevc-seek-no-cues-0-fresh",
+        "fifo-seek-hevc-seek-no-cues-0-eof",
+        "ready-startup-hevc-b0",
+        "ready-startup-hevc-b1",
+        "ready-startup-hevc-b3",
+        "ready-startup-hevc-mixed",
+        "ready-startup-hevc-repeated-configuration",
+        "ready-seek-hevc-seek-0-fresh",
+        "ready-seek-hevc-seek-0-eof",
+        "ready-seek-hevc-seek-no-cues-0-fresh",
+        "ready-seek-hevc-seek-no-cues-0-eof",
+        "pump-startup-hevc-b0",
+        "pump-startup-hevc-b1",
+        "pump-startup-hevc-b3",
+        "pump-startup-hevc-mixed",
+        "pump-startup-hevc-repeated-configuration",
+        "pump-seek-hevc-seek-0-fresh",
+        "pump-seek-hevc-seek-0-eof",
+        "pump-seek-hevc-seek-no-cues-0-fresh",
+        "pump-seek-hevc-seek-no-cues-0-eof",
+        "fifo-seek-hevc-seek-700-fresh",
+        "fifo-seek-hevc-seek-700-eof",
+        "fifo-seek-hevc-seek-1420-fresh",
+        "fifo-seek-hevc-seek-1420-eof",
+        "fifo-seek-hevc-seek-2700-fresh",
+        "fifo-seek-hevc-seek-2700-eof",
+        "fifo-seek-hevc-seek-no-cues-700-fresh",
+        "fifo-seek-hevc-seek-no-cues-700-eof",
+        "fifo-seek-hevc-seek-no-cues-1420-fresh",
+        "fifo-seek-hevc-seek-no-cues-1420-eof",
+        "fifo-seek-hevc-seek-no-cues-2700-fresh",
+        "fifo-seek-hevc-seek-no-cues-2700-eof",
+        "ready-seek-hevc-seek-700-fresh",
+        "ready-seek-hevc-seek-700-eof",
+        "ready-seek-hevc-seek-1420-fresh",
+        "ready-seek-hevc-seek-1420-eof",
+        "ready-seek-hevc-seek-2700-fresh",
+        "ready-seek-hevc-seek-2700-eof",
+        "ready-seek-hevc-seek-no-cues-700-fresh",
+        "ready-seek-hevc-seek-no-cues-700-eof",
+        "ready-seek-hevc-seek-no-cues-1420-fresh",
+        "ready-seek-hevc-seek-no-cues-1420-eof",
+        "ready-seek-hevc-seek-no-cues-2700-fresh",
+        "ready-seek-hevc-seek-no-cues-2700-eof",
+        "pump-seek-hevc-seek-700-fresh",
+        "pump-seek-hevc-seek-700-eof",
+        "pump-seek-hevc-seek-1420-fresh",
+        "pump-seek-hevc-seek-1420-eof",
+        "pump-seek-hevc-seek-2700-fresh",
+        "pump-seek-hevc-seek-2700-eof",
+        "pump-seek-hevc-seek-no-cues-700-fresh",
+        "pump-seek-hevc-seek-no-cues-700-eof",
+        "pump-seek-hevc-seek-no-cues-1420-fresh",
+        "pump-seek-hevc-seek-no-cues-1420-eof",
+        "pump-seek-hevc-seek-no-cues-2700-fresh",
+        "pump-seek-hevc-seek-no-cues-2700-eof"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
