@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 
+use crate::harness::oracle::{self, Kind};
 use crate::json::Value;
 use crate::process::{Stop, Text, run_text};
 use crate::{python, sha256};
@@ -135,9 +136,110 @@ fn frames(ours: &Path, reference: &Path) -> Result<(Value, bool), String> {
     ))
 }
 
-fn audio(ours: &Path, reference: &Path, limit: i64) -> Result<(Value, bool), String> {
+/// Compare the candidate's native Matroska clock with the independent wire
+/// reading. Compute the part of reference AAC output that precedes time zero.
+fn matroska_trim(
+    root: &Path,
+    input: &Path,
+    packets: &Path,
+    selected_audio: Option<i128>,
+    reference: &str,
+) -> Result<usize, String> {
+    let source = oracle::run(root, Kind::Timing, input)??;
+    let source = source
+        .get("packets")
+        .and_then(Value::as_array)
+        .ok_or("missing Matroska oracle packets")?;
+    let trace = std::fs::read_to_string(packets).map_err(|error| error.to_string())?;
+    let mut trace = trace.lines();
+    let mut selected = Vec::new();
+    for packet in source {
+        let track = packet
+            .get("track")
+            .and_then(python::int)
+            .ok_or("missing Matroska oracle track")?;
+        let time = |field| -> Result<Option<i128>, String> {
+            let value = packet
+                .get(field)
+                .ok_or("missing Matroska oracle clock field")?;
+            if value == &Value::Null {
+                return Ok(None);
+            }
+            let num = value
+                .get("numerator")
+                .and_then(python::int)
+                .ok_or("missing Matroska clock numerator")?;
+            let den = value
+                .get("denominator")
+                .and_then(python::int)
+                .filter(|&den| den > 0)
+                .ok_or("invalid Matroska clock denominator")?;
+            Ok(Some(num.div_euclid(den)))
+        };
+        let pts = time("pts")?;
+        let duration = time("duration")?;
+        let text = |value: Option<i128>| value.map_or_else(|| "-".to_owned(), |v| v.to_string());
+        let prefix = format!("{track} 1/1000000000 {} - {} ", text(pts), text(duration));
+        if !trace.next().is_some_and(|row| row.starts_with(&prefix)) {
+            return Err(format!(
+                "Matroska packet differs from the source clock: {prefix}"
+            ));
+        }
+        if selected_audio == Some(track) {
+            selected.push((pts, duration));
+        }
+    }
+    if trace.next().is_some() {
+        return Err("candidate has packets after the Matroska source trace".into());
+    }
+    if selected.is_empty() {
+        return Ok(0);
+    }
+
+    let (reference_blocks, rate) = reference.lines().fold((0, None), |(count, rate), row| {
+        let mut fields = row.split_ascii_whitespace();
+        if fields.next() == Some("a") {
+            (
+                count + 1,
+                rate.or_else(|| fields.next().and_then(|rate| rate.parse::<u32>().ok())),
+            )
+        } else {
+            (count, rate)
+        }
+    });
+    let whole = selected
+        .iter()
+        .take_while(|&&(pts, duration)| {
+            pts.zip(duration)
+                .is_some_and(|(pts, duration)| pts < 0 && pts + duration <= 0)
+        })
+        .count();
+    if selected.len() - whole != reference_blocks {
+        return Err("reference AAC block count disagrees with Matroska preroll".into());
+    }
+    let first_pts = selected
+        .get(whole)
+        .and_then(|(pts, _)| *pts)
+        .unwrap_or_default();
+    if first_pts >= 0 {
+        return Ok(0);
+    }
+    let rate = i128::from(rate.ok_or("missing reference AAC sample rate")?);
+    usize::try_from((-first_pts * rate + 500_000_000) / 1_000_000_000)
+        .map_err(|error| error.to_string())
+}
+
+fn audio(
+    ours: &Path,
+    reference: &Path,
+    prefix: usize,
+    limit: i64,
+) -> Result<(Value, bool), String> {
     let a = std::fs::read(ours).map_err(|err| err.to_string())?;
     let b = std::fs::read(reference).map_err(|err| err.to_string())?;
+    let b = b
+        .get(prefix.checked_mul(4).ok_or("stereo PCM prefix overflow")?..)
+        .ok_or("source trim exceeds reference stereo PCM")?;
     let mut worst = 0;
     let mut differing = 0;
     for (x, y) in a.as_chunks::<2>().0.iter().zip(b.as_chunks::<2>().0) {
@@ -152,7 +254,8 @@ fn audio(ours: &Path, reference: &Path, limit: i64) -> Result<(Value, bool), Str
             ("max_abs_lsb", Value::int(worst)),
             ("differing_samples", Value::int(differing)),
             ("ours_sha256", Value::str(sha256::hex(&a))),
-            ("reference_sha256", Value::str(sha256::hex(&b))),
+            ("reference_sha256", Value::str(sha256::hex(b))),
+            ("reference_leading_discard", Value::int(prefix as i64)),
         ]),
         a.len() == b.len() && a.len() % 4 == 0 && i64::from(worst) <= limit,
     ))
@@ -189,10 +292,14 @@ fn packets(ours: &Path, reference: &Path) -> Result<(Value, bool), String> {
 }
 
 pub(super) fn grade(grade: &Grade, path: &Path, tmp: &Path, vector: &Value) -> Result<Value, Stop> {
-    let path = python::path(path);
     let worker = python::path(grade.codec_workers.of("play"));
-    let ours = Run::execute(&worker, &path, &tmp.join("ours"), vector)?;
-    let reference = Run::execute(&grade.reference, &path, &tmp.join("reference"), vector)?;
+    let ours = Run::execute(&worker, &python::path(path), &tmp.join("ours"), vector)?;
+    let reference = Run::execute(
+        &grade.reference,
+        &python::path(path),
+        &tmp.join("reference"),
+        vector,
+    )?;
     let expected_exit = vector
         .get("candidate_exit")
         .and_then(python::int)
@@ -208,11 +315,36 @@ pub(super) fn grade(grade: &Grade, path: &Path, tmp: &Path, vector: &Value) -> R
     }
     let [ov, oa, op] = &ours.paths;
     let [rv, ra, rp] = &reference.paths;
+    let prefix = if vector.get("lane").and_then(Value::as_str) == Some("play-mkv") {
+        let selected_audio = vector
+            .get("tracks")
+            .and_then(Value::as_array)
+            .and_then(|tracks| tracks.get(1))
+            .and_then(python::int);
+        matroska_trim(
+            &grade.root,
+            path,
+            op,
+            selected_audio,
+            &reference.output.stdout,
+        )?
+    } else {
+        0
+    };
     let (video, exact_video) = frames(ov, rv)?;
-    let (audio, exact_audio) = audio(oa, ra, grade.rules.lsb)?;
+    let (audio, exact_audio) = audio(oa, ra, prefix, grade.rules.lsb)?;
     let (packets, exact_packets) = packets(op, rp)?;
     let ours_time = Timeline::parse(&ours.output.stdout)?;
-    let reference_time = Timeline::parse(&reference.output.stdout)?;
+    let mut reference_time = Timeline::parse(&reference.output.stdout)?;
+    if prefix != 0 {
+        let (_, samples) = reference_time
+            .audio
+            .first_mut()
+            .ok_or_else(|| "missing reference PCM timeline".to_owned())?;
+        *samples = samples
+            .checked_sub(prefix)
+            .ok_or_else(|| "source trim exceeds reference PCM timeline".to_owned())?;
+    }
     let exact_timeline = ours_time == reference_time;
     let pass = ours.output.code == 0
         && reference.output.code == 0

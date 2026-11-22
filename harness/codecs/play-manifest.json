@@ -5,7 +5,7 @@
     "Probe and demux the full container and decode the chosen video and audio tracks through the facade example and the pinned FFmpeg 9.0.2 reference.",
     "Matroska and MP4 use the playback engine packet view. MPEG-TS uses the facade source access-unit reader, because the transport playback engine does not supply that view.",
     "Compare every RGBA canvas byte and each picture presentation timestamp in output order. Require identical stereo s16 sample counts and rates and apply the existing audio_device_path LSB bound.",
-    "Compare every packet in demux order by stream ordinal, time base, signed PTS, DTS, duration, key flag, byte length and payload MD5. For MP4, both operations use the unedited media timeline and present AAC through each sample’s declared duration. Matroska packet ticks are expressed in nanoseconds. Compare differences in source and reference-derived clocks as open cases.",
+    "Compare every packet in demux order by stream ordinal, time base, signed PTS, DTS, duration, key flag, byte length and payload MD5. For MP4, both operations use the unedited media timeline and present AAC through each sample’s declared duration. Matroska packet ticks are expressed in nanoseconds and checked against the independent Block timing oracle. Compare selected Matroska AAC from time zero by applying the source-derived leading discard to reference PCM before comparing all presented samples.",
     "Use a 1920 by 1080 canvas. The 640 by 360 example canvas is outside this grade until there is pixel parity across the corpus.",
     "Both workers use explicit stream ordinals for three-tracks.mkv. The fixture rights and inputs are inherited from the existing authored corpora.",
     "The two private ATSC audio stream types use the declared ATSC namespace. The DVB E-AC-3 input uses its service profile."
@@ -111,27 +111,48 @@
     }
   ],
   "open_cases": [
-    "three-tracks",
-    "avc-high-b",
-    "hevc-b1",
-    "avc-seek",
-    "baseline-stereo",
-    "media-00",
-    "replay-avc-ac3-00",
-    "replay-avc-eac3-00",
-    "dvb-hevc-eac3-32000"
+    "replay-avc-ac3-00"
   ],
   "open_case_readings": {
-    "three-tracks": "Matroska CodecDelay and BlockDuration are source facts. The pipeline retains nanosecond clocks and discards 16 samples from the first selected AAC block. The native demuxer reports rounded clocks and its decode returns the complete first block.",
-    "avc-high-b": "Matroska DefaultDuration is in nanoseconds. The decoded canvases and presentation order match while the source durations or missing DTS differ from the native demuxer packets in Segment ticks.",
-    "hevc-b1": "Matroska DefaultDuration is in nanoseconds. The decoded canvases and presentation order match while the source durations or missing DTS differ from the native demuxer packets in Segment ticks.",
-    "avc-seek": "Matroska DefaultDuration is in nanoseconds. The decoded canvases and presentation order match while the source durations or missing DTS differ from the native demuxer packets in Segment ticks.",
-    "baseline-stereo": "H.222.0 PES headers carry selected PTS/DTS anchors. The source AU reader keeps unanchored clocks absent. The reference derives per-packet times and durations. The delivered RGBA and stereo PCM outputs match their numeric rules.",
-    "media-00": "H.222.0 PES headers carry selected PTS/DTS anchors. The source AU reader keeps unanchored clocks absent. The reference derives per-packet times and durations. The delivered RGBA and stereo PCM outputs match their numeric rules.",
-    "replay-avc-ac3-00": "H.222.0 PES headers and A/52 coded frames distinguish source clock anchors from derived timing. The strict AU reader and FFmpeg can report different packet clocks or order. The stereo PCM grade retains every sample.",
-    "replay-avc-eac3-00": "H.222.0 PES headers and A/52 coded frames distinguish source clock anchors from derived timing. The strict AU reader and FFmpeg can report different packet clocks or order. The stereo PCM grade retains every sample.",
-    "dvb-hevc-eac3-32000": "H.222.0 PES headers and A/52 coded frames distinguish source clock anchors from derived timing. The strict AU reader and FFmpeg can report different packet clocks or order. The stereo PCM grade retains every sample."
+    "replay-avc-ac3-00": "The ordered AVC and AC-3 payloads match within each track, but the AC-3 parser returns a different cross-track interleave. Verify both sequences against physical AU completion and define the equivalent cross-track order before closing this case."
   },
+  "open_deviations": [
+    {
+      "reading": "Matroska packet clocks keep nanosecond CodecDelay and DefaultDuration and omit DTS",
+      "clause": "RFC 9559 sections 5.1.4.1.13, 5.1.4.1.25 and 11.2 give nanosecond durations and the Block presentation timestamp; a Block has no separate DTS field",
+      "candidate": "Reports 41666666 ns for the video controls and -333333 ns for the selected AAC packet, with DTS absent; source presentation clocks agree with the independent EBML oracle",
+      "reference": "Reports 41000000 ns for the video controls and zero PTS for the selected AAC packet; publishes DTS for pictures and audio where demux derives it",
+      "compat": "compat::matroska::demux_clock",
+      "cases": [
+        "three-tracks",
+        "avc-high-b",
+        "hevc-b1",
+        "avc-seek"
+      ]
+    },
+    {
+      "reading": "Transport AVC and AAC packet fields retain the available source anchors",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.5 to 2.4.3.7 Table 2-21 and 2.7.5 define timestamp anchors and transport random access; the AAC ADTS clock uses ISO/IEC 13818-7 section 6.2 as documented in the framing crate",
+      "candidate": "Keeps absent DTS in PTS-only PES and leaves unanchored AAC PTS absent; it reports no AVC duration or fractional 90 kHz AAC duration, and audio picture random access is unknown",
+      "reference": "Synthesizes DTS and fills intermediate AAC clocks, reports rounded AAC and derived AVC durations, and marks AAC packets key; packet count, bytes and order agree",
+      "compat": "compat::mpegts::demux_packet_fields",
+      "cases": [
+        "baseline-stereo",
+        "media-00"
+      ]
+    },
+    {
+      "reading": "Transport AVC and Dolby packet fields distinguish coded anchors from derived timing and key flags",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.5 to 2.4.3.7 Table 2-21 and ATSC A/52:2018 Annex E sections 2.3.1.4 to 2.3.1.5 define PES clocks and Dolby frame lengths independently",
+      "candidate": "Keeps DTS absent and attaches PTS to the first eligible unit of each PES; its coded Enhanced AC-3 durations are 2880 or 4320 ticks, with audio picture random access unknown",
+      "reference": "Synthesizes DTS and flags every audio packet key; packet count, bytes and order agree",
+      "compat": "compat::mpegts::demux_packet_fields",
+      "cases": [
+        "replay-avc-eac3-00",
+        "dvb-hevc-eac3-32000"
+      ]
+    }
+  ],
   "observations": {
     "three-tracks": {
       "ours_rc": 0,
@@ -146,11 +167,12 @@
       },
       "audio": {
         "samples_ours": 48112,
-        "samples_ref": 48128,
-        "max_abs_lsb": 3823,
-        "differing_samples": 96216,
+        "samples_ref": 48112,
+        "max_abs_lsb": 1,
+        "differing_samples": 24,
         "ours_sha256": "6a772a71eaaa33c1909b762a9bf62b4ecfc80e3af3a89166c14506a31879385d",
-        "reference_sha256": "d02efcac1c040bb11fef4c51d042b3b3c2cd9e9ef924eea8fd4d6a6c2818864e"
+        "reference_sha256": "5d4b8c8c0316f0428e5e9af55e5bb5760936f4f04ac1fa4d335c6078889c7a24",
+        "reference_leading_discard": 16
       },
       "packets": {
         "packets_ours": 101,
@@ -163,7 +185,7 @@
           "reference": "2 1/1000000000 -23000000 -23000000 23000000 1 136 540c011093eb73a1cc2efbf841e43f03"
         }
       },
-      "timeline_equal": false
+      "timeline_equal": true
     },
     "avc-high-b": {
       "ours_rc": 0,

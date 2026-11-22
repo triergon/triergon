@@ -190,7 +190,9 @@ fixtures under plain `cargo test`.
 The playback comparisons run the example's demux, framing and decode loop over
 Matroska, MP4 and MPEG-TS, checking packet fields and payloads, ordered RGBA
 pictures with presentation times, and stereo PCM. Matroska and MP4 use
-`Player`. MPEG-TS uses its source access-unit reader. The facade also has
+`Player`. The Matroska grade checks the exact Block clocks independently
+and compares the selected AAC output from presentation time zero. MPEG-TS uses
+its source access-unit reader. The facade also has
 separate comparisons for strict MPEG-TS access units and seek delivery.
 See the [play corpus](../../harness/codecs/play-manifest.json) and
 [quality gates](../../docs/quality.md).
