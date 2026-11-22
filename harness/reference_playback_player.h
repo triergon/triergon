@@ -186,10 +186,12 @@ static int player_range_duration(const ViewCase *input, const PlaybackPlayerCase
     uint64_t ticks = wide ? AV_RB64(header.data + 24) : AV_RB32(header.data + 16);
     if (!scale)
         return AVERROR_INVALIDDATA;
-    if (ticks && ticks != (wide ? UINT64_MAX : UINT32_MAX) && ticks <= INT64_MAX) {
-        int64_t declared = av_rescale_rnd((int64_t)ticks, AV_TIME_BASE, scale, AV_ROUND_NEAR_INF);
-        if (declared > 0) {
-            *duration = declared;
+    if (ticks && ticks != (wide ? UINT64_MAX : UINT32_MAX)) {
+        uint64_t seconds = ticks / scale;
+        int64_t fraction = av_rescale_rnd((int64_t)(ticks % scale), AV_TIME_BASE,
+                                         scale, AV_ROUND_NEAR_INF);
+        if ((seconds || fraction) && seconds <= (uint64_t)((INT64_MAX - fraction) / AV_TIME_BASE)) {
+            *duration = (int64_t)seconds * AV_TIME_BASE + fraction;
             return 0;
         }
     }

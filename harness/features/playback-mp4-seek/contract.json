@@ -449,310 +449,310 @@
     }
   ],
   "pending_module_requirements": [
-    "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
-    "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-    "Check MOV edit-list and track admission under ISO/IEC 14496-12 sections 8.3 and 8.6. The candidate rejects a plan or seek which the public MOV demuxer accepts.",
-    "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
-    "Check the movie-to-media edit mapping under ISO/IEC 14496-12 section 8.6.6. Movie seek applies the mapped request and replays source state, while FFmpeg starts a demux packet suffix."
+    "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
+    "Compare the two source seeks after the last fragmented subtitle cue in the source composition domain. The earlier duration difference was in other cases.",
+    "Admit valid edited AV1 and RTP hint tracks in the demux seek plan. The basic EditCursor rejects the reordered or zero-delta input before an index or packet can be delivered.",
+    "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
+    "Map the movie request through the track edit and compare the resulting replay, including secondary audio before the mapped video landing. The reference currently seeks directly in its demux clock."
   ],
   "open_cases": [
     {
       "id": "regular-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "variable-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "fragmented-before-sync",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "fragmented-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "fragmented-rescaled-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "opus-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "opus-seek-edit-boundary",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "opus-crop-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "quicktime-aac-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "quicktime-aac-minimal-wave-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "quicktime-aac-reordered-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "quicktime-aac-fragmented-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "quicktime-aac-7-1-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "rtp-hints-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "aac-program-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "fragmented-subtitles-seek-start",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "fragmented-subtitles-seek-during-cue",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "fragmented-subtitle-edit-seek-start",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "fragmented-subtitle-edit-seek-during-cue",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "leading-video-edit-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "leading-video-edit-seek-before-sync",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "leading-video-edit-seek-at-sync",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "leading-video-edit-trimmed-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "leading-video-edit-overlapping-sync-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "fate-shorter-track-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "native-r-multitrack",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "native-f-multitrack",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "native-encoded-avc-aac-native-seek",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "source-fragment-before-sync",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "source-fragment-at-sync",
-      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "fragmented-subtitles-seek-after-cue",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "requirement": "Compare the two source seeks after the last fragmented subtitle cue in the source composition domain. The earlier duration difference was in other cases.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "fragmented-subtitle-edit-seek-after-cue",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "requirement": "Compare the two source seeks after the last fragmented subtitle cue in the source composition domain. The earlier duration difference was in other cases.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "demux-dav1-seek",
-      "requirement": "Check MOV edit-list and track admission under ISO/IEC 14496-12 sections 8.3 and 8.6. The candidate rejects a plan or seek which the public MOV demuxer accepts.",
+      "requirement": "Admit valid edited AV1 and RTP hint tracks in the demux seek plan. The basic EditCursor rejects the reordered or zero-delta input before an index or packet can be delivered.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "demux-rtp-hints-seek",
-      "requirement": "Check MOV edit-list and track admission under ISO/IEC 14496-12 sections 8.3 and 8.6. The candidate rejects a plan or seek which the public MOV demuxer accepts.",
+      "requirement": "Admit valid edited AV1 and RTP hint tracks in the demux seek plan. The basic EditCursor rejects the reordered or zero-delta input before an index or packet can be delivered.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "demux-opus-seek",
-      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "demux-opus-seek-edit-boundary",
-      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "demux-opus-crop-seek",
-      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "demux-quicktime-aac-seek",
-      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "demux-quicktime-aac-minimal-wave-seek",
-      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "demux-aac-program-seek",
-      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "demux-leading-video-edit-overlapping-sync-seek",
-      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "demux-fate-shorter-track-seek",
-      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "movie-mapped-edit",
-      "requirement": "Check the movie-to-media edit mapping under ISO/IEC 14496-12 section 8.6.6. Movie seek applies the mapped request and replays source state, while FFmpeg starts a demux packet suffix.",
+      "requirement": "Map the movie request through the track edit and compare the resulting replay, including secondary audio before the mapped video landing. The reference currently seeks directly in its demux clock.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
