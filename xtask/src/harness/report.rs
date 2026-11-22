@@ -985,7 +985,7 @@ pub(crate) fn run_with_inputs(
         Some(key) => reuse::step(root, &options.output, &key, options.full, || {
             collect(root, options, None)
         }),
-        None => collect(root, options, None),
+        None => collect_with_inputs(root, options, None, optional),
     }
 }
 
@@ -1080,6 +1080,15 @@ pub(crate) fn collect(
     root: &Path,
     options: &Options,
     controls: Option<&Value>,
+) -> Result<i32, String> {
+    collect_with_inputs(root, options, controls, None)
+}
+
+fn collect_with_inputs(
+    root: &Path,
+    options: &Options,
+    controls: Option<&Value>,
+    optional: Option<&crate::test_skips::ParityInputs>,
 ) -> Result<i32, String> {
     if options.baseline_worker.is_some()
         && (options.require_acceptance || options.require_slice_acceptance)
