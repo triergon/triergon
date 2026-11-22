@@ -627,30 +627,20 @@
       "cause": "The reference publishes these syntax fields through a formatted trace log."
     }
   ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "FM1_BT_B.h264",
-      "requirement": "Reconcile the trace_headers filter error flag for this FMO stream with the completed candidate slice-header scan",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "FM2_SVA_B.264",
-      "requirement": "Reconcile the trace_headers filter error flag for this FMO stream with the completed candidate slice-header scan",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "FM2_SVA_C.264",
-      "requirement": "Reconcile the trace_headers filter error flag for this FMO stream with the completed candidate slice-header scan",
+      "reading": "A slice group is valid syntax for stream inspection",
+      "clause": "ITU-T H.264 (08/2024) sections 7.3.2.2 and 7.4.2.2 and section 8.2.2 define slice group signalling and mapping.",
+      "candidate": "returns the SPS, PPS and slice fact sets without a scan error",
+      "reference": "returns the same syntax fact sets and sets the trace filter error flag",
+      "cases": [
+        "FM1_BT_B.h264",
+        "FM2_SVA_B.264",
+        "FM2_SVA_C.264"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     }
-  ],
-  "pending_module_requirements": [
-    "Reconcile the trace_headers filter error flag for this FMO stream with the completed candidate slice-header scan"
   ]
 }
