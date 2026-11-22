@@ -7,7 +7,7 @@ use triergon_core::{
 };
 use triergon_harness_protocol::digest::{fold_bytes, signed};
 use triergon_isobmff::{
-    BuildStatus, CursorStatus, Next, Sample,
+    BuildStatus, CursorStatus, Limits, Next, Sample,
     compat::mov::{
         packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
         seek::{SeekJob, SeekLimits},
@@ -15,6 +15,7 @@ use triergon_isobmff::{
     interleave::SourceTrack,
     open::{Movie, MovieOpen, MovieTrack, OpenLimits, OpenStep},
     payload::SampleReader,
+    reference_trace::mov::sample_entry::{RawVisualEntriesJob, SampleEntryHeaderProfile},
     seek::{
         CompositionTarget, SourceCompositionLookup, SourceSeekLimits, SourceSeekPlanner,
         SourceSeekRequest,
@@ -252,6 +253,15 @@ impl Source<'_> {
             .ok_or(Error::Invalid("seek track absent"))?;
         match query {
             Query::Track { ticks, eof, .. } => {
+                for track in movie.tracks() {
+                    let mut check = RawVisualEntriesJob::new(
+                        track.header(),
+                        track.table(),
+                        Limits::default(),
+                        SampleEntryHeaderProfile,
+                    );
+                    while check.poll(&mut self.work(), &self.cancel)? == BuildStatus::Yield {}
+                }
                 if *eof {
                     self.drain(&mut input, &movie)?;
                 }

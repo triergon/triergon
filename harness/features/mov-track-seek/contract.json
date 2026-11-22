@@ -8,9 +8,9 @@
   "runner": "cargo xtask report",
   "reference": "ffmpeg-isobmff-views-native",
   "contract": [
-    "Open the preloaded movie and seek one track by ID and demux timestamp using SeekJob. FFmpeg uses +noparse+nofillin and avformat_index_get_entry_from_timestamp with AVSEEK_FLAG_BACKWARD.",
+    "Open the preloaded movie and seek one track by ID and demux timestamp using SeekJob. FFmpeg uses +noparse+nofillin, a backward public index lookup, and the first available index key when that lookup returns null. Both sides check MOV open admission before a landing is compared.",
     "Run both fresh and after draining packets and payloads to EOF. The candidate uses the existing complete-source index view, with the strict or bounded recovery opener named by the case.",
-    "Fold kind 3, entry presence, timestamp, absolute file position, size, signed index flags, minimum distance, and zero-based index ordinal in that order. A null reference entry is kind 3 with presence zero. A candidate first-key fallback is a real landing. An input refusal is kind 8. A negative public index size that causes ENOMEM in the drain is a format refusal.",
+    "Fold kind 3, entry presence, timestamp, absolute file position, size, signed index flags, minimum distance, and zero-based index ordinal in that order. No reference landing is kind 3 with presence zero. An input refusal is kind 8. A negative public index size that causes ENOMEM in the drain is a format refusal.",
     "Arguments are track ID, timestamp, EOF flag, window bytes, work quantum and candidate table policy. Input loading and argument parsing precede the observation window."
   ],
   "required_profiles": [
@@ -8893,2205 +8893,237 @@
       "cause": "both workers refuse the input or request"
     }
   ],
-  "pending_module_requirements": [
-    "Compare first-key fallback with a null backward index lookup before the first key.",
-    "Resolve the reference header refusal on the private carriage sample entries.",
-    "Resolve repeated edits whose index clocks overlap.",
-    "Compare refusal of invalid media extents with the demuxer index left by recovery.",
-    "Resolve fragment decode clocks at the demux timestamp sentinel."
-  ],
-  "open_cases": [
-    {
-      "id": "regular-leading-empty-edit-t1-start-seek-ordinary",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "regular-leading-empty-edit-t1-start-eof-seek-ordinary",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "origin18-nonzero-anchor-second-absent-t1-start-seek-ordinary",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "origin18-nonzero-anchor-second-absent-t1-start-eof-seek-ordinary",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "origin18-nonzero-anchor-second-absent-t1-start-seek-tiny",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "r-private-carriage-t1-start-seek-ordinary",
-      "requirement": "Resolve the reference header refusal on the private carriage sample entries."
-    },
-    {
-      "id": "unit-interleave-us-delta-999999-t2-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-interleave-us-delta-999999-t2-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-interleave-us-delta-999999-t2-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-interleave-us-delta-999999-t2-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-interleave-us-delta-1000000-t2-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-interleave-us-delta-1000000-t2-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-interleave-us-delta-1000000-t2-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-interleave-us-delta-1000000-t2-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-123-t2-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-123-t2-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-123-t2-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-123-t2-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-123-t3-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-123-t3-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-123-t3-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-123-t3-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order27-MIN-next-scale1000-cat12-t2-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order27-MIN-next-scale1000-cat12-t2-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order27-MIN-next-scale1000-cat12-t2-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order27-MIN-next-scale1000-cat12-t2-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-132-t3-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-132-t3-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-132-t3-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-132-t3-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-132-t2-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-132-t2-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-132-t2-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-order-header-132-t2-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-front-stco-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-front-stco-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-front-stco-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-front-stco-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-front-stco-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-front-stco-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-end-co64-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-end-co64-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-end-co64-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-end-co64-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-end-co64-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-end-co64-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-constant-stsz-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-constant-stsz-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-constant-stsz-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-constant-stsz-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-constant-stsz-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-constant-stsz-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-ctts-v0-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-ctts-v0-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-ctts-v0-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-ctts-v0-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-ctts-v0-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-ctts-v0-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-ctts-v1-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-ctts-v1-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-ctts-v1-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-negative-cts-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-negative-cts-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-negative-cts-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-negative-cts-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-negative-cts-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-negative-cts-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t2-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t2-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t2-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t2-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t2-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multitrack-t2-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multiple-mdats-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multiple-mdats-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multiple-mdats-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multiple-mdats-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multiple-mdats-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-multiple-mdats-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-absent-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-absent-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-absent-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-absent-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-absent-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-absent-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-empty-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-empty-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-empty-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-empty-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-empty-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stss-empty-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-4-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-4-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-4-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-4-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-4-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-4-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-8-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-8-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-8-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-8-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-8-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-8-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-16-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-16-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-16-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-16-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-16-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-stz2-16-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-vfr-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-vfr-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-vfr-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-vfr-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-vfr-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-vfr-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at0-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at0-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at0-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1000-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1000-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1000-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1023-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1023-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1023-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1024-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1024-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1024-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1025-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1025-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at1025-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2000-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2000-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2000-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2047-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2047-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2047-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2048-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2048-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2048-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2049-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2049-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2049-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2999-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2999-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at2999-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3000-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3000-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3000-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3071-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3071-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3071-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3072-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3072-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3072-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3073-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3073-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3073-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3500-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3500-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at3500-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at4095-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at4095-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at4095-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at4096-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at4096-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at4096-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at4097-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at4097-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at4097-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5000-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5000-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5000-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5119-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5119-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5119-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5120-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5120-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5120-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5121-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5121-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5121-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5500-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5500-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-empty-trim-t1-at5500-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at2000-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at2000-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at2000-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at2001-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at2001-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at2001-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at2999-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at2999-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at2999-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3000-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3000-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3000-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3001-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3001-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3001-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3500-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3500-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3500-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3999-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3999-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at3999-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at4000-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at4000-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at4000-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at4001-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at4001-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at4001-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at4999-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at4999-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at4999-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at5000-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at5000-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at5000-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at5001-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at5001-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at5001-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at5500-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at5500-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at5500-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at1099511627776-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at1099511627776-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-edits-repeat-t1-at1099511627776-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-r-elst-v1-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-elst-v1-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-elst-v1-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at0-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at0-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at0-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-leading-empty-one-t1-at1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-late-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-late-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-late-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-late-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-late-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-late-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-one-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-one-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-one-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-one-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-one-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-one-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-trim-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-trim-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-trim-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-two-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-two-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-two-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-two-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-two-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-single-two-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at2000-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at2000-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at2000-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at2001-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at2001-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at2001-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at2999-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at2999-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at2999-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3000-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3000-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3000-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3001-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3001-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3001-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3500-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3500-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3500-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3999-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3999-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at3999-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at4000-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at4000-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at4000-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at4001-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at4001-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at4001-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at4999-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at4999-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at4999-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at5000-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at5000-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at5000-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at5001-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at5001-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at5001-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at5500-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at5500-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at5500-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at1099511627776-eof0-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at1099511627776-eof1-w65536",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-edit-two-repeat-one-t1-at1099511627776-eof0-w1",
-      "requirement": "Resolve repeated edits whose index clocks overlap."
-    },
-    {
-      "id": "unit-f-explicit-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-explicit-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-explicit-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-explicit-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-explicit-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-explicit-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfhd-defaults-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfhd-defaults-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfhd-defaults-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfhd-defaults-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfhd-defaults-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfhd-defaults-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-trex-defaults-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-trex-defaults-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-trex-defaults-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-trex-defaults-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-trex-defaults-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-trex-defaults-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-first-flags-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-first-flags-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-first-flags-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-first-flags-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-first-flags-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-first-flags-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t2-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t2-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t2-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t2-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t2-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-multitrack-t2-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v0-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v0-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v0-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v0-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v0-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v0-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v1-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v1-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v1-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v1-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v1-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-ctts-v1-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at0-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at0-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at0-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at1000-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at1000-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at1000-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at2000-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at2000-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at2000-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at2999-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at2999-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at2999-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at3000-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at3000-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at3000-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at3500-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at3500-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at3500-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at5000-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at5000-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at5000-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at5500-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at5500-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfdt64-t1-at5500-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfra-mfra-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfra-mfra-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfra-mfra-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfra-mfra-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfra-mfra-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-tfra-mfra-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-description-change-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-description-change-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-description-change-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-description-change-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-description-change-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-r-description-change-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-no-second-tfdt-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-no-second-tfdt-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-no-second-tfdt-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-no-second-tfdt-t1-at-1-eof0-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-no-second-tfdt-t1-at-1-eof1-w65536",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-f-no-second-tfdt-t1-at-1-eof0-w1",
-      "requirement": "Compare first-key fallback with a null backward index lookup before the first key."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at-1-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at-1-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at-1-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at0-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at0-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at0-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at1000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at1000-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at1000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at2000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at2000-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at2000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at2999-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at2999-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at2999-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at3000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at3000-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at3000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at3500-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at3500-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at3500-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at5000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at5000-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at5000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at5500-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at5500-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at5500-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at1099511627776-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at1099511627776-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-sample-end-overflow-t1-at1099511627776-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at-1-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at-1-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at-1-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at0-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at0-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at0-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at1000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at1000-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at1000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at2000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at2000-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at2000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at2999-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at2999-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at2999-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at3000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at3000-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at3000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at3500-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at3500-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at3500-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at5000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at5000-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at5000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at5500-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at5500-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at5500-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at1099511627776-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at1099511627776-eof1-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-position-t1-at1099511627776-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at-1-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at-1-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at0-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at0-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at1000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at1000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at2000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at2000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at2999-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at2999-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at3000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at3000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at3500-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at3500-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at5000-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at5000-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at5500-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at5500-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at1099511627776-eof0-w65536",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-signed-size-t1-at1099511627776-eof0-w1",
-      "requirement": "Compare refusal of invalid media extents with the demuxer index left by recovery."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at-9223372036854775807-eof0-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at-9223372036854775807-eof1-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at-9223372036854775807-eof0-w1",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at-1-eof0-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at-1-eof1-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at-1-eof0-w1",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at0-eof0-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at0-eof1-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at0-eof0-w1",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at1000-eof0-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at1000-eof1-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at1000-eof0-w1",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at2000-eof0-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at2000-eof1-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at2000-eof0-w1",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at2999-eof0-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at2999-eof1-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at2999-eof0-w1",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at3000-eof0-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at3000-eof1-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at3000-eof0-w1",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at3500-eof0-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at3500-eof1-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at3500-eof0-w1",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at5000-eof0-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at5000-eof1-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at5000-eof0-w1",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at5500-eof0-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at5500-eof1-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at5500-eof0-w1",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at1099511627776-eof0-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at1099511627776-eof1-w65536",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
-    },
-    {
-      "id": "unit-null-index-clock-t1-at1099511627776-eof0-w1",
-      "requirement": "Resolve fragment decode clocks at the demux timestamp sentinel."
+  "open_deviations": [
+    {
+      "reading": "Repeated edits with non-increasing demux index timestamps",
+      "clause": "ISO/IEC 14496-12:2015 §8.6.6.3 and Apple QuickTime File Format ‘Edit list atom (elst)’ permit multiple mappings from movie time to media time; neither defines choosing an entry in a rolled-back demux index. SeekJob::poll documents its ordered-index precondition",
+      "candidate": "refuses a query at or beyond the first overlapping clock with Unsupported",
+      "reference": "returns an entry from its public backward index lookup, for example ordinal 4 at 2000 ticks",
+      "compat": "compat::mov::seek overlapping_edit_index would reproduce the reference choice on repeated edits",
+      "cases": [
+        "unit-r-edits-repeat-t1-at2000-eof0-w65536",
+        "unit-r-edits-repeat-t1-at2000-eof1-w65536",
+        "unit-r-edits-repeat-t1-at2000-eof0-w1",
+        "unit-r-edits-repeat-t1-at2001-eof0-w65536",
+        "unit-r-edits-repeat-t1-at2001-eof1-w65536",
+        "unit-r-edits-repeat-t1-at2001-eof0-w1",
+        "unit-r-edits-repeat-t1-at2999-eof0-w65536",
+        "unit-r-edits-repeat-t1-at2999-eof1-w65536",
+        "unit-r-edits-repeat-t1-at2999-eof0-w1",
+        "unit-r-edits-repeat-t1-at3000-eof0-w65536",
+        "unit-r-edits-repeat-t1-at3000-eof1-w65536",
+        "unit-r-edits-repeat-t1-at3000-eof0-w1",
+        "unit-r-edits-repeat-t1-at3001-eof0-w65536",
+        "unit-r-edits-repeat-t1-at3001-eof1-w65536",
+        "unit-r-edits-repeat-t1-at3001-eof0-w1",
+        "unit-r-edits-repeat-t1-at3500-eof0-w65536",
+        "unit-r-edits-repeat-t1-at3500-eof1-w65536",
+        "unit-r-edits-repeat-t1-at3500-eof0-w1",
+        "unit-r-edits-repeat-t1-at3999-eof0-w65536",
+        "unit-r-edits-repeat-t1-at3999-eof1-w65536",
+        "unit-r-edits-repeat-t1-at3999-eof0-w1",
+        "unit-r-edits-repeat-t1-at4000-eof0-w65536",
+        "unit-r-edits-repeat-t1-at4000-eof1-w65536",
+        "unit-r-edits-repeat-t1-at4000-eof0-w1",
+        "unit-r-edits-repeat-t1-at4001-eof0-w65536",
+        "unit-r-edits-repeat-t1-at4001-eof1-w65536",
+        "unit-r-edits-repeat-t1-at4001-eof0-w1",
+        "unit-r-edits-repeat-t1-at4999-eof0-w65536",
+        "unit-r-edits-repeat-t1-at4999-eof1-w65536",
+        "unit-r-edits-repeat-t1-at4999-eof0-w1",
+        "unit-r-edits-repeat-t1-at5000-eof0-w65536",
+        "unit-r-edits-repeat-t1-at5000-eof1-w65536",
+        "unit-r-edits-repeat-t1-at5000-eof0-w1",
+        "unit-r-edits-repeat-t1-at5001-eof0-w65536",
+        "unit-r-edits-repeat-t1-at5001-eof1-w65536",
+        "unit-r-edits-repeat-t1-at5001-eof0-w1",
+        "unit-r-edits-repeat-t1-at5500-eof0-w65536",
+        "unit-r-edits-repeat-t1-at5500-eof1-w65536",
+        "unit-r-edits-repeat-t1-at5500-eof0-w1",
+        "unit-r-edits-repeat-t1-at1099511627776-eof0-w65536",
+        "unit-r-edits-repeat-t1-at1099511627776-eof1-w65536",
+        "unit-r-edits-repeat-t1-at1099511627776-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at2000-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at2000-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at2000-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at2001-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at2001-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at2001-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at2999-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at2999-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at2999-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at3000-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at3000-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at3000-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at3001-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at3001-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at3001-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at3500-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at3500-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at3500-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at3999-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at3999-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at3999-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at4000-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at4000-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at4000-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at4001-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at4001-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at4001-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at4999-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at4999-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at4999-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at5000-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at5000-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at5000-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at5001-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at5001-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at5001-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at5500-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at5500-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at5500-eof0-w1",
+        "unit-edit-two-repeat-one-t1-at1099511627776-eof0-w65536",
+        "unit-edit-two-repeat-one-t1-at1099511627776-eof1-w65536",
+        "unit-edit-two-repeat-one-t1-at1099511627776-eof0-w1"
+      ]
+    },
+    {
+      "reading": "Unsigned fragment clock equals the signed demux null sentinel",
+      "clause": "ISO/IEC 14496-12:2015 §§8.8.12.2–.3: version-1 tfdt is unsigned 64-bit. SeekJob::poll excludes the demux null timestamp from its signed search domain",
+      "candidate": "refuses to treat 2^63 as a signed seek timestamp",
+      "reference": "can return the index entry with raw timestamp bits 2^63 and flags -1",
+      "cases": [
+        "unit-null-index-clock-t1-at-9223372036854775807-eof0-w65536",
+        "unit-null-index-clock-t1-at-9223372036854775807-eof1-w65536",
+        "unit-null-index-clock-t1-at-9223372036854775807-eof0-w1",
+        "unit-null-index-clock-t1-at-1-eof0-w65536",
+        "unit-null-index-clock-t1-at-1-eof1-w65536",
+        "unit-null-index-clock-t1-at-1-eof0-w1",
+        "unit-null-index-clock-t1-at0-eof0-w65536",
+        "unit-null-index-clock-t1-at0-eof1-w65536",
+        "unit-null-index-clock-t1-at0-eof0-w1",
+        "unit-null-index-clock-t1-at1000-eof0-w65536",
+        "unit-null-index-clock-t1-at1000-eof1-w65536",
+        "unit-null-index-clock-t1-at1000-eof0-w1",
+        "unit-null-index-clock-t1-at2000-eof0-w65536",
+        "unit-null-index-clock-t1-at2000-eof1-w65536",
+        "unit-null-index-clock-t1-at2000-eof0-w1",
+        "unit-null-index-clock-t1-at2999-eof0-w65536",
+        "unit-null-index-clock-t1-at2999-eof1-w65536",
+        "unit-null-index-clock-t1-at2999-eof0-w1",
+        "unit-null-index-clock-t1-at3000-eof0-w65536",
+        "unit-null-index-clock-t1-at3000-eof1-w65536",
+        "unit-null-index-clock-t1-at3000-eof0-w1",
+        "unit-null-index-clock-t1-at3500-eof0-w65536",
+        "unit-null-index-clock-t1-at3500-eof1-w65536",
+        "unit-null-index-clock-t1-at3500-eof0-w1",
+        "unit-null-index-clock-t1-at5000-eof0-w65536",
+        "unit-null-index-clock-t1-at5000-eof1-w65536",
+        "unit-null-index-clock-t1-at5000-eof0-w1",
+        "unit-null-index-clock-t1-at5500-eof0-w65536",
+        "unit-null-index-clock-t1-at5500-eof1-w65536",
+        "unit-null-index-clock-t1-at5500-eof0-w1",
+        "unit-null-index-clock-t1-at1099511627776-eof0-w65536",
+        "unit-null-index-clock-t1-at1099511627776-eof1-w65536",
+        "unit-null-index-clock-t1-at1099511627776-eof0-w1"
+      ]
+    },
+    {
+      "reading": "An index backed by sample ranges outside the available media",
+      "clause": "ISO/IEC 14496-12:2015 §§8.1.1.1, 8.7.3.2.2 and 8.7.5.3: a chunk offset addresses the containing file and its sample sizes give the byte extents of its samples",
+      "candidate": "refuses the index whose complete-source validation encounters an impossible co64 position, an overflowing sample end, or an oversize final sample",
+      "reference": "can publish a landing at offset zero or an earlier index entry, keep a negative public size, or return no entry",
+      "compat": "compat::mov::seek partial_index would expose index entries before an invalid sample range",
+      "cases": [
+        "unit-sample-end-overflow-t1-at-9223372036854775807-eof0-w65536",
+        "unit-sample-end-overflow-t1-at-9223372036854775807-eof1-w65536",
+        "unit-sample-end-overflow-t1-at-9223372036854775807-eof0-w1",
+        "unit-sample-end-overflow-t1-at-1-eof0-w65536",
+        "unit-sample-end-overflow-t1-at-1-eof1-w65536",
+        "unit-sample-end-overflow-t1-at-1-eof0-w1",
+        "unit-sample-end-overflow-t1-at0-eof0-w65536",
+        "unit-sample-end-overflow-t1-at0-eof1-w65536",
+        "unit-sample-end-overflow-t1-at0-eof0-w1",
+        "unit-sample-end-overflow-t1-at1000-eof0-w65536",
+        "unit-sample-end-overflow-t1-at1000-eof1-w65536",
+        "unit-sample-end-overflow-t1-at1000-eof0-w1",
+        "unit-sample-end-overflow-t1-at2000-eof0-w65536",
+        "unit-sample-end-overflow-t1-at2000-eof1-w65536",
+        "unit-sample-end-overflow-t1-at2000-eof0-w1",
+        "unit-sample-end-overflow-t1-at2999-eof0-w65536",
+        "unit-sample-end-overflow-t1-at2999-eof1-w65536",
+        "unit-sample-end-overflow-t1-at2999-eof0-w1",
+        "unit-sample-end-overflow-t1-at3000-eof0-w65536",
+        "unit-sample-end-overflow-t1-at3000-eof1-w65536",
+        "unit-sample-end-overflow-t1-at3000-eof0-w1",
+        "unit-sample-end-overflow-t1-at3500-eof0-w65536",
+        "unit-sample-end-overflow-t1-at3500-eof1-w65536",
+        "unit-sample-end-overflow-t1-at3500-eof0-w1",
+        "unit-sample-end-overflow-t1-at5000-eof0-w65536",
+        "unit-sample-end-overflow-t1-at5000-eof1-w65536",
+        "unit-sample-end-overflow-t1-at5000-eof0-w1",
+        "unit-sample-end-overflow-t1-at5500-eof0-w65536",
+        "unit-sample-end-overflow-t1-at5500-eof1-w65536",
+        "unit-sample-end-overflow-t1-at5500-eof0-w1",
+        "unit-sample-end-overflow-t1-at1099511627776-eof0-w65536",
+        "unit-sample-end-overflow-t1-at1099511627776-eof1-w65536",
+        "unit-sample-end-overflow-t1-at1099511627776-eof0-w1",
+        "unit-signed-position-t1-at-9223372036854775807-eof0-w65536",
+        "unit-signed-position-t1-at-9223372036854775807-eof1-w65536",
+        "unit-signed-position-t1-at-9223372036854775807-eof0-w1",
+        "unit-signed-position-t1-at-1-eof0-w65536",
+        "unit-signed-position-t1-at-1-eof1-w65536",
+        "unit-signed-position-t1-at-1-eof0-w1",
+        "unit-signed-position-t1-at0-eof0-w65536",
+        "unit-signed-position-t1-at0-eof1-w65536",
+        "unit-signed-position-t1-at0-eof0-w1",
+        "unit-signed-position-t1-at1000-eof0-w65536",
+        "unit-signed-position-t1-at1000-eof1-w65536",
+        "unit-signed-position-t1-at1000-eof0-w1",
+        "unit-signed-position-t1-at2000-eof0-w65536",
+        "unit-signed-position-t1-at2000-eof1-w65536",
+        "unit-signed-position-t1-at2000-eof0-w1",
+        "unit-signed-position-t1-at2999-eof0-w65536",
+        "unit-signed-position-t1-at2999-eof1-w65536",
+        "unit-signed-position-t1-at2999-eof0-w1",
+        "unit-signed-position-t1-at3000-eof0-w65536",
+        "unit-signed-position-t1-at3000-eof1-w65536",
+        "unit-signed-position-t1-at3000-eof0-w1",
+        "unit-signed-position-t1-at3500-eof0-w65536",
+        "unit-signed-position-t1-at3500-eof1-w65536",
+        "unit-signed-position-t1-at3500-eof0-w1",
+        "unit-signed-position-t1-at5000-eof0-w65536",
+        "unit-signed-position-t1-at5000-eof1-w65536",
+        "unit-signed-position-t1-at5000-eof0-w1",
+        "unit-signed-position-t1-at5500-eof0-w65536",
+        "unit-signed-position-t1-at5500-eof1-w65536",
+        "unit-signed-position-t1-at5500-eof0-w1",
+        "unit-signed-position-t1-at1099511627776-eof0-w65536",
+        "unit-signed-position-t1-at1099511627776-eof1-w65536",
+        "unit-signed-position-t1-at1099511627776-eof0-w1",
+        "unit-signed-size-t1-at-9223372036854775807-eof0-w65536",
+        "unit-signed-size-t1-at-9223372036854775807-eof0-w1",
+        "unit-signed-size-t1-at-1-eof0-w65536",
+        "unit-signed-size-t1-at-1-eof0-w1",
+        "unit-signed-size-t1-at0-eof0-w65536",
+        "unit-signed-size-t1-at0-eof0-w1",
+        "unit-signed-size-t1-at1000-eof0-w65536",
+        "unit-signed-size-t1-at1000-eof0-w1",
+        "unit-signed-size-t1-at2000-eof0-w65536",
+        "unit-signed-size-t1-at2000-eof0-w1",
+        "unit-signed-size-t1-at2999-eof0-w65536",
+        "unit-signed-size-t1-at2999-eof0-w1",
+        "unit-signed-size-t1-at3000-eof0-w65536",
+        "unit-signed-size-t1-at3000-eof0-w1",
+        "unit-signed-size-t1-at3500-eof0-w65536",
+        "unit-signed-size-t1-at3500-eof0-w1",
+        "unit-signed-size-t1-at5000-eof0-w65536",
+        "unit-signed-size-t1-at5000-eof0-w1",
+        "unit-signed-size-t1-at5500-eof0-w65536",
+        "unit-signed-size-t1-at5500-eof0-w1",
+        "unit-signed-size-t1-at1099511627776-eof0-w65536",
+        "unit-signed-size-t1-at1099511627776-eof0-w1"
+      ]
     }
   ]
 }

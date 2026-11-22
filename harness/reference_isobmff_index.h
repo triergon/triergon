@@ -74,14 +74,24 @@ static int track_seek_main(AVFormatContext *format, AVStream *stream,
         if (code != AVERROR_EOF)
             return code;
     }
+    const int count = avformat_index_get_entries_count(stream);
     const AVIndexEntry *landing =
         avformat_index_get_entry_from_timestamp(stream, seek->ticks[0], AVSEEK_FLAG_BACKWARD);
+    if (!landing) {
+        /* SeekJob falls back to the first key when a backward lookup finds none. */
+        for (int ordinal = 0; ordinal < count; ++ordinal) {
+            const AVIndexEntry *entry = avformat_index_get_entry(stream, ordinal);
+            if (entry->flags & AVINDEX_KEYFRAME) {
+                landing = entry;
+                break;
+            }
+        }
+    }
     if (!landing) {
         const uint64_t absent = 0;
         mov_view_row(work, 3, &absent, 1, NULL, 0);
         return 0;
     }
-    const int count = avformat_index_get_entries_count(stream);
     int ordinal = 0;
     while (ordinal < count && avformat_index_get_entry(stream, ordinal) != landing)
         ++ordinal;
