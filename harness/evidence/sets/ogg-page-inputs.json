@@ -3,9 +3,9 @@
  "path": "ogg-page-inputs",
  "retention": "retained",
  "reason": "Pinned bitexact Ogg remuxes for page reading and writing, authored page boundaries, and Ogg track header variants.",
- "key": "evidence/ogg-page-inputs/809653e230f11d66b95aa7fc631f32890bb8d94150b1b191cbf9a2aab209c314.tar.gz",
- "sha256": "809653e230f11d66b95aa7fc631f32890bb8d94150b1b191cbf9a2aab209c314",
- "bytes": 2426814,
+ "key": "evidence/ogg-page-inputs/4c72f0c2d89653c539e5539b330669e482b86a0708ec6b9679909d566eddb901.tar.gz",
+ "sha256": "4c72f0c2d89653c539e5539b330669e482b86a0708ec6b9679909d566eddb901",
+ "bytes": 2427186,
  "unpacked_at": "repository",
  "files": [
   {
@@ -23,6 +23,10 @@
   {
    "path": ".research/ogg-page-inputs/comment-picture.opus",
    "sha256": "485cd9ce0dd5cdea9699db50e114e517c03c981623f5d1d8d625e63c79f9728f"
+  },
+  {
+   "path": ".research/ogg-page-inputs/comment-valid-picture.opus",
+   "sha256": "5c3ee5a59a46602edbb210cc9dc4ec5f6ec1eb3cb8f5fff516fb0bbb4e7d711b"
   },
   {
    "path": ".research/ogg-page-inputs/opus-family-255.opus",
