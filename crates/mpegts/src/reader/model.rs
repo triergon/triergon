@@ -233,7 +233,7 @@ pub(super) struct DependentSyncframe {
     pub pending_bytes: Option<Bytes>,
 }
 
-/// A complete AC-3 syncframe or a DVB E-AC-3 syncframe group.
+/// A complete AC-3 syncframe or an E-AC-3 access-unit group.
 /// Clones share the charged bytes and syncframe facts.
 #[derive(Clone, Debug)]
 pub struct Ac3AccessUnit {
@@ -256,7 +256,7 @@ impl Ac3AccessUnit {
         &self.bytes
     }
 
-    /// Facts of the primary syncframe, which supplies the unit's sample span.
+    /// Facts of the first primary syncframe.
     pub const fn facts(&self) -> Ac3FrameFacts {
         self.first
     }
@@ -267,6 +267,27 @@ impl Ac3AccessUnit {
             self.dependents
                 .iter()
                 .flat_map(|frames| frames.as_slice().iter().map(|frame| frame.facts)),
+        )
+    }
+
+    /// Combined primary sample span; dependent substreams add no time.
+    pub fn sample_span(&self) -> Result<Time> {
+        if self.first.header.blocks == 6 {
+            return self.first.header.sample_span();
+        }
+        let blocks: u16 = self
+            .syncframes()
+            .filter(|facts| {
+                !matches!(
+                    facts.header.details,
+                    triergon_framing::ac3::Ac3FrameDetails::Eac3 { stream_type: 1, .. }
+                )
+            })
+            .map(|facts| u16::from(facts.header.blocks))
+            .sum();
+        Time::new(
+            i128::from(blocks) * 256,
+            u128::from(self.first.header.sample_rate_hz),
         )
     }
 }
@@ -406,6 +427,51 @@ impl DtsExtensionFrame {
     }
 }
 
+/// Picture coding type from H.262 section 6.2.3.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MpegPictureCoding {
+    /// An independently coded I picture.
+    #[default]
+    Intra,
+    /// A P picture using forward prediction.
+    Predictive,
+    /// A B picture using bidirectional prediction.
+    Bidirectional,
+}
+
+/// A picture with sequence setup and its original coded slices.
+#[derive(Debug)]
+pub struct MpegVideoPicture {
+    pub(super) bytes: Bytes,
+    pub(super) range: Range<u64>,
+    /// Coded width in luma samples.
+    pub width: u16,
+    /// Coded height in luma samples.
+    pub height: u16,
+    /// Ten-bit display-order reference within the group.
+    pub temporal_reference: u16,
+    /// Prediction class declared by the picture header.
+    pub coding: MpegPictureCoding,
+    /// Picture start-code offset in the private elementary view.
+    pub picture_offset: u64,
+    /// Number of coded slice start codes.
+    pub slice_count: u8,
+    /// Whether the sequence uses MPEG-2 syntax.
+    pub mpeg2: bool,
+    pub(super) duration: Time,
+}
+
+impl MpegVideoPicture {
+    /// Original picture and sequence bytes, without the PES header.
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+    /// Byte range of the picture in the reader’s elementary view.
+    pub fn elementary_range(&self) -> Range<u64> {
+        self.range.clone()
+    }
+}
+
 /// Original framed bytes and syntax facts, before decoder-feed conversion.
 /// Framer offsets use a private concatenated elementary view (`SourceId(0)`);
 /// physical transport provenance is retained by [`Packet::sources`].
@@ -413,6 +479,8 @@ impl DtsExtensionFrame {
 pub enum AccessUnit {
     /// An AVC or HEVC access unit as framed from Annex B.
     Video(RawAccessUnit),
+    /// One MPEG-1 or MPEG-2 picture with sequence setup.
+    MpegVideo(MpegVideoPicture),
     /// An AAC frame with its ADTS header.
     Adts(AacAdtsFrame),
     /// A LOAS envelope with an opaque LATM multiplex element.
@@ -443,6 +511,7 @@ pub enum AccessUnit {
 impl AccessUnit {
     fn stored_bytes(&self) -> &Bytes {
         match self {
+            Self::MpegVideo(frame) => frame.bytes(),
             Self::Adts(frame) => frame.source_bytes(),
             Self::AdtsFragment(fragment) => fragment.source_bytes(),
             Self::Loas(frame) => frame.bytes(),
@@ -459,6 +528,7 @@ impl AccessUnit {
     pub(super) fn range(&self) -> Range<u64> {
         match self {
             Self::Video(unit) => unit.range.clone(),
+            Self::MpegVideo(unit) => unit.range.clone(),
             Self::Adts(frame) => {
                 frame.source().offset..frame.source().offset + frame.source_bytes().len() as u64
             }
@@ -496,6 +566,7 @@ impl AccessUnit {
     }
     pub(super) fn duration(&self) -> Result<Option<Time>> {
         match self {
+            Self::MpegVideo(unit) => Ok(Some(unit.duration)),
             Self::Video(_)
             | Self::Loas(_)
             | Self::DvbSubtitle(_)
@@ -508,7 +579,7 @@ impl AccessUnit {
                     .ok_or(Error::Invalid("ADTS frequency"))?;
                 Ok(Some(Time::new(1024, u128::from(rate))?))
             }
-            Self::Ac3(frame) => Ok(Some(frame.facts().header.sample_span()?)),
+            Self::Ac3(frame) => Ok(Some(frame.sample_span()?)),
             Self::Dts(frame) => Ok(Some(frame.sample_span())),
             Self::DtsExtension(frame) => Ok(frame.sample_span()),
             Self::MpegAudio(frame) => Ok(Some(Time::new(
@@ -602,6 +673,10 @@ impl PacketInfo for Packet {
     }
     fn random_access(&self) -> RandomAccess {
         match &self.0.unit {
+            AccessUnit::MpegVideo(unit) if unit.coding == MpegPictureCoding::Intra => {
+                RandomAccess::Sync
+            }
+            AccessUnit::MpegVideo(_) => RandomAccess::NotSync,
             AccessUnit::Video(unit) if unit.random_access => RandomAccess::Sync,
             AccessUnit::Video(unit) if unit.has_vcl => RandomAccess::NotSync,
             _ => RandomAccess::Unknown,

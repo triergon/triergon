@@ -60,7 +60,7 @@ pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N] [--target TAR
              steps, then timing on CPU 1) or memory (memory on CPUs 1 to the last,
              then the grades); each step's output goes under DIR, its log to
              DIR/logs and its record to DIR/steps; --full measures what a kept
-             evidence set holds; --no-early-stop collects every planned report pair
+             evidence set holds; --no-early-stop collects every planned report, progressive or codec pair
   summary    join the outputs of every shard of a run into FILE: each step's
              status and time, with a failure if a planned step did not run, a
              step failed, or the shards measured different sources or workers

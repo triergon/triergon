@@ -26,8 +26,8 @@ fn decode(frames: &[&[u8]]) -> Result<(), DecodeError> {
 }
 ```
 
-An access unit is one whole frame, header included, as `triergon-framing`'s
-`MpegAudioHeader::from_bytes` reads it. `Decoder::new_in` charges a caller's `Budget`.
+An access unit is one whole frame, header included. `Decoder::new_in` charges a
+caller's `Budget`; `frame_header` reads a frame header as the decoder does.
 `examples/decode_mp3` decodes the first MPEG audio track of a file (a raw stream or a
 container), read through the `triergon` facade, to interleaved f32le: the decoder's whole
 output, without container trims. `--reset-at N` resets the decoder before access unit N.
@@ -45,8 +45,7 @@ output, without container trims. `--reset-at N` resets the decoder before access
   grouped quantizers and the joint stereo bound.
 - Layer I, joint stereo included.
 - All three layers share one polyphase synthesis filterbank (a 32-point DCT by Lee's
-  factorisation, then the 512-tap window, which uses the symmetry of the matrixed
-  vectors to read each value once for two outputs). Mono frames give one plane (`FC`); stereo,
+  factorisation, then the 512-tap window). Mono frames give one plane (`FC`); stereo,
   joint stereo and dual channel give two (`FL`, `FR`). A stream may change mode, sample
   rate or layer between frames.
 
@@ -94,18 +93,8 @@ The Huffman tables are checked to be complete prefix codes.
 
 ## Verification
 
-The `codecs-files` gate grades Layers I, II and III against the FFmpeg float decoders.
-It compares decoded PCM with container trims applied and stereo device output,
-including the three MPEG audio workload files.
-
 `harness/codecs/mp3/make_vectors.sh FFMPEG OUT` generates the test streams (libmp3lame,
 mp2 and mp2fixed encodes at MPEG-1, 2 and 2.5 rates, and random Layer I/II frames from
-`harness/codecs/mp3/random_frames.py`) with the FFmpeg it is given.
-`cargo xtask codecs grade` decodes them and the ISO conformance streams through the
-container readers under the [numeric rules](../../harness/codecs/numeric-rules.json) (the
-`mp1`, `mp2` and `mp3` lanes, [harness/codecs/STATUS.md](../../harness/codecs/STATUS.md));
-On AArch64, 65 of 67 files match (Layer I 5/5, Layer II 21/21, Layer III 39/41).
-The open Layer III case `he_mode` changes channel mode mid-stream. FFmpeg's CLI
-converts to the first frame's format and its stereo device path stops at the change.
-Both sides refuse `he_free`, which uses free-format frames (bit rate index zero).
-See the [runtime and memory results](../../docs/status.md).
+`harness/codecs/mp3/random_frames.py`) with the FFmpeg it is given. Comparison:
+[harness/codecs](../../harness/codecs/STATUS.md); results in
+[docs/status.md](../../docs/status.md).

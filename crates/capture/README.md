@@ -24,17 +24,14 @@ assert!(report.picture.key && out.len() == report.ts_bytes && out.len() % 188 ==
 
 `SessionConfig` holds `width`, `height`, `bit_rate`, `max_rate`, `vbv_bits`, `gop` and
 `mux` (a `mux::MuxConfig`). `SessionConfig::with_rate_rule(width, height, b)` sets
-`max_rate = b·7/5` (saturating), `vbv_bits = b/7`, `gop = 30` and the default
-multiplex. The
+`max_rate = b·7/5`, `vbv_bits = b/7`, `gop = 30` and the default multiplex. The
 component crates are re-exported as `pixel`, `mpeg1` and `mux`. `Session` also gives
 `geometry()`, `converted()` (the last converted input), `reconstruction()` and
 `vbv_underflow_bits()`.
 
-`Session::open` selects the chroma conversion by width on every platform. To
-match the reference conversion in the capture suite, use `Session::open` on
-32-bit ARMv7 and `Session::open_filtered` on AArch64 Linux. The filtered
-constructor uses the centre-sited chroma filter at every width. Its reference
-comparison is on Linux AArch64.
+`Session::open` selects the chroma conversion by width, as the reference does on 32-bit
+ARMv7; `Session::open_filtered` uses the centre-sited chroma filter at every width, as it
+does on Linux AArch64.
 
 ## Supported
 
@@ -56,15 +53,12 @@ comparison is on Linux AArch64.
   | `CaptureError` | Cause |
   |---|---|
   | `Pixel` | geometry not even, zero or above 4094; RGBA shorter than `width × height × 4` |
-  | `Encoder` | rate, VBV buffer or intra period outside the encodable range; encoder storage refused |
+  | `Encoder` | rate or intra period outside the encodable range, or a refused storage charge |
   | `Mux` | a `MuxConfig` field the writer cannot represent (names, PIDs, program number, stream type) |
   | `Sink` | the sink refused or partially wrote the frame (`Sink::send` returned `false`) |
-  | `Closed` | an earlier `Sink` failure closed the session; open a new one |
+  | `Closed` | an earlier `Sink` failure poisoned the session; open a new one |
 
-  A `Pixel` or `Encoder` error from `encode` leaves the session as it was, so the
-  frame can be retried; a `Sink` failure closes it.
-- Planes and output buffers are plain `Vec`s owned by the session and reused across
-  frames.
+- The session's buffers and the encoder's budgeted storage are reused across frames.
 
 ### Differences from FFmpeg
 
@@ -77,25 +71,8 @@ Multiplex differences (PMT stream type, SDT provider) are listed under
 
 ## Conformance
 
-The reference is FFmpeg 9.0.2 (`swscale` with `SWS_BILINEAR`, `mpeg1video` with
-I/P pictures, `mpegts`) driven by the capture build of `harness/reference.c`.
-The capture worker selects the constructor for the target. The capture
-contract and required cases live in `harness/capture/contract.json` and
-`harness/capture/cases.json`; `harness/capture/` runs both pipelines and applies
-the per-stage rules documented in [triergon-pixel](../pixel/README.md#conformance)
-and [triergon-codec-mpeg1](../codec-mpeg1/README.md#conformance). For the multiplex,
-an independent re-demux (FFmpeg and an own TS walker) must find the same PIDs and
-tables (subject to the documented differences), PES payloads equal to the
-elementary stream, identical per-frame PTS, DTS and PCR, valid continuity and the
-table cadence. The harness measures peak live heap and total resident peak RSS
-with the same input and checked output for each worker.
-The configuration cases exercise nondefault geometry, GOP, VBV and multiplex
-settings. PCR is carried on every picture. A VBV buffer below one picture at the
-average rate (`bit_rate` / 30) is refused at open (`CaptureError::Encoder`), as the
-reference refuses it. The comparison checks both diagnostics and that neither
-worker emits a stream.
-
-`tests/session.rs` covers the start sequence and timing, keepalive, sink failure,
-bottom-up input, geometry and rate extremes, and error mapping.
-[capture-worker](../capture-worker/README.md) runs a session from the harness command
-line. Gates: [docs/quality.md](../../docs/quality.md).
+The reference is FFmpeg 9.0.2 (`swscale` with `SWS_BILINEAR`, `mpeg1video` with an I/P
+GOP of 30, `mpegts`). The comparison rules are in
+[harness/capture](../../harness/capture/README.md) and the results in
+[docs/status.md](../../docs/status.md). [capture-worker](../capture-worker/README.md) runs
+a session from the harness command line.

@@ -2,11 +2,11 @@
   "schema": 1,
   "about": "What the gates require and every exception to them, counted from the feature contracts, the gate plan, every list under harness/ whose name starts with open_ (an entry counts once for each case it names, under each gate target it is open on) and the public features of each crate in harness/not-compared.json that no contract compares. `cargo xtask check-design` counts them again: a change that drops a requirement or adds an exception must change this file too.",
   "counts": {
-    "features": 178,
-    "required_by_check": 147,
+    "features": 181,
+    "required_by_check": 150,
     "on_demand": 3,
     "diagnostic": 1,
-    "gated_by_report": 118,
+    "gated_by_report": 121,
     "gated_by_another_command": 57,
     "not_gated": 3,
     "open": {
@@ -267,7 +267,7 @@
       "harness/features/isobmff-source-seek/contract.json": {"open_deviations": {"aarch64-unknown-linux-gnu": 115, "thumbv7neon-unknown-linux-gnueabihf": 115}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 13362, "thumbv7neon-unknown-linux-gnueabihf": 13362}},
       "harness/status-rows.json": {
         "open_cells": {
-          "aarch64-unknown-linux-gnu": 29,
+          "aarch64-unknown-linux-gnu": 28,
           "thumbv7neon-unknown-linux-gnueabihf": 30
         }
       }

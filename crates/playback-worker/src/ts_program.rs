@@ -4,8 +4,8 @@
 //! end of the source.
 //!
 //! TS188 uses `compat::pes::open` with every selection. M2TS192 starts
-//! through `Startup::new_m2ts_prefix`, which admits one registered
-//! carriage. Times are 90 kHz ticks of the native projection; the duration is the
+//! through `Startup::new_m2ts_prefix` with the selected PIDs sharing its input
+//! context. Times are 90 kHz ticks of the demux clock; the duration is the
 //! demuxer's raw 90 kHz duration and the flags its packet flags.
 
 use crate::packet_fold::{Packet, Work, drive};
@@ -104,30 +104,39 @@ fn player(
         let engine = pes::open(input, PROGRAM, limits, policy, NAMESPACE, selections)?;
         Player::new(engine, source, Selection::All, PlayerPolicy::default())?
     } else {
-        let [
-            PidSelection {
-                pid,
-                carriage: Carriage::Registered(carriage),
-            },
-        ] = selections
-        else {
-            return Err("M2TS192 admits one registered carriage".into());
-        };
         let mut startup = Startup::new_m2ts_prefix(SelectedInput {
             input,
             source,
             format: Format::Ts(format),
         })?;
         while startup.advance(&mut WorkBudget::new(WORK), &cancel)? != StartupStep::Ready {}
-        startup.finish()?.into_player(
-            PROGRAM,
-            limits,
-            policy,
-            *pid,
-            *carriage,
-            Selection::All,
-            PlayerPolicy::default(),
-        )?
+        let bound = startup.finish()?;
+        if let [
+            PidSelection {
+                pid,
+                carriage: Carriage::Registered(carriage),
+            },
+        ] = selections
+        {
+            bound.into_player(
+                PROGRAM,
+                limits,
+                policy,
+                *pid,
+                *carriage,
+                Selection::All,
+                PlayerPolicy::default(),
+            )?
+        } else {
+            bound.into_program_player(
+                PROGRAM,
+                limits,
+                policy,
+                NAMESPACE,
+                selections,
+                PlayerPolicy::default(),
+            )?
+        }
     };
     player.set_clock_view(ClockChoice::Demux)?;
     Ok(player)

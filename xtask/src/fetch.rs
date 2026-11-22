@@ -417,6 +417,7 @@ pub fn vectors(root: &Path, net: &dyn Transport, limit: usize) -> Result<Vec<Str
     let mut verified = required_vectors(root, net, cache.as_deref(), limit)?;
     verified.extend(fate_corpus_vectors(root, net, cache.as_deref(), limit)?);
     verified.extend(crate::codec_views::fetch_opus(root, net)?);
+    crate::transport_fixtures::dts_discovery::prepare(root)?;
     Ok(verified)
 }
 

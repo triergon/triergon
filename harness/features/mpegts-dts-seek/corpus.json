@@ -529,6 +529,250 @@
         "bytes": 5664,
         "digest": 15312889608648295272
       }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-ts188-early-previous",
+      "profile": "dts-core-xll-mode-zero-ts188-early-previous",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-188.ts",
+      "sha256": "1b5b77ffdc2e117862e0ab254571258c819b2f3a35390da8d2552a7e93b0801b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb",
+        "256",
+        "90500",
+        "previous"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 2240,
+        "digest": 10682737737748994260
+      }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-ts188-late-previous",
+      "profile": "dts-core-xll-mode-zero-ts188-late-previous",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-188.ts",
+      "sha256": "1b5b77ffdc2e117862e0ab254571258c819b2f3a35390da8d2552a7e93b0801b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb",
+        "256",
+        "92500",
+        "previous"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1120,
+        "digest": 5647296439415520380
+      }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-ts188-backward-indexed-previous",
+      "profile": "dts-core-xll-mode-zero-ts188-backward-indexed-previous",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-188.ts",
+      "sha256": "1b5b77ffdc2e117862e0ab254571258c819b2f3a35390da8d2552a7e93b0801b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb",
+        "256",
+        "92500",
+        "previous",
+        "90500"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 3360,
+        "digest": 3051379829332849880
+      }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-ts188-early-preroll",
+      "profile": "dts-core-xll-mode-zero-ts188-early-preroll",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-188.ts",
+      "sha256": "1b5b77ffdc2e117862e0ab254571258c819b2f3a35390da8d2552a7e93b0801b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb",
+        "256",
+        "90500",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 2240,
+        "digest": 7902615390127664328
+      }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-ts188-late-preroll",
+      "profile": "dts-core-xll-mode-zero-ts188-late-preroll",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-188.ts",
+      "sha256": "1b5b77ffdc2e117862e0ab254571258c819b2f3a35390da8d2552a7e93b0801b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb",
+        "256",
+        "92500",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1120,
+        "digest": 4049539011272952768
+      }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-ts188-backward-indexed-preroll",
+      "profile": "dts-core-xll-mode-zero-ts188-backward-indexed-preroll",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-188.ts",
+      "sha256": "1b5b77ffdc2e117862e0ab254571258c819b2f3a35390da8d2552a7e93b0801b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb",
+        "256",
+        "92500",
+        "preroll",
+        "90500"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 3360,
+        "digest": 11116006783609891080
+      }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-m2ts192-early-previous",
+      "profile": "dts-core-xll-mode-zero-m2ts192-early-previous",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-192.m2ts",
+      "sha256": "91a8683c07cca91d00e9a1546392454d9fc3a63dd2dd2dcd24f40e07516c5e7f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb",
+        "256",
+        "90500",
+        "previous"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 2240,
+        "digest": 10682737737748994260
+      }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-m2ts192-late-previous",
+      "profile": "dts-core-xll-mode-zero-m2ts192-late-previous",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-192.m2ts",
+      "sha256": "91a8683c07cca91d00e9a1546392454d9fc3a63dd2dd2dcd24f40e07516c5e7f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb",
+        "256",
+        "92500",
+        "previous"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1120,
+        "digest": 5647296439415520380
+      }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-m2ts192-backward-indexed-previous",
+      "profile": "dts-core-xll-mode-zero-m2ts192-backward-indexed-previous",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-192.m2ts",
+      "sha256": "91a8683c07cca91d00e9a1546392454d9fc3a63dd2dd2dcd24f40e07516c5e7f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb",
+        "256",
+        "92500",
+        "previous",
+        "90500"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 3360,
+        "digest": 3051379829332849880
+      }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-m2ts192-early-preroll",
+      "profile": "dts-core-xll-mode-zero-m2ts192-early-preroll",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-192.m2ts",
+      "sha256": "91a8683c07cca91d00e9a1546392454d9fc3a63dd2dd2dcd24f40e07516c5e7f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb",
+        "256",
+        "90500",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 2240,
+        "digest": 7902615390127664328
+      }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-m2ts192-late-preroll",
+      "profile": "dts-core-xll-mode-zero-m2ts192-late-preroll",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-192.m2ts",
+      "sha256": "91a8683c07cca91d00e9a1546392454d9fc3a63dd2dd2dcd24f40e07516c5e7f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb",
+        "256",
+        "92500",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1120,
+        "digest": 4049539011272952768
+      }
+    },
+    {
+      "id": "dts-core-xll-mode-zero-m2ts192-backward-indexed-preroll",
+      "profile": "dts-core-xll-mode-zero-m2ts192-backward-indexed-preroll",
+      "file": "harness/features/mpegts-dts-seek/inputs/dts-core-xll-mode-zero-192.m2ts",
+      "sha256": "91a8683c07cca91d00e9a1546392454d9fc3a63dd2dd2dcd24f40e07516c5e7f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb",
+        "256",
+        "92500",
+        "preroll",
+        "90500"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 3360,
+        "digest": 11116006783609891080
+      }
     }
   ]
 }

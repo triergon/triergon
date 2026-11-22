@@ -18,7 +18,8 @@
     "Explicit epoch cases supply epoch=CLOCK:CONFIG and epoch-start=BYTES. Only the candidate interprets the complete source epoch pair. The physical offset identifies the carrier containing the final epoch's first PES, including the M2TS prefix, and selects the reference's landing candidates by public AVPacket.pos at or beyond that boundary. The reference checks that the boundary identifies a packet and retains its position during replay; it does not infer source epochs from timestamps or use FFmpeg internals.",
     "Authored AVC controls carry one complete picture per PES with overlapping, reordered presentation clocks and increasing encoded decode clocks in each epoch. A signalled PCR discontinuity changes the clock epoch, or a same-codec PMT descriptor change changes the configuration epoch, in TS188 and M2TS192. The earlier epoch has a later eligible keyframe, so ignoring the supplied boundary changes the landing and suffix. Each carrier and change has both previous-picture and playback-preroll controls.",
     "Both explicit-epoch workers scan the same full stable input from its start through EOF, then reopen or restart that full input and replay through EOF. They keep the existing seek-control and complete-suffix fold without timestamp normalization, packet filtering after the landing, or changes to existing case pins. Explicit epoch cases also combine with ordered entities and repeated indexed seeks; reuse requires the same complete epoch pair and entity plan. Equal-PTS controls place overlapping epochs in separate entities and select the later coded picture on ties.",
-    "Physical repeated-seek controls carry ten self-contained AVC IDR or base-layer HEVC IDR_N_LP pictures, each with its referenced in-band parameter sets in one aligned finite multi-carrier PES and immediately repeated PAT/PMT. A null prefix has no elementary coordinate. Both workers fold the exact landing and complete suffix for forward or backward repeated targets; separate reader tests prohibit prefix reads on the indexed restart. SEI, other HEVC IRAP types and prior decoder state are outside this direct profile."
+    "Physical repeated-seek controls carry ten self-contained AVC IDR or base-layer HEVC IDR_N_LP pictures, each with its referenced in-band parameter sets in one aligned finite multi-carrier PES and immediately repeated PAT/PMT. A null prefix has no elementary coordinate. Both workers fold the exact landing and complete suffix for forward or backward repeated targets; separate reader tests prohibit prefix reads on the indexed restart. SEI, other HEVC IRAP types and prior decoder state are outside this direct profile.",
+    "The AVC-to-HEVC PMT-change control uses the original TS188 carriers reproduced by seek_epochs.rs, selects configuration epoch 3 at byte 11468 and replays all twelve HEVC pictures through physical EOF. The landing carries its original VPS, SPS and PPS; reordered PTS and strictly increasing encoded DTS are preserved. No stream discovery, codec override or source rewriting is used by the reference."
   ],
   "required_profiles": [
     "avc-earliest-picture",
@@ -67,7 +68,8 @@
     "avc-equal-pts-epoch-m2ts-previous-split-indexed",
     "avc-equal-pts-epoch-m2ts-preroll",
     "avc-equal-pts-epoch-m2ts-preroll-split",
-    "avc-equal-pts-epoch-m2ts-preroll-split-indexed"
+    "avc-equal-pts-epoch-m2ts-preroll-split-indexed",
+    "avc-hevc-configuration-epoch-ts188-preroll"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

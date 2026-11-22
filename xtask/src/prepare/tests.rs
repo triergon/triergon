@@ -103,3 +103,28 @@ fn video_profile_adds_only_the_h264_and_hevc_decoders() {
         )]
     );
 }
+
+#[test]
+fn transport_mpeg_video_isolates_the_ordinary_parser() {
+    let prefix = Path::new("/p/install");
+    let dts = configure_argv(prefix, Profile::TransportDts);
+    let video = configure_argv(prefix, Profile::TransportMpegVideo);
+    let expected: Vec<_> = dts
+        .into_iter()
+        .map(|arg| {
+            if arg == "--enable-parser=dca" {
+                "--enable-parser=mpegvideo".to_owned()
+            } else {
+                arg
+            }
+        })
+        .collect();
+    assert_eq!(video, expected);
+    assert!(video.contains(&"--enable-demuxer=mpegts".to_owned()));
+    assert!(Profile::TransportMpegVideo.source() == Source::Revision);
+    assert!(Profile::parse("transport-mpeg-video") == Some(Profile::TransportMpegVideo));
+    assert_ne!(
+        Profile::TransportMpegVideo.cache(),
+        Profile::Formats.cache()
+    );
+}

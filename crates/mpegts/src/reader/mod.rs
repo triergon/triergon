@@ -12,8 +12,8 @@ pub use limits::{AudioEofPolicy, DvbSubtitleTailPolicy, ReaderLimits};
 use model::Shared;
 pub use model::{
     Ac3AccessUnit, AccessUnit, DtsAudioFrame, DtsExtensionFrame, DvbSubtitleUnit, IncompleteVideo,
-    LoasFrame, MpegAudioFrame, Packet, PacketClock, PayloadSource, ReaderEvent, SourceEvent, Track,
-    UnframedAudio,
+    LoasFrame, MpegAudioFrame, MpegPictureCoding, MpegVideoPicture, Packet, PacketClock,
+    PayloadSource, ReaderEvent, SourceEvent, Track, UnframedAudio,
 };
 pub use seek::SeekEntity;
 use std::sync::atomic::AtomicBool;

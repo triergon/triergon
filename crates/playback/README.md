@@ -155,7 +155,7 @@ index as separate operations.
 | MP4 / MOV | `mp4::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `mp4::Mp4IndexJob`, `Engine::mp4`, `Engine::mp4_progressive`, `compat::mov::{index, index_front, index_encoded_range, open_front, forward_encoded_edits}`, `mp4::Mp4RangeOpen` / `Mp4RangePlayer` |
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_demux_seek` / `apply_mp4_demux_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `mp4::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
-| TS / M2TS | `Engine::ts`, `Engine::ts_entities`; demux PES of selected PIDs (1 to 0x1ffe, at most 64) or of a segment's own tracks: `compat::pes::{open, open_segment, open_private_audio}`, `compat::pes::startup::Startup` for bound M2TS startup |
+| TS / M2TS | `Engine::ts`, `Engine::ts_entities`; demux PES of selected PIDs (1 to 0x1ffe, at most 64) or of a segment's own tracks: `compat::pes::{open, open_segment, open_private_audio}`, `compat::pes::startup::Startup` for bound M2TS startup and program playback |
 | PES feed | `pes_feed`: the feed [`triergon-hls`](../hls/README.md) reads HLS segments and progressive TS188 input from |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 
@@ -274,7 +274,11 @@ physical end, or as an unsupported layout once the source passes its start.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
 admission, and a subtitle track when a DVB namespace names DVB subtitling or
 teletext; stream type `0x90` (PGS) is a subtitle track. M2TS prefix startup (`compat::pes::startup::Startup::new_m2ts_prefix`) needs an
-8 KiB input window. The DVB demux PES parser caps a continued segment at
+8 KiB input window. The bound input opens one registered PID with
+`BoundInput::into_player`, or a selected program with
+`BoundInput::into_program_player`. Selected PIDs share the same startup context
+and demux clock through physical EOF, with original 192-byte carrier offsets.
+The DVB demux PES parser caps a continued segment at
 65,536 bytes. PES outputs reuse their payload storage's budget handle, which
 remains valid while a caller retains an output after closing the player.
 Delivery without a seek uses the presence of the projected presentation

@@ -119,3 +119,33 @@ fn discontinuity_does_not_publish_a_compatibility_eof_tail() {
     }
     assert!(found_frame && found_interruption);
 }
+
+#[test]
+fn multiple_raw_blocks_are_refused_before_inventing_a_single_block_entry() {
+    for protected in [false, true] {
+        for blocks_minus_one in 1..=3 {
+            let mut frame = adts(&[0; 32]);
+            if protected {
+                frame[1] &= !1;
+            }
+            frame[6] = (frame[6] & !3) | blocks_minus_one;
+            let mut ts = Transport::new();
+            ts.tables(&[(0x0f, PID, &[])], 0);
+            ts.pes(PID, 0xc0, &frame, Some(90_000), None);
+            let mut drive = Drive::new(&ts.bytes, ReaderLimits::default(), 1, 1);
+            loop {
+                match drive.next() {
+                    Err(error) => {
+                        assert_eq!(
+                            error,
+                            Error::Unsupported("ADTS multiple raw-data-block layout")
+                        );
+                        break;
+                    }
+                    Ok(Some(Event::Other(_))) => (),
+                    Ok(_) => panic!("multiple raw blocks became an audio entry"),
+                }
+            }
+        }
+    }
+}

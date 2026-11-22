@@ -7,8 +7,10 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities,
     SourceId, SourceLocation, Step, WorkBudget,
 };
+use triergon_framing::BuildStep;
 use triergon_framing::ac3::{
     Ac3Frame, Ac3FrameDetails, Ac3FrameFacts, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection,
+    Eac3BsiLimits, Eac3BsiParser,
 };
 
 // A/52 Annex E §2.3.1 permits eight sequential dependent substreams
@@ -16,6 +18,16 @@ use triergon_framing::ac3::{
 const MAX_DEPENDENTS: usize = 8;
 // The 11-bit frame size gives the number of 16-bit words minus one.
 const MAX_SYNCFRAME_BYTES: usize = 2 * (1 << 11);
+
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the resumable parser stays inline without a separate allocation"
+)]
+enum ConverterSync {
+    Unchecked,
+    Reading(Eac3BsiParser),
+    Confirmed,
+}
 
 pub(super) struct Reader {
     framer: Ac3FrameReader,
@@ -25,6 +37,7 @@ pub(super) struct Reader {
     maximum_incomplete_bytes: usize,
     group: Option<Group>,
     pending: Option<Ac3Frame>,
+    converter_sync: ConverterSync,
     sealed: bool,
     end: Option<SourceLocation>,
 }
@@ -55,8 +68,10 @@ impl Reader {
             }
         }
         let syncframe_bytes = limits.maximum_audio_frame_bytes.min(MAX_SYNCFRAME_BYTES);
+        let direct_carriage = track.stream().stream_type == 0x87;
+        let maximum_syncframes = (1 + MAX_DEPENDENTS) * if direct_carriage { 6 } else { 1 };
         let maximum_group_bytes = syncframe_bytes
-            .checked_mul(1 + MAX_DEPENDENTS)
+            .checked_mul(maximum_syncframes)
             .ok_or(Error::Overflow)?;
         // A partial lookahead syncframe may follow the entire pending group.
         let maximum_incomplete_bytes = maximum_group_bytes
@@ -74,7 +89,7 @@ impl Reader {
                 maximum_frames: limits
                     .maximum_access_units
                     .saturating_add(1)
-                    .saturating_mul(1 + MAX_DEPENDENTS)
+                    .saturating_mul(maximum_syncframes)
                     .saturating_add(1),
                 maximum_input_window: limits.elementary_input_window,
             },
@@ -82,11 +97,12 @@ impl Reader {
         Ok(Self {
             framer,
             pool: pool.clone(),
-            direct_carriage: track.stream().stream_type == 0x87,
+            direct_carriage,
             maximum_group_bytes,
             maximum_incomplete_bytes,
             group: None,
             pending: None,
+            converter_sync: ConverterSync::Unchecked,
             sealed: false,
             end: None,
         })
@@ -177,6 +193,9 @@ impl Reader {
             if self.sealed {
                 let lookahead = self.pending.as_ref().map(Ac3Frame::bytes);
                 let group = self.group.as_mut().expect("sealed E-AC-3 group");
+                if self.direct_carriage {
+                    group.validate_complete()?;
+                }
                 let Some(unit) = group.materialize(&self.pool, lookahead, work, cancel)? else {
                     return Ok(Step::Yield);
                 };
@@ -213,6 +232,19 @@ impl Reader {
                 // A completed frame remains staged if its framer used the grant.
                 continue;
             }
+            if let ConverterSync::Reading(parser) = &mut self.converter_sync {
+                match parser.step(work, cancel)? {
+                    BuildStep::Complete => return Err(Error::Truncated),
+                    BuildStep::Yield => return Ok(Step::Yield),
+                    BuildStep::Ready(bsi) => {
+                        if bsi.facts().converter_sync != Some(true) {
+                            return Err(Error::Invalid("ATSC E-AC-3 first converter sync"));
+                        }
+                        self.converter_sync = ConverterSync::Confirmed;
+                    }
+                }
+                continue;
+            }
             if !work.try_charge(1) {
                 return Ok(Step::Yield);
             }
@@ -229,17 +261,44 @@ impl Reader {
                     substream_id: 0,
                     ..
                 } => {
-                    if self.group.is_some() {
-                        self.sealed = true;
+                    if self.direct_carriage
+                        && stream_type != 0
+                        && self.group.as_ref().is_none_or(|group| group.blocks < 6)
+                    {
+                        return Err(Error::Unsupported(
+                            "ATSC E-AC-3 requires a six-block independent syncframe",
+                        ));
+                    }
+                    if let Some(group) = &mut self.group {
+                        if self.direct_carriage && group.blocks < 6 {
+                            group.append_primary(
+                                &self.pool,
+                                &mut self.pending,
+                                self.maximum_group_bytes,
+                            )?;
+                        } else {
+                            self.sealed = true;
+                        }
                     } else {
-                        // A/52 Annex G §3.3 requires six blocks per access unit.
-                        if self.direct_carriage && (facts.header.blocks != 6 || stream_type != 0) {
-                            return Err(Error::Unsupported(
-                                "ATSC E-AC-3 requires a six-block independent syncframe",
-                            ));
+                        // A/52 Annex G §3.3 requires convsync on a short first
+                        // independent frame. Inspect its BSI cooperatively.
+                        if self.direct_carriage
+                            && facts.header.blocks < 6
+                            && matches!(self.converter_sync, ConverterSync::Unchecked)
+                        {
+                            self.converter_sync = ConverterSync::Reading(Eac3BsiParser::new(
+                                &self.pool,
+                                frame.clone(),
+                                Eac3BsiLimits {
+                                    maximum_frame_bytes: MAX_SYNCFRAME_BYTES,
+                                    maximum_bsi_bits: MAX_SYNCFRAME_BYTES * 8,
+                                },
+                            )?);
+                            continue;
                         }
                         let frame = self.pending.take().expect("E-AC-3 primary");
                         self.group = Some(Group::new(frame));
+                        self.converter_sync = ConverterSync::Unchecked;
                     }
                 }
                 Ac3FrameDetails::Eac3 {
@@ -273,8 +332,12 @@ impl Reader {
 
 struct Group {
     first: Ac3FrameFacts,
+    current_blocks: u8,
+    blocks: u8,
+    dependent_count: u8,
+    expected_dependents: Option<u8>,
     primary: Option<Bytes>,
-    // Create the table and its pool handle when the first dependent is admitted.
+    // Allocate only when another syncframe is admitted; retain wire order.
     dependents: Option<BudgetVec<DependentSyncframe>>,
     length: usize,
     joined: Option<BudgetVec<u8>>,
@@ -286,6 +349,10 @@ impl Group {
     fn new(frame: Ac3Frame) -> Self {
         Self {
             first: frame.facts(),
+            current_blocks: frame.facts().header.blocks,
+            blocks: frame.facts().header.blocks,
+            dependent_count: 0,
+            expected_dependents: None,
             length: frame.bytes().len(),
             primary: Some(frame.into_bytes()),
             dependents: None,
@@ -340,14 +407,63 @@ impl Group {
         let first = self.first.header;
         let facts = frame.facts();
         let header = facts.header;
-        let count = self.dependents.as_ref().map_or(0, BudgetVec::len);
         if !matches!(first.details, Ac3FrameDetails::Eac3 { stream_type: 0, .. })
-            || usize::from(substream_id) != count
+            || substream_id != self.dependent_count
             || first.sample_rate_hz != header.sample_rate_hz
-            || first.blocks != header.blocks
+            || self.current_blocks != header.blocks
         {
             return Err(Error::Invalid("DVB E-AC-3 dependent substream sequence"));
         }
+        self.retain_frame(pool, pending, maximum_bytes)?;
+        self.dependent_count += 1;
+        Ok(())
+    }
+
+    fn validate_complete(&self) -> Result<()> {
+        if self.blocks != 6
+            || self
+                .expected_dependents
+                .is_some_and(|count| count != self.dependent_count)
+        {
+            return Err(Error::Invalid("ATSC E-AC-3 incomplete six-block group"));
+        }
+        Ok(())
+    }
+
+    fn append_primary(
+        &mut self,
+        pool: &Budget,
+        pending: &mut Option<Ac3Frame>,
+        maximum_bytes: usize,
+    ) -> Result<()> {
+        let facts = pending.as_ref().ok_or(Error::Truncated)?.facts();
+        let blocks = self.blocks + facts.header.blocks;
+        if blocks > 6 || facts.header.sample_rate_hz != self.first.header.sample_rate_hz {
+            return Err(Error::Invalid("ATSC E-AC-3 independent block sequence"));
+        }
+        if self
+            .expected_dependents
+            .is_some_and(|count| count != self.dependent_count)
+        {
+            return Err(Error::Invalid("ATSC E-AC-3 incomplete dependent group"));
+        }
+        self.retain_frame(pool, pending, maximum_bytes)?;
+        self.expected_dependents = Some(self.dependent_count);
+        self.dependent_count = 0;
+        self.current_blocks = facts.header.blocks;
+        self.blocks = blocks;
+        Ok(())
+    }
+
+    fn retain_frame(
+        &mut self,
+        pool: &Budget,
+        pending: &mut Option<Ac3Frame>,
+        maximum_bytes: usize,
+    ) -> Result<()> {
+        let frame = pending.as_ref().ok_or(Error::Truncated)?;
+        let facts = frame.facts();
+        let count = self.dependents.as_ref().map_or(0, BudgetVec::len);
         let length = self
             .length
             .checked_add(frame.bytes().len())
@@ -358,7 +474,8 @@ impl Group {
                 maximum: maximum_bytes,
             });
         }
-        // The wire ID bounds the table to eight entries. Growth temporarily
+        // Six primary intervals with eight dependents bound the table to 53
+        // entries after the first primary. Growth temporarily
         // retains both capacities, as well as the staged syncframe.
         let allocation = if self
             .dependents
@@ -379,22 +496,21 @@ impl Group {
                 .ok_or(Error::Overflow)?,
         )?;
         // Reserve before moving the staged syncframe so a failed append can retry.
-        let make = |_| DependentSyncframe {
-            facts,
-            pending_bytes: Some(
-                pending
-                    .take()
-                    .expect("staged E-AC-3 dependent")
-                    .into_bytes(),
-            ),
-        };
-        if let Some(dependents) = &mut self.dependents {
-            dependents.try_extend_with(1, make)?;
+        let dependents = if let Some(dependents) = &mut self.dependents {
+            dependents.try_reserve_exact(1)?;
+            dependents
         } else {
             let mut dependents = BudgetVec::new(pool);
-            dependents.try_extend_with(1, make)?;
-            self.dependents = Some(dependents);
-        }
+            dependents.try_reserve_exact(1)?;
+            self.dependents.insert(dependents)
+        };
+        let frame = pending.take().ok_or(Error::Truncated)?;
+        dependents
+            .try_push(DependentSyncframe {
+                facts,
+                pending_bytes: Some(frame.into_bytes()),
+            })
+            .map_err(|refused| refused.error)?;
         self.length = length;
         Ok(())
     }
@@ -558,6 +674,10 @@ mod tests {
             .unwrap();
         Group {
             first,
+            current_blocks: first.header.blocks,
+            blocks: first.header.blocks,
+            dependent_count: 1,
+            expected_dependents: None,
             primary: Some(primary),
             dependents: Some(dependents),
             length: GROUP_BYTES,

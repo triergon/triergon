@@ -2,6 +2,7 @@
 //! playback: a finite entity read whole through its confirmed end within one input
 //! window, or an M2TS prefix, after which the source reads on.
 use super::PidSelection;
+use crate::engine::ts::Binding;
 use crate::pes_feed::TsEngine;
 use crate::source::{Source, SourceReply};
 use crate::{
@@ -354,6 +355,41 @@ impl<S: Source> BoundInput<S> {
     pub fn context(&self) -> &InputContext {
         &self.context
     }
+    /// Play the demux PES of the selected PIDs with one program clock and the
+    /// carrier grid established at startup. The source remains open through EOF.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a mismatched startup context, an invalid PID selection,
+    /// or a storage limit.
+    pub fn into_program_player(
+        self,
+        program: u16,
+        limits: ParseLimits,
+        policy: SourceTimePolicy,
+        namespace: triergon_mpegts::psi::DescriptorNamespace,
+        selections: &[PidSelection],
+        player_policy: PlayerPolicy,
+    ) -> Result<Player<S>> {
+        self.context.validate_cursor(&self.input)?;
+        let mut engine = TsEngine::with_selections(
+            self.input,
+            self.format,
+            program,
+            limits,
+            policy,
+            namespace,
+            selections,
+        )?;
+        engine.binding = Binding::Bound(self.context);
+        Player::new(
+            Engine::Ts(engine),
+            self.source,
+            Selection::All,
+            player_policy,
+        )
+    }
+
     /// A player of `program` with the demux PES of `pid`, whose observer is
     /// bound to this input's startup context.
     #[expect(

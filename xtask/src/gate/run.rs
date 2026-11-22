@@ -34,6 +34,17 @@ fn append(path: &Path, line: &str) -> R<()> {
     writeln!(file, "{} {line}", crate::python::utc_now()).map_err(|e| e.to_string())
 }
 
+fn collect_all_pairs(command: &mut Vec<String>) {
+    let subcommand = command.get(1).map(String::as_str);
+    let operation = command.get(2).map(String::as_str);
+    if matches!(
+        (subcommand, operation),
+        (Some("report" | "progressive"), _) | (Some("codecs"), Some("time" | "memory"))
+    ) {
+        command.push("--no-early-stop".into());
+    }
+}
+
 /// Runs the steps of one stage of a shard; returns 1 if any failed.
 pub(super) fn run(
     root: &Path,
@@ -52,13 +63,7 @@ pub(super) fn run(
     let mut items = shard_items(root, &out, full, shard, selection)?;
     if no_early_stop {
         for step in items.iter_mut().flat_map(|item| &mut item.steps) {
-            if step
-                .command
-                .get(1)
-                .is_some_and(|command| command == "report")
-            {
-                step.command.push("--no-early-stop".into());
-            }
+            collect_all_pairs(&mut step.command);
         }
     }
     // A stage's records describe this run of it alone: the timing stage starts a
@@ -643,4 +648,23 @@ pub(super) fn unmeasured_in(
         }
     }
     Ok(missing)
+}
+
+#[cfg(test)]
+mod pair_tests {
+    use super::super::xtask;
+    use super::collect_all_pairs;
+
+    #[test]
+    fn full_pair_count_reaches_codec_collections_only() {
+        for operation in ["time", "memory", "grade", "readers", "summarize"] {
+            let mut command = xtask(&["codecs", operation]);
+            collect_all_pairs(&mut command);
+            assert_eq!(
+                command.last().unwrap() == "--no-early-stop",
+                matches!(operation, "time" | "memory"),
+                "{operation}"
+            );
+        }
+    }
 }

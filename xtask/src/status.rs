@@ -55,6 +55,7 @@ enum Cells<'a> {
 struct Row<'a> {
     area: &'a str,
     targets: Vec<&'a str>,
+    implemented: Option<&'a str>,
     /// The runs the row cites instead of its tables' runs, one per target at most.
     runs: Vec<&'a str>,
     cells: Cells<'a>,
@@ -248,6 +249,7 @@ impl<'a> Rows<'a> {
             rows.push(Row {
                 area,
                 targets: row_targets,
+                implemented: text(row, "implemented"),
                 runs: row_runs,
                 cells,
                 parity,
@@ -516,6 +518,8 @@ fn memory_cell(memory: &crate::harness::measured::Memory, revision: &str) -> Str
 /// Memory cells, and each row's line and cells.
 struct PageTable<'p> {
     header: usize,
+    width: usize,
+    implemented: Option<usize>,
     columns: (usize, usize),
     parity: Option<usize>,
     rows: Vec<(usize, Vec<&'p str>)>,
@@ -560,6 +564,8 @@ fn page_table<'p>(lines: &[&'p str], heading: &str) -> Result<PageTable<'p>, Str
         .collect();
     Ok(PageTable {
         header,
+        width: names.len(),
+        implemented: column("Implemented").ok(),
         columns,
         parity,
         rows,
@@ -573,6 +579,7 @@ type Rendered<'p> = Vec<(PageTable<'p>, Vec<RenderedRow>)>;
 struct RenderedRow {
     bounds: Option<(String, String)>,
     parity: Option<String>,
+    implemented: Option<String>,
 }
 
 impl RenderedRow {
@@ -592,6 +599,12 @@ impl RenderedRow {
                     .parity
                     .zip(self.parity.as_deref())
                     .map(|(index, cell)| (index, cell, "Verified against the reference")),
+            )
+            .chain(
+                table
+                    .implemented
+                    .zip(self.implemented.as_deref())
+                    .map(|(index, cell)| (index, cell, "Implemented")),
             )
     }
 }
@@ -713,7 +726,11 @@ fn render<'p>(
                     None
                 }
             };
-            cells.push(RenderedRow { bounds, parity });
+            cells.push(RenderedRow {
+                bounds,
+                parity,
+                implemented: row.implemented.map(str::to_owned),
+            });
         }
         rendered.push((page_table, cells));
     }
@@ -786,6 +803,45 @@ fn data_index(data: &[(String, Value)]) -> Index<'_> {
         .collect()
 }
 
+/// Insert rows whose scope is supplied by the registry. Existing rows must
+/// already be in registry order and are preserved with their editorial cells.
+fn add_rows(rows: &Rows<'_>, page: &str) -> Result<String, String> {
+    let original: Vec<_> = page.lines().collect();
+    let mut lines: Vec<_> = original.iter().map(|line| (*line).to_owned()).collect();
+    let mut insertions = Vec::new();
+    for table in &rows.tables {
+        let layout = page_table(&original, table.heading)?;
+        let mut existing = layout.rows.iter().peekable();
+        for row in rows
+            .rows
+            .iter()
+            .filter(|row| row.targets.contains(&table.target))
+        {
+            if existing
+                .peek()
+                .is_some_and(|(_, cells)| cells.first() == Some(&row.area))
+            {
+                existing.next();
+            } else if row.implemented.is_some() {
+                let at = existing
+                    .peek()
+                    .map_or(layout.header + 2 + layout.rows.len(), |(line, _)| *line);
+                let mut cells = vec![""; layout.width];
+                cells[0] = row.area;
+                insertions.push((at, format!("| {} |", cells.join(" | "))));
+            }
+        }
+        if let Some((line, _)) = existing.next() {
+            return Err(format!("{PAGE}:{}: row is out of registry order", line + 1));
+        }
+    }
+    insertions.sort_by_key(|(line, _)| *line);
+    for (at, row) in insertions.into_iter().rev() {
+        lines.insert(at, row);
+    }
+    Ok(lines.join("\n"))
+}
+
 /// `cargo xtask status [--write]`: the page's tables with their Runtime and Memory
 /// cells rendered from the evidence index, the open ones as written; with `--write`,
 /// the page is rewritten with them instead.
@@ -798,6 +854,7 @@ pub fn tables(root: &Path, write: bool) -> Result<String, String> {
     let document = json::read(&root.join(ROWS)).map_err(|e| format!("{ROWS}: {e}"))?;
     let rows = Rows::parse(&document).map_err(|errors| errors.join("\n"))?;
     let page = fs::read_to_string(root.join(PAGE)).map_err(|e| format!("{PAGE}: {e}"))?;
+    let page = add_rows(&rows, &page)?;
     let lines: Vec<&str> = page.lines().collect();
     let rendered = render(root, &rows, &index, &lines).map_err(|errors| errors.join("\n"))?;
     let mut rewritten: Vec<String> = lines.iter().map(|line| (*line).to_owned()).collect();
@@ -807,7 +864,7 @@ pub fn tables(root: &Path, write: bool) -> Result<String, String> {
         printed.push(lines[table.header].to_owned());
         printed.push(lines[table.header + 1].to_owned());
         for ((line, written), cell) in table.rows.iter().zip(cells) {
-            if cell.bounds.is_some() || cell.parity.is_some() {
+            if cell.bounds.is_some() || cell.parity.is_some() || cell.implemented.is_some() {
                 let mut written: Vec<&str> = written.clone();
                 for (column, shown, _) in cell.cells(table) {
                     written[column] = shown;

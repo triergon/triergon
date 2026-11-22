@@ -67,6 +67,7 @@ pub fn generate_all(paths: &Paths) -> Result<Vec<String>, String> {
         crate::framing_views::config::fixtures(paths, false)?,
         crate::transport_views::fixtures(paths)?,
         crate::isobmff_views::index::fixtures(paths, false)?,
+        crate::transport_fixtures::eac3_probe::generate(paths, None)?,
     ])
 }
 

@@ -42,48 +42,37 @@ charges a caller's `Budget`.
 | Area | Behaviour |
 |---|---|
 | Pictures | I and P; no B or D pictures |
-| Sequence header | Before every I picture. Size from the `Geometry`, square pixels (pel_aspect_ratio 1), 30 Hz (frame_rate_code 5), bit_rate = `max_rate` in 400 bit/s units rounded up, vbv_buffer_size = `vbv_bits` in 16 kbit units rounded up, default intra and non-intra matrices, constrained_parameters_flag 0 |
+| Sequence header | Before every I picture. Size from the `Geometry`, square pixels (pel_aspect_ratio 1), 30 Hz (frame_rate_code 5), bit_rate = `max_rate` in 400 bit/s units, vbv_buffer_size from `vbv_bits` in 16 kbit units (1–1023), default intra and non-intra matrices, constrained_parameters_flag 0 |
 | GOP | GOP header before every I picture; time code from the picture index at 30 Hz. An I picture every `gop` pictures; a P picture whose prediction is worse than intra coding across the picture becomes an I picture and restarts the GOP (scene change). Without B pictures every GOP decodes independently; `closed_gop` is set on the first GOP only, as FFmpeg does |
 | Slices | One slice per picture; DC and vector predictors run across row ends, and per-row quantiser changes travel in macroblock_quant fields |
-| Motion | Forward half-sample vectors, search window ±64 luma samples, f_code up to 4; skipped macroblocks; a P macroblock is intra coded when that is cheaper. A picture whose luma repeats the previous source picture's is predicted at the zero vector without a search. For unchanged predictions from skipped macroblocks the encoder reuses the previous luma error |
+| Motion | Forward half-sample vectors, search window ±64 luma samples, f_code up to 4; skipped macroblocks; a P macroblock is intra coded when that is cheaper. A picture whose luma repeats the previous source picture's is predicted at the zero vector without a search |
 | Quantiser | quantizer_scale 2–31 |
-| Rate control | GOP bit allocation by the MPEG-2 Test Model 5 complexity rule (I/P only) over the bits a quantiser changes, an I picture's side bits paid first, a P picture starting from TM5's initial complexity for a picture predicted from the one before, and a P picture whose source repeats the previous one in every plane planned as the I picture of the rest of the GOP; one quantiser per picture from a per-type model, `bits ≈ α · activity / q` for P pictures and `side + α · activity / q` for I pictures, whose side bits (macroblock headers, DC differentials, end_of_block) no quantiser changes, measured by the first I picture's trial pass; rows deviating by a bounded amount; VBV modelled as the variable-rate case of Annex C; vbv_delay 0xFFFF |
+| Rate control | GOP bit allocation by the MPEG-2 Test Model 5 complexity rule (I/P only); one quantiser per picture from a per-type `bits ≈ α · activity / q` model, rows deviating by a bounded amount; VBV modelled as the variable-rate case of Annex C; vbv_delay 0xFFFF |
 
 ## Behaviour and limits
 
-- `Encoder::new` refuses `gop == 0` (`Error::Gop`), a zero `bit_rate` or a `max_rate`
-  that is zero or above 104,856,800 bit/s, whose 400 bit/s units would reach 0x3FFFF,
-  the sequence-header bit_rate that marks variable bit rate operation
-  (`Error::BitRate`, with the refused rate), and a `vbv_bits` below one picture at the
-  average rate (`bit_rate` / 30) or beyond 1023 units of 16 kbit (`Error::VbvBuffer`):
-  every picture leaves the VBV whole (Annex C), so a smaller buffer cannot carry the
-  average rate. Geometry limits (even, 2–4094) are
-  enforced by `Geometry::new`.
+- `Encoder::new` refuses `gop == 0` (`Error::Gop`) and a zero `bit_rate`, `max_rate`
+  or `vbv_bits`, or a `max_rate` beyond the 18-bit sequence-header field in
+  400 bit/s units (`Error::BitRate`). Geometry limits (even, 2–4094) are enforced by
+  `Geometry::new`.
 - `encode` refuses a picture whose geometry differs from the configuration
-  (`Error::PictureGeometry`) before changing any state. A successful encode replaces the contents of `out`.
+  (`Error::PictureGeometry`) before changing any state. A successful encode replaces the
+  contents of `out`.
 - Storage sized from the configuration is charged to the encoder's budget before it
-  is allocated: the reference and reconstructed pictures, the previous source
-  picture, the macroblock and motion arrays and the coarse planes, the bit writer and the
-  caller's `out` at the bound of one picture (the VBV buffer plus one full and
-  16 bytes per further macroblock; the bit writer never grows), and the first I
-  picture's trial pass (one row). The default `Limits::live_storage_bytes` is
-  96 MiB; the largest geometry (4094x4094) at the largest signalled VBV buffer
+  is allocated: the reference, reconstructed and previous source pictures, the
+  macroblock and motion arrays, the coarse planes (reserved together on first motion
+  search; skipped while the source luma repeats), the bit writer and the caller's `out`
+  at the bound of one picture (the VBV buffer plus one full and 16 bytes per further
+  macroblock), and the first I picture's trial pass (one row). The default
+  `Limits::live_storage_bytes` is 96 MiB; 4094x4094 at the largest signalled VBV buffer
   (1023 × 16 kbit) needs about 74 MiB. A refused charge is `Error::Budget`, from the
-  constructor or before coding the picture. Motion search reserves both coarse
-  luma planes together on first use. Repeated source luma skips that reservation
-  and both downsampling passes, including when only chroma changes. After
-  backpressure, `out` still holds its previous bytes. Release space and retry
-  the same input at the same picture index.
+  constructor or before coding the picture; `out` then keeps its previous bytes, and
+  the same input can be retried at the same picture index once space is released.
 - The input must have its coded padding filled (`Picture::pad_edges`; the pixel
   `Converter` does this).
-- Every successful call encodes and advances the picture index, also for an unchanged source
-  picture (a keepalive). When the whole picture repeats, a macroblock the previous
-  picture skipped after its residual quantised to zero is skipped again without
-  computing the residual, as long as its quantiser is no finer: its residual is the
-  same, and both reconstruction buffers already hold the skipped samples. The first I picture of an
-  encoder runs a trial pass that counts bits to seed the intra rate model.
-  Refining coefficient levels within the same code length and reconstructing
-  samples run only for the coded picture.
+- Every successful call encodes and advances the picture index, also for an unchanged
+  source picture (a keepalive). The first I picture runs a trial pass to seed the intra
+  rate model.
 - The picture rate is fixed at 30 Hz. Timestamps belong to the caller or muxer.
 - A nonzero `vbv_underflow_bits` means some picture exceeded the modelled buffer
   occupancy.
@@ -91,27 +80,7 @@ charges a caller's `Budget`.
 ## Conformance
 
 Written from ISO/IEC 11172-2 (sequence to block layers, Table 2-D.4 picture rates,
-Annex C VBV model). The reference is FFmpeg 9.0.2 `mpeg1video` with I/P pictures,
-driven through the capture pipeline ([triergon-capture](../capture/README.md)). Per
-case the harness requires:
-
-- an error-free independent FFmpeg decode of every picture and identical picture
-  types;
-- VBV underflow no worse than the reference;
-- PSNR-Y within 0.25 dB of the reference at equal or fewer bits. When the reference
-  overspends, the encoder is re-run at 1.25–4.5× the requested rate and PSNR-Y is
-  interpolated at the reference's bit count.
-
-The capture comparison includes GOP lengths 1, 2, 12 and 300, rates with the
-average and maximum set equal, and alternate VBV sizes. It checks the visible
-dimensions and the signalled maximum rate and VBV size in the sequence headers.
-The capture worker reaches the encoder through `Encoder::new` and `Encoder::encode`.
-
-Unit tests cover the VLC tables (prefix-free and complete), DC differentials, escape
-levels, reconstruction oddification and saturation, half-sample rounding, motion
-search and bounds, the zero-residual shortcut against the complete transform, the
-inverse transform over a block's nonzero coefficients and the forward rows against a
-butterfly transform, skips reused for a repeated picture against the computed path,
-rate plans against the headers already written and an I picture's side bits, and
-pictures cut short by the VBV guard. `tests/encoder.rs` covers configuration, geometry refusal and exact output
-after a budget retry. See the [quality gates](../../docs/quality.md).
+Annex C VBV model). The reference is FFmpeg 9.0.2 `mpeg1video` with an I/P GOP of 30,
+driven through the capture pipeline ([triergon-capture](../capture/README.md)); the
+comparison is described in [harness/capture](../../harness/capture/README.md) and its
+results in [docs/status.md](../../docs/status.md).

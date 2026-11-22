@@ -486,15 +486,13 @@
       ],
       "text": "with MPEG-TS previous picture"
     },
-    {
-      "area": "MPEG-TS program playback",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ],
-      "results": [
-        "ts-program"
-      ]
-    },
+    {"area": "MPEG-TS DTS core discovery", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "Two matching canonical frames in the first descriptor-free private PES.", "text": "Historical gate evidence at `9f0fca33` ([AArch64](../harness/evidence/sets/gate-run-aarch64-9f0fca33-20261121-170345-shard-1.json) · [ARMv7](../harness/evidence/sets/gate-run-armv7-9f0fca33-20261121-170343-shard-1.json))", "parity": {"aarch64-unknown-linux-gnu": "7 admission and refusal folds ([contract](../harness/features/mpegts-dts-discovery/contract.json))", "thumbv7neon-unknown-linux-gnueabihf": "7 admission and refusal folds ([contract](../harness/features/mpegts-dts-discovery/contract.json))"}},
+    {"area": "MPEG-TS ATSC E-AC-3 grouping", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "Six blocks and their dependent syncframes per access unit in a finite TS188 PES.", "text": "Historical gate evidence at `d72369ca` ([AArch64](../harness/evidence/sets/gate-run-aarch64-d72369ca-20261121-195825-shard-1.json) · [ARMv7](../harness/evidence/sets/gate-run-armv7-d72369ca-20261121-195849-shard-1.json))", "parity": {"aarch64-unknown-linux-gnu": "10 grouped packet folds ([contract](../harness/features/mpegts-atsc-eac3-six-block/contract.json))", "thumbv7neon-unknown-linux-gnueabihf": "10 grouped packet folds ([contract](../harness/features/mpegts-atsc-eac3-six-block/contract.json))"}},
+    {"area": "MPEG-TS MPEG-1 and MPEG-2 pictures", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "One I, P or B picture with sequence setup in an aligned finite PES of at most 175 bytes.", "text": "Historical gate evidence at `fac55c36` ([AArch64](../harness/evidence/sets/gate-run-aarch64-fac55c36-20261122-023943-shard-1.json) · [ARMv7](../harness/evidence/sets/gate-run-armv7-fac55c36-20261122-023956-shard-1.json))", "parity": {"aarch64-unknown-linux-gnu": "14 packet folds across TS188 and M2TS192 ([contract](../harness/features/mpegts-mpeg-video/contract.json))", "thumbv7neon-unknown-linux-gnueabihf": "14 packet folds across TS188 and M2TS192 ([contract](../harness/features/mpegts-mpeg-video/contract.json))"}},
+    {"area": "MPEG-TS multi-subframe LATM seek", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "Previous-entry seeking to a self-configured LOAS envelope of up to 64 AAC-LC subframes.", "text": "Historical gate evidence at `fd9d1335` ([AArch64](../harness/evidence/sets/gate-run-aarch64-fd9d1335-20261121-225330-shard-1.json) · [ARMv7](../harness/evidence/sets/gate-run-armv7-fd9d1335-20261121-225946-shard-1.json))", "parity": {"aarch64-unknown-linux-gnu": "9 multi-subframe landing and suffix folds ([contract](../harness/features/mpegts-previous-audio/contract.json))", "thumbv7neon-unknown-linux-gnueabihf": "9 multi-subframe landing and suffix folds ([contract](../harness/features/mpegts-previous-audio/contract.json))"}},
+    {"area": "MPEG-TS AVC to HEVC seek", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "Playback preroll from HEVC setup after a program-map change on the same PID.", "text": "Historical gate evidence at `84d5a5ad` ([AArch64](../harness/evidence/sets/gate-run-aarch64-84d5a5ad-20261121-180213-shard-1.json) · [ARMv7](../harness/evidence/sets/gate-run-armv7-84d5a5ad-20261121-174939-shard-1.json))", "parity": {"aarch64-unknown-linux-gnu": "12 pictures and 15,780 bytes through EOF ([contract](../harness/features/mpegts-previous-picture/contract.json))", "thumbv7neon-unknown-linux-gnueabihf": "12 pictures and 15,780 bytes through EOF ([contract](../harness/features/mpegts-previous-picture/contract.json))"}},
+    {"area": "MPEG-TS DTS-HD mode-zero seek", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "Previous-entry seeking to a core and aligned XLL asset with static mode-zero component navigation.", "text": "Historical gate evidence at `ee4e5290` ([AArch64](../harness/evidence/sets/gate-run-aarch64-ee4e5290-20261121-182522-shard-1.json) · [ARMv7](../harness/evidence/sets/gate-run-armv7-ee4e5290-20261121-182615-shard-1.json))", "parity": {"aarch64-unknown-linux-gnu": "12 mode-zero landing and suffix folds ([contract](../harness/features/mpegts-dts-seek/contract.json))", "thumbv7neon-unknown-linux-gnueabihf": "12 mode-zero landing and suffix folds ([contract](../harness/features/mpegts-dts-seek/contract.json))"}},
+    {"area": "MPEG-TS program playback", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "Explicit PID selection in TS188 or forward-only M2TS192 with one program clock and original carrier offsets.", "text": "Historical gate evidence at `16ab70ba` ([AArch64](../harness/evidence/sets/gate-run-aarch64-16ab70ba-20261122-020353-shard-1.json) · [ARMv7](../harness/evidence/sets/gate-run-armv7-16ab70ba-20261122-020418-shard-1.json))", "parity": {"aarch64-unknown-linux-gnu": "36 packet folds ([contract](../harness/features/ts-program/contract.json))", "thumbv7neon-unknown-linux-gnueabihf": "36 packet folds ([contract](../harness/features/ts-program/contract.json))"}},
     {
       "area": "MPEG-TS progressive playback",
       "targets": [
@@ -1121,12 +1119,6 @@
       "targets": [
         "aarch64-unknown-linux-gnu",
         "thumbv7neon-unknown-linux-gnueabihf"
-      ]
-    },
-    {
-      "area": "MPEG-TS program playback",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {

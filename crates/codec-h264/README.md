@@ -4,9 +4,9 @@ H.264/AVC decoder for Annex B byte streams, written from Rec. ITU-T H.264 (08/20
 is a codec-layer crate that depends on [triergon-bitstream](../bitstream/README.md),
 [triergon-codec](../codec/README.md) (it implements `VideoDecoder`) and
 [triergon-framing](../framing/README.md) (Annex B units and the decoded picture buffer),
-and builds on stable Rust. It
-decodes 8-bit 4:2:0 (and 4:0:0) Constrained Baseline, Main and High streams to cropped
-pictures in output order. It does not scale, convert colour or conceal damaged slices.
+and builds on stable Rust. It decodes 8-bit 4:2:0 (and 4:0:0) Constrained Baseline, Main
+and High streams to cropped pictures in output order. It does not scale, convert colour
+or conceal damaged slices.
 
 ## Usage
 
@@ -30,9 +30,8 @@ assert!(pictures > 0);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`send_nals` accepts complete Annex B NAL units without an implied access-unit boundary.
-Assemble a complete NAL before sending when reading in arbitrary byte chunks.
-`send_nal` takes one NAL unit without start code. `reset` drops the DPB and keeps parameter sets.
+`send_nals` accepts Annex B data without an implied access-unit boundary; `send_nal`
+takes one NAL unit without start code. `reset` drops the DPB and keeps parameter sets.
 `examples/decode_h264.rs IN.264 OUT.yuv` writes raw yuv420p and one JSON line per picture.
 
 ## Supported
@@ -51,12 +50,12 @@ Assemble a complete NAL before sending when reading in arbitrary byte chunks.
 ## Behaviour and limits
 
 - `Picture` carries cropped `width`/`height`, three `Plane`s that share the decoder's
-  frame buffer (no copy; `row(y)`, `data()`, `raw()`), `pts`, `poc`, `sar`, `colour` and
-  `interlaced`. Each picture keeps the timestamp of the access unit that carried it
-  through reordering.
-- Errors are typed (`DecodeError`, the one of triergon-codec): `Unsupported(&str)` names
-  the feature, `Invalid(&str)`, `Policy(&str)`, `Budget(StorageError)`. The decoder does not panic on
-  malformed input. A send call returns the first decoding error it encounters.
+  frame buffer (no copy; `row(y)`, `data()`, `raw()`), `bit_depth`, `pts`, `poc`, `sar`,
+  `colour` and `interlaced`. Each picture keeps the timestamp of the access unit that
+  carried it through reordering.
+- Errors are typed: `Unsupported(&str)` names the feature, `InvalidData(&str)`,
+  `ResourceLimit(&str)`, `Budget(StorageError)`. The decoder does not panic on
+  malformed input.
 - Refused with `Unsupported`: bit depth above 8, 4:2:2 and 4:4:4, lossless transform
   bypass, flexible macroblock ordering (more than one slice group), SP/SI slices, data
   partitioning.
@@ -73,69 +72,23 @@ Assemble a complete NAL before sending when reading in arbitrary byte chunks.
   free once its picture is output and unused for reference; at most three more stores
   than the DPB size are made, and when every one holds a picture, pictures are output
   until one is free (a buffer of reference pictures none of which waits is
-  `Policy`).
+  `ResourceLimit`).
 - Storage: frame buffers (also while output pictures share them), motion and macroblock
   arrays, the decoded picture buffer, deblocking state, RBSP and slice lists are charged
-  to a `Budget` before they are allocated. `Decoder::with_limits(Limits { live_storage_bytes })` gives the decoder its
-  own pool (320 MiB by default) and `Decoder::new_in(&budget)` charges a caller's pool. A
-  refused charge is `DecodeError::Budget`; that picture is not decoded and the decoder
-  stays usable. The default covers a level 5.2 DPB (184320 macroblocks) and five more
-  36864-macroblock frames (three stores beyond the DPB size, a spare buffer and a picture
-  the caller holds) at 640 bytes per stored macroblock (384 of samples, at most 256 of
-  motion), plus about 700 bytes per macroblock of one picture's scratch and RBSP: about
-  250 MiB.
-- A damaged slice returns `Invalid`; its macroblocks stay undecoded where FFmpeg
+  to a `Budget` before they are allocated. `Decoder::with_limits(Limits {
+  live_storage_bytes })` gives the decoder its own pool (320 MiB by default, which covers
+  a level 5.2 DPB plus five more 36864-macroblock frames, about 250 MiB) and
+  `Decoder::new_in(&budget)` charges a caller's pool. A refused charge is
+  `DecodeError::Budget`; that picture is not decoded and the decoder stays usable.
+- A damaged slice returns `InvalidData`; its macroblocks stay undecoded where FFmpeg
   would conceal them. An unpaired field is output as a frame with the other field's lines
   unset.
+- Scaling and inverse transforms wrap on overflow, as FFmpeg's `int` arithmetic does; a
+  conforming stream never overflows.
 
-## Performance
+## Standards
 
-- Macroblock addresses split into column and row by a multiplication and a shift
-  (`triergon_codec::Divisor`), so 32-bit ARM, whose baseline has no divide instruction,
-  calls no division routine per macroblock. Temporal direct prediction and implicit
-  weights take the reciprocal of the POC distance from a table.
-- On 32-bit ARM the code generator vectorises loops over 16 byte lanes and none over 8 or
-  4, so bi-prediction of a block narrower than 16 samples combines its two predictions in
-  scratch, 16 samples at a time over the rows laid end to end, and copies its own samples
-  out; other targets combine row by row in place. Chroma interpolation gathers a block's
-  rows end to end and runs one loop over all of its samples on every target.
-- Deblocking filters an edge's Cb and Cr lines together in one 16-lane pass, writes an
-  edge back only where a sample changed, and transposes vertical edges in u32 words on
-  32-bit targets (u64 elsewhere). An inter macroblock's uniform-motion summary, which the
-  edge strengths start from, is taken as the macroblock decodes, while its motion is in
-  cache.
-- The macroblock layer's syntax is compiled once per entropy mode, so no syntax element
-  tests whether the slice is CAVLC or CABAC. What does not depend on the mode is compiled
-  once: the mb_type tables, I_PCM storage and reconstruction.
-- CABAC decodes in a 32-bit register on 32-bit targets (`triergon_bitstream::cabac`).
-- The Codecs rows report gate timings against FFmpeg on
-  [Linux AArch64](../../docs/status.md#linux-aarch64) and
-  [32-bit ARMv7](../../docs/status.md#32-bit-armv7).
-
-## Conformance
-
-The [picture properties comparison](../../harness/features/picture-properties/contract.json)
-checks sample aspect ratio, colour and interlaced coding alongside the visible plane hashes.
-When the stream omits VUI colour information, a decoded picture reports the
-Annex E unspecified colour codes.
-The [inspection comparison](../../harness/features/h264-stream-inspection/contract.json)
-checks syntax-element sets and flags. The [NAL-input
-comparison](../../harness/features/video-nal-input/contract.json) checks native planes and
-timestamps for both per-NAL entry points.
-
-- Specification: Rec. ITU-T H.264 (V15, 08/2024). Tables are transcribed from the text
-  with the table number in a comment; Table 9-26 prints ctxIdx 641 where 541 is meant.
-- Reference: FFmpeg 9.0.2 (`-threads 1 -f framemd5 -pix_fmt yuv420p -fps_mode
-  passthrough`) on the FATE `h264-conformance` suite. Every output picture must be
-  bit-exact, with identical count and order; out-of-set vectors must be refused.
-- `cargo test -p triergon-codec-h264` runs unit tests; `tests/conformance.rs` checks all
-  vectors against `tests/ffmpeg_framemd5_digests.txt` when
-  `.research/fate-samples/h264-conformance/` is present (`H264_VECTOR` selects one)
-  and skips otherwise. `examples/fuzz.rs` mutates the vectors to check for panics, and
-  `tests/fuzz_regressions.rs` rebuilds earlier fuzz findings from the same vectors.
-- `cargo xtask codecs grade` compares the planar decoder output and the RGBA worker
-  output. Each requires matching complete pictures and two successful process exits.
-  The report records both exit codes and any trailing bytes on either side.
-- Scaling and inverse transforms wrap on overflow, as FFmpeg's `int` arithmetic does.
-  A conforming stream never overflows, so this only affects corrupt input.
-- Project-wide gates: [docs/quality.md](../../docs/quality.md).
+Rec. ITU-T H.264 (V15, 08/2024). Tables are transcribed from the text with the table
+number in a comment; Table 9-26 prints ctxIdx 641 where 541 is meant. Verification:
+[harness/codecs](../../harness/codecs/STATUS.md); results in
+[docs/status.md](../../docs/status.md).

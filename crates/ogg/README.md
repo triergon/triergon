@@ -28,11 +28,7 @@ while let Some(packet) = reader.next_packet(&cancel)? {
 ```
 
 `BlockingReader::open` takes `Read + Seek` (seeking bisects); `open_stream` takes a
-sequential `Read` and discovers tracks without scanning the end.
-`Track::is_configured` tells whether the track's headers are complete.
-The track's codec and `codec_tag` identify its mapping.
-`Reader::request` gives the source, token and byte range for the next input window.
-`Reader` is the push reader: it performs no I/O, accepts windows of
+sequential `Read`. `Reader` is the push reader: it performs no I/O, accepts windows of
 any size down to one byte, steps under a `WorkBudget` and a cancellation flag, and
 charges its storage to the caller's `Budget`.
 
@@ -78,9 +74,7 @@ leaves out are the last packets' `Trim::end`, and samples before time zero (Opus
 pre-skip, a start offset) are `Trim::start`. Every audio packet is a random-access
 point; of Theora, the intra frames. DTS equals PTS.
 `Track::end` holds the last granule position, found by reading at most
-`Limits::end_scan_bytes` at the end of a seekable source of known length. A scan
-that reaches the next link from the first link's headers keeps the first link's
-end, even if the next link reuses a serial number.
+`Limits::end_scan_bytes` at the end of a seekable source of known length.
 
 `compat::clock::packet_timing` reports FFmpeg's clock instead (skip samples, discard
 padding and FFmpeg's Vorbis durations); its documentation lists the differences.
@@ -101,56 +95,35 @@ start (`SeekMethod::Restart`).
 ## Limits
 
 `Limits::default()`: packets of up to 16 MiB gathered across pages, 16 MiB of headers per
-track (cover art in a comment header), 64 logical streams per link, 1024 tracks, 128 KiB
-of skipped bytes in a row, 256 KiB per seek probe, 128 KiB end scan. Charged to the
-budget: gathered packets and split pages, track configurations, and the track, stream
-and link tables. The scratch lists of one page are fixed at its 255 lacing values. A
-limit violation is an error; a full pool is `Step::Backpressure`, and the step resumes
-once output is released.
+track (cover art in a comment header), 64 logical streams per link, 1024 tracks, and
+two maximum pages (`page::MAX_PAGE`, 65,307 bytes) of skipped bytes in a row, four per
+seek probe and two for the end scan, in a 64 MiB pool. Charged to the budget: gathered
+packets and split pages, track configurations, and the track, stream and link tables.
+The scratch lists of one page are fixed at its 255 lacing values. A limit violation is an
+error; a full pool is `Step::Backpressure`, and the step resumes once output is released.
 
-## Comparison with FFmpeg
+## Differences from FFmpeg
 
-The [page comparison](../../harness/features/ogg-pages/contract.json) checks
-page headers, lacing, CRC and exact rewritten bytes against an independent
-walk of the same stored pages using RFC 3533 section 6. Its inputs include
-remuxed streams and an original stream carrying a Skeleton track.
+The reader's own timing differs from FFmpeg 9.0.2 where FFmpeg starts the first Vorbis
+packet as many samples before zero as it states alone (this reader times the overlap it
+primes as no output), starts a short Vorbis block after a long one late by the
+difference of their quarter blocks, times chained links' starts and packets after a lost
+page from the page rather than the granule position, and reports no Speex trims,
+shortening the last packet instead. `compat::clock` reproduces those, and still differs
+where FFmpeg:
 
-`cargo xtask codecs readers` compares every packet `BlockingReader` delivers with the
-pinned `ffprobe -show_packets` of FFmpeg 9.0.2 in two views: the reader's own timing
-(track, pts, dts, duration, trims, size) and `compat::clock`, the FFmpeg-compatible view
-of the same packets. The rules, the reviewed dispositions and their frozen difference
-lists are [harness/codecs/reader-rules.json](../../harness/codecs/reader-rules.json) and
-[reader-differences.json](../../harness/codecs/reader-differences.json); gates:
-[docs/quality.md](../../docs/quality.md#gates) (gate item `ogg-readers`). On 45 files:
-the 21 FATE Vorbis samples, the FATE Theora samples (`bear.ogv` with Vorbis,
-`empty_theora_packets.ogv`, `offset_test.ogv`) and chained Opus, Vorbis and FLAC
-samples, 13 generated Opus, Vorbis, FLAC, multiplexed, chained, corrupted and truncated
-files, and 5 generated Speex files (narrowband, wideband, ultra-wideband stereo, with
-Skeleton, chained):
+- prints a negative last duration modulo 2^32;
+- times the first packet after a page that fails its CRC from its own page
+  (`compat::clock` times it from the stream start);
+- times the Vorbis packets of leading pages stating granule position 0 from the next
+  page's;
+- reads a chained link that reuses the previous link's serial number as the same stream,
+  its headers as packets;
+- seeks in a chained file within one link only.
 
-- `compat::clock`: 40/45 pass. FFmpeg prints a negative last duration modulo 2^32
-  (`b_vorbis.ogg`, `chain_vorbis.ogg`); times the first packet after a page that fails
-  its CRC from its own page where `compat::clock` times it from the stream start
-  (`crc_bad.opus`); in `bear.ogv` times the Vorbis packets of the leading pages stating
-  granule position 0 from the next page's; and reads a chained link that reuses the
-  previous link's serial number as the same stream, its headers as packets
-  (`chain_speex.spx`).
-- The reader's own timing: 10/45 pass; 31 differ only where `compat::clock` reproduces
-  FFmpeg, and 4 by the behaviours above. The differences are FFmpeg's: it starts the
-  first Vorbis packet as many samples before zero as it states alone, where this reader
-  times the overlap it primes as no output; it starts a short Vorbis block after a long
-  one late by the difference of their quarter blocks; it times chained links' starts and
-  packets after a lost page from the page rather than the granule position; and it
-  reports no Speex trims, shortening the last packet instead.
-
-Its seek cases ([reader-seeks.json](../../harness/codecs/reader-seeks.json)) seek a track
-with either policy and compare the packets from the landing to the end of the file with
-`ffprobe -read_intervals`, into each link of the chained files, on each track of the
-multiplexed ones, and in single-link Opus, Vorbis, FLAC, Speex and Theora files: 11/26
-pass in `compat::clock` (7 in the reader's own timing, 4 more where `compat::clock`
-reproduces FFmpeg), and the 15 chained cases differ by FFmpeg's seek in a chained file,
-which delivers one link only: Vorbis and FLAC from the first link's start to its end,
-Opus and Speex from the last link's start, timed from that link's own zero.
+The reviewed differences are in
+[reader-differences.json](../../harness/codecs/reader-differences.json); results in
+[docs/status.md](../../docs/status.md).
 
 The `read_packets` helper reads every packet of a whole file in memory, headers
-included, charged to the caller's pool, for tests and tools.
+included, for tests and tools.

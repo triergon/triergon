@@ -1,9 +1,12 @@
 mod aligned_audio;
 mod dts_hd;
+mod dts_probe;
 mod dvb;
 mod eac3;
 mod loas;
 mod mpeg_audio;
+mod mpeg_video;
+mod pes_storage;
 mod unframed_audio;
 
 mod build;
@@ -49,6 +52,7 @@ use triergon_framing::{
 #[allow(clippy::large_enum_variant)]
 enum Framer {
     Video(RawAnnexBReader),
+    MpegVideo(mpeg_video::Reader),
     Adts(AacAdtsStreamReader),
     AdtsFragments(AacAdtsCarrierReader),
     Loas(aligned_audio::Reader<3, ()>),
@@ -76,7 +80,7 @@ impl Framer {
             Self::Ac3(reader) => reader.input_wait_buffer_capacity(),
             Self::Eac3(reader) => reader.input_wait_storage()?,
             // Direct PES carriages do not keep a pending unit between inputs.
-            Self::LatmPes | Self::Dvb(_) => 0,
+            Self::LatmPes | Self::Dvb(_) | Self::MpegVideo(_) => 0,
         })
     }
 
@@ -115,6 +119,7 @@ impl Framer {
         let stream = track.stream();
         let namespace = stream.descriptor_namespace();
         match stream.stream_type {
+            1 | 2 => Ok(Self::MpegVideo(mpeg_video::Reader::default())),
             kind @ (0x1b | 0x24) => Ok(Self::Video(RawAnnexBReader::new(
                 pool,
                 if kind == 0x1b {
@@ -300,7 +305,9 @@ impl Framer {
                 AccessUnit::Ac3(Ac3AccessUnit::single(frame))
             }),
             Self::Eac3(reader) => map(reader.step(work, cancel)?, AccessUnit::Ac3),
-            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
+            Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                unreachable!("this route uses validated PES input")
+            }
         })
     }
     fn provide(&mut self, window: InputWindow) -> Result<()> {
@@ -315,7 +322,9 @@ impl Framer {
             Self::AdtsFragments(reader) => reader.provide_owned(window),
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
-            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
+            Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                unreachable!("this route uses validated PES input")
+            }
         }
     }
     fn finish(&mut self, request: InputRequest) -> Result<()> {
@@ -330,7 +339,9 @@ impl Framer {
             Self::AdtsFragments(reader) => reader.finish(request.source, request.token),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),
-            Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
+            Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                unreachable!("this route uses validated PES input")
+            }
         }
     }
 }
@@ -397,15 +408,28 @@ pub(super) struct Lane {
     completed: usize,
     published: u64,
     eof: bool,
+    probe: Option<dts_probe::Probe>,
 }
 
 impl Lane {
+    pub(super) fn is_probing_dts(&self) -> bool {
+        self.probe.is_some()
+    }
+
     pub(super) fn new(
         pool: &Budget,
         track: Track,
         limits: ReaderLimits,
         frame: bool,
     ) -> Result<Self> {
+        let mut track = track;
+        if limits.probe_unlabelled_dts_core
+            && !limits.unlabelled_dts_core.is_some_and(|selection| {
+                selection.program == track.program() && selection.pid == track.stream().pid
+            })
+        {
+            track.unlabelled_dts_core = false;
+        }
         let (framer, unsupported, residue) = if frame {
             match Framer::new(pool, &track, limits) {
                 Ok(framer) => (Some(framer), None, None),
@@ -419,9 +443,15 @@ impl Lane {
         } else {
             (None, None, None)
         };
+        let probe = (frame
+            && limits.probe_unlabelled_dts_core
+            && !track.unlabelled_dts_core
+            && dts_probe::eligible(&track))
+        .then(dts_probe::Probe::default);
         Ok(Self {
             track,
             unsupported,
+            probe,
             framer,
             pool: pool.clone(),
             limits,
@@ -490,7 +520,12 @@ impl Lane {
         clock: ClockContext,
         work: &mut WorkBudget,
     ) -> std::result::Result<Option<SourceEvent>, Refused<SourceEvent>> {
-        let (end, serial) = match self.prepare_piece(source.pes(), work) {
+        let prepared = if self.probe.is_some() {
+            self.prepare_probed_piece(source.pes(), work)
+        } else {
+            self.prepare_piece(source.pes(), work)
+        };
+        let (end, serial) = match prepared {
             Ok(Prepared::Piece { end, serial }) => (end, serial),
             Ok(Prepared::Ignored) => return Ok(None),
             Ok(Prepared::Yield) => return Ok(Some(source)),
@@ -524,6 +559,34 @@ impl Lane {
         self.run = run;
         self.input = self.framer.as_ref().map(|_| Input { span: 0, offset: 0 });
         Ok(None)
+    }
+
+    #[cold]
+    fn prepare_probed_piece(
+        &mut self,
+        pes: &crate::pes::Pes,
+        work: &mut WorkBudget,
+    ) -> Result<Prepared> {
+        if let Some(probe) = &mut self.probe {
+            match probe.step(pes, work) {
+                None => return Ok(Prepared::Yield),
+                Some(dts_probe::Verdict::Proved) => {
+                    let mut track = self.track.clone();
+                    track.unlabelled_dts_core = true;
+                    let framer = Framer::new(&self.pool, &track, self.limits)?;
+                    self.track = track;
+                    self.framer = Some(framer);
+                    self.unsupported = None;
+                }
+                Some(dts_probe::Verdict::Refused) => {
+                    self.unsupported = Some(Error::Unsupported(
+                        "MPEG-TS private PES does not prove DTS core",
+                    ));
+                }
+            }
+            self.probe = None;
+        }
+        self.prepare_piece(pes, work)
     }
 
     /// Checks `pes` against the lane, pays its work unit and reserves its piece.
@@ -715,6 +778,25 @@ impl Lane {
                 }
                 return Ok(LaneStep::End);
             };
+            if let Framer::MpegVideo(reader) = framer {
+                if self.input.is_some() {
+                    let Some(unit) =
+                        reader.step(&self.pieces, self.track.stream().stream_type, work, cancel)?
+                    else {
+                        return Ok(LaneStep::Yield);
+                    };
+                    let end = unit.range.end;
+                    self.start_build(AccessUnit::MpegVideo(unit))?;
+                    self.supplied = end;
+                    self.input = None;
+                    continue;
+                }
+                return Ok(if draining {
+                    LaneStep::End
+                } else {
+                    LaneStep::NeedPayload
+                });
+            }
             if let Framer::Dvb(reader) = framer {
                 if self.input.is_some() {
                     let Some(unit) = reader.step(&self.pieces, work, cancel)? else {
@@ -849,15 +931,20 @@ impl Lane {
                                 .checked_add(count as u64)
                                 .ok_or(Error::Overflow)?;
                             let range = input.offset..input.offset + count;
-                            let appended = if let Framer::Video(reader) = framer {
-                                reader.append_payload(
+                            let appended = match framer {
+                                Framer::Video(reader) => reader.append_payload(
                                     &request,
                                     &payload[range.clone()],
                                     work,
                                     cancel,
-                                )?
-                            } else {
-                                false
+                                )?,
+                                Framer::Loas(reader) => reader.append_payload(
+                                    &request,
+                                    &payload[range.clone()],
+                                    work,
+                                    cancel,
+                                )?,
+                                _ => false,
                             };
                             if !appended {
                                 let bytes = span.payload_bytes()?;

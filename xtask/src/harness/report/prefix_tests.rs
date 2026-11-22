@@ -119,6 +119,19 @@ fn pcr_compatibility_leaves_companion_input_pins_required() {
     let unpinned =
         parse(r#"{"arguments":["188","1","next.ts","--ignore-pcr-reserved-bits"]}"#).unwrap();
     assert!(entity_input_failure(root, &unpinned, Some("ts-au-")).is_err());
+    let probe =
+        parse(r#"{"arguments":["188","1","--probe-dts-core","--ignore-pcr-reserved-bits"]}"#)
+            .unwrap();
+    assert_eq!(
+        entity_input_failure(root, &probe, Some("ts-au-")).unwrap(),
+        None
+    );
+    assert!(entity_input_failure(root, &probe, Some("ts-")).is_err());
+    let unpinned_probe = parse(
+        r#"{"arguments":["188","1","next.ts","--probe-dts-core","--ignore-pcr-reserved-bits"]}"#,
+    )
+    .unwrap();
+    assert!(entity_input_failure(root, &unpinned_probe, Some("ts-au-")).is_err());
 }
 
 #[test]

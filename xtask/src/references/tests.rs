@@ -17,6 +17,9 @@ fn every_ffmpeg_profile_has_a_build_and_names_are_unique() {
     for name in [
         "matroska",
         "formats",
+        "framing-views",
+        "transport-dts",
+        "transport-mpeg-video",
         "video",
         "subtitles",
         "decode",

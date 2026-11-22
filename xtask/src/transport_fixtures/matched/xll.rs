@@ -1,13 +1,13 @@
 //! Authored XLL recovery syntax with an optional core, without coded XLL samples.
 use super::{Codec, Input, PID, Path, R, Transport, Value, part};
 
-struct Bits {
-    bytes: Vec<u8>,
-    at: usize,
+pub(super) struct Bits {
+    pub(super) bytes: Vec<u8>,
+    pub(super) at: usize,
 }
 
 impl Bits {
-    fn put(&mut self, width: usize, value: u32) {
+    pub(super) fn put(&mut self, width: usize, value: u32) {
         for bit in (0..width).rev() {
             self.bytes[self.at / 8] |= ((value >> bit) as u8 & 1) << (7 - self.at % 8);
             self.at += 1;
@@ -15,7 +15,7 @@ impl Bits {
     }
 }
 
-fn crc(bytes: &mut [u8]) {
+pub(super) fn crc(bytes: &mut [u8]) {
     let end = bytes.len() - 2;
     let mut value = u16::MAX;
     for &byte in &bytes[..end] {
@@ -30,7 +30,7 @@ fn crc(bytes: &mut [u8]) {
 // ETSI TS 102 114 V1.6.1 Tables 7-2, 7-5/6/7 and 8-1. Both headers
 // have their own CRC. One complete XLL frame fills the only active asset;
 // sync is DWORD-aligned at offset zero, without buffering or decoding delay.
-fn frame(long: bool, tag: u8, core: bool) -> Vec<u8> {
+pub(super) fn frame(long: bool, tag: u8, core: bool) -> Vec<u8> {
     const XLL_BYTES: u32 = 400;
     let header_bytes = if long { 32 } else { 28 };
     let size_bits = if long { 20 } else { 16 };
@@ -132,8 +132,12 @@ pub(super) fn seek_cases(
         header: 0,
     };
     let pid = PID.to_string();
-    for core in [false, true] {
-        let name = if core { "dts-core-xll" } else { "dts-xll" };
+    for (name, core) in [
+        ("dts-xll", false),
+        ("dts-core-xll", true),
+        ("dts-core-xll-mode-zero", true),
+    ] {
+        let mode_zero = name == "dts-core-xll-mode-zero";
         for (carrier, m2ts) in [("ts188", false), ("m2ts192", true)] {
             let mut ts = Transport::new();
             // Annex G.3.1 / Table E-2: construction 17 or 14 with a separate core.
@@ -146,7 +150,11 @@ pub(super) fn seek_cases(
             };
             ts.tables(&codec, descriptor)?;
             for i in 0..4 {
-                let mut bytes = frame(m2ts, i + 1, core);
+                let mut bytes = if mode_zero {
+                    super::xll_mode_zero::frame_with_core(i)
+                } else {
+                    frame(m2ts, i + 1, core)
+                };
                 if core {
                     let mut prefix =
                         include_bytes!("../../../../harness/fixtures/mpegts/dts-core-mono.dts")
@@ -162,11 +170,13 @@ pub(super) fn seek_cases(
                 ts.pes(codec.stream_id, &pes)?;
             }
             let input = Input {
-                name: match (core, m2ts) {
-                    (true, true) => "dts-core-xll-long",
-                    (true, false) => "dts-core-xll-short",
-                    (false, true) => "dts-xll-long",
-                    (false, false) => "dts-xll-short",
+                name: match (mode_zero, core, m2ts) {
+                    (true, _, true) => "dts-core-xll-mode-zero-192",
+                    (true, _, false) => "dts-core-xll-mode-zero-188",
+                    (false, true, true) => "dts-core-xll-long",
+                    (false, true, false) => "dts-core-xll-short",
+                    (false, false, true) => "dts-xll-long",
+                    (false, false, false) => "dts-xll-short",
                 },
                 m2ts,
                 data: ts.finish(m2ts),

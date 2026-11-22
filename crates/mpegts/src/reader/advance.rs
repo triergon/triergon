@@ -131,6 +131,12 @@ impl Reader {
             return false;
         }
         let lane = &self.lanes.as_slice()[index];
+        if self.limits.probe_unlabelled_dts_core
+            && lane.track.stream().stream_type == crate::psi::PES_PRIVATE_DATA
+            && lane.track.stream().descriptor_bytes.is_empty()
+        {
+            return false;
+        }
         let old = lane.track.program_map();
         let new = source.map();
         if old.pcr_pid != new.pcr_pid || old.header.extension != new.header.extension {
@@ -825,6 +831,9 @@ impl Reader {
         {
             lane.run = previous.run;
         }
+        if self.limits.probe_unlabelled_dts_core {
+            self.tracks.as_mut_slice()[index] = lane.track.clone();
+        }
         self.lanes.as_mut_slice()[index] = lane;
         Ok(interrupted)
     }
@@ -920,28 +929,47 @@ impl Reader {
                 lane,
                 source,
                 clock,
-            } => match self.lanes.as_mut_slice()[lane].push(source, clock, work) {
-                Ok(None) => {
-                    self.lane_work = LaneWork::Step(lane);
-                    Ok(Flow::Continue)
+            } => {
+                let track_lane = &mut self.lanes.as_mut_slice()[lane];
+                let probing = self.limits.probe_unlabelled_dts_core && track_lane.is_probing_dts();
+                match track_lane.push(source, clock, work) {
+                    Ok(None) => {
+                        self.lane_work = LaneWork::Step(lane);
+                        if self.limits.probe_unlabelled_dts_core {
+                            if probing && let Some(error) = track_lane.unsupported {
+                                return Ok(Flow::Return(Step::Ready(Event::Other(
+                                    ReaderEvent::Unsupported {
+                                        track: track_lane.track.clone(),
+                                        error,
+                                    },
+                                ))));
+                            }
+                            let published = &mut self.tracks.as_mut_slice()[lane];
+                            if published.unlabelled_dts_core != track_lane.track.unlabelled_dts_core
+                            {
+                                *published = track_lane.track.clone();
+                            }
+                        }
+                        Ok(Flow::Continue)
+                    }
+                    Ok(Some(source)) => {
+                        self.lane_work = LaneWork::Push {
+                            lane,
+                            source,
+                            clock,
+                        };
+                        Ok(Flow::Return(Step::Yield))
+                    }
+                    Err(refused) => {
+                        self.lane_work = LaneWork::Push {
+                            lane,
+                            source: refused.value,
+                            clock,
+                        };
+                        Err(refused.error)
+                    }
                 }
-                Ok(Some(source)) => {
-                    self.lane_work = LaneWork::Push {
-                        lane,
-                        source,
-                        clock,
-                    };
-                    Ok(Flow::Return(Step::Yield))
-                }
-                Err(refused) => {
-                    self.lane_work = LaneWork::Push {
-                        lane,
-                        source: refused.value,
-                        clock,
-                    };
-                    Err(refused.error)
-                }
-            },
+            }
             LaneWork::Unsupported(index) => {
                 if !work.try_charge(1) {
                     self.lane_work = LaneWork::Unsupported(index);
@@ -952,6 +980,7 @@ impl Reader {
                 }
                 if let Some(lane) = self.lanes.as_slice().get(index)
                     && let Some(error) = lane.unsupported
+                    && !lane.is_probing_dts()
                 {
                     return Ok(Flow::Return(Step::Ready(Event::Other(
                         ReaderEvent::Unsupported {

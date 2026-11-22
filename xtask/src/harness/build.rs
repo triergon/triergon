@@ -101,6 +101,40 @@ pub(crate) fn test_transport_entities(root: &Path) -> R<()> {
     run(&[binary.display().to_string(), root.display().to_string()])
 }
 
+/// Build the opt-in experiment against the same pinned public formats libraries.
+pub(crate) fn eac3_experiment_workers(root: &Path, out: &Path) -> R<()> {
+    let profile = PROFILE_REFERENCES
+        .iter()
+        .find(|p| p.record == "ffmpeg-formats-native")
+        .expect("formats profile");
+    let mut query = vec!["--static", "--cflags", "--libs"];
+    query.extend(profile.packages);
+    let flags = output(
+        "pkg-config",
+        &query,
+        &[(
+            "PKG_CONFIG_LIBDIR",
+            root.join(profile.profile)
+                .join("install/lib/pkgconfig")
+                .display()
+                .to_string(),
+        )],
+    )?;
+    for (source, binary, define) in [
+        ("harness/reference_ts_eac3_worker.c", "proof", None),
+        ("harness/reference.c", "stock", profile.define),
+    ] {
+        let mut command = vec![std::env::var("CC").unwrap_or_else(|_| "cc".into())];
+        command.extend(profile.options.iter().map(ToString::to_string));
+        command.extend(define.map(str::to_owned));
+        command.push(root.join(source).display().to_string());
+        command.extend(shell_words(&flags)?);
+        command.extend(["-o".into(), out.join(binary).display().to_string()]);
+        run(&command)?;
+    }
+    Ok(())
+}
+
 /// POSIX shell word splitting of `pkg-config` output (quotes and backslashes).
 pub fn shell_words(text: &str) -> R<Vec<String>> {
     let (mut words, mut word, mut active) = (Vec::new(), String::new(), false);
@@ -1006,7 +1040,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 33] = [
+const PROFILE_REFERENCES: &[ProfileReference] = &[
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -1029,6 +1063,17 @@ const PROFILE_REFERENCES: [ProfileReference; 33] = [
         packages: CONTAINER_PACKAGES,
         options: CONTAINER_OPTIONS,
         identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-ts-eac3-worker",
+        source: "harness/reference_ts_eac3_worker.c",
+        record: "ffmpeg-ts-eac3",
+        kind: "FFmpeg public demux/parser ATSC E-AC-3 six-block comparison adapter",
+        libraries: "ts_eac3_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
         ..REFERENCE
     },
     ProfileReference {
@@ -1073,6 +1118,17 @@ const PROFILE_REFERENCES: [ProfileReference; 33] = [
         record: "ffmpeg-transport-dts",
         kind: "FFmpeg MPEG-TS and DTS core access units",
         libraries: "transport_dts_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-transport-mpeg-video",
+        binary: "ffmpeg-transport-mpeg-video-worker",
+        source: "harness/reference_ts_worker.c",
+        record: "ffmpeg-transport-mpeg-video",
+        kind: "FFmpeg MPEG-TS and ordinary MPEG-1/2 video access units",
+        libraries: "transport_mpeg_video_reference",
         packages: CONTAINER_PACKAGES,
         options: CONTAINER_OPTIONS,
         ..REFERENCE

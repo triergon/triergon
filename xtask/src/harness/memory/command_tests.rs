@@ -238,6 +238,7 @@ fn unreadable_memory_input_returns_a_failed_row() {
             arguments: &[],
             candidate_arguments: None,
             expected_outputs: None,
+            pinned_refusal: false,
             work_fields: None,
             timeout: worker::DEFAULT_TIMEOUT,
         },
@@ -318,6 +319,7 @@ fn distinct_commands_keep_compatibility_options_on_the_candidate() {
         arguments: &reference,
         candidate_arguments: Some(&candidate),
         expected_outputs: None,
+        pinned_refusal: false,
         work_fields: None,
         timeout: worker::DEFAULT_TIMEOUT,
     };
@@ -335,6 +337,7 @@ fn shared_commands_remain_identical_for_both_roles() {
         arguments: &arguments,
         candidate_arguments: None,
         expected_outputs: None,
+        pinned_refusal: false,
         work_fields: None,
         timeout: worker::DEFAULT_TIMEOUT,
     };
@@ -373,6 +376,7 @@ fn a_deferred_memory_bound_collects_and_grades_only_the_selected_observer() {
                 &Value::Null,
                 None,
                 selection,
+                false,
             )
         };
         let accepted = grade(sample(selection.roles()));
@@ -382,4 +386,48 @@ fn a_deferred_memory_bound_collects_and_grades_only_the_selected_observer() {
         let surplus = grade(sample(Selection::Both.roles()));
         assert_eq!(s(&surplus, "status"), Some("invalid-memory-observation"));
     }
+}
+
+#[test]
+fn pinned_refusals_compare_equal_work_and_keep_role_diagnostics() {
+    let pair = |candidate: &Value, reference: &Value, candidate_rss: &Value| {
+        let measured = |work: &Value| Value::object([("work", work.clone())]);
+        Value::object([
+            ("candidate_heap", measured(candidate)),
+            ("candidate_rss", measured(candidate_rss)),
+            ("reference_heap", measured(reference)),
+            ("reference_rss", measured(reference)),
+        ])
+    };
+    let output = |refusal, packets, eof, iterations, diagnostic| {
+        Value::object([
+            ("refusal", Value::str(refusal)),
+            ("packets", Value::int(packets)),
+            ("bytes", Value::int(0)),
+            ("digest", Value::int(0)),
+            ("eof", Value::Bool(eof)),
+            ("iterations", Value::int(iterations)),
+            (diagnostic, Value::str("details")),
+        ])
+    };
+    let candidate = output("typed refusal", 0, false, 1, "cause");
+    let reference = output("refused", 0, false, 1, "error");
+    assert!(matched_refusal_work(
+        &pair(&candidate, &reference, &candidate),
+        Selection::Both
+    ));
+    for different in [
+        output("refused", 1, false, 1, "error"),
+        output("refused", 0, true, 1, "error"),
+        output("refused", 0, false, 2, "error"),
+    ] {
+        assert!(!matched_refusal_work(
+            &pair(&candidate, &different, &candidate),
+            Selection::Both
+        ));
+    }
+    assert!(!matched_refusal_work(
+        &pair(&candidate, &reference, &reference),
+        Selection::Both
+    ));
 }

@@ -2,14 +2,12 @@
 
 The decoder vocabulary shared by the codec crates: the `VideoDecoder` and
 `AudioDecoder` traits, decoded audio as `AudioFrame` with a `ChannelLayout` of
-`Speaker`s, stream downmix metadata, the codec selectors, the Kaiser-Bessel-derived
-window the AAC and AC-3 filterbanks share, the inverse MDCT the Vorbis and Opus
-decoders share, and integer division by a run-time divisor without a library call on
-32-bit ARM. It sits in the codec layer below the nine decoders and depends only on
-[triergon-core](../core/README.md), whose storage types it re-exports for the
-decoders' budgets, and [triergon-pixel](../pixel/README.md), whose picture views (`PictureView`, `Plane`,
-`Colour`) it re-exports. It contains no decoder; sessions and workers drive the
-decoders only through these traits.
+`Speaker`s, stream downmix metadata, the codec selectors, and the windows, inverse MDCT
+and run-time integer division several decoders share. It depends only on
+[triergon-core](../core/README.md), whose storage types it re-exports for the decoders'
+budgets, and [triergon-pixel](../pixel/README.md), whose picture views (`PictureView`,
+`Plane`, `Colour`) it re-exports. It contains no decoder; sessions and workers drive the
+nine decoders only through these traits.
 
 ## Usage
 
@@ -56,19 +54,19 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 |---|---|
 | `VideoDecoder` | `send(au, pts) -> Result<(), Self::Error>`, `receive() -> Option<PictureView>`, `flush`, `reset`; `Send` |
 | `AudioDecoder` | `decode(au, &mut AudioFrame) -> Result<Option<DownmixLevels>, Self::Error>`, `reset`; `delay()` (samples a stream starts with that carry no signal, 0 by default) and `flush(&mut AudioFrame)` (samples held back at the end, none by default); `Send` |
+| `AudioFrame` | `sample_rate`, `layout`, `samples_per_channel`, `planes`: planar `f32`, full scale 1.0; `sample_format` (`SampleFormat::Float`, `S16`, `S32`): the decoder's native format, for mixing as FFmpeg mixes it |
+| `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `default_for(n)` (FFmpeg's default), `speakers`, `channels`, `position`, `mask`, `name` (FFmpeg's layout name), `EMPTY`, `CAPACITY` |
+| `layout::{vorbis_order, flac_order, native_order}` | the Vorbis/Opus and FLAC coded channel orders, and the plane each coded channel goes to |
+| `mdct::Imdct` | inverse MDCT and DCT-IV for any `N` with `N / 4` a product of 2, 3 and 5: an iterative mixed-radix FFT over split real and imaginary planes; `new` charges its tables to a budget |
+| `Speaker` | loudspeaker position; `name()` gives FFmpeg's short name, `mask()` its `AV_CH_*` bit |
+| `DownmixLevels` | `center`, `surround`, `lfe` gains and `SurroundEncoding` (`None`, `Dolby`, `ProLogicII`) |
 | `Error` (associated) | the decoder's error type: `DecodeError`, or a codec crate's own `DecodeError` with the same classes and more detail; each is `Copy` and converts to `triergon_core::Error` without formatting or allocating |
 | `DecodeError` | `Unsupported`, `Invalid`, `Policy` (each with a `&'static str` naming the feature, check or cap) and `Budget` (a refused storage charge): the error of the H.264, DTS, MPEG audio, Opus and Vorbis decoders |
 | `boxed::<E>()` | the decoder behind a box with its errors converted to `E` |
 | `DynVideoDecoder`, `DynAudioDecoder` | `dyn VideoDecoder<Error = Error>` and `dyn AudioDecoder<Error = Error>`: a decoder of a codec chosen at run time |
-| `Error`, `StorageError` | `triergon_core::Error`; the second name is the one decoders use for a refused storage charge |
-| `AudioFrame` | `sample_rate`, `layout`, `samples_per_channel`, `planes`: planar `f32`, full scale 1.0; `sample_format` (`SampleFormat::Float`, `S16`, `S32`): the decoder's native format, for mixing as FFmpeg mixes it |
-| `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `default_for(n)` (FFmpeg's default), `speakers`, `channels`, `position`, `mask`, `name` (FFmpeg's layout name), `EMPTY`, `CAPACITY` |
-| `layout::{vorbis_order, flac_order, native_order}` | the Vorbis/Opus and FLAC coded channel orders, and the plane each coded channel goes to |
-| `mdct::Imdct` | the Vorbis and Opus inverse MDCT and DCT-IV for any caller-supplied output length `N` with `N / 4` a product of 2, 3 and 5: an iterative mixed-radix FFT over split real and imaginary planes in `f32`, in a fixed operation order the decoders' bit-exact output depends on; its tables are charged to a budget when it is built |
-| `Speaker` | loudspeaker position; `name()` gives FFmpeg's short name, `mask()` its `AV_CH_*` bit |
-| `DownmixLevels` | `center`, `surround`, `lfe` gains and `SurroundEncoding` (`None`, `Dolby`, `ProLogicII`) |
 | `AudioFrame::try_resize` | sizes the planes, charging the frame's capacity to a decoder's `Reservation` first |
 | `kbd_window` | rising half of a Kaiser-Bessel-derived window of any length and alpha |
+| `vorbis_window` | rising slope of the power-complementary window Vorbis and CELT overlap by |
 | `divide`, `divide_u32` | `a / b` rounded towards zero for `b > 0`; on 32-bit ARM, whose baseline has no divide instruction, an exact double division instead of the library routine |
 | `Divisor` | quotient and remainder by one divisor fixed at run time, as a multiplication and a shift, exact while dividend times divisor stays below 2^31 |
 
@@ -111,33 +109,10 @@ then keeps the element order of the PCE, and so does the AAC decoder.
   it carries them (AC-3 and E-AC-3). `DownmixLevels::default()` is the conventional
   −3 dB centre and surrounds (1/√2) with LFE omitted and no surround encoding, for
   streams that carry none.
-- **Errors.** A refused access unit leaves the decoder usable. Each decoder reports
-  `DecodeError` through the trait, or, where it has more to say, its crate's own
-  `DecodeError`, whose variants of the same classes have the same names and texts
-  (AAC, AC-3, FLAC, HEVC). Converted to `triergon_core::Error` it keeps its class and
-  detail text: invalid data is `Invalid`, a feature outside the decoder's set
-  `Unsupported`, a resource cap of the codec `Policy`, a short access unit `Truncated`,
-  and a refused storage charge the budget's own error (`Limit`, `Allocation`,
-  `Overflow`). What only the decoder's type can say (byte counts, a feature's number)
-  stays with that type.
-
-## Conformance
-
-The [layout comparison](../../harness/features/codec-layouts/contract.json) checks the decoded
-sample rate, speaker on each plane, layout mask and name, native and Vorbis permutations, and
-published downmix gains. Native layouts without a standard name compare the ordered
-speaker list. The DTS inputs compare the core decode. The Ogg inputs include Vorbis
-and Opus with one through eight channels.
+- **Errors.** A refusal leaves the decoder usable. Convert the typed error to
+  `triergon_core::Error` to keep its class and detail across decoder kinds.
+  Typed errors are available from each codec crate's own `decode`/`send`.
 
 Speaker ids and names follow FFmpeg's channel layout API (`AV_CHAN_*`, `AV_CH_*`).
-The channel order is verified through the codec crates, whose output planes are
-compared with FFmpeg channel by channel; unit tests pin layout equality, masks and
-capacity. Gates: [docs/quality.md](../../docs/quality.md).
-
-The [inverse transform comparison](../../harness/features/dsp-imdct/contract.json)
-checks IMDCT and DCT-IV samples at every supported length through 8192 against
-the cosine definitions and the public FFmpeg transform under a numeric rule.
-The [window comparison](../../harness/features/dsp-windows/contract.json) checks
-KBD and Vorbis windows against their formulae within one binary32 ULP.
-The [division comparison](../../harness/features/dsp-divide/contract.json)
-checks truncation, quotients and remainders against exact integer arithmetic.
+Verification: [harness/codecs](../../harness/codecs/STATUS.md); results in
+[docs/status.md](../../docs/status.md).

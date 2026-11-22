@@ -6,7 +6,7 @@ use crate::engine::ts::Delivery;
 use crate::{Engine, Result, TrackKey, pes_feed::TsEngine};
 use triergon_core::InputCursor;
 use triergon_mpegts::{
-    ParseLimits,
+    PacketFormat, ParseLimits,
     clock::SourceTimePolicy,
     compat::pes::{PrivateAudioCarriage, RegisteredCarriage},
     psi::DescriptorNamespace,
@@ -39,7 +39,16 @@ pub fn open(
     namespace: DescriptorNamespace,
     selections: &[PidSelection],
 ) -> Result<Engine> {
-    TsEngine::with_selections(input, program, limits, policy, namespace, selections).map(Engine::Ts)
+    TsEngine::with_selections(
+        input,
+        PacketFormat::Ts188,
+        program,
+        limits,
+        policy,
+        namespace,
+        selections,
+    )
+    .map(Engine::Ts)
 }
 
 /// The source events of one independent TS188 media segment with an in-band PAT

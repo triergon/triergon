@@ -1135,9 +1135,46 @@ pub fn evaluate(
         certificate,
         expected_outputs,
         Selection::Both,
+        false,
     )
 }
 
+fn matched_refusal_work(row: &Value, selection: Selection) -> bool {
+    let work = |key| row.get(key).and_then(|sample| sample.get("work"));
+    let candidate_role = if selection.heap() {
+        "candidate_heap"
+    } else {
+        "candidate_rss"
+    };
+    let (Some(candidate), Some(reference)) = (work(candidate_role), selection.reference_work(row))
+    else {
+        return false;
+    };
+    // Each role's observers must agree on the entire output. Across roles,
+    // diagnostic details may differ for the same pinned zero-output refusal.
+    let (Value::Object(candidate_fields), Value::Object(reference_fields)) = (candidate, reference)
+    else {
+        return false;
+    };
+    let comparable = |fields: &[(String, Value)]| {
+        Value::Object(
+            fields
+                .iter()
+                .filter(|(key, _)| !matches!(key.as_str(), "refusal" | "cause" | "error"))
+                .cloned()
+                .collect(),
+        )
+    };
+    super::parity::reports_zero_output_refusal(candidate)
+        && super::parity::reports_zero_output_refusal(reference)
+        && candidate.get("iterations") == Some(&Value::int(1))
+        && (selection != Selection::Both
+            || (work("candidate_rss").is_some_and(|rss| equal(candidate, rss))
+                && work("reference_rss").is_some_and(|rss| equal(reference, rss))))
+        && equal(&comparable(candidate_fields), &comparable(reference_fields))
+}
+
+#[allow(clippy::too_many_arguments)] // The evaluation binds its observers and refusal policy.
 fn evaluate_selected(
     root: &Path,
     samples: &[Value],
@@ -1146,6 +1183,7 @@ fn evaluate_selected(
     certificate: &Value,
     expected_outputs: Option<&Value>,
     selection: Selection,
+    pinned_refusal: bool,
 ) -> Value {
     let linux = s(certificate, "platform") == Some("Linux");
     let failed = |status: &str| {
@@ -1237,16 +1275,20 @@ fn evaluate_selected(
         if expected_outputs.is_none() && reference_output.is_none() {
             return failed("invalid-memory-observation");
         }
-        let work_matches = entries.iter().all(|(key, sample)| {
-            let expected = match expected_outputs {
-                Some(outputs) => key.split_once('_').and_then(|(role, _)| outputs.get(role)),
-                None => reference_output,
-            };
-            sample
-                .get("work")
-                .zip(expected)
-                .is_some_and(|(a, b)| equal(a, b))
-        });
+        let work_matches = if pinned_refusal && expected_outputs.is_none() {
+            matched_refusal_work(row, selection)
+        } else {
+            entries.iter().all(|(key, sample)| {
+                let expected = match expected_outputs {
+                    Some(outputs) => key.split_once('_').and_then(|(role, _)| outputs.get(role)),
+                    None => reference_output,
+                };
+                sample
+                    .get("work")
+                    .zip(expected)
+                    .is_some_and(|(a, b)| equal(a, b))
+            })
+        };
         if !work_matches {
             return failed("unequal-memory-work");
         }
@@ -1477,6 +1519,7 @@ struct Invocation<'a> {
     arguments: &'a [String],
     candidate_arguments: Option<&'a [String]>,
     expected_outputs: Option<&'a Value>,
+    pinned_refusal: bool,
     work_fields: Option<&'a [String]>,
     /// How long one observer run may take.
     timeout: Duration,
@@ -1638,6 +1681,7 @@ fn measure(
             certificate,
             invocation.expected_outputs,
             selection,
+            invocation.pinned_refusal,
         )
     };
     if !retried.is_empty() {
@@ -1913,6 +1957,7 @@ fn relocated(workers: &WorkerPaths<'_>) -> bool {
 
 /// One memory collection in `slot`, rejected (but kept) when tracked processes
 /// used CPU meanwhile.
+#[allow(clippy::too_many_arguments)] // The slot, workload and pairing configuration.
 pub fn collect(
     slot: &Slot,
     root: &Path,
@@ -1921,6 +1966,7 @@ pub fn collect(
     pairs: Pairs,
     seed: u64,
     operation: &Operation,
+    pinned_refusal: bool,
 ) -> R<Value> {
     collect_selected(
         slot,
@@ -1931,6 +1977,7 @@ pub fn collect(
         seed,
         operation,
         Selection::Both,
+        pinned_refusal,
     )
 }
 
@@ -1944,6 +1991,7 @@ pub(crate) fn collect_selected(
     seed: u64,
     operation: &Operation,
     selection: Selection,
+    pinned_refusal: bool,
 ) -> R<Value> {
     if !operation.candidate_options.is_empty() || operation.reference_prefix.is_some() {
         let arguments = |candidate| {
@@ -1972,6 +2020,7 @@ pub(crate) fn collect_selected(
                 arguments: &reference_arguments,
                 candidate_arguments: Some(&candidate_arguments),
                 expected_outputs: None,
+                pinned_refusal,
                 work_fields: Some(&operation.work.fields),
                 timeout: operation.timeout,
             },
@@ -1996,6 +2045,7 @@ pub(crate) fn collect_selected(
             arguments: &arguments,
             candidate_arguments: None,
             expected_outputs: None,
+            pinned_refusal,
             work_fields: Some(&operation.work.fields),
             timeout: operation.timeout,
         },
@@ -2028,6 +2078,7 @@ pub(crate) fn collect_command(
             arguments,
             candidate_arguments: None,
             expected_outputs: Some(expected_outputs),
+            pinned_refusal: false,
             work_fields: None,
             timeout,
         },
@@ -2070,6 +2121,7 @@ pub(crate) fn collect_commands(
             arguments: commands.reference,
             candidate_arguments: Some(commands.candidate),
             expected_outputs: Some(commands.expected_outputs),
+            pinned_refusal: false,
             work_fields: None,
             timeout: worker::DEFAULT_TIMEOUT,
         },
@@ -2291,6 +2343,7 @@ pub fn evidence_valid_with_outputs(
             }
         }
         let seed = py_int(memory.get("seed")).unwrap_or(280) as u64;
+        let pinned_refusal = expected.is_some_and(super::parity::pins_zero_output_refusal);
         let recomputed = evaluate_selected(
             root,
             raw,
@@ -2299,6 +2352,7 @@ pub fn evidence_valid_with_outputs(
             certificate,
             expected_outputs,
             selection,
+            pinned_refusal,
         );
         let same = [
             "status",

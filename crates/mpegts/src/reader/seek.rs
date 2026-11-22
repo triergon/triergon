@@ -1,5 +1,6 @@
 //! Bounded source seeks in the exact presentation clock.
 mod dts_hd;
+mod latm;
 mod physical;
 mod retained;
 
@@ -8,7 +9,6 @@ use crate::stream::TraceEvent;
 use crate::{SourceEpochs, clock::SourceTimePolicy};
 use retained::{Retain, RetainedOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::container::{
     CodecId, Event, PacketInfo, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest,
     TrackId, TrackInfo,
@@ -18,7 +18,7 @@ use triergon_core::{
     SourceLocation, Step, Time, WorkBudget,
 };
 use triergon_framing::{
-    aac, dts,
+    dts,
     mpeg_audio::{MpegChannelMode, MpegLayer, MpegVersion},
 };
 
@@ -203,7 +203,14 @@ pub(super) struct Seeking {
 struct Probing {
     packet: Packet,
     probe: SeekProbe,
-    xll_header: Option<dts_hd::Header>,
+    check: ProbeCheck,
+}
+
+/// An entry whose complete envelope still needs validation.
+enum ProbeCheck {
+    Complete,
+    Xll(dts_hd::Header),
+    Latm(latm::Probe),
 }
 
 #[derive(Clone, Copy)]
@@ -264,53 +271,26 @@ fn mpeg_audio_entry(frame: &MpegAudioFrame) -> Result<bool> {
     Ok(side[0] == 0 && (!mpeg1 || side[1] & 0x80 == 0))
 }
 
-// ISO/IEC 14496-3 §1.7.3: a LOAS AudioMuxElement can either carry its
-// StreamMuxConfig or refer to the previous one. A seek entry must carry its own
-// config. This profile has one AAC-LC program, layer and variable-size payload.
-fn latm_entry(multiplex: &[u8]) -> Option<()> {
-    let mut bits = BitCursor::new(multiplex);
-    // useSameStreamMux = 0, audioMuxVersion = 0, allStreamsSameTimeFraming = 1.
-    if bits.read(3).ok()? != 1 || bits.read(13).ok()? != 0 {
-        return None;
-    }
-    let asc = bits.read(16).ok()?;
-    if asc >> 11 != 2 || asc & 7 != 0 || !(1..=7).contains(&((asc >> 3) & 15)) {
-        return None;
-    }
-    aac::indexed_frequency(((asc >> 7) & 15) as u8)?;
-    if bits.read(3).ok()? != 0 {
-        return None;
-    }
-    bits.skip(8).ok()?; // LATM buffer fullness.
-    if bits.read(2).ok()? != 0 {
-        return None; // Other data and CRC-bearing configurations are outside this profile.
-    }
-    let mut payload = 0;
-    loop {
-        let length = bits.read(8).ok()? as usize;
-        payload += length;
-        if payload > bits.remaining() / 8 {
-            return None;
-        }
-        if length != 255 {
-            break;
-        }
-    }
-    bits.skip(payload * 8).ok()?;
-    (payload != 0 && bits.remaining() < 8).then_some(())
-}
-
-fn packet_probe(packet: Packet) -> Result<Probing> {
+fn packet_probe(packet: Packet, check_latm: impl FnOnce(Time) -> bool) -> Result<Probing> {
     let clock = packet.clock();
     let time = clock.and_then(|clock| clock.pts.exact);
-    let mut xll_header = None;
+    let mut check = ProbeCheck::Complete;
     let (offset, random_access) = match packet.access_unit() {
         AccessUnit::Video(unit) => (unit.range.start, unit.random_access),
         AccessUnit::Adts(frame) => (frame.source().offset, time.is_some()),
-        AccessUnit::Loas(frame) => (
-            frame.elementary_range().start,
-            time.is_some() && latm_entry(frame.multiplex_element()).is_some(),
-        ),
+        AccessUnit::Loas(frame) => {
+            // An unindexed scan still observes clocks and delivers the suffix.
+            // An envelope after its target cannot supply a landing.
+            if time.is_some_and(check_latm)
+                && let Some(probe) = latm::Probe::new(frame.multiplex_element())
+            {
+                check = ProbeCheck::Latm(probe);
+            }
+            (
+                frame.elementary_range().start,
+                matches!(check, ProbeCheck::Latm(_)),
+            )
+        }
         // E-AC-3 access units begin with the independent syncframe and
         // include its associated dependent substreams (A/52 Annex E §2.3.1).
         AccessUnit::Ac3(frame) => (frame.facts().offset, time.is_some()),
@@ -332,21 +312,26 @@ fn packet_probe(packet: Packet) -> Result<Probing> {
                 }) {
                     return Err(Error::Unsupported("MPEG-TS DTS-HD seek"));
                 }
-                xll_header = dts_hd::entry(&packet)?;
+                if let Some(header) = dts_hd::entry(&packet)? {
+                    check = ProbeCheck::Xll(header);
+                }
             }
             // DTS TS 102 114 §5.4.2, HFLAG signals prior predictor history.
             (
                 frame.elementary_range().start,
                 time.is_some()
                     && header.history == 0
-                    && (header.frame_bytes == frame.bytes().len() || xll_header.is_some()),
+                    && (header.frame_bytes == frame.bytes().len()
+                        || matches!(check, ProbeCheck::Xll(_))),
             )
         }
         AccessUnit::DtsExtension(frame) => {
-            xll_header = dts_hd::entry(&packet)?;
+            if let Some(header) = dts_hd::entry(&packet)? {
+                check = ProbeCheck::Xll(header);
+            }
             (
                 frame.elementary_range().start,
-                time.is_some() && xll_header.is_some(),
+                time.is_some() && matches!(check, ProbeCheck::Xll(_)),
             )
         }
         AccessUnit::AdtsFragment(fragment) => (fragment.source().offset, false),
@@ -370,7 +355,7 @@ fn packet_probe(packet: Packet) -> Result<Probing> {
     Ok(Probing {
         packet,
         probe,
-        xll_header,
+        check,
     })
 }
 
@@ -797,7 +782,6 @@ impl Reader {
             // the suffix without keeping both the index and the output packets.
             let retain = (selected_epochs.is_none()
                 && index_entries.is_none()
-                && entities.is_none()
                 && length <= 256 * 1024
                 && single_track)
                 .then(|| Retain::new(&self.pool));
@@ -880,21 +864,32 @@ impl Reader {
             }
             let seek = &mut self.seek.as_mut_slice()[0];
             let request = seek.request;
-            if let Some(probing) = &mut seek.probing
-                && let Some(header) = &mut probing.xll_header
-            {
-                let checked =
-                    header
-                        .step(probing.packet.bytes().as_ref(), work)
-                        .map_err(|error| {
-                            if matches!(seek.phase, Phase::Replay { .. }) {
-                                Error::SourceMismatch
-                            } else {
-                                error
-                            }
-                        })?;
-                if !checked {
-                    return Ok(Step::Yield);
+            if let Some(probing) = &mut seek.probing {
+                match &mut probing.check {
+                    ProbeCheck::Complete => {}
+                    ProbeCheck::Latm(probe) => {
+                        let AccessUnit::Loas(frame) = probing.packet.access_unit() else {
+                            return Err(Error::SourceMismatch);
+                        };
+                        let Some(valid) = probe.step(frame.multiplex_element(), work) else {
+                            return Ok(Step::Yield);
+                        };
+                        probing.probe.random_access = valid;
+                    }
+                    ProbeCheck::Xll(header) => {
+                        let checked = header.step(probing.packet.bytes().as_ref(), work).map_err(
+                            |error| {
+                                if matches!(seek.phase, Phase::Replay { .. }) {
+                                    Error::SourceMismatch
+                                } else {
+                                    error
+                                }
+                            },
+                        )?;
+                        if !checked {
+                            return Ok(Step::Yield);
+                        }
+                    }
                 }
             }
             // Splitting the seek phases raised previous-audio seek instructions by at least 0.83%.
@@ -1003,7 +998,9 @@ impl Reader {
                         if let Some(index) = &mut scan.index {
                             index.packet(&packet);
                         }
-                        seek.probing = Some(packet_probe(packet)?);
+                        seek.probing = Some(packet_probe(packet, |time| {
+                            scan.index.is_some() || time <= request.target
+                        })?);
                     }
                 }
                 (Phase::Scan(scan), Step::Ready(Event::Other(event))) => {
@@ -1035,8 +1032,11 @@ impl Reader {
                     if let Some(retain) = seek.retain.take() {
                         self.seek_index =
                             scan.finish_index(&self.pool, request.track, seek.selected_epochs);
-                        let result =
-                            seek_result(request, landing, Some(end.offset), retain.skipped);
+                        let scanned = self
+                            .seek_entities
+                            .as_deref()
+                            .map_or(end.offset, |plan| plan.total);
+                        let result = seek_result(request, landing, Some(scanned), retain.skipped);
                         let tracks =
                             std::mem::replace(&mut self.tracks, BudgetVec::new(&self.pool));
                         seek.phase = Phase::Retained {
@@ -1108,7 +1108,8 @@ impl Reader {
                     {
                         return Err(Error::SourceMismatch);
                     }
-                    seek.probing = Some(packet_probe(packet).map_err(|_| Error::SourceMismatch)?);
+                    seek.probing =
+                        Some(packet_probe(packet, |_| true).map_err(|_| Error::SourceMismatch)?);
                 }
                 (Phase::Replay { .. }, Step::Ready(Event::Other(event))) => {
                     if matches!(&event, ReaderEvent::Source(source)

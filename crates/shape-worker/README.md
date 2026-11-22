@@ -4,8 +4,7 @@ Shaping measurement worker for the harness. It shapes text, resolves bidi and
 reads Unicode properties through [triergon-shape](../shape/README.md), as the
 HarfBuzz and FriBidi reference worker (`harness/reference_shape.h`) does with
 HarfBuzz 14.6.0 and FriBidi 1.0.17, and with FreeType 2.15.0 for libass's font
-functions. It is tooling (`publish = false`), not part
-of the library.
+functions. It is tooling (`publish = false`), not part of the library.
 
 ## Command line
 
@@ -32,8 +31,7 @@ hexadecimal code points separated by spaces, optionally prefixed by
 
 A face, text or line the crate rejects is recorded as such and reading goes on, so
 the case fails. The fold, bench and memory modes print the harness protocol's one
-JSON line, whose `digest` folds every value in a fixed order (`src/record.rs`);
-the bench mode adds the elapsed time of the timed loop and the memory mode
-brackets one operation with the allocation-window markers. Reading the file is
-outside both. The dump mode prints the same values as lines, identical to the
+JSON line, whose `digest` folds every value in a fixed order; the bench mode adds the
+elapsed time and the memory mode brackets one operation with the allocation-window
+markers. The dump mode prints the same values as lines, identical to the
 reference's dump. The features are `harness/features/shape-*/`.

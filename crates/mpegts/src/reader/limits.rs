@@ -53,6 +53,9 @@ pub struct ReaderLimits {
     pub unframed_audio_policy: UnframedAudioPolicy,
     /// Explicit DTS core identity for one unlabelled private-data route.
     pub unlabelled_dts_core: Option<crate::compat::dts::UnlabelledCore>,
+    /// Probe the initial unlabelled private PES for two canonical DTS core envelopes.
+    /// Disabled by default. See [DTS admission](crate::compat::dts).
+    pub probe_unlabelled_dts_core: bool,
     /// Compatibility policy for the reserved bits in a program clock reference.
     pub pcr_policy: crate::compat::pes::PcrPolicy,
     /// Framing policy for ADTS. The compatibility policy handles ADTS EOF itself.
@@ -93,6 +96,7 @@ impl Default for ReaderLimits {
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
             unframed_audio_policy: UnframedAudioPolicy::Strict,
             unlabelled_dts_core: None,
+            probe_unlabelled_dts_core: false,
             pcr_policy: crate::compat::pes::PcrPolicy::Strict,
             adts_packet_policy: PacketPolicy::Strict,
             adts_pes_policy: adts::PesPolicy::Strict,

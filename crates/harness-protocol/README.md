@@ -1,12 +1,12 @@
 # triergon-harness-protocol
 
-The trace protocol of the differential harness. The Rust workers (`media-worker`,
-`codec-worker`, `playback-worker`) and the trace examples and tests of the format and
-codec crates print one JSON document per operation; this crate holds the field
-encodings and digests they share with the FFmpeg reference worker
-(`harness/reference.c`), so both sides of a comparison produce byte-identical traces
-for equal behaviour. It is tooling: library crates use it only as a dev-dependency, and
-it has no dependencies of its own.
+The trace protocol of the differential harness. The Rust harness workers (every
+`*-worker` crate but `capture-worker`) and the trace examples and tests of the format
+and codec crates print one JSON document per operation; this crate holds the field
+encodings and digests they share with the reference worker (`harness/reference.c`),
+so both sides of a comparison produce byte-identical traces for equal behaviour. It is
+tooling: library crates use it only as a dev-dependency, and it has no dependencies of
+its own.
 
 ## Usage
 

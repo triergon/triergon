@@ -39,6 +39,8 @@ pub enum Profile {
     Subtitles,
     /// MPEG-TS and the DTS core packet parser.
     TransportDts,
+    /// MPEG-TS and the ordinary MPEG-1/2 video packet parser.
+    TransportMpegVideo,
     /// FFmpeg's default configuration (static libraries, `ffmpeg`, `ffprobe`):
     /// the decoder comparison reference, and the independent decoder and demuxer
     /// of the capture comparison.
@@ -65,6 +67,7 @@ impl Profile {
             Profile::Formats => ".research/reference-formats",
             Profile::FramingViews => ".research/reference-framing-views",
             Profile::TransportDts => ".research/reference-transport-dts",
+            Profile::TransportMpegVideo => ".research/reference-transport-mpeg-video",
             Profile::Video => ".research/reference-video",
             Profile::Subtitles => ".research/reference-subtitles",
             Profile::Decode => ".research/reference-decode",
@@ -80,7 +83,8 @@ impl Profile {
             | Profile::FramingViews
             | Profile::Video
             | Profile::Subtitles
-            | Profile::TransportDts => Source::Revision,
+            | Profile::TransportDts
+            | Profile::TransportMpegVideo => Source::Revision,
             Profile::Decode | Profile::Capture | Profile::CaptureSmall => Source::Release,
         }
     }
@@ -91,6 +95,7 @@ impl Profile {
             Profile::Formats,
             Profile::FramingViews,
             Profile::TransportDts,
+            Profile::TransportMpegVideo,
             Profile::Video,
             Profile::Subtitles,
             Profile::Decode,
@@ -107,6 +112,7 @@ impl Profile {
             Profile::Formats => "formats",
             Profile::FramingViews => "framing-views",
             Profile::TransportDts => "transport-dts",
+            Profile::TransportMpegVideo => "transport-mpeg-video",
             Profile::Video => "video",
             Profile::Subtitles => "subtitles",
             Profile::Decode => "decode",
@@ -175,7 +181,8 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
         | Profile::FramingViews
         | Profile::Video
         | Profile::Subtitles
-        | Profile::TransportDts => {}
+        | Profile::TransportDts
+        | Profile::TransportMpegVideo => {}
     }
     let mut argv: Vec<String> = [
         "./configure",
@@ -236,6 +243,16 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
             *flag = match flag.as_str() {
                 "--enable-demuxer=matroska" => "--enable-demuxer=mpegts",
                 "--enable-parser=h264,hevc,aac,ac3,vorbis" => "--enable-parser=dca",
+                other => other,
+            }
+            .to_owned();
+        }
+    }
+    if profile == Profile::TransportMpegVideo {
+        for flag in &mut argv {
+            *flag = match flag.as_str() {
+                "--enable-demuxer=matroska" => "--enable-demuxer=mpegts",
+                "--enable-parser=h264,hevc,aac,ac3,vorbis" => "--enable-parser=mpegvideo",
                 other => other,
             }
             .to_owned();

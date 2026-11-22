@@ -25,12 +25,6 @@ assert_eq!((track.codec_tag(), track.sample_rate()), (b"mp3".as_slice(), 44100))
 # Ok::<(), triergon_core::Error>(())
 ```
 
-`Reader::request` gives the source, token and byte range for the next input window.
-`MpegAudio::header`, `Adts::header` and `Ac3::header` expose the first confirmed
-audio frame's header. `MpegAudio::lame` gives the encoder identifier and the
-coded encoder delay and padding when an information frame carries them.
-`PacketInfo::trim` gives the samples to discard at the ends of each packet.
-
 ## Behaviour
 
 All four formats run one frame-stream engine: leading ID3v2 tags, the format's
@@ -66,8 +60,7 @@ Seeking reports a receipt and, through `Reader::last_seek`, whether the landing 
 exact. FLAC bisects by frame header timestamps within the SEEKTABLE interval (or the
 whole file) and reads forward to the frame holding the target. MPEG audio estimates
 from the Xing table of contents or the bit rate (`SeekBasis::Toc`, `SeekBasis::Bitrate`)
-and counts from the start when the estimate falls past the end. A seek to the start
-of a stream with an information frame starts at the first audio frame. ADTS and AC-3 count
+and counts from the start when the estimate falls past the end. ADTS and AC-3 count
 frames from the start (`SeekMethod::Restart`). A playback seek lands
 `Format::PREROLL` frames early (two for MPEG audio, one for ADTS and AC-3, none for
 FLAC).
@@ -76,31 +69,13 @@ FLAC).
 
 `Limits` bounds the largest access unit (4 MiB: a verbatim FLAC frame of 65535 samples
 of eight 32-bit channels is about 2.2 MB), retained tags and metadata (4 MiB in all),
-sync search (1 MiB), SEEKTABLE points (65536) and bisection jumps (64). `Reader::new`
-takes the largest input window it requests; `BlockingReader` asks for 64 KiB. Every input-dependent allocation is charged to the reader's `Budget`;
+sync search (1 MiB), input window (64 KiB), SEEKTABLE points (65536) and bisection
+jumps (64). Every input-dependent allocation is charged to the reader's `Budget`;
 exceeding a limit is a typed error.
 
-## Comparison with FFmpeg
+## Differences from FFmpeg
 
-The [metadata comparison](../../harness/features/elementary-metadata/contract.json)
-compares FLAC stream declarations from the stored STREAMINFO block, alongside
-packet trim and mapped tags. The [wire comparison](../../harness/features/elementary-metadata-wire/contract.json)
-checks raw headers and tag envelopes, including SEEKTABLE and LAME fields.
-
-The `elementary-readers` gate compares native FLAC, MPEG audio, ADTS, AC-3 and E-AC-3
-packets with FFmpeg and checks each reviewed difference against its frozen values.
-
-`cargo xtask codecs readers` compares every packet's size, position, timestamps and trim as
-the readers deliver them with the pinned `ffprobe -show_packets` of FFmpeg 9.0.2, under the
-reviewed rules and dispositions of
-[harness/codecs/reader-rules.json](../../harness/codecs/reader-rules.json); gates:
-[docs/quality.md](../../docs/quality.md#gates). Over the IETF FLAC decoder testbench, the
-MPEG audio conformance bitstreams, streams FFmpeg writes (FLAC, MP3 with and without
-Xing/Info and LAME tags, MP2, ADTS, AC-3, E-AC-3) and crafted damaged ones, 253 of 271
-match on AArch64. Both readers refuse testbench faulty 06 and 07. The remaining 16
-files match their reviewed [packet differences](../../harness/codecs/reader-differences.json)
-under [rules that cite the applicable format clauses](../../harness/codecs/reader-rules.json).
-Those cases exercise the following FFmpeg behaviours.
+Packets differ from FFmpeg 9.0.2's (`ffprobe -show_packets`) only where FFmpeg:
 
 - delivers a FLAC frame's duration rescaled to the first frame's rate when the rate
   changes, no duration at 768 kHz, and the last frame of a stream with varying block
@@ -113,7 +88,10 @@ Those cases exercise the following FFmpeg behaviours.
 - reports ADTS positions after junk as if the junk were not there;
 - rejects free-format MPEG audio;
 - refuses to open a FLAC stream whose STREAMINFO declares a maximum block size below 16
-  (testbench faulty 08 and 09): a decoder decision, so this reader still delivers the
-  frames.
+  (a decoder decision; this reader still delivers the frames);
 - declares the stream STREAMINFO describes when a metadata block runs past the end of the
-  file (testbench faulty 11), where this reader reports the stream as truncated.
+  file, where this reader reports the stream as truncated.
+
+The reviewed differences are in
+[reader-differences.json](../../harness/codecs/reader-differences.json); results in
+[docs/status.md](../../docs/status.md).

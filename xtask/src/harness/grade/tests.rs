@@ -522,7 +522,7 @@ fn every_feature_manifest_keeps_all_cases_including_nonrequired_profiles() {
         ("matroska-audio-clocks", 10),
         ("matroska-legacy-aac", 4),
         ("mp4-forward", 51),
-        ("ts-program", 35),
+        ("ts-program", 36),
         ("raw-annex-b", 7),
         ("mpegts-pes", 97),
         ("subtitle-pgs", 319),

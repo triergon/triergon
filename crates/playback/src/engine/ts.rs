@@ -275,10 +275,11 @@ impl TsEngine {
         Self::from_stream(input, format, limits, policy, namespace, stream)
     }
 
-    /// The source events of a TS188 `program` and the demux PES of the selected
+    /// The source events of `program` and the demux PES of the selected
     /// PIDs: 1 to 64 distinct PIDs from 1 to 0x1ffe.
     pub(crate) fn with_selections(
         input: InputCursor,
+        format: ts::PacketFormat,
         program: u16,
         limits: ts::ParseLimits,
         policy: SourceTimePolicy,
@@ -302,14 +303,7 @@ impl TsEngine {
                 "selected PES PID must be between 1 and 8190",
             ));
         }
-        let engine = Self::program(
-            input,
-            ts::PacketFormat::Ts188,
-            program,
-            limits,
-            policy,
-            namespace,
-        )?;
+        let engine = Self::program(input, format, program, limits, policy, namespace)?;
         let pes_tracks = if let [selection] = selections {
             PesTracks::Inline(Some(PesTrack::new(*selection)))
         } else {
