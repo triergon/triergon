@@ -8,12 +8,13 @@
   "worker_operation": "ts-pes-assembler-",
   "reference": "ffmpeg-transport-views-native",
   "contract": [
-    "For the selected elementary PID the candidate admits accepted payloads to a standalone PES assembler in chunks of 1, 7 or 184 bytes, or one whole carrier payload. PUSI applies to the first chunk of its carrier. Ordinary entity boundaries retain assembly.",
+    "For the selected elementary PID, supply each complete transport payload to the standalone PES assembler with its PUSI and physical offset. Poll with one, seven, 184 or 4096 work units. Ordinary entity boundaries retain assembly.",
     "The packet fold uses the returned original stream ID, raw PTS and DTS in period zero, first header carrier position and all payload bytes. Raw header fields, partial headers and source ranges are also emitted in trace mode. The reference exposes the packet fold.",
     "The pinned formats worker opens the selected program with public MPEG-TS AVIO, NOPARSE and NOFILLIN, without stream discovery. It delivers ordinary entities in one AVIO source and flushes at a declared discontinuity.",
     "The packet fold is the mpegts-pes fold: stream index, PID, PTS and DTS in 90 kHz ticks (INT64_MIN for absence), duration, position, flags, size, bytes and every side-data element. Input loading is outside the run. Both sides drain the last entity to logical end.",
     "Every operation in the mpegts-pes corpus runs for each form, retaining its 272 request mappings and the hash of every ordered input.",
-    "Candidate header and payload source ranges are checked against the preloaded entity bytes. Partial progress and the public header flags are traced."
+    "Candidate header and payload source ranges are checked against the preloaded entity bytes. Partial progress and the public header flags are traced.",
+    "The source-clocks profile uses the public demux clock reduced to 33 bits, encoded timestamp presence from the PES start on the original carrier grid, and the physical start carrier offset for M2TS."
   ],
   "required_profiles": [
     "ts188-basic",
@@ -1306,1234 +1307,230 @@
     }
   ],
   "pin_note": "Reference folds are recorded from the formats views worker and match the mpegts-pes pins for the same ordered inputs.",
-  "pending_module_requirements": [
-    "Review the DTS projection of PTS-only PES",
-    "Review the origin coordinate of prefixed M2TS carriers",
-    "Review period-zero source timestamps against signed demux clocks",
-    "Review PES packet delivery after duplicate transport carriers",
-    "Review incomplete PES delivery after transport continuity loss",
-    "Review PES output from carriers with invalid PCR or OPCR",
-    "Review PES output from damaged or scrambled carriers",
-    "Review rejected PES timing syntax",
-    "Review strict PES length validation versus demux recovery",
-    "Review PES publication before surplus bytes arrive in a later chunk"
-  ],
-  "open_cases": [
+  "open_deviations": [
+    {
+      "reading": "Duplicate payload is delivered once",
+      "clause": "H.222.0 \u00a72.4.3.3: one consecutive identical copy on the same PID is permitted, with PCR the only permitted byte change.",
+      "candidate": "Drops the legal duplicate, preserving each original PES payload and position.",
+      "reference": "Repeats the PES or includes duplicate elementary bytes, sometimes splitting the PES.",
+      "compat": "compat::pes::DuplicatePayloadDelivery",
+      "cases": [
+        "cc-one-duplicate-1",
+        "cc-one-duplicate-7",
+        "cc-one-duplicate-184",
+        "cc-one-duplicate-whole",
+        "cc-duplicate-pcr-update-1",
+        "cc-duplicate-pcr-update-7",
+        "cc-duplicate-pcr-update-184",
+        "cc-duplicate-pcr-update-whole",
+        "di-duplicate-complete-1",
+        "di-duplicate-complete-7",
+        "di-duplicate-complete-184",
+        "di-duplicate-complete-whole",
+        "di-duplicate-start-1",
+        "di-duplicate-start-7",
+        "di-duplicate-start-184",
+        "di-duplicate-start-whole",
+        "partial-start-duplicate-1",
+        "partial-start-duplicate-7",
+        "partial-start-duplicate-184",
+        "partial-start-duplicate-whole",
+        "partial-middle-duplicate-1",
+        "partial-middle-duplicate-7",
+        "partial-middle-duplicate-184",
+        "partial-middle-duplicate-whole",
+        "interleaved-other-pid-duplicate-1",
+        "interleaved-other-pid-duplicate-7",
+        "interleaved-other-pid-duplicate-184",
+        "interleaved-other-pid-duplicate-whole",
+        "m2ts-prefix-only-duplicate-1",
+        "m2ts-prefix-only-duplicate-7",
+        "m2ts-prefix-only-duplicate-184",
+        "m2ts-prefix-only-duplicate-whole",
+        "duplicate-middle-low-occupancy-finite-1",
+        "duplicate-middle-low-occupancy-finite-7",
+        "duplicate-middle-low-occupancy-finite-184",
+        "duplicate-middle-low-occupancy-finite-whole",
+        "duplicate-middle-low-occupancy-unbounded-1",
+        "duplicate-middle-low-occupancy-unbounded-7",
+        "duplicate-middle-low-occupancy-unbounded-184",
+        "duplicate-middle-low-occupancy-unbounded-whole"
+      ]
+    },
+    {
+      "reading": "A third copy is a continuity fault",
+      "clause": "H.222.0 \u00a72.4.3.3 permits only two consecutive identical packets of the same PID.",
+      "candidate": "Discards the excess copy and the pending assembly it interrupts. An already published PES stays delivered, and the next admissible start can resume assembly.",
+      "reference": "Delivers payload from excess copies or merges it into the affected PES.",
+      "compat": "compat::pes::DuplicatePayloadDelivery",
+      "cases": [
+        "cc-third-copy-1",
+        "cc-third-copy-7",
+        "cc-third-copy-184",
+        "cc-third-copy-whole",
+        "third-middle-copy-then-clean-1",
+        "third-middle-copy-then-clean-7",
+        "third-middle-copy-then-clean-184",
+        "third-middle-copy-then-clean-whole"
+      ]
+    },
+    {
+      "reading": "Missing transport continuity breaks pending PES assembly",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.6 define continuity on each PID and the declared PES extent.",
+      "candidate": "Drops the affected partial PES and publishes the next complete packet if present.",
+      "reference": "Publishes the available bytes with the corrupt flag and continues on the next start if present.",
+      "compat": "compat::pes::DeliverCorruptPrefix",
+      "cases": [
+        "cc-loss-mid-pes-1",
+        "cc-loss-mid-pes-7",
+        "cc-loss-mid-pes-184",
+        "cc-loss-mid-pes-whole",
+        "loss-then-clean-pusi-1",
+        "loss-then-clean-pusi-7",
+        "loss-then-clean-pusi-184",
+        "loss-then-clean-pusi-whole",
+        "loss-at-clean-pusi-1",
+        "loss-at-clean-pusi-7",
+        "loss-at-clean-pusi-184",
+        "loss-at-clean-pusi-whole"
+      ]
+    },
+    {
+      "reading": "PCR extension outside its modulus",
+      "clause": "H.222.0 \u00a72.4.3.5 defines PCR extension as the system-clock count modulo 300.",
+      "candidate": "Rejects the affected carrier and emits no PES from it.",
+      "reference": "Returns the 27-byte PES payload at PTS 90000.",
+      "compat": "compat::pes::IgnoreInvalidPcrExtension",
+      "cases": [
+        "pcr-extension-invalid-1",
+        "pcr-extension-invalid-7",
+        "pcr-extension-invalid-184",
+        "pcr-extension-invalid-whole"
+      ]
+    },
     {
-      "id": "ts188-basic-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "ts188-basic-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "ts188-basic-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "ts188-basic-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-header-every-byte-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-header-every-byte-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-header-every-byte-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-header-every-byte-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "psi-header-every-byte-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "psi-header-every-byte-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "psi-header-every-byte-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "psi-header-every-byte-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-multiple-ts-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-multiple-ts-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-multiple-ts-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-multiple-ts-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-next-pusi-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-next-pusi-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-next-pusi-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-next-pusi-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-definitive-eof-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-definitive-eof-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-definitive-eof-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pes-unbounded-definitive-eof-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-reorder-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-reorder-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-reorder-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-reorder-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-half-wrap-ambiguous-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-half-wrap-ambiguous-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-half-wrap-ambiguous-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pts-half-wrap-ambiguous-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-wrap-15-to-zero-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-wrap-15-to-zero-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-wrap-15-to-zero-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-wrap-15-to-zero-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-same-counter-changed-payload-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-same-counter-changed-payload-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-same-counter-changed-payload-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-same-counter-changed-payload-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-adaptation-only-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-adaptation-only-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-adaptation-only-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-adaptation-only-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-loss-clean-pusi-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-loss-clean-pusi-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-loss-clean-pusi-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "cc-loss-clean-pusi-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-timeline-discontinuity-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-timeline-discontinuity-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-timeline-discontinuity-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-timeline-discontinuity-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-extension-preserved-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-extension-preserved-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-extension-preserved-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pcr-extension-preserved-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-null-pid-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-null-pid-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-null-pid-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-null-pid-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-partial-final-packet-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-partial-final-packet-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-partial-final-packet-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-partial-final-packet-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-sync-loss-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-sync-loss-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-sync-loss-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "transport-sync-loss-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-dvb-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-dvb-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-dvb-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-dvb-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-dvb-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-dvb-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-dvb-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-dvb-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-direct-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-direct-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-direct-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-ac3-direct-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-direct-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-direct-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-direct-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-eac3-direct-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-adts-direct-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-adts-direct-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-adts-direct-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-adts-direct-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-latm-direct-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-latm-direct-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-latm-direct-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-aac-latm-direct-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-hevc-direct-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-hevc-direct-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-hevc-direct-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "carriage-hevc-direct-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "elementary-bytes-cross-pes-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "elementary-bytes-cross-pes-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "elementary-bytes-cross-pes-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "elementary-bytes-cross-pes-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-contiguous-pes-carry-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-contiguous-pes-carry-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-contiguous-pes-carry-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-contiguous-pes-carry-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-external-map-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-external-map-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-external-map-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-external-map-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-explicit-discontinuity-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-explicit-discontinuity-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-explicit-discontinuity-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "hls-explicit-discontinuity-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb2-literals-fields-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb2-literals-fields-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb2-literals-fields-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb2-literals-fields-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-ancillary-pages-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-ancillary-pages-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-ancillary-pages-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-ancillary-pages-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-default-clut2-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-default-clut2-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-default-clut2-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-default-clut2-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-nonmodifying-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-nonmodifying-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-nonmodifying-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-nonmodifying-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-partial-alpha-projection-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-partial-alpha-projection-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-partial-alpha-projection-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-partial-alpha-projection-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-truncated-segment-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-truncated-segment-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-truncated-segment-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "dvb-truncated-segment-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pat-pointer-then-clean-pusi-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pat-pointer-then-clean-pusi-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pat-pointer-then-clean-pusi-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pat-pointer-then-clean-pusi-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pmt-pointer-then-clean-pusi-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pmt-pointer-then-clean-pusi-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pmt-pointer-then-clean-pusi-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "pmt-pointer-then-clean-pusi-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-payload-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-payload-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-payload-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-payload-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-header-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-header-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-header-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pes-header-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-adaptation-only-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-adaptation-only-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-adaptation-only-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-adaptation-only-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pat-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pat-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pat-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pat-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pmt-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pmt-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pmt-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "di-continuous-pmt-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "same-content-new-counters-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "same-content-new-counters-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "same-content-new-counters-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "same-content-new-counters-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "opcr-change-is-not-duplicate-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "opcr-change-is-not-duplicate-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "opcr-change-is-not-duplicate-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "opcr-change-is-not-duplicate-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "finite-continuation-body-400-1",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "finite-continuation-body-400-7",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "finite-continuation-body-400-184",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "finite-continuation-body-400-whole",
-      "requirement": "Review the DTS projection of PTS-only PES"
-    },
-    {
-      "id": "m2ts192-opaque-prefix-1",
-      "requirement": "Review the origin coordinate of prefixed M2TS carriers"
-    },
-    {
-      "id": "m2ts192-opaque-prefix-7",
-      "requirement": "Review the origin coordinate of prefixed M2TS carriers"
-    },
-    {
-      "id": "m2ts192-opaque-prefix-184",
-      "requirement": "Review the origin coordinate of prefixed M2TS carriers"
-    },
-    {
-      "id": "m2ts192-opaque-prefix-whole",
-      "requirement": "Review the origin coordinate of prefixed M2TS carriers"
-    },
-    {
-      "id": "pts-wrap-forward-1",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-wrap-forward-7",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-wrap-forward-184",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-wrap-forward-whole",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-dts-common-epoch-1",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-dts-common-epoch-7",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-dts-common-epoch-184",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "pts-dts-common-epoch-whole",
-      "requirement": "Review period-zero source timestamps against signed demux clocks"
-    },
-    {
-      "id": "cc-one-duplicate-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-one-duplicate-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-one-duplicate-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-one-duplicate-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-third-copy-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-third-copy-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-third-copy-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-third-copy-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-duplicate-pcr-update-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-duplicate-pcr-update-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-duplicate-pcr-update-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-duplicate-pcr-update-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-complete-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-complete-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-complete-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-complete-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-start-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-start-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-start-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "di-duplicate-start-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-start-duplicate-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-start-duplicate-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-start-duplicate-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-start-duplicate-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-middle-duplicate-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-middle-duplicate-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-middle-duplicate-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "partial-middle-duplicate-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "interleaved-other-pid-duplicate-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "interleaved-other-pid-duplicate-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "interleaved-other-pid-duplicate-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "interleaved-other-pid-duplicate-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "m2ts-prefix-only-duplicate-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "m2ts-prefix-only-duplicate-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "m2ts-prefix-only-duplicate-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "m2ts-prefix-only-duplicate-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "third-middle-copy-then-clean-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "third-middle-copy-then-clean-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "third-middle-copy-then-clean-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "third-middle-copy-then-clean-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-finite-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-finite-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-finite-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-finite-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-unbounded-1",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-unbounded-7",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-unbounded-184",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-unbounded-whole",
-      "requirement": "Review PES packet delivery after duplicate transport carriers"
-    },
-    {
-      "id": "cc-loss-mid-pes-1",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "cc-loss-mid-pes-7",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "cc-loss-mid-pes-184",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "cc-loss-mid-pes-whole",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-then-clean-pusi-1",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-then-clean-pusi-7",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-then-clean-pusi-184",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-then-clean-pusi-whole",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-at-clean-pusi-1",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-at-clean-pusi-7",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-at-clean-pusi-184",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "loss-at-clean-pusi-whole",
-      "requirement": "Review incomplete PES delivery after transport continuity loss"
-    },
-    {
-      "id": "pcr-extension-invalid-1",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "pcr-extension-invalid-7",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "pcr-extension-invalid-184",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "pcr-extension-invalid-whole",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "opcr-without-pcr-invalid-1",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "opcr-without-pcr-invalid-7",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "opcr-without-pcr-invalid-184",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "opcr-without-pcr-invalid-whole",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
-    },
-    {
-      "id": "transport-tei-1",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-tei-7",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-tei-184",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-tei-whole",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-1",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-7",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-184",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-whole",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "pes-timestamp-marker-1",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-timestamp-marker-7",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-timestamp-marker-184",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-timestamp-marker-whole",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-1",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-7",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-184",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-whole",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-finite-truncated-eof-1",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-truncated-eof-7",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-truncated-eof-184",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-truncated-eof-whole",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-extra-payload-7",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-extra-payload-184",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-extra-payload-whole",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-audio-zero-length-invalid-1",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-audio-zero-length-invalid-7",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-audio-zero-length-invalid-184",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-audio-zero-length-invalid-whole",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-401-7",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-401-184",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-401-whole",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-408-7",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-408-184",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-408-whole",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-409-7",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-409-184",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-409-whole",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-414-7",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-414-184",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-414-whole",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-415-7",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-415-184",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "finite-continuation-body-415-whole",
-      "requirement": "Review strict PES length validation versus demux recovery"
-    },
-    {
-      "id": "pes-finite-extra-payload-1",
-      "requirement": "Review PES publication before surplus bytes arrive in a later chunk"
-    },
-    {
-      "id": "finite-continuation-body-401-1",
-      "requirement": "Review PES publication before surplus bytes arrive in a later chunk"
-    },
-    {
-      "id": "finite-continuation-body-408-1",
-      "requirement": "Review PES publication before surplus bytes arrive in a later chunk"
-    },
-    {
-      "id": "finite-continuation-body-409-1",
-      "requirement": "Review PES publication before surplus bytes arrive in a later chunk"
-    },
-    {
-      "id": "finite-continuation-body-414-1",
-      "requirement": "Review PES publication before surplus bytes arrive in a later chunk"
-    },
-    {
-      "id": "finite-continuation-body-415-1",
-      "requirement": "Review PES publication before surplus bytes arrive in a later chunk"
+      "reading": "OPCR is signalled without PCR",
+      "clause": "H.222.0 \u00a72.4.3.5 permits OPCR only in a transport packet containing PCR.",
+      "candidate": "Rejects the carrier with unpaired OPCR and publishes no PES on this input.",
+      "reference": "Returns both 27-byte packets.",
+      "compat": "compat::pes::IgnoreUnpairedOpcr",
+      "cases": [
+        "opcr-without-pcr-invalid-1",
+        "opcr-without-pcr-invalid-7",
+        "opcr-without-pcr-invalid-184",
+        "opcr-without-pcr-invalid-whole"
+      ]
+    },
+    {
+      "reading": "Transport error indication marks untrustworthy payload",
+      "clause": "H.222.0 \u00a72.4.3.3 defines TEI as at least one uncorrectable error in the transport packet.",
+      "candidate": "Does not publish a PES from the errored carrier.",
+      "reference": "Returns 27 bytes at PTS 90000 without a corrupt flag.",
+      "compat": "compat::pes::DeliverTeiPayload",
+      "cases": [
+        "transport-tei-1",
+        "transport-tei-7",
+        "transport-tei-184",
+        "transport-tei-whole"
+      ]
+    },
+    {
+      "reading": "User-defined scrambling flag requires an interpretation before clear payload delivery",
+      "clause": "H.222.0 \u00a72.4.3.3 Table 2-4 distinguishes scrambling from clear payload.",
+      "candidate": "Does not publish a PES from the scrambled carrier.",
+      "reference": "Returns the 27 bytes and PTS 90000 as a packet.",
+      "compat": "compat::pes::DeliverScrambledPayload",
+      "cases": [
+        "transport-scrambled-1",
+        "transport-scrambled-7",
+        "transport-scrambled-184",
+        "transport-scrambled-whole"
+      ]
+    },
+    {
+      "reading": "A zero PTS marker bit violates the PES header grammar",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.6\u20132.4.3.7 Table 2-21 requires the timestamp marker bits.",
+      "candidate": "Rejects the malformed header and emits no PES.",
+      "reference": "Returns 27 bytes with PTS and DTS 90000.",
+      "compat": "compat::pes::IgnoreTimestampMarkers",
+      "cases": [
+        "pes-timestamp-marker-1",
+        "pes-timestamp-marker-7",
+        "pes-timestamp-marker-184",
+        "pes-timestamp-marker-whole"
+      ]
+    },
+    {
+      "reading": "PES timestamp flag value 01 is forbidden",
+      "clause": "H.222.0 \u00a72.4.3.7 forbids PTS_DTS_flags 01.",
+      "candidate": "Rejects the malformed header and emits no PES.",
+      "reference": "Returns 27 bytes with both clocks absent.",
+      "compat": "compat::pes::IgnoreForbiddenTimeFlags",
+      "cases": [
+        "pes-forbidden-time-flags-1",
+        "pes-forbidden-time-flags-7",
+        "pes-forbidden-time-flags-184",
+        "pes-forbidden-time-flags-whole"
+      ]
+    },
+    {
+      "reading": "EOF inside a finite PES",
+      "clause": "H.222.0 \u00a72.4.3.7 gives the number of bytes after PES_packet_length.",
+      "candidate": "Emits no incomplete PES.",
+      "reference": "Emits the 24 available payload bytes with the corrupt flag.",
+      "compat": "compat::pes::DeliverCorruptPrefix",
+      "cases": [
+        "pes-finite-truncated-eof-1",
+        "pes-finite-truncated-eof-7",
+        "pes-finite-truncated-eof-184",
+        "pes-finite-truncated-eof-whole"
+      ]
+    },
+    {
+      "reading": "An audio PES declares an unbounded length",
+      "clause": "H.222.0 \u00a72.4.3.7 allows zero PES_packet_length only for video elementary payload in TS.",
+      "candidate": "Rejects the audio packet.",
+      "reference": "Returns 27 bytes at PTS 90000.",
+      "compat": "compat::pes::AllowUnboundedAudio",
+      "cases": [
+        "pes-audio-zero-length-invalid-1",
+        "pes-audio-zero-length-invalid-7",
+        "pes-audio-zero-length-invalid-184",
+        "pes-audio-zero-length-invalid-whole"
+      ]
+    },
+    {
+      "reading": "Continuation payload exceeds the finite PES extent",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.7 define one PES start per PUSI carrier and the length through the last PES byte.",
+      "candidate": "Does not publish the PES when a carrier supplies extra payload past its declared extent.",
+      "reference": "Publishes a 27-byte declared prefix or returns 401\u2013415 bytes in split PES packets.",
+      "compat": "compat::pes::RecoverFiniteSurplus",
+      "cases": [
+        "pes-finite-extra-payload-7",
+        "pes-finite-extra-payload-184",
+        "pes-finite-extra-payload-whole",
+        "finite-continuation-body-401-7",
+        "finite-continuation-body-401-184",
+        "finite-continuation-body-401-whole",
+        "finite-continuation-body-408-7",
+        "finite-continuation-body-408-184",
+        "finite-continuation-body-408-whole",
+        "finite-continuation-body-409-7",
+        "finite-continuation-body-409-184",
+        "finite-continuation-body-409-whole",
+        "finite-continuation-body-414-7",
+        "finite-continuation-body-414-184",
+        "finite-continuation-body-414-whole",
+        "finite-continuation-body-415-7",
+        "finite-continuation-body-415-184",
+        "finite-continuation-body-415-whole",
+        "pes-finite-extra-payload-1",
+        "finite-continuation-body-401-1",
+        "finite-continuation-body-408-1",
+        "finite-continuation-body-409-1",
+        "finite-continuation-body-414-1",
+        "finite-continuation-body-415-1"
+      ]
     }
   ]
 }
