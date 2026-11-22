@@ -231,12 +231,6 @@
         "entry_points": ["Track::channels", "Track::comments", "Track::end", "Track::frame_rate", "Track::header_error", "TrackInfo::configuration"],
         "degree": "unit-tests",
         "needs": "Ogg tracks compare identification, setup, comments, timing, configuration and header errors. The contract declares twelve differences in source end clocks, dictionaries and malformed-header handling. The paired bounds remain due."
-      },
-      {
-        "name": "page-codec",
-        "entry_points": ["page::PageHeader::parse", "page::write_page"],
-        "degree": "unit-tests",
-        "needs": "The Ogg page comparison verifies exact parsed and written pages against an independent page and CRC reader on the same source bytes. The paired bounds remain due."
       }
     ],
     "triergon-pixel": [],

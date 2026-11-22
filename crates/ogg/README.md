@@ -37,6 +37,8 @@ charges its storage to the caller's `Budget`.
 - **Pages**: capture-pattern search, CRC check, resynchronisation. A page with a bad
   CRC, garbage between pages and a trailing partial page are skipped and reported as
   `ReaderEvent::Resync`; a sequence gap drops the packet it broke (`ReaderEvent::Lost`).
+  The [page gate](../../harness/features/ogg-pages/contract.json) compares parsed
+  headers and exact bytes from `write_page` with an independent RFC 3533 page reader.
 - **Packets**: any length across any number of pages, empty packets and 255-multiple
   lengths. A packet inside one page shares the input window; only a packet split
   across pages is gathered.
