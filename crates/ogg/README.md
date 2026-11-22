@@ -82,6 +82,18 @@ For the first nonterminal Opus audio page, it uses the granule-derived start
 if later than the header anchor. This includes cropped streams and the first
 surviving page after initial audio loss.
 
+For a blocking reader, `recover_initial_vorbis(compat::clock::InitialVorbis { max_events })` opts into bounded
+lookahead before event delivery. It holds the ordered event prefix while initial
+Vorbis packets ending on zero-granule pages have unknown compatibility PTS, and
+backfills those times from the next known compatibility PTS and their signed
+durations. Packet source times stay unchanged. The event slots and packet storage
+are charged to the reader's budget. A discontinuity, missing duration, end of
+input or the event limit releases unresolved packets with their original times;
+seeking discards retained packets and disables further initial recovery. The
+default reader does not look ahead for this policy.
+The calculation also applies to audio-only input when explicitly enabled; FFmpeg
+can leave those packets untimed.
+
 ## Seeking
 
 `request_seek` lands on the packet containing the target (Vorbis: the packet before
@@ -120,8 +132,6 @@ where FFmpeg:
   duration 4,294,967,168 and discard padding 1,152 for a 1,024-sample packet.
   The compatibility view keeps the signed duration of -128. The native clock
   keeps coded durations and distributes the end trim across packets;
-- times the Vorbis packets of leading pages stating granule position 0 from the next
-  page's;
 - reads a chained link that reuses the previous link's serial number as the same stream,
   its headers as packets;
 - seeks in a chained file within one link only.
