@@ -212,3 +212,33 @@ fn skips_reused_for_a_repeated_picture_match_the_computed_path() {
     );
     assert_eq!(computed.reused_skips, 0);
 }
+
+#[test]
+fn the_intra_probe_counts_the_same_bits_without_reconstructing() {
+    let mut probe = encoder();
+    let mut final_pass = encoder();
+    let mut input = Picture::new(probe.cfg.geometry);
+    for (i, sample) in input.y_mut().iter_mut().enumerate() {
+        *sample = (i as u8).wrapping_mul(13);
+    }
+    input.cb_mut().fill(72);
+    input.cr_mut().fill(160);
+    for e in [&mut probe, &mut final_pass] {
+        e.recon.y_mut().fill(1);
+        e.recon.cb_mut().fill(2);
+        e.recon.cr_mut().fill(3);
+    }
+    let mut trial = SliceState::new(8);
+    let mut coded = SliceState::new(8);
+    let ac_bits = probe.intra_mb::<true>(&input, 0, 0, 0, &mut trial, PictureType::Intra, false);
+    final_pass.intra_mb::<false>(&input, 0, 0, 0, &mut coded, PictureType::Intra, false);
+    assert!(ac_bits > 0);
+    let (mut measured, mut actual) = (Vec::new(), Vec::new());
+    probe.writer.take_into(&mut measured).unwrap();
+    final_pass.writer.take_into(&mut actual).unwrap();
+    assert_eq!(measured, actual);
+    assert!(probe.recon.y().iter().all(|&sample| sample == 1));
+    assert!(probe.recon.cb().iter().all(|&sample| sample == 2));
+    assert!(probe.recon.cr().iter().all(|&sample| sample == 3));
+    assert_ne!(probe.recon.y(), final_pass.recon.y());
+}

@@ -81,7 +81,8 @@ charges a caller's `Budget`.
   picture skipped after its residual quantised to zero is skipped again without
   computing the residual, as long as its quantiser is no finer: its residual is the
   same, and the output is what computing it would give. The first I picture of an
-  encoder runs a trial pass to seed the intra rate model.
+  encoder runs a trial pass that counts bits to seed the intra rate model.
+  Reconstruction runs only for the coded picture.
 - The picture rate is fixed at 30 Hz. Timestamps belong to the caller or muxer.
 - A nonzero `vbv_underflow_bits` means some picture exceeded the modelled buffer
   occupancy.

@@ -143,10 +143,10 @@ impl Encoder {
         s.skipped = 0;
     }
 
-    /// Code an intra macroblock of an I or P picture and reconstruct it; `dc_only`
-    /// drops every AC coefficient (the VBV guard). Returns the bits of its AC
-    /// coefficient codes, end_of_block excluded, when `MEASURE` (the trial pass),
-    /// and 0 otherwise.
+    /// Code an intra macroblock of an I or P picture. The trial pass counts AC
+    /// coefficient bits (excluding end_of_block) and leaves reconstruction alone.
+    /// The final pass reconstructs the macroblock and returns 0. The VBV guard
+    /// sets `dc_only` to drop every AC coefficient.
     #[expect(
         clippy::too_many_arguments,
         reason = "a per-macroblock call whose arguments a struct would pass through memory"
@@ -207,18 +207,19 @@ impl Encoder {
             write_coefficients(&mut self.writer, &levels, mask, true);
             if MEASURE {
                 coefficient_bits += self.writer.bit_len() - start;
-            }
-            block::dequant_intra(&levels, mask, dc, s.q, &mut coeffs);
-            dct::idct(&mut coeffs, mask | 1);
-            let dst = match plane {
-                0 => self.recon.y_mut(),
-                1 => self.recon.cb_mut(),
-                _ => self.recon.cr_mut(),
-            };
-            for r in 0..8 {
-                let row = &mut dst[(y + r) * stride + x..(y + r) * stride + x + 8];
-                for c in 0..8 {
-                    row[c] = coeffs[r * 8 + c].clamp(0, 255) as u8;
+            } else {
+                block::dequant_intra(&levels, mask, dc, s.q, &mut coeffs);
+                dct::idct(&mut coeffs, mask | 1);
+                let dst = match plane {
+                    0 => self.recon.y_mut(),
+                    1 => self.recon.cb_mut(),
+                    _ => self.recon.cr_mut(),
+                };
+                for r in 0..8 {
+                    let row = &mut dst[(y + r) * stride + x..(y + r) * stride + x + 8];
+                    for c in 0..8 {
+                        row[c] = coeffs[r * 8 + c].clamp(0, 255) as u8;
+                    }
                 }
             }
         }

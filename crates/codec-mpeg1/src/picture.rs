@@ -123,8 +123,7 @@ impl Encoder {
 
     /// First intra picture of a session: trial-encode every second row at a
     /// fixed quantiser into scratch bits to seed the intra rate model, its side
-    /// bits scaled to every row. The reconstruction it leaves behind is
-    /// overwritten by the real pass.
+    /// bits scaled to every row. Only the final pass reconstructs the picture.
     fn probe_intra(&mut self, input: &Picture, mut scratch: BitWriter) -> Result<()> {
         const PROBE_Q: u32 = 8;
         let g = self.cfg.geometry;
