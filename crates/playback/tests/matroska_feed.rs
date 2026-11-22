@@ -1608,10 +1608,8 @@ fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
     }
 }
 
-#[test]
-fn cued_aac_suffix_keeps_source_and_projected_clocks_distinct() {
-    let (fixture, _, _) = cued_audio_fixture::cued_aac();
-    let (mut player, pool) = player_with_input(&fixture, 7);
+fn check_cued_aac_clocks(fixture: &[u8], skipped: usize, expected: &[(i64, &[u8])]) {
+    let (mut player, pool) = player_with_input(fixture, 7);
     let outputs = collect_with_work(&mut player, 1);
     let configuration = outputs
         .iter()
@@ -1625,16 +1623,14 @@ fn cued_aac_suffix_keeps_source_and_projected_clocks_distinct() {
         .iter()
         .filter(|output| matches!(output.event(), RawEvent::Matroska(Event::Packet(_))))
         .collect::<Vec<_>>();
-    assert_eq!(packets.len(), 3);
 
-    // A fresh clock sees the same packet suffix as the indexed seek. The
-    // FFmpeg backward-seek comparison reports these PTS/DTS values and no duration.
-    let expected = [
-        (1_000_000_000, &b"second"[..]),
-        (1_020_000_000, &b"third"[..]),
-    ];
-    let mut probe = feed.native_aac_clock_probe(&pool, 2).unwrap().unwrap();
-    for (ordinal, (output, (pts_ns, bytes))) in packets[1..].iter().zip(expected).enumerate() {
+    assert_eq!(packets.len(), skipped + expected.len());
+    let mut probe = feed
+        .native_aac_clock_probe(&pool, expected.len())
+        .unwrap()
+        .unwrap();
+    for (ordinal, (output, &(pts_ns, bytes))) in packets[skipped..].iter().zip(expected).enumerate()
+    {
         let packet = frame(&feed, output);
         assert_eq!(packet.source.packet.data.as_ref(), bytes);
         assert_eq!(packet.source.packet.pts_ns, Some(pts_ns));
@@ -1647,12 +1643,33 @@ fn cued_aac_suffix_keeps_source_and_projected_clocks_distinct() {
         assert_eq!(probe.push(&packet).unwrap(), ordinal);
     }
     let projected = probe.finish();
-    for (ordinal, (pts_ns, _)) in expected.into_iter().enumerate() {
+    for (ordinal, (pts_ns, _)) in expected.iter().copied().enumerate() {
         let timing = projected.timing(ordinal).unwrap();
         assert_eq!(timing.pts_ns, Some(pts_ns));
         assert_eq!(timing.dts_ns, Some(pts_ns));
         assert_eq!(timing.duration_ns, Some(23_000_000));
     }
+}
+
+#[test]
+fn cued_aac_suffix_keeps_source_and_projected_clocks_distinct() {
+    let (fixture, _, _) = cued_audio_fixture::cued_aac();
+    check_cued_aac_clocks(
+        &fixture,
+        1,
+        &[(1_000_000_000, b"second"), (1_020_000_000, b"third")],
+    );
+}
+
+#[test]
+fn coded_cued_aac_suffix_projects_the_decodable_packet_clocks() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-aac/inputs/coded-cues.mkv");
+    // The pinned decoder reference reports PTS = DTS and a 23 ms duration
+    // for each of the four packets after this seek.
+    let payload = &[0x20, 0x64, 0, 1, 0x90, 0, 0x0e][..];
+    let expected = [93, 116, 139, 163].map(|ms| (ms * 1_000_000, payload));
+    check_cued_aac_clocks(fixture, 4, &expected);
 }
 
 #[test]

@@ -29,6 +29,20 @@
         "digest": 10656081498208427173,
         "eof": true
       }
+    },
+    {
+      "id": "coded-cues",
+      "profile": "coded-cues",
+      "file": "harness/features/matroska-cued-aac/inputs/coded-cues.mkv",
+      "sha256": "7f9e4ffa67e5e6cf6e027998e130a1ee3ec419e934adbdb75697cbe2d8624ee9",
+      "rights": "authored-synthetic",
+      "arguments": ["100000000"],
+      "expected": {
+        "packets": 4,
+        "bytes": 28,
+        "digest": 16219901096867284417,
+        "eof": true
+      }
     }
   ]
 }

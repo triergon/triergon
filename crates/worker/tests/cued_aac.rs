@@ -53,3 +53,39 @@ fn source_seek_protocol_folds_the_complete_suffix() {
     );
     std::fs::remove_file(path).unwrap();
 }
+
+#[test]
+fn coded_fixture_seek_folds_every_packet_through_eof() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-aac/inputs/coded-cues.mkv");
+    assert_eq!(fixture.as_slice(), ebml::cued_aac_coded());
+    let path = std::env::temp_dir().join(format!("triergon-coded-cues-{}.mkv", std::process::id()));
+    std::fs::write(&path, fixture).unwrap();
+    let run = |mode| {
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_media-worker"))
+            .args([mode, path.to_str().unwrap(), "100000000"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout).unwrap()
+    };
+    assert_eq!(
+        run("cued-aac-trace"),
+        concat!(
+            "{\"landing_ns\":93000000,\"packets\":[",
+            "{\"track\":0,\"pts_ns\":93000000,\"dts_ns\":null,\"duration_ns\":null,\"payload\":\"2064000190000e\"},",
+            "{\"track\":0,\"pts_ns\":116000000,\"dts_ns\":null,\"duration_ns\":null,\"payload\":\"2064000190000e\"},",
+            "{\"track\":0,\"pts_ns\":139000000,\"dts_ns\":null,\"duration_ns\":null,\"payload\":\"2064000190000e\"},",
+            "{\"track\":0,\"pts_ns\":163000000,\"dts_ns\":null,\"duration_ns\":null,\"payload\":\"2064000190000e\"}],\"eof\":true}\n"
+        )
+    );
+    assert_eq!(
+        run("cued-aac-fold"),
+        "{\"packets\":4,\"bytes\":28,\"digest\":16219901096867284417,\"eof\":true}\n"
+    );
+    std::fs::remove_file(path).unwrap();
+}

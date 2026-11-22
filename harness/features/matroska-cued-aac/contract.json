@@ -13,7 +13,7 @@
     "The reference uses the public libavformat source view with NOPARSE and NOFILLIN, flooring the target to the stream time base before seeking. Every packet retains its source timestamps, durations and opaque payload.",
     "Fold the landing time, then the track, timestamp and duration presence and values, payload length and bytes of each packet in order, and successful EOF."
   ],
-  "required_profiles": ["two-cues", "fraction-before-second-cue"],
+  "required_profiles": ["two-cues", "fraction-before-second-cue", "coded-cues"],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
     "thumbv7neon-unknown-linux-gnueabihf"

@@ -191,12 +191,18 @@ CARGO_INCREMENTAL=0 cargo run -p triergon-matroska --example cued_aac_fixture --
   harness/features/matroska-cued-aac/inputs/two-cues.mkv
 ```
 
-With stream-information probing and clock projection enabled, FFmpeg reports
-DTS equal to PTS for both packets in the second Cue's suffix.
-A fresh playback AAC clock fed the same suffix projects those DTS values and
-infers 23 ms durations, which remain unknown in the reference. The fixture
-exercises seek and demux with opaque payloads. Native performance and memory
-qualification remain open.
+The `coded-cues` case uses eight authored silent stereo AAC-LC access units
+at 44.1 kHz. A 100 ms seek lands at 93 ms and reads four units through EOF.
+The source-view comparison matches each PTS, absent DTS and duration, and
+all payload bytes. The AAC decoder accepts all eight units and produces
+1,024 samples per channel per unit. Pass the output path followed by
+`coded` to regenerate this fixture.
+
+The playback AAC clock projects source PTS into DTS and infers a 23 ms
+duration in both fixtures. The pinned FFprobe decoder build reports those
+same projected fields for the coded fixture. With opaque payloads in the
+original fixture, FFprobe leaves durations unknown. Playback seek
+integration and native performance and memory qualification remain open.
 
 **Colour.** `Track::colour` keeps every source field: bit depth, both chroma and Cb
 subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering value as
