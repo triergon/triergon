@@ -1,5 +1,6 @@
 //! The packets FFmpeg's demuxers hand its `dvdsub` decoder: VobSub
 //! `.idx`/`.sub` pairs, program streams and the MP4 palette configuration.
+use super::c_text::IntegerConversionWidth;
 use super::program_stream::{PADDING_STREAM, PRIVATE_STREAM_1, PRIVATE_STREAM_2, Pes, Unit, Units};
 use super::vobsub::{Line, Lines};
 use triergon_core::{Budget, BudgetVec, Error, Result};
@@ -39,6 +40,15 @@ impl VobSubIndex {
     /// Read an index. A malformed `id:`, `delay:` or `timestamp:` line fails
     /// the whole index, as it fails the reference's demuxer.
     pub fn parse(budget: &Budget, text: &[u8]) -> Result<Self> {
+        Self::parse_with_integer_conversion_width(budget, text, IntegerConversionWidth::Bits32)
+    }
+
+    /// Read an index with the selected reference integer conversion width.
+    pub fn parse_with_integer_conversion_width(
+        budget: &Budget,
+        text: &[u8],
+        width: IntegerConversionWidth,
+    ) -> Result<Self> {
         let mut index = Self {
             configuration: BudgetVec::new(budget),
             streams: BudgetVec::new(budget),
@@ -47,7 +57,7 @@ impl VobSubIndex {
         let mut track = None;
         let mut seen_track = false;
         let mut delay = 0_i64;
-        for (raw, line) in Lines::new(text) {
+        for (raw, line) in Lines::with_integer_conversion_width(text, width) {
             match line? {
                 Line::Setting(_) if !seen_track => {
                     index.configuration.try_extend_from_slice(raw)?;

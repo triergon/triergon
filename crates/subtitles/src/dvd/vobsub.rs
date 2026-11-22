@@ -5,9 +5,9 @@
 //! [`Lines`] reads it one line at a time without allocating: settings such as
 //! `size:` and `palette:` stay raw for the caller, and every `id:`, `delay:`
 //! and `timestamp:` line is decoded. Line ends may be LF or CRLF. A `delay:`
-//! line gives the delays observed in FFmpeg built for 32-bit ARMv7, and is
+//! line defaults to the delays observed in FFmpeg built for 32-bit ARMv7, and is
 //! never malformed: whatever its fields do not say is zero.
-use super::c_text::scan_int;
+use super::c_text::{IntegerConversionWidth, scan_field};
 use triergon_core::{Error, Result};
 
 /// One line of an index.
@@ -39,11 +39,17 @@ pub enum Line<'a> {
 #[derive(Clone, Debug)]
 pub struct Lines<'a> {
     rest: &'a [u8],
+    width: IntegerConversionWidth,
 }
 
 impl<'a> Lines<'a> {
     pub fn new(text: &'a [u8]) -> Self {
-        Self { rest: text }
+        Self::with_integer_conversion_width(text, IntegerConversionWidth::Bits32)
+    }
+
+    /// Read delay fields using the selected reference integer width.
+    pub fn with_integer_conversion_width(text: &'a [u8], width: IntegerConversionWidth) -> Self {
+        Self { rest: text, width }
     }
 }
 
@@ -63,11 +69,11 @@ impl<'a> Iterator for Lines<'a> {
         };
         self.rest = rest;
         let line = line.strip_suffix(b"\r").unwrap_or(line);
-        Some((line, classify(line)))
+        Some((line, classify(line, self.width)))
     }
 }
 
-fn classify(line: &[u8]) -> Result<Line<'_>> {
+fn classify(line: &[u8], width: IntegerConversionWidth) -> Result<Line<'_>> {
     if line.trim_ascii().is_empty() {
         return Ok(Line::Blank);
     }
@@ -94,7 +100,7 @@ fn classify(line: &[u8]) -> Result<Line<'_>> {
         });
     }
     if let Some(value) = line.strip_prefix(b"delay:") {
-        return Ok(Line::Delay(delay(value)));
+        return Ok(Line::Delay(delay(value, width)));
     }
     if let Some(value) = line.strip_prefix(b"timestamp:") {
         let mut scanner = Scanner(value);
@@ -112,13 +118,13 @@ fn classify(line: &[u8]) -> Result<Line<'_>> {
     Ok(Line::Setting(line))
 }
 
-/// A `delay:` value in milliseconds, with the values observed in FFmpeg built for 32-bit
-/// ARMv7: after spaces (only U+0020), a `-` negates the whole delay; then up to four fields
-/// `H:M:S:ms`, each a decimal number after any white space and an optional sign, saturating
-/// at 2³¹ − 1 and −2³¹ ([`scan_int`]), each but the first right after a `:`. Fields it does
+/// A `delay:` value in milliseconds: after spaces (only U+0020), a `-` negates
+/// the whole delay; then up to four signed decimal fields `H:M:S:ms` saturate
+/// at the selected long width and narrow to 32 bits. Each but the first follows
+/// a `:`. Fields it does
 /// not reach are zero, so text without a number is a delay of zero; the fields are summed in
 /// 64 bits.
-fn delay(value: &[u8]) -> i64 {
+fn delay(value: &[u8], width: IntegerConversionWidth) -> i64 {
     let spaces = value.iter().take_while(|&&b| b == b' ').count();
     let (negative, text) = match &value[spaces..] {
         [b'-', rest @ ..] => (true, rest),
@@ -133,7 +139,7 @@ fn delay(value: &[u8]) -> i64 {
             }
             at += 1;
         }
-        let Some((field, end)) = scan_int(text, at) else {
+        let Some((field, end)) = scan_field(text, at, width) else {
             break;
         };
         total += i64::from(field) * scale;
