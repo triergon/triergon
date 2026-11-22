@@ -554,6 +554,13 @@ mod tests {
 
     #[test]
     fn pinned_profiles_require_bound_passing_parity() {
+        fn member<'a>(object: &'a mut Value, key: &str) -> &'a mut Value {
+            let Value::Object(fields) = object else {
+                panic!("expected object containing {key}");
+            };
+            &mut fields.iter_mut().find(|(field, _)| field == key).unwrap().1
+        }
+
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         let root = std::env::temp_dir().join(format!("aac-admission-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
@@ -660,31 +667,16 @@ mod tests {
                 "contract_sha256",
             ] {
                 let mut changed = parity.clone();
-                if let Value::Object(ref mut fields) = changed {
-                    if let Value::Object(ref mut binding) = fields
-                        .iter_mut()
-                        .find(|(k, _)| k == "comparison")
-                        .unwrap()
-                        .1
-                    {
-                        binding.iter_mut().find(|(k, _)| k == key).unwrap().1 =
-                            Value::str("altered");
-                    }
-                }
+                *member(member(&mut changed, "comparison"), key) = Value::str("altered");
                 corpus::write_json(&parity_path, &changed).unwrap();
                 assert!(admit(&manifest).is_err(), "{key}");
             }
             for key in ["pass", "id", "input_sha256"] {
                 let mut changed = parity.clone();
-                if let Value::Object(ref mut fields) = changed {
-                    if let Value::Array(ref mut rows) =
-                        fields.iter_mut().find(|(k, _)| k == "cases").unwrap().1
-                    {
-                        if let Value::Object(ref mut row) = rows[0] {
-                            row.iter_mut().find(|(k, _)| k == key).unwrap().1 = Value::Null;
-                        }
-                    }
-                }
+                let Value::Array(rows) = member(&mut changed, "cases") else {
+                    panic!("expected case array");
+                };
+                *member(&mut rows[0], key) = Value::Null;
                 corpus::write_json(&parity_path, &changed).unwrap();
                 assert!(admit(&manifest).is_err(), "{key}");
             }
@@ -699,13 +691,10 @@ mod tests {
         }
         let mut mixed = checks::read_json(&root.join(FEATURE).join("corpus.json")).unwrap();
         let sbr = checks::read_json(&root.join(FEATURE).join("sbr-corpus.json")).unwrap();
-        if let Value::Object(ref mut fields) = mixed {
-            if let Value::Array(ref mut rows) =
-                fields.iter_mut().find(|(k, _)| k == "workloads").unwrap().1
-            {
-                rows.push(sbr.get("workloads").unwrap().as_array().unwrap()[0].clone());
-            }
-        }
+        let Value::Array(rows) = member(&mut mixed, "workloads") else {
+            panic!("expected workload array");
+        };
+        rows.push(sbr.get("workloads").unwrap().as_array().unwrap()[0].clone());
         assert!(
             measurement_parity(
                 &root,
