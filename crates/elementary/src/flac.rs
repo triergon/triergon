@@ -213,7 +213,13 @@ impl Syntax for Flac {
         }
     }
 
-    fn prelude(&mut self, view: &[u8], at_end: bool) -> Result<Prelude> {
+    fn prelude(
+        &mut self,
+        view: &[u8],
+        at_end: bool,
+        _limits: &Limits,
+        _work: &mut triergon_core::WorkBudget,
+    ) -> Result<Prelude> {
         Ok(match self.expect {
             Expect::Marker => match view.get(..4) {
                 None if !at_end && b"fLaC".starts_with(view) => Prelude::Need(4),

@@ -25,7 +25,7 @@ use stereo::{Intensity, JointStereo};
 const MAX_BACKSTEP: usize = 511;
 
 /// The longest Layer III frame: 320 kbit/s at 32 kHz, or 160 kbit/s at 8 kHz, padded.
-const MAX_FRAME: usize = 1441;
+pub(crate) const MAX_FRAME: usize = 1441;
 
 /// Main data of earlier frames, the last [`MAX_BACKSTEP`] bytes of the stream's
 /// concatenated main data, followed by the current frame's.

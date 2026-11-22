@@ -49,8 +49,12 @@ output, without container trims. `--reset-at N` resets the decoder before access
   joint stereo and dual channel give two (`FL`, `FR`). A stream may change mode, sample
   rate or layer between frames.
 
-Not supported: free-format frames (bit rate index 0), refused as
-`DecodeError::Unsupported`.
+Free-format Layer III frames are accepted by `Decoder::decode_framed` and
+`AudioDecoder::decode` when the caller supplies exactly one complete frame,
+including its header and optional CRC.
+The header does not encode its extent, so the decoder cannot verify the boundary.
+Free-format Layer I and II remain unsupported. `decode_frame` requires the header
+to specify the frame length.
 
 ## Behaviour and limits
 
@@ -67,8 +71,11 @@ Not supported: free-format frames (bit rate index 0), refused as
   288, block type 0 with window switching) is `DecodeError::Invalid` but its main
   data still joins the reservoir.
 - A frame cut short decodes as if the missing bytes were zero; bytes after a frame are
-  ignored. The reserved emphasis value is accepted, and the forbidden Layer I
-  allocation 15 reads as 16 bits. The mixed-block flag of a start or stop block gives
+  ignored, for frames whose header specifies their length. For free-format Layer III,
+  the complete side information must be present and main data must fit the fixed
+  reservoir's 1441-byte current-frame capacity. The reserved emphasis value is
+  accepted, and the forbidden Layer I allocation 15 reads as 16 bits. The mixed-block
+  flag of a start or stop block gives
   its two lowest subbands the normal window. In the intensity stereo of the low
   sampling frequencies every position is intensity coded, the largest value of its
   field included.
@@ -98,3 +105,16 @@ mp2 and mp2fixed encodes at MPEG-1, 2 and 2.5 rates, and random Layer I/II frame
 `harness/codecs/mp3/random_frames.py`) with the FFmpeg it is given. Comparison:
 [harness/codecs](../../harness/codecs/STATUS.md); results in
 [docs/status.md](../../docs/status.md).
+
+For the free-format PCM comparison, put the FATE input `he_free.bit` under
+`.research/fate-samples/mp3-conformance/`. The test checks its pin and the
+authored mono stream's pin, then compares every sample with mpg123 1.33.7:
+
+```sh
+CARGO_INCREMENTAL=0 TRIERGON_MPG123=/path/to/mpg123 \
+  cargo test -p triergon-codec-mp3 --test decoder free_format_layer_three_matches_mpg123 -- --ignored --nocapture
+```
+
+The comparison reads complete access units through the normal reader and
+uses each decoder's PCM before gapless trimming. It reports the worst RMS and
+peak sample differences across all frames and channels.

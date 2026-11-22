@@ -1,5 +1,7 @@
 //! Recognising an elementary stream from its first bytes.
+use crate::mpeg::FreeFormatProbe;
 use triergon_bitstream::crc::crc16_a52;
+use triergon_core::WorkBudget;
 use triergon_framing::{FlacBlocking, FlacFrameHeader, MpegAudioHeader, probe_ac3_header};
 
 /// The elementary stream formats this crate reads.
@@ -14,6 +16,7 @@ pub enum Kind {
 /// The elementary stream `bytes` holds, after any ID3v2 tag: native FLAC by its marker,
 /// MPEG audio, ADTS and AC-3 by two frames that follow each other from the first byte,
 /// and FLAC without its marker by a frame header the next header numbers on from.
+/// Free-format Layer III needs three headers at one unpadded frame length.
 /// MPEG audio and marker-less FLAC may also start later, as FFmpeg's probe allows: MPEG
 /// audio then needs three frames, FLAC a first frame its CRC-16 confirms. `None` when
 /// `bytes` is too short to tell, including an ID3v2 tag that does not fit in it.
@@ -33,6 +36,9 @@ pub fn probe(bytes: &[u8]) -> Option<Kind> {
     }
     if flac_frames(bytes, false) {
         return Some(Kind::Flac);
+    }
+    if free_layer_three(bytes) {
+        return Some(Kind::MpegAudio);
     }
     let later = (1..bytes.len()).filter(|&at| bytes[at] == 0xff);
     for at in later.clone() {
@@ -105,6 +111,15 @@ fn mpeg_frame(b: &[u8]) -> Option<(MpegAudioHeader, usize)> {
     Some((header, header.frame_bytes()?))
 }
 
+/// Confirm two spans of the same unpadded length. One later sync could be payload.
+#[cold]
+fn free_layer_three(bytes: &[u8]) -> bool {
+    let mut probe = FreeFormatProbe::default();
+    let mut work = WorkBudget::new(bytes.len() as u64);
+    probe.step(bytes, bytes.len() / 2, true, &mut work);
+    probe.base().is_some()
+}
+
 fn ac3_frame(b: &[u8]) -> Option<((), usize)> {
     let header = probe_ac3_header(b).ok()?;
     (header.frame_bytes > 0).then_some(((), header.frame_bytes))
@@ -131,6 +146,22 @@ mod tests {
         let mut frame = vec![0u8; 417];
         frame[..4].copy_from_slice(&0xfffb_9064u32.to_be_bytes());
         frame.repeat(count)
+    }
+
+    #[test]
+    fn free_format_layer_three_needs_a_confirmed_frame_length() {
+        let mut bytes = [0; 834 + 4];
+        let frame = 0xfffb_0064u32.to_be_bytes();
+        let mut padded = frame;
+        padded[2] |= 0x02;
+        bytes[..4].copy_from_slice(&padded);
+        bytes[417..421].copy_from_slice(&frame);
+        bytes[833..837].copy_from_slice(&frame);
+        assert_eq!(probe(&bytes[..836]), None);
+        assert_eq!(probe(&bytes), Some(Kind::MpegAudio));
+        bytes[833..837].fill(0);
+        bytes[834..838].copy_from_slice(&frame);
+        assert_eq!(probe(&bytes), None);
     }
 
     #[test]

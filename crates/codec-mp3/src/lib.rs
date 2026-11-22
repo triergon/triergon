@@ -121,15 +121,34 @@ impl Decoder {
     /// were zero; bytes after the frame are ignored. A frame refused after its header
     /// leaves `out` empty.
     pub fn decode_frame(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+        self.decode_packet::<false>(au, out)
+    }
+
+    /// Decode an exactly framed access unit. For free-format Layer III the caller
+    /// supplies the complete frame extent, including its header and any CRC. The
+    /// extent cannot be inferred or verified from a free-format header alone.
+    /// Other frames have the same truncation and trailing-byte behaviour as
+    /// [`Self::decode_frame`].
+    pub fn decode_framed(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+        self.decode_packet::<true>(au, out)
+    }
+
+    fn decode_packet<const FRAMED: bool>(
+        &mut self,
+        au: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<(), DecodeError> {
         let header = frame_header(au).ok_or(DecodeError::Invalid("frame header"))?;
-        let length = header
-            .frame_bytes()
-            .ok_or(DecodeError::Unsupported("free-format frame"))?;
-        let decoded = self.decode_body(&header, &au[..length.min(au.len())], out);
-        if decoded.is_err() {
+        let result = match header.frame_bytes() {
+            Some(length) => self.decode_body(&header, &au[..length.min(au.len())], out),
+            None if FRAMED => check_free_format(&header, au.len())
+                .and_then(|()| self.decode_body(&header, au, out)),
+            None => return Err(DecodeError::Unsupported("free-format frame")),
+        };
+        if result.is_err() {
             out.clear();
         }
-        decoded
+        result
     }
 
     fn decode_body(
@@ -166,6 +185,23 @@ impl Decoder {
     }
 }
 
+#[cold]
+fn check_free_format(header: &MpegAudioHeader, length: usize) -> Result<(), DecodeError> {
+    if header.layer != MpegLayer::III {
+        return Err(DecodeError::Unsupported("free-format frame"));
+    }
+    let prefix = 4 + usize::from(header.crc) * 2 + header.side_info_bytes();
+    let main_data = length
+        .checked_sub(prefix)
+        .ok_or(DecodeError::Invalid("truncated side information"))?;
+    if main_data > layer3::MAX_FRAME {
+        return Err(DecodeError::Invalid(
+            "free-format frame exceeds reservoir capacity",
+        ));
+    }
+    Ok(())
+}
+
 /// The header of the frame at the start of `bytes`.
 pub fn frame_header(bytes: &[u8]) -> Option<MpegAudioHeader> {
     MpegAudioHeader::from_bytes(bytes)
@@ -177,7 +213,7 @@ impl AudioDecoder for Decoder {
         au: &[u8],
         out: &mut AudioFrame,
     ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        self.decode_frame(au, out)
+        self.decode_framed(au, out)
             .map_err(DecodeFailure::from_error)?;
         Ok(None)
     }
