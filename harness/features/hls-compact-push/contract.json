@@ -95,21 +95,29 @@
       "cause": "awaiting native gate-host measurement"
     }
   ],
-  "pending_module_requirements": [
-    "The reference operation refuses an AAC packet marked corrupt after a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
-    "The standalone AVC reader requires an initial delimiter under H.222.0 section 2.14.1. The reference parser returns the opening access unit whose first NAL is SEI."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "legal-duplicate-44100",
-      "requirement": "The reference operation refuses an AAC packet marked corrupt after a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
+      "reading": "An exact repeat of a payload-bearing transport packet",
+      "clause": "ITU-T H.222.0 (08/2023) section 2.4.3.3 permits two consecutive same-PID packets with the same continuity counter and adaptation_field_control 01 or 11 when their bytes match apart from a valid PCR.",
+      "candidate": "Returns 36 compact-input AAC and AVC access-unit records with 5573 source bytes, matching the nonduplicated control.",
+      "reference": "Reports a PES size mismatch, marks the AAC packet corrupt and yields a single refusal record.",
+      "compat": "compat::pes::reject_corrupt_duplicate_carrier for a consumer reproducing the reference demux corruption decision.",
+      "cases": [
+        "legal-duplicate-44100"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "reordered-48000",
-      "requirement": "The standalone AVC reader requires an initial delimiter under H.222.0 section 2.14.1. The reference parser returns the opening access unit whose first NAL is SEI.",
+      "reading": "A transport AVC access unit opens with SEI instead of an access-unit delimiter",
+      "clause": "ITU-T H.222.0 (08/2023) section 2.14.1 requires an AUD in every carried AVC access unit. H.264 (08/2024) section 7.4.1.2.3 puts it first.",
+      "candidate": "Returns Unsupported with AVC TS access unit has no initial delimiter before publishing a unit.",
+      "reference": "Accepts the first 3640-byte unit starting with SEI at PTS 133500 and DTS 126000 and continues to the end.",
+      "compat": "compat::avc::recover_missing_delimiter for a consumer accepting delimiterless transport AVC.",
+      "cases": [
+        "reordered-48000"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

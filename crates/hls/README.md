@@ -58,7 +58,11 @@ The [packet-view comparison](../../harness/features/hls-unit-packets/contract.js
 reads AVC and AAC through `PacketInfo`. The [AAC clock comparison](../../harness/features/hls-aac-clocks/contract.json)
 checks exact timestamps, their anchor origins and the 90 kHz projection.
 The [compact input comparison](../../harness/features/hls-compact-push/contract.json)
-drives the standalone readers with compact PES payloads. The
+drives the standalone readers with compact PES payloads. The transport
+reader admits one copy of an exact adjacent duplicate carrier. The
+standalone AVC reader requires an access-unit delimiter before the first
+video access unit. The comparison contracts declare the reference's
+different results for these inputs. The
 [segment push comparison](../../harness/features/hls-push-input/contract.json)
 checks the complete feed and final timestamps with 1-, 188- and 4096-byte
 replies through both segment readers.
