@@ -27,7 +27,7 @@ pub struct EncodedSelection {
 }
 /// How [`EncodedCreationSource`] read the `mdhd` creation time, or why it has no tag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CreationCause {
+enum CreationCause {
     /// The creation time is zero: no tag.
     SourceZero,
     /// A version-0 time below 2,082,844,800, read as seconds since 1970 rather than 1904.
@@ -44,9 +44,17 @@ pub enum CreationCause {
 #[derive(Clone, Debug)]
 pub struct EncodedCreationSource {
     raw: BoxView,
+    #[expect(
+        dead_code,
+        reason = "Debug reports the width of the source creation time"
+    )]
     source_version: u8,
     source_seconds: u64,
     demux: Option<[u8; 27]>,
+    #[expect(
+        dead_code,
+        reason = "Debug distinguishes the derivation from the source value"
+    )]
     cause: CreationCause,
 }
 impl EncodedCreationSource {
@@ -109,10 +117,6 @@ impl EncodedCreationSource {
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
-    /// The `mdhd` version: 0 for a 32-bit creation time, 1 for a 64-bit one.
-    pub fn source_version(&self) -> u8 {
-        self.source_version
-    }
     /// The creation time as stored, nominally in seconds since 1904-01-01 UTC.
     pub fn source_seconds(&self) -> u64 {
         self.source_seconds
@@ -120,10 +124,6 @@ impl EncodedCreationSource {
     /// The tag text, `YYYY-MM-DDTHH:MM:SS.000000Z` in UTC; `None` when there is no tag.
     pub fn demux(&self) -> Option<&[u8; 27]> {
         self.demux.as_ref()
-    }
-    /// How the tag was derived, or why there is none.
-    pub fn cause(&self) -> CreationCause {
-        self.cause
     }
 }
 

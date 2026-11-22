@@ -702,7 +702,12 @@ impl Grouping {
 pub struct PcmPayload {
     plan: PcmPacket,
     payload: Bytes,
+    #[expect(dead_code, reason = "Debug identifies the source of the payload")]
     source: SourceId,
+    #[expect(
+        dead_code,
+        reason = "Debug identifies the input transaction of the payload"
+    )]
     token: InputToken,
 }
 impl PcmPayload {
@@ -713,14 +718,6 @@ impl PcmPayload {
     /// The bytes of the packet's [`demux_range`](PcmPacket::demux_range).
     pub fn payload(&self) -> &Bytes {
         &self.payload
-    }
-    /// The input source they were read from.
-    pub fn source(&self) -> SourceId {
-        self.source
-    }
-    /// The input request they were read under.
-    pub fn token(&self) -> &InputToken {
-        &self.token
     }
 }
 

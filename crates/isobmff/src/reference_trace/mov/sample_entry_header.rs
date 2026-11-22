@@ -20,7 +20,7 @@ pub struct SampleEntryHeaderProfile;
 
 /// Why FFmpeg's open rejects a sample entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HeaderCause {
+enum HeaderCause {
     /// A `dOps` payload shorter than 11 bytes or longer than 2^30 bytes.
     OpusBodyLength {
         /// Payload length in bytes.
@@ -44,13 +44,14 @@ pub enum HeaderCause {
     },
 }
 
-/// The child box FFmpeg's open rejects a sample entry for.
 #[derive(Debug)]
-pub struct HeaderRejection {
-    /// The first rejected child box, as it is in the source.
-    pub raw: BoxView,
-    /// Why FFmpeg rejects it.
-    pub cause: HeaderCause,
+#[allow(
+    dead_code,
+    reason = "Debug identifies the first rejected box and why it was refused"
+)]
+struct HeaderRejection {
+    raw: BoxView,
+    cause: HeaderCause,
 }
 
 /// FFmpeg's open outcome for one sample entry, with the entry itself.

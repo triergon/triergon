@@ -92,10 +92,6 @@ impl Packet {
     pub fn sample(&self) -> &Sample {
         &self.sample
     }
-    /// Shared payload storage, without copying.
-    pub fn bytes(&self) -> &Bytes {
-        &self.payload
-    }
 }
 impl PacketInfo for Packet {
     fn track(&self) -> TrackId {

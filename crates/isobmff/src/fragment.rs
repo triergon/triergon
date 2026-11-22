@@ -319,10 +319,6 @@ impl FragmentIndex {
     pub fn track_id(&self) -> u32 {
         self.defaults.track_id
     }
-    /// 1-based sample description index all the fragment's samples use.
-    pub fn description_index(&self) -> u32 {
-        self.defaults.description_index
-    }
     /// Absolute file offset just past the data of the last run.
     pub fn data_end(&self) -> u64 {
         self.data_end

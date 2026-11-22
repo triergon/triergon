@@ -17,12 +17,6 @@ pub use direct::*;
 /// elsewhere is unaffected.
 #[derive(Clone, Copy, Debug)]
 pub struct RunRecoveryProfile;
-#[cfg(feature = "reference-trace")]
-impl RunRecoveryProfile {
-    /// SHA-256 of the FFmpeg reference worker that recovery traces are compared with.
-    pub const REFERENCE_WORKER_SHA256: &'static str =
-        "7ff6742eaafa59884b6dc95f65c701c26b18975c265aa8401d61154eb2ef1204";
-}
 /// The timing table a [`RunCoverage`] describes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunKind {
@@ -137,8 +131,7 @@ impl RunRecoveryTable {
     pub fn raw(&self) -> &BoxView {
         self.storage.raw()
     }
-    /// The `stsd` sample descriptions, in order; the first has index 1.
-    pub fn descriptions(&self) -> &[SampleDescription] {
+    fn descriptions(&self) -> &[SampleDescription] {
         self.storage.descriptions()
     }
     /// The overrun of the decode runs (`[0]`) and composition runs (`[1]`); `None` where a
@@ -161,12 +154,8 @@ impl RunRecoveryTable {
     pub fn sync_diagnostic(&self) -> Option<SyncDiagnostic> {
         self.sync_diagnostic
     }
-    /// The stream FFmpeg reports for this track, built from its first sample description
-    /// and timed in `header.demux_projection_base()`. `major_brand` is the `ftyp` major
-    /// brand: a raw-video stream drops its vendor tag unless it is `qt  `. Fails with
-    /// `Error::Unsupported` for a table without samples, a raw-video stream without a major
-    /// brand, or a codec other than raw video and `tx3g`.
-    pub fn stream_view_for_recovery_header(
+    #[cfg(feature = "reference-trace")]
+    fn stream_view_for_recovery_header(
         &self,
         header: &crate::compat::mov::field_recovery::RecoveryTrackHeader,
         major_brand: Option<[u8; 4]>,

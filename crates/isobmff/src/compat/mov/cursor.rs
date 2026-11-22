@@ -40,16 +40,6 @@ pub enum DemuxProfile {
     /// nonseekable input from its start.
     NoParseNoFillin,
 }
-#[cfg(feature = "reference-trace")]
-impl DemuxProfile {
-    /// SHA-256 of the FFmpeg comparison worker whose traces this view reproduces.
-    pub const WORKER_SHA256: &'static str =
-        "d97ce08126efe876cf92dfaac3655073da87fd8c590793a7d37ffd9e1fbea2d2";
-    /// SHA-256 of a comparison worker of the same FFmpeg revision built separately
-    /// for Linux AArch64.
-    pub const LINUX_BOUNDARY_WORKER_SHA256: &'static str =
-        "e8fcc2429e2086b5d0edf4929c098e0150c715ffa3faafc00e9b691e0128c14f";
-}
 
 /// One track's parsed tables, as input to a packet cursor or a seek. Give tracks in
 /// the order of their `trak` boxes in `moov`, the order in which the demuxer lists

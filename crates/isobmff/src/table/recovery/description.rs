@@ -288,22 +288,10 @@ impl DescriptionRecoveryTable {
     pub fn descriptions(&self) -> &[SampleDescription] {
         self.base.descriptions()
     }
-    /// As [`RunRecoveryTable::coverage`].
-    pub fn coverage(&self) -> &[Option<RunCoverage>; 2] {
-        self.base.coverage()
-    }
-    /// As [`RunRecoveryTable::sync_diagnostic`].
-    pub fn sync_diagnostic(&self) -> Option<SyncDiagnostic> {
-        self.base.sync_diagnostic()
-    }
     /// As [`RunRecoveryTable::source_prefix_cursor`]; samples keep their stated description
     /// indexes.
     pub fn source_prefix_cursor(&self) -> RecoverySourceCursor<'_> {
         self.base.source_prefix_cursor()
-    }
-    /// Number of rows in `stsc`.
-    pub fn raw_description_row_count(&self) -> u32 {
-        self.base.storage.stsc.count
     }
     /// Number of `stsc` rows whose description index is not 1.
     pub fn invalid_description_count(&self) -> u32 {
@@ -338,7 +326,11 @@ impl DescriptionRecoveryTable {
             strict_error: Error::Invalid("stsc order/count/description"),
         }))
     }
-    /// As [`RunRecoveryTable::stream_view_for_recovery_header`].
+    /// Projects the first description into FFmpeg's recovered stream clock. A zero
+    /// `mdhd` scale uses a one-second tick. A raw-video track requires the `ftyp`
+    /// major brand and keeps its vendor tag only for `qt  `. Empty tables and entries
+    /// other than raw video or `tx3g` are unsupported.
+    #[cfg(feature = "reference-trace")]
     pub fn stream_view_for_recovery_header(
         &self,
         header: &crate::compat::mov::field_recovery::RecoveryTrackHeader,

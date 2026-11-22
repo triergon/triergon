@@ -198,6 +198,10 @@ pub(crate) fn validate_range_configs(
 pub struct EncodedInitial {
     demux: StreamView,
     source_initial_description: u32,
+    #[expect(
+        dead_code,
+        reason = "Retains the source box and includes it in Debug output"
+    )]
     initial_config: BoxView,
     metadata_description: BoxView,
 }
@@ -244,10 +248,6 @@ impl EncodedInitial {
     /// 1-based `stsd` index of the first sample's description.
     pub fn source_initial_description(&self) -> u32 {
         self.source_initial_description
-    }
-    /// The configuration box of the first sample's description.
-    pub fn initial_configuration(&self) -> &BoxView {
-        &self.initial_config
     }
     /// The first `stsd` entry, which supplies the metadata.
     pub fn metadata_description(&self) -> &BoxView {

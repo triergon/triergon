@@ -37,7 +37,9 @@ pub struct RejectedPacketSeek {
     source_mdhd: BoxView,
     event: DescriptionEvent,
     source_error: Error,
+    #[expect(dead_code, reason = "Debug records the modeled buffer state at open")]
     open: ModeledOpenState,
+    #[expect(dead_code, reason = "Debug records the physical EOF used by the model")]
     physical_length: u64,
 }
 impl RejectedPacketSeek {
@@ -56,14 +58,6 @@ impl RejectedPacketSeek {
     /// The `Error::Invalid` the input cursor returns when asked for the packet's start.
     pub fn source_error(&self) -> Error {
         self.source_error
-    }
-    /// The model's buffer states when open returns.
-    pub fn modeled_open_state(&self) -> ModeledOpenState {
-        self.open
-    }
-    /// Length of the source in bytes.
-    pub fn physical_length(&self) -> u64 {
-        self.physical_length
     }
     /// FFmpeg's read return code, `-1094995529` (`AVERROR_INVALIDDATA`). It is neither the
     /// core error nor the read callback's return value.

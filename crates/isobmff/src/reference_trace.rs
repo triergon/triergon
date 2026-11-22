@@ -6,8 +6,6 @@
 //! absent from default builds.
 //!
 //! With the feature enabled,
-//! [`DemuxProfile::WORKER_SHA256`](crate::compat::mov::packets::DemuxProfile::WORKER_SHA256),
-//! [`RunRecoveryProfile::REFERENCE_WORKER_SHA256`](crate::compat::mov::recovery::RunRecoveryProfile::REFERENCE_WORKER_SHA256),
 //! [`DescriptionRecoveryTable`](crate::compat::mov::recovery::DescriptionRecoveryTable)'s
 //! transport cursors,
 //! [`DescriptionEvent::modeled_transport_read`](crate::compat::mov::recovery::DescriptionEvent::modeled_transport_read)
@@ -71,8 +69,7 @@ pub mod mov {
             PrivateConfigurationJob,
         };
         pub use super::sample_entry_header::{
-            HeaderCause, HeaderRejection, RawVisualEntriesJob, SampleEntryHeader,
-            SampleEntryHeaderJob, SampleEntryHeaderProfile,
+            RawVisualEntriesJob, SampleEntryHeader, SampleEntryHeaderJob, SampleEntryHeaderProfile,
         };
     }
 

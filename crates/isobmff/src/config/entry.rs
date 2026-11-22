@@ -116,8 +116,7 @@ impl EntryConfiguration {
         }
         Ok(BuildStatus::Ready)
     }
-    /// The `esds` object type for `mp4a` or `mp4s`, if the scan found one.
-    pub fn object_type(&self) -> Option<u8> {
+    pub(crate) fn object_type(&self) -> Option<u8> {
         self.object_type
     }
     /// The entry's codec: [`codec_id`] with the object type found.

@@ -104,9 +104,9 @@ pub mod mov {
             EncodedContextProfile, SourceProfileFault, WaveObservation,
         };
         pub use super::encoded_metadata::{
-            CreationCause, DependedOn, DependencyView, EncodedCreationSource,
-            EncodedMetadataProfile, EncodedSelection, EncodedSource, HandlerSource, LanguageCause,
-            LanguageSource, SoundV1Source,
+            DependedOn, DependencyView, EncodedCreationSource, EncodedMetadataProfile,
+            EncodedSelection, EncodedSource, HandlerSource, LanguageCause, LanguageSource,
+            SoundV1Source,
         };
         pub use super::encoded_recovery::{
             DependencyCause, DependencyObservation, EncodedRecoveryProfile, RecoveryFacts,

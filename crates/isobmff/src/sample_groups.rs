@@ -382,10 +382,6 @@ impl RecoveryMappings {
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
-    /// The grouping type.
-    pub fn kind(&self) -> RecoveryKind {
-        self.kind
-    }
     /// Number of runs.
     pub fn run_count(&self) -> u32 {
         self.count

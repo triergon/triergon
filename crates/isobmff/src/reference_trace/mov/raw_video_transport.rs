@@ -143,8 +143,8 @@ impl RawVideoTransportModel {
         false
     }
     /// Whether FFmpeg reaches end of file, rather than seeking, when it reads a first packet
-    /// at `range` (absolute file offsets): see [`initial_read_plan`](Self::initial_read_plan).
-    /// The source range stays invalid either way.
+    /// at the given absolute byte range. The model covers packets of 1 byte to 16 MiB
+    /// starting at or beyond EOF and at most 32 KiB beyond every possible buffer end.
     pub fn models_initial_eof(&self, range: Range<u64>) -> bool {
         self.initial_read_plan(range).is_some()
     }
@@ -152,7 +152,7 @@ impl RawVideoTransportModel {
     /// where the model does not apply. It applies to a packet of 1 byte to 16 MiB that
     /// starts at or past the physical end, at most 32768 bytes past the buffer end in every
     /// possible state, so that FFmpeg skips to it by reading and discarding.
-    pub fn initial_read_plan(&self, range: Range<u64>) -> Option<ModeledInitialRead> {
+    pub(crate) fn initial_read_plan(&self, range: Range<u64>) -> Option<ModeledInitialRead> {
         let size = range.end.checked_sub(range.start)?;
         if size == 0 || size > 16 * 1024 * 1024 || range.start < self.physical_length {
             return None;

@@ -109,6 +109,10 @@ impl OpusTiming {
 pub struct EncodedEditPlan {
     source_table: BoxView,
     source_edit: BoxView,
+    #[expect(
+        dead_code,
+        reason = "Retains the source box and includes it in Debug output"
+    )]
     source_config: BoxView,
     entry: EditEntry,
     edit_ordinal: u32,
@@ -158,10 +162,6 @@ impl EncodedEditPlan {
     pub fn source_edit(&self) -> &BoxView {
         &self.source_edit
     }
-    /// The stream's configuration box, as [`EncodedStream::configuration_box`] gives it.
-    pub fn source_configuration(&self) -> &BoxView {
-        &self.source_config
-    }
     /// The media edit applied, as stored.
     pub fn source_entry(&self) -> EditEntry {
         self.entry
@@ -190,7 +190,7 @@ impl EncodedEditPlan {
     /// End of the Opus presentation on the edited timeline: the earlier of the edit's
     /// end and the last sample's end, less the anchor. The last source duration can
     /// shorten the last coded packet. `Error::Unsupported` for another codec's plan.
-    pub fn opus_presentation_end(&self) -> Result<Time> {
+    fn opus_presentation_end(&self) -> Result<Time> {
         if !matches!(self.timing, EditTiming::Opus) {
             return Err(Error::Unsupported("Opus presentation needs an Opus edit"));
         }

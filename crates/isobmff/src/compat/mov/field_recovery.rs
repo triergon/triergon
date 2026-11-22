@@ -39,8 +39,7 @@ impl RecoveryTrackHeader {
     pub fn source(&self) -> &TrackHeader {
         &self.source
     }
-    /// Returns the header as stated in the file.
-    pub fn into_source(self) -> TrackHeader {
+    pub(crate) fn into_source(self) -> TrackHeader {
         self.source
     }
     /// The time base of FFmpeg's packets for the track: 1/timescale of `mdhd`, or 1/1 when
