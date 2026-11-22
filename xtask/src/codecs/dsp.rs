@@ -235,6 +235,7 @@ pub(crate) fn windows_match(actual: &[u8], expected: &[u8]) -> bool {
 
 struct TransformComparison<'a> {
     maximum: f64,
+    reference_qualified: bool,
     root: &'a Path,
     candidate: PathBuf,
     reference: PathBuf,
@@ -324,10 +325,10 @@ impl TransformComparison<'_> {
                 ("reference", reference_result),
             ]));
         }
-        let status = if reference_ok && definition_ok {
-            "pass"
-        } else {
-            "mismatch"
+        let status = match (definition_ok, self.reference_qualified, reference_ok) {
+            (true, false, _) => "unpinned",
+            (true, true, true) => "pass",
+            _ => "mismatch",
         };
         Ok((
             Value::object([
@@ -375,6 +376,7 @@ pub(super) fn main(root: &Path, output: &Path, record: bool) -> R<i32> {
     let output = output.canonicalize().map_err(|error| error.to_string())?;
     let comparison = TransformComparison {
         maximum,
+        reference_qualified: crate::gate::TARGETS.contains(&target.as_str()),
         root,
         candidate,
         reference,

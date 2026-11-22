@@ -7,7 +7,7 @@
   "contract": [
     "Compare every sample of both the full inverse MDCT and DCT-IV with the independent float64 cosine definitions and the documented projection of the public av_tx inverse float MDCT.",
     "Every supported output length through 8192 uses scales 1 and 1/N, one seeded coefficient vector and first and last impulses. Follow the imdct_float numeric rule.",
-    "A length refused by av_tx is compared with the cosine definitions. Reference discrepancies are kept as open cases and never waive the definition comparison."
+    "A length refused by av_tx is compared with the cosine definitions. Reference discrepancies are kept as open cases on their gate targets. Other targets report the av_tx comparison without a pinned disposition and still require the cosine comparison."
   ],
   "required_profiles": [
     "imdct"
