@@ -18,31 +18,18 @@ impl DemuxObserver {
             if !work.try_charge(1) {
                 return Ok(false);
             }
-            let gap = self.previous_counter.is_some_and(|previous| {
-                pending.carrier.continuity_counter != ((previous + u8::from(has_payload)) & 15)
-            });
-            if gap && self.finite_private() {
-                return Err(self.finite_private_error(
-                    "continuity counter damage in private audio PES",
-                    "continuity counter damage in DVB subtitle PES",
-                ));
+            let counter = pending.carrier.continuity_counter;
+            let gap = self
+                .previous_counter
+                .is_some_and(|previous| counter != ((previous + u8::from(has_payload)) & 15));
+            if gap {
+                self.counter_gap(
+                    pending.carrier.payload_unit_start,
+                    pending.carrier.discontinuity,
+                    has_payload,
+                )?;
             }
-            if gap && !pending.carrier.payload_unit_start && pending.carrier.discontinuity {
-                return Err(Error::Unsupported(
-                    "continuation has a continuity counter break and a discontinuity indicator",
-                ));
-            }
-            if gap && !has_payload {
-                return Err(Error::Unsupported(
-                    "continuity counter changed on a carrier without payload",
-                ));
-            }
-            // The observed reference marks the active byte buffer before a
-            // possible pre-append overflow flush. A new PUSI then starts clean.
-            if gap && !pending.carrier.payload_unit_start && self.active {
-                self.corrupt = true;
-            }
-            self.previous_counter = Some(pending.carrier.continuity_counter);
+            self.previous_counter = Some(counter);
             self.pending
                 .as_mut()
                 .ok_or(Error::Invalid("PES observer input missing"))?
@@ -79,6 +66,31 @@ impl DemuxObserver {
         Ok(true)
     }
 
+    #[inline(always)]
+    fn counter_gap(&mut self, start: bool, discontinuity: bool, has_payload: bool) -> Result<()> {
+        if self.finite_private() {
+            return Err(self.finite_private_error(
+                "continuity counter damage in private audio PES",
+                "continuity counter damage in DVB subtitle PES",
+            ));
+        }
+        if !start && discontinuity {
+            return Err(Error::Unsupported(
+                "continuation has a continuity counter break and a discontinuity indicator",
+            ));
+        }
+        if !has_payload {
+            return Err(Error::Unsupported(
+                "continuity counter changed on a carrier without payload",
+            ));
+        }
+        // Mark the packet before a possible pre-append flush.
+        if !start && self.active {
+            self.corrupt = true;
+        }
+        Ok(())
+    }
+
     pub(super) fn poll_body(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         let pending = self
             .pending
@@ -103,20 +115,12 @@ impl DemuxObserver {
                 "PES buffer already exceeds the declared payload length",
             ))?;
             if available > remaining {
-                if self.finite_private() {
-                    return Err(self.finite_private_error(
-                        "private audio payload exceeds the declared PES length",
-                        "DVB subtitle payload exceeds the declared PES length",
-                    ));
-                }
-                if pending.carrier.payload_unit_start {
-                    // Observed finite-overlong PUSI: bound this admission to its
-                    // declared PES bytes. The original raw carrier is unchanged.
-                    count = remaining;
-                } else {
-                    self.schedule(DemuxBoundary::FiniteOverrun, true, true)?;
+                let Some(in_bound) =
+                    self.finite_overrun(pending.carrier.payload_unit_start, remaining)?
+                else {
                     return Ok(true);
-                }
+                };
+                count = in_bound;
             }
         }
         let next = self
@@ -198,5 +202,21 @@ impl DemuxObserver {
         self.add_spans(1);
         self.set_payload_len(next);
         Ok(true)
+    }
+
+    #[inline(always)]
+    fn finite_overrun(&mut self, start: bool, remaining: usize) -> Result<Option<usize>> {
+        if self.finite_private() {
+            return Err(self.finite_private_error(
+                "private audio payload exceeds the declared PES length",
+                "DVB subtitle payload exceeds the declared PES length",
+            ));
+        }
+        if start {
+            // Admit only the declared PES bytes and preserve the raw carrier.
+            return Ok(Some(remaining));
+        }
+        self.schedule(DemuxBoundary::FiniteOverrun, true, true)?;
+        Ok(None)
     }
 }

@@ -54,6 +54,19 @@ impl DemuxObserver {
         if capacity > len {
             return Ok(true);
         }
+        self.grow(arena, len, maximum, item_bytes, work, cancel)
+    }
+
+    #[inline(always)]
+    fn grow(
+        &mut self,
+        arena: Arena,
+        len: usize,
+        maximum: usize,
+        item_bytes: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
         if self.growth.is_none() {
             self.growth = Some(Growth::plan(arena, len, maximum, item_bytes)?);
         }
