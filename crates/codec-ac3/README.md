@@ -61,7 +61,9 @@ Further independent programs are skipped.
 - Concealment (A/52 7.10 block repeat): a damaged block repeats the previous block for
   the rest of the frame; a truncated AC-3 frame outputs six copies of the last block; a
   truncated E-AC-3 frame outputs nothing.
-- CRC failures are decoded and reported (`FrameInfo::crc_ok`) unless `CrcPolicy::Reject`.
+- `CrcPolicy::Reject` refuses complete syncframes whose CRC fails. The `ac3-crc-reject`
+  and `eac3-crc-reject` gates compare frame counts and PCM with FFmpeg under `crccheck`,
+  including short AC-3 tails that the decoder conceals and FFmpeg drops.
 - Not applied, as in FFmpeg: dialnorm, compr, transient pre-noise processing (parsed).
 - `FrameInfo::downmix` mirrors FFmpeg's downmix side data: exported only for programs
   with more than two channels, taken from the last syncframe of the access unit.
