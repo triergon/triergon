@@ -14,7 +14,7 @@
 
 mod native_audio;
 mod play;
-mod session;
+pub(super) mod session;
 mod video;
 
 use super::damage;
@@ -1321,6 +1321,23 @@ pub fn grade(a: &Grade) -> Result<(), String> {
         .into_iter()
         .flatten()
         .collect::<Vec<_>>();
+    for manifest in &manifests {
+        for (id, refusal) in session::registered_refusals(manifest)? {
+            if open.contains(&id)
+                || !vectors.iter().any(|vector| {
+                    vector.get("sha256").and_then(Value::as_str) == Some(refusal.sha256)
+                        && vector_lanes(vector, Some(&[]))
+                            .into_iter()
+                            .flatten()
+                            .any(|lane| vector_name(lane, vector).as_deref() == Some(id))
+                })
+            {
+                return Err(format!(
+                    "{id}: registered session refusal overlaps or lacks a pinned vector"
+                ));
+            }
+        }
+    }
     let in_lanes = |lane: Option<&str>| {
         a.lanes
             .as_ref()

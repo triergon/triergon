@@ -25,38 +25,7 @@
   "skip-flip-csi_miami_stereo_128_spx_small.eac3",
   "skip-flip-matrix2_commentary1_stereo_192_small.eac3",
   "skip-flip-serenity_english_5.1_1536_small.eac3",
-  "skip-flip-the_great_wall_7.1.eac3",
-  "session-h264:.research/fate-samples/h264-conformance/FM1_FT_E.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR10_SONY_B.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR13_SONY_B.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR1_SONY_A.jsv",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR6_SONY_A.jsv",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I1_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I2_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I3_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I4_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I5_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I6_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I7_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I1_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I2_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I3_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I4_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I5_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I6_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I7_Panasonic_A.264",
-  "session-h264:.research/fate-samples/h264-conformance/sp1_bt_a.h264",
-  "session-h264:.research/fate-samples/h264-conformance/sp2_bt_b.h264",
-  "session-hevc:.research/fate-samples/hevc-conformance/ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit",
-  "session-hevc:.research/fate-samples/hevc-conformance/IPCM_A_RExt_NEC.bit",
-  "session-hevc:.research/fate-samples/hevc-conformance/IPCM_B_RExt_NEC.bit",
-  "session-hevc:.research/fate-samples/hevc-conformance/Main_422_10_A_RExt_Sony_1.bin",
-  "session-hevc:.research/fate-samples/hevc-conformance/Main_422_10_B_RExt_Sony_1.bin",
-  "session-hevc:.research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_1.bit",
-  "session-hevc:.research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_3.bit",
-  "session-hevc:.research/fate-samples/hevc-conformance/QMATRIX_A_RExt_Sony_1.bit",
-  "session-hevc:.research/fate-samples/hevc-conformance/SAO_A_RExt_MediaTek_1.bit",
-  "session-hevc:.research/fate-samples/hevc-conformance/WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit"
+  "skip-flip-the_great_wall_7.1.eac3"
  ],
  "vectors": [
   {
@@ -2616,39 +2585,90 @@
   "skip-flip-csi_miami_stereo_128_spx_small.eac3": "The codec-ac3 owner must qualify CRC-first concealment for independent and dependent syncframes under ATSC A/52:2018 Annex E §3.2 and state which concealment outputs and original packet clocks the session route should promise.",
   "skip-flip-matrix2_commentary1_stereo_192_small.eac3": "The codec-ac3 owner must qualify CRC-first concealment for independent and dependent syncframes under ATSC A/52:2018 Annex E §3.2 and state which concealment outputs and original packet clocks the session route should promise.",
   "skip-flip-serenity_english_5.1_1536_small.eac3": "The codec-ac3 owner must qualify CRC-first concealment for independent and dependent syncframes under ATSC A/52:2018 Annex E §3.2 and state which concealment outputs and original packet clocks the session route should promise.",
-  "skip-flip-the_great_wall_7.1.eac3": "The first compound packet begins with reserved stream type 3 and a declared extent of 2588 bytes, with a second sync at byte 2304. The codec-ac3 owner must qualify the recovered independent and dependent extents and their CRC-first concealment under ATSC A/52:2018 Annex E §§2.3.1.1–2.3.1.2 and 3.2.",
-  "session-h264:.research/fate-samples/h264-conformance/FM1_FT_E.264": "Valid flexible macroblock ordering remains unsupported. The codec-h264 owner needs PPS slice-group maps and group-aware macroblock traversal under ITU-T H.264 §§7.4.2.2 and 8.2.2, with exact decoded-picture coverage.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR10_SONY_B.264": "Valid non-4:2:0 chroma remains unsupported. The codec-h264 owner needs planar reconstruction and deblocking at the SPS chroma geometry under ITU-T H.264 §§7.4.2.1.1, 8.3–8.7 and Annex A.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR13_SONY_B.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR1_SONY_A.jsv": "Valid non-4:2:0 chroma remains unsupported. The codec-h264 owner needs planar reconstruction and deblocking at the SPS chroma geometry under ITU-T H.264 §§7.4.2.1.1, 8.3–8.7 and Annex A.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR6_SONY_A.jsv": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I1_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I2_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I3_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I4_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I5_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I6_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I7_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I1_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I2_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I3_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I4_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I5_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I6_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I7_Panasonic_A.264": "Valid higher bit depth remains unsupported. The codec-h264 owner needs widened samples and the SPS QP offsets under ITU-T H.264 §§7.4.2.1.1, 8.5–8.7 and Annex A, with exact native-depth pictures.",
-  "session-h264:.research/fate-samples/h264-conformance/sp1_bt_a.h264": "Valid SP/SI slices remain unsupported. The codec-h264 owner needs switching-slice parsing and reconstruction under ITU-T H.264 §§7.4.3 and 8.6.2, with the complete decoded sequence.",
-  "session-h264:.research/fate-samples/h264-conformance/sp2_bt_b.h264": "Valid SP/SI slices remain unsupported. The codec-h264 owner needs switching-slice parsing and reconstruction under ITU-T H.264 §§7.4.3 and 8.6.2, with the complete decoded sequence.",
-  "session-hevc:.research/fate-samples/hevc-conformance/ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit": "The codec-hevc owner needs range-extension SPS admission and 4:2:2 reconstruction under ITU-T H.265 §§7.4.3.2.1 and 8.6 and Annex A. Keep the complete native-depth picture sequence.",
-  "session-hevc:.research/fate-samples/hevc-conformance/IPCM_A_RExt_NEC.bit": "The codec-hevc owner needs range-extension SPS admission and 4:2:2 reconstruction under ITU-T H.265 §§7.4.3.2.1 and 8.6 and Annex A. Keep the complete native-depth picture sequence.",
-  "session-hevc:.research/fate-samples/hevc-conformance/IPCM_B_RExt_NEC.bit": "The codec-hevc owner needs range-extension SPS admission and 4:4:4 reconstruction under ITU-T H.265 §§7.4.3.2.1 and 8.6 and Annex A. Keep the complete native-depth picture sequence.",
-  "session-hevc:.research/fate-samples/hevc-conformance/Main_422_10_A_RExt_Sony_1.bin": "The codec-hevc owner needs range-extension SPS admission and 4:2:2 reconstruction under ITU-T H.265 §§7.4.3.2.1 and 8.6 and Annex A. Keep the complete native-depth picture sequence.",
-  "session-hevc:.research/fate-samples/hevc-conformance/Main_422_10_B_RExt_Sony_1.bin": "The codec-hevc owner needs range-extension SPS admission and 4:2:2 reconstruction under ITU-T H.265 §§7.4.3.2.1 and 8.6 and Annex A. Keep the complete native-depth picture sequence.",
-  "session-hevc:.research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_1.bit": "The codec-hevc owner needs range-extension SPS admission and 4:4:4 reconstruction under ITU-T H.265 §§7.4.3.2.1 and 8.6 and Annex A. Keep the complete native-depth picture sequence.",
-  "session-hevc:.research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_3.bit": "The codec-hevc owner needs range-extension SPS admission and 4:4:4 reconstruction under ITU-T H.265 §§7.4.3.2.1 and 8.6 and Annex A. Keep the complete native-depth picture sequence.",
-  "session-hevc:.research/fate-samples/hevc-conformance/QMATRIX_A_RExt_Sony_1.bit": "The codec-hevc owner needs range-extension SPS admission and 4:4:4 reconstruction under ITU-T H.265 §§7.4.3.2.1 and 8.6 and Annex A. Keep the complete native-depth picture sequence.",
-  "session-hevc:.research/fate-samples/hevc-conformance/SAO_A_RExt_MediaTek_1.bit": "The codec-hevc owner needs range-extension SPS admission and 4:4:4 reconstruction under ITU-T H.265 §§7.4.3.2.1 and 8.6 and Annex A. Keep the complete native-depth picture sequence.",
-  "session-hevc:.research/fate-samples/hevc-conformance/WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit": "The codec-hevc owner needs the signalled intra 4x4 transform-skip rotation in residual reconstruction under ITU-T H.265 §§7.4.3.2.2 and 8.6 and Annex A. Keep the complete native-depth picture sequence."
+  "skip-flip-the_great_wall_7.1.eac3": "The first compound packet begins with reserved stream type 3 and a declared extent of 2588 bytes, with a second sync at byte 2304. The codec-ac3 owner must qualify the recovered independent and dependent extents and their CRC-first concealment under ATSC A/52:2018 Annex E §§2.3.1.1–2.3.1.2 and 3.2."
  },
+ "open_refusals": [
+ {
+  "reason": "Flexible macroblock ordering (more than one slice group)",
+  "clause": "ITU-T H.264 (08/2024) §§7.4.2.2 and 8.2.2",
+  "detail": "flexible macroblock ordering (slice groups)",
+  "cases": [
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FM1_FT_E.264", "sha256": "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade", "candidate_pictures": 103, "reference_pictures": 305}
+  ]
+ },
+ {
+  "reason": "4:2:2 and 4:4:4 chroma",
+  "clause": "ITU-T H.264 (08/2024) §7.4.2.1.1 and Annex A",
+  "detail": "chroma format 4:2:2 / 4:4:4",
+  "cases": [
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR10_SONY_B.264", "sha256": "8aed60728f2b8be7dd4886a94e73702532941557d712e04680ce8c258be7ccec", "candidate_pictures": 0, "reference_pictures": 5},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR1_SONY_A.jsv", "sha256": "d0fcd8a6699d85f78eb80d8c2b2113ce6eb03347a0dc8ed19aa51b308986a589", "candidate_pictures": 0, "reference_pictures": 5}
+  ]
+ },
+ {
+  "reason": "Bit depth above 8",
+  "clause": "ITU-T H.264 (08/2024) §7.4.2.1.1 and Annex A",
+  "detail": "bit depth > 8 (High 10 / High 4:2:2 / High 4:4:4)",
+  "cases": [
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR13_SONY_B.264", "sha256": "aa55f7064732a83c86fe228ba3cf8ab065b3129cf0f107c9fba469e57dd59881", "candidate_pictures": 0, "reference_pictures": 5},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR6_SONY_A.jsv", "sha256": "2ba847a7f9756eebd6a1204f9eecbb85628ebc6b424d5af2493bccb4fd0e2e61", "candidate_pictures": 0, "reference_pictures": 5},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I1_Panasonic_A.264", "sha256": "7c2f72b1091095840aed11dd659530531ad4d17ac59386145878fa51de6667f5", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I2_Panasonic_A.264", "sha256": "80a02559ed20f0e3cc54d84faf7d8f6d79530c10067e7e4bbc663ef6590838c9", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I3_Panasonic_A.264", "sha256": "66c5b426e66b97bb9951a590fc52435d5da03e73673a25bcfbdfddca72a9a117", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I4_Panasonic_A.264", "sha256": "fc9b9512027d6c6ae2034e583f12f109823fc1bab4cf6fa9fa8720975b4db37e", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I5_Panasonic_A.264", "sha256": "72d732367e063fcc619ab3aeea79f894ba6afa702bab9855824a6d338bb92ee4", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I6_Panasonic_A.264", "sha256": "eec1ad9774aa0d6844786980a83a2d8a0ffd16772c31e175dc6096396abc8afd", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I7_Panasonic_A.264", "sha256": "50046fc1758b1f6bc71e6bdb8f99f8b752f1d590579ebb62ea520f8960599700", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I1_Panasonic_A.264", "sha256": "c6b53da3735d92a98bbf4f363e5af00e821bc8f8debe1ec9999910c7511b964c", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I2_Panasonic_A.264", "sha256": "faca58ec834c82c63ddcf406374c7e76e112b3c5cc71adf0f016b1327f60bfbf", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I3_Panasonic_A.264", "sha256": "2fc5a02e724c6b726b489e45f08e17a0fb68f04fb0221bd30028776594e1677c", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I4_Panasonic_A.264", "sha256": "af882d0e6e8ad83d6e7f414b0378867125732df987fb0f364167cd998d6802bf", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I5_Panasonic_A.264", "sha256": "532df6d3e181bd8f4e148bca0489614d1f5b370dc0f2d4e2d933e1a72ebc1d62", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I6_Panasonic_A.264", "sha256": "3e462f2f89c0313b4a53121785a4ccf6a944bf7d9cacb9be48f6988f7a5bdf52", "candidate_pictures": 0, "reference_pictures": 10},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I7_Panasonic_A.264", "sha256": "b0d2b9fd99bc44033a9b22715644fd83fd563bdccabf6a092394a3e1f3507d4e", "candidate_pictures": 0, "reference_pictures": 10}
+  ]
+ },
+ {
+  "reason": "SP/SI slices",
+  "clause": "ITU-T H.264 (08/2024) §§7.4.3 and 8.6.2",
+  "detail": "SP/SI slices (Extended profile)",
+  "cases": [
+   {"id": "session-h264:.research/fate-samples/h264-conformance/sp1_bt_a.h264", "sha256": "2126d0489811e0bae6c3fd751506f883a673f9ecf1e4687d2cc1fbf791f6223f", "candidate_pictures": 6, "reference_pictures": 400},
+   {"id": "session-h264:.research/fate-samples/h264-conformance/sp2_bt_b.h264", "sha256": "6482a8a5a7f1c1600ed291dca5be8417b88dd4c6d47aa724afde17eafabe43bf", "candidate_pictures": 10, "reference_pictures": 400}
+  ]
+ },
+ {
+  "reason": "4:2:2 chroma",
+  "clause": "ITU-T H.265 (01/2026) §7.4.3.2.1 and Annex A",
+  "detail": "chroma_format_idc 2 (4:2:2, RExt)",
+  "cases": [
+   {"id": "session-hevc:.research/fate-samples/hevc-conformance/ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit", "sha256": "6063fb81c57d8596af226960f17b8dea06eb0661f97d76509ce331fa99e1ba46", "candidate_pictures": 0, "reference_pictures": 3},
+   {"id": "session-hevc:.research/fate-samples/hevc-conformance/IPCM_A_RExt_NEC.bit", "sha256": "0e707edd0d6c46427bddff2ded8dafe2420ffe1bc57a81501097d068ae293562", "candidate_pictures": 0, "reference_pictures": 1},
+   {"id": "session-hevc:.research/fate-samples/hevc-conformance/Main_422_10_A_RExt_Sony_1.bin", "sha256": "91f796b1ef99c5391a4e1a2f3c5d64471290b642e272965201e7c7bb1bdac3be", "candidate_pictures": 0, "reference_pictures": 24},
+   {"id": "session-hevc:.research/fate-samples/hevc-conformance/Main_422_10_B_RExt_Sony_1.bin", "sha256": "57f4ad77560ad1698218b181f09fa42059a45408e285283ab49ef74dad2f796c", "candidate_pictures": 0, "reference_pictures": 17}
+  ]
+ },
+ {
+  "reason": "4:4:4 chroma",
+  "clause": "ITU-T H.265 (01/2026) §7.4.3.2.1 and Annex A",
+  "detail": "chroma_format_idc 3 (4:4:4, RExt)",
+  "cases": [
+   {"id": "session-hevc:.research/fate-samples/hevc-conformance/IPCM_B_RExt_NEC.bit", "sha256": "39f97b25079ce5f12340cce43c9dbd5821c5e23f44da58dd6f1942e135bc93b5", "candidate_pictures": 0, "reference_pictures": 1},
+   {"id": "session-hevc:.research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_1.bit", "sha256": "e5e83ec018379e9bf83cad62a8f18ea7502261c8a554ab93cad16849154eca36", "candidate_pictures": 0, "reference_pictures": 2},
+   {"id": "session-hevc:.research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_3.bit", "sha256": "5e1a69d29278e3e4cbd7695c7d3c229ac63c1e5e2b7af3b1c8f8062586ea1468", "candidate_pictures": 0, "reference_pictures": 2},
+   {"id": "session-hevc:.research/fate-samples/hevc-conformance/QMATRIX_A_RExt_Sony_1.bit", "sha256": "74847e07f3298923da0e9b68b1f861930d227bd5ad83a834a8280cf042a7e78f", "candidate_pictures": 0, "reference_pictures": 20},
+   {"id": "session-hevc:.research/fate-samples/hevc-conformance/SAO_A_RExt_MediaTek_1.bit", "sha256": "6b0d45b5ca4d4919eaec5a98daf0eb4cebcc6d8b0a12b30b748386cc9358df13", "candidate_pictures": 0, "reference_pictures": 8}
+  ]
+ },
+ {
+  "reason": "Intra 4×4 transform-skip rotation",
+  "clause": "ITU-T H.265 (01/2026) §7.4.3.2.2 and §8.6",
+  "detail": "transform_skip_rotation_enabled_flag (RExt)",
+  "cases": [
+   {"id": "session-hevc:.research/fate-samples/hevc-conformance/WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit", "sha256": "2b7110f868bfb62da8282a0a6300408d7abad70a5a940a6a0ba1fbc69536f870", "candidate_pictures": 0, "reference_pictures": 3}
+  ]
+ }
+ ],
  "open_deviations": [
  {
   "reading": "The Opus drain tail has no independent caller packet timestamp",

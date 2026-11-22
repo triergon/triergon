@@ -1,4 +1,5 @@
 //! Session grading over packet clocks and the existing decoder references.
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -8,7 +9,111 @@ use crate::python;
 
 use super::{Grade, PROBE_TIMEOUT, audio_format};
 
-pub(super) const CASES: &str = "harness/codecs/session-cases.json";
+pub(in crate::codecs) const CASES: &str = "harness/codecs/session-cases.json";
+
+pub(in crate::codecs) struct RegisteredRefusal<'a> {
+    pub(in crate::codecs) sha256: &'a str,
+    pub(in crate::codecs) reason: &'a str,
+    detail: &'a str,
+    candidate: i128,
+    reference: i128,
+}
+
+pub(in crate::codecs) fn registered_refusals(
+    manifest: &Value,
+) -> Result<BTreeMap<&str, RegisteredRefusal<'_>>, String> {
+    let mut refusals = BTreeMap::new();
+    let Some(groups) = manifest.get("open_refusals") else {
+        return Ok(refusals);
+    };
+    for group in groups.as_array().ok_or("open_refusals must be an array")? {
+        let line = |key| {
+            group
+                .get(key)
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty() && !value.contains('\n'))
+                .ok_or_else(|| format!("registered session refusal needs {key}"))
+        };
+        let reason = line("reason")?;
+        let detail = line("detail")?;
+        line("clause")?;
+        let cases = group
+            .get("cases")
+            .and_then(Value::as_array)
+            .filter(|cases| !cases.is_empty())
+            .ok_or("registered session refusal needs cases")?;
+        for case in cases {
+            let id = case
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|id| id.starts_with("session-h264:") || id.starts_with("session-hevc:"))
+                .ok_or("registered refusal needs a video session case")?;
+            let sha256 = case
+                .get("sha256")
+                .and_then(Value::as_str)
+                .filter(|sha| {
+                    sha.len() == 64
+                        && sha
+                            .bytes()
+                            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+                })
+                .ok_or_else(|| format!("{id}: registered refusal needs an input SHA-256"))?;
+            let pictures = |key| {
+                case.get(key)
+                    .and_then(python::int)
+                    .ok_or_else(|| format!("{id}: registered refusal needs {key}"))
+            };
+            let (candidate, reference) = (
+                pictures("candidate_pictures")?,
+                pictures("reference_pictures")?,
+            );
+            if candidate < 0
+                || reference <= candidate
+                || refusals
+                    .insert(
+                        id,
+                        RegisteredRefusal {
+                            sha256,
+                            reason,
+                            detail,
+                            candidate,
+                            reference,
+                        },
+                    )
+                    .is_some()
+            {
+                return Err(format!("{id}: invalid or duplicate registered refusal"));
+            }
+        }
+    }
+    Ok(refusals)
+}
+
+impl RegisteredRefusal<'_> {
+    pub(in crate::codecs) fn matches(&self, row: &Value, decoder: &Value, output: &Value) -> bool {
+        let number =
+            |section: &Value, key, expected| section.get(key) == Some(&Value::int(expected));
+        row.get("sha256").and_then(Value::as_str) == Some(self.sha256)
+            && !row.get("open_case").is_some_and(Value::truthy)
+            && decoder.get("status").and_then(Value::as_str) == Some("fail")
+            && number(decoder, "ours_blocks", self.candidate)
+            && number(decoder, "reference_frames", self.reference)
+            && number(decoder, "first_difference", self.candidate)
+            && output.get("status").and_then(Value::as_str) == Some("failed-exit")
+            && number(output, "pictures_ours", self.candidate)
+            && number(output, "pictures_ref", self.reference)
+            && number(output, "pictures_equal", self.candidate)
+            && number(output, "ours_rc", 1)
+            && number(output, "reference_rc", 0)
+            && number(output, "ours_partial_bytes", 0)
+            && number(output, "reference_partial_bytes", 0)
+            && output
+                .get("ours_stderr_tail")
+                .and_then(Value::as_str)
+                .and_then(|tail| tail.lines().last())
+                == Some(format!("Error: Unsupported({:?})", self.detail).as_str())
+    }
+}
 
 /// Both decoders explicitly report the same mid-stream FLAC format refusal.
 /// The reference device command can return success after reporting it.
@@ -347,6 +452,36 @@ pub(super) fn video_timeline(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn registered_refusal_requires_the_same_error_and_complete_prefix() {
+        let manifest = crate::json::parse(
+            r#"{"open_refusals":[{"reason":"SP/SI slices","clause":"H.264 §8.6.2",
+                "detail":"SP/SI slices (Extended profile)",
+                "cases":[{"id":"session-h264:switching.h264",
+                    "sha256":"0000000000000000000000000000000000000000000000000000000000000000",
+                    "candidate_pictures":6,"reference_pictures":400}]}]}"#,
+        )
+        .unwrap();
+        let refusals = registered_refusals(&manifest).unwrap();
+        let refusal = &refusals["session-h264:switching.h264"];
+        let row = Value::object([("sha256", Value::str(refusal.sha256))]);
+        let decoder = crate::json::parse(
+            r#"{"status":"fail","ours_blocks":6,"reference_frames":400,"first_difference":6}"#,
+        )
+        .unwrap();
+        let output = r#"{"status":"failed-exit","pictures_ours":6,"pictures_ref":400,
+            "pictures_equal":6,"ours_rc":1,"reference_rc":0,"ours_partial_bytes":0,
+            "reference_partial_bytes":0,"ours_stderr_tail":"Error: Unsupported(\"SP/SI slices (Extended profile)\")\n"}"#;
+        assert!(refusal.matches(&row, &decoder, &crate::json::parse(output).unwrap()));
+        for changed in [
+            output.replace("Unsupported", "Invalid"),
+            output.replace("\"pictures_equal\":6", "\"pictures_equal\":5"),
+            output.replace("\"reference_rc\":0", "\"reference_rc\":1"),
+        ] {
+            assert!(!refusal.matches(&row, &decoder, &crate::json::parse(&changed).unwrap()));
+        }
+    }
 
     #[test]
     fn timestamp_projection_rounds_both_signs_and_refuses_overflow() {

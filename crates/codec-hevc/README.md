@@ -69,6 +69,7 @@ identical output.
 - Refused with `Unsupported`: monochrome, 4:2:2, 4:4:4, separate colour planes, bit depth
   above 10, unequal luma and chroma bit depth, every SPS range-extension tool, PPS
   range-extension tools under RExt profiles, SCC extensions.
+  The unsupported SPS tools include intra 4×4 transform-skip rotation.
 - NAL units with `nuh_layer_id > 0` are skipped, so the base layer of a multi-layer
   stream decodes. PPS extension bits are ignored for Main profiles. SEI is ignored
   (decoded picture hashes are not checked).

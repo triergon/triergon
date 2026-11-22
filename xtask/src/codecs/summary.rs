@@ -21,6 +21,8 @@ use std::path::Path;
 use crate::json::{self, Value};
 use crate::python;
 
+use super::correctness::session;
+
 /// Summary schema written by [`summarize`].
 pub const SUMMARY_SCHEMA: &str = "triergon.codecs.correctness-summary.v1";
 
@@ -444,6 +446,17 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
     let mut closed = Vec::new();
     let mut changed = Vec::new();
     let mut variant_manifests = BTreeMap::new();
+    let session_manifest = if rows.iter().any(|row| {
+        matches!(
+            text(get(row, "lane")),
+            Some("session-h264" | "session-hevc")
+        )
+    }) {
+        json::read(Path::new(session::CASES))?
+    } else {
+        Value::Null
+    };
+    let session_refusals = session::registered_refusals(&session_manifest)?;
     for row in &rows {
         let lane = text(get(row, "lane")).ok_or("row without lane")?.to_owned();
         let name = get(row, "name").cloned().unwrap_or(Value::Null);
@@ -453,7 +466,21 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
         let video = matches!(lane.as_str(), "h264" | "hevc");
         let open = get(row, "open_case").is_some_and(Value::truthy);
         let expected = video_exception(&lane, name.as_str().unwrap_or_default()).filter(|_| open);
-        let c = if video && open {
+        let session_refusal = session_refusals
+            .get(name.as_str().unwrap_or_default())
+            .filter(|_| matches!(lane.as_str(), "session-h264" | "session-hevc"));
+        let c = if let Some(refusal) = session_refusal {
+            if refusal.matches(row, decoder, output) {
+                "registered refusal".into()
+            } else {
+                changed.push(format!(
+                    "{} (expected {})",
+                    python::str(&name),
+                    refusal.reason
+                ));
+                "FAIL".into()
+            }
+        } else if video && open {
             if let Some(expected) = &expected {
                 if expected.matches(decoder, output) {
                     "open".into()
@@ -563,14 +590,18 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
                 ("open_case", Value::Bool(c == "open")),
             ]));
         }
-        listed.push(Value::object([
+        let mut listed_row = vec![
             ("lane", Value::str(lane.as_str())),
             ("name", name),
             ("sha256", get(row, "sha256").cloned().unwrap_or(Value::Null)),
             ("classification", Value::str(c)),
             ("decoder", status(decoder)),
             ("output", status(output)),
-        ]));
+        ];
+        if let Some(refusal) = session_refusal {
+            listed_row.push(("refusal_reason", Value::str(refusal.reason)));
+        }
+        listed.push(Value::object(listed_row));
     }
     per_lane.sort_by(|a, b| a.0.cmp(&b.0));
     let counts = |c: &[(String, i64)]| {
