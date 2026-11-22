@@ -310,9 +310,6 @@
         "hls-map-media",
         "inactive-pat-then-unrouted-pes",
         "unknown-pid-pes-after-pat-control"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -323,9 +320,6 @@
       "compat": "compat::psi::IncompletePatSection",
       "cases": [
         "pat-incomplete-version"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -336,9 +330,6 @@
       "compat": "compat::psi::DescriptorOverrun",
       "cases": [
         "pmt-descriptor-overrun"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -349,9 +340,6 @@
       "compat": "compat::psi::NonzeroPmtSection",
       "cases": [
         "pmt-multi-section-forbidden"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -362,10 +350,7 @@
       "compat": "compat::input::DiscardPartialCarrier",
       "cases": [
         "physical-truncated-tail",
-        "mpegts-transport-partial-final-packet"],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
+        "mpegts-transport-partial-final-packet"]
     },
     {
       "reading": "Private direct signalling with no caller-declared namespace",
@@ -376,9 +361,6 @@
       "cases": [
         "carriage-ac3-direct",
         "carriage-eac3-direct"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -391,9 +373,6 @@
         "carriage-ac3-dvb",
         "carriage-eac3-dvb",
         "program-pmt-retype"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
