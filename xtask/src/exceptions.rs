@@ -2,8 +2,9 @@
 //!
 //! Data alone loosens a gate when a contract's `gate` leaves `required`, when a
 //! feature leaves the gate plan, when a list whose name starts with `open_` (a
-//! contract's `open_cases` and `open_bounds`, a workload list's `open_workloads`, a
-//! vector manifest's `open_cases`, the status page's `open_cells`) gains an entry, or
+//! contract's `open_cases`, `open_deviations` and `open_bounds`, a workload list's
+//! `open_workloads`, a vector manifest's `open_cases`, the status page's
+//! `open_cells`) gains an entry, or
 //! when a crate's list of public features no gated comparison compares directly
 //! ([`NOT_COMPARED`]) grows. `harness/gate-exceptions.json` records how many of each
 //! the repository holds, and `cargo xtask check-design` counts them again: a change

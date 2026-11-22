@@ -1540,10 +1540,15 @@ fn publish_measurements(
     write_observed_case_report(output, &header, rows.iter().map(load_case))
 }
 
-/// A contract's `open_cases` on `target`: case ids that fail today, each tied to
-/// one of its `pending_module_requirements`. An entry with `targets` is open on
-/// those of the contract's `required_targets` only, and must pass elsewhere.
-/// Every id must be a case of the manifest.
+/// The cases of a contract that differ from their pins on `target` as listed: its
+/// `open_cases`, each tied to one of its `pending_module_requirements`, and the
+/// cases of its `open_deviations`. A deviation is a decided reading: the reference
+/// departs from the specification where the candidate keeps to it, stated once
+/// with its `reading`, the specification `clause`, both observed results
+/// (`candidate`, `reference`), optionally the `compat` policy a consumer needing
+/// the reference's result would use, and the `cases` it covers. An entry with
+/// `targets` is open on those of the contract's `required_targets` only, and must
+/// pass elsewhere. Every id must be a case of the manifest, listed once.
 pub(crate) fn open_cases(
     contract: &Value,
     manifest: &Value,
@@ -1557,8 +1562,29 @@ pub(crate) fn open_cases(
             .to_vec()
     };
     let pending = list(contract, "pending_module_requirements");
+    let required = list(contract, "required_targets");
     let cases = list(manifest, "cases");
     let mut open = Vec::new();
+    let mut listed = std::collections::BTreeSet::new();
+    // Whether `entry` is open on `target`, after checking `id` against the manifest.
+    let mut admit = |entry: &Value, id: &str, what: &str| -> Result<bool, String> {
+        if !cases.iter().any(|case| s(case, "id") == Some(id)) {
+            return Err(format!("{what} {id}: not a case of the manifest"));
+        }
+        if !listed.insert(id.to_owned()) {
+            return Err(format!("{what} {id}: listed twice"));
+        }
+        let Some(scope) = entry.get("targets") else {
+            return Ok(true);
+        };
+        let scope = scope.as_array().unwrap_or_default();
+        if scope.is_empty() || scope.iter().any(|t| !required.contains(t)) {
+            return Err(format!(
+                "{what} {id}: its targets must be some of the required targets"
+            ));
+        }
+        Ok(scope.iter().any(|t| t.as_str() == Some(target)))
+    };
     for entry in list(contract, "open_cases") {
         let (Some(id), Some(requirement)) = (s(&entry, "id"), entry.get("requirement")) else {
             return Err("an open case needs an id and a requirement".into());
@@ -1566,22 +1592,42 @@ pub(crate) fn open_cases(
         if !pending.contains(requirement) {
             return Err(format!("open case {id}: its requirement is not pending"));
         }
-        if !cases.iter().any(|case| s(case, "id") == Some(id)) {
-            return Err(format!("open case {id}: not a case of the manifest"));
+        if admit(&entry, id, "open case")? {
+            open.push(id.to_owned());
         }
-        if let Some(scope) = entry.get("targets") {
-            let required = list(contract, "required_targets");
-            let scope = scope.as_array().unwrap_or_default();
-            if scope.is_empty() || scope.iter().any(|t| !required.contains(t)) {
-                return Err(format!(
-                    "open case {id}: its targets must be some of the required targets"
-                ));
-            }
-            if !scope.iter().any(|t| t.as_str() == Some(target)) {
-                continue;
+    }
+    for entry in list(contract, "open_deviations") {
+        let line = |key: &str| s(&entry, key).filter(|t| !t.trim().is_empty() && !t.contains('\n'));
+        let Some(reading) = line("reading") else {
+            return Err("a deviation needs a one-line reading".into());
+        };
+        if ["clause", "candidate", "reference"]
+            .iter()
+            .any(|key| line(key).is_none())
+            || entry
+                .get("compat")
+                .is_some_and(|_| line("compat").is_none())
+        {
+            return Err(format!(
+                "deviation {reading}: clause, candidate and reference, and compat when \
+                 given, are one line each"
+            ));
+        }
+        let ids = entry
+            .get("cases")
+            .and_then(Value::as_array)
+            .unwrap_or_default();
+        if ids.is_empty() {
+            return Err(format!("deviation {reading}: it names no case"));
+        }
+        for id in ids {
+            let id = id
+                .as_str()
+                .ok_or_else(|| format!("deviation {reading}: a case is not an id"))?;
+            if admit(&entry, id, "deviating case")? {
+                open.push(id.to_owned());
             }
         }
-        open.push(id.to_owned());
     }
     Ok(open)
 }
@@ -1627,7 +1673,7 @@ pub(crate) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
     }
     if !closed.is_empty() {
         println!(
-            "{label}: listed open cases now pass; remove them from open_cases: {}",
+            "{label}: listed cases now pass; remove them from open_cases or open_deviations: {}",
             closed.join(", ")
         );
     }

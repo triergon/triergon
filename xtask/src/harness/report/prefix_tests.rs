@@ -386,3 +386,48 @@ fn open_cases_only_shrink() {
         );
     }
 }
+
+#[test]
+fn a_deviation_states_its_reading_once_for_its_cases() {
+    let manifest = parse(r#"{"cases": [{"id": "a"}, {"id": "b"}, {"id": "c"}]}"#).unwrap();
+    let contract = |deviation: &str| {
+        parse(&format!(
+            r#"{{"required_targets": ["t", "u"], "pending_module_requirements": ["x"],
+                "open_cases": [{{"id": "a", "requirement": "x"}}],
+                "open_deviations": [{deviation}]}}"#
+        ))
+        .unwrap()
+    };
+    let full = r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q",
+                   "compat": "m", "cases": ["b", "c"]}"#;
+    assert_eq!(
+        open_cases(&contract(full), &manifest, "t").unwrap(),
+        ["a", "b", "c"]
+    );
+    let scoped = r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q",
+                     "cases": ["b"], "targets": ["u"]}"#;
+    assert_eq!(
+        open_cases(&contract(scoped), &manifest, "t").unwrap(),
+        ["a"]
+    );
+    assert_eq!(
+        open_cases(&contract(scoped), &manifest, "u").unwrap(),
+        ["a", "b"]
+    );
+    for wrong in [
+        r#"{"clause": "c", "candidate": "p", "reference": "q", "cases": ["b"]}"#,
+        r#"{"reading": "r", "candidate": "p", "reference": "q", "cases": ["b"]}"#,
+        r#"{"reading": "r", "clause": "c\nd", "candidate": "p", "reference": "q", "cases": ["b"]}"#,
+        r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q", "compat": "",
+            "cases": ["b"]}"#,
+        r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q", "cases": []}"#,
+        r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q", "cases": ["d"]}"#,
+        r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q", "cases": ["a"]}"#,
+        r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q", "cases": ["b", "b"]}"#,
+    ] {
+        assert!(
+            open_cases(&contract(wrong), &manifest, "t").is_err(),
+            "{wrong}"
+        );
+    }
+}

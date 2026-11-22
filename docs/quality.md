@@ -343,6 +343,15 @@ resource limit becomes an explicit, reviewed rule for that case.
   listed. Features that a module's documentation names as additional coverage, such
   as `shape-text` and `shape-text-all` for the shaper, keep their open cases listed
   without blocking it.
+- **Declared deviations.** Where the reference departs from the specification and
+  the candidate keeps to it, a contract states the reading once in
+  `open_deviations`: a short `reading`, the specification `clause`, both observed
+  results (`candidate` and `reference`), optionally the `compat` policy a consumer
+  needing the reference's result would use, and the `cases` it covers (with
+  `targets`, as for open cases). The report, grade and ratchet hold these cases as
+  they hold open cases, a case may be listed only once, and each counts in
+  `harness/gate-exceptions.json`. A deviation is decided; a case nobody has decided
+  stays an open case.
 - **Bounds.** `cargo xtask grade` fails on a case whose runtime bound is above the
   ceiling, or whose heap or total RSS bound is not below 1, or whose measurement of
   either is not valid, and prints one line per failing bound and case, as the codec
