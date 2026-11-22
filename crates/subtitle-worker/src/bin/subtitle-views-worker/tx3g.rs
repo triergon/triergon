@@ -35,7 +35,7 @@ pub(super) fn operation<'a>(
         Some("defaults") => (ConfigLayout::DefaultsRecord, false, false),
         Some("sample-entry") => (ConfigLayout::SampleEntryBody, false, false),
         Some("unicode") => (ConfigLayout::DefaultsRecord, true, false),
-        Some("ass-header") => (ConfigLayout::DefaultsRecord, false, true),
+        Some("ass-header") => (ConfigLayout::DefaultsRecord, true, true),
         _ => return Err(format!("invalid tx3g view: {}", mode.to_string_lossy())),
     };
     Ok(Operation {
@@ -122,13 +122,29 @@ fn fields(records: &mut Records<'_, '_>, config: &Configuration) -> Result<(), S
 fn ass_header(records: &mut Records<'_, '_>, config: &Configuration) -> Result<(), String> {
     let defaults = config.defaults;
     let style = defaults.style;
-    let font = config
+    let raw_font = config
         .fonts
         .iter()
-        .find(|font| font.id == style.font_id)
+        .rfind(|font| font.id == style.font_id)
         .map_or(&[][..], |font| {
             &config.raw.as_ref()[font.name_range.clone()]
         });
+    // The ASS decoder's header exposes one C string. The configuration
+    // oracle compares every font record and its full length-delimited name.
+    let decoded;
+    let font = if let Some(bytes) = raw_font.strip_prefix(&[0xfe, 0xff]) {
+        decoded = char::decode_utf16(
+            bytes
+                .chunks_exact(2)
+                .map(|word| u16::from_be_bytes([word[0], word[1]])),
+        )
+        .collect::<Result<String, _>>()
+        .map_err(|error| error.to_string())?;
+        decoded.as_bytes()
+    } else {
+        raw_font
+    };
+    let font = font.split(|&byte| byte == 0).next().unwrap_or_default();
     let [r, g, b, a] = style.rgba;
     let primary = u32::from_be_bytes([255 - a, b, g, r]);
     let [r, g, b, a] = defaults.background;

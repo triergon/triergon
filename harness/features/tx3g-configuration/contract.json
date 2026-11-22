@@ -27,88 +27,15 @@
       "bound": "runtime",
       "cases": [
         "bad-two",
-        "bom",
-        "box-refusal-then-good",
-        "clear",
-        "clear-then-good",
         "config-invalid-font-size",
         "config-one-dimension",
         "config-too-short",
         "config-valid-empty-fonts",
         "configured-defaults",
         "configured-style-font",
-        "cr-lf-markup",
         "duplicate-fonts",
-        "duplicate-wrap",
-        "empty-event",
-        "empty-physical",
-        "extended-short",
-        "extended-wrap",
-        "ffff",
-        "flush-read-order",
         "font-nul",
         "font-utf16",
-        "highlight-color",
-        "highlight-empty",
-        "highlight-inverse",
-        "invalid-overlong",
-        "invalid-tail",
-        "known-zero-duration",
-        "negative-half",
-        "noncharacter-fffe",
-        "nul-invalid-tail",
-        "one-byte",
-        "original177-tx3g-basic",
-        "original177-tx3g-box-overrun",
-        "original177-tx3g-byte-not-character-count",
-        "original177-tx3g-embedded-nul",
-        "original177-tx3g-empty-sample",
-        "original177-tx3g-empty-with-modifier",
-        "original177-tx3g-extended-box-gap",
-        "original177-tx3g-line-codepoints-exact",
-        "original177-tx3g-lone-surrogate",
-        "original177-tx3g-missing-length",
-        "original177-tx3g-modifier-order",
-        "original177-tx3g-short-box",
-        "original177-tx3g-style-highlight-raw",
-        "original177-tx3g-text-overrun",
-        "original177-tx3g-u16-byte-count-boundary",
-        "original177-tx3g-unknown-modifier",
-        "original177-tx3g-utf16-odd",
-        "original177-tx3g-utf16be-bom",
-        "overflow-clock",
-        "overrun-box",
-        "overstated",
-        "positive-half",
-        "rational-clock",
-        "short-body",
-        "short-box",
-        "size0",
-        "style-adjacent-different",
-        "style-adjacent-equal",
-        "style-all",
-        "style-empty",
-        "style-malformed-after-good",
-        "style-outside",
-        "style-overlap",
-        "style-repeated",
-        "style-reversed",
-        "style-unicode",
-        "style-zero-after-good",
-        "two-packets",
-        "understated",
-        "unicode",
-        "unknown",
-        "unknown-clock",
-        "unset-clock",
-        "utf16be",
-        "utf16le",
-        "utf8-refusal-then-good",
-        "wrap-0",
-        "wrap-1",
-        "wrap-2",
-        "wrap-nul",
-        "authored-base",
         "authored-empty-fonts",
         "authored-duplicate-font-id",
         "authored-face",
@@ -119,12 +46,10 @@
         "authored-uuid-box",
         "authored-duplicate-table",
         "authored-flag-high",
-        "authored-h-left",
         "authored-h-right",
         "authored-h-center",
         "authored-v-top",
         "authored-v-center",
-        "authored-v-bottom",
         "authored-background-red",
         "authored-background-green",
         "authored-background-blue",
@@ -139,7 +64,6 @@
         "authored-font-size-zero",
         "authored-font-size-high",
         "authored-bad-justification",
-        "authored-truncated-00",
         "authored-truncated-01",
         "authored-truncated-02",
         "authored-truncated-03",
@@ -185,8 +109,7 @@
         "authored-truncated-43",
         "authored-truncated-44",
         "authored-truncated-45",
-        "authored-truncated-46",
-        "authored-truncated-47"
+        "authored-truncated-46"
       ],
       "cause": "the reference reads the sample description while opening its decoder"
     },
@@ -194,88 +117,15 @@
       "bound": "heap",
       "cases": [
         "bad-two",
-        "bom",
-        "box-refusal-then-good",
-        "clear",
-        "clear-then-good",
         "config-invalid-font-size",
         "config-one-dimension",
         "config-too-short",
         "config-valid-empty-fonts",
         "configured-defaults",
         "configured-style-font",
-        "cr-lf-markup",
         "duplicate-fonts",
-        "duplicate-wrap",
-        "empty-event",
-        "empty-physical",
-        "extended-short",
-        "extended-wrap",
-        "ffff",
-        "flush-read-order",
         "font-nul",
         "font-utf16",
-        "highlight-color",
-        "highlight-empty",
-        "highlight-inverse",
-        "invalid-overlong",
-        "invalid-tail",
-        "known-zero-duration",
-        "negative-half",
-        "noncharacter-fffe",
-        "nul-invalid-tail",
-        "one-byte",
-        "original177-tx3g-basic",
-        "original177-tx3g-box-overrun",
-        "original177-tx3g-byte-not-character-count",
-        "original177-tx3g-embedded-nul",
-        "original177-tx3g-empty-sample",
-        "original177-tx3g-empty-with-modifier",
-        "original177-tx3g-extended-box-gap",
-        "original177-tx3g-line-codepoints-exact",
-        "original177-tx3g-lone-surrogate",
-        "original177-tx3g-missing-length",
-        "original177-tx3g-modifier-order",
-        "original177-tx3g-short-box",
-        "original177-tx3g-style-highlight-raw",
-        "original177-tx3g-text-overrun",
-        "original177-tx3g-u16-byte-count-boundary",
-        "original177-tx3g-unknown-modifier",
-        "original177-tx3g-utf16-odd",
-        "original177-tx3g-utf16be-bom",
-        "overflow-clock",
-        "overrun-box",
-        "overstated",
-        "positive-half",
-        "rational-clock",
-        "short-body",
-        "short-box",
-        "size0",
-        "style-adjacent-different",
-        "style-adjacent-equal",
-        "style-all",
-        "style-empty",
-        "style-malformed-after-good",
-        "style-outside",
-        "style-overlap",
-        "style-repeated",
-        "style-reversed",
-        "style-unicode",
-        "style-zero-after-good",
-        "two-packets",
-        "understated",
-        "unicode",
-        "unknown",
-        "unknown-clock",
-        "unset-clock",
-        "utf16be",
-        "utf16le",
-        "utf8-refusal-then-good",
-        "wrap-0",
-        "wrap-1",
-        "wrap-2",
-        "wrap-nul",
-        "authored-base",
         "authored-empty-fonts",
         "authored-duplicate-font-id",
         "authored-face",
@@ -286,12 +136,10 @@
         "authored-uuid-box",
         "authored-duplicate-table",
         "authored-flag-high",
-        "authored-h-left",
         "authored-h-right",
         "authored-h-center",
         "authored-v-top",
         "authored-v-center",
-        "authored-v-bottom",
         "authored-background-red",
         "authored-background-green",
         "authored-background-blue",
@@ -306,7 +154,6 @@
         "authored-font-size-zero",
         "authored-font-size-high",
         "authored-bad-justification",
-        "authored-truncated-00",
         "authored-truncated-01",
         "authored-truncated-02",
         "authored-truncated-03",
@@ -352,8 +199,7 @@
         "authored-truncated-43",
         "authored-truncated-44",
         "authored-truncated-45",
-        "authored-truncated-46",
-        "authored-truncated-47"
+        "authored-truncated-46"
       ],
       "cause": "the reference reads the sample description while opening its decoder"
     },
@@ -361,88 +207,15 @@
       "bound": "total_rss",
       "cases": [
         "bad-two",
-        "bom",
-        "box-refusal-then-good",
-        "clear",
-        "clear-then-good",
         "config-invalid-font-size",
         "config-one-dimension",
         "config-too-short",
         "config-valid-empty-fonts",
         "configured-defaults",
         "configured-style-font",
-        "cr-lf-markup",
         "duplicate-fonts",
-        "duplicate-wrap",
-        "empty-event",
-        "empty-physical",
-        "extended-short",
-        "extended-wrap",
-        "ffff",
-        "flush-read-order",
         "font-nul",
         "font-utf16",
-        "highlight-color",
-        "highlight-empty",
-        "highlight-inverse",
-        "invalid-overlong",
-        "invalid-tail",
-        "known-zero-duration",
-        "negative-half",
-        "noncharacter-fffe",
-        "nul-invalid-tail",
-        "one-byte",
-        "original177-tx3g-basic",
-        "original177-tx3g-box-overrun",
-        "original177-tx3g-byte-not-character-count",
-        "original177-tx3g-embedded-nul",
-        "original177-tx3g-empty-sample",
-        "original177-tx3g-empty-with-modifier",
-        "original177-tx3g-extended-box-gap",
-        "original177-tx3g-line-codepoints-exact",
-        "original177-tx3g-lone-surrogate",
-        "original177-tx3g-missing-length",
-        "original177-tx3g-modifier-order",
-        "original177-tx3g-short-box",
-        "original177-tx3g-style-highlight-raw",
-        "original177-tx3g-text-overrun",
-        "original177-tx3g-u16-byte-count-boundary",
-        "original177-tx3g-unknown-modifier",
-        "original177-tx3g-utf16-odd",
-        "original177-tx3g-utf16be-bom",
-        "overflow-clock",
-        "overrun-box",
-        "overstated",
-        "positive-half",
-        "rational-clock",
-        "short-body",
-        "short-box",
-        "size0",
-        "style-adjacent-different",
-        "style-adjacent-equal",
-        "style-all",
-        "style-empty",
-        "style-malformed-after-good",
-        "style-outside",
-        "style-overlap",
-        "style-repeated",
-        "style-reversed",
-        "style-unicode",
-        "style-zero-after-good",
-        "two-packets",
-        "understated",
-        "unicode",
-        "unknown",
-        "unknown-clock",
-        "unset-clock",
-        "utf16be",
-        "utf16le",
-        "utf8-refusal-then-good",
-        "wrap-0",
-        "wrap-1",
-        "wrap-2",
-        "wrap-nul",
-        "authored-base",
         "authored-empty-fonts",
         "authored-duplicate-font-id",
         "authored-face",
@@ -453,12 +226,10 @@
         "authored-uuid-box",
         "authored-duplicate-table",
         "authored-flag-high",
-        "authored-h-left",
         "authored-h-right",
         "authored-h-center",
         "authored-v-top",
         "authored-v-center",
-        "authored-v-bottom",
         "authored-background-red",
         "authored-background-green",
         "authored-background-blue",
@@ -473,7 +244,6 @@
         "authored-font-size-zero",
         "authored-font-size-high",
         "authored-bad-justification",
-        "authored-truncated-00",
         "authored-truncated-01",
         "authored-truncated-02",
         "authored-truncated-03",
@@ -519,947 +289,148 @@
         "authored-truncated-43",
         "authored-truncated-44",
         "authored-truncated-45",
-        "authored-truncated-46",
-        "authored-truncated-47"
+        "authored-truncated-46"
       ],
       "cause": "the reference reads the sample description while opening its decoder"
     }
   ],
-  "pending_module_requirements": [
-    "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-    "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-    "The description has no matching name for its default font identifier; the decoder writes Arial and the source view has no name.",
-    "ConfigJob retains both font records in wire order. The comparison resolves the first matching record, while the decoder's ASS style uses the last.",
-    "A UTF-8 font name in the length-prefixed table contains a NUL; the source view retains all 11 bytes, while the ASS header ends the name after Font."
-  ],
-  "open_cases": [
-    {
-      "id": "bad-two",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "bom",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "box-refusal-then-good",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "clear",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "clear-then-good",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "config-invalid-font-size",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "config-too-short",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "config-valid-empty-fonts",
-      "requirement": "The description has no matching name for its default font identifier; the decoder writes Arial and the source view has no name.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "cr-lf-markup",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "duplicate-fonts",
-      "requirement": "ConfigJob retains both font records in wire order. The comparison resolves the first matching record, while the decoder's ASS style uses the last.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "duplicate-wrap",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "empty-event",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "empty-physical",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "extended-short",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "extended-wrap",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ffff",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "flush-read-order",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "font-nul",
-      "requirement": "A UTF-8 font name in the length-prefixed table contains a NUL; the source view retains all 11 bytes, while the ASS header ends the name after Font.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "font-utf16",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "highlight-color",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "highlight-empty",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "highlight-inverse",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "invalid-overlong",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "invalid-tail",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "known-zero-duration",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "negative-half",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "noncharacter-fffe",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "nul-invalid-tail",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "one-byte",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-basic",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-box-overrun",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-byte-not-character-count",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-embedded-nul",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-empty-sample",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-empty-with-modifier",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-extended-box-gap",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-line-codepoints-exact",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-lone-surrogate",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-missing-length",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-modifier-order",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-short-box",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-style-highlight-raw",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-text-overrun",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-u16-byte-count-boundary",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-unknown-modifier",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-utf16-odd",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "original177-tx3g-utf16be-bom",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "overflow-clock",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "overrun-box",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "overstated",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "positive-half",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "rational-clock",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "short-body",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "short-box",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "size0",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "style-adjacent-different",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "style-adjacent-equal",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "style-all",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "style-empty",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "style-malformed-after-good",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "style-outside",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "style-overlap",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "style-repeated",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "style-reversed",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "style-unicode",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "style-zero-after-good",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "two-packets",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "understated",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "unicode",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "unknown",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "unknown-clock",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "unset-clock",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "utf16be",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "utf16le",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "utf8-refusal-then-good",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "wrap-0",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "wrap-1",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "wrap-2",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "wrap-nul",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-empty-fonts",
-      "requirement": "The description has no matching name for its default font identifier; the decoder writes Arial and the source view has no name.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-duplicate-font-id",
-      "requirement": "ConfigJob retains both font records in wire order. The comparison resolves the first matching record, while the decoder's ASS style uses the last.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-duplicate-table",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-default-range",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-missing-font",
-      "requirement": "The description has no matching name for its default font identifier; the decoder writes Arial and the source view has no name.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-bad-justification",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-00",
-      "requirement": "No sample description is present. The specification view refuses a missing TextSampleEntry, while the decoder opens with a built-in Arial style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-01",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-02",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-03",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-04",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-05",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-06",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-07",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-08",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-09",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-10",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-11",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-12",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-13",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-14",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-15",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-16",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-17",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-18",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-19",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-20",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-21",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-22",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-23",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-24",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-25",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-26",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-27",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-28",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-29",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-30",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-31",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-32",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-33",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-34",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-35",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-36",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-37",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-38",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-39",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-40",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-41",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-42",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-43",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "authored-truncated-44",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
+  "open_deviations": [
+    {
+      "reading": "An absent TextSampleEntry does not supply a default style",
+      "clause": "ETSI TS 126 245 V19.0.0 \u00a75.16, the default style and font table are fields of TextSampleEntry",
+      "candidate": "reports no description",
+      "reference": "synthesizes an Arial 16 ASS Default style",
+      "compat": "compat::tx3g::missing_description_style",
+      "cases": [
+        "bad-two"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "A cut TextSampleEntry cannot supply a complete default style",
+      "clause": "ETSI TS 126 245 V19.0.0 \u00a75.16, TextSampleEntry fixed fields and counted FontTableBox records",
+      "candidate": "refuses the incomplete description",
+      "reference": "opens with Arial 16 and default colors and alignment",
+      "compat": "compat::tx3g::truncated_description_style",
+      "cases": [
+        "config-invalid-font-size",
+        "config-too-short",
+        "authored-truncated-01",
+        "authored-truncated-02",
+        "authored-truncated-03",
+        "authored-truncated-04",
+        "authored-truncated-05",
+        "authored-truncated-06",
+        "authored-truncated-07",
+        "authored-truncated-08",
+        "authored-truncated-09",
+        "authored-truncated-10",
+        "authored-truncated-11",
+        "authored-truncated-12",
+        "authored-truncated-13",
+        "authored-truncated-14",
+        "authored-truncated-15",
+        "authored-truncated-16",
+        "authored-truncated-17",
+        "authored-truncated-18",
+        "authored-truncated-19",
+        "authored-truncated-20",
+        "authored-truncated-21",
+        "authored-truncated-22",
+        "authored-truncated-23",
+        "authored-truncated-24",
+        "authored-truncated-25",
+        "authored-truncated-26",
+        "authored-truncated-27",
+        "authored-truncated-28",
+        "authored-truncated-29",
+        "authored-truncated-30",
+        "authored-truncated-31",
+        "authored-truncated-32",
+        "authored-truncated-33",
+        "authored-truncated-34",
+        "authored-truncated-35",
+        "authored-truncated-36",
+        "authored-truncated-37",
+        "authored-truncated-38",
+        "authored-truncated-39",
+        "authored-truncated-40",
+        "authored-truncated-41",
+        "authored-truncated-42",
+        "authored-truncated-43",
+        "authored-truncated-44",
+        "authored-truncated-45",
+        "authored-truncated-46"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "A default font identifier absent from the font table is unbound",
+      "clause": "ETSI TS 126 245 V19.0.0 \u00a7\u00a75.15\u20135.16, font-ID refers to a member of the complete font table",
+      "candidate": "keeps the supplied style with no declared font name",
+      "reference": "supplies Arial for the missing font",
+      "compat": "compat::tx3g::unbound_font_fallback",
+      "cases": [
+        "config-valid-empty-fonts",
+        "authored-empty-fonts",
+        "authored-missing-font"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "A BOM marks a UTF-16 font name",
+      "clause": "ETSI TS 126 245 V19.0.0 \u00a75.16, the counted font name is UTF-16 when it begins with a byte-order mark",
+      "candidate": "decodes the declared name to A",
+      "reference": "exposes the two BOM bytes FE FF before the first zero byte",
+      "compat": "compat::tx3g::font_name_c_string",
+      "cases": [
+        "font-utf16"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
     },
     {
-      "id": "authored-truncated-45",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
+      "reading": "TextSampleEntry contains one font table",
+      "clause": "ETSI TS 126 245 V19.0.0 \u00a75.16, TextSampleEntry declares a single FontTableBox",
+      "candidate": "refuses the duplicate table",
+      "reference": "publishes an Arial 16 style",
+      "compat": "compat::tx3g::duplicate_font_table",
+      "cases": [
+        "authored-duplicate-table"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "authored-truncated-46",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
+      "reading": "The default style has zero start and end offsets",
+      "clause": "ETSI TS 126 245 V19.0.0 \u00a75.15, both offsets are zero in a sample description",
+      "candidate": "refuses a nonzero default style range",
+      "reference": "publishes an Arial 16 style",
+      "compat": "compat::tx3g::invalid_default_style_range",
+      "cases": [
+        "authored-default-range"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "authored-truncated-47",
-      "requirement": "ConfigJob requires the fixed fields and complete valid font table of a TextSampleEntry. The reference opens this incomplete or invalid description with a fallback ASS style.",
+      "reading": "Justification codes are -1, 0 and 1",
+      "clause": "ETSI TS 126 245 V19.0.0 \u00a75.16, horizontal and vertical justification table",
+      "candidate": "refuses horizontal justification 2",
+      "reference": "writes ASS alignment 0 and Arial 16",
+      "compat": "compat::tx3g::reserved_justification",
+      "cases": [
+        "authored-bad-justification"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

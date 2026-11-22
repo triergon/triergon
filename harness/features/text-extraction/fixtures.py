@@ -127,6 +127,7 @@ def capsule(data):
 
 def write_corpora(out):
     cases = defaultdict(list)
+    decoder_descriptions = set()
 
     def file(feature, name, data):
         mixed = {"dvb-source", "pgs-segments", "renderer-context", "tx3g-configuration", "vobsub-index"}
@@ -143,6 +144,10 @@ def write_corpora(out):
         if not data_path.exists():
             data_path = path
         digest = hashlib.sha256(data_path.read_bytes()).hexdigest()
+        if feature == "tx3g-configuration":
+            if digest in decoder_descriptions:
+                return
+            decoder_descriptions.add(digest)
         if source and source["sha256"] != digest:
             raise ValueError(f"{path} does not match its source manifest")
         row = dict(id=name, profile=profile or name, file=path.as_posix(),
