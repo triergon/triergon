@@ -22,12 +22,13 @@ use crate::{Bold, Drawing, Italic, Limits, charge};
 #[derive(Debug)]
 pub(super) struct OutlineValue {
     /// The glyph or drawing, 26.6, y down.
-    pub shape: Shape,
+    pub(super) shape: Shape,
     /// The advance, 26.6.
-    pub advance: i32,
-    /// The ascent and descent, 26.6.
-    pub asc: i32,
-    pub desc: i32,
+    pub(super) advance: i32,
+    /// The ascent above the baseline, 26.6.
+    pub(super) asc: i32,
+    /// The descent below the baseline, 26.6.
+    pub(super) desc: i32,
 }
 
 /// A built outline the cache keeps. It is identified as libass's caches
