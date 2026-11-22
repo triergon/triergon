@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::io::Write;
 use std::sync::atomic::AtomicBool;
 
-use triergon::framing::nal::{self, NalFraming, RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
+use triergon::framing::nal::{self, RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
 use triergon::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget};
 use triergon_codec_h264 as h264;
 use triergon_codec_hevc as hevc;
@@ -180,12 +180,9 @@ fn decode_operation<'a>(
     })
 }
 
-/// The input schedule varies at byte offsets. The reader retains split syntax
-/// and submits only complete NAL units to the decoder's Annex B interface.
 fn units(
     input: &[u8],
     codec: nal::Codec,
-    feed: Feed,
     mut receive: impl FnMut(RawAccessUnit) -> Result<(), String>,
 ) -> Result<bool, String> {
     let source = SourceId(0);
@@ -198,7 +195,6 @@ fn units(
         .map_err(|error| error.to_string())?;
     let mut work = WorkBudget::new(64 << 10);
     let cancel = AtomicBool::new(false);
-    let mut seed = 0x7769_6e64_u32;
     loop {
         match reader.step(&mut work, &cancel) {
             Ok(Step::Ready(unit)) => receive(unit)?,
@@ -210,13 +206,7 @@ fn units(
                         .map_err(|error| error.to_string())?;
                     continue;
                 }
-                let window = if matches!(feed, Feed::Split) {
-                    seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-                    1 + (seed as usize >> 16) % 4096
-                } else {
-                    request.maximum
-                };
-                let end = at + window.min(request.maximum).min(input.len() - at);
+                let end = at + request.maximum.min(input.len() - at);
                 let bytes =
                     Bytes::copy_from_slice(&pool, &input[at..end]).map_err(|e| e.to_string())?;
                 let window = InputWindow::new(request.source, request.token, request.offset, bytes)
@@ -337,7 +327,8 @@ fn decode(
     let mut pts = 0_i64;
     if codec == nal::Codec::Avc {
         let mut decoder = h264::Decoder::new();
-        let framing = units(input, codec, feed, |unit| {
+        let mut seed = 0x7769_6e64_u32;
+        let framing = units(input, codec, |unit| {
             let data = &input[unit.range.start as usize..unit.range.end as usize];
             match feed {
                 Feed::AccessUnit => refused |= decoder.send(data, Some(pts)).is_err(),
@@ -349,19 +340,15 @@ fn decode(
                     }
                 }
                 Feed::Split => {
-                    for (index, nal) in unit.nals().iter().enumerate() {
-                        let facts = nal.facts();
-                        let NalFraming::AnnexB {
-                            start_code_bytes, ..
-                        } = facts.framing
-                        else {
-                            return Err("a raw access unit lacks an Annex B prefix".into());
-                        };
-                        let start = facts.payload_offset as usize - usize::from(start_code_bytes);
-                        let end = facts.payload_offset as usize + facts.payload_length;
+                    let mut at = 0;
+                    while at < data.len() {
+                        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                        let length = 1 + (seed as usize >> 16) % 4096;
+                        let end = (at + length).min(data.len());
                         refused |= decoder
-                            .send_nals(&input[start..end], (index == 0).then_some(pts))
+                            .send_nals(&data[at..end], (at == 0).then_some(pts))
                             .is_err();
+                        at = end;
                     }
                 }
             }
@@ -380,7 +367,7 @@ fn decode(
                 drain(&mut decoder, &mut output)?;
             }
         } else {
-            let framing = units(input, codec, feed, |unit| {
+            let framing = units(input, codec, |unit| {
                 for (index, nal) in unit.nals().iter().enumerate() {
                     refused |= decoder
                         .send_nal(nal.bytes().as_ref(), (index == 0).then_some(pts))
