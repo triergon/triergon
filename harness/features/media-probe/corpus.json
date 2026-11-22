@@ -96905,7 +96905,7 @@
     {
       "id": "container-mov-run-recovery-harness-features-mov-run-recovery-variants-physical-missing.mov-32",
       "profile": "container",
-      "file": "harness/features/mov-run-recovery/variants/physical-missing.mov",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-747.mov",
       "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
       "rights": "authored-synthetic",
       "required": true,
@@ -96922,7 +96922,7 @@
     {
       "id": "container-mov-run-recovery-harness-features-mov-run-recovery-variants-physical-missing.mov-2048",
       "profile": "container",
-      "file": "harness/features/mov-run-recovery/variants/physical-missing.mov",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-747.mov",
       "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
       "rights": "authored-synthetic",
       "required": true,
@@ -96939,7 +96939,7 @@
     {
       "id": "container-mov-run-recovery-harness-features-mov-run-recovery-variants-physical-missing.mov-65536",
       "profile": "container",
-      "file": "harness/features/mov-run-recovery/variants/physical-missing.mov",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-747.mov",
       "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
       "rights": "authored-synthetic",
       "required": true,
@@ -96956,7 +96956,7 @@
     {
       "id": "container-mov-run-recovery-harness-features-mov-run-recovery-variants-physical-missing.mov-whole",
       "profile": "container",
-      "file": "harness/features/mov-run-recovery/variants/physical-missing.mov",
+      "file": "crates/isobmff/tests/fixtures/direct-recovery/offset-747.mov",
       "sha256": "9c90493a44858bde05f00e95ecd3fe6d6696b21d7d98b99aece17f13badc25b7",
       "rights": "authored-synthetic",
       "required": true,
