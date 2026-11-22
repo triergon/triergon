@@ -3250,6 +3250,23 @@
       }
     },
     {
+      "id": "core-plus-exss",
+      "profile": "authored",
+      "file": "core-plus-exss.dts",
+      "sha256": "f351217bd5748fa32c92bdd0328a221d44ea9723ebce74be48f4382c9581a8b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "16384",
+        "core"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 576,
+        "digest": 1904119709736480609
+      }
+    },
+    {
       "id": "core_51_24_48_768_0",
       "profile": "fate",
       "file": "core_51_24_48_768_0.core.dts",

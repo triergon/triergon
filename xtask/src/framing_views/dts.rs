@@ -350,6 +350,27 @@ fn authored(root: &Path, corpus: &mut Corpus) -> Result<()> {
         let packing = if order == "big" { "be14" } else { "le14" };
         corpus.native(id, packing, &hex(source)?, false)?;
     }
+    // Table 7-2 short and long size fields: both extensions declare a
+    // 16-byte header and 32-byte frame. Asset contents are opaque to framing.
+    let mut with_extensions = minimum.clone();
+    for sizes in [
+        &[0x01, 0xe0, 0x03, 0xe0][..],
+        &[0x20, 0x1e, 0x00, 0x03, 0xe0],
+    ] {
+        let start = with_extensions.len();
+        with_extensions.extend([0x64, 0x58, 0x20, 0x25, 0]);
+        with_extensions.extend(sizes);
+        with_extensions.resize(start + 32, 0);
+        with_extensions.extend(&minimum);
+    }
+    let source = corpus.input("core-plus-exss", &with_extensions, false)?;
+    corpus.case(
+        0,
+        &source,
+        "core-plus-exss",
+        "authored",
+        &["1", MAXIMUM, "core"],
+    );
     Ok(())
 }
 

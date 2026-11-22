@@ -5,7 +5,7 @@ typedef enum { DTS_CORE, DTS_PACKED, DTS_PARSER } DtsView;
 typedef struct {
     DtsView view;
     size_t window, maximum;
-    int decoded;
+    int decoded, core_projection;
 } DtsCase;
 
 static void dts_terminal(ViewWork *work, uint64_t kind, const char *reason)
@@ -130,10 +130,11 @@ static int dts_frames_run(const ViewCase *input, ViewWork *work)
                     status = AVERROR_INVALIDDATA;
                     break;
                 }
-                const uint64_t words[] = {start, bytes, core, core, core,
+                const size_t size_for_view = test->core_projection ? core : bytes;
+                const uint8_t *data_for_view = test->core_projection ? packet->data : data;
+                const uint64_t words[] = {start, size_for_view, core, core, core,
                                           context->sample_rate, parser->duration};
-                /* The parser bytes and the BSF bytes are both part of the comparison. */
-                dts_packet(work, words, 7, data, bytes);
+                dts_packet(work, words, 7, data_for_view, size_for_view);
                 const uint64_t filtered[] = {core};
                 dts_packet(work, filtered, 1, packet->data, core);
                 av_packet_unref(packet);
@@ -181,12 +182,14 @@ static int dts_frames_prepare(ViewCase *input)
     DtsCase test = {0};
     const char *const *args = (const char *const *)input->argv;
     if (!strcmp(input->prefix, "dts-core-")) {
-        if (input->argc != 3 || (strcmp(args[2], "frames") && strcmp(args[2], "decoded")))
+        if (input->argc != 3 ||
+            (strcmp(args[2], "frames") && strcmp(args[2], "decoded") && strcmp(args[2], "core")))
             return 2;
         test.view = DTS_CORE;
         test.window = dts_number(args[0]);
         test.maximum = dts_number(args[1]);
         test.decoded = !strcmp(args[2], "decoded");
+        test.core_projection = !strcmp(args[2], "core");
         input->name = "dts-core-frames";
         if (!test.maximum)
             return 2;

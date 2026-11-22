@@ -7,7 +7,7 @@
   "worker_operation": "dts-core-",
   "contract": [
     "Drive DtsCoreFrameReader and the public dca parser with the window in argument one, and apply the same core packet byte limit in argument two. The parser is opened at offset zero with default flags and drained at EOF.",
-    "Fold kind 1 with source offset, packet byte count, the declared sizes from DtsHeaderInspector and inspect_header_bits, probe_frame_extent size, source sample rate and coded duration, and the packet bytes. The reference uses dca_core output length for the three sizes and the parser clock for rate and duration.",
+    "Fold kind 1 with source offset, packet byte count, the declared sizes from DtsHeaderInspector and inspect_header_bits, probe_frame_extent size, source sample rate and coded duration, and the packet bytes. The reference uses dca_core output length for the three sizes and the parser clock for rate and duration. Core mode compares the core bytes from dca_core in both rows while retaining the parser’s physical access-unit offset, so following extension substreams do not count toward the core extent.",
     "Fold kind 1 with core byte count and all core bytes, from the bounded core prefix on the candidate and the dca_core output on the reference. Fold kind 7 at clean EOF or kind 8 at refusal, retaining any frames already emitted.",
     "The decoded mode adds one kind 3 row before the first packet. It compares core channel count and arrangement, nominal bit rate and absent raw depth with the layout and codec context of the first frame the reference decodes with its core_only option, so the extensions inside a core frame add no channels.",
     "Input loading and argument parsing are outside the operation. Reader or parser setup, both packet folds, the reference filter, and teardown are inside. The decoded cases are parity only."
@@ -119,15 +119,15 @@
       "cases": [
         "matrix-termination-raw"
       ]
-    }
-  ],
-  "pending_module_requirements": [
-    "The reader handles aligned core frames only. Supporting a following extension substream requires a bounded streaming extent skip with split-header, EOF and next-core tests for TS 102 114 clauses 7.2 and 7.5.2. This control has only an extension sync marker followed by an invalid size prefix, so it cannot certify a valid DTS-HD extent."
-  ],
-  "open_cases": [
+    },
     {
-      "id": "good-then-extension",
-      "requirement": "The reader handles aligned core frames only. Supporting a following extension substream requires a bounded streaming extent skip with split-header, EOF and next-core tests for TS 102 114 clauses 7.2 and 7.5.2. This control has only an extension sync marker followed by an invalid size prefix, so it cannot certify a valid DTS-HD extent."
+      "reading": "An extension substream must declare room for its header and asset data",
+      "clause": "ETSI TS 102 114 V1.6.1 §7.5.2, Table 7-2: nuExtSSHeaderSize spans the sync through the header CRC; nuExtSSFsize spans the entire substream frame",
+      "candidate": "returns the 96-byte core, then refuses the extension whose header and frame both claim a one-byte extent",
+      "reference": "returns a 112-byte parser packet that includes the invalid extension and filters it to the same 96-byte core, then reaches clean EOF",
+      "cases": [
+        "good-then-extension"
+      ]
     }
   ],
   "open_unmeasured": [
@@ -187,7 +187,7 @@
         "xbr_xch_61_24_48_3840", "xbr_xxch_71_24_48_3840", "xch_61_24_48_768", "xll_51_16_192_768_0",
         "xll_51_16_192_768_1", "xll_51_24_48_768", "xll_51_24_48_none", "xll_71_24_48_768_0",
         "xll_71_24_48_768_1", "xll_71_24_96_768", "xll_x96_51_24_96_1509", "xll_xch_61_24_48_768",
-        "xxch_71_24_48_2046"
+        "xxch_71_24_48_2046", "core-plus-exss"
       ],
       "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
     },
@@ -247,7 +247,7 @@
         "xbr_xch_61_24_48_3840", "xbr_xxch_71_24_48_3840", "xch_61_24_48_768", "xll_51_16_192_768_0",
         "xll_51_16_192_768_1", "xll_51_24_48_768", "xll_51_24_48_none", "xll_71_24_48_768_0",
         "xll_71_24_48_768_1", "xll_71_24_96_768", "xll_x96_51_24_96_1509", "xll_xch_61_24_48_768",
-        "xxch_71_24_48_2046"
+        "xxch_71_24_48_2046", "core-plus-exss"
       ],
       "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
     },
@@ -307,7 +307,7 @@
         "xbr_xch_61_24_48_3840", "xbr_xxch_71_24_48_3840", "xch_61_24_48_768", "xll_51_16_192_768_0",
         "xll_51_16_192_768_1", "xll_51_24_48_768", "xll_51_24_48_none", "xll_71_24_48_768_0",
         "xll_71_24_48_768_1", "xll_71_24_96_768", "xll_x96_51_24_96_1509", "xll_xch_61_24_48_768",
-        "xxch_71_24_48_2046"
+        "xxch_71_24_48_2046", "core-plus-exss"
       ],
       "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
     },

@@ -57,7 +57,7 @@ pub(super) fn operation<'a>(
     };
     let window = |value| size(value).map(|size| size.min(input.len().max(1)));
     match (prefix, args.as_slice()) {
-        ("dts-core-", [chunk, limit, mode @ ("frames" | "decoded")]) => {
+        ("dts-core-", [chunk, limit, mode @ ("frames" | "decoded" | "core")]) => {
             let (window, maximum, decoded) = (window(chunk)?, size(limit)?, *mode == "decoded");
             Ok(Operation {
                 name: "dts-core-frames",

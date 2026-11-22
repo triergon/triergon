@@ -104,7 +104,7 @@ assert_eq!(decoder_input, [
 | `aac`: configuration | `AacAscParser`, `AacAscScopeParser`, `decoder_configuration_view` | AudioSpecificConfig for AAC-LC (2), SBR (5), PS (29): frequency, fixed channel configurations 1–7, 11, 12 and 14, GASpecificConfig, PCE, `0x2b7`/`0x548` sync extensions |
 | `aac`: ADTS | `inspect_adts_header`, `AacAdtsParser`, `AacAdtsWriter`, `AacAdtsStreamReader`, `AacAdtsCarrierReader` | 56-bit header facts; single-block AAC-LC frames; ADTS wrapping of raw access units (`AacAdtsParameters::from_asc`); aligned ADTS streams |
 | `ac3` | `probe_header`, `Ac3FrameReader`, `Ac3ConfigParser`, `Eac3BsiParser` | Header facts (bsid 0–8, 11–16), aligned syncframe reader, dac3/dec3 records, complete E-AC-3 BSI |
-| `dts`: core | `probe_core_header`, `DtsCoreFrameReader`, `DtsHeaderInspector` | Normal and termination core headers (all fields, optional HCRC), FSIZE+1 frame acquisition |
+| `dts`: core | `probe_core_header`, `DtsCoreFrameReader`, `DtsHeaderInspector` | Normal and termination core headers (all fields, optional HCRC), FSIZE+1 core acquisition and traversal of directly following extension substreams |
 | `dts`: declared extents | `probe_frame_extent`, `probe_extension_substream_extent` | Bounded core and extension size fields at an established canonical sync, including the short and long extension prefixes |
 | `dts`: packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14SyncReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
 | `reference_trace::dts` | `ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
@@ -114,7 +114,9 @@ assert_eq!(decoder_input, [
 | `mpeg_audio` | `MpegAudioHeader`, `info_frame`, `MpegInfoFrame`, `LameTag` | The 32-bit frame header of ISO/IEC 11172-3 and 13818-3 with the MPEG-2.5 rates; Xing, Info and VBRI frames with the LAME tag |
 
 The framing views harness compares aligned DTS core frames and declared extents
-with FFmpeg's DTS parser and `dca_core` filter. Its header oracle checks every
+with FFmpeg's DTS parser and `dca_core` filter. For DTS-HD it compares the core bytes
+at each physical access-unit offset, including the offset after an extension.
+Its header oracle checks every
 field, bit range and derived view from both inspectors. A non-core sync leaves
 all later core fields unread. The packed-reader
 comparison covers 14-bit big- and little-endian words and 16-bit little-endian
@@ -229,7 +231,11 @@ descriptors are 16 bytes.
   from several slices when the first slice contains its header prefix.
 - DTS: `DtsCoreFrameReader` reads canonical big-endian normal and termination
   frames without resynchronizing. A termination frame reports its coded
-  window and its padding sample count separately. The extension extent probes read size fields. HCRC is reported, not
+  window and its padding sample count separately. The reader skips extension
+  substreams whose sync words directly follow a core or another extension, using
+  their declared sizes. The frame-byte limit applies to each substream. The frame
+  count limits the returned cores. Extension metadata and CRCs remain opaque.
+  The extension extent probes read size fields. HCRC is reported, not
   checked. `DtsHeaderInspector` and `inspect_header_bits` expose the raw
   seven-bit NBLKS code once complete. Their `coded_window_samples` view is
   `32 × (NBLKS + 1)` core samples per channel for codes 5 through 127.
@@ -278,10 +284,11 @@ units, Annex B configuration and caller-declared record layouts, and both
 hvcC-to-Annex-B writers. The reader comparison covers one- through four-byte
 length fields at three window sizes. It compares each unit returned by the
 reference converter with the corresponding length-delimited source span.
-The configuration comparison checks
-ordered unit types and bytes, retained opaque source bytes, and four-byte
-start codes from `AnnexBWriter`. The HEVC writer comparison also checks the
-decoder writer's refusal type.
+The configuration comparison checks ordered unit types and bytes, retained
+opaque source bytes, and four-byte start codes from `AnnexBWriter`. An
+independent reader checks the caller's opaque layout, including the declared
+array bounds, length-field bytes and NAL payloads. The HEVC writer comparison
+also checks the decoder writer's refusal type.
 
 Prepare the inputs with `cargo xtask framing-views fixtures nal`. The
 [NAL comparison results](../../docs/status.md#linux-aarch64) link the three
@@ -292,7 +299,8 @@ The framing views harness also compares AV1 OBUs returned by FFmpeg's
 comparison uses `aac_adtstoasc` for configured frames and the demuxed payload
 for in-band program configurations and empty frame bodies. The AV1 comparison
 covers low-overhead and externally sized OBUs, including complete OBUs before
-a truncated size field. Independent wire
+a truncated size field. A wire projection reads the authored opaque sequence
+without interpreting its payloads. Independent wire
 oracles check AV1 offsets and exact LEB128 spellings, and all ADTS header
 fields, optional CRC words and original payloads. The AV1 wire oracle uses
 three input window sizes for every case.
