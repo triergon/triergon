@@ -95,6 +95,7 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ("bit-readers", Coverage::Item("oracle-compare")),
     ("rbsp-unescape", Coverage::Item("oracle-compare")),
     ("core-budgets", Coverage::Item("oracle-compare")),
+    ("ac3-features", Coverage::Item("oracle-compare")),
     ("elementary-metadata-wire", Coverage::Item("oracle-compare")),
     ("dsp-windows", Coverage::Item("oracle-compare")),
     ("dsp-divide", Coverage::Item("oracle-compare")),
@@ -568,25 +569,44 @@ impl Plan<'_> {
         if feature.manifest_directory.is_some() {
             preflight.extend(owned(&["--manifest", &format!("{id}={manifest}")]));
         }
+        let mut steps = if feature.parity_only.contains(&self.target) {
+            vec![step(
+                format!("{id}-compare"),
+                Stage::Timing,
+                Placement::Free,
+                report(None),
+            )]
+        } else {
+            self.graded(
+                id,
+                report(Some("benchmark")),
+                report(Some("memory")),
+                id,
+                &manifest,
+            )
+        };
+        if id == "facade-seek" {
+            steps.push(step(
+                "facade-container-seeks",
+                Stage::Timing,
+                Placement::Free,
+                xtask(&[
+                    "play-views",
+                    "seek",
+                    &format!("{}/play-views-worker", self.release),
+                    &format!("{}/parity/facade-container-seeks.json", self.out),
+                ]),
+            ));
+            preflight.extend(owned(&[
+                "--feature",
+                "matroska-cues-preroll",
+                "--isobmff-seek",
+            ]));
+        }
         Item {
             name: id.to_owned(),
             weight: feature.weight,
-            steps: if feature.parity_only.contains(&self.target) {
-                vec![step(
-                    format!("{id}-compare"),
-                    Stage::Timing,
-                    Placement::Free,
-                    report(None),
-                )]
-            } else {
-                self.graded(
-                    id,
-                    report(Some("benchmark")),
-                    report(Some("memory")),
-                    id,
-                    &manifest,
-                )
-            },
+            steps,
             preflight,
         }
     }
@@ -950,11 +970,7 @@ impl Plan<'_> {
         }
     }
 
-    /// The AAC, AC-3, E-AC-3 and DTS decoders against FFmpeg's on every vector of their
-    /// correctness lanes, the derived streams among them included; the summary fails on
-    /// any vector that fails and is not a listed open case. The AAC decoder is built as
-    /// `codec-aac-worker` builds it: by the pinned nightly with its `simd` feature, in the
-    /// nightly workers' target directory; the AAC lane's output comes from that worker.
+    /// The six video workloads with a per-NAL feed and the existing RGBA comparison.
     fn nal_workloads(&self) -> Item {
         let bin = format!("{}/nal-workload-bin", self.out);
         let worker = format!("{}/codec-views-worker", self.release);
@@ -1007,6 +1023,11 @@ impl Plan<'_> {
         }
     }
 
+    /// The AAC, AC-3, E-AC-3 and DTS decoders against FFmpeg's on every vector of their
+    /// correctness lanes, the derived streams among them included; the summary fails on
+    /// any vector that fails and is not a listed open case. The AAC decoder is built as
+    /// `codec-aac-worker` builds it: by the pinned nightly with its `simd` feature, in the
+    /// nightly workers' target directory; the AAC lane's output comes from that worker.
     fn audio_codecs(&self) -> Item {
         let (out, release) = (self.out, self.release);
         let audio_bin = format!("{out}/codec-audio-bin");
