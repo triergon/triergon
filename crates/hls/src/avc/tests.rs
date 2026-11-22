@@ -1,4 +1,9 @@
 use super::*;
+use triergon_mpegts::transport::parse_transport;
+use triergon_mpegts::{
+    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs,
+    compat::pes::{DemuxClock, DemuxObserver, DemuxScope, SourceContext},
+};
 
 const DELIMITER: &[u8] = &[0, 0, 0, 1, 9, 0xf0];
 // RBSP prefixes from the authored bframes-multislice fixture.
@@ -32,25 +37,77 @@ fn clock(pts: u64) -> AvcTsClock {
     }
 }
 
-fn push_span(reader: &mut AvcTsReader, bytes: &[u8]) {
-    assert!(reader.input.is_none());
-    reader.input = Some(Chunk {
-        bytes: Some(Bytes::copy_from_slice(&reader.pool, bytes).unwrap()),
-        offset: 0,
-    });
-}
+const SOURCE: SourceId = SourceId(9);
+const EPOCHS: SourceEpochs = SourceEpochs {
+    clock: 0,
+    configuration: 1,
+};
 
-fn push_pes_span(reader: &mut AvcTsReader, bytes: &[u8]) {
-    assert!(reader.pending_pes.is_none());
-    push_span(reader, bytes);
-    reader.pending_pes = Some(PendingPes {
-        spans: triergon_mpegts::compat::pes::CompactPayload::from_spans(BudgetVec::new(
-            &reader.pool,
-        ))
-        .into_cursor(),
-        remaining: 0,
-        may_reserve: true,
-    });
+/// Carries `bytes` to the reader as the payload of one PES, in as many TS packets
+/// as it needs, through a transport observer and `push`. The PES header applies no
+/// timestamps, so the reader's clock anchors stay as the test sets them.
+fn push_span(reader: &mut AvcTsReader, bytes: &[u8]) {
+    let mut observer = DemuxObserver::new_registered(
+        DemuxScope {
+            program: 31,
+            pid: 256,
+            stream_type: 0x1b,
+            stream_id: 0xe0,
+            entity: SOURCE,
+            epochs: EPOCHS,
+        },
+        RegisteredCarriage::Avc,
+        reader.pool.clone(),
+        ParseLimits::default(),
+    )
+    .unwrap();
+    let length = u16::try_from(3 + bytes.len()).unwrap().to_be_bytes();
+    let pes = [&[0, 0, 1, 0xe0, length[0], length[1], 0x80, 0, 0], bytes].concat();
+    let cancel = AtomicBool::new(false);
+    let mut work = WorkBudget::new(1 << 20);
+    for (index, payload) in pes.chunks(184).enumerate() {
+        let mut raw = [0xff; 188];
+        raw[..4].copy_from_slice(&[
+            0x47,
+            if index == 0 { 0x41 } else { 1 },
+            0,
+            0x10 | (index as u8 & 15),
+        ]);
+        if payload.len() < 184 {
+            raw[3] |= 0x20;
+            raw[4] = (183 - payload.len()) as u8;
+            raw[5] = 0;
+        }
+        raw[188 - payload.len()..].copy_from_slice(payload);
+        let mut carrier = parse_transport(
+            Bytes::copy_from_slice(&reader.pool, &raw).unwrap(),
+            PacketFormat::Ts188,
+            index as u64 * 188,
+        )
+        .unwrap();
+        carrier.source_id = Some(SOURCE);
+        observer
+            .push(
+                carrier,
+                SourceContext {
+                    source_event_ordinal: index as u64,
+                    epochs: EPOCHS,
+                    byte_run_epoch: None,
+                },
+            )
+            .unwrap();
+        if let AssemblyStep::Output(mut packet) = observer.poll(&mut work, &cancel).unwrap() {
+            packet.time_header_applies = false;
+            let clock = DemuxClock::new(31)
+                .unwrap()
+                .project_header(256, EPOCHS, None, &mut work, &cancel)
+                .unwrap()
+                .unwrap();
+            assert!(reader.push(&mut Some(packet), clock).unwrap());
+            return;
+        }
+    }
+    panic!("the fixture PES did not complete");
 }
 
 fn drain(reader: &mut AvcTsReader, out: &mut Vec<AvcTsAccessUnit>) {
@@ -255,7 +312,9 @@ fn repeated_in_band_sets_keep_complete_units_clocks_and_work() {
             }
         }
         assert_eq!(units.len(), 3);
-        assert_eq!(spent, raw.len() as u64 + 3 * 4 + 1);
+        // One unit admits the PES's span, one reads each byte, four start each
+        // unit's NALs and one publishes the last unit.
+        assert_eq!(spent, 1 + raw.len() as u64 + 3 * 4 + 1);
         assert_eq!(reader.sps.as_slice()[0].seen_in_unit, 3);
         assert_eq!(reader.pps.as_slice()[0].seen_in_unit, 3);
         for (index, output) in units.iter().enumerate() {
@@ -390,9 +449,10 @@ fn a_one_unit_budget_publishes_by_transferring_the_buffer() {
     let next_header = &DELIMITER[..LOOKAHEAD];
     push_span(&mut reader, next_header);
     let cancel = AtomicBool::new(false);
+    // One unit admits the span and one reads each lookahead byte.
     assert!(matches!(
         reader
-            .step(&mut WorkBudget::new(LOOKAHEAD as u64), &cancel)
+            .step(&mut WorkBudget::new(1 + LOOKAHEAD as u64), &cancel)
             .unwrap(),
         AvcTsStep::Yield
     ));
@@ -516,10 +576,11 @@ fn pes_extent_hint_preserves_packed_and_split_units_under_pressure() {
     for headroom in [None, Some(ordinary_growth + publication), Some(0)] {
         let (pool, mut reader) = fixture();
         reader.remember_clock(clock(9000)).unwrap();
-        push_pes_span(&mut reader, &packed);
+        push_span(&mut reader, &packed);
         // Stop after the first slice header. The IDR fixture ends with two
-        // payload bytes and the four NAL transitions cost one unit each.
-        let mut prefix_work = WorkBudget::new((headers.len() - 2 + 4) as u64);
+        // payload bytes, admitting the span and the four NAL transitions cost
+        // one unit each.
+        let mut prefix_work = WorkBudget::new((1 + headers.len() - 2 + 4) as u64);
         assert!(matches!(
             reader.step(&mut prefix_work, &cancel).unwrap(),
             AvcTsStep::Yield
@@ -546,7 +607,7 @@ fn pes_extent_hint_preserves_packed_and_split_units_under_pressure() {
 
         let mut units = vec![unit];
         drain(&mut reader, &mut units);
-        push_pes_span(&mut reader, tail);
+        push_span(&mut reader, tail);
         reader.finish();
         drain(&mut reader, &mut units);
         assert_eq!(units.len(), 2);
@@ -619,7 +680,7 @@ fn publish_before_next(reader: &mut AvcTsReader, unit: &[u8]) -> AvcTsAccessUnit
     let cancel = AtomicBool::new(false);
     assert!(matches!(
         reader
-            .step(&mut WorkBudget::new(LOOKAHEAD as u64), &cancel)
+            .step(&mut WorkBudget::new(1 + LOOKAHEAD as u64), &cancel)
             .unwrap(),
         AvcTsStep::Yield
     ));
@@ -629,6 +690,9 @@ fn publish_before_next(reader: &mut AvcTsReader, unit: &[u8]) -> AvcTsAccessUnit
     };
     assert_eq!(publication_work.spent(), 1);
     assert_eq!(reader.bytes.as_slice(), &DELIMITER[..LOOKAHEAD]);
+    // Release the consumed PES, as the reader's owner does before offering another.
+    drain(reader, &mut units);
+    assert!(units.is_empty());
     published
 }
 

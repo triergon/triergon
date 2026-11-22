@@ -4,7 +4,7 @@
 
 use crate::pes::{clock_describes, lane_track};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Bytes, BytesView, Error, Result, SourceId, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
 use triergon_framing::{
     avc,
     nal::{Codec, NalHeader},
@@ -159,9 +159,6 @@ struct Anchor {
 
 #[derive(Debug)]
 struct Chunk {
-    // Direct syntax fixtures do not construct a transport packet.
-    #[cfg(test)]
-    bytes: Option<Bytes>,
     offset: usize,
 }
 
@@ -172,30 +169,17 @@ struct PendingPes {
     may_reserve: bool,
 }
 
-impl Chunk {
-    fn view<'a>(&'a self, spans: Option<&'a PayloadCursor>) -> Option<BytesView<'a>> {
-        #[cfg(test)]
-        if let Some(bytes) = &self.bytes {
-            return Some(bytes.view(0..bytes.len()).expect("complete direct chunk"));
-        }
-        spans.and_then(PayloadCursor::current_bytes)
-    }
-
-    #[expect(
-        clippy::expect_used,
-        reason = "outside direct test chunks, a chunk is read only from the pending PES's spans"
-    )]
-    fn retire(&self, pending: &mut Option<PendingPes>) {
-        #[cfg(test)]
-        if self.bytes.is_some() {
-            return;
-        }
-        pending
-            .as_mut()
-            .expect("pending PES chunk")
-            .spans
-            .retire_current();
-    }
+/// Retires the chunk being read, which is the pending PES's current span.
+#[expect(
+    clippy::expect_used,
+    reason = "a chunk is read only from the pending PES's spans"
+)]
+fn retire_chunk(pending: &mut Option<PendingPes>) {
+    pending
+        .as_mut()
+        .expect("pending PES chunk")
+        .spans
+        .retire_current();
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -576,11 +560,7 @@ impl AvcTsReader {
                         .remaining
                         .checked_sub(bytes.len())
                         .ok_or(Error::Invalid("AVC TS PES payload extent"))?;
-                    self.input = Some(Chunk {
-                        #[cfg(test)]
-                        bytes: None,
-                        offset: 0,
-                    });
+                    self.input = Some(Chunk { offset: 0 });
                 } else {
                     if pending.remaining != 0 {
                         return Err(Error::Invalid("AVC TS PES payload extent"));
@@ -597,13 +577,13 @@ impl AvcTsReader {
                         spans,
                         remaining,
                         may_reserve,
-                    }) => (chunk.view(Some(spans)), *remaining, Some(may_reserve)),
-                    None => (chunk.view(None), 0, None),
+                    }) => (spans.current_bytes(), *remaining, Some(may_reserve)),
+                    None => (None, 0, None),
                 };
                 let span = span.ok_or(Error::Invalid("AVC TS missing PES span"))?;
                 let span_len = span.len();
                 if chunk.offset == span_len {
-                    chunk.retire(&mut self.pending_pes);
+                    retire_chunk(&mut self.pending_pes);
                     self.input = None;
                     continue;
                 }
@@ -642,7 +622,7 @@ impl AvcTsReader {
                 })?;
                 chunk.offset += copy;
                 if chunk.offset == span_len {
-                    chunk.retire(&mut self.pending_pes);
+                    retire_chunk(&mut self.pending_pes);
                     self.input = None;
                 }
                 work.try_charge(copy as u64);

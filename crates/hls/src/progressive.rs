@@ -250,8 +250,6 @@ pub struct TsProgressiveReader<S: Source> {
     audio: Option<HlsAac>,
     saw_video: bool,
     audio_times: Option<(Time, NextAudioTime)>,
-    #[cfg(test)]
-    reuse_storage: bool,
 }
 
 impl<S: Source> TsProgressiveReader<S> {
@@ -279,8 +277,6 @@ impl<S: Source> TsProgressiveReader<S> {
             audio: None,
             saw_video: false,
             audio_times: None,
-            #[cfg(test)]
-            reuse_storage: true,
         })
     }
 
@@ -600,10 +596,6 @@ impl<S: Source> TsProgressiveReader<S> {
     /// Takes a finished video unit back when the next one arrives so its unshared
     /// buffer can be reused. An audio unit releases its storage when dropped.
     pub fn reuse_unit(&mut self, unit: TsProgressiveUnit) {
-        #[cfg(test)]
-        if !self.reuse_storage {
-            return;
-        }
         if let (TsProgressiveUnit::Video(unit), Some(video)) = (unit, self.video.as_mut()) {
             video.reuse_unit(unit);
         }
@@ -613,7 +605,7 @@ impl<S: Source> TsProgressiveReader<S> {
     /// back the lists of the one a reader has just consumed.
     fn reuse_pes_lists(&mut self, track: impl Fn(&Tracks) -> TrackKey, lists: SpentLists) {
         #[cfg(test)]
-        if !self.reuse_storage {
+        if !tests::RETURN_PES_LISTS.get() {
             return;
         }
         if let (Some(transport), Some(tracks)) = (self.transport.as_mut(), self.tracks.as_ref())
@@ -757,8 +749,15 @@ fn select_track(map: &ProgramMap, stream_type: u8) -> Result<TrackKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
     use std::collections::VecDeque;
     use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId};
+
+    thread_local! {
+        /// Whether readers on this thread hand consumed PES lists back to their
+        /// observers. A test clears it to read without that reuse.
+        pub(super) static RETURN_PES_LISTS: Cell<bool> = const { Cell::new(true) };
+    }
 
     #[test]
     fn refusal_delivery_waits_for_work_and_keeps_its_original_fields() {
@@ -1162,7 +1161,7 @@ mod tests {
             let input = InputCursor::new(&pool, id, caps, window).unwrap();
             let mut reader =
                 TsProgressiveReader::new(input, source, TsProgressiveLimits::default()).unwrap();
-            reader.reuse_storage = reuse;
+            RETURN_PES_LISTS.set(reuse);
             let cancel = AtomicBool::new(false);
             let mut trace = Vec::new();
             let mut held: [VecDeque<TsProgressiveUnit>; 2] = Default::default();
@@ -1196,11 +1195,13 @@ mod tests {
                         track.push_back(unit);
                         if track.len() > 2
                             && let Some(oldest) = track.pop_front()
+                            && reuse
                         {
                             reader.reuse_unit(oldest);
                         }
                     }
                     TsProgressiveStep::End => {
+                        RETURN_PES_LISTS.set(true);
                         drop((reader, held));
                         assert_eq!(pool.used(), Budget::control_storage_bytes());
                         return (trace, peak, largest);
