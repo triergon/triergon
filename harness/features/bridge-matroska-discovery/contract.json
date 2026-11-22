@@ -1,0 +1,238 @@
+{
+  "schema": 1,
+  "id": "bridge-matroska-discovery",
+  "gate": "required",
+  "operation": "bridge-matroska-discovery",
+  "candidate": "playback-views-worker",
+  "worker_operation": "mkv-discovery-",
+  "reference": "ffmpeg-playback-views-native",
+  "runner": "cargo xtask report",
+  "contract": [
+    "Compare Matroska stream discovery with avformat_find_stream_info on the formats build. Fold stream ordinal, codec, width, height and complete codec configuration. PGS canvas comes from buffered packets and the VobSub canvas from CodecPrivate.",
+    "Replay the discovery prefix and then continue playback in source order. Compare every stream ordinal, optional source PTS and DTS in nanoseconds, key flag, length and packet bytes. The reference reads a fresh raw demux pass. Matroska Blocks carry PTS only, including DVB packets for which the reference additionally reports a demux DTS equal to PTS.",
+    "Compact discovery checks the buffered AAC feed segments and folds their raw AAC payload. Reconstruct legacy ASC from the first ADTS header emitted by the actual feed. The reference folds its discovered extradata.",
+    "Full discovery includes the HEVC/Dolby feed duration projection for Dolby packets. The indexed seek case folds the selected HEVC packets admitted from the landing keyframe and the gate's landed verdict.",
+    "Trace the candidate cutoff and buffered output count. The packet sequence is compared through the end independent of the readiness cutoff."
+  ],
+  "required_profiles": [
+    "compact",
+    "full",
+    "seek"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "aac-mpeg2-lc-laced",
+        "aac-mpeg2-lc",
+        "aac-mpeg4-lc-ambiguous-layout",
+        "aac-mpeg4-lc-empty-private",
+        "aac-mpeg4-lc-timed",
+        "aac-mpeg4-lc",
+        "audio-bad-first-discovery",
+        "audio-mixed-discovery",
+        "avc-reordered-discovery",
+        "hevc-dolby",
+        "hevc-indexed-seek",
+        "hevc-indexed-seek-seek",
+        "hevc-no-default-duration-discovery",
+        "hevc-repeated-configuration-in-band",
+        "hevc-repeated-configuration",
+        "hevc-repeated-parameter-sets",
+        "hevc-repeated-truncated-vps-configuration",
+        "hevc-single-configuration",
+        "hevc-truncated-pps",
+        "hevc-truncated-sps",
+        "hevc-truncated-vps",
+        "three-tracks",
+        "pgs-all-unknown",
+        "pgs-bad-first-canvas",
+        "pgs-combined-leading",
+        "pgs-duration-after-known",
+        "pgs-early-canvas",
+        "pgs-known-anchor",
+        "pgs-known-then-duration",
+        "pgs-known-zero",
+        "pgs-observed-relative",
+        "pgs-packet-cap",
+        "pgs-running-relative",
+        "avc-pgs-early-canvas",
+        "matroska-dvb-source-dts",
+        "matroska-dvb-ancillary"
+      ],
+      "cause": "Discovery runs inside matroska-startup-seek. This operation compares the discovery and replay fields."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "aac-mpeg2-lc-laced",
+        "aac-mpeg2-lc",
+        "aac-mpeg4-lc-ambiguous-layout",
+        "aac-mpeg4-lc-empty-private",
+        "aac-mpeg4-lc-timed",
+        "aac-mpeg4-lc",
+        "audio-bad-first-discovery",
+        "audio-mixed-discovery",
+        "avc-reordered-discovery",
+        "hevc-dolby",
+        "hevc-indexed-seek",
+        "hevc-indexed-seek-seek",
+        "hevc-no-default-duration-discovery",
+        "hevc-repeated-configuration-in-band",
+        "hevc-repeated-configuration",
+        "hevc-repeated-parameter-sets",
+        "hevc-repeated-truncated-vps-configuration",
+        "hevc-single-configuration",
+        "hevc-truncated-pps",
+        "hevc-truncated-sps",
+        "hevc-truncated-vps",
+        "three-tracks",
+        "pgs-all-unknown",
+        "pgs-bad-first-canvas",
+        "pgs-combined-leading",
+        "pgs-duration-after-known",
+        "pgs-early-canvas",
+        "pgs-known-anchor",
+        "pgs-known-then-duration",
+        "pgs-known-zero",
+        "pgs-observed-relative",
+        "pgs-packet-cap",
+        "pgs-running-relative",
+        "avc-pgs-early-canvas",
+        "matroska-dvb-source-dts",
+        "matroska-dvb-ancillary"
+      ],
+      "cause": "Discovery runs inside matroska-startup-seek. This operation compares the discovery and replay fields."
+    },
+    {
+      "bound": "rss",
+      "cases": [
+        "aac-mpeg2-lc-laced",
+        "aac-mpeg2-lc",
+        "aac-mpeg4-lc-ambiguous-layout",
+        "aac-mpeg4-lc-empty-private",
+        "aac-mpeg4-lc-timed",
+        "aac-mpeg4-lc",
+        "audio-bad-first-discovery",
+        "audio-mixed-discovery",
+        "avc-reordered-discovery",
+        "hevc-dolby",
+        "hevc-indexed-seek",
+        "hevc-indexed-seek-seek",
+        "hevc-no-default-duration-discovery",
+        "hevc-repeated-configuration-in-band",
+        "hevc-repeated-configuration",
+        "hevc-repeated-parameter-sets",
+        "hevc-repeated-truncated-vps-configuration",
+        "hevc-single-configuration",
+        "hevc-truncated-pps",
+        "hevc-truncated-sps",
+        "hevc-truncated-vps",
+        "three-tracks",
+        "pgs-all-unknown",
+        "pgs-bad-first-canvas",
+        "pgs-combined-leading",
+        "pgs-duration-after-known",
+        "pgs-early-canvas",
+        "pgs-known-anchor",
+        "pgs-known-then-duration",
+        "pgs-known-zero",
+        "pgs-observed-relative",
+        "pgs-packet-cap",
+        "pgs-running-relative",
+        "avc-pgs-early-canvas",
+        "matroska-dvb-source-dts",
+        "matroska-dvb-ancillary"
+      ],
+      "cause": "Discovery runs inside matroska-startup-seek. This operation compares the discovery and replay fields."
+    }
+  ],
+  "pending_module_requirements": [
+    "Resolve legacy AAC initialization for seven declared channels without an AAC channel assignment.",
+    "Resolve legacy AAC initialization when an empty CodecPrivate is explicitly present.",
+    "Resolve replay when the AC-3 track starts with a packet that fails syncframe admission.",
+    "Resolve exact CodecDelay subtraction versus the reference's Matroska tick projection.",
+    "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+  ],
+  "open_cases": [
+    {
+      "id": "aac-mpeg4-lc-ambiguous-layout",
+      "requirement": "Resolve legacy AAC initialization for seven declared channels without an AAC channel assignment."
+    },
+    {
+      "id": "aac-mpeg4-lc-empty-private",
+      "requirement": "Resolve legacy AAC initialization when an empty CodecPrivate is explicitly present."
+    },
+    {
+      "id": "audio-bad-first-discovery",
+      "requirement": "Resolve replay when the AC-3 track starts with a packet that fails syncframe admission."
+    },
+    {
+      "id": "audio-mixed-discovery",
+      "requirement": "Resolve exact CodecDelay subtraction versus the reference's Matroska tick projection."
+    },
+    {
+      "id": "hevc-dolby",
+      "requirement": "Resolve exact CodecDelay subtraction versus the reference's Matroska tick projection."
+    },
+    {
+      "id": "three-tracks",
+      "requirement": "Resolve exact CodecDelay subtraction versus the reference's Matroska tick projection."
+    },
+    {
+      "id": "pgs-all-unknown",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    },
+    {
+      "id": "pgs-bad-first-canvas",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    },
+    {
+      "id": "pgs-combined-leading",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    },
+    {
+      "id": "pgs-duration-after-known",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    },
+    {
+      "id": "pgs-early-canvas",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    },
+    {
+      "id": "pgs-known-anchor",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    },
+    {
+      "id": "pgs-known-then-duration",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    },
+    {
+      "id": "pgs-known-zero",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    },
+    {
+      "id": "pgs-observed-relative",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    },
+    {
+      "id": "pgs-packet-cap",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    },
+    {
+      "id": "pgs-running-relative",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    },
+    {
+      "id": "matroska-dvb-source-dts",
+      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+    }
+  ]
+}

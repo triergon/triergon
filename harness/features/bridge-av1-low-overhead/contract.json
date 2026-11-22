@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "id": "bridge-av1-low-overhead",
+  "gate": "required",
+  "operation": "bridge-mp4-packets",
+  "candidate": "playback-views-worker",
+  "worker_operation": "mp4-bridges-",
+  "oracle": "av1-low-overhead",
+  "contract": [
+    "Bind Av1BridgeSetup to an MP4 av01 or dav1 description or a Matroska AV1 track. Frame each packet as one low-overhead temporal unit.",
+    "Use an independent whole-file oracle for ISO BMFF sample tables and Matroska SimpleBlocks. Compare the exact bytes of every temporal unit, with a leading Temporal Delimiter OBU and a size field at each OBU, per AV1 \u00a7\u00a75.2\u20135.3 and the AV1 ISO BMFF binding \u00a72.4.",
+    "Include the configuration OBUs at random access if the configuration holds a sequence header and the sample lacks one. Preserve complete sample OBUs and their order."
+  ],
+  "required_profiles": [
+    "dolby-entry",
+    "mkv",
+    "mp4"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "range-dav1-0-av1",
+        "mp4-six-frames-0-av1",
+        "webm-six-frames-0-av1"
+      ],
+      "cause": "The whole-file AV1 specification oracle provides a byte comparison."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "range-dav1-0-av1",
+        "mp4-six-frames-0-av1",
+        "webm-six-frames-0-av1"
+      ],
+      "cause": "The whole-file AV1 specification oracle provides a byte comparison."
+    },
+    {
+      "bound": "rss",
+      "cases": [
+        "range-dav1-0-av1",
+        "mp4-six-frames-0-av1",
+        "webm-six-frames-0-av1"
+      ],
+      "cause": "The whole-file AV1 specification oracle provides a byte comparison."
+    }
+  ]
+}

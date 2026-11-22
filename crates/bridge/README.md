@@ -84,6 +84,17 @@ polls as needed.
   teletext per ETSI EN 300 472.
 - Closed captions: ATSC A/53 Part 4 `cc_data()` in ITU-T T.35 SEI messages.
 
+The [access-unit comparison](../../harness/features/bridge-access-units/contract.json)
+checks stream identity, source clocks, key and configuration flags, and payload
+bytes. The [AAC packet bridge](../../harness/features/bridge-mp4-packets/contract.json)
+compares complete ADTS frames with the FFmpeg muxer. The [AV1 packet
+bridge](../../harness/features/bridge-av1-low-overhead/contract.json) compares
+temporal-unit bytes with an independent low-overhead bitstream oracle for MP4
+and WebM. The [Matroska discovery comparison](../../harness/features/bridge-matroska-discovery/contract.json)
+checks discovered codec fields, PGS canvas, legacy AAC initialization, source
+replay and the HEVC seek landing. The AAC audio-clock comparison exercises
+the compact replay feed through its clock and raw packet output.
+
 The integration tests (`tests/it`) read the fixtures of `crates/playback/tests/fixtures`.
 Fixture provenance: [AV1](../playback/tests/fixtures/av1/README.md),
 [Matroska feeds](../playback/tests/fixtures/mkv-feed/README.md),

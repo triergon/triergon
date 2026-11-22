@@ -1,0 +1,546 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "aac-mpeg2-lc-laced",
+      "profile": "compact",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg2-lc-laced.mkv",
+      "sha256": "a64071af30efc713936cb81e3f7765eab919ee7733989b4bd6a2200cd935268f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "compact"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 2686,
+        "digest": 5710236384506085616
+      }
+    },
+    {
+      "id": "aac-mpeg2-lc",
+      "profile": "compact",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg2-lc.mkv",
+      "sha256": "c26f0023c6742aa8efc02c36452325beeab0f637f0fe8e248ffab4a4a84e1043",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "compact"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 2686,
+        "digest": 16152681904589859532
+      }
+    },
+    {
+      "id": "aac-mpeg4-lc-ambiguous-layout",
+      "profile": "compact",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-ambiguous-layout.mkv",
+      "sha256": "56268033639e981964ea404a656aa820712884fc653a4767ca40b47ae884b12f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "compact"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 2686,
+        "digest": 11306059086726804388
+      }
+    },
+    {
+      "id": "aac-mpeg4-lc-empty-private",
+      "profile": "compact",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-empty-private.mkv",
+      "sha256": "3aa8526d129e18370033f5b8a8bf02328e30947a96e24e7be14d9ccf3eb92442",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "compact"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 2686,
+        "digest": 16152681904589859532
+      }
+    },
+    {
+      "id": "aac-mpeg4-lc-timed",
+      "profile": "compact",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-timed.mkv",
+      "sha256": "d3774cb3e25bb6ce6a161c9de10b9f25d133e4b0155f59935d09682c4430f51d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "compact"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 2686,
+        "digest": 16152681904589859532
+      }
+    },
+    {
+      "id": "aac-mpeg4-lc",
+      "profile": "compact",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc.mkv",
+      "sha256": "4047e3e399b1620bcccdf5d6600f4712da82b7d166b079c120ef5e408775c121",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "compact"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 2686,
+        "digest": 16152681904589859532
+      }
+    },
+    {
+      "id": "audio-bad-first-discovery",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/audio-bad-first-discovery.mkv",
+      "sha256": "7105b3686a4361dbb4fe853bd0c3fe58d748903e5747985cefd48e359df9b42a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 6144,
+        "digest": 10358073284567032751
+      }
+    },
+    {
+      "id": "audio-mixed-discovery",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/audio-mixed-discovery.mkv",
+      "sha256": "8fa3222350e8b92aab49bfb6918307d5fcb729a2281bf2d4f9a438c306e3594a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 34,
+        "bytes": 7291,
+        "digest": 7327993944553194219
+      }
+    },
+    {
+      "id": "avc-reordered-discovery",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/avc-reordered-discovery.mkv",
+      "sha256": "4ad06aff1285ddae3f1e4684220a6666a83d150111c37951fd4c6c46efb256bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 1915,
+        "digest": 5586046132992318445
+      }
+    },
+    {
+      "id": "hevc-dolby",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-dolby.mkv",
+      "sha256": "319b3ee94fe7c67a6f1cfde4d1f3e0238f9ac51c6c7cda1140acb44f2cdcb39a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 98,
+        "bytes": 42542,
+        "digest": 10395039215577083151
+      }
+    },
+    {
+      "id": "hevc-indexed-seek",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 25118,
+        "digest": 7979512555703198908
+      }
+    },
+    {
+      "id": "hevc-indexed-seek-seek",
+      "profile": "seek",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "seek"
+      ],
+      "expected": {
+        "packets": 51,
+        "bytes": 20171,
+        "digest": 5030984342906862265
+      }
+    },
+    {
+      "id": "hevc-no-default-duration-discovery",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-no-default-duration-discovery.mkv",
+      "sha256": "ad6fd4d430be9fd7e913893c0eeb7fb0d7ffd884ecd24985019c5e3506c0a118",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 3483,
+        "digest": 4739190488670593314
+      }
+    },
+    {
+      "id": "hevc-repeated-configuration-in-band",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-configuration-in-band.mkv",
+      "sha256": "36e4490bcb67c97bd93a9853490fc6bb3b01d0c260e75867f6c8c9100d9de01e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2249,
+        "digest": 13428499100183503359
+      }
+    },
+    {
+      "id": "hevc-repeated-configuration",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-configuration.mkv",
+      "sha256": "903d54e0d60099646f0aea2d84810a3115c2b0ee1d9df6bb8a5bf136d3caa930",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2087,
+        "digest": 12790994424004522205
+      }
+    },
+    {
+      "id": "hevc-repeated-parameter-sets",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-parameter-sets.mkv",
+      "sha256": "90023f5ee80c66d387c1dbe21935f2804f85a4ee81bb89d1c3797f7ed3882888",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2174,
+        "digest": 4045866343938698420
+      }
+    },
+    {
+      "id": "hevc-repeated-truncated-vps-configuration",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-truncated-vps-configuration.mkv",
+      "sha256": "6dc062bfc80a961a3125b9bdfd4382d1c7e58ea3df5a2d17ee61de72bd67e976",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2045,
+        "digest": 12545881337238685515
+      }
+    },
+    {
+      "id": "hevc-single-configuration",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-single-configuration.mkv",
+      "sha256": "84aac621d845186d0191b7075e64d328c57ec723ef1dd3a42ccb97fb4adfbf5c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2012,
+        "digest": 3900076319267277010
+      }
+    },
+    {
+      "id": "hevc-truncated-pps",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-truncated-pps.mkv",
+      "sha256": "78ffcd772e5a5616cc83ba91fa1057c913e78f1e248e40479356339c408402bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2165,
+        "digest": 16801836625980010270
+      }
+    },
+    {
+      "id": "hevc-truncated-sps",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-truncated-sps.mkv",
+      "sha256": "71e2aff99f5af5e3b72738d2e4db792f8abc9152a9e62aa25870da9c6afffe5b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2132,
+        "digest": 13453879258025763143
+      }
+    },
+    {
+      "id": "hevc-truncated-vps",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-truncated-vps.mkv",
+      "sha256": "f8d1d0d4fb3b6f9a9d1182b9136e6f5e7e40ad8da7a25bc3dc54d39f2779b6e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 2153,
+        "digest": 13964628248346073231
+      }
+    },
+    {
+      "id": "three-tracks",
+      "profile": "compact",
+      "file": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "compact"
+      ],
+      "expected": {
+        "packets": 105,
+        "bytes": 13044,
+        "digest": 9952201077951685275
+      }
+    },
+    {
+      "id": "pgs-all-unknown",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/all-unknown.mkv",
+      "sha256": "9c597d5d80bcb0dd33677112761335434b50e779765f3a06dbc8328019bad1e5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 99,
+        "digest": 1115447749140800693
+      }
+    },
+    {
+      "id": "pgs-bad-first-canvas",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/bad-first-canvas.mkv",
+      "sha256": "8cabd8699519395d470d8aaa7eba799a77b474b305d3c73d0c40d05b019fd0ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 76,
+        "digest": 12343174426477586343
+      }
+    },
+    {
+      "id": "pgs-combined-leading",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/combined-leading.mkv",
+      "sha256": "2422bfc15316e1702d17f7fd1f51d6621881dd328fb6ee6b11520783c5d37651",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 86,
+        "digest": 14194044082326554128
+      }
+    },
+    {
+      "id": "pgs-duration-after-known",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/duration-after-known.mkv",
+      "sha256": "63d8a98cbe4a4e2a90ab4e231dbfa3d53eb94b11515bcf8c74db82f1a4d73a95",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 99,
+        "digest": 4602743127036889562
+      }
+    },
+    {
+      "id": "pgs-early-canvas",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/early-canvas.mkv",
+      "sha256": "8d428326558d9dd8c6e9b1b40daf03b706f66a4ce0ed0c65ce339cc995af1cbc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 71,
+        "digest": 17272962505234713468
+      }
+    },
+    {
+      "id": "pgs-known-anchor",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/known-anchor.mkv",
+      "sha256": "29d27200ac0cecfdbc3a24bf50a15b9474f92bf0f1b200f4f77b5af19794a008",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 99,
+        "digest": 3187915749980366622
+      }
+    },
+    {
+      "id": "pgs-known-then-duration",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/known-then-duration.mkv",
+      "sha256": "cea5453e93a7169da67aaab378e032151f04d7d128e6fe9a98d242d6be567c0f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 99,
+        "digest": 10566982486968548536
+      }
+    },
+    {
+      "id": "pgs-known-zero",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/known-zero.mkv",
+      "sha256": "bedda653b257c77b44b4bd429c2d82510a2fc892972e437a2ba03827c8eb3004",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 99,
+        "digest": 8114712599394830203
+      }
+    },
+    {
+      "id": "pgs-observed-relative",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/observed-relative.mkv",
+      "sha256": "8878b8e57f63e535fb32308485a5782b4d411080067cb9e9c618e3c55fd0ee1f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 99,
+        "digest": 1115447749140800693
+      }
+    },
+    {
+      "id": "pgs-packet-cap",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/packet-cap.mkv",
+      "sha256": "096ec68dffd8850f9893ec10d87ad5c0248f335350a896b112b466ef85eac971",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 104,
+        "digest": 5057362220482313387
+      }
+    },
+    {
+      "id": "pgs-running-relative",
+      "profile": "full",
+      "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/running-relative.mkv",
+      "sha256": "6ea2d03889c200c32c7faa03e19d3a9c26d4c71b957189caa15ba2ce91713ba5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 99,
+        "digest": 3187915749980366622
+      }
+    },
+    {
+      "id": "avc-pgs-early-canvas",
+      "profile": "full",
+      "file": "harness/fixtures/playback/avc-pgs-early-canvas.mkv",
+      "sha256": "158a661369533103eba91a13192558c472f15da5e2e7b74d3acb4ed222f54a58",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 1951,
+        "digest": 10772619898100684823
+      }
+    },
+    {
+      "id": "matroska-dvb-source-dts",
+      "profile": "full",
+      "file": ".research/subtitle-corpus/dvb/research/mkv-bitmap-dvb-v1--valid-video-carrier.mkv",
+      "sha256": "0824fe96a98e1c771086610eae24a01a6a515f0b067d785e8c3b1b7e4fa8260e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 425,
+        "digest": 9485618315445703961
+      }
+    },
+    {
+      "id": "matroska-dvb-ancillary",
+      "file": ".research/subtitle-corpus/dvb/pages-ancillary.mkv",
+      "sha256": "c5ad240ebf66963e887eacae5b5b5a4b2891c962ab3550397775f06723c4d94f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "full"
+      ],
+      "profile": "full",
+      "expected": {
+        "packets": 3,
+        "bytes": 234,
+        "digest": 7627946316794822821
+      }
+    }
+  ]
+}

@@ -1,0 +1,1901 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "range-regular-avc-aac-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/regular-avc-aac.mp4",
+      "sha256": "7f2f92cb0e7a97920828fc9f79daeec2471a58d990572305d7aa08c30fb512fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 49109,
+        "digest": 14796955959516710426
+      }
+    },
+    {
+      "id": "range-regular-avc-aac-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/regular-avc-aac.mp4",
+      "sha256": "7f2f92cb0e7a97920828fc9f79daeec2471a58d990572305d7aa08c30fb512fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 33840,
+        "digest": 5790688446142363773
+      }
+    },
+    {
+      "id": "range-variable-aac-duration-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/variable-aac-duration.mp4",
+      "sha256": "30eea0cf071465639669a0ab87c6e48db0022323a1f169c53f5de901b318c8d1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 49109,
+        "digest": 14796955959516710426
+      }
+    },
+    {
+      "id": "range-variable-aac-duration-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/variable-aac-duration.mp4",
+      "sha256": "30eea0cf071465639669a0ab87c6e48db0022323a1f169c53f5de901b318c8d1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 33840,
+        "digest": 11300879954093757659
+      }
+    },
+    {
+      "id": "range-fragmented-avc-aac-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/fragmented-avc-aac.mp4",
+      "sha256": "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 24465,
+        "digest": 14159811416455367062
+      }
+    },
+    {
+      "id": "range-fragmented-avc-aac-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/fragmented-avc-aac.mp4",
+      "sha256": "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 62,
+        "bytes": 16079,
+        "digest": 15368285775562052950
+      }
+    },
+    {
+      "id": "range-fragmented-aac-media-clock-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/fragmented-aac-media-clock.mp4",
+      "sha256": "07acb7a739b83a9597b462b561fb97db1767a2b3ccc2bba3b2bb219a985b563d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 24465,
+        "digest": 14159811416455367062
+      }
+    },
+    {
+      "id": "range-fragmented-aac-media-clock-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/fragmented-aac-media-clock.mp4",
+      "sha256": "07acb7a739b83a9597b462b561fb97db1767a2b3ccc2bba3b2bb219a985b563d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 62,
+        "bytes": 16079,
+        "digest": 11578606507604290568
+      }
+    },
+    {
+      "id": "range-dvh1-0-hevc",
+      "profile": "mp4-hevc",
+      "file": ".research/mp4-range-fixtures/dvh1.mp4",
+      "sha256": "b605e3873529a8bc857b7bdae9ce08184eba955a0000ca848c812900c92e0a84",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 5434,
+        "digest": 4851385735055296380
+      }
+    },
+    {
+      "id": "range-dvh1-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/dvh1.mp4",
+      "sha256": "b605e3873529a8bc857b7bdae9ce08184eba955a0000ca848c812900c92e0a84",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 437,
+        "digest": 15214125054916796062
+      }
+    },
+    {
+      "id": "range-dvhe-0-hevc",
+      "profile": "mp4-hevc",
+      "file": ".research/mp4-range-fixtures/dvhe.mp4",
+      "sha256": "22b2a2b95d866df543f8c4d6172fbf1fb84f652ab7000931f5b97fb8366dc2cd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 5434,
+        "digest": 4851385735055296380
+      }
+    },
+    {
+      "id": "range-dvhe-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/dvhe.mp4",
+      "sha256": "22b2a2b95d866df543f8c4d6172fbf1fb84f652ab7000931f5b97fb8366dc2cd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 437,
+        "digest": 15214125054916796062
+      }
+    },
+    {
+      "id": "range-dav1-0-av1",
+      "profile": "mp4-av1",
+      "file": ".research/mp4-range-fixtures/dav1.mp4",
+      "sha256": "10442e57ff92c76c30ed0bcd8e6be708e986208193c65442c44b05377916f191",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "av1"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 4097,
+        "digest": 5072224075494568218
+      }
+    },
+    {
+      "id": "range-avc-opus-edit-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-opus-edit.mp4",
+      "sha256": "109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 81,
+        "bytes": 45542,
+        "digest": 426183203378942444
+      }
+    },
+    {
+      "id": "range-avc-opus-seek-boundary-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-opus-seek-boundary.mp4",
+      "sha256": "b638bd26179ce0d091bc1e96f770788c3a6437a64d38342dcf1d6f896b015de4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 81,
+        "bytes": 45542,
+        "digest": 426183203378942444
+      }
+    },
+    {
+      "id": "range-avc-opus-trimmed-end-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-opus-trimmed-end.mp4",
+      "sha256": "d13e84fd4307cfba2a3e9c49f2e07f1d0cff85c8aa328f9355def77fa1b08511",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 81,
+        "bytes": 45542,
+        "digest": 426183203378942444
+      }
+    },
+    {
+      "id": "range-avc-opus-rescaled-edit-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-opus-rescaled-edit.mp4",
+      "sha256": "d553d89ec289ae117de866f5965bf90efed4aed78433ebb361b04a75bcbaf57c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 81,
+        "bytes": 45542,
+        "digest": 426183203378942444
+      }
+    },
+    {
+      "id": "range-avc-opus-cropped-edit-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-opus-cropped-edit.mp4",
+      "sha256": "aa39c47facc37101f7d3df72c2070623929406bdc457719dd2c56a9802baea24",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 81,
+        "bytes": 45542,
+        "digest": 426183203378942444
+      }
+    },
+    {
+      "id": "range-avc-opus-long-roll-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-opus-long-roll.mp4",
+      "sha256": "d41d2655fee91bdd7652bd10d0a54af9135b8d0365aacab1375771715eef09a9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 81,
+        "bytes": 45542,
+        "digest": 426183203378942444
+      }
+    },
+    {
+      "id": "range-avc-opus-video-composition-offset-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-opus-video-composition-offset.mp4",
+      "sha256": "f18067fb267cd1da91c23ba63d706106906ceb6fb315ec671894cba4736f91aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 81,
+        "bytes": 45542,
+        "digest": 8023969804136492012
+      }
+    },
+    {
+      "id": "range-avc-aac-quicktime-surround-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-aac-quicktime-surround.mov",
+      "sha256": "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 101,
+        "bytes": 88008,
+        "digest": 7963626207134339084
+      }
+    },
+    {
+      "id": "range-avc-aac-quicktime-surround-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-aac-quicktime-surround.mov",
+      "sha256": "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 88007,
+        "digest": 11090439095682171755
+      }
+    },
+    {
+      "id": "range-avc-aac-quicktime-minimal-wave-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-aac-quicktime-minimal-wave.mov",
+      "sha256": "5cb6c10eda05f3926d5a3cc65bc7ced39ef268cec19d5f577b69e9b544a29827",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 101,
+        "bytes": 88008,
+        "digest": 7963626207134339084
+      }
+    },
+    {
+      "id": "range-avc-aac-quicktime-minimal-wave-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-aac-quicktime-minimal-wave.mov",
+      "sha256": "5cb6c10eda05f3926d5a3cc65bc7ced39ef268cec19d5f577b69e9b544a29827",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 88007,
+        "digest": 11090439095682171755
+      }
+    },
+    {
+      "id": "range-avc-aac-quicktime-reordered-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-aac-quicktime-reordered.mov",
+      "sha256": "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 101,
+        "bytes": 20643,
+        "digest": 2696979135753780615
+      }
+    },
+    {
+      "id": "range-avc-aac-quicktime-reordered-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-aac-quicktime-reordered.mov",
+      "sha256": "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 175,
+        "bytes": 42521,
+        "digest": 6444877563337168168
+      }
+    },
+    {
+      "id": "range-avc-aac-quicktime-fragmented-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-aac-quicktime-fragmented.mov",
+      "sha256": "be592508645005099c312154a45504c5bb5be002d9616cc94af399394e493b83",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 24465,
+        "digest": 14159811416455367062
+      }
+    },
+    {
+      "id": "range-avc-aac-quicktime-fragmented-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-aac-quicktime-fragmented.mov",
+      "sha256": "be592508645005099c312154a45504c5bb5be002d9616cc94af399394e493b83",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 62,
+        "bytes": 16079,
+        "digest": 15623637054819520618
+      }
+    },
+    {
+      "id": "range-avc-aac-quicktime-7-1-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-aac-quicktime-7-1.mov",
+      "sha256": "005afe6563563ff5af1eee044f68759a188fe75079cf9e74745d43d5b2231c3c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 101,
+        "bytes": 19235,
+        "digest": 17659821202708912992
+      }
+    },
+    {
+      "id": "range-avc-aac-quicktime-7-1-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-aac-quicktime-7-1.mov",
+      "sha256": "005afe6563563ff5af1eee044f68759a188fe75079cf9e74745d43d5b2231c3c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "range-avc-aac-rtp-hints-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-aac-rtp-hints.mp4",
+      "sha256": "93188e58d7231bd9d90d97af6db4a0813cbaf2645cc577ca27b5ed94f7975273",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 101,
+        "bytes": 48279,
+        "digest": 18095592040462886378
+      }
+    },
+    {
+      "id": "range-avc-aac-rtp-hints-2-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-aac-rtp-hints.mp4",
+      "sha256": "93188e58d7231bd9d90d97af6db4a0813cbaf2645cc577ca27b5ed94f7975273",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "2",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 25436,
+        "digest": 16747417545668574081
+      }
+    },
+    {
+      "id": "range-avc-aac-program-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-aac-program.mov",
+      "sha256": "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 61,
+        "bytes": 23724,
+        "digest": 9580762796614719350
+      }
+    },
+    {
+      "id": "range-avc-aac-program-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-aac-program.mov",
+      "sha256": "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 115,
+        "bytes": 68712,
+        "digest": 8332389262833698837
+      }
+    },
+    {
+      "id": "range-fragmented-subtitles-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 45752,
+        "digest": 15022134878378723945
+      }
+    },
+    {
+      "id": "range-fragmented-subtitles-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 2472,
+        "digest": 1121471412470232387
+      }
+    },
+    {
+      "id": "range-fragmented-subtitle-edit-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/fragmented-subtitle-edit.mp4",
+      "sha256": "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 45752,
+        "digest": 7282880120731003119
+      }
+    },
+    {
+      "id": "range-fragmented-subtitle-edit-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/fragmented-subtitle-edit.mp4",
+      "sha256": "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 2472,
+        "digest": 1121471412470232387
+      }
+    },
+    {
+      "id": "range-avc-leading-edit-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-leading-edit.mp4",
+      "sha256": "b070fe3144893f7e747ee3609dbfabe488f429b25719d219ebc788358474385d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 49109,
+        "digest": 14796955959516710426
+      }
+    },
+    {
+      "id": "range-avc-leading-edit-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-leading-edit.mp4",
+      "sha256": "b070fe3144893f7e747ee3609dbfabe488f429b25719d219ebc788358474385d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 33840,
+        "digest": 5790688446142363773
+      }
+    },
+    {
+      "id": "range-avc-leading-edit-trimmed-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-leading-edit-trimmed.mp4",
+      "sha256": "a129ceb76c1926594738d98a9fd513854db348c90a74e92e63f1d58c760b17be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 49109,
+        "digest": 14796955959516710426
+      }
+    },
+    {
+      "id": "range-avc-leading-edit-trimmed-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-leading-edit-trimmed.mp4",
+      "sha256": "a129ceb76c1926594738d98a9fd513854db348c90a74e92e63f1d58c760b17be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 33840,
+        "digest": 5790688446142363773
+      }
+    },
+    {
+      "id": "range-avc-unrepresentable-edit-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-unrepresentable-edit.mp4",
+      "sha256": "36116695ac130b276e7f44bc0f49c58f6c38713c582075add21f1b35ae481d3f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 49109,
+        "digest": 14796955959516710426
+      }
+    },
+    {
+      "id": "range-avc-unrepresentable-edit-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-unrepresentable-edit.mp4",
+      "sha256": "36116695ac130b276e7f44bc0f49c58f6c38713c582075add21f1b35ae481d3f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 33840,
+        "digest": 5790688446142363773
+      }
+    },
+    {
+      "id": "range-avc-signed-endpoint-edit-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-signed-endpoint-edit.mp4",
+      "sha256": "57e65c61776b77c498a203a3e38e64f90ad93e461e77fa7192f34fc839acb9f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 49109,
+        "digest": 14796955959516710426
+      }
+    },
+    {
+      "id": "range-avc-signed-endpoint-edit-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-signed-endpoint-edit.mp4",
+      "sha256": "57e65c61776b77c498a203a3e38e64f90ad93e461e77fa7192f34fc839acb9f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 33840,
+        "digest": 5790688446142363773
+      }
+    },
+    {
+      "id": "range-avc-leading-edit-short-reordered-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/avc-leading-edit-short-reordered.mp4",
+      "sha256": "86dbc2353fc13606e6f4b598e7f42a38e4ac87074a374adddee6202f4af8c8bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 49109,
+        "digest": 14796955959516710426
+      }
+    },
+    {
+      "id": "range-avc-leading-edit-short-reordered-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/avc-leading-edit-short-reordered.mp4",
+      "sha256": "86dbc2353fc13606e6f4b598e7f42a38e4ac87074a374adddee6202f4af8c8bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 190,
+        "bytes": 33840,
+        "digest": 5790688446142363773
+      }
+    },
+    {
+      "id": "range-forward-avc-empty-edit-overlapping-sync-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2657,
+        "digest": 5429765221206425926
+      }
+    },
+    {
+      "id": "range-forward-avc-empty-edit-overlapping-sync-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 1981,
+        "digest": 16632462382909308351
+      }
+    },
+    {
+      "id": "range-mp4-init-nonkeyframe-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/mov/mp4-init-nonkeyframe.mp4",
+      "sha256": "94d76d559b850373a65108bae4b1716b8a4df975b317033745b0cc2ba6de64b7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "source": "fate-suite/mov/mp4-init-nonkeyframe.mp4",
+      "expected": {
+        "packets": 121,
+        "bytes": 1027636,
+        "digest": 2787908195665736673
+      }
+    },
+    {
+      "id": "range-mp4-init-nonkeyframe-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/mov/mp4-init-nonkeyframe.mp4",
+      "sha256": "94d76d559b850373a65108bae4b1716b8a4df975b317033745b0cc2ba6de64b7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "source": "fate-suite/mov/mp4-init-nonkeyframe.mp4",
+      "expected": {
+        "packets": 174,
+        "bytes": 132096,
+        "digest": 11689340040938157481
+      }
+    },
+    {
+      "id": "range-mov-stream-shorter-than-movie-0-h264",
+      "profile": "mp4-h264",
+      "file": ".research/mp4-range-fixtures/mov/mov_stream_shorter_than_movie.mov",
+      "sha256": "463a1c93d3cc155721fc481e4c2783b97fb4e388d571b3fdcf6972c6ce290b5b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "source": "fate-suite/mov/mov_stream_shorter_than_movie.mov",
+      "expected": {
+        "packets": 49,
+        "bytes": 57367,
+        "digest": 2319145493284181669
+      }
+    },
+    {
+      "id": "range-mov-stream-shorter-than-movie-1-aac",
+      "profile": "mp4-aac",
+      "file": ".research/mp4-range-fixtures/mov/mov_stream_shorter_than_movie.mov",
+      "sha256": "463a1c93d3cc155721fc481e4c2783b97fb4e388d571b3fdcf6972c6ce290b5b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "source": "fate-suite/mov/mov_stream_shorter_than_movie.mov",
+      "expected": {
+        "packets": 50,
+        "bytes": 17091,
+        "digest": 13496430118475742098
+      }
+    },
+    {
+      "id": "forward-encoded-avc-aac-front-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-front.mp4",
+      "sha256": "13254b171791057db2f6c88a03a6dc97d5af861fde3517cc3a23c8a62ea17916",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 4352,
+        "digest": 13610498620977313101
+      }
+    },
+    {
+      "id": "forward-encoded-avc-aac-front-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-front.mp4",
+      "sha256": "13254b171791057db2f6c88a03a6dc97d5af861fde3517cc3a23c8a62ea17916",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 437,
+        "digest": 15214125054916796062
+      }
+    },
+    {
+      "id": "forward-encoded-hevc-aac-front-0-hevc",
+      "profile": "mp4-hevc",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 5434,
+        "digest": 4851385735055296380
+      }
+    },
+    {
+      "id": "forward-encoded-hevc-aac-front-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 437,
+        "digest": 15214125054916796062
+      }
+    },
+    {
+      "id": "forward-encoded-avc-aac-native-seek-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-native-seek.mp4",
+      "sha256": "958a231aa73f32701a3be9835722db29d5cefabfb57dcb3c79148652d1ec6b1a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4928,
+        "digest": 17242045897017864774
+      }
+    },
+    {
+      "id": "forward-encoded-avc-aac-native-seek-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-native-seek.mp4",
+      "sha256": "958a231aa73f32701a3be9835722db29d5cefabfb57dcb3c79148652d1ec6b1a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 120,
+        "bytes": 10973,
+        "digest": 15306363236771359211
+      }
+    },
+    {
+      "id": "forward-encoded-avc-aac-indexed-seek-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-indexed-seek.mp4",
+      "sha256": "83af34f47b3624425bdc0efe532a71d2e0af82e5e0e93cbe6ef1ea6d507df006",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4928,
+        "digest": 17242045897017864774
+      }
+    },
+    {
+      "id": "forward-encoded-avc-aac-indexed-seek-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-indexed-seek.mp4",
+      "sha256": "83af34f47b3624425bdc0efe532a71d2e0af82e5e0e93cbe6ef1ea6d507df006",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 120,
+        "bytes": 10973,
+        "digest": 16275010773502924065
+      }
+    },
+    {
+      "id": "forward-forward-aac-priming-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-priming.mp4",
+      "sha256": "d86cda57d99064bd1d4799c02fc9b56248486ee81034532da990004f86725dff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2657,
+        "digest": 5429765221206425926
+      }
+    },
+    {
+      "id": "forward-forward-aac-priming-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-priming.mp4",
+      "sha256": "d86cda57d99064bd1d4799c02fc9b56248486ee81034532da990004f86725dff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 1981,
+        "digest": 16632462382909308351
+      }
+    },
+    {
+      "id": "forward-forward-aac-tail-trim-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-tail-trim.mp4",
+      "sha256": "05d659762cc522255142aadc28cf55f04caf6946a43dbd60854b6f1c5106c841",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2657,
+        "digest": 5429765221206425926
+      }
+    },
+    {
+      "id": "forward-forward-aac-tail-trim-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-tail-trim.mp4",
+      "sha256": "05d659762cc522255142aadc28cf55f04caf6946a43dbd60854b6f1c5106c841",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 1981,
+        "digest": 16632462382909308351
+      }
+    },
+    {
+      "id": "forward-forward-aac-fractional-edit-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-fractional-edit.mp4",
+      "sha256": "0d38fe25d769d15aaac29bcc161f531e06c0acaec6e1a5a859ba5f7b373169ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2657,
+        "digest": 5429765221206425926
+      }
+    },
+    {
+      "id": "forward-forward-aac-fractional-edit-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-fractional-edit.mp4",
+      "sha256": "0d38fe25d769d15aaac29bcc161f531e06c0acaec6e1a5a859ba5f7b373169ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 1981,
+        "digest": 16632462382909308351
+      }
+    },
+    {
+      "id": "forward-forward-fragment-aac-edit-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-edit.mp4",
+      "sha256": "d8990d764a54e21ff908bd2b7074b993b8e785e750907f270940034ed23f4c37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2657,
+        "digest": 5429765221206425926
+      }
+    },
+    {
+      "id": "forward-forward-fragment-aac-edit-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-edit.mp4",
+      "sha256": "d8990d764a54e21ff908bd2b7074b993b8e785e750907f270940034ed23f4c37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 1981,
+        "digest": 16632462382909308351
+      }
+    },
+    {
+      "id": "forward-forward-fragment-aac-late-track-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-late-track.mp4",
+      "sha256": "d898a74c2ddc7edf2c0d4a435e9b2808e14b611339028131d324cc518a27af4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2657,
+        "digest": 5429765221206425926
+      }
+    },
+    {
+      "id": "forward-forward-fragment-aac-late-track-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-late-track.mp4",
+      "sha256": "d898a74c2ddc7edf2c0d4a435e9b2808e14b611339028131d324cc518a27af4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 1981,
+        "digest": 16632462382909308351
+      }
+    },
+    {
+      "id": "forward-forward-fragment-aac-short-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-short.mp4",
+      "sha256": "866c763bd24f2f7fb442c152757777cd7456ce422937d19b7ee21eef0aed8d2f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1638,
+        "digest": 8048024833214699169
+      }
+    },
+    {
+      "id": "forward-forward-fragment-aac-short-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-short.mp4",
+      "sha256": "866c763bd24f2f7fb442c152757777cd7456ce422937d19b7ee21eef0aed8d2f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 58,
+        "digest": 17958809960531889692
+      }
+    },
+    {
+      "id": "forward-forward-avc-empty-edit-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit.mp4",
+      "sha256": "d814d9726aa99e62dc1f83cb069162484defd8397ebbc3aa36972eb57df56b22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2657,
+        "digest": 5429765221206425926
+      }
+    },
+    {
+      "id": "forward-forward-avc-empty-edit-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit.mp4",
+      "sha256": "d814d9726aa99e62dc1f83cb069162484defd8397ebbc3aa36972eb57df56b22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 1981,
+        "digest": 16632462382909308351
+      }
+    },
+    {
+      "id": "forward-forward-avc-empty-edit-trimmed-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-trimmed.mp4",
+      "sha256": "ef6fd674f8fe63a45ba122ea76bb9a119304b389026d744ee5d0b022a72c446b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2657,
+        "digest": 5429765221206425926
+      }
+    },
+    {
+      "id": "forward-forward-avc-empty-edit-trimmed-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-trimmed.mp4",
+      "sha256": "ef6fd674f8fe63a45ba122ea76bb9a119304b389026d744ee5d0b022a72c446b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 1981,
+        "digest": 16632462382909308351
+      }
+    },
+    {
+      "id": "forward-forward-avc-empty-edit-single-sync-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-single-sync.mp4",
+      "sha256": "4ff065b6eb9147d438adc3241a87b3108f5a90e3efc6fee2fdabf812327631a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2657,
+        "digest": 5429765221206425926
+      }
+    },
+    {
+      "id": "forward-forward-avc-empty-edit-single-sync-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-single-sync.mp4",
+      "sha256": "4ff065b6eb9147d438adc3241a87b3108f5a90e3efc6fee2fdabf812327631a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 1981,
+        "digest": 16632462382909308351
+      }
+    },
+    {
+      "id": "forward-forward-avc-empty-edit-rounded-end-0-h264",
+      "profile": "mp4-h264",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-rounded-end.mp4",
+      "sha256": "3f1811c7373788df7921f0e5210e678af0fbf30240479d7848ccffbc351f8d07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2657,
+        "digest": 5429765221206425926
+      }
+    },
+    {
+      "id": "forward-forward-avc-empty-edit-rounded-end-1-aac",
+      "profile": "mp4-aac",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-rounded-end.mp4",
+      "sha256": "3f1811c7373788df7921f0e5210e678af0fbf30240479d7848ccffbc351f8d07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 1981,
+        "digest": 16632462382909308351
+      }
+    },
+    {
+      "id": "mkv-feed-aac-mpeg2-lc-laced-0-aac",
+      "profile": "mkv-aac",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg2-lc-laced.mkv",
+      "sha256": "a64071af30efc713936cb81e3f7765eab919ee7733989b4bd6a2200cd935268f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "aac"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2740,
+        "digest": 924633625456339200
+      }
+    },
+    {
+      "id": "mkv-feed-aac-mpeg2-lc-laced-0-aac-declared",
+      "profile": "mkv-aac-declared",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg2-lc-laced.mkv",
+      "sha256": "a64071af30efc713936cb81e3f7765eab919ee7733989b4bd6a2200cd935268f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "aac",
+        "declared"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2740,
+        "digest": 924633625456339200
+      }
+    },
+    {
+      "id": "mkv-feed-aac-mpeg2-lc-0-aac",
+      "profile": "mkv-aac",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg2-lc.mkv",
+      "sha256": "c26f0023c6742aa8efc02c36452325beeab0f637f0fe8e248ffab4a4a84e1043",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "aac"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2740,
+        "digest": 11228442589935247136
+      }
+    },
+    {
+      "id": "mkv-feed-aac-mpeg2-lc-0-aac-declared",
+      "profile": "mkv-aac-declared",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg2-lc.mkv",
+      "sha256": "c26f0023c6742aa8efc02c36452325beeab0f637f0fe8e248ffab4a4a84e1043",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "aac",
+        "declared"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2740,
+        "digest": 11228442589935247136
+      }
+    },
+    {
+      "id": "mkv-feed-aac-mpeg4-lc-ambiguous-layout-0-aac",
+      "profile": "mkv-aac",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-ambiguous-layout.mkv",
+      "sha256": "56268033639e981964ea404a656aa820712884fc653a4767ca40b47ae884b12f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "aac"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2740,
+        "digest": 2643284072872258076
+      }
+    },
+    {
+      "id": "mkv-feed-aac-mpeg4-lc-empty-private-0-aac",
+      "profile": "mkv-aac",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-empty-private.mkv",
+      "sha256": "3aa8526d129e18370033f5b8a8bf02328e30947a96e24e7be14d9ccf3eb92442",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "aac"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2740,
+        "digest": 11228442589935247136
+      }
+    },
+    {
+      "id": "mkv-feed-aac-mpeg4-lc-timed-0-aac",
+      "profile": "mkv-aac",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-timed.mkv",
+      "sha256": "d3774cb3e25bb6ce6a161c9de10b9f25d133e4b0155f59935d09682c4430f51d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "aac"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2740,
+        "digest": 11228442589935247136
+      }
+    },
+    {
+      "id": "mkv-feed-aac-mpeg4-lc-timed-0-aac-declared",
+      "profile": "mkv-aac-declared",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-timed.mkv",
+      "sha256": "d3774cb3e25bb6ce6a161c9de10b9f25d133e4b0155f59935d09682c4430f51d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "aac",
+        "declared"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2740,
+        "digest": 11228442589935247136
+      }
+    },
+    {
+      "id": "mkv-feed-aac-mpeg4-lc-0-aac",
+      "profile": "mkv-aac",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc.mkv",
+      "sha256": "4047e3e399b1620bcccdf5d6600f4712da82b7d166b079c120ef5e408775c121",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "aac"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2740,
+        "digest": 11228442589935247136
+      }
+    },
+    {
+      "id": "mkv-feed-aac-mpeg4-lc-0-aac-declared",
+      "profile": "mkv-aac-declared",
+      "file": "crates/playback/tests/fixtures/mkv-feed/aac-mpeg4-lc.mkv",
+      "sha256": "4047e3e399b1620bcccdf5d6600f4712da82b7d166b079c120ef5e408775c121",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "aac",
+        "declared"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2740,
+        "digest": 11228442589935247136
+      }
+    },
+    {
+      "id": "mkv-feed-audio-mixed-discovery-0-aac",
+      "profile": "mkv-aac",
+      "file": "crates/playback/tests/fixtures/mkv-feed/audio-mixed-discovery.mkv",
+      "sha256": "8fa3222350e8b92aab49bfb6918307d5fcb729a2281bf2d4f9a438c306e3594a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "aac"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 626,
+        "digest": 18045309812849224268
+      }
+    },
+    {
+      "id": "mkv-feed-audio-mixed-discovery-1-aac",
+      "profile": "mkv-aac",
+      "file": "crates/playback/tests/fixtures/mkv-feed/audio-mixed-discovery.mkv",
+      "sha256": "8fa3222350e8b92aab49bfb6918307d5fcb729a2281bf2d4f9a438c306e3594a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 602,
+        "digest": 2884721743553596721
+      }
+    },
+    {
+      "id": "mkv-feed-avc-reordered-discovery-0-h264",
+      "profile": "mkv-h264",
+      "file": "crates/playback/tests/fixtures/mkv-feed/avc-reordered-discovery.mkv",
+      "sha256": "4ad06aff1285ddae3f1e4684220a6666a83d150111c37951fd4c6c46efb256bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1907,
+        "digest": 2362791711291958541
+      }
+    },
+    {
+      "id": "mkv-feed-hevc-dolby-0-hevc",
+      "profile": "mkv-hevc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-dolby.mkv",
+      "sha256": "319b3ee94fe7c67a6f1cfde4d1f3e0238f9ac51c6c7cda1140acb44f2cdcb39a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 10259,
+        "digest": 2763630437415587191
+      }
+    },
+    {
+      "id": "mkv-feed-hevc-indexed-seek-0-hevc",
+      "profile": "mkv-hevc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 42017,
+        "digest": 2363125234731722346
+      }
+    },
+    {
+      "id": "mkv-feed-hevc-no-default-duration-discovery-0-hevc",
+      "profile": "mkv-hevc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-no-default-duration-discovery.mkv",
+      "sha256": "ad6fd4d430be9fd7e913893c0eeb7fb0d7ffd884ecd24985019c5e3506c0a118",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 3456,
+        "digest": 17594224265661028037
+      }
+    },
+    {
+      "id": "mkv-feed-hevc-repeated-configuration-in-band-0-hevc",
+      "profile": "mkv-hevc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-configuration-in-band.mkv",
+      "sha256": "36e4490bcb67c97bd93a9853490fc6bb3b01d0c260e75867f6c8c9100d9de01e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 2391,
+        "digest": 1637998170240194754
+      }
+    },
+    {
+      "id": "mkv-feed-hevc-repeated-configuration-0-hevc",
+      "profile": "mkv-hevc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-configuration.mkv",
+      "sha256": "903d54e0d60099646f0aea2d84810a3115c2b0ee1d9df6bb8a5bf136d3caa930",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 2229,
+        "digest": 7154490680160661306
+      }
+    },
+    {
+      "id": "mkv-feed-hevc-repeated-parameter-sets-0-hevc",
+      "profile": "mkv-hevc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-parameter-sets.mkv",
+      "sha256": "90023f5ee80c66d387c1dbe21935f2804f85a4ee81bb89d1c3797f7ed3882888",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 2229,
+        "digest": 14943354859619544862
+      }
+    },
+    {
+      "id": "mkv-feed-hevc-repeated-truncated-vps-configuration-0-hevc",
+      "profile": "mkv-hevc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-truncated-vps-configuration.mkv",
+      "sha256": "6dc062bfc80a961a3125b9bdfd4382d1c7e58ea3df5a2d17ee61de72bd67e976",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 2145,
+        "digest": 17888886417338713074
+      }
+    },
+    {
+      "id": "mkv-feed-hevc-single-configuration-0-hevc",
+      "profile": "mkv-hevc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-single-configuration.mkv",
+      "sha256": "84aac621d845186d0191b7075e64d328c57ec723ef1dd3a42ccb97fb4adfbf5c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 2067,
+        "digest": 1155396350397132354
+      }
+    },
+    {
+      "id": "mkv-feed-hevc-truncated-pps-0-hevc",
+      "profile": "mkv-hevc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-truncated-pps.mkv",
+      "sha256": "78ffcd772e5a5616cc83ba91fa1057c913e78f1e248e40479356339c408402bf",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 2217,
+        "digest": 18410436408058779942
+      }
+    },
+    {
+      "id": "mkv-feed-hevc-truncated-sps-0-hevc",
+      "profile": "mkv-hevc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-truncated-sps.mkv",
+      "sha256": "71e2aff99f5af5e3b72738d2e4db792f8abc9152a9e62aa25870da9c6afffe5b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 2173,
+        "digest": 11602042511679306022
+      }
+    },
+    {
+      "id": "mkv-feed-hevc-truncated-vps-0-hevc",
+      "profile": "mkv-hevc",
+      "file": "crates/playback/tests/fixtures/mkv-feed/hevc-truncated-vps.mkv",
+      "sha256": "f8d1d0d4fb3b6f9a9d1182b9136e6f5e7e40ad8da7a25bc3dc54d39f2779b6e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "hevc"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 2187,
+        "digest": 3853044079302997858
+      }
+    },
+    {
+      "id": "mkv-feed-three-tracks-0-h264",
+      "profile": "mkv-h264",
+      "file": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "h264"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 4870,
+        "digest": 611773495307170475
+      }
+    },
+    {
+      "id": "mkv-feed-three-tracks-1-aac",
+      "profile": "mkv-aac",
+      "file": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "1",
+        "aac"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 4404,
+        "digest": 11587074313465889808
+      }
+    },
+    {
+      "id": "mkv-feed-three-tracks-2-aac",
+      "profile": "mkv-aac",
+      "file": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "2",
+        "aac"
+      ],
+      "expected": {
+        "packets": 46,
+        "bytes": 4439,
+        "digest": 10025281137736645798
+      }
+    },
+    {
+      "id": "mp4-six-frames-0-av1",
+      "profile": "mp4-av1",
+      "file": "crates/playback/tests/fixtures/av1/six-frames.mp4",
+      "sha256": "76383e7d9d646a2873ed6e8af7e52b48903b7a9a1fc95f1d807575b90c66b9c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "av1"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 4097,
+        "digest": 5072224075494568218
+      }
+    },
+    {
+      "id": "webm-six-frames-0-av1",
+      "profile": "mkv-av1",
+      "file": "crates/playback/tests/fixtures/av1/six-frames.webm",
+      "sha256": "a04b2811dee4567c15123d2778393dc3bfe9131d3ff7689795a6a5af20fbed7e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "av1"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 4097,
+        "digest": 15966971941410497924
+      }
+    }
+  ]
+}
