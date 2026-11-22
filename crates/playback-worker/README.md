@@ -38,5 +38,15 @@ A capsule is `SMVCL001`, one operation byte (0 startup, 1 seek after discovery,
 MP4 range inputs under `.research/`. In the `mkv-audio-`, `mp4-forward-`, `ts-program-`
 and `raw-video-` families `trace` prints one line per packet.
 
+With the `views` feature the crate also builds `playback-views-worker`, the candidate of
+the features that compare the public views of `triergon-playback`, `triergon-hls`,
+`triergon-raw-video` and `triergon-bridge`: probing (`probe-`, `probe-lifecycle-`),
+source views (`source-view-`), player delivery, selection, catalogues, MP4 seeks and
+indexes and TS opening (`delivery-`, `select-`, `catalogue-`, `mp4-seek-`, `mp4-index-`,
+`ts-pes-open-`), HLS views (`hls-views-`), decoder bridges (`access-units-`,
+`mp4-bridges-`, `mkv-discovery-`) and subtitle bridges (`text-bridge-`, `text-control-`,
+`subtitle-bridge-`). Each prefix is the `worker_operation` of features under
+`harness/features/`, such as `delivery-` of `playback-delivery`.
+
 The [transport worker](../transport-worker/README.md) runs the MPEG-TS PES and
 access-unit comparisons.
