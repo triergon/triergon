@@ -132,13 +132,16 @@
       "cause": "the same reads as hls-segments and progressive-ts188, which are measured"
     }
   ],
-  "pending_module_requirements": [
-    "The reference operation refuses an AAC packet marked corrupt after a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "legal-duplicate-44100",
-      "requirement": "The reference operation refuses an AAC packet marked corrupt after a payload-bearing exact-repeat carrier. H.222.0 section 2.4.3.3 permits the adjacent same-PID, same-counter duplicate used by this control.",
+      "reading": "An exact repeat of a payload-bearing transport packet",
+      "clause": "ITU-T H.222.0 (08/2023) section 2.4.3.3 permits two consecutive same-PID packets with the same continuity counter and adaptation_field_control 01 or 11 when their bytes match apart from a valid PCR.",
+      "candidate": "Returns 24 AAC clock records with 3625 frame bytes, matching the nonduplicated control.",
+      "reference": "Reports a PES size mismatch, marks the AAC packet corrupt and yields a single refusal record.",
+      "compat": "compat::pes::reject_corrupt_duplicate_carrier for a consumer reproducing the reference demux corruption decision.",
+      "cases": [
+        "legal-duplicate-44100"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
