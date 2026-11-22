@@ -15,7 +15,7 @@ mod worker {
     use triergon_core::{
         Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, Step, TimeBase,
         WorkBudget,
-        container::{CodecId, MediaKind, PacketInfo, RandomAccess, TrackInfo},
+        container::{CodecId, MediaKind, PacketInfo, RandomAccess, TrackInfo, Trim},
     };
     use triergon_framing::nal::{Codec, RawAnnexBLimits};
     use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
@@ -25,8 +25,8 @@ mod worker {
         stream::TraceEvent,
     };
     use triergon_playback::{
-        ByteSource, ClockChoice, Engine, Event, Format, Player, PlayerPolicy, Progress, Selection,
-        SourceOwner, Track, TrackKey,
+        ByteSource, ClockChoice, DemuxTimes, Engine, Event, Format, Packet, Player, PlayerPolicy,
+        Progress, Selection, SourceOwner, Track, TrackKey,
         mp4::{Mp4IndexJob, Mp4Open, OpenLimits, OpenProgress, PlanLimits, ProgressiveLimits},
         probe::SelectedInput,
     };
@@ -40,6 +40,8 @@ mod worker {
     const WINDOW: usize = 32768;
     const SOURCE: SourceId = SourceId(1);
     const NEXT: SourceId = SourceId(2);
+    const ENGINE_VIEW: Error = Error::Invalid("neutral engine view disagrees with its source");
+    const PACKET_VIEW: Error = Error::Invalid("neutral packet clock disagrees with its source");
 
     #[derive(Clone, Copy, PartialEq, Eq)]
     enum Layout {
@@ -127,6 +129,7 @@ mod worker {
             };
             match result {
                 Ok(()) => views.terminal(7),
+                Err(error @ (ENGINE_VIEW | PACKET_VIEW)) => return Err(error.into()),
                 Err(
                     error @ (Error::Invalid(_)
                     | Error::Unsupported(_)
@@ -244,17 +247,22 @@ mod worker {
                 (engine, opened.source)
             }
         };
+        let has_mp4 = engine.mp4_plan().is_some();
+        let has_matroska = engine.matroska_reader().is_some();
+        if has_mp4
+            != matches!(
+                layout,
+                Layout::Mp4 | Layout::Progressive | Layout::TimingPolicy
+            )
+            || has_matroska != (layout == Layout::Matroska)
+        {
+            return Err(ENGINE_VIEW);
+        }
         let mut player =
             Player::new_direct(engine, source, Selection::All, PlayerPolicy::default())?;
         player.set_clock_view(ClockChoice::Source)?;
-        if views.trace
-            && let Some(engine) = player.engine()
-        {
-            eprintln!(
-                "source views: MP4 plan={}, Matroska reader={}",
-                engine.mp4_plan().is_some(),
-                engine.matroska_reader().is_some(),
-            );
+        if views.trace {
+            eprintln!("source views: MP4 plan={has_mp4}, Matroska reader={has_matroska}");
         }
         let mut slot = None;
         let mut next = next;
@@ -266,19 +274,10 @@ mod worker {
                 && engine.track_count() != 0
             {
                 for index in 0..engine.track_count() {
-                    if let Some(track) = engine.track(index) {
-                        let key = track.key();
-                        let id = match key {
-                            TrackKey::Matroska(id) => id,
-                            TrackKey::Mp4(id) => u64::from(id),
-                            TrackKey::Ts { pid, .. } => u64::from(pid),
-                        };
-                        if id != track.id().0 {
-                            return Err(Error::Invalid("neutral track ID and engine key disagree"));
-                        }
-                        if views.selected(id) {
-                            views.track(&track);
-                        }
+                    let track = engine.track(index).ok_or(ENGINE_VIEW)?;
+                    check_track(engine, index, track)?;
+                    if views.selected(track.id().0) {
+                        views.track(&track);
                     }
                 }
                 catalogue = true;
@@ -326,6 +325,81 @@ mod worker {
                 _ => return Err(Error::Invalid("unexpected direct player progress")),
             }
         }
+    }
+
+    fn check_track(engine: &Engine, index: usize, track: Track<'_>) -> triergon_core::Result<()> {
+        let expected = match track {
+            Track::Matroska(track) => {
+                let reader = engine.matroska_reader().ok_or(ENGINE_VIEW)?;
+                let native = reader.tracks().get(index).ok_or(ENGINE_VIEW)?;
+                if !std::ptr::eq(native, track) {
+                    return Err(ENGINE_VIEW);
+                }
+                TrackKey::Matroska(native.number)
+            }
+            Track::Mp4(track) => {
+                let plan = engine.mp4_plan().ok_or(ENGINE_VIEW)?;
+                let native = plan.tracks().get(index).ok_or(ENGINE_VIEW)?;
+                if !std::ptr::eq(native, track) {
+                    return Err(ENGINE_VIEW);
+                }
+                TrackKey::Mp4(native.snapshot.track_id)
+            }
+            Track::Ts { program, stream } => TrackKey::Ts {
+                program,
+                pid: stream.pid(),
+            },
+        };
+        let id = match expected {
+            TrackKey::Matroska(id) => id,
+            TrackKey::Mp4(id) => u64::from(id),
+            TrackKey::Ts { pid, .. } => u64::from(pid),
+        };
+        if expected != track.key() || id != track.id().0 {
+            return Err(ENGINE_VIEW);
+        }
+        Ok(())
+    }
+
+    fn encoded_trim(bytes: Option<[u8; 10]>) -> Trim {
+        let [a, b, c, d, e, f, g, h, _, _] = bytes.unwrap_or([0; 10]);
+        let start = u32::from_le_bytes([a, b, c, d]);
+        let end = u32::from_le_bytes([e, f, g, h]);
+        Trim {
+            start: (start != 0).then_some(i64::from(start)),
+            end: (end != 0).then_some(i64::from(end)),
+        }
+    }
+
+    fn check_demux_times(packet: &Packet<'_>) -> triergon_core::Result<Option<DemuxTimes>> {
+        let checked = packet.demux_times();
+        let expected = match packet {
+            Packet::Matroska(packet) => Some(DemuxTimes {
+                time_base: packet.time_base(),
+                pts: packet.pts(),
+                dts: packet.dts(),
+                duration: packet.duration(),
+                trim: packet.trim(),
+            }),
+            Packet::Mp4(packet) => packet.occurrence.as_ref().map(|occurrence| DemuxTimes {
+                time_base: occurrence.media_clock.demux_base,
+                pts: occurrence.demux.pts,
+                dts: occurrence.demux.dts,
+                duration: Some(occurrence.demux.duration),
+                trim: encoded_trim(packet.encoded_skip_samples),
+            }),
+            Packet::Mp4Short(packet) => Some(DemuxTimes {
+                time_base: packet.occurrence.media_clock.demux_base,
+                pts: packet.occurrence.demux.pts,
+                dts: packet.occurrence.demux.dts,
+                duration: Some(packet.occurrence.demux.duration),
+                trim: encoded_trim(packet.encoded_skip_samples),
+            }),
+        };
+        if checked != expected {
+            return Err(PACKET_VIEW);
+        }
+        Ok(checked)
     }
 
     fn raw_views(
@@ -524,8 +598,9 @@ mod worker {
             }
         }
 
-        fn packet(&mut self, packet: &triergon_playback::Packet<'_>) -> triergon_core::Result<()> {
+        fn packet(&mut self, packet: &Packet<'_>) -> triergon_core::Result<()> {
             let base = packet.time_base();
+            let demux = check_demux_times(packet)?;
             if self.clock_only {
                 self.clocks.entry(packet.track().0).or_default().push((
                     base.numerator(),
@@ -538,12 +613,11 @@ mod worker {
             }
             if self.trace {
                 eprintln!(
-                    "packet {} clock={}/{} pts={:?} demux={:?} trim={:?}",
+                    "packet {} clock={}/{} pts={:?} demux={demux:?} trim={:?}",
                     packet.track().0,
                     base.numerator(),
                     base.denominator(),
                     packet.pts_time()?,
-                    packet.demux_times(),
                     packet.trim(),
                 );
             }

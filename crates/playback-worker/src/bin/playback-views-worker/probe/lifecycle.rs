@@ -115,7 +115,9 @@ fn selected(
         match next(&mut probe)? {
             ProbeProgress::Selected(Format::Matroska) => break,
             ProbeProgress::Yield | ProbeProgress::NeedInput(_) => {}
-            other => return Err(format!("unexpected probe selection: {other:?}").into()),
+            ProbeProgress::Selected(format) => {
+                return Err(format!("unexpected probe selection: {format:?}").into());
+            }
         }
     }
     let mut selected = probe.finish()?;

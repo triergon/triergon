@@ -214,7 +214,7 @@
         "name": "neutral-views",
         "entry_points": ["DemuxTimes", "Track::key", "mp4::PreparedMp4::identify_tracks", "Engine::mp4_plan", "Engine::matroska_reader"],
         "degree": "step",
-        "needs": "Playback-source-view compares neutral packet and track fields. Extend paired coverage to the underlying reader and prepared-plan accessors, track keys and DemuxTimes on the same packet."
+        "needs": "Playback-source-view checks the neutral track keys, reader and prepared-plan accessors, and DemuxTimes. Three progressive MP4 cases remain open because an implicit fragment loses the decode origin of a known predecessor."
       }
     ],
     "triergon-raster": [],

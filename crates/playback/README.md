@@ -149,7 +149,9 @@ ascending byte position across tracks. The opening MPEG-TS catalogue uses the
 first current PMT and keeps private descriptors opaque when the caller leaves
 the namespace unspecified. The comparison checks each ISO 639 descriptor tuple
 and the first language reported on the neutral track. The bounded timing-prefix
-controls use `TimingRunPolicy::BoundedPrefix`.
+controls use `TimingRunPolicy::BoundedPrefix`. The comparison checks each
+neutral track key against its source track and each neutral demux clock and
+trim against the underlying packet or MP4 occurrence.
 The [MP4 clock oracle](../../harness/features/mp4-source-clock/contract.json)
 checks sample decode and composition times before the movie's edit list. For
 surplus timing runs, it checks strict indexing and the bounded compatibility
