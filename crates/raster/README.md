@@ -147,7 +147,8 @@ matched:
 
 Every input-dependent allocation is charged to the `Budget` a value was created
 with: outlines, bitmaps and the rasteriser's, stroker's and blur's scratch,
-which a `Raster` keeps and reuses. Work is charged to the `WorkBudget` the caller passes
+which a `Raster` keeps and reuses. The caller's `Budget` reports the storage
+charged to it. Work is charged to the `WorkBudget` the caller passes
 to each stage, one per frame: subdivision steps (each spline part the
 stroker offsets and each arc it subdivides), emitted points, polyline
 segments and 16×16 tiles filled, and every 16 pixels of a row a blur stage

@@ -43,15 +43,6 @@ impl Raster {
         }
     }
 
-    /// Bytes of scratch storage currently charged.
-    pub fn retained_bytes(&self) -> usize {
-        self.rasterizer.retained_bytes()
-            + self.transformed.retained_bytes()
-            + self.stroked.retained_bytes()
-            + self.blur.retained_bytes()
-            + self.unit_box.as_ref().map_or(0, Shape::retained_bytes)
-    }
-
     /// Strokes `outline` with `pen`, writing the outer (+offset) and inner
     /// (−offset) border outlines into `border`, which is cleared first.
     ///

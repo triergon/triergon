@@ -299,10 +299,6 @@ impl Rasterizer {
         }
     }
 
-    pub(crate) fn retained_bytes(&self) -> usize {
-        (self.lines[0].capacity() + self.lines[1].capacity()) * size_of::<Line>()
-    }
-
     /// See [`Raster::rasterize`](crate::Raster::rasterize).
     pub(crate) fn rasterize(
         &mut self,

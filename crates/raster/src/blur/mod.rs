@@ -43,17 +43,6 @@ impl Blur {
         }
     }
 
-    pub(crate) fn retained_bytes(&self) -> usize {
-        (self.planes[0].capacity()
-            + self.planes[1].capacity()
-            + self.row.capacity()
-            + self.halves.capacity()
-            + self.zeros.capacity())
-            * 2
-            + self.acc.capacity() * 4
-            + self.lines.capacity() * 2
-    }
-
     /// See [`Raster::blur`](crate::Raster::blur).
     pub(crate) fn apply(
         &mut self,
