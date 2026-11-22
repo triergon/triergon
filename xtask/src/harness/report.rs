@@ -1494,7 +1494,11 @@ fn collect_with_inputs(
             }
         }
         rows.push(object(row));
-        save_checkpoint(&options.output.join("partial.json"), &partial(&base, &rows))?;
+        // Workspace parity also runs corpora with thousands of cases. Their
+        // progress is logged per case, so rewrite the accumulated JSON in batches.
+        if optional.is_none() || rows.len().is_multiple_of(64) || rows.len() == cases.len() {
+            save_checkpoint(&options.output.join("partial.json"), &partial(&base, &rows))?;
+        }
     }
     // Every case is timed before any memory runs; memory then fills the CPUs.
     let (indices, jobs): (Vec<usize>, Vec<_>) = memory_jobs.into_iter().unzip();
