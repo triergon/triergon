@@ -45,12 +45,6 @@
         "needs": "bridge-bitmap-subtitles compares container-to-picture playback. A comparison still needs to exercise Matroska DVB startup and live clock packets, bitmap receiver reset and the PGS packet-clock queue action."
       },
       {
-        "name": "legacy-aac-initialization",
-        "entry_points": ["compat::matroska::legacy_aac_lc_initialization"],
-        "degree": "unit-tests",
-        "needs": "matroska-legacy-aac's feed setup built through this function, its parameters folded against the reference's codec parameters; the gated feed derives them without calling it"
-      },
-      {
         "name": "compact-replay-prefix",
         "entry_points": ["matroska::MatroskaReplayPrefix", "matroska::MatroskaReplayPrefix::feed_packet"],
         "degree": "step",
