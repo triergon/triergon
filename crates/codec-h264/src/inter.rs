@@ -1193,10 +1193,12 @@ fn list_pos<'r>(g: &MbGeom, p: &PartMv, list: usize, rp: &RefPic, fb: &'r FrameB
     let ya = g.y_pic as i32 + p.y;
     // Chroma vertical offset between fields of opposite parity (Table 8-9 / 8-10).
     let mut mvcy = mvy;
-    match (rp.parity, g.field_parity) {
-        (Structure::Top, Structure::Bottom) => mvcy += 2,
-        (Structure::Bottom, Structure::Top) => mvcy -= 2,
-        _ => {}
+    if g.field_parity.is_field() && rp.parity.is_field() {
+        if rp.parity == Structure::Top && g.field_parity == Structure::Bottom {
+            mvcy += 2;
+        } else if rp.parity == Structure::Bottom && g.field_parity == Structure::Top {
+            mvcy -= 2;
+        }
     }
     ListPos {
         fb,
