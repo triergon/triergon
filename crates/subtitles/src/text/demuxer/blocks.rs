@@ -12,9 +12,8 @@
 //! ended with CR, and so does every run of four or more bytes.
 //!
 //! A NUL byte ends the block it is in, and the next block starts after it.
-//! The cut ends with an empty block, at the end of the document or at a NUL
-//! byte where a block would start, so such a NUL byte ends the document. A
-//! UTF-8 byte-order mark gets no special treatment here.
+//! EOF or a NUL where a block would start ends the document. A UTF-8
+//! byte-order mark gets no special treatment here.
 
 use super::lines::Span;
 use triergon_core::WorkBudget;
@@ -23,7 +22,7 @@ use triergon_core::WorkBudget;
 pub(super) enum Block {
     /// The bytes of one block, as a range of the document.
     Text(Span),
-    /// Returned after the last block, the empty one, and every later call.
+    /// No more blocks remain. Every later call also returns this.
     End,
 }
 
@@ -80,10 +79,7 @@ impl Blocks {
                 let byte = source.get(self.cursor).copied().unwrap_or(0);
                 if byte == 0 {
                     self.ended = true;
-                    return Some(Block::Text(Span {
-                        start: self.cursor,
-                        end: self.cursor,
-                    }));
+                    return Some(Block::End);
                 }
                 if is_break(byte) {
                     if !work.try_charge(1) {
@@ -132,5 +128,42 @@ impl Blocks {
             self.cursor = at + length;
             self.after_cr = source[self.cursor - 1] == CR;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Block, Blocks, Span};
+    use triergon_core::WorkBudget;
+
+    #[test]
+    fn eof_or_nul_between_blocks_ends_without_work() {
+        for source in [b"X\n\n".as_slice(), b"X\n\n\0ignored"] {
+            let mut blocks = Blocks::new();
+            let mut work = WorkBudget::new(1);
+            // Seeing the separator requires another poll after reading X.
+            assert_eq!(blocks.next(source, &mut work), None);
+            let mut work = WorkBudget::new(2);
+            assert_eq!(
+                blocks.next(source, &mut work),
+                Some(Block::Text(Span { start: 0, end: 1 }))
+            );
+            assert_eq!(work.spent(), 0);
+            assert_eq!(blocks.next(source, &mut work), Some(Block::End));
+            assert_eq!(work.spent(), 2);
+            assert_eq!(blocks.next(source, &mut work), Some(Block::End));
+        }
+    }
+
+    #[test]
+    fn a_nul_inside_a_block_delivers_it_and_allows_another_block() {
+        let source = b"X\0Y";
+        let mut blocks = Blocks::new();
+        let mut work = WorkBudget::new(3);
+        for span in [Span { start: 0, end: 1 }, Span { start: 2, end: 3 }] {
+            assert_eq!(blocks.next(source, &mut work), Some(Block::Text(span)));
+        }
+        assert_eq!(work.spent(), 3);
+        assert_eq!(blocks.next(source, &mut work), Some(Block::End));
     }
 }

@@ -107,27 +107,17 @@ impl Scan<'_> {
         Some(i64::from(value.cast_signed()))
     }
 
-    /// `count` fields separated by `:`, then `.` and the fraction.
-    fn clock(&mut self, count: usize) -> Option<i64> {
-        let mut total = 0_i64;
-        for at in 0..count {
-            if at > 0 {
-                self.byte(b':')?;
-            }
-            total = total * 60 + self.field()?;
-        }
-        self.byte(b'.')?;
-        Some(total * 1000 + self.field()?)
-    }
-
     /// `H:M:S.F` or `M:S.F`, in milliseconds.
     fn time(&mut self) -> Option<i64> {
-        let from = self.at;
-        if let Some(time) = self.clock(3) {
-            return Some(time);
+        let first = self.field()?;
+        self.byte(b':')?;
+        let second = self.field()?;
+        let mut seconds = first * 60 + second;
+        if self.byte(b':').is_some() {
+            seconds = seconds * 60 + self.field()?;
         }
-        self.at = from;
-        self.clock(2)
+        self.byte(b'.')?;
+        Some(seconds * 1000 + self.field()?)
     }
 
     /// Past the line end (CR LF, LF or CR) at the cursor, if there is one.
