@@ -44,8 +44,8 @@ pub use psi::SectionAssembler;
 pub use reader::{
     Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, DtsExtensionFrame,
     DvbSubtitleTailPolicy, DvbSubtitleUnit, EntityTransition, IncompleteVideo, LoasFrame,
-    MpegAudioFrame, Packet, PacketClock, PayloadSource, Reader, ReaderEvent, ReaderLimits,
-    SeekEntity, SourceEvent, Track, UnframedAudio,
+    MpegAudioFrame, MpegPictureCoding, MpegVideoPicture, Packet, PacketClock, PayloadSource,
+    Reader, ReaderEvent, ReaderLimits, SeekEntity, SourceEvent, Track, UnframedAudio,
 };
 pub use stream::{
     CarrierObservation, CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem,

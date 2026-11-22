@@ -42,6 +42,27 @@ impl<const HEADER_BYTES: usize, Header: Copy> Reader<HEADER_BYTES, Header> {
         self.input.provide_owned(window)
     }
 
+    // An accumulating frame can consume a borrowed response as long as it
+    // ends within that frame. The normal window path retains any next header.
+    pub(super) fn append_payload(
+        &mut self,
+        request: &InputRequest,
+        bytes: &[u8],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        let Some((_, size)) = self.frame else {
+            return Ok(false);
+        };
+        if self.buffer.is_empty() || bytes.len() > size - self.buffer.len() {
+            return Ok(false);
+        }
+        self.input
+            .consume_response(request, bytes.len(), work, cancel, || {
+                self.buffer.try_extend_from_slice(bytes)
+            })
+    }
+
     pub(super) fn input(&mut self) -> &mut InputCursor {
         &mut self.input
     }

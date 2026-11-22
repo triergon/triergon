@@ -40,6 +40,7 @@ fn facade_delivers_source_aus_and_every_original_pes_without_decoder_injection()
                         &mut audio_packets
                     }
                     AccessUnit::Ac3(_)
+                    | AccessUnit::MpegVideo(_)
                     | AccessUnit::Loas(_)
                     | AccessUnit::MpegAudio(_)
                     | AccessUnit::Dts(_)
