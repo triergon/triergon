@@ -9,7 +9,7 @@
   "reference": "ffmpeg-framing-views-native",
   "contract": [
     "Walk physical ADTS extents with inspect_adts_header and parse each with AacAdtsParser. The reference opens a raw AAC demuxer without stream discovery, reads each packet and filters it with aac_adtstoasc.",
-    "Fold kind 2 with the length and exact bytes of the candidate ASC header projection and reference ASC, initially or when the filter reports an update. Fold kind 1 with source offset, input frame length, object type, sampling index, channel configuration, protection-absent flag, payload length and exact payload bytes. The reference projects the configuration fields from the active ASC and the protection flag from the demuxed header.",
+    "Fold kind 2 with the length and exact bytes of the candidate ASC header projection and reference ASC, initially or when the filter reports an update. Fold kind 1 with source offset, input frame length, object type, sampling index, channel configuration, protection-absent flag, payload length and exact payload bytes. For channel configuration zero, use the demuxed header's two-byte ASC projection and the original payload, including any in-band PCE. Otherwise the reference projects the configuration fields from the active ASC and the protection flag from the demuxed header.",
     "Fold kind 7 with the frame count on clean end or kind 8 with the source offset on refusal or leftover input. Operate on preloaded bytes and include parser, demuxer and filter setup and teardown."
   ],
   "required_profiles": [
@@ -23,6 +23,65 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
+  "pending_module_requirements": [
+    "The wire inspector can expose the empty input extent; compare demuxed source extents independently of ADTS-to-ASC filter admission on header-only input."
+  ],
+  "open_cases": [
+    {
+      "id": "empty-payload-unprotected",
+      "requirement": "The wire inspector can expose the empty input extent; compare demuxed source extents independently of ADTS-to-ASC filter admission on header-only input."
+    },
+    {
+      "id": "empty-payload-protected",
+      "requirement": "The wire inspector can expose the empty input extent; compare demuxed source extents independently of ADTS-to-ASC filter admission on header-only input."
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "ADTS frame_length bounds the complete frame",
+      "clause": "ISO/IEC 13818-7 clause 6.2 (ADTS syntax), from the repository's ADTS wire parser and framing README (aac_frame_length includes header, CRC when present and payload)",
+      "candidate": "refuses a final frame that ends before its declared byte extent",
+      "reference": "returns the short final payload through the AAC demuxer and filter",
+      "compat": "compat::aac::return_truncated_adts_tail",
+      "cases": [
+        "truncated-crc-10",
+        "truncated-8",
+        "foo"
+      ]
+    },
+    {
+      "reading": "Only one raw_data_block belongs to the selected frame parser",
+      "clause": "ISO/IEC 13818-7 clause 6.2 (ADTS syntax), from the repository's ADTS wire parser and framing README (number_of_raw_data_blocks_in_frame)",
+      "candidate": "refuses a header declaring two raw blocks",
+      "reference": "returns the unprotected payload without splitting the two declared blocks",
+      "cases": [
+        "two-blocks-unprotected"
+      ]
+    },
+    {
+      "reading": "ADTS layer is zero",
+      "clause": "ISO/IEC 13818-7 clause 6.2 (ADTS syntax), from the repository's ADTS wire parser and framing README (adts_fixed_header layer)",
+      "candidate": "refuses layer 1",
+      "reference": "returns the payload",
+      "cases": [
+        "layer-1"
+      ]
+    },
+    {
+      "reading": "The frame parser selects the AAC-LC profile",
+      "clause": "ISO/IEC 13818-7 clause 6.2 (ADTS syntax), from the repository's ADTS wire parser and framing README (adts_fixed_header profile, profile_ObjectType) and AacAdtsParser's selected grammar",
+      "candidate": "refuses non-LC profiles before emitting a source frame",
+      "reference": "emits other MPEG audio object types and returns payloads",
+      "cases": [
+        "profile-0",
+        "profile-2",
+        "profile-3",
+        "am00_88",
+        "am05_44",
+        "ap05_48"
+      ]
+    }
+  ],
   "open_unmeasured": [
     {
       "bound": "runtime",
@@ -365,129 +424,6 @@
         "foo"
       ],
       "cause": "open parity differences require resolution"
-    }
-  ],
-  "pending_module_requirements": [
-    "The raw AAC demuxer and filter emit a short final payload while the buffer parser refuses a truncated declared extent",
-    "The filter refuses a header-only frame while the buffer parser exposes the empty payload and flags it in the wire view",
-    "The filter emits a payload for multiple unprotected raw blocks while the AAC-LC buffer parser selects a single block",
-    "The reference accepts nonzero ADTS layer bits while the buffer parser requires layer zero",
-    "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC",
-    "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload",
-    "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
-  ],
-  "open_cases": [
-    {
-      "id": "truncated-crc-10",
-      "requirement": "The raw AAC demuxer and filter emit a short final payload while the buffer parser refuses a truncated declared extent"
-    },
-    {
-      "id": "truncated-8",
-      "requirement": "The raw AAC demuxer and filter emit a short final payload while the buffer parser refuses a truncated declared extent"
-    },
-    {
-      "id": "empty-payload-unprotected",
-      "requirement": "The filter refuses a header-only frame while the buffer parser exposes the empty payload and flags it in the wire view"
-    },
-    {
-      "id": "two-blocks-unprotected",
-      "requirement": "The filter emits a payload for multiple unprotected raw blocks while the AAC-LC buffer parser selects a single block"
-    },
-    {
-      "id": "empty-payload-protected",
-      "requirement": "The filter refuses a header-only frame while the buffer parser exposes the empty payload and flags it in the wire view"
-    },
-    {
-      "id": "layer-1",
-      "requirement": "The reference accepts nonzero ADTS layer bits while the buffer parser requires layer zero"
-    },
-    {
-      "id": "profile-0",
-      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
-    },
-    {
-      "id": "profile-2",
-      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
-    },
-    {
-      "id": "profile-3",
-      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
-    },
-    {
-      "id": "channel-0",
-      "requirement": "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload"
-    },
-    {
-      "id": "crc-0000",
-      "requirement": "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload"
-    },
-    {
-      "id": "crc-0001",
-      "requirement": "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload"
-    },
-    {
-      "id": "crc-8000",
-      "requirement": "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload"
-    },
-    {
-      "id": "crc-ffff",
-      "requirement": "The filter requires a leading PCE for channel configuration zero while the buffer parser exposes the original header and opaque payload"
-    },
-    {
-      "id": "al04_44",
-      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
-    },
-    {
-      "id": "al05_44",
-      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
-    },
-    {
-      "id": "al06_44",
-      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
-    },
-    {
-      "id": "al07_96",
-      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
-    },
-    {
-      "id": "al15_44",
-      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
-    },
-    {
-      "id": "al17_44",
-      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
-    },
-    {
-      "id": "al22_chCfg0PCE_44",
-      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
-    },
-    {
-      "id": "al_sbr_cm_48_5.1",
-      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
-    },
-    {
-      "id": "al_sbr_ps_04_new",
-      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
-    },
-    {
-      "id": "al_sbr_ps_06_new",
-      "requirement": "The filter moves the leading PCE to the ASC while the buffer parser preserves all original payload bytes"
-    },
-    {
-      "id": "am00_88",
-      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
-    },
-    {
-      "id": "am05_44",
-      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
-    },
-    {
-      "id": "ap05_48",
-      "requirement": "The reference emits other MPEG-4 object types while the buffer parser selects AAC-LC"
-    },
-    {
-      "id": "foo",
-      "requirement": "The raw AAC demuxer and filter emit a short final payload while the buffer parser refuses a truncated declared extent"
     }
   ]
 }

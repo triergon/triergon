@@ -634,9 +634,9 @@
       "rights": "authored-synthetic",
       "arguments": [],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
+        "packets": 3,
+        "bytes": 4,
+        "digest": 2697854109161848110
       }
     },
     {
@@ -738,9 +738,9 @@
       "rights": "authored-synthetic",
       "arguments": [],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
+        "packets": 3,
+        "bytes": 6,
+        "digest": 4674985859785870204
       }
     },
     {
@@ -751,9 +751,9 @@
       "rights": "authored-synthetic",
       "arguments": [],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
+        "packets": 3,
+        "bytes": 6,
+        "digest": 4674985859785870204
       }
     },
     {
@@ -764,9 +764,9 @@
       "rights": "authored-synthetic",
       "arguments": [],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
+        "packets": 3,
+        "bytes": 6,
+        "digest": 4674985859785870204
       }
     },
     {
@@ -777,9 +777,9 @@
       "rights": "authored-synthetic",
       "arguments": [],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
+        "packets": 3,
+        "bytes": 6,
+        "digest": 4674985859785870204
       }
     },
     {
@@ -883,7 +883,7 @@
       "expected": {
         "packets": 357,
         "bytes": 65888,
-        "digest": 9352165127693103364
+        "digest": 5606243804172194018
       }
     },
     {
@@ -896,7 +896,7 @@
       "expected": {
         "packets": 322,
         "bytes": 118824,
-        "digest": 17690847560099472658
+        "digest": 3747542231688465932
       }
     },
     {
@@ -908,8 +908,8 @@
       "arguments": [],
       "expected": {
         "packets": 357,
-        "bytes": 197772,
-        "digest": 15543660425288629716
+        "bytes": 197773,
+        "digest": 17295146100796083122
       }
     },
     {
@@ -922,7 +922,7 @@
       "expected": {
         "packets": 782,
         "bytes": 399331,
-        "digest": 13260004701740166533
+        "digest": 18310197846435960859
       }
     },
     {
@@ -935,7 +935,7 @@
       "expected": {
         "packets": 132,
         "bytes": 144911,
-        "digest": 15230196653107194548
+        "digest": 6073779485506397645
       }
     },
     {
@@ -948,7 +948,7 @@
       "expected": {
         "packets": 325,
         "bytes": 119651,
-        "digest": 5278187300533220850
+        "digest": 11229853012917034250
       }
     },
     {
@@ -973,8 +973,8 @@
       "arguments": [],
       "expected": {
         "packets": 54,
-        "bytes": 69184,
-        "digest": 2633965808159334268
+        "bytes": 69185,
+        "digest": 6311672444827342387
       }
     },
     {
@@ -1000,7 +1000,7 @@
       "expected": {
         "packets": 756,
         "bytes": 514742,
-        "digest": 3740523087861709590
+        "digest": 3046873997876728747
       }
     },
     {
@@ -1012,8 +1012,8 @@
       "arguments": [],
       "expected": {
         "packets": 108,
-        "bytes": 27146,
-        "digest": 8206758662058726110
+        "bytes": 27147,
+        "digest": 11350136474091125351
       }
     },
     {
@@ -1025,8 +1025,8 @@
       "arguments": [],
       "expected": {
         "packets": 214,
-        "bytes": 54284,
-        "digest": 17992337494073224472
+        "bytes": 54285,
+        "digest": 14491161758388812897
       }
     },
     {

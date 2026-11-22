@@ -16,6 +16,38 @@ static int adts_read(void *opaque, uint8_t *destination, int length)
     return (int)size;
 }
 
+/* The source reader retains an in-band PCE, so use the public demuxer's
+ * original payload in the channel-configuration-zero branch. The derived
+ * two-byte ASC prefix describes the same channel configuration. */
+static int adts_source_payload(ViewWork *work, const AVPacket *packet,
+                               uint64_t position, uint64_t count)
+{
+    if (packet->size < 7)
+        return 0;
+    const uint8_t *data = packet->data;
+    const unsigned channel = ((data[2] & 1) << 2) | (data[3] >> 6);
+    const unsigned protection_absent = data[1] & 1;
+    const int header_size = protection_absent ? 7 : 9;
+    if (channel || packet->size < header_size || (data[6] & 3))
+        return 0;
+    const unsigned object = (data[2] >> 6) + 1;
+    const unsigned frequency = (data[2] >> 2) & 15;
+    if (!count) {
+        const uint8_t asc[] = {
+            (uint8_t)((object << 3) | (frequency >> 1)), (uint8_t)(frequency << 7),
+        };
+        const uint64_t words[] = {sizeof(asc)};
+        stream_record(work, 2, words, 1, asc, sizeof(asc));
+    }
+    const size_t payload_size = (size_t)(packet->size - header_size);
+    const uint64_t words[] = {
+        position, (uint64_t)packet->size, object, frequency, channel,
+        protection_absent, payload_size,
+    };
+    stream_record(work, 1, words, 7, data + header_size, payload_size);
+    return 1;
+}
+
 static int adts_run(const ViewCase *input, ViewWork *work)
 {
     AdtsInput source = {input->data, input->size, 0};
@@ -53,6 +85,12 @@ static int adts_run(const ViewCase *input, ViewWork *work)
         const uint64_t position = packet->pos >= 0 ? (uint64_t)packet->pos : offset;
         const int size = packet->size;
         const unsigned protection_absent = size >= 2 ? packet->data[1] & 1 : 0;
+        if (adts_source_payload(work, packet, position, count)) {
+            offset = position + (uint64_t)size;
+            ++count;
+            av_packet_unref(packet);
+            continue;
+        }
         status = av_bsf_send_packet(filter, packet);
         if (status >= 0)
             status = av_bsf_receive_packet(filter, packet);
