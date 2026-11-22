@@ -6,8 +6,8 @@ use std::ops::Deref;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 use triergon_raster::compat::libass::{
-    BorderStroke, Composite, EffectsKey, FrameScale, GlyphBitmaps, GlyphPlacement, GlyphRequest,
-    GlyphSource, PlacedBitmap, Run,
+    BorderStroke, Composite, EffectsKey, FrameScale, GlyphBitmaps, GlyphRequest, GlyphSource,
+    PlacedBitmap, PlacedStroke, Run,
 };
 use triergon_raster::{
     Bitmap, BitmapTransform, Limits, Matrix, OUTLINE_MAX, Quantized, Raster, Shape, Vector,
@@ -446,14 +446,14 @@ impl GlyphSource for CachedBitmaps<'_> {
         &mut self,
         raster: &mut Raster,
         _shape: &Shape,
-        stroke: BorderStroke,
-        placement: &GlyphPlacement,
+        placed: &PlacedStroke,
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
+        let stroke = placed.stroke();
         let Some(border) = self.outlines.border(self.glyph, stroke, raster, work)? else {
             return Ok(None);
         };
-        let Some(at) = placement.place_stroke(&border.shape) else {
+        let Some(at) = placed.place(&border.shape) else {
             return Ok(None);
         };
         let key = BitmapKey {

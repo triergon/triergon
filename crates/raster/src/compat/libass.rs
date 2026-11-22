@@ -15,6 +15,6 @@ mod glyph;
 pub use clip::{Clip, ClipFrame, ClipPart, Colour};
 pub use compose::{Border, Composite, Effects, EffectsKey, Shadow};
 pub use glyph::{
-    BorderStroke, FrameScale, GlyphBitmaps, GlyphPlacement, GlyphRequest, GlyphSource,
-    PlacedBitmap, Placement, Run,
+    BorderStroke, FrameScale, GlyphBitmaps, GlyphRequest, GlyphSource, PlacedBitmap, PlacedStroke,
+    Placement, Run,
 };

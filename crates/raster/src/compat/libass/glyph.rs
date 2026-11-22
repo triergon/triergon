@@ -332,7 +332,7 @@ pub struct Run {
 }
 
 /// Where a glyph's border bitmap comes from once the glyph is placed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum PlacedBorder {
     /// No border: none is drawn, or it leaves the coordinate range.
     None,
@@ -342,33 +342,43 @@ pub(crate) enum PlacedBorder {
     /// [`Shape::unit_box`] under this transform, `None` when the transform
     /// leaves the coordinate range and no box is drawn.
     Box(Option<Quantized>),
-    /// The glyph's first outline stroked by [`BorderStroke::stroke`], then
-    /// placed by [`GlyphPlacement::place_stroke`].
-    Stroke(BorderStroke),
+    /// The glyph's first outline stroked, then placed.
+    Stroke(PlacedStroke),
+}
+
+/// A glyph's stroked border, placed in its run before it is stroked: how its
+/// outline is stroked, and the transform the stroked outline is placed by.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PlacedStroke {
+    stroke: BorderStroke,
+    /// The stroked outline's matrix.
+    matrix: Matrix,
+    /// The run's sub-pixel origin, which the border is placed against.
+    offset: RunOffset,
+}
+
+impl PlacedStroke {
+    /// How the glyph's outline is stroked.
+    pub fn stroke(&self) -> BorderStroke {
+        self.stroke
+    }
+
+    /// The stroked border placed in the run, `stroked` being the glyph's
+    /// outline as [`BorderStroke::stroke`] strokes it. `None` when its
+    /// transform leaves the coordinate range; the glyph then has no border,
+    /// as in libass.
+    pub fn place(&self, stroked: &Shape) -> Option<Quantized> {
+        let quantized = BitmapTransform::quantize(&self.matrix, stroked.cbox(), Some(self.offset))?;
+        Some(quantized.placed)
+    }
 }
 
 /// A glyph quantised and placed in its run, before any of it is drawn: what
 /// its fill and border bitmaps are drawn from and under which transforms.
 #[derive(Clone, Copy, Debug)]
-pub struct GlyphPlacement {
+pub(crate) struct GlyphPlacement {
     fill: Quantized,
     border: PlacedBorder,
-    /// The stroked border's matrix, for [`PlacedBorder::Stroke`].
-    stroke_matrix: Matrix,
-    /// The run's sub-pixel origin, which the border is placed against.
-    offset: RunOffset,
-}
-
-impl GlyphPlacement {
-    /// The stroked border placed in the run, `stroked` being the glyph's
-    /// outline as [`BorderStroke::stroke`] strokes it. `None` when its
-    /// transform leaves the coordinate range; the glyph then has no border,
-    /// as in libass.
-    pub fn place_stroke(&self, stroked: &Shape) -> Option<Quantized> {
-        let quantized =
-            BitmapTransform::quantize(&self.stroke_matrix, stroked.cbox(), Some(self.offset))?;
-        Some(quantized.placed)
-    }
 }
 
 impl Run {
@@ -394,18 +404,17 @@ impl Run {
         if starts {
             self.offset = quantized.remainder;
         }
+        let offset = self.offset;
         let mut out = GlyphPlacement {
             fill: quantized.placed,
             border: PlacedBorder::None,
-            stroke_matrix: Matrix::IDENTITY,
-            offset: self.offset,
         };
         match effects.border {
             Border::None => {}
             Border::OpaqueBox { size, shown } => {
                 if shown || effects.casts_shadow() {
                     let m = transform.opaque_box(placement, frame, size);
-                    let q = BitmapTransform::quantize(&m, &UNIT_BOX, Some(self.offset));
+                    let q = BitmapTransform::quantize(&m, &UNIT_BOX, Some(offset));
                     out.border = PlacedBorder::Box(q.map(|q| q.placed));
                 }
             }
@@ -422,8 +431,11 @@ impl Run {
                     out.border = if stroke.is_empty() {
                         PlacedBorder::Fill
                     } else {
-                        out.stroke_matrix = matrix;
-                        PlacedBorder::Stroke(stroke)
+                        PlacedBorder::Stroke(PlacedStroke {
+                            stroke,
+                            matrix,
+                            offset,
+                        })
                     };
                 }
             }
@@ -550,8 +562,9 @@ pub trait GlyphSource {
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap<Self::Bitmap>>>;
 
-    /// The border: `shape` stroked by `stroke` ([`BorderStroke::stroke`]),
-    /// placed by `placement` once stroked ([`GlyphPlacement::place_stroke`]).
+    /// The border: `shape` stroked as `border` strokes it
+    /// ([`BorderStroke::stroke`]), and placed once stroked
+    /// ([`PlacedStroke::place`]).
     ///
     /// # Errors
     ///
@@ -561,8 +574,7 @@ pub trait GlyphSource {
         &mut self,
         raster: &mut Raster,
         shape: &Shape,
-        stroke: BorderStroke,
-        placement: &GlyphPlacement,
+        border: &PlacedStroke,
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap<Self::Bitmap>>>;
 }
@@ -608,14 +620,13 @@ impl GlyphSource for Drawing {
         &mut self,
         raster: &mut Raster,
         shape: &Shape,
-        stroke: BorderStroke,
-        placement: &GlyphPlacement,
+        border: &PlacedStroke,
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap>> {
-        let Some(stroked) = stroke.stroke(raster, shape, work)? else {
+        let Some(stroked) = border.stroke.stroke(raster, shape, work)? else {
             return Ok(None);
         };
-        let Some(at) = placement.place_stroke(&stroked) else {
+        let Some(at) = border.place(&stroked) else {
             return Ok(None);
         };
         Ok(Self::placed(
@@ -667,9 +678,7 @@ impl Run {
             PlacedBorder::None => None,
             PlacedBorder::Fill => fill.clone(),
             PlacedBorder::Box(at) => source.opaque_box(raster, at, work)?,
-            PlacedBorder::Stroke(stroke) => {
-                source.border(raster, shape, stroke, &placement, work)?
-            }
+            PlacedBorder::Stroke(border) => source.border(raster, shape, &border, work)?,
         };
         Ok(self.add(fill, border))
     }
