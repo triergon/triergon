@@ -121,12 +121,6 @@
         "needs": "ts-reader-views compares track configuration and time bases, AC-3 syncframes and incomplete extents, DVB segments and opaque ranges. The underlying source signalling has no separate public reference observation."
       },
       {
-        "name": "continuity-reader-container-view",
-        "entry_points": ["compat::annex_b::ContinuityReader", "compat::annex_b::ContinuityReader::request", "compat::annex_b::ContinuityReader::close", "compat::annex_b::ContinuityResidue::source_end", "compat::annex_b::ContinuityResidue::evidence"],
-        "degree": "step",
-        "needs": "ts-reader-container compares packet output and ordered carrier evidence, including the confirming source fault. The full typed diagnostic context remains candidate trace evidence."
-      },
-      {
         "name": "reference-trace-recovery",
         "entry_points": ["reference_trace::recovery::RecoveryObserver", "reference_trace::recovery::RecoveredPacket", "reference_trace::recovery::EncodedHeader", "reference_trace::recovery::PatSelection", "reference_trace::recovery::PmtBindingJob", "reference_trace::recovery::DiagnosticPacket"],
         "degree": "unit-tests",

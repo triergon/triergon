@@ -23,7 +23,8 @@ use triergon_mpegts::reader::{
     AudioEofPolicy, DvbSubtitleTailPolicy, EntityTransition, PacketClock,
 };
 use triergon_mpegts::reference_trace::input::PositionBasis;
-use triergon_mpegts::stream::TraceEvent;
+use triergon_mpegts::stream::{FaultKind, TraceEvent};
+use triergon_mpegts::transport::ContinuityOutcome;
 use triergon_mpegts::{
     AccessUnit, Packet, PacketFormat, Reader, ReaderEvent, ReaderLimits, SourceEpochs, Track,
 };
@@ -240,6 +241,16 @@ fn drain<R: ViewReader>(mut reader: R, out: &mut Output<'_, '_>) -> Result<(), S
             .map_err(explain)?;
         match step {
             Step::NeedInput(request) => {
+                if out.container {
+                    let pending = reader.request().map_err(explain)?;
+                    if pending.source != request.source
+                        || pending.token != request.token
+                        || pending.offset != request.offset
+                        || pending.maximum != request.maximum
+                    {
+                        return Err("continuity reader changed its pending request".into());
+                    }
+                }
                 let bytes = &out.entities[index].bytes;
                 let start = usize::try_from(request.offset).map_err(explain)?;
                 if start == bytes.len() {
@@ -270,7 +281,7 @@ fn drain<R: ViewReader>(mut reader: R, out: &mut Output<'_, '_>) -> Result<(), S
                 ContinuityEvent::Source(event) | ContinuityEvent::Pending(event) => {
                     out.source(event, &cancel)?;
                 }
-                ContinuityEvent::Residue(residue) => out.residue(&residue)?,
+                ContinuityEvent::Residue(residue) => out.residue(&residue, index)?,
             },
             Step::Ready(Event::Seek(_)) => {
                 return Err("unexpected seek while reading forward".into());
@@ -783,7 +794,7 @@ impl Output<'_, '_> {
         self.row(3, &[1, 1], &[stream_id])
     }
 
-    fn residue(&mut self, residue: &ContinuityResidue) -> Result<(), String> {
+    fn residue(&mut self, residue: &ContinuityResidue, index: usize) -> Result<(), String> {
         let first = residue
             .chunks()
             .first()
@@ -799,8 +810,65 @@ impl Output<'_, '_> {
             PacketPayload::untimed(0, &data),
         )?;
         let end = residue.source_end();
+        let source = SourceId(1 + index as u64);
+        let bytes = self.entities[index].bytes.as_ref();
+        if end.source != source || end.offset != bytes.len() as u64 {
+            return Err("continuity residue has a different physical source end".into());
+        }
         self.row(6, &[end.offset, residue.evidence().len() as u64], &[])?;
+        let mut previous = None;
+        let mut expected_fault = None;
         for evidence in residue.evidence() {
+            let carrier = &evidence.carrier;
+            let at = usize::try_from(carrier.source_offset).map_err(explain)?;
+            let extent = at.saturating_add(carrier.source.len());
+            let ordinal = evidence.context.source_event_ordinal;
+            if carrier.source_id != Some(source)
+                || carrier.pid != first.pid
+                || bytes.get(at..extent) != Some(carrier.source.as_ref())
+                || evidence.carrier_context.source_event_ordinal >= ordinal
+                || previous.is_some_and(|last| last >= ordinal)
+                || evidence.context.byte_run_epoch.is_some()
+                || evidence.carrier_context.byte_run_epoch.is_some()
+            {
+                return Err("continuity residue changed its carrier provenance or context".into());
+            }
+            match evidence.event.event() {
+                TraceEvent::Continuity { pid, outcome }
+                    if *pid == carrier.pid && expected_fault.is_none() =>
+                {
+                    expected_fault = match outcome {
+                        ContinuityOutcome::Lost { .. } => {
+                            Some(Error::Invalid("TS continuity loss"))
+                        }
+                        ContinuityOutcome::ExcessDuplicate => {
+                            Some(Error::Invalid("TS excess duplicate"))
+                        }
+                        ContinuityOutcome::Duplicate => None,
+                        ContinuityOutcome::SignalledDiscontinuity
+                            if carrier.discontinuity_indicator() =>
+                        {
+                            None
+                        }
+                        _ => return Err("unexpected continuity residue counter event".into()),
+                    };
+                }
+                TraceEvent::Diagnostic(fault)
+                    if fault.kind == FaultKind::Continuity
+                        && fault.pid == Some(carrier.pid)
+                        && fault.location.source == source
+                        && fault.location.offset == carrier.source_offset
+                        && fault.rejected.is_none()
+                        && Some(fault.error) == expected_fault.take() => {}
+                TraceEvent::Timeline {
+                    program,
+                    clock_epoch,
+                } if *program == first.program
+                    && *clock_epoch == evidence.context.epochs.clock
+                    && carrier.discontinuity_indicator() => {}
+                _ => return Err("continuity residue lost the confirming source event".into()),
+            }
+            previous = Some(ordinal);
             self.row(
                 6,
                 &[
@@ -809,6 +877,9 @@ impl Output<'_, '_> {
                 ],
                 evidence.carrier.source.as_ref(),
             )?;
+        }
+        if expected_fault.is_some() {
+            return Err("continuity residue lacks the matching source fault".into());
         }
         Ok(())
     }

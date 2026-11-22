@@ -299,6 +299,10 @@ and never reconstructing source clocks or validated PES:
 - `compat::annex_b::ContinuityReader` and `compat::opaque_video::OpaqueRecovery`
   report unframed video runs through continuity changes or a replayed fault.
 
+The [continuity reader comparison](../../harness/features/ts-reader-container/contract.json)
+checks the pending request and closure, then grades the residue's physical
+source end and typed confirming events alongside its paired packet result.
+
 ## Writing TS
 
 `mux::Muxer` writes 188-byte packets for one video elementary stream, one PES per

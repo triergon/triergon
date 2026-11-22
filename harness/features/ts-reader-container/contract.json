@@ -11,7 +11,7 @@
     "Drive ContinuityReader through its ContainerReader implementation, verify the source capabilities and initial request, enumerate the announced tracks, and close after EOF.",
     "Read the complete mpegts-access-units corpus through the selected program, advancing ordered entities and flushing at a declared discontinuity. The reference uses the public parser-enabled MPEG-TS demuxer with NOFILLIN, without stream discovery.",
     "The packet record compares stream index, PID, demux PTS and DTS, duration, position, flags, payload length and bytes, and time base. A following record compares each side-data element in order. Clean end requires consuming the last physical entity.",
-    "Compare the packet consequence of a continuity residue. The candidate appends the source end and the ordered carriers that admitted the observation. The reference derives the corresponding wire check from counter gaps and copies and their confirming fault diagnostics in the original single entity when it emits an opaque AVC or HEVC packet."
+    "Compare the packet consequence of a continuity residue. Check its physical source end, original carrier bytes, ordered source-event ordinals, selected PID, clock-discontinuity epoch and matching typed gap or duplicate fault. The candidate appends the source end and ordered carriers. The reference derives the corresponding wire check from counter gaps and copies and their confirming fault diagnostics in the original single entity when it emits an opaque AVC or HEVC packet."
   ],
   "required_profiles": [
     "ts188-basic",
