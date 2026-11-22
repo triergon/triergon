@@ -24,6 +24,7 @@ struct Payload {
 }
 
 impl Payload {
+    // Returning a checked payload view measured +0.197001% on one transport workload.
     #[expect(
         clippy::expect_used,
         reason = "an error return here and in the body loop measured +0.09% (pes/cc-wrap +0.13%)"
