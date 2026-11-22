@@ -528,6 +528,14 @@ pub enum OpenStep {
     Ready,
 }
 
+#[derive(Debug)]
+struct TrackBuild {
+    builder: SampleTableBuilder,
+    refs: Option<BoxChildren>,
+    pending_reference: Option<bool>,
+    description_at: usize,
+}
+
 /// The resumable opener over a caller-driven [`InputCursor`]: it walks the root
 /// boxes, the movie and every fragment, and validates each track.
 #[derive(Debug)]
@@ -555,12 +563,8 @@ pub struct MovieOpen {
     walk: Option<Walk>,
     tracks: BudgetVec<MovieTrack>,
     track_at: usize,
-    builder: Option<SampleTableBuilder>,
-    refs: Option<BoxChildren>,
+    track_build: Option<TrackBuild>,
     references: BudgetVec<bool>,
-    pending_reference: Option<bool>,
-    description_at: usize,
-    built_table: Option<SampleTable>,
     fragment_moof: usize,
     fragment_children: Option<BoxChildren>,
     fragment_raw: Option<BoxView>,
@@ -635,12 +639,8 @@ impl MovieOpen {
             walk: None,
             tracks: BudgetVec::new(&pool),
             track_at: 0,
-            builder: None,
-            refs: None,
+            track_build: None,
             references: BudgetVec::new(&pool),
-            pending_reference: None,
-            description_at: 0,
-            built_table: None,
             fragment_moof: 0,
             fragment_children: None,
             fragment_raw: None,
@@ -748,7 +748,7 @@ impl MovieOpen {
             .ok_or(Error::Invalid("walk missing"))?
             .parts
             .as_mut_slice()[self.track_at];
-        if self.builder.is_none() && self.built_table.is_none() {
+        if self.track_build.is_none() {
             if !w.try_charge(1) {
                 return Ok(OpenStep::Yield);
             }
@@ -769,19 +769,26 @@ impl MovieOpen {
             if fields::u32_at(dref.payload(), 0)? != 0 {
                 return Err(Error::Unsupported("data reference flags"));
             }
-            self.refs = Some(dref.children(8, self.limits.format)?);
-            self.builder = Some(builder);
+            self.track_build = Some(TrackBuild {
+                builder,
+                refs: Some(dref.children(8, self.limits.format)?),
+                pending_reference: None,
+                description_at: 0,
+            });
             p.stbl = None;
         }
-        if let Some(value) = self.pending_reference {
+        let Some(build) = &mut self.track_build else {
+            return Ok(OpenStep::Yield);
+        };
+        if let Some(value) = build.pending_reference {
             if !w.try_charge(1) {
                 return Ok(OpenStep::Yield);
             }
             push(&mut self.references, value)?;
-            self.pending_reference = None;
+            build.pending_reference = None;
             return Ok(OpenStep::Yield);
         }
-        if let Some(refs) = self.refs.as_mut() {
+        if let Some(refs) = build.refs.as_mut() {
             match refs.poll(w)? {
                 Next::Yield => return Ok(OpenStep::Yield),
                 Next::Item(raw) => {
@@ -791,7 +798,7 @@ impl MovieOpen {
                             maximum: self.limits.format.max_descriptions as usize,
                         });
                     }
-                    self.pending_reference =
+                    build.pending_reference =
                         Some(raw.header().kind == *b"url " && raw.payload() == [0, 0, 0, 1]);
                     return Ok(OpenStep::Yield);
                 }
@@ -800,26 +807,15 @@ impl MovieOpen {
                     if fields::u32_at(dref.payload(), 4)? as usize != self.references.len() {
                         return Err(Error::Invalid("data reference count"));
                     }
-                    self.refs = None;
+                    build.refs = None;
                 }
             }
         }
-        if let Some(builder) = self.builder.as_mut() {
-            if builder.poll(w)? == BuildStatus::Yield {
-                return Ok(OpenStep::Yield);
-            }
-            self.built_table = Some(
-                self.builder
-                    .take()
-                    .ok_or(Error::Invalid("table builder missing"))?
-                    .finish()?,
-            );
-        }
-        let table = self
-            .built_table
-            .as_ref()
-            .ok_or(Error::Invalid("table missing"))?;
-        if let Some(desc) = table.descriptions().get(self.description_at) {
+        build.builder.poll(w)?;
+        let Some(table) = build.builder.built() else {
+            return Ok(OpenStep::Yield);
+        };
+        if let Some(desc) = table.descriptions().get(build.description_at) {
             if !w.try_charge(1) {
                 return Ok(OpenStep::Yield);
             }
@@ -833,7 +829,7 @@ impl MovieOpen {
                 }
                 None => return Err(Error::Invalid("dangling source data reference")),
             }
-            self.description_at += 1;
+            build.description_at += 1;
             return Ok(OpenStep::Yield);
         }
         if !w.try_charge(1) {
@@ -867,22 +863,21 @@ impl MovieOpen {
             .map(|b| EditList::parse(b, self.limits.format))
             .transpose()?;
         self.tracks.try_reserve_exact(1)?;
-        push(
-            &mut self.tracks,
-            MovieTrack {
-                header,
-                next_ordinal: table.sample_count().checked_add(1).ok_or(Error::Overflow)?,
-                table: self
-                    .built_table
-                    .take()
-                    .ok_or(Error::Invalid("table missing"))?,
-                edits,
-                fragments: BudgetVec::new(&self.pool),
-                raw_dref: required(p.dref.take(), "missing dref")?,
-            },
-        )?;
+        let next_ordinal = table.sample_count().checked_add(1).ok_or(Error::Overflow)?;
+        if let Some(build) = self.track_build.take() {
+            push(
+                &mut self.tracks,
+                MovieTrack {
+                    header,
+                    next_ordinal,
+                    table: build.builder.finish()?,
+                    edits,
+                    fragments: BudgetVec::new(&self.pool),
+                    raw_dref: required(p.dref.take(), "missing dref")?,
+                },
+            )?;
+        }
         p.elst = None;
-        self.description_at = 0;
         self.references.clear();
         self.track_at += 1;
         Ok(OpenStep::Yield)

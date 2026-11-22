@@ -612,7 +612,7 @@ impl SampleTableBuilder {
         }
     }
     /// The table once the rows are checked.
-    fn built(&self) -> Option<&SampleTable> {
+    pub(crate) fn built(&self) -> Option<&SampleTable> {
         match &self.stage {
             Stage::Validate { table, rows } if rows.check == Check::Done => Some(table),
             _ => None,
