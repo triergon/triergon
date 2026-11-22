@@ -51,16 +51,12 @@ impl Reader {
         self.aligned.finish(request)
     }
 
-    #[expect(
-        clippy::expect_used,
-        reason = "error returns here measured +0.04% on MPEG-1 layer 1 and 2 workloads"
-    )]
     pub(super) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<MpegAudioFrame>> {
-        if let Some(free) = &mut self.free {
+        let free = if let Some(free) = &mut self.free {
             if let Some(base) = free.base
                 && free.buffer.is_empty()
             {
@@ -71,6 +67,7 @@ impl Reader {
                     Ok((header, free_size(header, base)?))
                 })?));
             }
+            free
         } else {
             match self.aligned.step(work, cancel, read_length)? {
                 Step::Ready(frame) => {
@@ -78,7 +75,7 @@ impl Reader {
                         return Ok(map_frame(Step::Ready(frame)));
                     }
                     let buffer = BudgetVec::new(self.aligned.input().budget());
-                    self.free = Some(FreeFormat {
+                    self.free.insert(FreeFormat {
                         buffer,
                         prefix: Some(frame.bytes),
                         first: frame.header,
@@ -87,19 +84,16 @@ impl Reader {
                         candidate: None,
                         base: None,
                         paid: 0,
-                    });
+                    })
                 }
                 Step::Yield => return Ok(Step::Yield),
                 Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                 Step::End(location) => return Ok(Step::End(location)),
                 Step::Backpressure(never) => match never {},
             }
-        }
+        };
         let maximum = self.aligned.maximum();
-        self.free
-            .as_mut()
-            .expect("free-format reader initialized")
-            .step(self.aligned.input(), maximum, work, cancel)
+        free.step(self.aligned.input(), maximum, work, cancel)
     }
 }
 
