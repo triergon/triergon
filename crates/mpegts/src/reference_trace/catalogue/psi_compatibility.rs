@@ -463,14 +463,17 @@ fn decode_rejected_pmt(
         if head[1] & 0xe0 != 0xe0 || u16::from_be_bytes([head[3], head[4]]) & 0xfc00 != 0xf000 {
             return Err(Error::Invalid("PSI compatibility ES reserved bits"));
         }
-        let pid = u16::from_be_bytes([head[1], head[2]]) & 0x1fff;
+        let pid = u16::from_be_bytes([head[1], head[2]]) & pid::MASK;
         let end = at
             .checked_add(5)
             .and_then(|n| {
                 n.checked_add(usize::from(u16::from_be_bytes([head[3], head[4]]) & 0x03ff))
             })
             .ok_or(Error::Overflow)?;
-        if end > raw.len() - 4 || pid < 0x10 || pid == 0x1fff || !matches!(head[0], 0x1b | 0x24) {
+        if end > raw.len() - 4
+            || !pid::ELEMENTARY.contains(&pid)
+            || !matches!(head[0], stream_type::H264 | stream_type::HEVC)
+        {
             return Err(Error::Unsupported(
                 "PSI compatibility ES identity/extent outside observed profile",
             ));
@@ -507,12 +510,12 @@ fn decode_rejected_pmt(
                 }
                 Err(e) => return Err(e),
             };
-            if !matches!(d.tag, 0x0a | 0xee) {
+            if !matches!(d.tag, descriptor_tag::ISO_639_LANGUAGE | OPAQUE_PRIVATE_TAG) {
                 return Err(Error::Unsupported(
                     "PSI compatibility descriptor interpretation unobserved",
                 ));
             }
-            if d.tag == 0x0a && language.is_empty() {
+            if d.tag == descriptor_tag::ISO_639_LANGUAGE && language.is_empty() {
                 for entry in d.languages()? {
                     cancelled(cancel)?;
                     if entry.language_code.contains(&0) {
@@ -558,7 +561,7 @@ fn decode_rejected_pmt(
     }
     Ok(DecodedPmt {
         header: h,
-        pcr_pid: u16::from_be_bytes([raw[8], raw[9]]) & 0x1fff,
+        pcr_pid: u16::from_be_bytes([raw[8], raw[9]]) & pid::MASK,
         streams,
         descriptor_stop: stop,
     })

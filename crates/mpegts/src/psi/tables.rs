@@ -1,4 +1,4 @@
-use super::{Descriptors, Section};
+use super::{Descriptors, Section, descriptor_tag, stream_type};
 use crate::transport::pid;
 use crate::{ParseLimits, SourceRange, limit};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -149,7 +149,7 @@ impl PatReader {
             let data = &self.source.as_ref()[self.position..self.position + 4];
             let program_number = u16::from_be_bytes([data[0], data[1]]);
             let pid = u16::from_be_bytes([data[2], data[3]]);
-            if pid & 0xe000 != 0xe000 || !(0x10..=0x1ffe).contains(&(pid & 0x1fff)) {
+            if pid & 0xe000 != 0xe000 || !pid::ELEMENTARY.contains(&(pid & pid::MASK)) {
                 return Err(Error::Invalid("PAT PID/reserved bits"));
             }
             // At most the explicitly bounded number of programmes; no hash map.
@@ -164,7 +164,7 @@ impl PatReader {
             self.programs
                 .try_push(ProgramAssociation {
                     program_number,
-                    pid: pid & 0x1fff,
+                    pid: pid & pid::MASK,
                 })
                 .map_err(|error| error.error)?;
             self.position += 4;
@@ -324,7 +324,7 @@ impl PmtReader {
             budget: budget.clone(),
             limits,
             header,
-            pcr_pid: pcr & 0x1fff,
+            pcr_pid: pcr & pid::MASK,
             program_descriptors: source.slice(12..end)?,
             source,
             position: 12,
@@ -376,7 +376,7 @@ impl PmtReader {
                     // Each TLV is at most 257 bytes. Service counting is O(1);
                     // no uncharged second descriptor walk or metadata allocation.
                     descriptor.validate_dvb_audio_syntax()?;
-                    if descriptor.tag == 0x59 {
+                    if descriptor.tag == descriptor_tag::DVB_SUBTITLING {
                         descriptor.dvb_subtitling()?;
                     }
                     if let Loop::Stream(stream) = &mut self.descriptor_loop {
@@ -385,10 +385,15 @@ impl PmtReader {
                             .observe(descriptor, self.position - self.descriptor_start)?;
                     }
                 }
-                if descriptor.tag == 0x38
+                if descriptor.tag == descriptor_tag::HEVC_VIDEO
                     && !matches!(
                         &self.descriptor_loop,
-                        Loop::Stream(stream) if matches!(stream.stream_type, 0x24 | 0x25 | 0x31)
+                        Loop::Stream(stream) if matches!(
+                            stream.stream_type,
+                            stream_type::HEVC
+                                | stream_type::HEVC_TEMPORAL_SUBSET
+                                | stream_type::HEVC_TILE_SUBSTREAMS
+                        )
                     )
                 {
                     return Err(Error::Invalid("HEVC descriptor stream type"));
@@ -443,11 +448,11 @@ impl PmtReader {
             let length = u16::from_be_bytes([data[3], data[4]]);
             if pid & 0xe000 != 0xe000
                 || length & 0xfc00 != 0xf000
-                || !pid::ELEMENTARY.contains(&(pid & 0x1fff))
+                || !pid::ELEMENTARY.contains(&(pid & pid::MASK))
             {
                 return Err(Error::Invalid("PMT elementary PID/reserved bits"));
             }
-            let pid = pid & 0x1fff;
+            let pid = pid & pid::MASK;
             if self
                 .streams
                 .as_slice()

@@ -777,6 +777,8 @@ impl TransportFramer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pes::stream_id;
+    use crate::psi::stream_type;
     use crate::transport::SYNC_BYTE;
     use triergon_core::{InputWindow, SourceCapabilities};
 
@@ -1077,8 +1079,8 @@ mod tests {
             DemuxScope {
                 program: 1,
                 pid: 256,
-                stream_type: 0x1b,
-                stream_id: 0xe0,
+                stream_type: stream_type::H264,
+                stream_id: stream_id::VIDEO_FIRST,
                 entity,
                 epochs,
             },

@@ -6,6 +6,8 @@ use triergon_mpegts::compat::pes::{
     DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope,
     RegisteredCarriage, SourceContext, TimestampOrigin,
 };
+use triergon_mpegts::pes::stream_id;
+use triergon_mpegts::psi::stream_type;
 use triergon_mpegts::transport::{TransportPacket, parse_transport};
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, SourceRange};
 
@@ -27,29 +29,29 @@ struct Case {
 }
 const AVC: Case = Case {
     carriage: RegisteredCarriage::Avc,
-    stream_type: 0x1b,
-    stream_id: 0xe0,
+    stream_type: stream_type::H264,
+    stream_id: stream_id::VIDEO_FIRST,
     pid: 256,
     bytes: include_bytes!("data/ts188-basic.ts"),
 };
 const HEVC: Case = Case {
     carriage: RegisteredCarriage::Hevc,
-    stream_type: 0x24,
-    stream_id: 0xe0,
+    stream_type: stream_type::HEVC,
+    stream_id: stream_id::VIDEO_FIRST,
     pid: 257,
     bytes: include_bytes!("data/carriage-hevc-direct.ts"),
 };
 const ADTS: Case = Case {
     carriage: RegisteredCarriage::AacAdts,
-    stream_type: 0x0f,
-    stream_id: 0xc0,
+    stream_type: stream_type::AAC_ADTS,
+    stream_id: stream_id::AUDIO_FIRST,
     pid: 257,
     bytes: include_bytes!("data/carriage-aac-adts-direct.ts"),
 };
 const LATM: Case = Case {
     carriage: RegisteredCarriage::AacLatm,
-    stream_type: 0x11,
-    stream_id: 0xc0,
+    stream_type: stream_type::AAC_LATM,
+    stream_id: stream_id::AUDIO_FIRST,
     pid: 257,
     bytes: include_bytes!("data/carriage-aac-latm-direct.ts"),
 };

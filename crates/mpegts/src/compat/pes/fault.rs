@@ -5,7 +5,7 @@
 use crate::compat::pes::observer::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, SourceContext,
 };
-use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
+use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS, stream_id};
 use crate::stream::{FaultKind, TraceFault};
 use crate::transport::TransportPacket;
 use crate::transport::{
@@ -574,7 +574,7 @@ impl TransportFaultJob {
         };
         packet.payload_unit_start
             && body.len() >= 9
-            && body[..4] == [0, 0, 1, 0xe0]
+            && body[..4] == [0, 0, 1, stream_id::VIDEO_FIRST]
             && (body[7] >> 6 == 1
                 || (body[7] >> 6 == 2
                     && body.len() >= 14
@@ -900,7 +900,7 @@ impl TransportFaultJob {
                     }
                 }
                 1 => {
-                    if body.len() < 9 || body[..4] != [0, 0, 1, 0xe0] {
+                    if body.len() < 9 || body[..4] != [0, 0, 1, stream_id::VIDEO_FIRST] {
                         return Err(Error::Unsupported(
                             "selected diagnostic PES prefix unobserved",
                         ));

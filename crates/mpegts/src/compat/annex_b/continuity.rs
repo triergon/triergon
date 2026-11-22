@@ -2,6 +2,8 @@ use crate::compat::pes::{
     DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, DemuxTimeView, PesFaultPolicy,
     RecoveredPes, RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
+use crate::pes::stream_id;
+use crate::psi::stream_type;
 use crate::reader::SourceEvent;
 use crate::stream::{FaultKind, TraceEvent, TransportStream};
 use crate::transport::{ContinuityOutcome, TransportPacket};
@@ -260,8 +262,8 @@ impl Proof {
                     return Err(UNOBSERVED);
                 };
                 let carriage = match stream.stream_type {
-                    0x1b => RegisteredCarriage::Avc,
-                    0x24 => RegisteredCarriage::Hevc,
+                    stream_type::H264 => RegisteredCarriage::Avc,
+                    stream_type::HEVC => RegisteredCarriage::Hevc,
                     _ => return Err(UNOBSERVED),
                 };
                 let source = source.ok_or(UNOBSERVED)?;
@@ -273,7 +275,7 @@ impl Proof {
                         program: map.header.extension,
                         pid: stream.pid,
                         stream_type: stream.stream_type,
-                        stream_id: 0xe0,
+                        stream_id: stream_id::VIDEO_FIRST,
                         entity: input.source(),
                         epochs: source.source_epochs(),
                     },

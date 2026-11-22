@@ -24,7 +24,8 @@ use crate::compat::adts::PacketPolicy;
 use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::latm;
 use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors, UnframedAudioPolicy};
-use crate::psi::{CodecIdentification, DescriptorNamespace};
+use crate::pes::stream_id;
+use crate::psi::{CodecIdentification, DescriptorNamespace, stream_type};
 use crate::stream::{StorageItem, TransportStorageCursor};
 use crate::{SourceEpochs, table_storage};
 use build::{Build, BuildOrigins, BuildUnit};
@@ -119,31 +120,37 @@ impl Framer {
         let stream = track.stream();
         let namespace = stream.descriptor_namespace();
         match stream.stream_type {
-            1 | 2 => Ok(Self::MpegVideo(mpeg_video::Reader::default())),
-            kind @ (0x1b | 0x24) => Ok(Self::Video(RawAnnexBReader::new(
-                pool,
-                if kind == 0x1b {
-                    Codec::Avc
-                } else {
-                    Codec::Hevc
-                },
-                source,
-                caps,
-                limits.video,
-            )?)),
-            0x0f if limits.adts_packet_policy == PacketPolicy::ReportFragments => Ok(
-                Self::AdtsFragments(AacAdtsCarrierReader::for_parser_packets(
+            stream_type::MPEG1_VIDEO | stream_type::MPEG2_VIDEO => {
+                Ok(Self::MpegVideo(mpeg_video::Reader::default()))
+            }
+            kind @ (stream_type::H264 | stream_type::HEVC) => {
+                Ok(Self::Video(RawAnnexBReader::new(
                     pool,
+                    if kind == stream_type::H264 {
+                        Codec::Avc
+                    } else {
+                        Codec::Hevc
+                    },
                     source,
                     caps,
-                    AacAdtsCarrierLimits {
-                        maximum_packet_bytes: limits.maximum_audio_frame_bytes,
-                        maximum_packets: limits.maximum_access_units,
-                        maximum_input_window: limits.elementary_input_window,
-                    },
-                )?),
-            ),
-            0x0f => Ok(Self::Adts(AacAdtsStreamReader::new(
+                    limits.video,
+                )?))
+            }
+            stream_type::AAC_ADTS if limits.adts_packet_policy == PacketPolicy::ReportFragments => {
+                Ok(Self::AdtsFragments(
+                    AacAdtsCarrierReader::for_parser_packets(
+                        pool,
+                        source,
+                        caps,
+                        AacAdtsCarrierLimits {
+                            maximum_packet_bytes: limits.maximum_audio_frame_bytes,
+                            maximum_packets: limits.maximum_access_units,
+                            maximum_input_window: limits.elementary_input_window,
+                        },
+                    )?,
+                ))
+            }
+            stream_type::AAC_ADTS => Ok(Self::Adts(AacAdtsStreamReader::new(
                 pool,
                 source,
                 caps,
@@ -153,29 +160,37 @@ impl Framer {
                     maximum_input_window: limits.elementary_input_window,
                 },
             )?)),
-            0x11 if limits.latm_packet_policy == latm::PacketPolicy::PreservePes => {
+            stream_type::AAC_LATM
+                if limits.latm_packet_policy == latm::PacketPolicy::PreservePes =>
+            {
                 Ok(Self::LatmPes)
             }
             // H.222.0 Table 2-34 assigns these streams to ISO/IEC 11172-3
             // and ISO/IEC 13818-3 audio respectively.
-            0x03 | 0x04 => Ok(Self::MpegAudio(mpeg_audio::Reader::new(
+            stream_type::MPEG1_AUDIO | stream_type::MPEG2_AUDIO => {
+                Ok(Self::MpegAudio(mpeg_audio::Reader::new(
+                    pool,
+                    source,
+                    caps,
+                    limits.maximum_audio_frame_bytes,
+                    limits.elementary_input_window,
+                )?))
+            }
+            stream_type::AAC_LATM => Ok(Self::Loas(aligned_audio::Reader::new(
                 pool,
                 source,
                 caps,
                 limits.maximum_audio_frame_bytes,
                 limits.elementary_input_window,
             )?)),
-            0x11 => Ok(Self::Loas(aligned_audio::Reader::new(
-                pool,
-                source,
-                caps,
-                limits.maximum_audio_frame_bytes,
-                limits.elementary_input_window,
-            )?)),
-            0x06 if stream.codec_identification() == CodecIdentification::DvbSubtitles => {
+            stream_type::PES_PRIVATE_DATA
+                if stream.codec_identification() == CodecIdentification::DvbSubtitles =>
+            {
                 Ok(Self::Dvb(dvb::Reader::new(limits.dvb_subtitle_tail_policy)))
             }
-            0x06 if track.unlabelled_dts_core || stream.codec() == Some(CodecId::Dts) => {
+            stream_type::PES_PRIVATE_DATA
+                if track.unlabelled_dts_core || stream.codec() == Some(CodecId::Dts) =>
+            {
                 if !track.unlabelled_dts_core
                     && stream.dvb_descriptor_codec() != Some(CodecId::Dts)
                     && let Some(descriptor) = stream.dvb_dts_hd()?
@@ -208,22 +223,29 @@ impl Framer {
                     )?))
                 }
             }
-            0x06 if matches!(namespace, DescriptorNamespace::Dvb(_)) => {
+            stream_type::PES_PRIVATE_DATA if matches!(namespace, DescriptorNamespace::Dvb(_)) => {
                 let descriptors = PrivateAudioDescriptors {
                     program: track.program_map().program_descriptors.as_ref(),
                     elementary: stream.descriptor_bytes.as_ref(),
                 };
-                let carriage =
-                    PrivateAudioCarriage::from_observed_pmt(6, descriptors, limits.transport)
-                        .or_else(|error| {
-                            // An elementary registration can corroborate the DVB descriptor.
-                            if matches!(error, Error::Unsupported(_)) {
-                                PrivateAudioCarriage::from_hls_pmt(6, descriptors, limits.transport)
-                                    .map_err(|_| error)
-                            } else {
-                                Err(error)
-                            }
-                        })?;
+                let carriage = PrivateAudioCarriage::from_observed_pmt(
+                    stream_type::PES_PRIVATE_DATA,
+                    descriptors,
+                    limits.transport,
+                )
+                .or_else(|error| {
+                    // An elementary registration can corroborate the DVB descriptor.
+                    if matches!(error, Error::Unsupported(_)) {
+                        PrivateAudioCarriage::from_hls_pmt(
+                            stream_type::PES_PRIVATE_DATA,
+                            descriptors,
+                            limits.transport,
+                        )
+                        .map_err(|_| error)
+                    } else {
+                        Err(error)
+                    }
+                })?;
                 if carriage == PrivateAudioCarriage::DvbEac3Tag {
                     Ok(Self::Eac3(eac3::Reader::new(
                         pool, track, limits, source, caps,
@@ -232,10 +254,12 @@ impl Framer {
                     Self::ac3(pool, limits, source, caps)
                 }
             }
-            0x81 if namespace == DescriptorNamespace::Atsc => Self::ac3(pool, limits, source, caps),
-            0x87 if namespace == DescriptorNamespace::Atsc => Ok(Self::Eac3(eac3::Reader::new(
-                pool, track, limits, source, caps,
-            )?)),
+            stream_type::ATSC_AC3 if namespace == DescriptorNamespace::Atsc => {
+                Self::ac3(pool, limits, source, caps)
+            }
+            stream_type::ATSC_EAC3 if namespace == DescriptorNamespace::Atsc => Ok(Self::Eac3(
+                eac3::Reader::new(pool, track, limits, source, caps)?,
+            )),
             _ => Err(Error::Unsupported(
                 "MPEG-TS carriage has no admitted access-unit framer",
             )),
@@ -601,29 +625,32 @@ impl Lane {
             Some(Framer::DtsHd(reader)) => reader.check_pes(pes)?,
             Some(Framer::DtsExtension(reader)) => reader.check_pes(pes)?,
             Some(Framer::Dts(_))
-                if self.track.unlabelled_dts_core && pes.header.stream_id != 0xbd =>
+                if self.track.unlabelled_dts_core
+                    && pes.header.stream_id != stream_id::PRIVATE_STREAM_1 =>
             {
                 return Err(Error::Invalid("unlabelled DTS core PES stream ID"));
             }
             _ => (),
         }
         let stream_type = self.track.stream().stream_type;
-        if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
+        if !stream_id::AUDIO.contains(&pes.header.stream_id) {
             match stream_type {
-                0x03 | 0x04 => return Err(Error::Invalid("MPEG audio PES stream ID")),
-                0x11 => return Err(Error::Invalid("LATM audio PES stream ID")),
+                stream_type::MPEG1_AUDIO | stream_type::MPEG2_AUDIO => {
+                    return Err(Error::Invalid("MPEG audio PES stream ID"));
+                }
+                stream_type::AAC_LATM => return Err(Error::Invalid("LATM audio PES stream ID")),
                 _ => (),
             }
         }
-        if stream_type == 0x11
+        if stream_type == stream_type::AAC_LATM
             && pes.payload_len == 0
             && matches!(self.framer, Some(Framer::LatmPes))
         {
             return Ok(Prepared::Ignored);
         }
-        if pes.header.stream_id != 0xbd {
+        if pes.header.stream_id != stream_id::PRIVATE_STREAM_1 {
             if self.track.stream().descriptor_namespace() == DescriptorNamespace::Atsc
-                && matches!(stream_type, 0x81 | 0x87)
+                && matches!(stream_type, stream_type::ATSC_AC3 | stream_type::ATSC_EAC3)
             {
                 return Err(Error::Invalid("ATSC private audio PES stream ID"));
             }

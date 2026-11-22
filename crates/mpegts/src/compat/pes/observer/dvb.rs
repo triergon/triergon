@@ -2,7 +2,8 @@
 //! parsing or source namespace inference. The demux packet keeps the complete
 //! PES data field, including identifier/stream ID/tail bytes and opaque faults.
 use super::{DemuxObserver, DemuxScope};
-use crate::psi::{DescriptorNamespace, Descriptors};
+use crate::pes::stream_id;
+use crate::psi::{DescriptorNamespace, Descriptors, descriptor_tag, stream_type};
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, Error, Result};
 
@@ -29,7 +30,9 @@ fn preflight(
     }
     checked_pid(scope.pid)?;
     limits.validate()?;
-    if scope.stream_type != 6 || scope.stream_id != 0xbd {
+    if scope.stream_type != stream_type::PES_PRIVATE_DATA
+        || scope.stream_id != stream_id::PRIVATE_STREAM_1
+    {
         return Err(Error::Unsupported(
             "DVB subtitles require PMT stream type 0x06 and PES stream ID 0xbd",
         ));
@@ -60,7 +63,7 @@ fn preflight(
                 return Err(limit(count, limits.descriptors));
             }
             descriptor.validate_selected_syntax()?;
-            if descriptor.tag == 0x59 {
+            if descriptor.tag == descriptor_tag::DVB_SUBTITLING {
                 let view = descriptor.dvb_subtitling()?;
                 if !program {
                     subtitle_descriptors += 1;

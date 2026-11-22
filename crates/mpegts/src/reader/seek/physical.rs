@@ -8,9 +8,11 @@ mod video;
 
 use super::{Landing, Reader, ReaderEvent, Shared};
 use crate::SourceEpochs;
+use crate::pes::stream_id;
+use crate::psi::stream_type;
 use crate::reader::{AccessUnit, Packet, SourceEvent};
 use crate::stream::TraceEvent;
-use crate::transport::{ContinuityOutcome, TransportPacket};
+use crate::transport::{ContinuityOutcome, TransportPacket, pid};
 use triergon_core::container::{Event, PacketInfo, ReaderStep};
 use triergon_core::{
     Budget, BudgetVec, Charged, Error, Result, SourceCapabilities, SourceId, Step,
@@ -175,7 +177,7 @@ impl Capture {
                 let slot = carrier_slot(self.next, self.width);
                 self.carriers[slot] = Some(carrier);
                 self.next += self.width as u64;
-                if packet.pid != 0 && packet.pid != 0x1fff
+                if packet.pid != pid::PAT && packet.pid != pid::NULL
                     && !self.map.as_ref().is_some_and(|map| {
                         map.map().streams.as_slice()[0].pid == packet.pid
                     })
@@ -202,9 +204,13 @@ impl Capture {
                     && map.streams.len() == 1
                     && matches!(
                         map.streams.as_slice()[0].stream_type,
-                        0x03 | 0x04 | 0x1b | 0x24
+                        stream_type::MPEG1_AUDIO
+                            | stream_type::MPEG2_AUDIO
+                            | stream_type::H264
+                            | stream_type::HEVC
                     )
-                    && (map.pcr_pid == 0x1fff || map.pcr_pid == map.streams.as_slice()[0].pid) =>
+                    && (map.pcr_pid == pid::NULL
+                        || map.pcr_pid == map.streams.as_slice()[0].pid) =>
                 {
                     self.map = Some(source.clone());
                 }
@@ -270,7 +276,7 @@ impl Capture {
                 != pes.header.as_bytes().len() + pes.payload_len
             || (nals != 0
                 && (!pes.header.data_alignment_indicator
-                    || !(0xe0..=0xef).contains(&pes.header.stream_id)))
+                    || !stream_id::VIDEO.contains(&pes.header.stream_id)))
             || packet.epochs()
                 != (SourceEpochs {
                     configuration: 2,

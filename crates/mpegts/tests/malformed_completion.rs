@@ -9,6 +9,8 @@ use triergon_mpegts::compat::pes::{
     MalformedInputKind, MalformedSourceDisposition, NoPacketsConfirmation, RecoveredPes,
     TransportFaultRecovery,
 };
+use triergon_mpegts::pes::stream_id;
+use triergon_mpegts::psi::stream_type;
 use triergon_mpegts::stream::{MediaEntityEnd, TraceEvent};
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits};
 
@@ -193,8 +195,8 @@ impl Run {
                                 let scope = DemuxScope {
                                     program: 1,
                                     pid: map.streams.as_slice()[0].pid,
-                                    stream_type: 0x1b,
-                                    stream_id: 0xe0,
+                                    stream_type: stream_type::H264,
+                                    stream_id: stream_id::VIDEO_FIRST,
                                     entity: SourceId(1),
                                     epochs: context.epochs,
                                 };

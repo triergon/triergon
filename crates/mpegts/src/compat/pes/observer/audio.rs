@@ -1,7 +1,8 @@
 //! The demuxer's private-audio interpretation, not source namespace
 //! inference, audio-frame parsing, ATSC service conformance or decoder config.
 use super::{DemuxObserver, DemuxScope};
-use crate::psi::Descriptors;
+use crate::pes::stream_id;
+use crate::psi::{Descriptors, descriptor_tag, stream_type};
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, Error, Result};
 
@@ -31,9 +32,9 @@ pub struct PrivateAudioDescriptors<'a> {
 impl PrivateAudioCarriage {
     fn stream_type(self) -> u8 {
         match self {
-            Self::DvbAc3Tag | Self::DvbEac3Tag => 6,
-            Self::PrivateType81Ac3 => 0x81,
-            Self::PrivateType87Eac3 => 0x87,
+            Self::DvbAc3Tag | Self::DvbEac3Tag => stream_type::PES_PRIVATE_DATA,
+            Self::PrivateType81Ac3 => stream_type::ATSC_AC3,
+            Self::PrivateType87Eac3 => stream_type::ATSC_EAC3,
         }
     }
     /// Identify private AC-3 or E-AC-3 from PMT signalling for the demux view.
@@ -67,7 +68,10 @@ impl PrivateAudioCarriage {
         hls: bool,
     ) -> Result<Self> {
         limits.validate()?;
-        if !matches!(stream_type, 6 | 0x81 | 0x87) {
+        if !matches!(
+            stream_type,
+            stream_type::PES_PRIVATE_DATA | stream_type::ATSC_AC3 | stream_type::ATSC_EAC3
+        ) {
             return Err(Error::Unsupported(
                 "private audio requires PMT stream type 0x06, 0x81 or 0x87",
             ));
@@ -93,7 +97,7 @@ impl PrivateAudioCarriage {
                 }
                 descriptor.validate_selected_syntax()?;
                 match descriptor.tag {
-                    0x05 if hls && !program => {
+                    descriptor_tag::REGISTRATION if hls && !program => {
                         let enhanced = match &descriptor.registration()?.format_identifier {
                             b"AC-3" => false,
                             b"EAC3" => true,
@@ -108,26 +112,28 @@ impl PrivateAudioCarriage {
                     }
                     // These contexts can change private interpretation; they
                     // are not established by the four retained observations.
-                    0x05 | 0x5f => {
+                    descriptor_tag::REGISTRATION | descriptor_tag::DVB_PRIVATE_DATA_SPECIFIER => {
                         return Err(Error::Unsupported(
                             "registration or private data specifier is unsupported for this private audio carriage",
                         ));
                     }
-                    0x59 | 0x28 | 0x38 => {
+                    descriptor_tag::DVB_SUBTITLING
+                    | descriptor_tag::AVC_VIDEO
+                    | descriptor_tag::HEVC_VIDEO => {
                         return Err(Error::Unsupported(
                             "conflicting private audio descriptors or stream type",
                         ));
                     }
-                    0x6a | 0x7a if program => {
+                    descriptor_tag::DVB_AC3 | descriptor_tag::DVB_EAC3 if program => {
                         return Err(Error::Unsupported(
                             "program-level DVB audio descriptor is unsupported for private audio",
                         ));
                     }
-                    0x6a => {
+                    descriptor_tag::DVB_AC3 => {
                         descriptor.dvb_ac3()?;
                         ac3 = true;
                     }
-                    0x7a => {
+                    descriptor_tag::DVB_EAC3 => {
                         descriptor.dvb_eac3()?;
                         eac3 = true;
                     }
@@ -138,18 +144,18 @@ impl PrivateAudioCarriage {
             }
         }
         let carriage = match (stream_type, ac3, eac3) {
-            (6, true, false) => Ok(Self::DvbAc3Tag),
-            (6, false, true) => Ok(Self::DvbEac3Tag),
-            (0x81, _, false) => Ok(Self::PrivateType81Ac3),
-            (0x87, false, _) => Ok(Self::PrivateType87Eac3),
-            (6, false, false) => Err(Error::Unsupported(
+            (stream_type::PES_PRIVATE_DATA, true, false) => Ok(Self::DvbAc3Tag),
+            (stream_type::PES_PRIVATE_DATA, false, true) => Ok(Self::DvbEac3Tag),
+            (stream_type::ATSC_AC3, _, false) => Ok(Self::PrivateType81Ac3),
+            (stream_type::ATSC_EAC3, false, _) => Ok(Self::PrivateType87Eac3),
+            (stream_type::PES_PRIVATE_DATA, false, false) => Err(Error::Unsupported(
                 "private data stream lacks a DVB AC-3 or E-AC-3 descriptor",
             )),
             _ => Err(Error::Unsupported(
                 "conflicting private audio descriptors or stream type",
             )),
         }?;
-        if hls && stream_type == 6 && registration.is_none() {
+        if hls && stream_type == stream_type::PES_PRIVATE_DATA && registration.is_none() {
             return Err(Error::Unsupported("HLS private audio registration absent"));
         }
         let enhanced = matches!(carriage, Self::DvbEac3Tag | Self::PrivateType87Eac3);
@@ -215,7 +221,7 @@ impl DemuxObserver {
                 "selected private audio carriage disagrees with the PMT",
             ));
         }
-        if scope.stream_id != 0xbd {
+        if scope.stream_id != stream_id::PRIVATE_STREAM_1 {
             return Err(Error::Unsupported(
                 "private audio requires PES stream ID 0xbd",
             ));

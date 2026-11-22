@@ -9,8 +9,8 @@ use super::pes::{
     DemuxBoundary, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope, DemuxSpan,
     PesFaultPolicy, RecoveredPes, RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
-use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
-use crate::psi::{DescriptorNamespace, ProgramMap};
+use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS, stream_id};
+use crate::psi::{DescriptorNamespace, ProgramMap, stream_type};
 use crate::stream::{
     FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TraceFault, TransportStream,
 };
@@ -531,14 +531,14 @@ impl OpaqueRecovery {
                 "opaque recovery requires one AVC stream",
             ));
         };
-        if map.header.extension != self.program || stream.stream_type != 0x1b {
+        if map.header.extension != self.program || stream.stream_type != stream_type::H264 {
             return Err(Error::Unsupported("opaque recovery requires selected AVC"));
         }
         let scope = DemuxScope {
             program: self.program,
             pid: stream.pid,
             stream_type: stream.stream_type,
-            stream_id: 0xe0,
+            stream_id: stream_id::VIDEO_FIRST,
             entity: input.source(),
             epochs: context.epochs,
         };

@@ -1,7 +1,7 @@
 //! The events a transport stream returns.
 use crate::SourceEpochs;
 use crate::compat::adts::UnboundedPes;
-use crate::pes::Pes;
+use crate::pes::{Pes, stream_id};
 use crate::psi::{PatTable, ProgramMap, Section};
 use crate::transport::carrier::TransportObservation;
 use crate::transport::{ContinuityOutcome, NullCarrierRun, TransportPacket};
@@ -131,7 +131,9 @@ impl TraceEvent {
     }
 
     pub(super) fn from_assembled_pes(pes: Pes) -> Self {
-        if pes.header.declared_packet_length == 0 && (0xc0..=0xdf).contains(&pes.header.stream_id) {
+        if pes.header.declared_packet_length == 0
+            && stream_id::AUDIO.contains(&pes.header.stream_id)
+        {
             Self::UnboundedAdtsPes(UnboundedPes(pes))
         } else {
             Self::Pes(pes)

@@ -130,6 +130,7 @@ impl TransportStream {
 mod tests {
     use super::*;
     use crate::SourceEpochs;
+    use crate::psi::stream_type;
     use triergon_core::Budget;
 
     #[test]
@@ -145,7 +146,7 @@ mod tests {
         ] {
             let route = PesRoute {
                 pid: 256,
-                stream_type: 0x1b,
+                stream_type: stream_type::H264,
                 descriptors: Bytes::copy_from_slice(&budget, descriptors).unwrap(),
                 epochs: SourceEpochs {
                     clock: 0,

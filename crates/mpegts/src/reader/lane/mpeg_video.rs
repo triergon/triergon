@@ -4,7 +4,8 @@
 //! fields. H.222.0 Table 2-34 identifies stream types 1 and 2; PES alignment
 //! alone never proves a picture boundary. Slice payloads remain coded bytes.
 use super::{Piece, pes_storage::Storage};
-use crate::pes::Pes;
+use crate::pes::{Pes, stream_id};
+use crate::psi::stream_type;
 use crate::reader::{MpegPictureCoding, MpegVideoPicture};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::bits_at;
@@ -68,7 +69,7 @@ impl Reader {
         }
         let piece = pieces.as_slice().last().ok_or(Error::Truncated)?;
         let pes = piece.source.pes();
-        if !(0xe0..=0xef).contains(&pes.header.stream_id)
+        if !stream_id::VIDEO.contains(&pes.header.stream_id)
             || pes.header.declared_packet_length == 0
             // The short-picture profile bounds payloads to transport capacity
             // minus the minimum nine-byte PES header, independent of splits.
@@ -241,14 +242,19 @@ impl Reader {
                     || self.height == 0
                     || self.height > 2800
                     || !(1..=8).contains(&self.rate)
-                    || !(1..=if stream_type == 2 { 4 } else { 14 }).contains(&bits(24, 4)?)
+                    || !(1..=if stream_type == stream_type::MPEG2_VIDEO {
+                        4
+                    } else {
+                        14
+                    })
+                        .contains(&bits(24, 4)?)
                     || bits(32, 18)? == 0
                 {
                     return Err(PROFILE);
                 }
                 self.phase = Phase::AfterSequence;
             }
-            (Phase::AfterSequence, 0xb5) if stream_type == 2 => {
+            (Phase::AfterSequence, 0xb5) if stream_type == stream_type::MPEG2_VIDEO => {
                 // Main Profile, progressive 4:2:0, base dimensions and frame rate.
                 if length != 6
                     || bits(0, 4)? != 1
@@ -271,7 +277,7 @@ impl Reader {
                 self.phase = Phase::Group;
             }
             (Phase::AfterSequence | Phase::Setup | Phase::Group, 0x00)
-                if stream_type == 1 || self.mpeg2 =>
+                if stream_type == stream_type::MPEG1_VIDEO || self.mpeg2 =>
             {
                 // H.262 §6.2.3: predictive headers carry forward and, for B,
                 // backward vector fields before extra_bit_picture. MPEG-2

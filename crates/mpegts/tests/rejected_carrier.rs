@@ -5,6 +5,8 @@ use triergon_core::{
     Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{DemuxClock, DemuxScope, RegisteredCarriage, SourceContext};
+use triergon_mpegts::pes::stream_id;
+use triergon_mpegts::psi::stream_type;
 use triergon_mpegts::reference_trace::recovery::{
     DemuxObservation, RecoveredPacket, RecoveryObserver, RejectedPolicy,
 };
@@ -29,8 +31,8 @@ fn observer(budget: &Budget) -> RecoveryObserver {
         DemuxScope {
             program: 1,
             pid: 256,
-            stream_type: 0x1b,
-            stream_id: 0xe0,
+            stream_type: stream_type::H264,
+            stream_id: stream_id::VIDEO_FIRST,
             entity: SourceId(1),
             epochs: EPOCHS,
         },

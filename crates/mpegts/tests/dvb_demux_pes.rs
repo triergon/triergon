@@ -7,6 +7,8 @@ use triergon_mpegts::compat::pes::{
     DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope,
     DvbSubtitlesDescriptors, SourceContext,
 };
+use triergon_mpegts::pes::stream_id;
+use triergon_mpegts::psi::stream_type;
 use triergon_mpegts::psi::{
     CodecIdentification, DescriptorNamespace, Descriptors, DvbNamespaceEvidence,
 };
@@ -33,7 +35,7 @@ fn scope() -> DemuxScope {
         program: 1,
         pid: 256,
         stream_type: 6,
-        stream_id: 0xbd,
+        stream_id: stream_id::PRIVATE_STREAM_1,
         entity: SourceId(1),
         epochs: EPOCH,
     }
@@ -255,11 +257,11 @@ fn dvb_namespace_scope_preflight_before_stub() {
             ..scope()
         },
         DemuxScope {
-            stream_type: 0x1b,
+            stream_type: stream_type::H264,
             ..scope()
         },
         DemuxScope {
-            stream_id: 0xe0,
+            stream_id: stream_id::VIDEO_FIRST,
             ..scope()
         },
     ] {

@@ -6,6 +6,8 @@ use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_mpegts::compat::pes::{
     DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, SourceContext, TimestampOrigin,
 };
+use triergon_mpegts::pes::stream_id;
+use triergon_mpegts::psi::stream_type;
 use triergon_mpegts::transport::{TransportPacket, parse_transport};
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
@@ -18,8 +20,8 @@ fn scope() -> DemuxScope {
     DemuxScope {
         program: 1,
         pid: 256,
-        stream_type: 0x1b,
-        stream_id: 0xe0,
+        stream_type: stream_type::H264,
+        stream_id: stream_id::VIDEO_FIRST,
         entity: SourceId(1),
         epochs: EPOCHS,
     }

@@ -1,3 +1,4 @@
+use super::descriptor_tag;
 use triergon_core::{Error, Result};
 
 /// A descriptor that overruns its loop.
@@ -19,10 +20,10 @@ impl Descriptor<'_> {
     /// Invalid lengths and fields return `Invalid`. Other tags remain opaque.
     pub fn validate_selected_syntax(self) -> Result<()> {
         match self.tag {
-            0x05 => self.registration().map(|_| ()),
-            0x0a => self.languages().map(|_| ()),
-            0x28 => self.avc_video().map(|_| ()),
-            0x38 => self.hevc_video().map(|_| ()),
+            descriptor_tag::REGISTRATION => self.registration().map(|_| ()),
+            descriptor_tag::ISO_639_LANGUAGE => self.languages().map(|_| ()),
+            descriptor_tag::AVC_VIDEO => self.avc_video().map(|_| ()),
+            descriptor_tag::HEVC_VIDEO => self.hevc_video().map(|_| ()),
             _ => Ok(()),
         }
     }
@@ -30,8 +31,8 @@ impl Descriptor<'_> {
     /// return `Invalid`. This check is for DVB loops. All other tags succeed.
     pub fn validate_dvb_audio_syntax(self) -> Result<()> {
         match self.tag {
-            0x6a => self.dvb_ac3().map(|_| ()),
-            0x7a => self.dvb_eac3().map(|_| ()),
+            descriptor_tag::DVB_AC3 => self.dvb_ac3().map(|_| ()),
+            descriptor_tag::DVB_EAC3 => self.dvb_eac3().map(|_| ()),
             _ => Ok(()),
         }
     }

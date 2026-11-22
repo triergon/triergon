@@ -324,7 +324,7 @@ impl Lane {
             let end = range.end.min(piece.range.end);
             if start < end {
                 if !origins.as_slice().is_empty()
-                    && self.track.stream().stream_type == 0x87
+                    && self.track.stream().stream_type == stream_type::ATSC_EAC3
                     && matches!(&build.unit, BuildUnit::Packet(AccessUnit::Ac3(_)))
                 {
                     return Err(Error::Invalid("ATSC E-AC-3 access unit crosses PES"));

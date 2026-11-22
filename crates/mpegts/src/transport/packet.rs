@@ -141,7 +141,7 @@ impl TransportPacket {
             .is_some_and(|field| field.discontinuity)
     }
     pub(crate) fn is_null(&self) -> bool {
-        self.pid == 0x1fff
+        self.pid == super::pid::NULL
     }
     pub(crate) fn ts_bytes(&self) -> &[u8] {
         &self.source.as_ref()[self.sync..self.sync + 188]

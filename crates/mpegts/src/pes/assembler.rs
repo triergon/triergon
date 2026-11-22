@@ -9,7 +9,7 @@ use triergon_core::{
 };
 
 use super::header::{parse_header, parse_timed_header};
-use super::{HEADER_MAX, Pes, PesHeader, PesSpan};
+use super::{HEADER_MAX, Pes, PesHeader, PesSpan, stream_id};
 
 #[derive(Debug)]
 struct Payload {
@@ -521,8 +521,9 @@ impl PesAssembler {
             return Ok(false);
         };
         let id = header.stream_id;
-        if !(id == 0xbd || (0xc0..=0xef).contains(&id))
-            || (total.is_none() && !(self.video && (0xe0..=0xef).contains(&id)))
+        if !(id == stream_id::PRIVATE_STREAM_1
+            || (stream_id::AUDIO_FIRST..=stream_id::VIDEO_LAST).contains(&id))
+            || (total.is_none() && !(self.video && stream_id::VIDEO.contains(&id)))
         {
             return Ok(false);
         }
@@ -727,7 +728,9 @@ impl PesAssembler {
                             return Err(Error::Invalid("PES start code"));
                         }
                         let id = self.raw_header[3];
-                        if !(id == 0xbd || (0xc0..=0xef).contains(&id)) {
+                        if !(id == stream_id::PRIVATE_STREAM_1
+                            || (stream_id::AUDIO_FIRST..=stream_id::VIDEO_LAST).contains(&id))
+                        {
                             return Err(Error::Unsupported("PES stream-id syntax"));
                         }
                         let length = usize::from(u16::from_be_bytes([
@@ -736,8 +739,9 @@ impl PesAssembler {
                         ]));
                         if length == 0 {
                             // H.222.0 §2.4.3.7 reserves this syntax for TS video.
-                            let video = self.video && (0xe0..=0xef).contains(&id);
-                            let recovered_adts = self.unbounded_adts && (0xc0..=0xdf).contains(&id);
+                            let video = self.video && stream_id::VIDEO.contains(&id);
+                            let recovered_adts =
+                                self.unbounded_adts && stream_id::AUDIO.contains(&id);
                             if !video && !recovered_adts {
                                 return Err(UNBOUNDED_NON_VIDEO);
                             }
@@ -920,7 +924,7 @@ impl PesAssembler {
                         || (self.unbounded_adts
                             && self.header.as_ref().is_some_and(|header| {
                                 header.declared_packet_length == 0
-                                    && (0xc0..=0xdf).contains(&header.stream_id)
+                                    && stream_id::AUDIO.contains(&header.stream_id)
                             })))
                     && !self.reserve_body_span(work, cancel)?
                 {

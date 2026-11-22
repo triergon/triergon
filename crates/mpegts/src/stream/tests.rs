@@ -4,7 +4,9 @@ use super::*;
 use crate::AssemblyStep;
 use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
 use crate::compat::pes::{DemuxScope, DemuxSpan, RegisteredCarriage};
+use crate::pes::stream_id;
 use crate::psi::POINTER_FIELD;
+use crate::psi::stream_type;
 use crate::transport::SYNC_BYTE;
 use crate::transport::carrier::TS188_BYTES;
 use crate::transport::framer::FramedCarrier;
@@ -355,8 +357,8 @@ impl PayloadFeed {
             DemuxScope {
                 program: 1,
                 pid: PID,
-                stream_type: 0x1b,
-                stream_id: 0xe0,
+                stream_type: stream_type::H264,
+                stream_id: stream_id::VIDEO_FIRST,
                 entity: SOURCE,
                 epochs,
             },
@@ -385,7 +387,7 @@ impl PayloadFeed {
             .routes
             .try_push(PesRoute {
                 pid: PID,
-                stream_type: 0x1b,
+                stream_type: stream_type::H264,
                 descriptors: Bytes::copy_from_slice(&pool, &[]).unwrap(),
                 epochs,
                 continuity: Some(continuity),

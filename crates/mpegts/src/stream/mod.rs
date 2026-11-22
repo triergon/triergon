@@ -21,7 +21,7 @@ pub(crate) use storage::{StorageItem, TransportStorageCursor};
 
 use crate::pes::PesAssembler;
 use crate::psi::SectionAssembler;
-use crate::psi::{DescriptorNamespace, PatCollector};
+use crate::psi::{DescriptorNamespace, PatCollector, stream_type};
 use crate::transport::{Continuity, TransportFramer};
 use crate::{PacketFormat, ParseLimits, SourceEpochs};
 use std::sync::atomic::AtomicUsize;
@@ -280,7 +280,13 @@ impl TransportStream {
             return Err(Error::SourceMismatch);
         };
         if route.pid != pid
-            || !matches!(route.stream_type, 0x03 | 0x04 | 0x1b | 0x24)
+            || !matches!(
+                route.stream_type,
+                stream_type::MPEG1_AUDIO
+                    | stream_type::MPEG2_AUDIO
+                    | stream_type::H264
+                    | stream_type::HEVC
+            )
             || route.epochs
                 != (SourceEpochs {
                     configuration: 2,

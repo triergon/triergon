@@ -8,6 +8,8 @@ use triergon_mpegts::compat::pes::{
     DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, PesFaultPolicy, RecoveredPes,
     SourceContext, TransportFaultRecovery,
 };
+use triergon_mpegts::pes::stream_id;
+use triergon_mpegts::psi::stream_type;
 use triergon_mpegts::stream::{MediaEntityEnd, ObservedTrace, TraceEvent, TransportStream};
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
@@ -29,8 +31,8 @@ fn policy(pool: &Budget, options: PesFaultPolicy) -> TransportFaultRecovery {
             DemuxScope {
                 program: 1,
                 pid: 256,
-                stream_type: 0x1b,
-                stream_id: 0xe0,
+                stream_type: stream_type::H264,
+                stream_id: stream_id::VIDEO_FIRST,
                 entity: SourceId(1),
                 epochs: EPOCHS,
             },

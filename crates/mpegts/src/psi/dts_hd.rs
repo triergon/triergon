@@ -1,10 +1,7 @@
 //! DVB DTS-HD descriptor views from EN 300 468 Annex G.3.
-use super::stream_type::PES_PRIVATE_DATA;
-use super::{Descriptor, DescriptorNamespace, ElementaryStream};
+use super::descriptor_tag::{DVB_DTS, DVB_DTS_HD_EXTENSION, DVB_EXTENSION};
+use super::{Descriptor, DescriptorNamespace, ElementaryStream, stream_type};
 use triergon_core::{Error, Result};
-
-const EXTENSION_DESCRIPTOR: u8 = 0x7f;
-const DTS_HD_EXTENSION: u8 = 0x0e;
 
 /// Signalled DTS-HD substreams and the original descriptor bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -96,7 +93,7 @@ impl<'a> Descriptor<'a> {
     /// Wrong tags, invalid substream lengths and multiple core assets return `Invalid`.
     /// Incomplete flagged fields or asset data return `Truncated`.
     pub fn dvb_dts_hd(self) -> Result<DvbDtsHd<'a>> {
-        if self.tag != EXTENSION_DESCRIPTOR || self.data.first() != Some(&DTS_HD_EXTENSION) {
+        if self.tag != DVB_EXTENSION || self.data.first() != Some(&DVB_DTS_HD_EXTENSION) {
             return Err(Error::Invalid("DVB DTS-HD descriptor tag"));
         }
         let (&[_, flags], mut remaining) =
@@ -147,7 +144,7 @@ impl ElementaryStream {
     /// means the stream or descriptor is absent from this scope. A malformed, duplicate
     /// or conflicting descriptor returns an error.
     pub fn dvb_dts_hd(&self) -> Result<Option<DvbDtsHd<'_>>> {
-        if self.stream_type != PES_PRIVATE_DATA
+        if self.stream_type != stream_type::PES_PRIVATE_DATA
             || !matches!(self.descriptor_namespace(), DescriptorNamespace::Dvb(_))
         {
             return Ok(None);
@@ -156,11 +153,11 @@ impl ElementaryStream {
         let mut core = false;
         for descriptor in self.descriptors() {
             let descriptor = descriptor?;
-            if descriptor.tag == 0x7b {
+            if descriptor.tag == DVB_DTS {
                 core = true;
             }
-            if descriptor.tag == EXTENSION_DESCRIPTOR
-                && descriptor.data.first() == Some(&DTS_HD_EXTENSION)
+            if descriptor.tag == DVB_EXTENSION
+                && descriptor.data.first() == Some(&DVB_DTS_HD_EXTENSION)
                 && hd.replace(descriptor.dvb_dts_hd()?).is_some()
             {
                 return Err(Error::Invalid("duplicate DVB DTS-HD descriptor"));
@@ -179,7 +176,7 @@ mod tests {
 
     fn descriptor(data: &[u8]) -> Descriptor<'_> {
         Descriptor {
-            tag: 0x7f,
+            tag: DVB_EXTENSION,
             data,
             source: data,
         }

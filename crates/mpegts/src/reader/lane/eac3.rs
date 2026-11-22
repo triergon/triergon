@@ -1,5 +1,6 @@
 //! Group complete E-AC-3 syncframes in a single private audio stream.
 use crate::pes::Pes;
+use crate::psi::{descriptor_tag, stream_type};
 use crate::reader::model::{DependentSyncframe, Shared};
 use crate::reader::{Ac3AccessUnit, ReaderLimits, Track};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,8 +55,8 @@ impl Reader {
         // separately. This lane admits only the primary independent service.
         for descriptor in track.stream().descriptors() {
             let descriptor = descriptor?;
-            if track.stream().stream_type == 0x06
-                && descriptor.tag == 0x7a
+            if track.stream().stream_type == stream_type::PES_PRIVATE_DATA
+                && descriptor.tag == descriptor_tag::DVB_EAC3
                 && descriptor
                     .dvb_eac3()?
                     .substreams
@@ -68,7 +69,7 @@ impl Reader {
             }
         }
         let syncframe_bytes = limits.maximum_audio_frame_bytes.min(MAX_SYNCFRAME_BYTES);
-        let direct_carriage = track.stream().stream_type == 0x87;
+        let direct_carriage = track.stream().stream_type == stream_type::ATSC_EAC3;
         let maximum_syncframes = (1 + MAX_DEPENDENTS) * if direct_carriage { 6 } else { 1 };
         let maximum_group_bytes = syncframe_bytes
             .checked_mul(maximum_syncframes)

@@ -1,6 +1,6 @@
 //! DVB DTS-HD access units in aligned PES (TS 102 114 F.4.3).
 use super::{DtsAudioFrame, DtsExtensionFrame, aligned_audio};
-use crate::pes::Pes;
+use crate::pes::{Pes, stream_id};
 use crate::psi::DvbDtsHd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::{BitCursor, BitSource};
@@ -246,7 +246,7 @@ fn await_logical_end<T>(
 }
 
 fn check_pes(pes: &Pes, minimum: usize, maximum: usize) -> Result<()> {
-    if pes.header.stream_id != 0xbd
+    if pes.header.stream_id != stream_id::PRIVATE_STREAM_1
         || pes.header.declared_packet_length == 0
         || !pes.header.data_alignment_indicator
         || pes.payload_len < minimum

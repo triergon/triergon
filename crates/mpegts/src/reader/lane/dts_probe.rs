@@ -1,21 +1,22 @@
 //! Identifies canonical DTS core frames in a descriptor-free private PES.
 use super::Track;
-use crate::pes::Pes;
-use crate::psi::stream_type::PES_PRIVATE_DATA;
+use crate::pes::{Pes, stream_id};
+use crate::psi::stream_type;
 use triergon_core::WorkBudget;
 use triergon_framing::dts::probe_core_header;
 
 pub(super) fn eligible(track: &Track) -> bool {
     let map = track.program_map();
     map.program_descriptors.is_empty()
-        && track.stream().stream_type == PES_PRIVATE_DATA
+        && track.stream().stream_type == stream_type::PES_PRIVATE_DATA
         && track.stream().descriptor_bytes.is_empty()
         && map
             .streams
             .as_slice()
             .iter()
             .filter(|stream| {
-                stream.stream_type == PES_PRIVATE_DATA && stream.descriptor_bytes.is_empty()
+                stream.stream_type == stream_type::PES_PRIVATE_DATA
+                    && stream.descriptor_bytes.is_empty()
             })
             .count()
             == 1
@@ -89,7 +90,7 @@ impl Probe {
         if let Phase::Finished(verdict) = self.phase {
             return Some(verdict);
         }
-        if pes.header.stream_id != 0xbd || pes.elementary_offset != 0 {
+        if pes.header.stream_id != stream_id::PRIVATE_STREAM_1 || pes.elementary_offset != 0 {
             return self.finish(Verdict::Refused);
         }
         loop {

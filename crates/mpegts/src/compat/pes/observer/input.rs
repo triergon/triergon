@@ -3,6 +3,8 @@
 use super::DemuxScope;
 use super::{CarrierLayout, DemuxObserver, DemuxSpan, Pending, SourceContext};
 use crate::SourceRange;
+use crate::pes::stream_id;
+use crate::psi::stream_type;
 use crate::transport::TransportPacket;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Refused, Result, WorkBudget};
@@ -202,8 +204,8 @@ impl DemuxObserver {
         if !self.recovery_idle() {
             return Err(Error::Invalid("selected diagnostic input not drained"));
         }
-        if self.scope.stream_type != 0x1b
-            || self.scope.stream_id != 0xe0
+        if self.scope.stream_type != stream_type::H264
+            || self.scope.stream_id != stream_id::VIDEO_FIRST
             || context.byte_run_epoch.is_some()
         {
             return Err(Error::Unsupported(
@@ -243,8 +245,8 @@ impl DemuxObserver {
         if !self.recovery_idle() {
             return Err(Error::Invalid("selected diagnostic input not drained"));
         }
-        if self.scope.stream_type != 0x1b
-            || self.scope.stream_id != 0xe0
+        if self.scope.stream_type != stream_type::H264
+            || self.scope.stream_id != stream_id::VIDEO_FIRST
             || packet.source_id() != Some(self.scope.entity)
             || context.epochs != self.scope.epochs
             || context.byte_run_epoch.is_some()

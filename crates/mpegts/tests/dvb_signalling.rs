@@ -8,6 +8,7 @@ use triergon_mpegts::compat::pes::{
     DemuxObserver, DemuxScope, DvbSubtitlesDescriptors, PrivateAudioCarriage,
     PrivateAudioDescriptors, selected_track_kind,
 };
+use triergon_mpegts::pes::stream_id;
 use triergon_mpegts::psi::{
     CodecIdentification, Descriptor, DescriptorNamespace, Descriptors, DvbNamespaceEvidence,
     PmtReader, ProgramMap, Section, SectionAssembler, TableStep,
@@ -203,7 +204,7 @@ fn private_audio_admission_does_not_backfill_source_classification() {
             program: 1,
             pid: stream.pid,
             stream_type: 6,
-            stream_id: 0xbd,
+            stream_id: stream_id::PRIVATE_STREAM_1,
             entity: SourceId(73),
             epochs: SourceEpochs::default(),
         };
@@ -291,7 +292,7 @@ fn private_audio_stays_unselected_after_carriage_refusal() {
                 program: 1,
                 pid: stream.pid,
                 stream_type: 6,
-                stream_id: 0xbd,
+                stream_id: stream_id::PRIVATE_STREAM_1,
                 entity: SourceId(73),
                 epochs: SourceEpochs::default(),
             },
@@ -343,7 +344,7 @@ fn subtitle_signalling_and_selected_pes_admission_remain_distinct() {
                 program: 1,
                 pid: stream.pid,
                 stream_type: 6,
-                stream_id: 0xbd,
+                stream_id: stream_id::PRIVATE_STREAM_1,
                 entity: SourceId(73),
                 epochs: SourceEpochs::default(),
             },

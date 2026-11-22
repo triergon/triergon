@@ -13,6 +13,8 @@ use crate::compat::pes::observer::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, PrivateAudioCarriage,
     PrivateAudioDescriptors, RegisteredCarriage, SourceContext,
 };
+use crate::pes::stream_id;
+use crate::psi::stream_type;
 use crate::transport::OPCR_WITHOUT_PCR;
 use crate::transport::{RejectedTransport, TransportPacket};
 use crate::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, SourceRange};
@@ -429,8 +431,8 @@ impl RecoveryObserver {
                 "PES recovery requires a fully checked carrier rejected only for OPCR without PCR",
             ))
         } else if rejection.format() != PacketFormat::Ts188
-            || scope.stream_type != 0x1b
-            || scope.stream_id != 0xe0
+            || scope.stream_type != stream_type::H264
+            || scope.stream_id != stream_id::VIDEO_FIRST
             || f.pid != scope.pid
             || !f.pusi
             || f.tei
@@ -563,7 +565,7 @@ impl RecoveryObserver {
             let body = &p.rejection.bytes().as_ref()[start..];
             match p.stage {
                 OpcrStage::Prefix => {
-                    if body.len() < 14 || body[..4] != [0, 0, 1, 0xe0] {
+                    if body.len() < 14 || body[..4] != [0, 0, 1, stream_id::VIDEO_FIRST] {
                         return Err(Error::Unsupported(
                             "rejected carrier lacks a complete AVC PES header",
                         ));
@@ -666,7 +668,7 @@ impl RecoveryObserver {
                             position,
                             flags: 0,
                             duration90_raw: 0,
-                            stream_id: 0xe0,
+                            stream_id: stream_id::VIDEO_FIRST,
                             payload_len: p.spans.as_slice()[0].as_ref().len(),
                             rejection: p.rejection,
                             context: p.context,

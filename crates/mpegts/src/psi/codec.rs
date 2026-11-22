@@ -1,7 +1,6 @@
 //! The codec a PMT entry names: H.222.0 Table 2-34 stream types and, for PES
 //! private data, the EN 300 468 descriptors that name a codec.
-use super::stream_type::PES_PRIVATE_DATA;
-use super::{DescriptorNamespace, ElementaryStream};
+use super::{DescriptorNamespace, ElementaryStream, descriptor_tag, stream_type};
 use triergon_core::container::CodecId;
 
 impl ElementaryStream {
@@ -16,15 +15,21 @@ impl ElementaryStream {
     /// in an explicitly selected ATSC namespace.
     pub fn codec(&self) -> Option<CodecId> {
         match self.stream_type {
-            0x01 | 0x02 => Some(CodecId::Mpeg2Video),
-            0x03 | 0x04 => Some(CodecId::MpegAudio),
-            0x0f => Some(CodecId::Aac),
-            0x11 => Some(CodecId::AacLatm),
-            0x1b => Some(CodecId::H264),
-            0x24 => Some(CodecId::Hevc),
-            0x81 if self.namespace == DescriptorNamespace::Atsc => Some(CodecId::Ac3),
-            0x87 if self.namespace == DescriptorNamespace::Atsc => Some(CodecId::Eac3),
-            PES_PRIVATE_DATA if matches!(self.namespace, DescriptorNamespace::Dvb(_)) => {
+            stream_type::MPEG1_VIDEO | stream_type::MPEG2_VIDEO => Some(CodecId::Mpeg2Video),
+            stream_type::MPEG1_AUDIO | stream_type::MPEG2_AUDIO => Some(CodecId::MpegAudio),
+            stream_type::AAC_ADTS => Some(CodecId::Aac),
+            stream_type::AAC_LATM => Some(CodecId::AacLatm),
+            stream_type::H264 => Some(CodecId::H264),
+            stream_type::HEVC => Some(CodecId::Hevc),
+            stream_type::ATSC_AC3 if self.namespace == DescriptorNamespace::Atsc => {
+                Some(CodecId::Ac3)
+            }
+            stream_type::ATSC_EAC3 if self.namespace == DescriptorNamespace::Atsc => {
+                Some(CodecId::Eac3)
+            }
+            stream_type::PES_PRIVATE_DATA
+                if matches!(self.namespace, DescriptorNamespace::Dvb(_)) =>
+            {
                 self.dvb_descriptor_codec().or_else(|| {
                     let hd = self.dvb_dts_hd().ok().flatten()?;
                     hd.extensions
@@ -46,11 +51,11 @@ impl ElementaryStream {
         self.descriptors()
             .map_while(Result::ok)
             .find_map(|descriptor| match descriptor.tag {
-                0x56 => Some(CodecId::DvbTeletext),
-                0x59 => Some(CodecId::DvbSubtitle),
-                0x6a => Some(CodecId::Ac3),
-                0x7a => Some(CodecId::Eac3),
-                0x7b if descriptor.data.len() >= 5 => Some(CodecId::Dts),
+                descriptor_tag::DVB_TELETEXT => Some(CodecId::DvbTeletext),
+                descriptor_tag::DVB_SUBTITLING => Some(CodecId::DvbSubtitle),
+                descriptor_tag::DVB_AC3 => Some(CodecId::Ac3),
+                descriptor_tag::DVB_EAC3 => Some(CodecId::Eac3),
+                descriptor_tag::DVB_DTS if descriptor.data.len() >= 5 => Some(CodecId::Dts),
                 _ => None,
             })
     }

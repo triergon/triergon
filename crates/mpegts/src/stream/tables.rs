@@ -3,9 +3,11 @@ use super::event::{FaultKind, TraceEvent, TraceFault};
 use super::{PesRoute, PsiRoute, Route, TransportStream};
 use crate::SourceEpochs;
 use crate::pes::PesAssembler;
-use crate::psi::{PatReader, PatSection, PatTable, PmtReader, ProgramMap, Section, TableStep};
+use crate::psi::{
+    PatReader, PatSection, PatTable, PmtReader, ProgramMap, Section, TableStep, stream_type,
+};
 use crate::retryable;
-use crate::transport::Continuity;
+use crate::transport::{Continuity, pid};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -222,7 +224,7 @@ impl TransportStream {
                     self.limits,
                     epochs,
                 )?;
-                if self.unbounded_adts && stream.stream_type == 0x0f {
+                if self.unbounded_adts && stream.stream_type == stream_type::AAC_ADTS {
                     assembler.allow_unbounded_adts();
                 }
                 Some(assembler)
@@ -257,7 +259,7 @@ impl TransportStream {
                 route.epochs = previous.epochs;
             }
         }
-        let pcr = if build.map.pcr_pid == 0x1fff {
+        let pcr = if build.map.pcr_pid == pid::NULL {
             None
         } else {
             Some(build.map.pcr_pid)
@@ -485,7 +487,10 @@ impl TransportStream {
 /// Video stream types, whose PES packets may leave `PES_packet_length` 0
 /// (ISO/IEC 13818-1 2.4.3.7): MPEG-1 and MPEG-2 video, H.264 and HEVC.
 fn is_video_stream_type(stream_type: u8) -> bool {
-    matches!(stream_type, 0x01 | 0x02 | 0x1b | 0x24)
+    matches!(
+        stream_type,
+        stream_type::MPEG1_VIDEO | stream_type::MPEG2_VIDEO | stream_type::H264 | stream_type::HEVC
+    )
 }
 
 #[cfg(test)]
@@ -511,7 +516,7 @@ mod tests {
                 .routes
                 .try_push(PesRoute {
                     pid,
-                    stream_type: 0x1b,
+                    stream_type: stream_type::H264,
                     descriptors: Bytes::copy_from_slice(&pool, &[]).unwrap(),
                     epochs: stream.source_epochs(),
                     continuity: Some(Continuity::new(pid).unwrap()),
@@ -534,7 +539,7 @@ mod tests {
             (256, Route::Pes(0)),
             (257, Route::Pes(1)),
             (300, Route::Clock),
-            (0x1fff, Route::Ignore),
+            (pid::NULL, Route::Ignore),
         ];
         for previous in [Route::Ignore, Route::Pmt, Route::Pes(0), Route::Pes(1)] {
             stream.route = previous;

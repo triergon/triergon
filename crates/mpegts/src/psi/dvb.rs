@@ -1,5 +1,5 @@
 //! Original EN 300 468 6.2.41/Table 99 source views. No inner subtitle parsing.
-use super::{Descriptor, ElementaryStream};
+use super::{Descriptor, ElementaryStream, descriptor_tag, stream_type};
 use triergon_core::{Error, Result};
 
 /// Out-of-band interpretation, kept separate from source descriptor bytes.
@@ -103,7 +103,7 @@ impl<'a> Descriptor<'a> {
     /// Borrow the DVB subtitle service table, of at most 31 eight-byte entries.
     /// A wrong tag, body beyond 255 bytes or incomplete entry returns `Invalid`.
     pub fn dvb_subtitling(self) -> Result<DvbSubtitling<'a>> {
-        if self.tag != 0x59 {
+        if self.tag != descriptor_tag::DVB_SUBTITLING {
             return Err(Error::Invalid("DVB subtitling descriptor tag"));
         }
         if self.data.len() > 255 || !self.data.len().is_multiple_of(8) {
@@ -169,7 +169,7 @@ pub(super) struct DvbSummary {
 impl DvbSummary {
     pub(super) fn observe(&mut self, descriptor: Descriptor<'_>, offset: usize) -> Result<()> {
         match descriptor.tag {
-            0x59 => {
+            descriptor_tag::DVB_SUBTITLING => {
                 let count = descriptor.dvb_subtitling()?.service_count();
                 let descriptors = self.descriptors.checked_add(1).ok_or(Error::Overflow)?;
                 let services = self.services.checked_add(count).ok_or(Error::Overflow)?;
@@ -180,7 +180,7 @@ impl DvbSummary {
                 self.descriptors = descriptors;
                 self.services = services;
             }
-            0x6a | 0x7a => self.audio_present = true,
+            descriptor_tag::DVB_AC3 | descriptor_tag::DVB_EAC3 => self.audio_present = true,
             _ => {}
         }
         Ok(())
@@ -210,7 +210,7 @@ impl ElementaryStream {
         let Some(facts) = self.dvb_subtitling_signalling() else {
             return CodecIdentification::Unknown;
         };
-        if self.stream_type != 0x06 || facts.services == 0 {
+        if self.stream_type != stream_type::PES_PRIVATE_DATA || facts.services == 0 {
             CodecIdentification::Unknown
         } else if facts.audio_conflict {
             CodecIdentification::ConflictingDvbSignalling

@@ -4,6 +4,8 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{DemuxClock, DemuxScope, SourceContext};
+use triergon_mpegts::pes::stream_id;
+use triergon_mpegts::psi::stream_type;
 use triergon_mpegts::psi::{DescriptorNamespace, PatTable, ProgramMap, TableStep};
 use triergon_mpegts::reference_trace::recovery::{
     DemuxObservation, PatRoute, PatSelection, PmtBinding, RecoveryObserver,
@@ -292,7 +294,7 @@ fn bind(events: &Events, b: &Budget) -> (RecoveryObserver, PatRoute) {
         program: r.program(),
         pid: stream.pid,
         stream_type: stream.stream_type,
-        stream_id: 0xe0,
+        stream_id: stream_id::VIDEO_FIRST,
         entity: r.entity(),
         epochs: c,
     };
@@ -627,8 +629,8 @@ fn initial_binding_is_allocation_free_and_drop_cancel_is_atomic() {
     let scope = DemuxScope {
         program: 1,
         pid: 256,
-        stream_type: 0x1b,
-        stream_id: 0xe0,
+        stream_type: stream_type::H264,
+        stream_id: stream_id::VIDEO_FIRST,
         entity: SourceId(1),
         epochs: c,
     };

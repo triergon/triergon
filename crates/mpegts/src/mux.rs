@@ -7,12 +7,12 @@
 //! when their period elapsed in PCR time, PAT/PMT also before a key picture
 //! following a non-key picture.
 
-use crate::psi::PsiCrc32;
+use crate::pes::stream_id;
+use crate::psi::{PsiCrc32, descriptor_tag, stream_type};
+use crate::transport::pid;
 use triergon_core::{Error, Result};
 
 const PACKET: usize = 188;
-const PAT_PID: u16 = 0x0000;
-const SDT_PID: u16 = 0x0011;
 const PCR_HZ_PER_90K: i64 = 300;
 const PAT_PERIOD: i64 = 27_000_000 / 10;
 const SDT_PERIOD: i64 = 27_000_000 / 2;
@@ -31,7 +31,7 @@ pub struct MuxConfig {
     /// The 13-bit PID of the video stream, which also carries the PCR; in 0x0020..0x1FFF and
     /// distinct from `pmt_pid`.
     pub video_pid: u16,
-    /// 0x01 (ISO/IEC 11172-2 video, normative default) or 0x02 (FFmpeg's choice).
+    /// [`stream_type::MPEG1_VIDEO`] (the default) or [`stream_type::MPEG2_VIDEO`].
     pub stream_type: u8,
     /// The SDT service provider name; printable ASCII.
     pub provider_name: String,
@@ -47,7 +47,7 @@ impl Default for MuxConfig {
             program_number: 1,
             pmt_pid: 0x1000,
             video_pid: 0x0100,
-            stream_type: 0x01,
+            stream_type: stream_type::MPEG1_VIDEO,
             provider_name: "Triergon".into(),
             service_name: "Service01".into(),
         }
@@ -103,13 +103,17 @@ impl Muxer {
         if cfg.program_number == 0 {
             return Err(Error::Unsupported("zero program number"));
         }
-        if !(0x20..0x1fff).contains(&cfg.pmt_pid) || !(0x20..0x1fff).contains(&cfg.video_pid) {
+        if !(0x20..pid::NULL).contains(&cfg.pmt_pid) || !(0x20..pid::NULL).contains(&cfg.video_pid)
+        {
             return Err(Error::Unsupported("PMT/video PID must be usable13-bit PID"));
         }
         if cfg.pmt_pid == cfg.video_pid {
             return Err(Error::Unsupported("PMT/video PID collision"));
         }
-        if !matches!(cfg.stream_type, 0x01 | 0x02) {
+        if !matches!(
+            cfg.stream_type,
+            stream_type::MPEG1_VIDEO | stream_type::MPEG2_VIDEO
+        ) {
             return Err(Error::Unsupported("unselected stream type"));
         }
 
@@ -137,7 +141,12 @@ impl Muxer {
             let descriptor = 3 + provider.len() + service.len();
             let loop_len = 2 + descriptor;
             b.extend_from_slice(&((4u16 << 13) | loop_len as u16).to_be_bytes()); // running, not scrambled
-            b.extend_from_slice(&[0x48, descriptor as u8, 0x01, provider.len() as u8]);
+            b.extend_from_slice(&[
+                descriptor_tag::DVB_SERVICE,
+                descriptor as u8,
+                0x01,
+                provider.len() as u8,
+            ]);
             b.extend_from_slice(provider);
             b.push(service.len() as u8);
             b.extend_from_slice(service);
@@ -161,14 +170,14 @@ impl Muxer {
         if self.last_sdt.is_none_or(|last| pcr - last >= SDT_PERIOD) {
             self.last_sdt = Some(self.last_sdt.map_or(pcr, |l| l.max(pcr)));
             let sdt = std::mem::take(&mut self.sdt);
-            self.write_section(SDT_PID, CC_SDT, &sdt, out);
+            self.write_section(pid::DVB_SDT, CC_SDT, &sdt, out);
             self.sdt = sdt;
         }
         let force = key && !self.previous_key;
         if force || self.last_pat.is_none_or(|last| pcr - last >= PAT_PERIOD) {
             self.last_pat = Some(self.last_pat.map_or(pcr, |l| l.max(pcr)));
             let (pat, pmt) = (std::mem::take(&mut self.pat), std::mem::take(&mut self.pmt));
-            self.write_section(PAT_PID, CC_PAT, &pat, out);
+            self.write_section(pid::PAT, CC_PAT, &pat, out);
             self.write_section(self.pmt_pid, CC_PMT, &pmt, out);
             (self.pat, self.pmt) = (pat, pmt);
         }
@@ -192,7 +201,17 @@ impl Muxer {
 
     fn write_pes(&mut self, es: &[u8], pts: i64, dts: i64, pcr: i64, key: bool, out: &mut Vec<u8>) {
         let mut header = [0u8; 19];
-        header[..9].copy_from_slice(&[0x00, 0x00, 0x01, 0xE0, 0x00, 0x00, 0x80, 0xC0, 10]);
+        header[..9].copy_from_slice(&[
+            0x00,
+            0x00,
+            0x01,
+            stream_id::VIDEO_FIRST,
+            0x00,
+            0x00,
+            0x80,
+            0xC0,
+            10,
+        ]);
         timestamp(&mut header[9..14], 0b0011, pts);
         timestamp(&mut header[14..19], 0b0001, dts);
         let mut payload = es;
@@ -293,7 +312,7 @@ mod tests {
     #[test]
     fn tables_match_observed_layout() {
         let ffmpeg = MuxConfig {
-            stream_type: 0x02,
+            stream_type: stream_type::MPEG2_VIDEO,
             provider_name: "FFmpeg".into(),
             ..MuxConfig::default()
         };

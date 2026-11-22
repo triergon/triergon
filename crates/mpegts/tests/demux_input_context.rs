@@ -5,6 +5,8 @@ use triergon_core::{
 };
 use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep};
 use triergon_mpegts::compat::pes::{DemuxObserver, DemuxScope, SourceContext};
+use triergon_mpegts::pes::stream_id;
+use triergon_mpegts::psi::stream_type;
 #[cfg(feature = "reference-trace")]
 use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::transport::parse_transport;
@@ -55,8 +57,8 @@ fn observer(b: &Budget) -> DemuxObserver {
         DemuxScope {
             program: 1,
             pid: 256,
-            stream_type: 0x1b,
-            stream_id: 0xe0,
+            stream_type: stream_type::H264,
+            stream_id: stream_id::VIDEO_FIRST,
             entity: SourceId(1),
             epochs: SourceEpochs::default(),
         },

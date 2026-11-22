@@ -1,6 +1,6 @@
 //! DVB subtitle PES envelopes (EN 300 743, §§6.2 and 7.2).
 use super::{Piece, pes_storage::Storage};
-use crate::pes::Pes;
+use crate::pes::{Pes, stream_id};
 use crate::reader::{DvbSubtitleTailPolicy, DvbSubtitleUnit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -39,7 +39,7 @@ impl Reader {
             if !work.try_charge(1) {
                 return Ok(None);
             }
-            if pes.header.stream_id != 0xbd
+            if pes.header.stream_id != stream_id::PRIVATE_STREAM_1
                 || pes.header.declared_packet_length == 0
                 || !pes.header.data_alignment_indicator
                 || pes.header.pts_raw33.is_none()

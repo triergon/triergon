@@ -7,6 +7,7 @@ use super::{
 };
 use crate::clock::ClockKey;
 use crate::compat::adts;
+use crate::psi::stream_type;
 use crate::stream::{CarrierObservation, FaultKind, TraceEvent, TransportStream};
 use crate::transport::ContinuityOutcome;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -132,7 +133,7 @@ impl Reader {
         }
         let lane = &self.lanes.as_slice()[index];
         if self.limits.probe_unlabelled_dts_core
-            && lane.track.stream().stream_type == crate::psi::stream_type::PES_PRIVATE_DATA
+            && lane.track.stream().stream_type == stream_type::PES_PRIVATE_DATA
             && lane.track.stream().descriptor_bytes.is_empty()
         {
             return false;
@@ -158,8 +159,10 @@ impl Reader {
             return false;
         }
         let stream = lane.track.stream();
-        if matches!(stream.stream_type, 0x06 | 0x81 | 0x87)
-            && old.program_descriptors.as_ref() != new.program_descriptors.as_ref()
+        if matches!(
+            stream.stream_type,
+            stream_type::PES_PRIVATE_DATA | stream_type::ATSC_AC3 | stream_type::ATSC_EAC3
+        ) && old.program_descriptors.as_ref() != new.program_descriptors.as_ref()
         {
             return false;
         }
@@ -773,7 +776,7 @@ impl Reader {
         let unlabelled_dts_core = self.limits.unlabelled_dts_core.is_some_and(|selection| {
             selection.program == map.header.extension
                 && selection.pid == stream.pid
-                && stream.stream_type == crate::psi::stream_type::PES_PRIVATE_DATA
+                && stream.stream_type == stream_type::PES_PRIVATE_DATA
                 && stream.descriptor_bytes.is_empty()
                 && map.program_descriptors.is_empty()
         });

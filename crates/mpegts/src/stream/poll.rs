@@ -8,7 +8,7 @@ use crate::SourceEpochs;
 use crate::pes::Pes;
 use crate::transport::carrier::{PlainContinuation, TransportObservation};
 use crate::transport::framer::FramedCarrier;
-use crate::transport::{ContinuityOutcome, TransportFramer, TransportPacket};
+use crate::transport::{ContinuityOutcome, TransportFramer, TransportPacket, pid};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, InputCursor, Result, SourceLocation, Step, WorkBudget};
 
@@ -507,7 +507,7 @@ impl TransportStream {
                 };
             }
             if T::COMPACT
-                && matches!(self.find_route(0x1fff), Route::Ignore)
+                && matches!(self.find_route(pid::NULL), Route::Ignore)
                 && let Some(event) = T::null_run(&mut self.framer, input, work, cancel)?
             {
                 self.entity_end = None;

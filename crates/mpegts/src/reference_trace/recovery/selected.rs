@@ -213,7 +213,7 @@ pub(super) fn has_selected_hint(packet: &TransportPacket) -> bool {
         return false;
     };
     p.len() >= 9
-        && p[..4] == [0, 0, 1, 0xe0]
+        && p[..4] == [0, 0, 1, stream_id::VIDEO_FIRST]
         && (p[7] >> 6 == 1
             || (p[7] >> 6 == 2
                 && p.len() >= 14
@@ -229,7 +229,7 @@ impl RecoveryObserver {
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
-        if scope.stream_type != 0x1b || scope.stream_id != 0xe0 {
+        if scope.stream_type != stream_type::H264 || scope.stream_id != stream_id::VIDEO_FIRST {
             return Err(Error::Unsupported(
                 "selected diagnostics require explicit AVC carriage",
             ));
@@ -566,7 +566,7 @@ impl RecoveryObserver {
                     }
                 }
                 1 => {
-                    if body.len() < 9 || body[..4] != [0, 0, 1, 0xe0] {
+                    if body.len() < 9 || body[..4] != [0, 0, 1, stream_id::VIDEO_FIRST] {
                         return Err(Error::Unsupported(
                             "selected diagnostic PES prefix unobserved",
                         ));
@@ -681,7 +681,7 @@ impl RecoveryObserver {
                             position,
                             flags: 0,
                             duration90_raw: 0,
-                            stream_id: 0xe0,
+                            stream_id: stream_id::VIDEO_FIRST,
                             selected_fault: p.kind,
                             source_fault: fault,
                             carrier: p.carrier,

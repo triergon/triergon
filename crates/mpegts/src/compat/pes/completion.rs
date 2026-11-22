@@ -8,7 +8,9 @@ use crate::compat::pes::observer::SourceContext;
 use crate::psi::{PatReader, PatSection, Section, SectionAssembler, TableStep};
 use crate::stream::entity::{ObservedTrace, TraceOrigin};
 use crate::stream::{CompactTraceEvent, FaultKind, MediaEntityEnd, TraceEvent, TraceFault};
-use crate::transport::{NullCarrierRun, TransportInspection, TransportInspector, TransportPacket};
+use crate::transport::{
+    NullCarrierRun, TransportInspection, TransportInspector, TransportPacket, pid,
+};
 use crate::{AssemblyStep, PacketFormat, ParseLimits};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -366,7 +368,7 @@ impl PacketCompletion {
             .source_offset
             .checked_add(self.format.bytes() as u64)
             .ok_or(Error::Overflow)?;
-        let kind = if actual.pid == 0 {
+        let kind = if actual.pid == pid::PAT {
             self.pat_pid_seen = true;
             // A PES start at the control payload start is not silently ignored.
             if actual.payload_unit_start
@@ -380,7 +382,7 @@ impl PacketCompletion {
                 ));
             }
             ControlCarrierKind::PatPid
-        } else if actual.pid == 0x1fff && !actual.payload_unit_start {
+        } else if actual.pid == pid::NULL && !actual.payload_unit_start {
             ControlCarrierKind::NullPid
         } else if actual.payload.is_none() {
             ControlCarrierKind::NoPayload

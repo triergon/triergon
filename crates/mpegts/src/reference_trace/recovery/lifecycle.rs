@@ -452,8 +452,8 @@ impl<'a> PmtBindingJob<'a> {
                         return Err(Error::ForeignPool);
                     }
                     if stream.pid != current.pid
-                        || !matches!(stream.stream_type, 0x1b | 0x24)
-                        || current.stream_id != 0xe0
+                        || !matches!(stream.stream_type, stream_type::H264 | stream_type::HEVC)
+                        || current.stream_id != stream_id::VIDEO_FIRST
                     {
                         return Err(Error::Unsupported(
                             "selected PMT PID/carriage transition unobserved",
@@ -474,8 +474,8 @@ impl<'a> PmtBindingJob<'a> {
                         if self.route.tsid != old.route.tsid
                             || self.route.pmt_pid != old.route.pmt_pid
                             || self.map.pcr_pid != old.pcr_pid
-                            || current.stream_type != 0x1b
-                            || stream.stream_type != 0x24
+                            || current.stream_type != stream_type::H264
+                            || stream.stream_type != stream_type::HEVC
                         {
                             return Err(Error::Unsupported(
                                 "selected PMT routing/retype context unobserved",

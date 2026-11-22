@@ -1,7 +1,7 @@
 //! Bounded descriptor views for H.222.0 §2.6 and EN 300 468 Annex D.
 //! Each parser reads at most one 255-byte descriptor body. Variable tails borrow
 //! the charged source, and the fields describe signalling without inspecting coded payloads.
-use super::Descriptor;
+use super::{Descriptor, descriptor_tag};
 use triergon_core::{Error, Result};
 
 /// A registration descriptor (tag 5), borrowed from its descriptor bytes.
@@ -153,7 +153,7 @@ impl<'a> Descriptor<'a> {
     ///
     /// Fails with `Invalid` when the tag is not 5 or the body is shorter than 4 bytes.
     pub fn registration(self) -> Result<Registration<'a>> {
-        if self.tag != 5 {
+        if self.tag != descriptor_tag::REGISTRATION {
             return Err(Error::Invalid("registration descriptor tag"));
         }
         if self.data.len() < 4 {
@@ -168,7 +168,7 @@ impl<'a> Descriptor<'a> {
     ///
     /// Fails with `Invalid` when the tag is not 10 or the body length is not a multiple of 4.
     pub fn languages(self) -> Result<LanguageEntries<'a>> {
-        if self.tag != 10 {
+        if self.tag != descriptor_tag::ISO_639_LANGUAGE {
             return Err(Error::Invalid("language descriptor tag"));
         }
         if !self.data.len().is_multiple_of(4) {
@@ -181,7 +181,7 @@ impl<'a> Descriptor<'a> {
     /// Borrow the AVC profile, level and source flags from a four-byte descriptor body.
     /// A wrong tag, length or reserved-bit pattern returns `Invalid`.
     pub fn avc_video(self) -> Result<AvcVideo> {
-        if self.tag != 0x28 {
+        if self.tag != descriptor_tag::AVC_VIDEO {
             return Err(Error::Invalid("AVC descriptor tag"));
         }
         let data = self.data;
@@ -212,7 +212,7 @@ impl<'a> Descriptor<'a> {
     /// A wrong tag, illegal length, invalid reserved bits or an inverted temporal-ID range
     /// returns `Invalid`. The PMT reader checks the enclosing stream type.
     pub fn hevc_video(self) -> Result<HevcVideo> {
-        if self.tag != 0x38 {
+        if self.tag != descriptor_tag::HEVC_VIDEO {
             return Err(Error::Invalid("HEVC descriptor tag"));
         }
         let data = self.data;
@@ -270,7 +270,7 @@ impl<'a> Descriptor<'a> {
     /// In a DVB descriptor loop, decode the AC-3 flags byte and its indicated fields.
     /// A wrong tag, missing flags or missing signalled field returns `Invalid`.
     pub fn dvb_ac3(self) -> Result<DvbAc3<'a>> {
-        if self.tag != 0x6a {
+        if self.tag != descriptor_tag::DVB_AC3 {
             return Err(Error::Invalid("DVB AC-3 descriptor tag"));
         }
         let flags = *self
@@ -295,7 +295,7 @@ impl<'a> Descriptor<'a> {
     /// The mixing information bit consumes no extra byte. A wrong tag or missing
     /// flags or fields returns `Invalid`.
     pub fn dvb_eac3(self) -> Result<DvbEac3<'a>> {
-        if self.tag != 0x7a {
+        if self.tag != descriptor_tag::DVB_EAC3 {
             return Err(Error::Invalid("DVB E-AC-3 descriptor tag"));
         }
         let flags = *self

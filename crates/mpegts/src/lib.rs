@@ -125,7 +125,7 @@ pub enum AssemblyStep<T> {
 }
 
 pub(crate) fn checked_pid(pid: u16) -> Result<()> {
-    if pid > 0x1ffe {
+    if pid >= transport::pid::NULL {
         Err(Error::Invalid("assembly PID"))
     } else {
         Ok(())

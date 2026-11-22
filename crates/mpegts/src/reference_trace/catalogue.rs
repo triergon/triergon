@@ -9,11 +9,18 @@
 //! The bounded catalogue preserves H.222.0 source validation. Compatibility
 //! observations carry their source status, and only accepted tables activate routes.
 use crate::psi::{DESCRIPTOR_LENGTH, PMT_PROGRAM_IDENTITY};
-use crate::psi::{DescriptorNamespace, ElementaryStream, PatTable, ProgramMap, PsiCrc32, Section};
+use crate::psi::{
+    DescriptorNamespace, ElementaryStream, PatTable, ProgramMap, PsiCrc32, Section, descriptor_tag,
+    stream_type,
+};
 use crate::stream::{MediaEntityEnd, TraceEvent};
+use crate::transport::pid;
 use crate::{PacketFormat, ParseLimits, SourceRange};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, InputCursor, Result, SourceId, WorkBudget};
+
+/// A user-private descriptor tag the catalogue accepts and leaves uninterpreted.
+const OPAQUE_PRIVATE_TAG: u8 = 0xee;
 
 mod psi_compatibility;
 pub use psi_compatibility::{
@@ -194,22 +201,25 @@ impl Catalogue {
     fn codec(&self, stream: &ElementaryStream, program: &[u8]) -> Result<CatalogueCodec> {
         let kind = stream.stream_type;
         match kind {
-            0x1b => Ok(CatalogueCodec::Avc),
-            0x24 => Ok(CatalogueCodec::Hevc),
+            stream_type::H264 => Ok(CatalogueCodec::Avc),
+            stream_type::HEVC => Ok(CatalogueCodec::Hevc),
             _ if !self.selected_carriage => Err(Error::Unsupported(
                 "demux video catalogue supports only AVC and HEVC stream types",
             )),
-            0x03 | 0x04 => Ok(CatalogueCodec::MpegAudio),
-            0x0f => Ok(CatalogueCodec::AacAdts),
-            0x11 => Ok(CatalogueCodec::AacLatm),
-            6 if stream.descriptor_namespace() != DescriptorNamespace::Atsc
-                && stream
-                    .descriptors()
-                    .any(|item| item.is_ok_and(|descriptor| descriptor.tag == 0x59)) =>
+            stream_type::MPEG1_AUDIO | stream_type::MPEG2_AUDIO => Ok(CatalogueCodec::MpegAudio),
+            stream_type::AAC_ADTS => Ok(CatalogueCodec::AacAdts),
+            stream_type::AAC_LATM => Ok(CatalogueCodec::AacLatm),
+            stream_type::PES_PRIVATE_DATA
+                if stream.descriptor_namespace() != DescriptorNamespace::Atsc
+                    && stream.descriptors().any(|item| {
+                        item.is_ok_and(|descriptor| {
+                            descriptor.tag == descriptor_tag::DVB_SUBTITLING
+                        })
+                    }) =>
             {
                 Ok(CatalogueCodec::DvbSubtitle)
             }
-            6 | 0x81 | 0x87 => {
+            stream_type::PES_PRIVATE_DATA | stream_type::ATSC_AC3 | stream_type::ATSC_EAC3 => {
                 use crate::compat::pes::observer::{
                     PrivateAudioCarriage as C, PrivateAudioDescriptors,
                 };
@@ -220,7 +230,7 @@ impl Catalogue {
                 // A registered DVB E-AC-3 route has both the registration and the
                 // identifying audio descriptor. The registered-carriage check
                 // validates that pair and rejects conflicting descriptors.
-                let observed = if kind == 6
+                let observed = if kind == stream_type::PES_PRIVATE_DATA
                     && matches!(stream.descriptor_namespace(), DescriptorNamespace::Dvb(_))
                     && stream.descriptors().any(|item| {
                         item.is_ok_and(|descriptor| {
@@ -512,13 +522,13 @@ impl Catalogue {
                     .get(position)
                     .ok_or(Error::Invalid("demux catalogue PAT entry missing"))?;
                 if expected.program_number != u16::from_be_bytes([entry[0], entry[1]])
-                    || expected.pid != u16::from_be_bytes([entry[2], entry[3]]) & 0x1fff
+                    || expected.pid != u16::from_be_bytes([entry[2], entry[3]]) & pid::MASK
                 {
                     return Err(Error::Invalid(
                         "demux catalogue PAT entry disagrees with the encoded program or PID",
                     ));
                 }
-                if entry[2] & 0xe0 != 0xe0 || !(0x10..=0x1ffe).contains(&expected.pid) {
+                if entry[2] & 0xe0 != 0xe0 || !pid::ELEMENTARY.contains(&expected.pid) {
                     return Err(Error::Invalid(
                         "demux catalogue PAT has an invalid encoded PMT PID",
                     ));
@@ -618,7 +628,7 @@ impl Catalogue {
         {
             return Err(Error::Invalid("demux catalogue PMT has no PAT route"));
         }
-        if map.pcr_pid != u16::from_be_bytes([raw[8], raw[9]]) & 0x1fff {
+        if map.pcr_pid != u16::from_be_bytes([raw[8], raw[9]]) & pid::MASK {
             return Err(Error::Invalid(
                 "demux catalogue PMT disagrees with the encoded PCR PID",
             ));
@@ -645,18 +655,24 @@ impl Catalogue {
             let end = at + 5 + usize::from(u16::from_be_bytes([encoded[3], encoded[4]]) & 0x0fff);
             if end > raw.len() - 4
                 || stream.stream_type != encoded[0]
-                || stream.pid != u16::from_be_bytes([encoded[1], encoded[2]]) & 0x1fff
+                || stream.pid != u16::from_be_bytes([encoded[1], encoded[2]]) & pid::MASK
                 || stream.descriptor_bytes.as_ref() != &raw[at + 5..end]
             {
                 return Err(Error::Invalid(
                     "demux catalogue stream disagrees with the encoded PMT entry",
                 ));
             }
-            if !(matches!(stream.stream_type, 0x1b | 0x24)
+            if !(matches!(stream.stream_type, stream_type::H264 | stream_type::HEVC)
                 || self.selected_carriage
                     && matches!(
                         stream.stream_type,
-                        0x03 | 0x04 | 0x0f | 0x11 | 6 | 0x81 | 0x87
+                        stream_type::MPEG1_AUDIO
+                            | stream_type::MPEG2_AUDIO
+                            | stream_type::AAC_ADTS
+                            | stream_type::AAC_LATM
+                            | stream_type::PES_PRIVATE_DATA
+                            | stream_type::ATSC_AC3
+                            | stream_type::ATSC_EAC3
                     ))
             {
                 return Err(Error::Unsupported(
@@ -687,7 +703,7 @@ impl Catalogue {
                     return Err(Error::Cancelled);
                 }
                 let descriptor = descriptor?;
-                if descriptor.tag == 0x59
+                if descriptor.tag == descriptor_tag::DVB_SUBTITLING
                     && let Some(pages) = &mut dvb_initialization
                 {
                     let subtitles = descriptor.dvb_subtitling()?;
@@ -702,7 +718,7 @@ impl Catalogue {
                     }
                     continue;
                 }
-                if descriptor.tag == 0x05 {
+                if descriptor.tag == descriptor_tag::REGISTRATION {
                     let registration = descriptor.registration()?.format_identifier;
                     if matches!(
                         (&registration, codec),
@@ -715,21 +731,37 @@ impl Catalogue {
                 if stream.descriptor_namespace() == DescriptorNamespace::Atsc
                     && matches!(
                         (stream.stream_type, codec, descriptor.tag),
-                        (0x81, CatalogueCodec::Ac3, 0x81) | (0x87, CatalogueCodec::Eac3, 0xcc)
+                        (
+                            stream_type::ATSC_AC3,
+                            CatalogueCodec::Ac3,
+                            descriptor_tag::ATSC_AC3
+                        ) | (
+                            stream_type::ATSC_EAC3,
+                            CatalogueCodec::Eac3,
+                            descriptor_tag::ATSC_EAC3
+                        )
                     )
                 {
                     continue;
                 }
-                if !(matches!(descriptor.tag, 0x0a | 0xee)
-                    || self.selected_carriage
-                        && matches!(codec, CatalogueCodec::Ac3 | CatalogueCodec::Eac3)
-                        && matches!(descriptor.tag, 0x6a | 0x7a))
+                if !(matches!(
+                    descriptor.tag,
+                    descriptor_tag::ISO_639_LANGUAGE | OPAQUE_PRIVATE_TAG
+                ) || self.selected_carriage
+                    && matches!(codec, CatalogueCodec::Ac3 | CatalogueCodec::Eac3)
+                    && matches!(
+                        descriptor.tag,
+                        descriptor_tag::DVB_AC3 | descriptor_tag::DVB_EAC3
+                    ))
                 {
                     return Err(Error::Unsupported(
                         "descriptor is unsupported for video in the demux catalogue",
                     ));
                 }
-                if descriptor.tag == 0x0a && language.is_empty() && dvb_initialization.is_none() {
+                if descriptor.tag == descriptor_tag::ISO_639_LANGUAGE
+                    && language.is_empty()
+                    && dvb_initialization.is_none()
+                {
                     for e in descriptor.languages()? {
                         Self::append_language(&mut language, &e.language_code)?;
                         hearing_impaired |= e.audio_type == 2;

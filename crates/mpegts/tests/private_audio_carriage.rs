@@ -9,6 +9,8 @@ use triergon_mpegts::compat::pes::{
     DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope,
     PrivateAudioCarriage, PrivateAudioDescriptors, SourceContext, TimestampOrigin,
 };
+use triergon_mpegts::pes::stream_id;
+use triergon_mpegts::psi::stream_type;
 use triergon_mpegts::psi::{CodecIdentification, DescriptorNamespace};
 #[cfg(feature = "reference-trace")]
 use triergon_mpegts::reference_trace::recovery::{
@@ -49,13 +51,13 @@ const EAC3_DVB: Case = Case {
 };
 const AC3_DIRECT: Case = Case {
     carriage: PrivateAudioCarriage::PrivateType81Ac3,
-    stream_type: 0x81,
+    stream_type: stream_type::ATSC_AC3,
     descriptors: &[],
     bytes: include_bytes!("data/carriage-ac3-direct.ts"),
 };
 const EAC3_DIRECT: Case = Case {
     carriage: PrivateAudioCarriage::PrivateType87Eac3,
-    stream_type: 0x87,
+    stream_type: stream_type::ATSC_EAC3,
     descriptors: &[],
     bytes: include_bytes!("data/carriage-eac3-direct.ts"),
 };
@@ -72,7 +74,7 @@ fn scope(case: Case) -> DemuxScope {
         program: 1,
         pid: 257,
         stream_type: case.stream_type,
-        stream_id: 0xbd,
+        stream_id: stream_id::PRIVATE_STREAM_1,
         entity: SourceId(1),
         epochs: EPOCHS,
     }

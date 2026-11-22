@@ -2,9 +2,8 @@
 //!
 //! Assembly uses actual carrier starts, declared lengths and logical EOF.
 //! Each packet retains those boundaries and the source extents of its payload.
-use crate::pes::HEADER_MAX;
-use crate::pes::PesHeader;
-use crate::psi::ElementaryStream;
+use crate::pes::{HEADER_MAX, PesHeader, stream_id};
+use crate::psi::{ElementaryStream, stream_type};
 use crate::transport::TransportPacket;
 use crate::{AssemblyStep, ParseLimits, SourceEpochs, SourceRange, checked_pid};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -67,12 +66,22 @@ pub enum RegisteredCarriage {
     AacLatm,
 }
 impl RegisteredCarriage {
-    fn selected_signature(self) -> (u8, u8) {
+    /// The PMT stream type this carriage requires.
+    pub fn stream_type(self) -> u8 {
+        self.signature().0
+    }
+
+    /// The PES stream ID this carriage requires: the first video or the first audio stream.
+    pub fn stream_id(self) -> u8 {
+        self.signature().1
+    }
+
+    fn signature(self) -> (u8, u8) {
         match self {
-            Self::Avc => (0x1b, 0xe0),
-            Self::Hevc => (0x24, 0xe0),
-            Self::AacAdts => (0x0f, 0xc0),
-            Self::AacLatm => (0x11, 0xc0),
+            Self::Avc => (stream_type::H264, stream_id::VIDEO_FIRST),
+            Self::Hevc => (stream_type::HEVC, stream_id::VIDEO_FIRST),
+            Self::AacAdts => (stream_type::AAC_ADTS, stream_id::AUDIO_FIRST),
+            Self::AacLatm => (stream_type::AAC_LATM, stream_id::AUDIO_FIRST),
         }
     }
 }
@@ -86,16 +95,19 @@ pub fn selected_track_kind(
     stream: &ElementaryStream,
     observer: Option<&DemuxObserver>,
 ) -> MediaKind {
-    if stream.stream_type == 0x01 {
+    if stream.stream_type == stream_type::MPEG1_VIDEO {
         return MediaKind::Unknown;
     }
-    if matches!(stream.stream_type, 0x81 | 0x87) {
+    if matches!(
+        stream.stream_type,
+        stream_type::ATSC_AC3 | stream_type::ATSC_EAC3
+    ) {
         return MediaKind::Audio;
     }
-    if stream.stream_type == 0x90 {
+    if stream.stream_type == stream_type::HDMV_PGS {
         return MediaKind::Subtitle;
     }
-    if stream.stream_type != 0x06 {
+    if stream.stream_type != stream_type::PES_PRIVATE_DATA {
         return stream.kind();
     }
     if matches!(
@@ -513,7 +525,7 @@ impl DemuxObserver {
         }
         checked_pid(scope.pid)?;
         limits.validate()?;
-        let (stream_type, stream_id) = carriage.selected_signature();
+        let (stream_type, stream_id) = carriage.signature();
         if scope.stream_type != stream_type {
             return Err(Error::Invalid(
                 "registered PES carriage disagrees with the PMT stream type",
@@ -538,7 +550,7 @@ impl DemuxObserver {
             ));
         }
         checked_pid(scope.pid)?;
-        if scope.stream_type != 0x1b || scope.stream_id != 0xe0 {
+        if scope.stream_type != stream_type::H264 || scope.stream_id != stream_id::VIDEO_FIRST {
             return Err(Error::Unsupported(
                 "AVC PES requires PMT stream type 0x1b and PES stream ID 0xe0",
             ));
@@ -964,8 +976,8 @@ mod tests {
             DemuxScope {
                 program: 1,
                 pid: 256,
-                stream_type: 0x1b,
-                stream_id: 0xe0,
+                stream_type: stream_type::H264,
+                stream_id: stream_id::VIDEO_FIRST,
                 entity: SourceId(1),
                 epochs,
             },
@@ -1436,8 +1448,8 @@ mod tests {
             DemuxScope {
                 program: 1,
                 pid: 256,
-                stream_type: 0x1b,
-                stream_id: 0xe0,
+                stream_type: stream_type::H264,
+                stream_id: stream_id::VIDEO_FIRST,
                 entity,
                 epochs,
             },

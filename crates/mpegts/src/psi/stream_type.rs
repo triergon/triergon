@@ -23,6 +23,10 @@ pub const H264: u8 = 0x1b;
 pub const H264_MVC: u8 = 0x20;
 /// HEVC video (H.265).
 pub const HEVC: u8 = 0x24;
+/// An HEVC temporal video subset: the sub-layers above those of the base HEVC stream.
+pub const HEVC_TEMPORAL_SUBSET: u8 = 0x25;
+/// HEVC video with one or more tile substreams.
+pub const HEVC_TILE_SUBSTREAMS: u8 = 0x31;
 /// VVC video (H.266).
 pub const VVC: u8 = 0x33;
 /// AVS video (GB/T 20090.2), a user-private value.

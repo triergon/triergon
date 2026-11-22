@@ -3,6 +3,8 @@ use std::ops::RangeInclusive;
 
 /// The program association table.
 pub const PAT: u16 = 0x0000;
+/// The DVB service description table (EN 300 468 Table 1).
+pub const DVB_SDT: u16 = 0x0011;
 /// PIDs a program map or an elementary stream may use: above the reserved table PIDs,
 /// below the null PID.
 pub const ELEMENTARY: RangeInclusive<u16> = 0x0010..=0x1ffe;

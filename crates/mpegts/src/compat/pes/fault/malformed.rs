@@ -3,7 +3,8 @@
 //! including empty physical input.
 use super::{SourceContext, TransportFaultRecovery};
 use crate::compat::pes::observer::DemuxScope;
-use crate::psi::DescriptorNamespace;
+use crate::pes::stream_id;
+use crate::psi::{DescriptorNamespace, stream_type};
 use crate::stream::{
     FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TraceFault, TransportStream,
 };
@@ -482,7 +483,7 @@ impl MalformedInputCompletion {
         {
             packet.payload.as_ref().and_then(|payload| {
                 let raw = payload.as_ref();
-                if raw.len() < 6 || raw[3] != 0xe0 {
+                if raw.len() < 6 || raw[3] != stream_id::VIDEO_FIRST {
                     None
                 } else if raw[..3] != [0, 0, 1] {
                     Some(MalformedInputKind::PesStartCode)
@@ -761,13 +762,13 @@ impl MalformedInputCompletion {
                 if literal
                     && map.header.extension == self.program
                     && map.streams.len() == 1
-                    && map.streams.as_slice()[0].stream_type == 0x1b
+                    && map.streams.as_slice()[0].stream_type == stream_type::H264
                 {
                     self.scope = Some(DemuxScope {
                         program: self.program,
                         pid: map.streams.as_slice()[0].pid,
-                        stream_type: 0x1b,
-                        stream_id: 0xe0,
+                        stream_type: stream_type::H264,
+                        stream_id: stream_id::VIDEO_FIRST,
                         entity: self.source,
                         epochs: context.epochs,
                     });

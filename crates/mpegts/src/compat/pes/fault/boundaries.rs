@@ -4,6 +4,8 @@
 use super::{SourceContext, TransportFaultRecovery};
 use crate::PacketFormat;
 use crate::compat::pes::observer::{DemuxBoundary, DemuxPacket};
+use crate::pes::stream_id;
+use crate::psi::stream_type;
 use crate::stream::entity::TraceOrigin;
 use crate::stream::{FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TraceFault};
 use crate::transport::SYNC_BYTE;
@@ -218,8 +220,8 @@ impl TransportFaultRecovery {
                     || !packet.payload_unit_start
                     || context.byte_run_epoch.is_some()
                     || scope.pid != packet.pid
-                    || scope.stream_type != 0x1b
-                    || scope.stream_id != 0xe0)
+                    || scope.stream_type != stream_type::H264
+                    || scope.stream_id != stream_id::VIDEO_FIRST)
                     .then_some(Error::Unsupported(
                         "source PCR boundary requires drained AVC TS188 PUSI",
                     ))
@@ -340,8 +342,8 @@ impl TransportFaultRecovery {
             || self.boundaries.input_error().is_some()
             || !self.inner.recovery_idle()
             || !self.boundaries.finite_output
-            || scope.stream_type != 0x1b
-            || scope.stream_id != 0xe0
+            || scope.stream_type != stream_type::H264
+            || scope.stream_id != stream_id::VIDEO_FIRST
             || fault.kind != FaultKind::Transport
             || fault.pid.is_some()
             || !carrier

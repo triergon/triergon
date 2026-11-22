@@ -9,9 +9,10 @@
 //!
 //! [`TransportStream`]: crate::stream::TransportStream
 //! [`ElementaryStream::codec`]: crate::psi::ElementaryStream::codec
-use crate::psi::stream_type::PES_PRIVATE_DATA;
-use crate::psi::{Descriptor, ElementaryStream, Section, SectionAssembler};
-use crate::transport::TransportPacket;
+use crate::psi::{
+    Descriptor, ElementaryStream, Section, SectionAssembler, descriptor_tag, stream_type,
+};
+use crate::transport::{TransportPacket, pid};
 use crate::{AssemblyStep, ParseLimits, limit};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::CodecId;
@@ -175,8 +176,8 @@ impl ProgramReader {
         let mut pmts = BudgetVec::new(&self.budget);
         for entry in data[8..data.len() - 4].chunks_exact(4) {
             let program = u16::from_be_bytes([entry[0], entry[1]]);
-            let pid = u16::from_be_bytes([entry[2], entry[3]]) & 0x1fff;
-            if program == 0 || pid == 0 || pid == 0x1fff {
+            let pid = u16::from_be_bytes([entry[2], entry[3]]) & pid::MASK;
+            if program == 0 || pid == pid::PAT || pid == pid::NULL {
                 continue;
             }
             if pmts.len() == self.limits.programs {
@@ -216,7 +217,7 @@ impl ProgramReader {
         }
         route.last = crc;
         let end = data.len() - 4;
-        let pcr_pid = u16::from_be_bytes([data[8], data[9]]) & 0x1fff;
+        let pcr_pid = u16::from_be_bytes([data[8], data[9]]) & pid::MASK;
         let info = usize::from(u16::from_be_bytes([data[10], data[11]]) & 0x0fff);
         let mut position = 12 + info;
         let mut streams = BudgetVec::new(&self.budget);
@@ -231,7 +232,7 @@ impl ProgramReader {
             streams
                 .try_push(ElementaryStream::unchecked(
                     entry[0],
-                    u16::from_be_bytes([entry[1], entry[2]]) & 0x1fff,
+                    u16::from_be_bytes([entry[1], entry[2]]) & pid::MASK,
                     section.bytes().slice(start..stop)?,
                 ))
                 .map_err(|error| error.error)?;
@@ -239,7 +240,7 @@ impl ProgramReader {
         }
         Ok(Some(Program {
             number: route.program,
-            pcr_pid: (pcr_pid != 0x1fff).then_some(pcr_pid),
+            pcr_pid: (pcr_pid != pid::NULL).then_some(pcr_pid),
             streams,
         }))
     }
@@ -251,10 +252,10 @@ impl ProgramReader {
 /// types 0x81 (AC-3), 0x87 (E-AC-3) and 0x90 (PGS).
 pub fn codec(stream: &ElementaryStream) -> Option<CodecId> {
     match stream.stream_type {
-        0x81 => Some(CodecId::Ac3),
-        0x87 => Some(CodecId::Eac3),
-        0x90 => Some(CodecId::Pgs),
-        PES_PRIVATE_DATA => stream.dvb_descriptor_codec(),
+        stream_type::ATSC_AC3 => Some(CodecId::Ac3),
+        stream_type::ATSC_EAC3 => Some(CodecId::Eac3),
+        stream_type::HDMV_PGS => Some(CodecId::Pgs),
+        stream_type::PES_PRIVATE_DATA => stream.dvb_descriptor_codec(),
         _ => stream.codec(),
     }
 }
@@ -265,7 +266,17 @@ pub fn codec(stream: &ElementaryStream) -> Option<CodecId> {
 pub fn is_video(stream: &ElementaryStream) -> bool {
     matches!(
         stream.stream_type,
-        0x01 | 0x02 | 0x10 | 0x1b | 0x20 | 0x24 | 0x33 | 0x42 | 0xd1 | 0xd2 | 0xea
+        stream_type::MPEG1_VIDEO
+            | stream_type::MPEG2_VIDEO
+            | stream_type::MPEG4_VISUAL
+            | stream_type::H264
+            | stream_type::H264_MVC
+            | stream_type::HEVC
+            | stream_type::VVC
+            | stream_type::CAVS
+            | stream_type::DIRAC
+            | stream_type::AVS2
+            | stream_type::VC1
     )
 }
 
@@ -275,10 +286,10 @@ pub fn is_video(stream: &ElementaryStream) -> bool {
 /// teletext page its type and magazine byte and its page number. Empty for
 /// other codecs.
 pub fn configuration(stream: &ElementaryStream) -> impl Iterator<Item = u8> + '_ {
-    let services = first(stream, CodecId::DvbSubtitle, 0x59)
+    let services = first(stream, CodecId::DvbSubtitle, descriptor_tag::DVB_SUBTITLING)
         .flat_map(|descriptor| descriptor.data.chunks_exact(8))
         .flat_map(|service| [service[4], service[5], service[6], service[7], service[3]]);
-    let pages = first(stream, CodecId::DvbTeletext, 0x56)
+    let pages = first(stream, CodecId::DvbTeletext, descriptor_tag::DVB_TELETEXT)
         .flat_map(|descriptor| descriptor.data.chunks_exact(5))
         .flat_map(|page| [page[3], page[4]]);
     services.chain(pages)
