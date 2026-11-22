@@ -378,9 +378,10 @@ fn dts_entries(
                     &[],
                 )?;
             } else {
+                let demux_rate = if frequency == 0 { rate } else { frequency };
                 out.row(
                     2,
-                    &[index as u64, verdict, rate.into(), samples.into()],
+                    &[index as u64, verdict, demux_rate.into(), samples.into()],
                     &[],
                 )?;
             }

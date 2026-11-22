@@ -9,8 +9,8 @@
   "reference": "ffmpeg-isobmff-views-native",
   "contract": [
     "Compare stream count and the audio entry's DTS classification, integral rate and samples per access unit from codec parameters after a MOV open, without stream discovery or packet decoding.",
-    "The candidate reports its core-signalling verdict and the sample entry's base rate. FFmpeg reports the DTS codec identifier and can use the maximum coded rate from ddts. A candidate entry refusal is distinct from a non-DTS entry.",
-    "The mismatched-format case passes an inconsistent typed format to the candidate's public checker and opens the original wire entry with FFmpeg.",
+    "Compare the candidate’s core-signalling verdict and either the coded DTS sampling frequency from ddts or, without an access-unit clock, the AudioSampleEntry rate. FFmpeg reports the DTS codec identifier and its public stream rate and frame size. A candidate entry refusal is distinct from a non-DTS entry.",
+    "The typed-format case compares the supplied format with the wire entry type on the candidate and with the opened stream’s public codec_tag on the reference.",
     "Input loading and schedule parsing precede the operation. Both sides open, consume and release their readers inside it."
   ],
   "required_profiles": [
@@ -195,134 +195,81 @@
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     }
   ],
-  "pending_module_requirements": [
-    "The AudioSampleEntry base sample rate and the reference's coded DTS sampling frequency differ.",
-    "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level.",
-    "The source checker rejects the invalid coded frequency per description and the demuxer rejects the stream at open.",
-    "The selected core profile refuses the entry tag while demuxing reports a codec identifier.",
-    "MPEG-4 object-type core admission differs from the pinned demuxer's codec identifier mapping.",
-    "The typed format conflicts with the encoded entry type and is refused before reading its configuration."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "ddts-largest-duration",
-      "requirement": "The AudioSampleEntry base sample rate and the reference's coded DTS sampling frequency differ."
+      "reading": "A DTS-specific box shorter than its fixed fields",
+      "clause": "ETSI TS 102 114 V1.6.1 Annex E §E.2.2.3.1: the fixed fields of ddts occupy 20 payload bytes",
+      "candidate": "refuses core admission on the incomplete description",
+      "reference": "can publish DTS codec parameters, including inferred rate or frame size, or fail the entire MOV open on a short record",
+      "compat": "compat::mov::encoded incomplete_dts_configuration would reproduce admission of a short record",
+      "cases": [
+        "ddts-truncated-00",
+        "ddts-truncated-01",
+        "ddts-truncated-02",
+        "ddts-truncated-03",
+        "ddts-truncated-04",
+        "ddts-truncated-05",
+        "ddts-truncated-06",
+        "ddts-truncated-07",
+        "ddts-truncated-08",
+        "ddts-truncated-09",
+        "ddts-truncated-10",
+        "ddts-truncated-11",
+        "ddts-truncated-12",
+        "ddts-truncated-13",
+        "ddts-truncated-14",
+        "ddts-truncated-15",
+        "ddts-truncated-16",
+        "ddts-truncated-17",
+        "ddts-truncated-18",
+        "ddts-truncated-19"
+      ]
     },
     {
-      "id": "ddts-truncated-00",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+      "reading": "Zero DTS sampling frequency",
+      "clause": "ETSI TS 102 114 V1.6.1 Annex E §§E.2.2.2 and E.2.2.3.2: the coded frequency must designate the sampling rate at which the access-unit samples are counted",
+      "candidate": "reports an unsupported core configuration for the entry with zero frequency",
+      "reference": "refuses the entire MOV open",
+      "cases": [
+        "ddts-zero-frequency"
+      ]
     },
     {
-      "id": "ddts-truncated-01",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+      "reading": "DTS LBR coding name without a core",
+      "clause": "ETSI TS 102 114 V1.6.1 Annex E Tables E-1 and E-2: dtse designates LBR in an extension substream without a core",
+      "candidate": "refuses core admission",
+      "reference": "reports generic DTS at 48000 Hz with 4096 samples",
+      "cases": [
+        "dtse"
+      ]
     },
     {
-      "id": "ddts-truncated-02",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+      "reading": "DTS-UHD tag in the DTS core checker",
+      "clause": "ETSI TS 103 491 V1.2.1 §§B.2.2 and F.2.3: dtsx is DTS-UHD profile 2 and its entry carries udts, distinct from the DTS-HD coding names in ETSI TS 102 114 V1.6.1 Table E-1",
+      "candidate": "refuses the unsupported DTS-UHD tag for core playback",
+      "reference": "reports no DTS codec classification for the fixture",
+      "cases": [
+        "dtsx"
+      ]
     },
     {
-      "id": "ddts-truncated-03",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
+      "reading": "MPEG-4 object type AA declares a DTS core and extension",
+      "clause": "MP4 Registration Authority, Object Types table (A9–AC): AA denotes the core plus extension substream",
+      "candidate": "reports eligibility for core inspection and 48000 Hz from the sample entry",
+      "reference": "reports no DTS codec classification and no DTS clock",
+      "cases": [
+        "mp4a-object-aa"
+      ]
     },
     {
-      "id": "ddts-truncated-04",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-05",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-06",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-07",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-08",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-09",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-10",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-11",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-12",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-13",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-14",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-15",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-16",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-17",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-18",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-truncated-19",
-      "requirement": "A truncated ddts record has no complete source configuration, while demux opening can publish DTS or fail at the stream level."
-    },
-    {
-      "id": "ddts-zero-frequency",
-      "requirement": "The source checker rejects the invalid coded frequency per description and the demuxer rejects the stream at open."
-    },
-    {
-      "id": "dtse",
-      "requirement": "The selected core profile refuses the entry tag while demuxing reports a codec identifier."
-    },
-    {
-      "id": "dtsh",
-      "requirement": "The AudioSampleEntry base sample rate and the reference's coded DTS sampling frequency differ."
-    },
-    {
-      "id": "dtsl",
-      "requirement": "The AudioSampleEntry base sample rate and the reference's coded DTS sampling frequency differ."
-    },
-    {
-      "id": "dtsx",
-      "requirement": "The selected core profile refuses the entry tag while demuxing reports a codec identifier."
-    },
-    {
-      "id": "mp4a-object-aa",
-      "requirement": "MPEG-4 object-type core admission differs from the pinned demuxer's codec identifier mapping."
-    },
-    {
-      "id": "mp4a-object-ab",
-      "requirement": "MPEG-4 object-type core admission differs from the pinned demuxer's codec identifier mapping."
-    },
-    {
-      "id": "mp4a-object-ac",
-      "requirement": "MPEG-4 object-type core admission differs from the pinned demuxer's codec identifier mapping."
-    },
-    {
-      "id": "dtsc-mismatched-format",
-      "requirement": "The typed format conflicts with the encoded entry type and is refused before reading its configuration."
+      "reading": "MPEG-4 object types with an extension and no DTS core",
+      "clause": "MP4 Registration Authority, Object Types table (A9–AC): AB declares an XLL-only extension and AC declares an LBR-only extension",
+      "candidate": "reports unsupported core signalling for both known extension-only object types",
+      "reference": "reports no DTS codec classification for either",
+      "cases": [
+        "mp4a-object-ab",
+        "mp4a-object-ac"
+      ]
     }
   ]
 }

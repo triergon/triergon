@@ -158,7 +158,7 @@ done:
     return code;
 }
 
-static void mov_dts_entries(AVFormatContext *format, ViewWork *work)
+static void mov_dts_entries(AVFormatContext *format, ViewWork *work, int check_typed_format)
 {
     const uint64_t count = format->nb_streams;
     mov_view_row(work, 2, &count, 1, NULL, 0);
@@ -166,6 +166,11 @@ static void mov_dts_entries(AVFormatContext *format, ViewWork *work)
         const AVCodecParameters *p = format->streams[index]->codecpar;
         if (p->codec_type != AVMEDIA_TYPE_AUDIO)
             continue;
+        if (check_typed_format && p->codec_tag != MKTAG('d', 't', 's', 'h')) {
+            const uint64_t fields[] = {index, 2, 0, 0};
+            mov_view_row(work, 2, fields, sizeof(fields) / sizeof(*fields), NULL, 0);
+            continue;
+        }
         const int dts = p->codec_id == AV_CODEC_ID_DTS;
         const uint64_t fields[] = {
             index, dts, dts ? p->sample_rate : 0,
@@ -181,7 +186,7 @@ typedef enum {
 
 typedef struct {
     MovViewOperation operation;
-    int window;
+    int window, check_typed_format;
 } MovViewSchedule;
 
 static int isobmff_packets_run(const ViewCase *input, ViewWork *work)
@@ -206,7 +211,7 @@ static int isobmff_packets_run(const ViewCase *input, ViewWork *work)
         return 0;
     }
     if (dts) {
-        mov_dts_entries(format, work);
+        mov_dts_entries(format, work, schedule->check_typed_format);
         code = AVERROR_EOF;
     } else if (pcm_samples) {
         code = qt_pcm_read(format, work);
@@ -270,7 +275,9 @@ static int isobmff_packets_prepare(ViewCase *input)
     MovViewSchedule *schedule = malloc(sizeof(*schedule));
     if (!schedule)
         return 2;
-    *schedule = (MovViewSchedule){.operation = operation, .window = (int)arguments[0]};
+    *schedule = (MovViewSchedule){
+        .operation = operation, .window = (int)arguments[0], .check_typed_format = mismatched,
+    };
     input->prepared = schedule;
     input->release = free;
     input->run = isobmff_packets_run;
