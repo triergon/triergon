@@ -1,0 +1,261 @@
+{
+  "schema": 1,
+  "id": "playback-ts-open",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "playback-ts-open",
+  "candidate": "playback-views-worker",
+  "worker_operation": "ts-pes-open-",
+  "reference": "ffmpeg-playback-views-native",
+  "contract": [
+    "Open the existing TS program corpus through independent segment or finite startup operations and compare the selected PES payloads and 90 kHz demux clocks through logical end.",
+    "Exercise explicit private audio admission on the DVB AC-3 PID and registered single-PID startup.",
+    "The reference uses the public MPEG-TS demuxer and the TS program packet fold."
+  ],
+  "required_profiles": [
+    "ts188-basic",
+    "program-eof-avc-aac",
+    "program-pmt-retype",
+    "program-private-avc-dvb",
+    "carriage-aac-adts-direct",
+    "carriage-hevc-direct",
+    "pts-negative-against-dts",
+    "transport-partial-final-packet",
+    "pmt-opaque-language-descriptors",
+    "replay-avc-aac-00",
+    "replay-avc-aac-01",
+    "replay-avc-aac-02",
+    "replay-avc-aac-03",
+    "replay-avc-aac-04",
+    "replay-avc-aac-05",
+    "replay-avc-aac-06",
+    "replay-avc-aac-07",
+    "replay-avc-aac-08",
+    "replay-avc-aac-09",
+    "replay-hevc-aac-00",
+    "replay-hevc-aac-01",
+    "replay-hevc-aac-02",
+    "replay-hevc-aac-03",
+    "replay-hevc-aac-04",
+    "replay-hevc-aac-05",
+    "replay-hevc-aac-06",
+    "replay-hevc-aac-07",
+    "replay-hevc-aac-08",
+    "replay-hevc-aac-09",
+    "entry-hevc-aac-44100-00",
+    "entry-hevc-aac-44100-01",
+    "m2ts-replay-avc-aac-00-video",
+    "m2ts-replay-avc-aac-00-audio",
+    "m2ts-replay-hevc-aac-00-video",
+    "m2ts-entry-hevc-aac-44100-01-video",
+    "private-audio-dvb-ac3",
+    "startup-ts188-basic",
+    "startup-carriage-aac-adts-direct",
+    "startup-carriage-hevc-direct",
+    "startup-pts-negative-against-dts",
+    "startup-transport-partial-final-packet",
+    "startup-pmt-opaque-language-descriptors"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "ts188-basic",
+        "program-eof-avc-aac",
+        "program-pmt-retype",
+        "program-private-avc-dvb",
+        "carriage-aac-adts-direct",
+        "carriage-hevc-direct",
+        "pts-negative-against-dts",
+        "transport-partial-final-packet",
+        "pmt-opaque-language-descriptors",
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "replay-hevc-aac-00",
+        "replay-hevc-aac-01",
+        "replay-hevc-aac-02",
+        "replay-hevc-aac-03",
+        "replay-hevc-aac-04",
+        "replay-hevc-aac-05",
+        "replay-hevc-aac-06",
+        "replay-hevc-aac-07",
+        "replay-hevc-aac-08",
+        "replay-hevc-aac-09",
+        "entry-hevc-aac-44100-00",
+        "entry-hevc-aac-44100-01",
+        "m2ts-replay-avc-aac-00-video",
+        "m2ts-replay-avc-aac-00-audio",
+        "m2ts-replay-hevc-aac-00-video",
+        "m2ts-entry-hevc-aac-44100-01-video",
+        "private-audio-dvb-ac3",
+        "startup-ts188-basic",
+        "startup-carriage-aac-adts-direct",
+        "startup-carriage-hevc-direct",
+        "startup-pts-negative-against-dts",
+        "startup-transport-partial-final-packet",
+        "startup-pmt-opaque-language-descriptors"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "ts188-basic",
+        "program-eof-avc-aac",
+        "program-pmt-retype",
+        "program-private-avc-dvb",
+        "carriage-aac-adts-direct",
+        "carriage-hevc-direct",
+        "pts-negative-against-dts",
+        "transport-partial-final-packet",
+        "pmt-opaque-language-descriptors",
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "replay-hevc-aac-00",
+        "replay-hevc-aac-01",
+        "replay-hevc-aac-02",
+        "replay-hevc-aac-03",
+        "replay-hevc-aac-04",
+        "replay-hevc-aac-05",
+        "replay-hevc-aac-06",
+        "replay-hevc-aac-07",
+        "replay-hevc-aac-08",
+        "replay-hevc-aac-09",
+        "entry-hevc-aac-44100-00",
+        "entry-hevc-aac-44100-01",
+        "m2ts-replay-avc-aac-00-video",
+        "m2ts-replay-avc-aac-00-audio",
+        "m2ts-replay-hevc-aac-00-video",
+        "m2ts-entry-hevc-aac-44100-01-video",
+        "private-audio-dvb-ac3",
+        "startup-ts188-basic",
+        "startup-carriage-aac-adts-direct",
+        "startup-carriage-hevc-direct",
+        "startup-pts-negative-against-dts",
+        "startup-transport-partial-final-packet",
+        "startup-pmt-opaque-language-descriptors"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "ts188-basic",
+        "program-eof-avc-aac",
+        "program-pmt-retype",
+        "program-private-avc-dvb",
+        "carriage-aac-adts-direct",
+        "carriage-hevc-direct",
+        "pts-negative-against-dts",
+        "transport-partial-final-packet",
+        "pmt-opaque-language-descriptors",
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "replay-hevc-aac-00",
+        "replay-hevc-aac-01",
+        "replay-hevc-aac-02",
+        "replay-hevc-aac-03",
+        "replay-hevc-aac-04",
+        "replay-hevc-aac-05",
+        "replay-hevc-aac-06",
+        "replay-hevc-aac-07",
+        "replay-hevc-aac-08",
+        "replay-hevc-aac-09",
+        "entry-hevc-aac-44100-00",
+        "entry-hevc-aac-44100-01",
+        "m2ts-replay-avc-aac-00-video",
+        "m2ts-replay-avc-aac-00-audio",
+        "m2ts-replay-hevc-aac-00-video",
+        "m2ts-entry-hevc-aac-44100-01-video",
+        "private-audio-dvb-ac3",
+        "startup-ts188-basic",
+        "startup-carriage-aac-adts-direct",
+        "startup-carriage-hevc-direct",
+        "startup-pts-negative-against-dts",
+        "startup-transport-partial-final-packet",
+        "startup-pmt-opaque-language-descriptors"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    }
+  ],
+  "pending_module_requirements": [
+    "Verify the private-stream descriptor domain under H.222.0 section 2.4.4 and ETSI EN 300 468. The independent segment opener emits AVC and private audio, while the reference also emits a selected DVB subtitle packet.",
+    "Check the finite input contract against H.222.0 carrier geometry. The input exceeds the startup API's 16 KiB bound. The reference demuxes these packets incrementally.",
+    "Check complete carrier admission under H.222.0 section 2.4.3. The finite opener rejects a partial final carrier. The reference retains a complete earlier PES packet."
+  ],
+  "open_cases": [
+    {
+      "id": "program-private-avc-dvb",
+      "requirement": "Verify the private-stream descriptor domain under H.222.0 section 2.4.4 and ETSI EN 300 468. The independent segment opener emits AVC and private audio, while the reference also emits a selected DVB subtitle packet.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "m2ts-replay-avc-aac-00-video",
+      "requirement": "Check the finite input contract against H.222.0 carrier geometry. The input exceeds the startup API's 16 KiB bound. The reference demuxes these packets incrementally.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "m2ts-replay-avc-aac-00-audio",
+      "requirement": "Check the finite input contract against H.222.0 carrier geometry. The input exceeds the startup API's 16 KiB bound. The reference demuxes these packets incrementally.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "m2ts-replay-hevc-aac-00-video",
+      "requirement": "Check the finite input contract against H.222.0 carrier geometry. The input exceeds the startup API's 16 KiB bound. The reference demuxes these packets incrementally.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "m2ts-entry-hevc-aac-44100-01-video",
+      "requirement": "Check the finite input contract against H.222.0 carrier geometry. The input exceeds the startup API's 16 KiB bound. The reference demuxes these packets incrementally.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "startup-transport-partial-final-packet",
+      "requirement": "Check complete carrier admission under H.222.0 section 2.4.3. The finite opener rejects a partial final carrier. The reference retains a complete earlier PES packet.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,4938 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "fifo-regular-r-ctts-v1",
+      "profile": "fifo-regular-r-ctts-v1",
+      "file": "crates/playback/tests/fixtures/mp4/r-ctts-v1.mov",
+      "sha256": "18cab35d9bb30156da26d4048f29ebaffefee98dbb1596b418659f21b6a764f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 14986036429310669533
+      }
+    },
+    {
+      "id": "fifo-regular-r-description-change",
+      "profile": "fifo-regular-r-description-change",
+      "file": "crates/playback/tests/fixtures/mp4/r-description-change.mov",
+      "sha256": "8c2fb474eae734d1453a7d3c82a226cdde2ac6fd5489227225dd1d36503e7960",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 84,
+        "digest": 7093699674745347597
+      }
+    },
+    {
+      "id": "fifo-regular-r-edits-repeat",
+      "profile": "fifo-regular-r-edits-repeat",
+      "file": "crates/playback/tests/fixtures/mp4/r-edits-repeat.mov",
+      "sha256": "0837ad805378408e83cb4ab14f8309bfaae258221ecf28e8e03d932282cf3dd4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 96,
+        "digest": 5898622088084149929
+      }
+    },
+    {
+      "id": "fifo-regular-r-end-co64",
+      "profile": "fifo-regular-r-end-co64",
+      "file": "crates/playback/tests/fixtures/mp4/r-end-co64.mov",
+      "sha256": "0100ce1a959b5dda456131420ea16f138394d55a836757dedffeef320266fa4c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-regular-r-front-stco",
+      "profile": "fifo-regular-r-front-stco",
+      "file": "crates/playback/tests/fixtures/mp4/r-front-stco.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-regular-unknown-movie-duration",
+      "profile": "fifo-regular-unknown-movie-duration",
+      "file": "crates/playback/tests/fixtures/mp4/r-unknown-movie-duration.mov",
+      "sha256": "1688b0dc51fc97be4007b2750d8cb56a8dbdbeb090294e7c028d18a92e2e12f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-regular-r-multiple-mdats",
+      "profile": "fifo-regular-r-multiple-mdats",
+      "file": "crates/playback/tests/fixtures/mp4/r-multiple-mdats.mov",
+      "sha256": "8e2528da4358cc3909b62b34a2a94171328774acaf6e81e8603aecd457a21724",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-regular-r-multitrack",
+      "profile": "fifo-regular-r-multitrack",
+      "file": "crates/playback/tests/fixtures/mp4/r-multitrack.mov",
+      "sha256": "221d72b05e73706c99dc97228b15aa4aa7c8761350f642a1e9776d97df7c378c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 105,
+        "digest": 12540576847560192127
+      }
+    },
+    {
+      "id": "fifo-regular-r-negative-cts",
+      "profile": "fifo-regular-r-negative-cts",
+      "file": "crates/playback/tests/fixtures/mp4/r-negative-cts.mov",
+      "sha256": "c64279c754f0f581b576a667006cf42276da59b82d5e3b2f3682c7f06912a2f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 12333090569972465541
+      }
+    },
+    {
+      "id": "fifo-regular-r-subtitle-tx3g",
+      "profile": "fifo-regular-r-subtitle-tx3g",
+      "file": "crates/playback/tests/fixtures/mp4/r-subtitle-tx3g.mov",
+      "sha256": "133cf97e94036df359ba13f66d95cbd2b22b6c543fbf6520600829b6a06e5b2a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 34,
+        "digest": 11698240114182984265
+      }
+    },
+    {
+      "id": "fifo-regular-f-ctts-v1",
+      "profile": "fifo-regular-f-ctts-v1",
+      "file": "crates/playback/tests/fixtures/mp4/f-ctts-v1.mp4",
+      "sha256": "6efbc9730675b972c7dbb65dd5cdd3bf296520a6a2b1ddeb5f92a40d9cd61adb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 5392888418584610013
+      }
+    },
+    {
+      "id": "fifo-regular-f-description-change",
+      "profile": "fifo-regular-f-description-change",
+      "file": "crates/playback/tests/fixtures/mp4/f-description-change.mp4",
+      "sha256": "296bf5f4f95e7e457f0cc451a16a90e97f4ead91476b78b101cac1937e522500",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-regular-f-explicit",
+      "profile": "fifo-regular-f-explicit",
+      "file": "crates/playback/tests/fixtures/mp4/f-explicit.mp4",
+      "sha256": "a084e104efa43e81b85e12f54e9911b57213f5c3941e9c56ced51054b89728f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-regular-f-multitrack",
+      "profile": "fifo-regular-f-multitrack",
+      "file": "crates/playback/tests/fixtures/mp4/f-multitrack.mp4",
+      "sha256": "4d94b2287d7dc8a55dc629fe23636b66487b286cae35efa60996df24292c8609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 105,
+        "digest": 14542225515769306563
+      }
+    },
+    {
+      "id": "fifo-regular-f-no-second-tfdt",
+      "profile": "fifo-regular-f-no-second-tfdt",
+      "file": "crates/playback/tests/fixtures/mp4/f-no-second-tfdt.mp4",
+      "sha256": "c813dcb356c91c96f57d748894724c09edc39e2784804b51b7fe198a8ea85bb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-regular-encoded-avc-aac-front",
+      "profile": "fifo-regular-encoded-avc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-front.mp4",
+      "sha256": "13254b171791057db2f6c88a03a6dc97d5af861fde3517cc3a23c8a62ea17916",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 4738,
+        "digest": 6627454790630712356
+      }
+    },
+    {
+      "id": "fifo-regular-encoded-hevc-aac-front",
+      "profile": "fifo-regular-encoded-hevc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3438,
+        "digest": 10941705118333741720
+      }
+    },
+    {
+      "id": "fifo-regular-encoded-avc-aac-native-seek",
+      "profile": "fifo-regular-encoded-avc-aac-native-seek",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-native-seek.mp4",
+      "sha256": "958a231aa73f32701a3be9835722db29d5cefabfb57dcb3c79148652d1ec6b1a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 140,
+        "bytes": 14957,
+        "digest": 12316551774547553361
+      }
+    },
+    {
+      "id": "fifo-regular-encoded-avc-aac-indexed-seek",
+      "profile": "fifo-regular-encoded-avc-aac-indexed-seek",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-indexed-seek.mp4",
+      "sha256": "83af34f47b3624425bdc0efe532a71d2e0af82e5e0e93cbe6ef1ea6d507df006",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 140,
+        "bytes": 14957,
+        "digest": 11009952758921669613
+      }
+    },
+    {
+      "id": "fifo-regular-opaque-tail-terminal",
+      "profile": "fifo-regular-opaque-tail-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/opaque-tail-terminal.mp4",
+      "sha256": "3b7f12ec2f43de2e584eb4944c4e5001543fbb1f6156c2ec6544956f27a91676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-regular-pending-terminal",
+      "profile": "fifo-regular-pending-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/pending-terminal.mp4",
+      "sha256": "5012e1c28a2f08f5c3584eb5ed5e7133bb4328d94d8c6bb6072b789e553ea9b0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "fifo-regular-regular-terminal",
+      "profile": "fifo-regular-regular-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/regular-terminal.mp4",
+      "sha256": "b735e75d02b8ecc3a968da38b9518f03b9af8a4b026d987767d4d80b0ba37f28",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-regular-unknown-clock-terminal",
+      "profile": "fifo-regular-unknown-clock-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/unknown-clock-terminal.mp4",
+      "sha256": "d5a039c57c8ff4a1daa22756ea5a3d404072d2bf7e0cb37893721e9ff2c5d156",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "regular"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "fifo-progressive-pending-description",
+      "profile": "fifo-progressive-pending-description",
+      "file": "crates/playback/tests/fixtures/progressive/pending-description.mp4",
+      "sha256": "68ababde0dae59b1b40d3452f0ef6228bb38d8b4c83fc4504eefc0813debe2de",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "fifo-progressive-pending-pair",
+      "profile": "fifo-progressive-pending-pair",
+      "file": "crates/playback/tests/fixtures/progressive/pending-pair.mp4",
+      "sha256": "88323ad38a78a79a6c5685a8fdb034b1d201923029e6545bc0c42695a535f3b3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "fifo-progressive-pending-reverse-ranges",
+      "profile": "fifo-progressive-pending-reverse-ranges",
+      "file": "crates/playback/tests/fixtures/progressive/pending-reverse-ranges.mp4",
+      "sha256": "5c697cef7c0369a88dc76dd463a452df2494f46d46357d1fe7c3205205457676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "fifo-progressive-pending-two-mdats",
+      "profile": "fifo-progressive-pending-two-mdats",
+      "file": "crates/playback/tests/fixtures/progressive/pending-two-mdats.mp4",
+      "sha256": "26b1b0516c5fc16c07fb492edb3eb4d038a422ce8421a4bae500b92c16b9c215",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "fifo-progressive-pending-unknown-clock",
+      "profile": "fifo-progressive-pending-unknown-clock",
+      "file": "crates/playback/tests/fixtures/progressive/pending-unknown-clock.mp4",
+      "sha256": "156e7b51aa426e891fa12e2fdaa91d6d38072b24238fd225f60d5a61a1b004c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "fifo-progressive-ten-sequential-batches",
+      "profile": "fifo-progressive-ten-sequential-batches",
+      "file": "crates/playback/tests/fixtures/progressive/ten-sequential-batches.mp4",
+      "sha256": "e145a6ab05a84e0a85c7d836d50beaaf352d27c3ef881b109fb288ed973523e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 31,
+        "bytes": 360,
+        "digest": 11284750124636190909
+      }
+    },
+    {
+      "id": "fifo-progressive-encoded-avc-aac-front",
+      "profile": "fifo-progressive-encoded-avc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-front.mp4",
+      "sha256": "13254b171791057db2f6c88a03a6dc97d5af861fde3517cc3a23c8a62ea17916",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 4738,
+        "digest": 6627454790630712356
+      }
+    },
+    {
+      "id": "fifo-progressive-encoded-hevc-aac-front",
+      "profile": "fifo-progressive-encoded-hevc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3438,
+        "digest": 10941705118333741720
+      }
+    },
+    {
+      "id": "fifo-progressive-f-ctts-v1",
+      "profile": "fifo-progressive-f-ctts-v1",
+      "file": "crates/playback/tests/fixtures/mp4/f-ctts-v1.mp4",
+      "sha256": "6efbc9730675b972c7dbb65dd5cdd3bf296520a6a2b1ddeb5f92a40d9cd61adb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 5392888418584610013
+      }
+    },
+    {
+      "id": "fifo-progressive-f-description-change",
+      "profile": "fifo-progressive-f-description-change",
+      "file": "crates/playback/tests/fixtures/mp4/f-description-change.mp4",
+      "sha256": "296bf5f4f95e7e457f0cc451a16a90e97f4ead91476b78b101cac1937e522500",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-progressive-f-explicit",
+      "profile": "fifo-progressive-f-explicit",
+      "file": "crates/playback/tests/fixtures/mp4/f-explicit.mp4",
+      "sha256": "a084e104efa43e81b85e12f54e9911b57213f5c3941e9c56ced51054b89728f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-progressive-f-multitrack",
+      "profile": "fifo-progressive-f-multitrack",
+      "file": "crates/playback/tests/fixtures/mp4/f-multitrack.mp4",
+      "sha256": "4d94b2287d7dc8a55dc629fe23636b66487b286cae35efa60996df24292c8609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 105,
+        "digest": 14728237410047009631
+      }
+    },
+    {
+      "id": "fifo-progressive-f-no-second-tfdt",
+      "profile": "fifo-progressive-f-no-second-tfdt",
+      "file": "crates/playback/tests/fixtures/mp4/f-no-second-tfdt.mp4",
+      "sha256": "c813dcb356c91c96f57d748894724c09edc39e2784804b51b7fe198a8ea85bb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "fifo-progressive-pending-terminal",
+      "profile": "fifo-progressive-pending-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/pending-terminal.mp4",
+      "sha256": "5012e1c28a2f08f5c3584eb5ed5e7133bb4328d94d8c6bb6072b789e553ea9b0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "fifo-progressive-unknown-clock-terminal",
+      "profile": "fifo-progressive-unknown-clock-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/unknown-clock-terminal.mp4",
+      "sha256": "d5a039c57c8ff4a1daa22756ea5a3d404072d2bf7e0cb37893721e9ff2c5d156",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "fifo-progressive-first-source-clock-unknown",
+      "profile": "fifo-progressive-first-source-clock-unknown",
+      "file": "crates/playback/tests/fixtures/native-terminal-controls/first-source-clock-unknown.mp4",
+      "sha256": "b2b9ae54e4f1c667c66099bc5e399ddc1c716924cea674051cb6298a6e87b967",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "fifo-progressive-aac-priming",
+      "profile": "fifo-progressive-aac-priming",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-priming.mp4",
+      "sha256": "d86cda57d99064bd1d4799c02fc9b56248486ee81034532da990004f86725dff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 12198797415146556974
+      }
+    },
+    {
+      "id": "fifo-progressive-aac-tail-trim",
+      "profile": "fifo-progressive-aac-tail-trim",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-tail-trim.mp4",
+      "sha256": "05d659762cc522255142aadc28cf55f04caf6946a43dbd60854b6f1c5106c841",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 17030618766723014095
+      }
+    },
+    {
+      "id": "fifo-progressive-aac-fractional-edit",
+      "profile": "fifo-progressive-aac-fractional-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-fractional-edit.mp4",
+      "sha256": "0d38fe25d769d15aaac29bcc161f531e06c0acaec6e1a5a859ba5f7b373169ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 3034,
+        "digest": 1952147538437063958
+      }
+    },
+    {
+      "id": "fifo-progressive-fragment-aac-edit",
+      "profile": "fifo-progressive-fragment-aac-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-edit.mp4",
+      "sha256": "d8990d764a54e21ff908bd2b7074b993b8e785e750907f270940034ed23f4c37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 13767856871718308820
+      }
+    },
+    {
+      "id": "fifo-progressive-fragment-aac-late-track",
+      "profile": "fifo-progressive-fragment-aac-late-track",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-late-track.mp4",
+      "sha256": "d898a74c2ddc7edf2c0d4a435e9b2808e14b611339028131d324cc518a27af4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 15599049442651276692
+      }
+    },
+    {
+      "id": "fifo-progressive-fragment-aac-short",
+      "profile": "fifo-progressive-fragment-aac-short",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-short.mp4",
+      "sha256": "866c763bd24f2f7fb442c152757777cd7456ce422937d19b7ee21eef0aed8d2f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited-recovery"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 1654,
+        "digest": 3841553350329656100
+      }
+    },
+    {
+      "id": "fifo-progressive-fragment-mp3-edit",
+      "profile": "fifo-progressive-fragment-mp3-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-mp3-edit.mp4",
+      "sha256": "44410be7427716494f36e126ba826b40d3763aa5c65ee932563ec33b385f5f06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 2716,
+        "digest": 1960771588561332256
+      }
+    },
+    {
+      "id": "fifo-progressive-leading-video-edit",
+      "profile": "fifo-progressive-leading-video-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit.mp4",
+      "sha256": "d814d9726aa99e62dc1f83cb069162484defd8397ebbc3aa36972eb57df56b22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 10520415353746382498
+      }
+    },
+    {
+      "id": "fifo-progressive-leading-video-edit-trimmed",
+      "profile": "fifo-progressive-leading-video-edit-trimmed",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-trimmed.mp4",
+      "sha256": "ef6fd674f8fe63a45ba122ea76bb9a119304b389026d744ee5d0b022a72c446b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 2846,
+        "digest": 16599670244692372105
+      }
+    },
+    {
+      "id": "fifo-progressive-leading-video-edit-single-sync",
+      "profile": "fifo-progressive-leading-video-edit-single-sync",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-single-sync.mp4",
+      "sha256": "4ff065b6eb9147d438adc3241a87b3108f5a90e3efc6fee2fdabf812327631a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 2827,
+        "digest": 12241543766638842988
+      }
+    },
+    {
+      "id": "fifo-progressive-leading-video-edit-rounded-end",
+      "profile": "fifo-progressive-leading-video-edit-rounded-end",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-rounded-end.mp4",
+      "sha256": "3f1811c7373788df7921f0e5210e678af0fbf30240479d7848ccffbc351f8d07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4430,
+        "digest": 16201830697732283759
+      }
+    },
+    {
+      "id": "fifo-progressive-leading-video-edit-overlapping-sync",
+      "profile": "fifo-progressive-leading-video-edit-overlapping-sync",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "fifo",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 2827,
+        "digest": 18117270992773708776
+      }
+    },
+    {
+      "id": "fifo-startup-avc-eight-pictures",
+      "profile": "fifo-startup-avc-eight-pictures",
+      "file": ".research/startup-seek-fixtures/startup-avc-eight-pictures.case",
+      "sha256": "8128ce26b5cc8f2b0aa053a24632a3612f60fdd6076b62ccf043537330c4af3b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-eight-pictures.mkv",
+      "source_sha256": "c4017ec0af03c3e4902d4c2602193b2754096b1c12b70d4d1f50b281acdae73d",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 4806,
+        "digest": 6913200193987984265
+      }
+    },
+    {
+      "id": "fifo-startup-avc-high-b",
+      "profile": "fifo-startup-avc-high-b",
+      "file": ".research/startup-seek-fixtures/startup-avc-high-b.case",
+      "sha256": "dd3342bf4a334436ac7211a43e61715dfe08add7cb4dc7c05c68b008cd8e9ee9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-high-b.mkv",
+      "source_sha256": "9eecf9c54905332e8da7dd31c78f8f3f38098f95cf3eb867d3152a7386931693",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1862,
+        "digest": 15373755166668062844
+      }
+    },
+    {
+      "id": "fifo-startup-avc-high-b0",
+      "profile": "fifo-startup-avc-high-b0",
+      "file": ".research/startup-seek-fixtures/startup-avc-high-b0.case",
+      "sha256": "1273a757d3729afc568654a7801cb52177ee4e59de48682292d2ec45b78644bc",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-high-b0.mkv",
+      "source_sha256": "8c0ae50e89b9f609390301f6ce720496f5311f262bf1a6462387e083ab09420e",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 8120302694448681400
+      }
+    },
+    {
+      "id": "fifo-startup-avc-high-b1",
+      "profile": "fifo-startup-avc-high-b1",
+      "file": ".research/startup-seek-fixtures/startup-avc-high-b1.case",
+      "sha256": "f33241bcbf6c040d872ffa8e3c782f7407826a76f993f5053adb27c4cc9e0143",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/avc-reordered-discovery.mkv",
+      "source_sha256": "4ad06aff1285ddae3f1e4684220a6666a83d150111c37951fd4c6c46efb256bc",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1871,
+        "digest": 17454669043508806917
+      }
+    },
+    {
+      "id": "fifo-startup-avc-mixed",
+      "profile": "fifo-startup-avc-mixed",
+      "file": ".research/startup-seek-fixtures/startup-avc-mixed.case",
+      "sha256": "fc27534590fc00afdc71f6b2b84807602baf8597bbfd7040046e8ae697dd4eed",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "source_sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 4806,
+        "digest": 6913200193987984265
+      }
+    },
+    {
+      "id": "fifo-startup-avc-pgs-early-canvas",
+      "profile": "fifo-startup-avc-pgs-early-canvas",
+      "file": ".research/startup-seek-fixtures/startup-avc-pgs-early-canvas.case",
+      "sha256": "381c15727d6b9deb18a97ec97c41d320d28dec06d03cfd4778ddf3a90123a3e2",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-pgs-early-canvas.mkv",
+      "source_sha256": "158a661369533103eba91a13192558c472f15da5e2e7b74d3acb4ed222f54a58",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 8120302694448681400
+      }
+    },
+    {
+      "id": "fifo-startup-avc-six-pictures",
+      "profile": "fifo-startup-avc-six-pictures",
+      "file": ".research/startup-seek-fixtures/startup-avc-six-pictures.case",
+      "sha256": "335d92cfd87ba203ea2e09788dc900eb15a9ae01fb84bb8417fab6ecb9583394",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-six-pictures.mkv",
+      "source_sha256": "52a3eb0fcb23f11726f0a3084775503e2c704b44094a6653dddeb2a0308d44c1",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 4544,
+        "digest": 15938542491792388411
+      }
+    },
+    {
+      "id": "fifo-startup-hevc-b0",
+      "profile": "fifo-startup-hevc-b0",
+      "file": ".research/startup-seek-fixtures/startup-hevc-b0.case",
+      "sha256": "3fcda6616f8d8ca64f17efde55291b697b05dff2a46d83bdea91b7e1537fe8c0",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b0.mkv",
+      "source_sha256": "31e1d9527fb997ffc15eb1f58667f7d14997135d1056ae6dfbd5e95ab84647f3",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1051,
+        "digest": 4280992160489678835
+      }
+    },
+    {
+      "id": "fifo-startup-hevc-b1",
+      "profile": "fifo-startup-hevc-b1",
+      "file": ".research/startup-seek-fixtures/startup-hevc-b1.case",
+      "sha256": "8fc4c29c41e9fe1c1685af06cd4cdc860b5fb397e1c80d30d5040ca8e4eb34d9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b1.mkv",
+      "source_sha256": "f70b123a68fb3da0683c5d7d9a9f5a07afbef996e7eb529e4eb7c0c323335f4f",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 11737519659862281505
+      }
+    },
+    {
+      "id": "fifo-startup-hevc-b3",
+      "profile": "fifo-startup-hevc-b3",
+      "file": ".research/startup-seek-fixtures/startup-hevc-b3.case",
+      "sha256": "02123908a07ac9eaab8876edaaf04a809fbf99df2b4948c639bbc38bb9315269",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b3.mkv",
+      "source_sha256": "436165ad073c131f99580d69933cc10c5b96c23442aa0c2e21dd7768968fa7b3",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1059,
+        "digest": 16925660571099046149
+      }
+    },
+    {
+      "id": "fifo-startup-hevc-mixed",
+      "profile": "fifo-startup-hevc-mixed",
+      "file": ".research/startup-seek-fixtures/startup-hevc-mixed.case",
+      "sha256": "2d8774181591ffdef111e917174c962f44e892664d6172f8d300636e3f46b7fc",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-dolby.mkv",
+      "source_sha256": "319b3ee94fe7c67a6f1cfde4d1f3e0238f9ac51c6c7cda1140acb44f2cdcb39a",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 7840,
+        "digest": 5046889894076106272
+      }
+    },
+    {
+      "id": "fifo-startup-hevc-no-default-duration",
+      "profile": "fifo-startup-hevc-no-default-duration",
+      "file": ".research/startup-seek-fixtures/startup-hevc-no-default-duration.case",
+      "sha256": "c15ee99c8ab0e9f9dc113ec5ae7d1253417509cf90f37302cc50569da4194f85",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-no-default-duration-discovery.mkv",
+      "source_sha256": "ad6fd4d430be9fd7e913893c0eeb7fb0d7ffd884ecd24985019c5e3506c0a118",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 2672068826024770465
+      }
+    },
+    {
+      "id": "fifo-startup-hevc-repeated-configuration",
+      "profile": "fifo-startup-hevc-repeated-configuration",
+      "file": ".research/startup-seek-fixtures/startup-hevc-repeated-configuration.case",
+      "sha256": "2e33cea75ea17aecf6bbe708f78a9e3bb7f0d52d0ecb3d119a252d0368859040",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-configuration.mkv",
+      "source_sha256": "903d54e0d60099646f0aea2d84810a3115c2b0ee1d9df6bb8a5bf136d3caa930",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 1905,
+        "digest": 9917174220997194792
+      }
+    },
+    {
+      "id": "fifo-startup-hevc-vps-timed-no-default",
+      "profile": "fifo-startup-hevc-vps-timed-no-default",
+      "file": ".research/startup-seek-fixtures/startup-hevc-vps-timed-no-default.case",
+      "sha256": "40020b8a0bdd18f1102999810545271da84ab01dcd33de6f954b4d7054c8408b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-vps-timed-no-default.mkv",
+      "source_sha256": "1b697518df58ee27bd77b7edb1dde88125095d8aeb4f81a6456c470ae16e12f1",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 2672068826024770465
+      }
+    },
+    {
+      "id": "fifo-seek-avc-seek-0-fresh",
+      "profile": "fifo-seek-avc-seek-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-0-fresh.case",
+      "sha256": "b456c1f84f3d16efc21c6403d3d70f96b1912262703984db3d8c109025903433",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 6079877907757236771
+      }
+    },
+    {
+      "id": "fifo-seek-avc-seek-0-eof",
+      "profile": "fifo-seek-avc-seek-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-0-eof.case",
+      "sha256": "eddd3ac23acddca6100b8aa16da5eb68d8f4a54b3d012d04fd52cfc2204e588e",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 6079877907757236771
+      }
+    },
+    {
+      "id": "fifo-seek-avc-seek-700-fresh",
+      "profile": "fifo-seek-avc-seek-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-700-fresh.case",
+      "sha256": "c4acf5a25a297292240f99e2ba6a0afba9886b29ce4c7247db57e16d166ffd05",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      }
+    },
+    {
+      "id": "fifo-seek-avc-seek-700-eof",
+      "profile": "fifo-seek-avc-seek-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-700-eof.case",
+      "sha256": "db1febe6f23ccf343132db32ea4412be6a7c4146f883c12819480ea4a6d4491b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      }
+    },
+    {
+      "id": "fifo-seek-avc-seek-1420-fresh",
+      "profile": "fifo-seek-avc-seek-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-1420-fresh.case",
+      "sha256": "586e024f73a6717aae45e943bfc10a2efbcb463737356f84bef405112644a462",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      }
+    },
+    {
+      "id": "fifo-seek-avc-seek-1420-eof",
+      "profile": "fifo-seek-avc-seek-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-1420-eof.case",
+      "sha256": "cc0048da234714758c4806c758ee2077597f9d0302e49ceb317a94639e854ae9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      }
+    },
+    {
+      "id": "fifo-seek-avc-seek-2700-fresh",
+      "profile": "fifo-seek-avc-seek-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-2700-fresh.case",
+      "sha256": "6bb04d2d76dd883a3d1a153ab52343aae1eb85a5fe3b45f05b56748ffbed11e7",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      }
+    },
+    {
+      "id": "fifo-seek-avc-seek-2700-eof",
+      "profile": "fifo-seek-avc-seek-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-2700-eof.case",
+      "sha256": "4cf9f94dc0ba82feb1e2daab81faa521c9f38fb96b2a33185accd51d18b539cf",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-0-fresh",
+      "profile": "fifo-seek-hevc-seek-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-0-fresh.case",
+      "sha256": "13d628a05304f08ac4e94cf1021ed45ac178bdfee798a9e36e1d9e9d76514156",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-0-eof",
+      "profile": "fifo-seek-hevc-seek-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-0-eof.case",
+      "sha256": "eac62771f883d41943154d569e0e5aa2026c007f0c500e80489f5b7dc6fc9655",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-700-fresh",
+      "profile": "fifo-seek-hevc-seek-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-700-fresh.case",
+      "sha256": "5cf9ff5d5c824d7ad51691951d87046411569a5ca442a23a775d2c61e79b800a",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-700-eof",
+      "profile": "fifo-seek-hevc-seek-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-700-eof.case",
+      "sha256": "31687fad38dfafa803601334a558953f2311379f47e1750eea53960a59068207",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-1420-fresh",
+      "profile": "fifo-seek-hevc-seek-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-1420-fresh.case",
+      "sha256": "1138b2e62a2eab10c5a3be041bab176659e8fdd19793519c1d30eaf2d1a53b73",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-1420-eof",
+      "profile": "fifo-seek-hevc-seek-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-1420-eof.case",
+      "sha256": "0d017e1bd0b95b2faf0c040e7b476c96be5258533a76c103eca3bb788ca227a1",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-2700-fresh",
+      "profile": "fifo-seek-hevc-seek-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-2700-fresh.case",
+      "sha256": "800b37e350d3344fdb8050d2f65618ff6a042f3a76492e58c9462166abb0eeab",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-2700-eof",
+      "profile": "fifo-seek-hevc-seek-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-2700-eof.case",
+      "sha256": "09a831483ed8016110cc405033f4152b72234536eb3cc7bd64ef77a5c1c901c6",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-0-fresh",
+      "profile": "fifo-seek-hevc-seek-no-default-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-0-fresh.case",
+      "sha256": "dd9cc3c32f5f4c02fa6ae475b43dc525bad51973817c0be57b4fd45733c02ad6",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11543322743909777440
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-0-eof",
+      "profile": "fifo-seek-hevc-seek-no-default-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-0-eof.case",
+      "sha256": "4031cf956855d27c37bbf6902150ecf61429a921fca3ab53d7bc902300076736",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11543322743909777440
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-700-fresh",
+      "profile": "fifo-seek-hevc-seek-no-default-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-700-fresh.case",
+      "sha256": "0d38e0a9e23ca591b792e03efd0559b6ff03d231935096c3b1ccbf4ef7a0fabc",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-700-eof",
+      "profile": "fifo-seek-hevc-seek-no-default-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-700-eof.case",
+      "sha256": "2f0c470f49861951610b7057bf449fe4134fd249f91394989c6488adc62609d5",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-1420-fresh",
+      "profile": "fifo-seek-hevc-seek-no-default-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-1420-fresh.case",
+      "sha256": "bb16dd724f24278adfe889b56d802744c2b95ea26e84413c25295e978e6a9eaf",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-1420-eof",
+      "profile": "fifo-seek-hevc-seek-no-default-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-1420-eof.case",
+      "sha256": "e609b34aac22255410f67d914ade00e730dfbf27db99f6d89974907bfba5c3b0",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-2700-fresh",
+      "profile": "fifo-seek-hevc-seek-no-default-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-2700-fresh.case",
+      "sha256": "2bf6ba58193b4ed8433a82bff1d07ba0e0f9684c7ace942749fa3400ee61c050",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-2700-eof",
+      "profile": "fifo-seek-hevc-seek-no-default-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-2700-eof.case",
+      "sha256": "87f3ff1ec9374867e20150fd9c1398d49f9e6908dff28ee7f45e2b573805fa76",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-0-fresh",
+      "profile": "fifo-seek-hevc-seek-no-cues-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-0-fresh.case",
+      "sha256": "16ffb44696a9fbfa616462da013be8b5e9e65d6dff7a855bc7fd80767c65460f",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-0-eof",
+      "profile": "fifo-seek-hevc-seek-no-cues-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-0-eof.case",
+      "sha256": "e40156ecc8fed4e70d821f5d061c348c072c5df3e54ca5b0d764615c4caffc2b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-700-fresh",
+      "profile": "fifo-seek-hevc-seek-no-cues-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-700-fresh.case",
+      "sha256": "3d097b844fd5a43a3276d4d5dff17ad30a345b1c365db2c9eb528a68c9e9591c",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-700-eof",
+      "profile": "fifo-seek-hevc-seek-no-cues-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-700-eof.case",
+      "sha256": "936b8a3dd75c1663e1f2411d20c0f6046ff8fc0afa42623fd19b261a770fb076",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-1420-fresh",
+      "profile": "fifo-seek-hevc-seek-no-cues-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-1420-fresh.case",
+      "sha256": "dec4d2c180abe1dd1b56e851340e19e0a2cb9f0ced95e2d566f64b95e330c93f",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-1420-eof",
+      "profile": "fifo-seek-hevc-seek-no-cues-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-1420-eof.case",
+      "sha256": "59ccc48fe9145d85028453696c4f447e1c9d7741758dec02342dfce238689665",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-2700-fresh",
+      "profile": "fifo-seek-hevc-seek-no-cues-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-2700-fresh.case",
+      "sha256": "449d8070ccf0ee24c7cd3615843028f54e7e3dd895fd806136762ad88832f8f7",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-2700-eof",
+      "profile": "fifo-seek-hevc-seek-no-cues-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-2700-eof.case",
+      "sha256": "78fa366396b3c3d95eb87b6147be6d3ec1d3da319ac3c848a832027749aecd6e",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "fifo",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    },
+    {
+      "id": "ready-regular-r-ctts-v1",
+      "profile": "ready-regular-r-ctts-v1",
+      "file": "crates/playback/tests/fixtures/mp4/r-ctts-v1.mov",
+      "sha256": "18cab35d9bb30156da26d4048f29ebaffefee98dbb1596b418659f21b6a764f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 14986036429310669533
+      }
+    },
+    {
+      "id": "ready-regular-r-description-change",
+      "profile": "ready-regular-r-description-change",
+      "file": "crates/playback/tests/fixtures/mp4/r-description-change.mov",
+      "sha256": "8c2fb474eae734d1453a7d3c82a226cdde2ac6fd5489227225dd1d36503e7960",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 84,
+        "digest": 7093699674745347597
+      }
+    },
+    {
+      "id": "ready-regular-r-edits-repeat",
+      "profile": "ready-regular-r-edits-repeat",
+      "file": "crates/playback/tests/fixtures/mp4/r-edits-repeat.mov",
+      "sha256": "0837ad805378408e83cb4ab14f8309bfaae258221ecf28e8e03d932282cf3dd4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 96,
+        "digest": 5898622088084149929
+      }
+    },
+    {
+      "id": "ready-regular-r-end-co64",
+      "profile": "ready-regular-r-end-co64",
+      "file": "crates/playback/tests/fixtures/mp4/r-end-co64.mov",
+      "sha256": "0100ce1a959b5dda456131420ea16f138394d55a836757dedffeef320266fa4c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-regular-r-front-stco",
+      "profile": "ready-regular-r-front-stco",
+      "file": "crates/playback/tests/fixtures/mp4/r-front-stco.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-regular-unknown-movie-duration",
+      "profile": "ready-regular-unknown-movie-duration",
+      "file": "crates/playback/tests/fixtures/mp4/r-unknown-movie-duration.mov",
+      "sha256": "1688b0dc51fc97be4007b2750d8cb56a8dbdbeb090294e7c028d18a92e2e12f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-regular-r-multiple-mdats",
+      "profile": "ready-regular-r-multiple-mdats",
+      "file": "crates/playback/tests/fixtures/mp4/r-multiple-mdats.mov",
+      "sha256": "8e2528da4358cc3909b62b34a2a94171328774acaf6e81e8603aecd457a21724",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-regular-r-multitrack",
+      "profile": "ready-regular-r-multitrack",
+      "file": "crates/playback/tests/fixtures/mp4/r-multitrack.mov",
+      "sha256": "221d72b05e73706c99dc97228b15aa4aa7c8761350f642a1e9776d97df7c378c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 105,
+        "digest": 12540576847560192127
+      }
+    },
+    {
+      "id": "ready-regular-r-negative-cts",
+      "profile": "ready-regular-r-negative-cts",
+      "file": "crates/playback/tests/fixtures/mp4/r-negative-cts.mov",
+      "sha256": "c64279c754f0f581b576a667006cf42276da59b82d5e3b2f3682c7f06912a2f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 12333090569972465541
+      }
+    },
+    {
+      "id": "ready-regular-r-subtitle-tx3g",
+      "profile": "ready-regular-r-subtitle-tx3g",
+      "file": "crates/playback/tests/fixtures/mp4/r-subtitle-tx3g.mov",
+      "sha256": "133cf97e94036df359ba13f66d95cbd2b22b6c543fbf6520600829b6a06e5b2a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 34,
+        "digest": 11698240114182984265
+      }
+    },
+    {
+      "id": "ready-regular-f-ctts-v1",
+      "profile": "ready-regular-f-ctts-v1",
+      "file": "crates/playback/tests/fixtures/mp4/f-ctts-v1.mp4",
+      "sha256": "6efbc9730675b972c7dbb65dd5cdd3bf296520a6a2b1ddeb5f92a40d9cd61adb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 5392888418584610013
+      }
+    },
+    {
+      "id": "ready-regular-f-description-change",
+      "profile": "ready-regular-f-description-change",
+      "file": "crates/playback/tests/fixtures/mp4/f-description-change.mp4",
+      "sha256": "296bf5f4f95e7e457f0cc451a16a90e97f4ead91476b78b101cac1937e522500",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-regular-f-explicit",
+      "profile": "ready-regular-f-explicit",
+      "file": "crates/playback/tests/fixtures/mp4/f-explicit.mp4",
+      "sha256": "a084e104efa43e81b85e12f54e9911b57213f5c3941e9c56ced51054b89728f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-regular-f-multitrack",
+      "profile": "ready-regular-f-multitrack",
+      "file": "crates/playback/tests/fixtures/mp4/f-multitrack.mp4",
+      "sha256": "4d94b2287d7dc8a55dc629fe23636b66487b286cae35efa60996df24292c8609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 105,
+        "digest": 14542225515769306563
+      }
+    },
+    {
+      "id": "ready-regular-f-no-second-tfdt",
+      "profile": "ready-regular-f-no-second-tfdt",
+      "file": "crates/playback/tests/fixtures/mp4/f-no-second-tfdt.mp4",
+      "sha256": "c813dcb356c91c96f57d748894724c09edc39e2784804b51b7fe198a8ea85bb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-regular-encoded-avc-aac-front",
+      "profile": "ready-regular-encoded-avc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-front.mp4",
+      "sha256": "13254b171791057db2f6c88a03a6dc97d5af861fde3517cc3a23c8a62ea17916",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 4738,
+        "digest": 6627454790630712356
+      }
+    },
+    {
+      "id": "ready-regular-encoded-hevc-aac-front",
+      "profile": "ready-regular-encoded-hevc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3438,
+        "digest": 10941705118333741720
+      }
+    },
+    {
+      "id": "ready-regular-encoded-avc-aac-native-seek",
+      "profile": "ready-regular-encoded-avc-aac-native-seek",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-native-seek.mp4",
+      "sha256": "958a231aa73f32701a3be9835722db29d5cefabfb57dcb3c79148652d1ec6b1a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 140,
+        "bytes": 14957,
+        "digest": 12316551774547553361
+      }
+    },
+    {
+      "id": "ready-regular-encoded-avc-aac-indexed-seek",
+      "profile": "ready-regular-encoded-avc-aac-indexed-seek",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-indexed-seek.mp4",
+      "sha256": "83af34f47b3624425bdc0efe532a71d2e0af82e5e0e93cbe6ef1ea6d507df006",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 140,
+        "bytes": 14957,
+        "digest": 11009952758921669613
+      }
+    },
+    {
+      "id": "ready-regular-opaque-tail-terminal",
+      "profile": "ready-regular-opaque-tail-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/opaque-tail-terminal.mp4",
+      "sha256": "3b7f12ec2f43de2e584eb4944c4e5001543fbb1f6156c2ec6544956f27a91676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-regular-pending-terminal",
+      "profile": "ready-regular-pending-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/pending-terminal.mp4",
+      "sha256": "5012e1c28a2f08f5c3584eb5ed5e7133bb4328d94d8c6bb6072b789e553ea9b0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "ready-regular-regular-terminal",
+      "profile": "ready-regular-regular-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/regular-terminal.mp4",
+      "sha256": "b735e75d02b8ecc3a968da38b9518f03b9af8a4b026d987767d4d80b0ba37f28",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-regular-unknown-clock-terminal",
+      "profile": "ready-regular-unknown-clock-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/unknown-clock-terminal.mp4",
+      "sha256": "d5a039c57c8ff4a1daa22756ea5a3d404072d2bf7e0cb37893721e9ff2c5d156",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "regular"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "ready-progressive-pending-description",
+      "profile": "ready-progressive-pending-description",
+      "file": "crates/playback/tests/fixtures/progressive/pending-description.mp4",
+      "sha256": "68ababde0dae59b1b40d3452f0ef6228bb38d8b4c83fc4504eefc0813debe2de",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "ready-progressive-pending-pair",
+      "profile": "ready-progressive-pending-pair",
+      "file": "crates/playback/tests/fixtures/progressive/pending-pair.mp4",
+      "sha256": "88323ad38a78a79a6c5685a8fdb034b1d201923029e6545bc0c42695a535f3b3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "ready-progressive-pending-reverse-ranges",
+      "profile": "ready-progressive-pending-reverse-ranges",
+      "file": "crates/playback/tests/fixtures/progressive/pending-reverse-ranges.mp4",
+      "sha256": "5c697cef7c0369a88dc76dd463a452df2494f46d46357d1fe7c3205205457676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "ready-progressive-pending-two-mdats",
+      "profile": "ready-progressive-pending-two-mdats",
+      "file": "crates/playback/tests/fixtures/progressive/pending-two-mdats.mp4",
+      "sha256": "26b1b0516c5fc16c07fb492edb3eb4d038a422ce8421a4bae500b92c16b9c215",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "ready-progressive-pending-unknown-clock",
+      "profile": "ready-progressive-pending-unknown-clock",
+      "file": "crates/playback/tests/fixtures/progressive/pending-unknown-clock.mp4",
+      "sha256": "156e7b51aa426e891fa12e2fdaa91d6d38072b24238fd225f60d5a61a1b004c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "ready-progressive-ten-sequential-batches",
+      "profile": "ready-progressive-ten-sequential-batches",
+      "file": "crates/playback/tests/fixtures/progressive/ten-sequential-batches.mp4",
+      "sha256": "e145a6ab05a84e0a85c7d836d50beaaf352d27c3ef881b109fb288ed973523e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 31,
+        "bytes": 360,
+        "digest": 11284750124636190909
+      }
+    },
+    {
+      "id": "ready-progressive-encoded-avc-aac-front",
+      "profile": "ready-progressive-encoded-avc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-front.mp4",
+      "sha256": "13254b171791057db2f6c88a03a6dc97d5af861fde3517cc3a23c8a62ea17916",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 4738,
+        "digest": 6627454790630712356
+      }
+    },
+    {
+      "id": "ready-progressive-encoded-hevc-aac-front",
+      "profile": "ready-progressive-encoded-hevc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3438,
+        "digest": 10941705118333741720
+      }
+    },
+    {
+      "id": "ready-progressive-f-ctts-v1",
+      "profile": "ready-progressive-f-ctts-v1",
+      "file": "crates/playback/tests/fixtures/mp4/f-ctts-v1.mp4",
+      "sha256": "6efbc9730675b972c7dbb65dd5cdd3bf296520a6a2b1ddeb5f92a40d9cd61adb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 5392888418584610013
+      }
+    },
+    {
+      "id": "ready-progressive-f-description-change",
+      "profile": "ready-progressive-f-description-change",
+      "file": "crates/playback/tests/fixtures/mp4/f-description-change.mp4",
+      "sha256": "296bf5f4f95e7e457f0cc451a16a90e97f4ead91476b78b101cac1937e522500",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-progressive-f-explicit",
+      "profile": "ready-progressive-f-explicit",
+      "file": "crates/playback/tests/fixtures/mp4/f-explicit.mp4",
+      "sha256": "a084e104efa43e81b85e12f54e9911b57213f5c3941e9c56ced51054b89728f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-progressive-f-multitrack",
+      "profile": "ready-progressive-f-multitrack",
+      "file": "crates/playback/tests/fixtures/mp4/f-multitrack.mp4",
+      "sha256": "4d94b2287d7dc8a55dc629fe23636b66487b286cae35efa60996df24292c8609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 105,
+        "digest": 14728237410047009631
+      }
+    },
+    {
+      "id": "ready-progressive-f-no-second-tfdt",
+      "profile": "ready-progressive-f-no-second-tfdt",
+      "file": "crates/playback/tests/fixtures/mp4/f-no-second-tfdt.mp4",
+      "sha256": "c813dcb356c91c96f57d748894724c09edc39e2784804b51b7fe198a8ea85bb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "ready-progressive-pending-terminal",
+      "profile": "ready-progressive-pending-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/pending-terminal.mp4",
+      "sha256": "5012e1c28a2f08f5c3584eb5ed5e7133bb4328d94d8c6bb6072b789e553ea9b0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "ready-progressive-unknown-clock-terminal",
+      "profile": "ready-progressive-unknown-clock-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/unknown-clock-terminal.mp4",
+      "sha256": "d5a039c57c8ff4a1daa22756ea5a3d404072d2bf7e0cb37893721e9ff2c5d156",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "ready-progressive-first-source-clock-unknown",
+      "profile": "ready-progressive-first-source-clock-unknown",
+      "file": "crates/playback/tests/fixtures/native-terminal-controls/first-source-clock-unknown.mp4",
+      "sha256": "b2b9ae54e4f1c667c66099bc5e399ddc1c716924cea674051cb6298a6e87b967",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "ready-progressive-aac-priming",
+      "profile": "ready-progressive-aac-priming",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-priming.mp4",
+      "sha256": "d86cda57d99064bd1d4799c02fc9b56248486ee81034532da990004f86725dff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 12198797415146556974
+      }
+    },
+    {
+      "id": "ready-progressive-aac-tail-trim",
+      "profile": "ready-progressive-aac-tail-trim",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-tail-trim.mp4",
+      "sha256": "05d659762cc522255142aadc28cf55f04caf6946a43dbd60854b6f1c5106c841",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 17030618766723014095
+      }
+    },
+    {
+      "id": "ready-progressive-aac-fractional-edit",
+      "profile": "ready-progressive-aac-fractional-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-fractional-edit.mp4",
+      "sha256": "0d38fe25d769d15aaac29bcc161f531e06c0acaec6e1a5a859ba5f7b373169ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 3034,
+        "digest": 1952147538437063958
+      }
+    },
+    {
+      "id": "ready-progressive-fragment-aac-edit",
+      "profile": "ready-progressive-fragment-aac-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-edit.mp4",
+      "sha256": "d8990d764a54e21ff908bd2b7074b993b8e785e750907f270940034ed23f4c37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 13767856871718308820
+      }
+    },
+    {
+      "id": "ready-progressive-fragment-aac-late-track",
+      "profile": "ready-progressive-fragment-aac-late-track",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-late-track.mp4",
+      "sha256": "d898a74c2ddc7edf2c0d4a435e9b2808e14b611339028131d324cc518a27af4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 15599049442651276692
+      }
+    },
+    {
+      "id": "ready-progressive-fragment-aac-short",
+      "profile": "ready-progressive-fragment-aac-short",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-short.mp4",
+      "sha256": "866c763bd24f2f7fb442c152757777cd7456ce422937d19b7ee21eef0aed8d2f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited-recovery"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 1654,
+        "digest": 3841553350329656100
+      }
+    },
+    {
+      "id": "ready-progressive-fragment-mp3-edit",
+      "profile": "ready-progressive-fragment-mp3-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-mp3-edit.mp4",
+      "sha256": "44410be7427716494f36e126ba826b40d3763aa5c65ee932563ec33b385f5f06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 2716,
+        "digest": 1960771588561332256
+      }
+    },
+    {
+      "id": "ready-progressive-leading-video-edit",
+      "profile": "ready-progressive-leading-video-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit.mp4",
+      "sha256": "d814d9726aa99e62dc1f83cb069162484defd8397ebbc3aa36972eb57df56b22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 10520415353746382498
+      }
+    },
+    {
+      "id": "ready-progressive-leading-video-edit-trimmed",
+      "profile": "ready-progressive-leading-video-edit-trimmed",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-trimmed.mp4",
+      "sha256": "ef6fd674f8fe63a45ba122ea76bb9a119304b389026d744ee5d0b022a72c446b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 2846,
+        "digest": 16599670244692372105
+      }
+    },
+    {
+      "id": "ready-progressive-leading-video-edit-single-sync",
+      "profile": "ready-progressive-leading-video-edit-single-sync",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-single-sync.mp4",
+      "sha256": "4ff065b6eb9147d438adc3241a87b3108f5a90e3efc6fee2fdabf812327631a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 2827,
+        "digest": 12241543766638842988
+      }
+    },
+    {
+      "id": "ready-progressive-leading-video-edit-rounded-end",
+      "profile": "ready-progressive-leading-video-edit-rounded-end",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-rounded-end.mp4",
+      "sha256": "3f1811c7373788df7921f0e5210e678af0fbf30240479d7848ccffbc351f8d07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4430,
+        "digest": 16201830697732283759
+      }
+    },
+    {
+      "id": "ready-progressive-leading-video-edit-overlapping-sync",
+      "profile": "ready-progressive-leading-video-edit-overlapping-sync",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ready",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 2827,
+        "digest": 18117270992773708776
+      }
+    },
+    {
+      "id": "ready-startup-avc-eight-pictures",
+      "profile": "ready-startup-avc-eight-pictures",
+      "file": ".research/startup-seek-fixtures/startup-avc-eight-pictures.case",
+      "sha256": "8128ce26b5cc8f2b0aa053a24632a3612f60fdd6076b62ccf043537330c4af3b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-eight-pictures.mkv",
+      "source_sha256": "c4017ec0af03c3e4902d4c2602193b2754096b1c12b70d4d1f50b281acdae73d",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 4806,
+        "digest": 6913200193987984265
+      }
+    },
+    {
+      "id": "ready-startup-avc-high-b",
+      "profile": "ready-startup-avc-high-b",
+      "file": ".research/startup-seek-fixtures/startup-avc-high-b.case",
+      "sha256": "dd3342bf4a334436ac7211a43e61715dfe08add7cb4dc7c05c68b008cd8e9ee9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-high-b.mkv",
+      "source_sha256": "9eecf9c54905332e8da7dd31c78f8f3f38098f95cf3eb867d3152a7386931693",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1862,
+        "digest": 15373755166668062844
+      }
+    },
+    {
+      "id": "ready-startup-avc-high-b0",
+      "profile": "ready-startup-avc-high-b0",
+      "file": ".research/startup-seek-fixtures/startup-avc-high-b0.case",
+      "sha256": "1273a757d3729afc568654a7801cb52177ee4e59de48682292d2ec45b78644bc",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-high-b0.mkv",
+      "source_sha256": "8c0ae50e89b9f609390301f6ce720496f5311f262bf1a6462387e083ab09420e",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 8120302694448681400
+      }
+    },
+    {
+      "id": "ready-startup-avc-high-b1",
+      "profile": "ready-startup-avc-high-b1",
+      "file": ".research/startup-seek-fixtures/startup-avc-high-b1.case",
+      "sha256": "f33241bcbf6c040d872ffa8e3c782f7407826a76f993f5053adb27c4cc9e0143",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/avc-reordered-discovery.mkv",
+      "source_sha256": "4ad06aff1285ddae3f1e4684220a6666a83d150111c37951fd4c6c46efb256bc",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1871,
+        "digest": 17454669043508806917
+      }
+    },
+    {
+      "id": "ready-startup-avc-mixed",
+      "profile": "ready-startup-avc-mixed",
+      "file": ".research/startup-seek-fixtures/startup-avc-mixed.case",
+      "sha256": "fc27534590fc00afdc71f6b2b84807602baf8597bbfd7040046e8ae697dd4eed",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "source_sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 4806,
+        "digest": 6913200193987984265
+      }
+    },
+    {
+      "id": "ready-startup-avc-pgs-early-canvas",
+      "profile": "ready-startup-avc-pgs-early-canvas",
+      "file": ".research/startup-seek-fixtures/startup-avc-pgs-early-canvas.case",
+      "sha256": "381c15727d6b9deb18a97ec97c41d320d28dec06d03cfd4778ddf3a90123a3e2",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-pgs-early-canvas.mkv",
+      "source_sha256": "158a661369533103eba91a13192558c472f15da5e2e7b74d3acb4ed222f54a58",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 8120302694448681400
+      }
+    },
+    {
+      "id": "ready-startup-avc-six-pictures",
+      "profile": "ready-startup-avc-six-pictures",
+      "file": ".research/startup-seek-fixtures/startup-avc-six-pictures.case",
+      "sha256": "335d92cfd87ba203ea2e09788dc900eb15a9ae01fb84bb8417fab6ecb9583394",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-six-pictures.mkv",
+      "source_sha256": "52a3eb0fcb23f11726f0a3084775503e2c704b44094a6653dddeb2a0308d44c1",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 4544,
+        "digest": 15938542491792388411
+      }
+    },
+    {
+      "id": "ready-startup-hevc-b0",
+      "profile": "ready-startup-hevc-b0",
+      "file": ".research/startup-seek-fixtures/startup-hevc-b0.case",
+      "sha256": "3fcda6616f8d8ca64f17efde55291b697b05dff2a46d83bdea91b7e1537fe8c0",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b0.mkv",
+      "source_sha256": "31e1d9527fb997ffc15eb1f58667f7d14997135d1056ae6dfbd5e95ab84647f3",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1051,
+        "digest": 4280992160489678835
+      }
+    },
+    {
+      "id": "ready-startup-hevc-b1",
+      "profile": "ready-startup-hevc-b1",
+      "file": ".research/startup-seek-fixtures/startup-hevc-b1.case",
+      "sha256": "8fc4c29c41e9fe1c1685af06cd4cdc860b5fb397e1c80d30d5040ca8e4eb34d9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b1.mkv",
+      "source_sha256": "f70b123a68fb3da0683c5d7d9a9f5a07afbef996e7eb529e4eb7c0c323335f4f",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 11737519659862281505
+      }
+    },
+    {
+      "id": "ready-startup-hevc-b3",
+      "profile": "ready-startup-hevc-b3",
+      "file": ".research/startup-seek-fixtures/startup-hevc-b3.case",
+      "sha256": "02123908a07ac9eaab8876edaaf04a809fbf99df2b4948c639bbc38bb9315269",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b3.mkv",
+      "source_sha256": "436165ad073c131f99580d69933cc10c5b96c23442aa0c2e21dd7768968fa7b3",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1059,
+        "digest": 16925660571099046149
+      }
+    },
+    {
+      "id": "ready-startup-hevc-mixed",
+      "profile": "ready-startup-hevc-mixed",
+      "file": ".research/startup-seek-fixtures/startup-hevc-mixed.case",
+      "sha256": "2d8774181591ffdef111e917174c962f44e892664d6172f8d300636e3f46b7fc",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-dolby.mkv",
+      "source_sha256": "319b3ee94fe7c67a6f1cfde4d1f3e0238f9ac51c6c7cda1140acb44f2cdcb39a",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 7840,
+        "digest": 5046889894076106272
+      }
+    },
+    {
+      "id": "ready-startup-hevc-no-default-duration",
+      "profile": "ready-startup-hevc-no-default-duration",
+      "file": ".research/startup-seek-fixtures/startup-hevc-no-default-duration.case",
+      "sha256": "c15ee99c8ab0e9f9dc113ec5ae7d1253417509cf90f37302cc50569da4194f85",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-no-default-duration-discovery.mkv",
+      "source_sha256": "ad6fd4d430be9fd7e913893c0eeb7fb0d7ffd884ecd24985019c5e3506c0a118",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 2672068826024770465
+      }
+    },
+    {
+      "id": "ready-startup-hevc-repeated-configuration",
+      "profile": "ready-startup-hevc-repeated-configuration",
+      "file": ".research/startup-seek-fixtures/startup-hevc-repeated-configuration.case",
+      "sha256": "2e33cea75ea17aecf6bbe708f78a9e3bb7f0d52d0ecb3d119a252d0368859040",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-configuration.mkv",
+      "source_sha256": "903d54e0d60099646f0aea2d84810a3115c2b0ee1d9df6bb8a5bf136d3caa930",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 1905,
+        "digest": 9917174220997194792
+      }
+    },
+    {
+      "id": "ready-startup-hevc-vps-timed-no-default",
+      "profile": "ready-startup-hevc-vps-timed-no-default",
+      "file": ".research/startup-seek-fixtures/startup-hevc-vps-timed-no-default.case",
+      "sha256": "40020b8a0bdd18f1102999810545271da84ab01dcd33de6f954b4d7054c8408b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-vps-timed-no-default.mkv",
+      "source_sha256": "1b697518df58ee27bd77b7edb1dde88125095d8aeb4f81a6456c470ae16e12f1",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 2672068826024770465
+      }
+    },
+    {
+      "id": "ready-seek-avc-seek-0-fresh",
+      "profile": "ready-seek-avc-seek-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-0-fresh.case",
+      "sha256": "b456c1f84f3d16efc21c6403d3d70f96b1912262703984db3d8c109025903433",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 6079877907757236771
+      }
+    },
+    {
+      "id": "ready-seek-avc-seek-0-eof",
+      "profile": "ready-seek-avc-seek-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-0-eof.case",
+      "sha256": "eddd3ac23acddca6100b8aa16da5eb68d8f4a54b3d012d04fd52cfc2204e588e",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 6079877907757236771
+      }
+    },
+    {
+      "id": "ready-seek-avc-seek-700-fresh",
+      "profile": "ready-seek-avc-seek-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-700-fresh.case",
+      "sha256": "c4acf5a25a297292240f99e2ba6a0afba9886b29ce4c7247db57e16d166ffd05",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      }
+    },
+    {
+      "id": "ready-seek-avc-seek-700-eof",
+      "profile": "ready-seek-avc-seek-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-700-eof.case",
+      "sha256": "db1febe6f23ccf343132db32ea4412be6a7c4146f883c12819480ea4a6d4491b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      }
+    },
+    {
+      "id": "ready-seek-avc-seek-1420-fresh",
+      "profile": "ready-seek-avc-seek-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-1420-fresh.case",
+      "sha256": "586e024f73a6717aae45e943bfc10a2efbcb463737356f84bef405112644a462",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      }
+    },
+    {
+      "id": "ready-seek-avc-seek-1420-eof",
+      "profile": "ready-seek-avc-seek-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-1420-eof.case",
+      "sha256": "cc0048da234714758c4806c758ee2077597f9d0302e49ceb317a94639e854ae9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      }
+    },
+    {
+      "id": "ready-seek-avc-seek-2700-fresh",
+      "profile": "ready-seek-avc-seek-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-2700-fresh.case",
+      "sha256": "6bb04d2d76dd883a3d1a153ab52343aae1eb85a5fe3b45f05b56748ffbed11e7",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      }
+    },
+    {
+      "id": "ready-seek-avc-seek-2700-eof",
+      "profile": "ready-seek-avc-seek-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-2700-eof.case",
+      "sha256": "4cf9f94dc0ba82feb1e2daab81faa521c9f38fb96b2a33185accd51d18b539cf",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-0-fresh",
+      "profile": "ready-seek-hevc-seek-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-0-fresh.case",
+      "sha256": "13d628a05304f08ac4e94cf1021ed45ac178bdfee798a9e36e1d9e9d76514156",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-0-eof",
+      "profile": "ready-seek-hevc-seek-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-0-eof.case",
+      "sha256": "eac62771f883d41943154d569e0e5aa2026c007f0c500e80489f5b7dc6fc9655",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-700-fresh",
+      "profile": "ready-seek-hevc-seek-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-700-fresh.case",
+      "sha256": "5cf9ff5d5c824d7ad51691951d87046411569a5ca442a23a775d2c61e79b800a",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-700-eof",
+      "profile": "ready-seek-hevc-seek-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-700-eof.case",
+      "sha256": "31687fad38dfafa803601334a558953f2311379f47e1750eea53960a59068207",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-1420-fresh",
+      "profile": "ready-seek-hevc-seek-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-1420-fresh.case",
+      "sha256": "1138b2e62a2eab10c5a3be041bab176659e8fdd19793519c1d30eaf2d1a53b73",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-1420-eof",
+      "profile": "ready-seek-hevc-seek-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-1420-eof.case",
+      "sha256": "0d017e1bd0b95b2faf0c040e7b476c96be5258533a76c103eca3bb788ca227a1",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-2700-fresh",
+      "profile": "ready-seek-hevc-seek-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-2700-fresh.case",
+      "sha256": "800b37e350d3344fdb8050d2f65618ff6a042f3a76492e58c9462166abb0eeab",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-2700-eof",
+      "profile": "ready-seek-hevc-seek-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-2700-eof.case",
+      "sha256": "09a831483ed8016110cc405033f4152b72234536eb3cc7bd64ef77a5c1c901c6",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-0-fresh",
+      "profile": "ready-seek-hevc-seek-no-default-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-0-fresh.case",
+      "sha256": "dd9cc3c32f5f4c02fa6ae475b43dc525bad51973817c0be57b4fd45733c02ad6",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11543322743909777440
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-0-eof",
+      "profile": "ready-seek-hevc-seek-no-default-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-0-eof.case",
+      "sha256": "4031cf956855d27c37bbf6902150ecf61429a921fca3ab53d7bc902300076736",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11543322743909777440
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-700-fresh",
+      "profile": "ready-seek-hevc-seek-no-default-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-700-fresh.case",
+      "sha256": "0d38e0a9e23ca591b792e03efd0559b6ff03d231935096c3b1ccbf4ef7a0fabc",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-700-eof",
+      "profile": "ready-seek-hevc-seek-no-default-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-700-eof.case",
+      "sha256": "2f0c470f49861951610b7057bf449fe4134fd249f91394989c6488adc62609d5",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-1420-fresh",
+      "profile": "ready-seek-hevc-seek-no-default-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-1420-fresh.case",
+      "sha256": "bb16dd724f24278adfe889b56d802744c2b95ea26e84413c25295e978e6a9eaf",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-1420-eof",
+      "profile": "ready-seek-hevc-seek-no-default-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-1420-eof.case",
+      "sha256": "e609b34aac22255410f67d914ade00e730dfbf27db99f6d89974907bfba5c3b0",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-2700-fresh",
+      "profile": "ready-seek-hevc-seek-no-default-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-2700-fresh.case",
+      "sha256": "2bf6ba58193b4ed8433a82bff1d07ba0e0f9684c7ace942749fa3400ee61c050",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-2700-eof",
+      "profile": "ready-seek-hevc-seek-no-default-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-2700-eof.case",
+      "sha256": "87f3ff1ec9374867e20150fd9c1398d49f9e6908dff28ee7f45e2b573805fa76",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-0-fresh",
+      "profile": "ready-seek-hevc-seek-no-cues-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-0-fresh.case",
+      "sha256": "16ffb44696a9fbfa616462da013be8b5e9e65d6dff7a855bc7fd80767c65460f",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-0-eof",
+      "profile": "ready-seek-hevc-seek-no-cues-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-0-eof.case",
+      "sha256": "e40156ecc8fed4e70d821f5d061c348c072c5df3e54ca5b0d764615c4caffc2b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-700-fresh",
+      "profile": "ready-seek-hevc-seek-no-cues-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-700-fresh.case",
+      "sha256": "3d097b844fd5a43a3276d4d5dff17ad30a345b1c365db2c9eb528a68c9e9591c",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-700-eof",
+      "profile": "ready-seek-hevc-seek-no-cues-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-700-eof.case",
+      "sha256": "936b8a3dd75c1663e1f2411d20c0f6046ff8fc0afa42623fd19b261a770fb076",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-1420-fresh",
+      "profile": "ready-seek-hevc-seek-no-cues-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-1420-fresh.case",
+      "sha256": "dec4d2c180abe1dd1b56e851340e19e0a2cb9f0ced95e2d566f64b95e330c93f",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-1420-eof",
+      "profile": "ready-seek-hevc-seek-no-cues-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-1420-eof.case",
+      "sha256": "59ccc48fe9145d85028453696c4f447e1c9d7741758dec02342dfce238689665",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-2700-fresh",
+      "profile": "ready-seek-hevc-seek-no-cues-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-2700-fresh.case",
+      "sha256": "449d8070ccf0ee24c7cd3615843028f54e7e3dd895fd806136762ad88832f8f7",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-2700-eof",
+      "profile": "ready-seek-hevc-seek-no-cues-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-2700-eof.case",
+      "sha256": "78fa366396b3c3d95eb87b6147be6d3ec1d3da319ac3c848a832027749aecd6e",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "ready",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    },
+    {
+      "id": "pump-regular-r-ctts-v1",
+      "profile": "pump-regular-r-ctts-v1",
+      "file": "crates/playback/tests/fixtures/mp4/r-ctts-v1.mov",
+      "sha256": "18cab35d9bb30156da26d4048f29ebaffefee98dbb1596b418659f21b6a764f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 14986036429310669533
+      }
+    },
+    {
+      "id": "pump-regular-r-description-change",
+      "profile": "pump-regular-r-description-change",
+      "file": "crates/playback/tests/fixtures/mp4/r-description-change.mov",
+      "sha256": "8c2fb474eae734d1453a7d3c82a226cdde2ac6fd5489227225dd1d36503e7960",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 84,
+        "digest": 7093699674745347597
+      }
+    },
+    {
+      "id": "pump-regular-r-edits-repeat",
+      "profile": "pump-regular-r-edits-repeat",
+      "file": "crates/playback/tests/fixtures/mp4/r-edits-repeat.mov",
+      "sha256": "0837ad805378408e83cb4ab14f8309bfaae258221ecf28e8e03d932282cf3dd4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 96,
+        "digest": 5898622088084149929
+      }
+    },
+    {
+      "id": "pump-regular-r-end-co64",
+      "profile": "pump-regular-r-end-co64",
+      "file": "crates/playback/tests/fixtures/mp4/r-end-co64.mov",
+      "sha256": "0100ce1a959b5dda456131420ea16f138394d55a836757dedffeef320266fa4c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-regular-r-front-stco",
+      "profile": "pump-regular-r-front-stco",
+      "file": "crates/playback/tests/fixtures/mp4/r-front-stco.mov",
+      "sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-regular-unknown-movie-duration",
+      "profile": "pump-regular-unknown-movie-duration",
+      "file": "crates/playback/tests/fixtures/mp4/r-unknown-movie-duration.mov",
+      "sha256": "1688b0dc51fc97be4007b2750d8cb56a8dbdbeb090294e7c028d18a92e2e12f7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-regular-r-multiple-mdats",
+      "profile": "pump-regular-r-multiple-mdats",
+      "file": "crates/playback/tests/fixtures/mp4/r-multiple-mdats.mov",
+      "sha256": "8e2528da4358cc3909b62b34a2a94171328774acaf6e81e8603aecd457a21724",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-regular-r-multitrack",
+      "profile": "pump-regular-r-multitrack",
+      "file": "crates/playback/tests/fixtures/mp4/r-multitrack.mov",
+      "sha256": "221d72b05e73706c99dc97228b15aa4aa7c8761350f642a1e9776d97df7c378c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 105,
+        "digest": 12540576847560192127
+      }
+    },
+    {
+      "id": "pump-regular-r-negative-cts",
+      "profile": "pump-regular-r-negative-cts",
+      "file": "crates/playback/tests/fixtures/mp4/r-negative-cts.mov",
+      "sha256": "c64279c754f0f581b576a667006cf42276da59b82d5e3b2f3682c7f06912a2f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 12333090569972465541
+      }
+    },
+    {
+      "id": "pump-regular-r-subtitle-tx3g",
+      "profile": "pump-regular-r-subtitle-tx3g",
+      "file": "crates/playback/tests/fixtures/mp4/r-subtitle-tx3g.mov",
+      "sha256": "133cf97e94036df359ba13f66d95cbd2b22b6c543fbf6520600829b6a06e5b2a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 34,
+        "digest": 11698240114182984265
+      }
+    },
+    {
+      "id": "pump-regular-f-ctts-v1",
+      "profile": "pump-regular-f-ctts-v1",
+      "file": "crates/playback/tests/fixtures/mp4/f-ctts-v1.mp4",
+      "sha256": "6efbc9730675b972c7dbb65dd5cdd3bf296520a6a2b1ddeb5f92a40d9cd61adb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 5392888418584610013
+      }
+    },
+    {
+      "id": "pump-regular-f-description-change",
+      "profile": "pump-regular-f-description-change",
+      "file": "crates/playback/tests/fixtures/mp4/f-description-change.mp4",
+      "sha256": "296bf5f4f95e7e457f0cc451a16a90e97f4ead91476b78b101cac1937e522500",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-regular-f-explicit",
+      "profile": "pump-regular-f-explicit",
+      "file": "crates/playback/tests/fixtures/mp4/f-explicit.mp4",
+      "sha256": "a084e104efa43e81b85e12f54e9911b57213f5c3941e9c56ced51054b89728f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-regular-f-multitrack",
+      "profile": "pump-regular-f-multitrack",
+      "file": "crates/playback/tests/fixtures/mp4/f-multitrack.mp4",
+      "sha256": "4d94b2287d7dc8a55dc629fe23636b66487b286cae35efa60996df24292c8609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 105,
+        "digest": 14542225515769306563
+      }
+    },
+    {
+      "id": "pump-regular-f-no-second-tfdt",
+      "profile": "pump-regular-f-no-second-tfdt",
+      "file": "crates/playback/tests/fixtures/mp4/f-no-second-tfdt.mp4",
+      "sha256": "c813dcb356c91c96f57d748894724c09edc39e2784804b51b7fe198a8ea85bb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-regular-encoded-avc-aac-front",
+      "profile": "pump-regular-encoded-avc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-front.mp4",
+      "sha256": "13254b171791057db2f6c88a03a6dc97d5af861fde3517cc3a23c8a62ea17916",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 4738,
+        "digest": 6627454790630712356
+      }
+    },
+    {
+      "id": "pump-regular-encoded-hevc-aac-front",
+      "profile": "pump-regular-encoded-hevc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3438,
+        "digest": 10941705118333741720
+      }
+    },
+    {
+      "id": "pump-regular-encoded-avc-aac-native-seek",
+      "profile": "pump-regular-encoded-avc-aac-native-seek",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-native-seek.mp4",
+      "sha256": "958a231aa73f32701a3be9835722db29d5cefabfb57dcb3c79148652d1ec6b1a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 140,
+        "bytes": 14957,
+        "digest": 12316551774547553361
+      }
+    },
+    {
+      "id": "pump-regular-encoded-avc-aac-indexed-seek",
+      "profile": "pump-regular-encoded-avc-aac-indexed-seek",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-indexed-seek.mp4",
+      "sha256": "83af34f47b3624425bdc0efe532a71d2e0af82e5e0e93cbe6ef1ea6d507df006",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 140,
+        "bytes": 14957,
+        "digest": 11009952758921669613
+      }
+    },
+    {
+      "id": "pump-regular-opaque-tail-terminal",
+      "profile": "pump-regular-opaque-tail-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/opaque-tail-terminal.mp4",
+      "sha256": "3b7f12ec2f43de2e584eb4944c4e5001543fbb1f6156c2ec6544956f27a91676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-regular-pending-terminal",
+      "profile": "pump-regular-pending-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/pending-terminal.mp4",
+      "sha256": "5012e1c28a2f08f5c3584eb5ed5e7133bb4328d94d8c6bb6072b789e553ea9b0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "pump-regular-regular-terminal",
+      "profile": "pump-regular-regular-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/regular-terminal.mp4",
+      "sha256": "b735e75d02b8ecc3a968da38b9518f03b9af8a4b026d987767d4d80b0ba37f28",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-regular-unknown-clock-terminal",
+      "profile": "pump-regular-unknown-clock-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/unknown-clock-terminal.mp4",
+      "sha256": "d5a039c57c8ff4a1daa22756ea5a3d404072d2bf7e0cb37893721e9ff2c5d156",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "regular"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "pump-progressive-pending-description",
+      "profile": "pump-progressive-pending-description",
+      "file": "crates/playback/tests/fixtures/progressive/pending-description.mp4",
+      "sha256": "68ababde0dae59b1b40d3452f0ef6228bb38d8b4c83fc4504eefc0813debe2de",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "pump-progressive-pending-pair",
+      "profile": "pump-progressive-pending-pair",
+      "file": "crates/playback/tests/fixtures/progressive/pending-pair.mp4",
+      "sha256": "88323ad38a78a79a6c5685a8fdb034b1d201923029e6545bc0c42695a535f3b3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "pump-progressive-pending-reverse-ranges",
+      "profile": "pump-progressive-pending-reverse-ranges",
+      "file": "crates/playback/tests/fixtures/progressive/pending-reverse-ranges.mp4",
+      "sha256": "5c697cef7c0369a88dc76dd463a452df2494f46d46357d1fe7c3205205457676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "pump-progressive-pending-two-mdats",
+      "profile": "pump-progressive-pending-two-mdats",
+      "file": "crates/playback/tests/fixtures/progressive/pending-two-mdats.mp4",
+      "sha256": "26b1b0516c5fc16c07fb492edb3eb4d038a422ce8421a4bae500b92c16b9c215",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "pump-progressive-pending-unknown-clock",
+      "profile": "pump-progressive-pending-unknown-clock",
+      "file": "crates/playback/tests/fixtures/progressive/pending-unknown-clock.mp4",
+      "sha256": "156e7b51aa426e891fa12e2fdaa91d6d38072b24238fd225f60d5a61a1b004c4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "pump-progressive-ten-sequential-batches",
+      "profile": "pump-progressive-ten-sequential-batches",
+      "file": "crates/playback/tests/fixtures/progressive/ten-sequential-batches.mp4",
+      "sha256": "e145a6ab05a84e0a85c7d836d50beaaf352d27c3ef881b109fb288ed973523e9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 31,
+        "bytes": 360,
+        "digest": 11284750124636190909
+      }
+    },
+    {
+      "id": "pump-progressive-encoded-avc-aac-front",
+      "profile": "pump-progressive-encoded-avc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-avc-aac-front.mp4",
+      "sha256": "13254b171791057db2f6c88a03a6dc97d5af861fde3517cc3a23c8a62ea17916",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 4738,
+        "digest": 6627454790630712356
+      }
+    },
+    {
+      "id": "pump-progressive-encoded-hevc-aac-front",
+      "profile": "pump-progressive-encoded-hevc-aac-front",
+      "file": "crates/playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4",
+      "sha256": "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3438,
+        "digest": 10941705118333741720
+      }
+    },
+    {
+      "id": "pump-progressive-f-ctts-v1",
+      "profile": "pump-progressive-f-ctts-v1",
+      "file": "crates/playback/tests/fixtures/mp4/f-ctts-v1.mp4",
+      "sha256": "6efbc9730675b972c7dbb65dd5cdd3bf296520a6a2b1ddeb5f92a40d9cd61adb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 5392888418584610013
+      }
+    },
+    {
+      "id": "pump-progressive-f-description-change",
+      "profile": "pump-progressive-f-description-change",
+      "file": "crates/playback/tests/fixtures/mp4/f-description-change.mp4",
+      "sha256": "296bf5f4f95e7e457f0cc451a16a90e97f4ead91476b78b101cac1937e522500",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-progressive-f-explicit",
+      "profile": "pump-progressive-f-explicit",
+      "file": "crates/playback/tests/fixtures/mp4/f-explicit.mp4",
+      "sha256": "a084e104efa43e81b85e12f54e9911b57213f5c3941e9c56ced51054b89728f9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-progressive-f-multitrack",
+      "profile": "pump-progressive-f-multitrack",
+      "file": "crates/playback/tests/fixtures/mp4/f-multitrack.mp4",
+      "sha256": "4d94b2287d7dc8a55dc629fe23636b66487b286cae35efa60996df24292c8609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 105,
+        "digest": 14728237410047009631
+      }
+    },
+    {
+      "id": "pump-progressive-f-no-second-tfdt",
+      "profile": "pump-progressive-f-no-second-tfdt",
+      "file": "crates/playback/tests/fixtures/mp4/f-no-second-tfdt.mp4",
+      "sha256": "c813dcb356c91c96f57d748894724c09edc39e2784804b51b7fe198a8ea85bb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 72,
+        "digest": 17972977392795404141
+      }
+    },
+    {
+      "id": "pump-progressive-pending-terminal",
+      "profile": "pump-progressive-pending-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/pending-terminal.mp4",
+      "sha256": "5012e1c28a2f08f5c3584eb5ed5e7133bb4328d94d8c6bb6072b789e553ea9b0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "pump-progressive-unknown-clock-terminal",
+      "profile": "pump-progressive-unknown-clock-terminal",
+      "file": "crates/playback/tests/fixtures/open-ended/unknown-clock-terminal.mp4",
+      "sha256": "d5a039c57c8ff4a1daa22756ea5a3d404072d2bf7e0cb37893721e9ff2c5d156",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "pump-progressive-first-source-clock-unknown",
+      "profile": "pump-progressive-first-source-clock-unknown",
+      "file": "crates/playback/tests/fixtures/native-terminal-controls/first-source-clock-unknown.mp4",
+      "sha256": "b2b9ae54e4f1c667c66099bc5e399ddc1c716924cea674051cb6298a6e87b967",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 108,
+        "digest": 5891782937912466263
+      }
+    },
+    {
+      "id": "pump-progressive-aac-priming",
+      "profile": "pump-progressive-aac-priming",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-priming.mp4",
+      "sha256": "d86cda57d99064bd1d4799c02fc9b56248486ee81034532da990004f86725dff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 12198797415146556974
+      }
+    },
+    {
+      "id": "pump-progressive-aac-tail-trim",
+      "profile": "pump-progressive-aac-tail-trim",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-tail-trim.mp4",
+      "sha256": "05d659762cc522255142aadc28cf55f04caf6946a43dbd60854b6f1c5106c841",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 17030618766723014095
+      }
+    },
+    {
+      "id": "pump-progressive-aac-fractional-edit",
+      "profile": "pump-progressive-aac-fractional-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-fractional-edit.mp4",
+      "sha256": "0d38fe25d769d15aaac29bcc161f531e06c0acaec6e1a5a859ba5f7b373169ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 3034,
+        "digest": 1952147538437063958
+      }
+    },
+    {
+      "id": "pump-progressive-fragment-aac-edit",
+      "profile": "pump-progressive-fragment-aac-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-edit.mp4",
+      "sha256": "d8990d764a54e21ff908bd2b7074b993b8e785e750907f270940034ed23f4c37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 13767856871718308820
+      }
+    },
+    {
+      "id": "pump-progressive-fragment-aac-late-track",
+      "profile": "pump-progressive-fragment-aac-late-track",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-late-track.mp4",
+      "sha256": "d898a74c2ddc7edf2c0d4a435e9b2808e14b611339028131d324cc518a27af4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 15599049442651276692
+      }
+    },
+    {
+      "id": "pump-progressive-fragment-aac-short",
+      "profile": "pump-progressive-fragment-aac-short",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-short.mp4",
+      "sha256": "866c763bd24f2f7fb442c152757777cd7456ce422937d19b7ee21eef0aed8d2f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited-recovery"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 1654,
+        "digest": 3841553350329656100
+      }
+    },
+    {
+      "id": "pump-progressive-fragment-mp3-edit",
+      "profile": "pump-progressive-fragment-mp3-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-mp3-edit.mp4",
+      "sha256": "44410be7427716494f36e126ba826b40d3763aa5c65ee932563ec33b385f5f06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 2716,
+        "digest": 1960771588561332256
+      }
+    },
+    {
+      "id": "pump-progressive-leading-video-edit",
+      "profile": "pump-progressive-leading-video-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit.mp4",
+      "sha256": "d814d9726aa99e62dc1f83cb069162484defd8397ebbc3aa36972eb57df56b22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 22,
+        "bytes": 4449,
+        "digest": 10520415353746382498
+      }
+    },
+    {
+      "id": "pump-progressive-leading-video-edit-trimmed",
+      "profile": "pump-progressive-leading-video-edit-trimmed",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-trimmed.mp4",
+      "sha256": "ef6fd674f8fe63a45ba122ea76bb9a119304b389026d744ee5d0b022a72c446b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 2846,
+        "digest": 16599670244692372105
+      }
+    },
+    {
+      "id": "pump-progressive-leading-video-edit-single-sync",
+      "profile": "pump-progressive-leading-video-edit-single-sync",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-single-sync.mp4",
+      "sha256": "4ff065b6eb9147d438adc3241a87b3108f5a90e3efc6fee2fdabf812327631a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 2827,
+        "digest": 12241543766638842988
+      }
+    },
+    {
+      "id": "pump-progressive-leading-video-edit-rounded-end",
+      "profile": "pump-progressive-leading-video-edit-rounded-end",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-rounded-end.mp4",
+      "sha256": "3f1811c7373788df7921f0e5210e678af0fbf30240479d7848ccffbc351f8d07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4430,
+        "digest": 16201830697732283759
+      }
+    },
+    {
+      "id": "pump-progressive-leading-video-edit-overlapping-sync",
+      "profile": "pump-progressive-leading-video-edit-overlapping-sync",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pump",
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 2827,
+        "digest": 18117270992773708776
+      }
+    },
+    {
+      "id": "pump-startup-avc-eight-pictures",
+      "profile": "pump-startup-avc-eight-pictures",
+      "file": ".research/startup-seek-fixtures/startup-avc-eight-pictures.case",
+      "sha256": "8128ce26b5cc8f2b0aa053a24632a3612f60fdd6076b62ccf043537330c4af3b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-eight-pictures.mkv",
+      "source_sha256": "c4017ec0af03c3e4902d4c2602193b2754096b1c12b70d4d1f50b281acdae73d",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 4806,
+        "digest": 6913200193987984265
+      }
+    },
+    {
+      "id": "pump-startup-avc-high-b",
+      "profile": "pump-startup-avc-high-b",
+      "file": ".research/startup-seek-fixtures/startup-avc-high-b.case",
+      "sha256": "dd3342bf4a334436ac7211a43e61715dfe08add7cb4dc7c05c68b008cd8e9ee9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-high-b.mkv",
+      "source_sha256": "9eecf9c54905332e8da7dd31c78f8f3f38098f95cf3eb867d3152a7386931693",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1862,
+        "digest": 15373755166668062844
+      }
+    },
+    {
+      "id": "pump-startup-avc-high-b0",
+      "profile": "pump-startup-avc-high-b0",
+      "file": ".research/startup-seek-fixtures/startup-avc-high-b0.case",
+      "sha256": "1273a757d3729afc568654a7801cb52177ee4e59de48682292d2ec45b78644bc",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-high-b0.mkv",
+      "source_sha256": "8c0ae50e89b9f609390301f6ce720496f5311f262bf1a6462387e083ab09420e",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 8120302694448681400
+      }
+    },
+    {
+      "id": "pump-startup-avc-high-b1",
+      "profile": "pump-startup-avc-high-b1",
+      "file": ".research/startup-seek-fixtures/startup-avc-high-b1.case",
+      "sha256": "f33241bcbf6c040d872ffa8e3c782f7407826a76f993f5053adb27c4cc9e0143",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/avc-reordered-discovery.mkv",
+      "source_sha256": "4ad06aff1285ddae3f1e4684220a6666a83d150111c37951fd4c6c46efb256bc",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1871,
+        "digest": 17454669043508806917
+      }
+    },
+    {
+      "id": "pump-startup-avc-mixed",
+      "profile": "pump-startup-avc-mixed",
+      "file": ".research/startup-seek-fixtures/startup-avc-mixed.case",
+      "sha256": "fc27534590fc00afdc71f6b2b84807602baf8597bbfd7040046e8ae697dd4eed",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "source_sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 4806,
+        "digest": 6913200193987984265
+      }
+    },
+    {
+      "id": "pump-startup-avc-pgs-early-canvas",
+      "profile": "pump-startup-avc-pgs-early-canvas",
+      "file": ".research/startup-seek-fixtures/startup-avc-pgs-early-canvas.case",
+      "sha256": "381c15727d6b9deb18a97ec97c41d320d28dec06d03cfd4778ddf3a90123a3e2",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-pgs-early-canvas.mkv",
+      "source_sha256": "158a661369533103eba91a13192558c472f15da5e2e7b74d3acb4ed222f54a58",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 8120302694448681400
+      }
+    },
+    {
+      "id": "pump-startup-avc-six-pictures",
+      "profile": "pump-startup-avc-six-pictures",
+      "file": ".research/startup-seek-fixtures/startup-avc-six-pictures.case",
+      "sha256": "335d92cfd87ba203ea2e09788dc900eb15a9ae01fb84bb8417fab6ecb9583394",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-six-pictures.mkv",
+      "source_sha256": "52a3eb0fcb23f11726f0a3084775503e2c704b44094a6653dddeb2a0308d44c1",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 4544,
+        "digest": 15938542491792388411
+      }
+    },
+    {
+      "id": "pump-startup-hevc-b0",
+      "profile": "pump-startup-hevc-b0",
+      "file": ".research/startup-seek-fixtures/startup-hevc-b0.case",
+      "sha256": "3fcda6616f8d8ca64f17efde55291b697b05dff2a46d83bdea91b7e1537fe8c0",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b0.mkv",
+      "source_sha256": "31e1d9527fb997ffc15eb1f58667f7d14997135d1056ae6dfbd5e95ab84647f3",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1051,
+        "digest": 4280992160489678835
+      }
+    },
+    {
+      "id": "pump-startup-hevc-b1",
+      "profile": "pump-startup-hevc-b1",
+      "file": ".research/startup-seek-fixtures/startup-hevc-b1.case",
+      "sha256": "8fc4c29c41e9fe1c1685af06cd4cdc860b5fb397e1c80d30d5040ca8e4eb34d9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b1.mkv",
+      "source_sha256": "f70b123a68fb3da0683c5d7d9a9f5a07afbef996e7eb529e4eb7c0c323335f4f",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 11737519659862281505
+      }
+    },
+    {
+      "id": "pump-startup-hevc-b3",
+      "profile": "pump-startup-hevc-b3",
+      "file": ".research/startup-seek-fixtures/startup-hevc-b3.case",
+      "sha256": "02123908a07ac9eaab8876edaaf04a809fbf99df2b4948c639bbc38bb9315269",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b3.mkv",
+      "source_sha256": "436165ad073c131f99580d69933cc10c5b96c23442aa0c2e21dd7768968fa7b3",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1059,
+        "digest": 16925660571099046149
+      }
+    },
+    {
+      "id": "pump-startup-hevc-mixed",
+      "profile": "pump-startup-hevc-mixed",
+      "file": ".research/startup-seek-fixtures/startup-hevc-mixed.case",
+      "sha256": "2d8774181591ffdef111e917174c962f44e892664d6172f8d300636e3f46b7fc",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-dolby.mkv",
+      "source_sha256": "319b3ee94fe7c67a6f1cfde4d1f3e0238f9ac51c6c7cda1140acb44f2cdcb39a",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 7840,
+        "digest": 5046889894076106272
+      }
+    },
+    {
+      "id": "pump-startup-hevc-no-default-duration",
+      "profile": "pump-startup-hevc-no-default-duration",
+      "file": ".research/startup-seek-fixtures/startup-hevc-no-default-duration.case",
+      "sha256": "c15ee99c8ab0e9f9dc113ec5ae7d1253417509cf90f37302cc50569da4194f85",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-no-default-duration-discovery.mkv",
+      "source_sha256": "ad6fd4d430be9fd7e913893c0eeb7fb0d7ffd884ecd24985019c5e3506c0a118",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 2672068826024770465
+      }
+    },
+    {
+      "id": "pump-startup-hevc-repeated-configuration",
+      "profile": "pump-startup-hevc-repeated-configuration",
+      "file": ".research/startup-seek-fixtures/startup-hevc-repeated-configuration.case",
+      "sha256": "2e33cea75ea17aecf6bbe708f78a9e3bb7f0d52d0ecb3d119a252d0368859040",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-configuration.mkv",
+      "source_sha256": "903d54e0d60099646f0aea2d84810a3115c2b0ee1d9df6bb8a5bf136d3caa930",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 1905,
+        "digest": 9917174220997194792
+      }
+    },
+    {
+      "id": "pump-startup-hevc-vps-timed-no-default",
+      "profile": "pump-startup-hevc-vps-timed-no-default",
+      "file": ".research/startup-seek-fixtures/startup-hevc-vps-timed-no-default.case",
+      "sha256": "40020b8a0bdd18f1102999810545271da84ab01dcd33de6f954b4d7054c8408b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-vps-timed-no-default.mkv",
+      "source_sha256": "1b697518df58ee27bd77b7edb1dde88125095d8aeb4f81a6456c470ae16e12f1",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 2672068826024770465
+      }
+    },
+    {
+      "id": "pump-seek-avc-seek-0-fresh",
+      "profile": "pump-seek-avc-seek-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-0-fresh.case",
+      "sha256": "b456c1f84f3d16efc21c6403d3d70f96b1912262703984db3d8c109025903433",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 6079877907757236771
+      }
+    },
+    {
+      "id": "pump-seek-avc-seek-0-eof",
+      "profile": "pump-seek-avc-seek-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-0-eof.case",
+      "sha256": "eddd3ac23acddca6100b8aa16da5eb68d8f4a54b3d012d04fd52cfc2204e588e",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 6079877907757236771
+      }
+    },
+    {
+      "id": "pump-seek-avc-seek-700-fresh",
+      "profile": "pump-seek-avc-seek-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-700-fresh.case",
+      "sha256": "c4acf5a25a297292240f99e2ba6a0afba9886b29ce4c7247db57e16d166ffd05",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      }
+    },
+    {
+      "id": "pump-seek-avc-seek-700-eof",
+      "profile": "pump-seek-avc-seek-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-700-eof.case",
+      "sha256": "db1febe6f23ccf343132db32ea4412be6a7c4146f883c12819480ea4a6d4491b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      }
+    },
+    {
+      "id": "pump-seek-avc-seek-1420-fresh",
+      "profile": "pump-seek-avc-seek-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-1420-fresh.case",
+      "sha256": "586e024f73a6717aae45e943bfc10a2efbcb463737356f84bef405112644a462",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      }
+    },
+    {
+      "id": "pump-seek-avc-seek-1420-eof",
+      "profile": "pump-seek-avc-seek-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-1420-eof.case",
+      "sha256": "cc0048da234714758c4806c758ee2077597f9d0302e49ceb317a94639e854ae9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      }
+    },
+    {
+      "id": "pump-seek-avc-seek-2700-fresh",
+      "profile": "pump-seek-avc-seek-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-2700-fresh.case",
+      "sha256": "6bb04d2d76dd883a3d1a153ab52343aae1eb85a5fe3b45f05b56748ffbed11e7",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      }
+    },
+    {
+      "id": "pump-seek-avc-seek-2700-eof",
+      "profile": "pump-seek-avc-seek-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-avc-seek-2700-eof.case",
+      "sha256": "4cf9f94dc0ba82feb1e2daab81faa521c9f38fb96b2a33185accd51d18b539cf",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-0-fresh",
+      "profile": "pump-seek-hevc-seek-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-0-fresh.case",
+      "sha256": "13d628a05304f08ac4e94cf1021ed45ac178bdfee798a9e36e1d9e9d76514156",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-0-eof",
+      "profile": "pump-seek-hevc-seek-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-0-eof.case",
+      "sha256": "eac62771f883d41943154d569e0e5aa2026c007f0c500e80489f5b7dc6fc9655",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-700-fresh",
+      "profile": "pump-seek-hevc-seek-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-700-fresh.case",
+      "sha256": "5cf9ff5d5c824d7ad51691951d87046411569a5ca442a23a775d2c61e79b800a",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-700-eof",
+      "profile": "pump-seek-hevc-seek-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-700-eof.case",
+      "sha256": "31687fad38dfafa803601334a558953f2311379f47e1750eea53960a59068207",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-1420-fresh",
+      "profile": "pump-seek-hevc-seek-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-1420-fresh.case",
+      "sha256": "1138b2e62a2eab10c5a3be041bab176659e8fdd19793519c1d30eaf2d1a53b73",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-1420-eof",
+      "profile": "pump-seek-hevc-seek-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-1420-eof.case",
+      "sha256": "0d017e1bd0b95b2faf0c040e7b476c96be5258533a76c103eca3bb788ca227a1",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-2700-fresh",
+      "profile": "pump-seek-hevc-seek-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-2700-fresh.case",
+      "sha256": "800b37e350d3344fdb8050d2f65618ff6a042f3a76492e58c9462166abb0eeab",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-2700-eof",
+      "profile": "pump-seek-hevc-seek-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-2700-eof.case",
+      "sha256": "09a831483ed8016110cc405033f4152b72234536eb3cc7bd64ef77a5c1c901c6",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-0-fresh",
+      "profile": "pump-seek-hevc-seek-no-default-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-0-fresh.case",
+      "sha256": "dd9cc3c32f5f4c02fa6ae475b43dc525bad51973817c0be57b4fd45733c02ad6",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11543322743909777440
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-0-eof",
+      "profile": "pump-seek-hevc-seek-no-default-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-0-eof.case",
+      "sha256": "4031cf956855d27c37bbf6902150ecf61429a921fca3ab53d7bc902300076736",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11543322743909777440
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-700-fresh",
+      "profile": "pump-seek-hevc-seek-no-default-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-700-fresh.case",
+      "sha256": "0d38e0a9e23ca591b792e03efd0559b6ff03d231935096c3b1ccbf4ef7a0fabc",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-700-eof",
+      "profile": "pump-seek-hevc-seek-no-default-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-700-eof.case",
+      "sha256": "2f0c470f49861951610b7057bf449fe4134fd249f91394989c6488adc62609d5",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-1420-fresh",
+      "profile": "pump-seek-hevc-seek-no-default-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-1420-fresh.case",
+      "sha256": "bb16dd724f24278adfe889b56d802744c2b95ea26e84413c25295e978e6a9eaf",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-1420-eof",
+      "profile": "pump-seek-hevc-seek-no-default-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-1420-eof.case",
+      "sha256": "e609b34aac22255410f67d914ade00e730dfbf27db99f6d89974907bfba5c3b0",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-2700-fresh",
+      "profile": "pump-seek-hevc-seek-no-default-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-2700-fresh.case",
+      "sha256": "2bf6ba58193b4ed8433a82bff1d07ba0e0f9684c7ace942749fa3400ee61c050",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-2700-eof",
+      "profile": "pump-seek-hevc-seek-no-default-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-default-2700-eof.case",
+      "sha256": "87f3ff1ec9374867e20150fd9c1398d49f9e6908dff28ee7f45e2b573805fa76",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-0-fresh",
+      "profile": "pump-seek-hevc-seek-no-cues-0-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-0-fresh.case",
+      "sha256": "16ffb44696a9fbfa616462da013be8b5e9e65d6dff7a855bc7fd80767c65460f",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-0-eof",
+      "profile": "pump-seek-hevc-seek-no-cues-0-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-0-eof.case",
+      "sha256": "e40156ecc8fed4e70d821f5d061c348c072c5df3e54ca5b0d764615c4caffc2b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 11121402651723407264
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-700-fresh",
+      "profile": "pump-seek-hevc-seek-no-cues-700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-700-fresh.case",
+      "sha256": "3d097b844fd5a43a3276d4d5dff17ad30a345b1c365db2c9eb528a68c9e9591c",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-700-eof",
+      "profile": "pump-seek-hevc-seek-no-cues-700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-700-eof.case",
+      "sha256": "936b8a3dd75c1663e1f2411d20c0f6046ff8fc0afa42623fd19b261a770fb076",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-1420-fresh",
+      "profile": "pump-seek-hevc-seek-no-cues-1420-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-1420-fresh.case",
+      "sha256": "dec4d2c180abe1dd1b56e851340e19e0a2cb9f0ced95e2d566f64b95e330c93f",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-1420-eof",
+      "profile": "pump-seek-hevc-seek-no-cues-1420-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-1420-eof.case",
+      "sha256": "59ccc48fe9145d85028453696c4f447e1c9d7741758dec02342dfce238689665",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-2700-fresh",
+      "profile": "pump-seek-hevc-seek-no-cues-2700-fresh",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-2700-fresh.case",
+      "sha256": "449d8070ccf0ee24c7cd3615843028f54e7e3dd895fd806136762ad88832f8f7",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-2700-eof",
+      "profile": "pump-seek-hevc-seek-no-cues-2700-eof",
+      "file": ".research/startup-seek-fixtures/seek-hevc-seek-no-cues-2700-eof.case",
+      "sha256": "78fa366396b3c3d95eb87b6147be6d3ec1d3da319ac3c848a832027749aecd6e",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "arguments": [
+        "pump",
+        "matroska"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      }
+    }
+  ]
+}

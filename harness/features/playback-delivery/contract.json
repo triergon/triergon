@@ -1,0 +1,2117 @@
+{
+  "schema": 1,
+  "id": "playback-delivery",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "playback-delivery",
+  "candidate": "playback-views-worker",
+  "worker_operation": "delivery-",
+  "reference": "ffmpeg-playback-views-native",
+  "contract": [
+    "Compare delivered packets from advance with pop, advance_ready with pop, and a pump with a sink that retires each feed immediately.",
+    "Compare MOV packets in the demux view and the first video track of each Matroska startup and backward-seek capsule. Fold track, PTS, DTS, duration, flags, size and payload.",
+    "For the edited forward MOV cases also fold position, time base and encoded trim."
+  ],
+  "required_profiles": [
+    "fifo-regular-r-ctts-v1",
+    "fifo-regular-r-description-change",
+    "fifo-regular-r-edits-repeat",
+    "fifo-regular-r-end-co64",
+    "fifo-regular-r-front-stco",
+    "fifo-regular-unknown-movie-duration",
+    "fifo-regular-r-multiple-mdats",
+    "fifo-regular-r-multitrack",
+    "fifo-regular-r-negative-cts",
+    "fifo-regular-r-subtitle-tx3g",
+    "fifo-regular-f-ctts-v1",
+    "fifo-regular-f-description-change",
+    "fifo-regular-f-explicit",
+    "fifo-regular-f-multitrack",
+    "fifo-regular-f-no-second-tfdt",
+    "fifo-regular-encoded-avc-aac-front",
+    "fifo-regular-encoded-hevc-aac-front",
+    "fifo-regular-encoded-avc-aac-native-seek",
+    "fifo-regular-encoded-avc-aac-indexed-seek",
+    "fifo-regular-opaque-tail-terminal",
+    "fifo-regular-pending-terminal",
+    "fifo-regular-regular-terminal",
+    "fifo-regular-unknown-clock-terminal",
+    "fifo-progressive-pending-description",
+    "fifo-progressive-pending-pair",
+    "fifo-progressive-pending-reverse-ranges",
+    "fifo-progressive-pending-two-mdats",
+    "fifo-progressive-pending-unknown-clock",
+    "fifo-progressive-ten-sequential-batches",
+    "fifo-progressive-encoded-avc-aac-front",
+    "fifo-progressive-encoded-hevc-aac-front",
+    "fifo-progressive-f-ctts-v1",
+    "fifo-progressive-f-description-change",
+    "fifo-progressive-f-explicit",
+    "fifo-progressive-f-multitrack",
+    "fifo-progressive-f-no-second-tfdt",
+    "fifo-progressive-pending-terminal",
+    "fifo-progressive-unknown-clock-terminal",
+    "fifo-progressive-first-source-clock-unknown",
+    "fifo-progressive-aac-priming",
+    "fifo-progressive-aac-tail-trim",
+    "fifo-progressive-aac-fractional-edit",
+    "fifo-progressive-fragment-aac-edit",
+    "fifo-progressive-fragment-aac-late-track",
+    "fifo-progressive-fragment-aac-short",
+    "fifo-progressive-fragment-mp3-edit",
+    "fifo-progressive-leading-video-edit",
+    "fifo-progressive-leading-video-edit-trimmed",
+    "fifo-progressive-leading-video-edit-single-sync",
+    "fifo-progressive-leading-video-edit-rounded-end",
+    "fifo-progressive-leading-video-edit-overlapping-sync",
+    "fifo-startup-avc-eight-pictures",
+    "fifo-startup-avc-high-b",
+    "fifo-startup-avc-high-b0",
+    "fifo-startup-avc-high-b1",
+    "fifo-startup-avc-mixed",
+    "fifo-startup-avc-pgs-early-canvas",
+    "fifo-startup-avc-six-pictures",
+    "fifo-startup-hevc-b0",
+    "fifo-startup-hevc-b1",
+    "fifo-startup-hevc-b3",
+    "fifo-startup-hevc-mixed",
+    "fifo-startup-hevc-no-default-duration",
+    "fifo-startup-hevc-repeated-configuration",
+    "fifo-startup-hevc-vps-timed-no-default",
+    "fifo-seek-avc-seek-0-fresh",
+    "fifo-seek-avc-seek-0-eof",
+    "fifo-seek-avc-seek-700-fresh",
+    "fifo-seek-avc-seek-700-eof",
+    "fifo-seek-avc-seek-1420-fresh",
+    "fifo-seek-avc-seek-1420-eof",
+    "fifo-seek-avc-seek-2700-fresh",
+    "fifo-seek-avc-seek-2700-eof",
+    "fifo-seek-hevc-seek-0-fresh",
+    "fifo-seek-hevc-seek-0-eof",
+    "fifo-seek-hevc-seek-700-fresh",
+    "fifo-seek-hevc-seek-700-eof",
+    "fifo-seek-hevc-seek-1420-fresh",
+    "fifo-seek-hevc-seek-1420-eof",
+    "fifo-seek-hevc-seek-2700-fresh",
+    "fifo-seek-hevc-seek-2700-eof",
+    "fifo-seek-hevc-seek-no-default-0-fresh",
+    "fifo-seek-hevc-seek-no-default-0-eof",
+    "fifo-seek-hevc-seek-no-default-700-fresh",
+    "fifo-seek-hevc-seek-no-default-700-eof",
+    "fifo-seek-hevc-seek-no-default-1420-fresh",
+    "fifo-seek-hevc-seek-no-default-1420-eof",
+    "fifo-seek-hevc-seek-no-default-2700-fresh",
+    "fifo-seek-hevc-seek-no-default-2700-eof",
+    "fifo-seek-hevc-seek-no-cues-0-fresh",
+    "fifo-seek-hevc-seek-no-cues-0-eof",
+    "fifo-seek-hevc-seek-no-cues-700-fresh",
+    "fifo-seek-hevc-seek-no-cues-700-eof",
+    "fifo-seek-hevc-seek-no-cues-1420-fresh",
+    "fifo-seek-hevc-seek-no-cues-1420-eof",
+    "fifo-seek-hevc-seek-no-cues-2700-fresh",
+    "fifo-seek-hevc-seek-no-cues-2700-eof",
+    "ready-regular-r-ctts-v1",
+    "ready-regular-r-description-change",
+    "ready-regular-r-edits-repeat",
+    "ready-regular-r-end-co64",
+    "ready-regular-r-front-stco",
+    "ready-regular-unknown-movie-duration",
+    "ready-regular-r-multiple-mdats",
+    "ready-regular-r-multitrack",
+    "ready-regular-r-negative-cts",
+    "ready-regular-r-subtitle-tx3g",
+    "ready-regular-f-ctts-v1",
+    "ready-regular-f-description-change",
+    "ready-regular-f-explicit",
+    "ready-regular-f-multitrack",
+    "ready-regular-f-no-second-tfdt",
+    "ready-regular-encoded-avc-aac-front",
+    "ready-regular-encoded-hevc-aac-front",
+    "ready-regular-encoded-avc-aac-native-seek",
+    "ready-regular-encoded-avc-aac-indexed-seek",
+    "ready-regular-opaque-tail-terminal",
+    "ready-regular-pending-terminal",
+    "ready-regular-regular-terminal",
+    "ready-regular-unknown-clock-terminal",
+    "ready-progressive-pending-description",
+    "ready-progressive-pending-pair",
+    "ready-progressive-pending-reverse-ranges",
+    "ready-progressive-pending-two-mdats",
+    "ready-progressive-pending-unknown-clock",
+    "ready-progressive-ten-sequential-batches",
+    "ready-progressive-encoded-avc-aac-front",
+    "ready-progressive-encoded-hevc-aac-front",
+    "ready-progressive-f-ctts-v1",
+    "ready-progressive-f-description-change",
+    "ready-progressive-f-explicit",
+    "ready-progressive-f-multitrack",
+    "ready-progressive-f-no-second-tfdt",
+    "ready-progressive-pending-terminal",
+    "ready-progressive-unknown-clock-terminal",
+    "ready-progressive-first-source-clock-unknown",
+    "ready-progressive-aac-priming",
+    "ready-progressive-aac-tail-trim",
+    "ready-progressive-aac-fractional-edit",
+    "ready-progressive-fragment-aac-edit",
+    "ready-progressive-fragment-aac-late-track",
+    "ready-progressive-fragment-aac-short",
+    "ready-progressive-fragment-mp3-edit",
+    "ready-progressive-leading-video-edit",
+    "ready-progressive-leading-video-edit-trimmed",
+    "ready-progressive-leading-video-edit-single-sync",
+    "ready-progressive-leading-video-edit-rounded-end",
+    "ready-progressive-leading-video-edit-overlapping-sync",
+    "ready-startup-avc-eight-pictures",
+    "ready-startup-avc-high-b",
+    "ready-startup-avc-high-b0",
+    "ready-startup-avc-high-b1",
+    "ready-startup-avc-mixed",
+    "ready-startup-avc-pgs-early-canvas",
+    "ready-startup-avc-six-pictures",
+    "ready-startup-hevc-b0",
+    "ready-startup-hevc-b1",
+    "ready-startup-hevc-b3",
+    "ready-startup-hevc-mixed",
+    "ready-startup-hevc-no-default-duration",
+    "ready-startup-hevc-repeated-configuration",
+    "ready-startup-hevc-vps-timed-no-default",
+    "ready-seek-avc-seek-0-fresh",
+    "ready-seek-avc-seek-0-eof",
+    "ready-seek-avc-seek-700-fresh",
+    "ready-seek-avc-seek-700-eof",
+    "ready-seek-avc-seek-1420-fresh",
+    "ready-seek-avc-seek-1420-eof",
+    "ready-seek-avc-seek-2700-fresh",
+    "ready-seek-avc-seek-2700-eof",
+    "ready-seek-hevc-seek-0-fresh",
+    "ready-seek-hevc-seek-0-eof",
+    "ready-seek-hevc-seek-700-fresh",
+    "ready-seek-hevc-seek-700-eof",
+    "ready-seek-hevc-seek-1420-fresh",
+    "ready-seek-hevc-seek-1420-eof",
+    "ready-seek-hevc-seek-2700-fresh",
+    "ready-seek-hevc-seek-2700-eof",
+    "ready-seek-hevc-seek-no-default-0-fresh",
+    "ready-seek-hevc-seek-no-default-0-eof",
+    "ready-seek-hevc-seek-no-default-700-fresh",
+    "ready-seek-hevc-seek-no-default-700-eof",
+    "ready-seek-hevc-seek-no-default-1420-fresh",
+    "ready-seek-hevc-seek-no-default-1420-eof",
+    "ready-seek-hevc-seek-no-default-2700-fresh",
+    "ready-seek-hevc-seek-no-default-2700-eof",
+    "ready-seek-hevc-seek-no-cues-0-fresh",
+    "ready-seek-hevc-seek-no-cues-0-eof",
+    "ready-seek-hevc-seek-no-cues-700-fresh",
+    "ready-seek-hevc-seek-no-cues-700-eof",
+    "ready-seek-hevc-seek-no-cues-1420-fresh",
+    "ready-seek-hevc-seek-no-cues-1420-eof",
+    "ready-seek-hevc-seek-no-cues-2700-fresh",
+    "ready-seek-hevc-seek-no-cues-2700-eof",
+    "pump-regular-r-ctts-v1",
+    "pump-regular-r-description-change",
+    "pump-regular-r-edits-repeat",
+    "pump-regular-r-end-co64",
+    "pump-regular-r-front-stco",
+    "pump-regular-unknown-movie-duration",
+    "pump-regular-r-multiple-mdats",
+    "pump-regular-r-multitrack",
+    "pump-regular-r-negative-cts",
+    "pump-regular-r-subtitle-tx3g",
+    "pump-regular-f-ctts-v1",
+    "pump-regular-f-description-change",
+    "pump-regular-f-explicit",
+    "pump-regular-f-multitrack",
+    "pump-regular-f-no-second-tfdt",
+    "pump-regular-encoded-avc-aac-front",
+    "pump-regular-encoded-hevc-aac-front",
+    "pump-regular-encoded-avc-aac-native-seek",
+    "pump-regular-encoded-avc-aac-indexed-seek",
+    "pump-regular-opaque-tail-terminal",
+    "pump-regular-pending-terminal",
+    "pump-regular-regular-terminal",
+    "pump-regular-unknown-clock-terminal",
+    "pump-progressive-pending-description",
+    "pump-progressive-pending-pair",
+    "pump-progressive-pending-reverse-ranges",
+    "pump-progressive-pending-two-mdats",
+    "pump-progressive-pending-unknown-clock",
+    "pump-progressive-ten-sequential-batches",
+    "pump-progressive-encoded-avc-aac-front",
+    "pump-progressive-encoded-hevc-aac-front",
+    "pump-progressive-f-ctts-v1",
+    "pump-progressive-f-description-change",
+    "pump-progressive-f-explicit",
+    "pump-progressive-f-multitrack",
+    "pump-progressive-f-no-second-tfdt",
+    "pump-progressive-pending-terminal",
+    "pump-progressive-unknown-clock-terminal",
+    "pump-progressive-first-source-clock-unknown",
+    "pump-progressive-aac-priming",
+    "pump-progressive-aac-tail-trim",
+    "pump-progressive-aac-fractional-edit",
+    "pump-progressive-fragment-aac-edit",
+    "pump-progressive-fragment-aac-late-track",
+    "pump-progressive-fragment-aac-short",
+    "pump-progressive-fragment-mp3-edit",
+    "pump-progressive-leading-video-edit",
+    "pump-progressive-leading-video-edit-trimmed",
+    "pump-progressive-leading-video-edit-single-sync",
+    "pump-progressive-leading-video-edit-rounded-end",
+    "pump-progressive-leading-video-edit-overlapping-sync",
+    "pump-startup-avc-eight-pictures",
+    "pump-startup-avc-high-b",
+    "pump-startup-avc-high-b0",
+    "pump-startup-avc-high-b1",
+    "pump-startup-avc-mixed",
+    "pump-startup-avc-pgs-early-canvas",
+    "pump-startup-avc-six-pictures",
+    "pump-startup-hevc-b0",
+    "pump-startup-hevc-b1",
+    "pump-startup-hevc-b3",
+    "pump-startup-hevc-mixed",
+    "pump-startup-hevc-no-default-duration",
+    "pump-startup-hevc-repeated-configuration",
+    "pump-startup-hevc-vps-timed-no-default",
+    "pump-seek-avc-seek-0-fresh",
+    "pump-seek-avc-seek-0-eof",
+    "pump-seek-avc-seek-700-fresh",
+    "pump-seek-avc-seek-700-eof",
+    "pump-seek-avc-seek-1420-fresh",
+    "pump-seek-avc-seek-1420-eof",
+    "pump-seek-avc-seek-2700-fresh",
+    "pump-seek-avc-seek-2700-eof",
+    "pump-seek-hevc-seek-0-fresh",
+    "pump-seek-hevc-seek-0-eof",
+    "pump-seek-hevc-seek-700-fresh",
+    "pump-seek-hevc-seek-700-eof",
+    "pump-seek-hevc-seek-1420-fresh",
+    "pump-seek-hevc-seek-1420-eof",
+    "pump-seek-hevc-seek-2700-fresh",
+    "pump-seek-hevc-seek-2700-eof",
+    "pump-seek-hevc-seek-no-default-0-fresh",
+    "pump-seek-hevc-seek-no-default-0-eof",
+    "pump-seek-hevc-seek-no-default-700-fresh",
+    "pump-seek-hevc-seek-no-default-700-eof",
+    "pump-seek-hevc-seek-no-default-1420-fresh",
+    "pump-seek-hevc-seek-no-default-1420-eof",
+    "pump-seek-hevc-seek-no-default-2700-fresh",
+    "pump-seek-hevc-seek-no-default-2700-eof",
+    "pump-seek-hevc-seek-no-cues-0-fresh",
+    "pump-seek-hevc-seek-no-cues-0-eof",
+    "pump-seek-hevc-seek-no-cues-700-fresh",
+    "pump-seek-hevc-seek-no-cues-700-eof",
+    "pump-seek-hevc-seek-no-cues-1420-fresh",
+    "pump-seek-hevc-seek-no-cues-1420-eof",
+    "pump-seek-hevc-seek-no-cues-2700-fresh",
+    "pump-seek-hevc-seek-no-cues-2700-eof"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "fifo-regular-r-ctts-v1",
+        "fifo-regular-r-description-change",
+        "fifo-regular-r-edits-repeat",
+        "fifo-regular-r-end-co64",
+        "fifo-regular-r-front-stco",
+        "fifo-regular-unknown-movie-duration",
+        "fifo-regular-r-multiple-mdats",
+        "fifo-regular-r-multitrack",
+        "fifo-regular-r-negative-cts",
+        "fifo-regular-r-subtitle-tx3g",
+        "fifo-regular-f-ctts-v1",
+        "fifo-regular-f-description-change",
+        "fifo-regular-f-explicit",
+        "fifo-regular-f-multitrack",
+        "fifo-regular-f-no-second-tfdt",
+        "fifo-regular-encoded-avc-aac-front",
+        "fifo-regular-encoded-hevc-aac-front",
+        "fifo-regular-encoded-avc-aac-native-seek",
+        "fifo-regular-encoded-avc-aac-indexed-seek",
+        "fifo-regular-opaque-tail-terminal",
+        "fifo-regular-pending-terminal",
+        "fifo-regular-regular-terminal",
+        "fifo-regular-unknown-clock-terminal",
+        "fifo-progressive-pending-description",
+        "fifo-progressive-pending-pair",
+        "fifo-progressive-pending-reverse-ranges",
+        "fifo-progressive-pending-two-mdats",
+        "fifo-progressive-pending-unknown-clock",
+        "fifo-progressive-ten-sequential-batches",
+        "fifo-progressive-encoded-avc-aac-front",
+        "fifo-progressive-encoded-hevc-aac-front",
+        "fifo-progressive-f-ctts-v1",
+        "fifo-progressive-f-description-change",
+        "fifo-progressive-f-explicit",
+        "fifo-progressive-f-multitrack",
+        "fifo-progressive-f-no-second-tfdt",
+        "fifo-progressive-pending-terminal",
+        "fifo-progressive-unknown-clock-terminal",
+        "fifo-progressive-first-source-clock-unknown",
+        "fifo-progressive-aac-priming",
+        "fifo-progressive-aac-tail-trim",
+        "fifo-progressive-aac-fractional-edit",
+        "fifo-progressive-fragment-aac-edit",
+        "fifo-progressive-fragment-aac-late-track",
+        "fifo-progressive-fragment-aac-short",
+        "fifo-progressive-fragment-mp3-edit",
+        "fifo-progressive-leading-video-edit",
+        "fifo-progressive-leading-video-edit-trimmed",
+        "fifo-progressive-leading-video-edit-single-sync",
+        "fifo-progressive-leading-video-edit-rounded-end",
+        "fifo-progressive-leading-video-edit-overlapping-sync",
+        "fifo-startup-avc-eight-pictures",
+        "fifo-startup-avc-high-b",
+        "fifo-startup-avc-high-b0",
+        "fifo-startup-avc-high-b1",
+        "fifo-startup-avc-mixed",
+        "fifo-startup-avc-pgs-early-canvas",
+        "fifo-startup-avc-six-pictures",
+        "fifo-startup-hevc-b0",
+        "fifo-startup-hevc-b1",
+        "fifo-startup-hevc-b3",
+        "fifo-startup-hevc-mixed",
+        "fifo-startup-hevc-no-default-duration",
+        "fifo-startup-hevc-repeated-configuration",
+        "fifo-startup-hevc-vps-timed-no-default",
+        "fifo-seek-avc-seek-0-fresh",
+        "fifo-seek-avc-seek-0-eof",
+        "fifo-seek-avc-seek-700-fresh",
+        "fifo-seek-avc-seek-700-eof",
+        "fifo-seek-avc-seek-1420-fresh",
+        "fifo-seek-avc-seek-1420-eof",
+        "fifo-seek-avc-seek-2700-fresh",
+        "fifo-seek-avc-seek-2700-eof",
+        "fifo-seek-hevc-seek-0-fresh",
+        "fifo-seek-hevc-seek-0-eof",
+        "fifo-seek-hevc-seek-700-fresh",
+        "fifo-seek-hevc-seek-700-eof",
+        "fifo-seek-hevc-seek-1420-fresh",
+        "fifo-seek-hevc-seek-1420-eof",
+        "fifo-seek-hevc-seek-2700-fresh",
+        "fifo-seek-hevc-seek-2700-eof",
+        "fifo-seek-hevc-seek-no-default-0-fresh",
+        "fifo-seek-hevc-seek-no-default-0-eof",
+        "fifo-seek-hevc-seek-no-default-700-fresh",
+        "fifo-seek-hevc-seek-no-default-700-eof",
+        "fifo-seek-hevc-seek-no-default-1420-fresh",
+        "fifo-seek-hevc-seek-no-default-1420-eof",
+        "fifo-seek-hevc-seek-no-default-2700-fresh",
+        "fifo-seek-hevc-seek-no-default-2700-eof",
+        "fifo-seek-hevc-seek-no-cues-0-fresh",
+        "fifo-seek-hevc-seek-no-cues-0-eof",
+        "fifo-seek-hevc-seek-no-cues-700-fresh",
+        "fifo-seek-hevc-seek-no-cues-700-eof",
+        "fifo-seek-hevc-seek-no-cues-1420-fresh",
+        "fifo-seek-hevc-seek-no-cues-1420-eof",
+        "fifo-seek-hevc-seek-no-cues-2700-fresh",
+        "fifo-seek-hevc-seek-no-cues-2700-eof",
+        "ready-regular-r-ctts-v1",
+        "ready-regular-r-description-change",
+        "ready-regular-r-edits-repeat",
+        "ready-regular-r-end-co64",
+        "ready-regular-r-front-stco",
+        "ready-regular-unknown-movie-duration",
+        "ready-regular-r-multiple-mdats",
+        "ready-regular-r-multitrack",
+        "ready-regular-r-negative-cts",
+        "ready-regular-r-subtitle-tx3g",
+        "ready-regular-f-ctts-v1",
+        "ready-regular-f-description-change",
+        "ready-regular-f-explicit",
+        "ready-regular-f-multitrack",
+        "ready-regular-f-no-second-tfdt",
+        "ready-regular-encoded-avc-aac-front",
+        "ready-regular-encoded-hevc-aac-front",
+        "ready-regular-encoded-avc-aac-native-seek",
+        "ready-regular-encoded-avc-aac-indexed-seek",
+        "ready-regular-opaque-tail-terminal",
+        "ready-regular-pending-terminal",
+        "ready-regular-regular-terminal",
+        "ready-regular-unknown-clock-terminal",
+        "ready-progressive-pending-description",
+        "ready-progressive-pending-pair",
+        "ready-progressive-pending-reverse-ranges",
+        "ready-progressive-pending-two-mdats",
+        "ready-progressive-pending-unknown-clock",
+        "ready-progressive-ten-sequential-batches",
+        "ready-progressive-encoded-avc-aac-front",
+        "ready-progressive-encoded-hevc-aac-front",
+        "ready-progressive-f-ctts-v1",
+        "ready-progressive-f-description-change",
+        "ready-progressive-f-explicit",
+        "ready-progressive-f-multitrack",
+        "ready-progressive-f-no-second-tfdt",
+        "ready-progressive-pending-terminal",
+        "ready-progressive-unknown-clock-terminal",
+        "ready-progressive-first-source-clock-unknown",
+        "ready-progressive-aac-priming",
+        "ready-progressive-aac-tail-trim",
+        "ready-progressive-aac-fractional-edit",
+        "ready-progressive-fragment-aac-edit",
+        "ready-progressive-fragment-aac-late-track",
+        "ready-progressive-fragment-aac-short",
+        "ready-progressive-fragment-mp3-edit",
+        "ready-progressive-leading-video-edit",
+        "ready-progressive-leading-video-edit-trimmed",
+        "ready-progressive-leading-video-edit-single-sync",
+        "ready-progressive-leading-video-edit-rounded-end",
+        "ready-progressive-leading-video-edit-overlapping-sync",
+        "ready-startup-avc-eight-pictures",
+        "ready-startup-avc-high-b",
+        "ready-startup-avc-high-b0",
+        "ready-startup-avc-high-b1",
+        "ready-startup-avc-mixed",
+        "ready-startup-avc-pgs-early-canvas",
+        "ready-startup-avc-six-pictures",
+        "ready-startup-hevc-b0",
+        "ready-startup-hevc-b1",
+        "ready-startup-hevc-b3",
+        "ready-startup-hevc-mixed",
+        "ready-startup-hevc-no-default-duration",
+        "ready-startup-hevc-repeated-configuration",
+        "ready-startup-hevc-vps-timed-no-default",
+        "ready-seek-avc-seek-0-fresh",
+        "ready-seek-avc-seek-0-eof",
+        "ready-seek-avc-seek-700-fresh",
+        "ready-seek-avc-seek-700-eof",
+        "ready-seek-avc-seek-1420-fresh",
+        "ready-seek-avc-seek-1420-eof",
+        "ready-seek-avc-seek-2700-fresh",
+        "ready-seek-avc-seek-2700-eof",
+        "ready-seek-hevc-seek-0-fresh",
+        "ready-seek-hevc-seek-0-eof",
+        "ready-seek-hevc-seek-700-fresh",
+        "ready-seek-hevc-seek-700-eof",
+        "ready-seek-hevc-seek-1420-fresh",
+        "ready-seek-hevc-seek-1420-eof",
+        "ready-seek-hevc-seek-2700-fresh",
+        "ready-seek-hevc-seek-2700-eof",
+        "ready-seek-hevc-seek-no-default-0-fresh",
+        "ready-seek-hevc-seek-no-default-0-eof",
+        "ready-seek-hevc-seek-no-default-700-fresh",
+        "ready-seek-hevc-seek-no-default-700-eof",
+        "ready-seek-hevc-seek-no-default-1420-fresh",
+        "ready-seek-hevc-seek-no-default-1420-eof",
+        "ready-seek-hevc-seek-no-default-2700-fresh",
+        "ready-seek-hevc-seek-no-default-2700-eof",
+        "ready-seek-hevc-seek-no-cues-0-fresh",
+        "ready-seek-hevc-seek-no-cues-0-eof",
+        "ready-seek-hevc-seek-no-cues-700-fresh",
+        "ready-seek-hevc-seek-no-cues-700-eof",
+        "ready-seek-hevc-seek-no-cues-1420-fresh",
+        "ready-seek-hevc-seek-no-cues-1420-eof",
+        "ready-seek-hevc-seek-no-cues-2700-fresh",
+        "ready-seek-hevc-seek-no-cues-2700-eof",
+        "pump-regular-r-ctts-v1",
+        "pump-regular-r-description-change",
+        "pump-regular-r-edits-repeat",
+        "pump-regular-r-end-co64",
+        "pump-regular-r-front-stco",
+        "pump-regular-unknown-movie-duration",
+        "pump-regular-r-multiple-mdats",
+        "pump-regular-r-multitrack",
+        "pump-regular-r-negative-cts",
+        "pump-regular-r-subtitle-tx3g",
+        "pump-regular-f-ctts-v1",
+        "pump-regular-f-description-change",
+        "pump-regular-f-explicit",
+        "pump-regular-f-multitrack",
+        "pump-regular-f-no-second-tfdt",
+        "pump-regular-encoded-avc-aac-front",
+        "pump-regular-encoded-hevc-aac-front",
+        "pump-regular-encoded-avc-aac-native-seek",
+        "pump-regular-encoded-avc-aac-indexed-seek",
+        "pump-regular-opaque-tail-terminal",
+        "pump-regular-pending-terminal",
+        "pump-regular-regular-terminal",
+        "pump-regular-unknown-clock-terminal",
+        "pump-progressive-pending-description",
+        "pump-progressive-pending-pair",
+        "pump-progressive-pending-reverse-ranges",
+        "pump-progressive-pending-two-mdats",
+        "pump-progressive-pending-unknown-clock",
+        "pump-progressive-ten-sequential-batches",
+        "pump-progressive-encoded-avc-aac-front",
+        "pump-progressive-encoded-hevc-aac-front",
+        "pump-progressive-f-ctts-v1",
+        "pump-progressive-f-description-change",
+        "pump-progressive-f-explicit",
+        "pump-progressive-f-multitrack",
+        "pump-progressive-f-no-second-tfdt",
+        "pump-progressive-pending-terminal",
+        "pump-progressive-unknown-clock-terminal",
+        "pump-progressive-first-source-clock-unknown",
+        "pump-progressive-aac-priming",
+        "pump-progressive-aac-tail-trim",
+        "pump-progressive-aac-fractional-edit",
+        "pump-progressive-fragment-aac-edit",
+        "pump-progressive-fragment-aac-late-track",
+        "pump-progressive-fragment-aac-short",
+        "pump-progressive-fragment-mp3-edit",
+        "pump-progressive-leading-video-edit",
+        "pump-progressive-leading-video-edit-trimmed",
+        "pump-progressive-leading-video-edit-single-sync",
+        "pump-progressive-leading-video-edit-rounded-end",
+        "pump-progressive-leading-video-edit-overlapping-sync",
+        "pump-startup-avc-eight-pictures",
+        "pump-startup-avc-high-b",
+        "pump-startup-avc-high-b0",
+        "pump-startup-avc-high-b1",
+        "pump-startup-avc-mixed",
+        "pump-startup-avc-pgs-early-canvas",
+        "pump-startup-avc-six-pictures",
+        "pump-startup-hevc-b0",
+        "pump-startup-hevc-b1",
+        "pump-startup-hevc-b3",
+        "pump-startup-hevc-mixed",
+        "pump-startup-hevc-no-default-duration",
+        "pump-startup-hevc-repeated-configuration",
+        "pump-startup-hevc-vps-timed-no-default",
+        "pump-seek-avc-seek-0-fresh",
+        "pump-seek-avc-seek-0-eof",
+        "pump-seek-avc-seek-700-fresh",
+        "pump-seek-avc-seek-700-eof",
+        "pump-seek-avc-seek-1420-fresh",
+        "pump-seek-avc-seek-1420-eof",
+        "pump-seek-avc-seek-2700-fresh",
+        "pump-seek-avc-seek-2700-eof",
+        "pump-seek-hevc-seek-0-fresh",
+        "pump-seek-hevc-seek-0-eof",
+        "pump-seek-hevc-seek-700-fresh",
+        "pump-seek-hevc-seek-700-eof",
+        "pump-seek-hevc-seek-1420-fresh",
+        "pump-seek-hevc-seek-1420-eof",
+        "pump-seek-hevc-seek-2700-fresh",
+        "pump-seek-hevc-seek-2700-eof",
+        "pump-seek-hevc-seek-no-default-0-fresh",
+        "pump-seek-hevc-seek-no-default-0-eof",
+        "pump-seek-hevc-seek-no-default-700-fresh",
+        "pump-seek-hevc-seek-no-default-700-eof",
+        "pump-seek-hevc-seek-no-default-1420-fresh",
+        "pump-seek-hevc-seek-no-default-1420-eof",
+        "pump-seek-hevc-seek-no-default-2700-fresh",
+        "pump-seek-hevc-seek-no-default-2700-eof",
+        "pump-seek-hevc-seek-no-cues-0-fresh",
+        "pump-seek-hevc-seek-no-cues-0-eof",
+        "pump-seek-hevc-seek-no-cues-700-fresh",
+        "pump-seek-hevc-seek-no-cues-700-eof",
+        "pump-seek-hevc-seek-no-cues-1420-fresh",
+        "pump-seek-hevc-seek-no-cues-1420-eof",
+        "pump-seek-hevc-seek-no-cues-2700-fresh",
+        "pump-seek-hevc-seek-no-cues-2700-eof"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "fifo-regular-r-ctts-v1",
+        "fifo-regular-r-description-change",
+        "fifo-regular-r-edits-repeat",
+        "fifo-regular-r-end-co64",
+        "fifo-regular-r-front-stco",
+        "fifo-regular-unknown-movie-duration",
+        "fifo-regular-r-multiple-mdats",
+        "fifo-regular-r-multitrack",
+        "fifo-regular-r-negative-cts",
+        "fifo-regular-r-subtitle-tx3g",
+        "fifo-regular-f-ctts-v1",
+        "fifo-regular-f-description-change",
+        "fifo-regular-f-explicit",
+        "fifo-regular-f-multitrack",
+        "fifo-regular-f-no-second-tfdt",
+        "fifo-regular-encoded-avc-aac-front",
+        "fifo-regular-encoded-hevc-aac-front",
+        "fifo-regular-encoded-avc-aac-native-seek",
+        "fifo-regular-encoded-avc-aac-indexed-seek",
+        "fifo-regular-opaque-tail-terminal",
+        "fifo-regular-pending-terminal",
+        "fifo-regular-regular-terminal",
+        "fifo-regular-unknown-clock-terminal",
+        "fifo-progressive-pending-description",
+        "fifo-progressive-pending-pair",
+        "fifo-progressive-pending-reverse-ranges",
+        "fifo-progressive-pending-two-mdats",
+        "fifo-progressive-pending-unknown-clock",
+        "fifo-progressive-ten-sequential-batches",
+        "fifo-progressive-encoded-avc-aac-front",
+        "fifo-progressive-encoded-hevc-aac-front",
+        "fifo-progressive-f-ctts-v1",
+        "fifo-progressive-f-description-change",
+        "fifo-progressive-f-explicit",
+        "fifo-progressive-f-multitrack",
+        "fifo-progressive-f-no-second-tfdt",
+        "fifo-progressive-pending-terminal",
+        "fifo-progressive-unknown-clock-terminal",
+        "fifo-progressive-first-source-clock-unknown",
+        "fifo-progressive-aac-priming",
+        "fifo-progressive-aac-tail-trim",
+        "fifo-progressive-aac-fractional-edit",
+        "fifo-progressive-fragment-aac-edit",
+        "fifo-progressive-fragment-aac-late-track",
+        "fifo-progressive-fragment-aac-short",
+        "fifo-progressive-fragment-mp3-edit",
+        "fifo-progressive-leading-video-edit",
+        "fifo-progressive-leading-video-edit-trimmed",
+        "fifo-progressive-leading-video-edit-single-sync",
+        "fifo-progressive-leading-video-edit-rounded-end",
+        "fifo-progressive-leading-video-edit-overlapping-sync",
+        "fifo-startup-avc-eight-pictures",
+        "fifo-startup-avc-high-b",
+        "fifo-startup-avc-high-b0",
+        "fifo-startup-avc-high-b1",
+        "fifo-startup-avc-mixed",
+        "fifo-startup-avc-pgs-early-canvas",
+        "fifo-startup-avc-six-pictures",
+        "fifo-startup-hevc-b0",
+        "fifo-startup-hevc-b1",
+        "fifo-startup-hevc-b3",
+        "fifo-startup-hevc-mixed",
+        "fifo-startup-hevc-no-default-duration",
+        "fifo-startup-hevc-repeated-configuration",
+        "fifo-startup-hevc-vps-timed-no-default",
+        "fifo-seek-avc-seek-0-fresh",
+        "fifo-seek-avc-seek-0-eof",
+        "fifo-seek-avc-seek-700-fresh",
+        "fifo-seek-avc-seek-700-eof",
+        "fifo-seek-avc-seek-1420-fresh",
+        "fifo-seek-avc-seek-1420-eof",
+        "fifo-seek-avc-seek-2700-fresh",
+        "fifo-seek-avc-seek-2700-eof",
+        "fifo-seek-hevc-seek-0-fresh",
+        "fifo-seek-hevc-seek-0-eof",
+        "fifo-seek-hevc-seek-700-fresh",
+        "fifo-seek-hevc-seek-700-eof",
+        "fifo-seek-hevc-seek-1420-fresh",
+        "fifo-seek-hevc-seek-1420-eof",
+        "fifo-seek-hevc-seek-2700-fresh",
+        "fifo-seek-hevc-seek-2700-eof",
+        "fifo-seek-hevc-seek-no-default-0-fresh",
+        "fifo-seek-hevc-seek-no-default-0-eof",
+        "fifo-seek-hevc-seek-no-default-700-fresh",
+        "fifo-seek-hevc-seek-no-default-700-eof",
+        "fifo-seek-hevc-seek-no-default-1420-fresh",
+        "fifo-seek-hevc-seek-no-default-1420-eof",
+        "fifo-seek-hevc-seek-no-default-2700-fresh",
+        "fifo-seek-hevc-seek-no-default-2700-eof",
+        "fifo-seek-hevc-seek-no-cues-0-fresh",
+        "fifo-seek-hevc-seek-no-cues-0-eof",
+        "fifo-seek-hevc-seek-no-cues-700-fresh",
+        "fifo-seek-hevc-seek-no-cues-700-eof",
+        "fifo-seek-hevc-seek-no-cues-1420-fresh",
+        "fifo-seek-hevc-seek-no-cues-1420-eof",
+        "fifo-seek-hevc-seek-no-cues-2700-fresh",
+        "fifo-seek-hevc-seek-no-cues-2700-eof",
+        "ready-regular-r-ctts-v1",
+        "ready-regular-r-description-change",
+        "ready-regular-r-edits-repeat",
+        "ready-regular-r-end-co64",
+        "ready-regular-r-front-stco",
+        "ready-regular-unknown-movie-duration",
+        "ready-regular-r-multiple-mdats",
+        "ready-regular-r-multitrack",
+        "ready-regular-r-negative-cts",
+        "ready-regular-r-subtitle-tx3g",
+        "ready-regular-f-ctts-v1",
+        "ready-regular-f-description-change",
+        "ready-regular-f-explicit",
+        "ready-regular-f-multitrack",
+        "ready-regular-f-no-second-tfdt",
+        "ready-regular-encoded-avc-aac-front",
+        "ready-regular-encoded-hevc-aac-front",
+        "ready-regular-encoded-avc-aac-native-seek",
+        "ready-regular-encoded-avc-aac-indexed-seek",
+        "ready-regular-opaque-tail-terminal",
+        "ready-regular-pending-terminal",
+        "ready-regular-regular-terminal",
+        "ready-regular-unknown-clock-terminal",
+        "ready-progressive-pending-description",
+        "ready-progressive-pending-pair",
+        "ready-progressive-pending-reverse-ranges",
+        "ready-progressive-pending-two-mdats",
+        "ready-progressive-pending-unknown-clock",
+        "ready-progressive-ten-sequential-batches",
+        "ready-progressive-encoded-avc-aac-front",
+        "ready-progressive-encoded-hevc-aac-front",
+        "ready-progressive-f-ctts-v1",
+        "ready-progressive-f-description-change",
+        "ready-progressive-f-explicit",
+        "ready-progressive-f-multitrack",
+        "ready-progressive-f-no-second-tfdt",
+        "ready-progressive-pending-terminal",
+        "ready-progressive-unknown-clock-terminal",
+        "ready-progressive-first-source-clock-unknown",
+        "ready-progressive-aac-priming",
+        "ready-progressive-aac-tail-trim",
+        "ready-progressive-aac-fractional-edit",
+        "ready-progressive-fragment-aac-edit",
+        "ready-progressive-fragment-aac-late-track",
+        "ready-progressive-fragment-aac-short",
+        "ready-progressive-fragment-mp3-edit",
+        "ready-progressive-leading-video-edit",
+        "ready-progressive-leading-video-edit-trimmed",
+        "ready-progressive-leading-video-edit-single-sync",
+        "ready-progressive-leading-video-edit-rounded-end",
+        "ready-progressive-leading-video-edit-overlapping-sync",
+        "ready-startup-avc-eight-pictures",
+        "ready-startup-avc-high-b",
+        "ready-startup-avc-high-b0",
+        "ready-startup-avc-high-b1",
+        "ready-startup-avc-mixed",
+        "ready-startup-avc-pgs-early-canvas",
+        "ready-startup-avc-six-pictures",
+        "ready-startup-hevc-b0",
+        "ready-startup-hevc-b1",
+        "ready-startup-hevc-b3",
+        "ready-startup-hevc-mixed",
+        "ready-startup-hevc-no-default-duration",
+        "ready-startup-hevc-repeated-configuration",
+        "ready-startup-hevc-vps-timed-no-default",
+        "ready-seek-avc-seek-0-fresh",
+        "ready-seek-avc-seek-0-eof",
+        "ready-seek-avc-seek-700-fresh",
+        "ready-seek-avc-seek-700-eof",
+        "ready-seek-avc-seek-1420-fresh",
+        "ready-seek-avc-seek-1420-eof",
+        "ready-seek-avc-seek-2700-fresh",
+        "ready-seek-avc-seek-2700-eof",
+        "ready-seek-hevc-seek-0-fresh",
+        "ready-seek-hevc-seek-0-eof",
+        "ready-seek-hevc-seek-700-fresh",
+        "ready-seek-hevc-seek-700-eof",
+        "ready-seek-hevc-seek-1420-fresh",
+        "ready-seek-hevc-seek-1420-eof",
+        "ready-seek-hevc-seek-2700-fresh",
+        "ready-seek-hevc-seek-2700-eof",
+        "ready-seek-hevc-seek-no-default-0-fresh",
+        "ready-seek-hevc-seek-no-default-0-eof",
+        "ready-seek-hevc-seek-no-default-700-fresh",
+        "ready-seek-hevc-seek-no-default-700-eof",
+        "ready-seek-hevc-seek-no-default-1420-fresh",
+        "ready-seek-hevc-seek-no-default-1420-eof",
+        "ready-seek-hevc-seek-no-default-2700-fresh",
+        "ready-seek-hevc-seek-no-default-2700-eof",
+        "ready-seek-hevc-seek-no-cues-0-fresh",
+        "ready-seek-hevc-seek-no-cues-0-eof",
+        "ready-seek-hevc-seek-no-cues-700-fresh",
+        "ready-seek-hevc-seek-no-cues-700-eof",
+        "ready-seek-hevc-seek-no-cues-1420-fresh",
+        "ready-seek-hevc-seek-no-cues-1420-eof",
+        "ready-seek-hevc-seek-no-cues-2700-fresh",
+        "ready-seek-hevc-seek-no-cues-2700-eof",
+        "pump-regular-r-ctts-v1",
+        "pump-regular-r-description-change",
+        "pump-regular-r-edits-repeat",
+        "pump-regular-r-end-co64",
+        "pump-regular-r-front-stco",
+        "pump-regular-unknown-movie-duration",
+        "pump-regular-r-multiple-mdats",
+        "pump-regular-r-multitrack",
+        "pump-regular-r-negative-cts",
+        "pump-regular-r-subtitle-tx3g",
+        "pump-regular-f-ctts-v1",
+        "pump-regular-f-description-change",
+        "pump-regular-f-explicit",
+        "pump-regular-f-multitrack",
+        "pump-regular-f-no-second-tfdt",
+        "pump-regular-encoded-avc-aac-front",
+        "pump-regular-encoded-hevc-aac-front",
+        "pump-regular-encoded-avc-aac-native-seek",
+        "pump-regular-encoded-avc-aac-indexed-seek",
+        "pump-regular-opaque-tail-terminal",
+        "pump-regular-pending-terminal",
+        "pump-regular-regular-terminal",
+        "pump-regular-unknown-clock-terminal",
+        "pump-progressive-pending-description",
+        "pump-progressive-pending-pair",
+        "pump-progressive-pending-reverse-ranges",
+        "pump-progressive-pending-two-mdats",
+        "pump-progressive-pending-unknown-clock",
+        "pump-progressive-ten-sequential-batches",
+        "pump-progressive-encoded-avc-aac-front",
+        "pump-progressive-encoded-hevc-aac-front",
+        "pump-progressive-f-ctts-v1",
+        "pump-progressive-f-description-change",
+        "pump-progressive-f-explicit",
+        "pump-progressive-f-multitrack",
+        "pump-progressive-f-no-second-tfdt",
+        "pump-progressive-pending-terminal",
+        "pump-progressive-unknown-clock-terminal",
+        "pump-progressive-first-source-clock-unknown",
+        "pump-progressive-aac-priming",
+        "pump-progressive-aac-tail-trim",
+        "pump-progressive-aac-fractional-edit",
+        "pump-progressive-fragment-aac-edit",
+        "pump-progressive-fragment-aac-late-track",
+        "pump-progressive-fragment-aac-short",
+        "pump-progressive-fragment-mp3-edit",
+        "pump-progressive-leading-video-edit",
+        "pump-progressive-leading-video-edit-trimmed",
+        "pump-progressive-leading-video-edit-single-sync",
+        "pump-progressive-leading-video-edit-rounded-end",
+        "pump-progressive-leading-video-edit-overlapping-sync",
+        "pump-startup-avc-eight-pictures",
+        "pump-startup-avc-high-b",
+        "pump-startup-avc-high-b0",
+        "pump-startup-avc-high-b1",
+        "pump-startup-avc-mixed",
+        "pump-startup-avc-pgs-early-canvas",
+        "pump-startup-avc-six-pictures",
+        "pump-startup-hevc-b0",
+        "pump-startup-hevc-b1",
+        "pump-startup-hevc-b3",
+        "pump-startup-hevc-mixed",
+        "pump-startup-hevc-no-default-duration",
+        "pump-startup-hevc-repeated-configuration",
+        "pump-startup-hevc-vps-timed-no-default",
+        "pump-seek-avc-seek-0-fresh",
+        "pump-seek-avc-seek-0-eof",
+        "pump-seek-avc-seek-700-fresh",
+        "pump-seek-avc-seek-700-eof",
+        "pump-seek-avc-seek-1420-fresh",
+        "pump-seek-avc-seek-1420-eof",
+        "pump-seek-avc-seek-2700-fresh",
+        "pump-seek-avc-seek-2700-eof",
+        "pump-seek-hevc-seek-0-fresh",
+        "pump-seek-hevc-seek-0-eof",
+        "pump-seek-hevc-seek-700-fresh",
+        "pump-seek-hevc-seek-700-eof",
+        "pump-seek-hevc-seek-1420-fresh",
+        "pump-seek-hevc-seek-1420-eof",
+        "pump-seek-hevc-seek-2700-fresh",
+        "pump-seek-hevc-seek-2700-eof",
+        "pump-seek-hevc-seek-no-default-0-fresh",
+        "pump-seek-hevc-seek-no-default-0-eof",
+        "pump-seek-hevc-seek-no-default-700-fresh",
+        "pump-seek-hevc-seek-no-default-700-eof",
+        "pump-seek-hevc-seek-no-default-1420-fresh",
+        "pump-seek-hevc-seek-no-default-1420-eof",
+        "pump-seek-hevc-seek-no-default-2700-fresh",
+        "pump-seek-hevc-seek-no-default-2700-eof",
+        "pump-seek-hevc-seek-no-cues-0-fresh",
+        "pump-seek-hevc-seek-no-cues-0-eof",
+        "pump-seek-hevc-seek-no-cues-700-fresh",
+        "pump-seek-hevc-seek-no-cues-700-eof",
+        "pump-seek-hevc-seek-no-cues-1420-fresh",
+        "pump-seek-hevc-seek-no-cues-1420-eof",
+        "pump-seek-hevc-seek-no-cues-2700-fresh",
+        "pump-seek-hevc-seek-no-cues-2700-eof"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "fifo-regular-r-ctts-v1",
+        "fifo-regular-r-description-change",
+        "fifo-regular-r-edits-repeat",
+        "fifo-regular-r-end-co64",
+        "fifo-regular-r-front-stco",
+        "fifo-regular-unknown-movie-duration",
+        "fifo-regular-r-multiple-mdats",
+        "fifo-regular-r-multitrack",
+        "fifo-regular-r-negative-cts",
+        "fifo-regular-r-subtitle-tx3g",
+        "fifo-regular-f-ctts-v1",
+        "fifo-regular-f-description-change",
+        "fifo-regular-f-explicit",
+        "fifo-regular-f-multitrack",
+        "fifo-regular-f-no-second-tfdt",
+        "fifo-regular-encoded-avc-aac-front",
+        "fifo-regular-encoded-hevc-aac-front",
+        "fifo-regular-encoded-avc-aac-native-seek",
+        "fifo-regular-encoded-avc-aac-indexed-seek",
+        "fifo-regular-opaque-tail-terminal",
+        "fifo-regular-pending-terminal",
+        "fifo-regular-regular-terminal",
+        "fifo-regular-unknown-clock-terminal",
+        "fifo-progressive-pending-description",
+        "fifo-progressive-pending-pair",
+        "fifo-progressive-pending-reverse-ranges",
+        "fifo-progressive-pending-two-mdats",
+        "fifo-progressive-pending-unknown-clock",
+        "fifo-progressive-ten-sequential-batches",
+        "fifo-progressive-encoded-avc-aac-front",
+        "fifo-progressive-encoded-hevc-aac-front",
+        "fifo-progressive-f-ctts-v1",
+        "fifo-progressive-f-description-change",
+        "fifo-progressive-f-explicit",
+        "fifo-progressive-f-multitrack",
+        "fifo-progressive-f-no-second-tfdt",
+        "fifo-progressive-pending-terminal",
+        "fifo-progressive-unknown-clock-terminal",
+        "fifo-progressive-first-source-clock-unknown",
+        "fifo-progressive-aac-priming",
+        "fifo-progressive-aac-tail-trim",
+        "fifo-progressive-aac-fractional-edit",
+        "fifo-progressive-fragment-aac-edit",
+        "fifo-progressive-fragment-aac-late-track",
+        "fifo-progressive-fragment-aac-short",
+        "fifo-progressive-fragment-mp3-edit",
+        "fifo-progressive-leading-video-edit",
+        "fifo-progressive-leading-video-edit-trimmed",
+        "fifo-progressive-leading-video-edit-single-sync",
+        "fifo-progressive-leading-video-edit-rounded-end",
+        "fifo-progressive-leading-video-edit-overlapping-sync",
+        "fifo-startup-avc-eight-pictures",
+        "fifo-startup-avc-high-b",
+        "fifo-startup-avc-high-b0",
+        "fifo-startup-avc-high-b1",
+        "fifo-startup-avc-mixed",
+        "fifo-startup-avc-pgs-early-canvas",
+        "fifo-startup-avc-six-pictures",
+        "fifo-startup-hevc-b0",
+        "fifo-startup-hevc-b1",
+        "fifo-startup-hevc-b3",
+        "fifo-startup-hevc-mixed",
+        "fifo-startup-hevc-no-default-duration",
+        "fifo-startup-hevc-repeated-configuration",
+        "fifo-startup-hevc-vps-timed-no-default",
+        "fifo-seek-avc-seek-0-fresh",
+        "fifo-seek-avc-seek-0-eof",
+        "fifo-seek-avc-seek-700-fresh",
+        "fifo-seek-avc-seek-700-eof",
+        "fifo-seek-avc-seek-1420-fresh",
+        "fifo-seek-avc-seek-1420-eof",
+        "fifo-seek-avc-seek-2700-fresh",
+        "fifo-seek-avc-seek-2700-eof",
+        "fifo-seek-hevc-seek-0-fresh",
+        "fifo-seek-hevc-seek-0-eof",
+        "fifo-seek-hevc-seek-700-fresh",
+        "fifo-seek-hevc-seek-700-eof",
+        "fifo-seek-hevc-seek-1420-fresh",
+        "fifo-seek-hevc-seek-1420-eof",
+        "fifo-seek-hevc-seek-2700-fresh",
+        "fifo-seek-hevc-seek-2700-eof",
+        "fifo-seek-hevc-seek-no-default-0-fresh",
+        "fifo-seek-hevc-seek-no-default-0-eof",
+        "fifo-seek-hevc-seek-no-default-700-fresh",
+        "fifo-seek-hevc-seek-no-default-700-eof",
+        "fifo-seek-hevc-seek-no-default-1420-fresh",
+        "fifo-seek-hevc-seek-no-default-1420-eof",
+        "fifo-seek-hevc-seek-no-default-2700-fresh",
+        "fifo-seek-hevc-seek-no-default-2700-eof",
+        "fifo-seek-hevc-seek-no-cues-0-fresh",
+        "fifo-seek-hevc-seek-no-cues-0-eof",
+        "fifo-seek-hevc-seek-no-cues-700-fresh",
+        "fifo-seek-hevc-seek-no-cues-700-eof",
+        "fifo-seek-hevc-seek-no-cues-1420-fresh",
+        "fifo-seek-hevc-seek-no-cues-1420-eof",
+        "fifo-seek-hevc-seek-no-cues-2700-fresh",
+        "fifo-seek-hevc-seek-no-cues-2700-eof",
+        "ready-regular-r-ctts-v1",
+        "ready-regular-r-description-change",
+        "ready-regular-r-edits-repeat",
+        "ready-regular-r-end-co64",
+        "ready-regular-r-front-stco",
+        "ready-regular-unknown-movie-duration",
+        "ready-regular-r-multiple-mdats",
+        "ready-regular-r-multitrack",
+        "ready-regular-r-negative-cts",
+        "ready-regular-r-subtitle-tx3g",
+        "ready-regular-f-ctts-v1",
+        "ready-regular-f-description-change",
+        "ready-regular-f-explicit",
+        "ready-regular-f-multitrack",
+        "ready-regular-f-no-second-tfdt",
+        "ready-regular-encoded-avc-aac-front",
+        "ready-regular-encoded-hevc-aac-front",
+        "ready-regular-encoded-avc-aac-native-seek",
+        "ready-regular-encoded-avc-aac-indexed-seek",
+        "ready-regular-opaque-tail-terminal",
+        "ready-regular-pending-terminal",
+        "ready-regular-regular-terminal",
+        "ready-regular-unknown-clock-terminal",
+        "ready-progressive-pending-description",
+        "ready-progressive-pending-pair",
+        "ready-progressive-pending-reverse-ranges",
+        "ready-progressive-pending-two-mdats",
+        "ready-progressive-pending-unknown-clock",
+        "ready-progressive-ten-sequential-batches",
+        "ready-progressive-encoded-avc-aac-front",
+        "ready-progressive-encoded-hevc-aac-front",
+        "ready-progressive-f-ctts-v1",
+        "ready-progressive-f-description-change",
+        "ready-progressive-f-explicit",
+        "ready-progressive-f-multitrack",
+        "ready-progressive-f-no-second-tfdt",
+        "ready-progressive-pending-terminal",
+        "ready-progressive-unknown-clock-terminal",
+        "ready-progressive-first-source-clock-unknown",
+        "ready-progressive-aac-priming",
+        "ready-progressive-aac-tail-trim",
+        "ready-progressive-aac-fractional-edit",
+        "ready-progressive-fragment-aac-edit",
+        "ready-progressive-fragment-aac-late-track",
+        "ready-progressive-fragment-aac-short",
+        "ready-progressive-fragment-mp3-edit",
+        "ready-progressive-leading-video-edit",
+        "ready-progressive-leading-video-edit-trimmed",
+        "ready-progressive-leading-video-edit-single-sync",
+        "ready-progressive-leading-video-edit-rounded-end",
+        "ready-progressive-leading-video-edit-overlapping-sync",
+        "ready-startup-avc-eight-pictures",
+        "ready-startup-avc-high-b",
+        "ready-startup-avc-high-b0",
+        "ready-startup-avc-high-b1",
+        "ready-startup-avc-mixed",
+        "ready-startup-avc-pgs-early-canvas",
+        "ready-startup-avc-six-pictures",
+        "ready-startup-hevc-b0",
+        "ready-startup-hevc-b1",
+        "ready-startup-hevc-b3",
+        "ready-startup-hevc-mixed",
+        "ready-startup-hevc-no-default-duration",
+        "ready-startup-hevc-repeated-configuration",
+        "ready-startup-hevc-vps-timed-no-default",
+        "ready-seek-avc-seek-0-fresh",
+        "ready-seek-avc-seek-0-eof",
+        "ready-seek-avc-seek-700-fresh",
+        "ready-seek-avc-seek-700-eof",
+        "ready-seek-avc-seek-1420-fresh",
+        "ready-seek-avc-seek-1420-eof",
+        "ready-seek-avc-seek-2700-fresh",
+        "ready-seek-avc-seek-2700-eof",
+        "ready-seek-hevc-seek-0-fresh",
+        "ready-seek-hevc-seek-0-eof",
+        "ready-seek-hevc-seek-700-fresh",
+        "ready-seek-hevc-seek-700-eof",
+        "ready-seek-hevc-seek-1420-fresh",
+        "ready-seek-hevc-seek-1420-eof",
+        "ready-seek-hevc-seek-2700-fresh",
+        "ready-seek-hevc-seek-2700-eof",
+        "ready-seek-hevc-seek-no-default-0-fresh",
+        "ready-seek-hevc-seek-no-default-0-eof",
+        "ready-seek-hevc-seek-no-default-700-fresh",
+        "ready-seek-hevc-seek-no-default-700-eof",
+        "ready-seek-hevc-seek-no-default-1420-fresh",
+        "ready-seek-hevc-seek-no-default-1420-eof",
+        "ready-seek-hevc-seek-no-default-2700-fresh",
+        "ready-seek-hevc-seek-no-default-2700-eof",
+        "ready-seek-hevc-seek-no-cues-0-fresh",
+        "ready-seek-hevc-seek-no-cues-0-eof",
+        "ready-seek-hevc-seek-no-cues-700-fresh",
+        "ready-seek-hevc-seek-no-cues-700-eof",
+        "ready-seek-hevc-seek-no-cues-1420-fresh",
+        "ready-seek-hevc-seek-no-cues-1420-eof",
+        "ready-seek-hevc-seek-no-cues-2700-fresh",
+        "ready-seek-hevc-seek-no-cues-2700-eof",
+        "pump-regular-r-ctts-v1",
+        "pump-regular-r-description-change",
+        "pump-regular-r-edits-repeat",
+        "pump-regular-r-end-co64",
+        "pump-regular-r-front-stco",
+        "pump-regular-unknown-movie-duration",
+        "pump-regular-r-multiple-mdats",
+        "pump-regular-r-multitrack",
+        "pump-regular-r-negative-cts",
+        "pump-regular-r-subtitle-tx3g",
+        "pump-regular-f-ctts-v1",
+        "pump-regular-f-description-change",
+        "pump-regular-f-explicit",
+        "pump-regular-f-multitrack",
+        "pump-regular-f-no-second-tfdt",
+        "pump-regular-encoded-avc-aac-front",
+        "pump-regular-encoded-hevc-aac-front",
+        "pump-regular-encoded-avc-aac-native-seek",
+        "pump-regular-encoded-avc-aac-indexed-seek",
+        "pump-regular-opaque-tail-terminal",
+        "pump-regular-pending-terminal",
+        "pump-regular-regular-terminal",
+        "pump-regular-unknown-clock-terminal",
+        "pump-progressive-pending-description",
+        "pump-progressive-pending-pair",
+        "pump-progressive-pending-reverse-ranges",
+        "pump-progressive-pending-two-mdats",
+        "pump-progressive-pending-unknown-clock",
+        "pump-progressive-ten-sequential-batches",
+        "pump-progressive-encoded-avc-aac-front",
+        "pump-progressive-encoded-hevc-aac-front",
+        "pump-progressive-f-ctts-v1",
+        "pump-progressive-f-description-change",
+        "pump-progressive-f-explicit",
+        "pump-progressive-f-multitrack",
+        "pump-progressive-f-no-second-tfdt",
+        "pump-progressive-pending-terminal",
+        "pump-progressive-unknown-clock-terminal",
+        "pump-progressive-first-source-clock-unknown",
+        "pump-progressive-aac-priming",
+        "pump-progressive-aac-tail-trim",
+        "pump-progressive-aac-fractional-edit",
+        "pump-progressive-fragment-aac-edit",
+        "pump-progressive-fragment-aac-late-track",
+        "pump-progressive-fragment-aac-short",
+        "pump-progressive-fragment-mp3-edit",
+        "pump-progressive-leading-video-edit",
+        "pump-progressive-leading-video-edit-trimmed",
+        "pump-progressive-leading-video-edit-single-sync",
+        "pump-progressive-leading-video-edit-rounded-end",
+        "pump-progressive-leading-video-edit-overlapping-sync",
+        "pump-startup-avc-eight-pictures",
+        "pump-startup-avc-high-b",
+        "pump-startup-avc-high-b0",
+        "pump-startup-avc-high-b1",
+        "pump-startup-avc-mixed",
+        "pump-startup-avc-pgs-early-canvas",
+        "pump-startup-avc-six-pictures",
+        "pump-startup-hevc-b0",
+        "pump-startup-hevc-b1",
+        "pump-startup-hevc-b3",
+        "pump-startup-hevc-mixed",
+        "pump-startup-hevc-no-default-duration",
+        "pump-startup-hevc-repeated-configuration",
+        "pump-startup-hevc-vps-timed-no-default",
+        "pump-seek-avc-seek-0-fresh",
+        "pump-seek-avc-seek-0-eof",
+        "pump-seek-avc-seek-700-fresh",
+        "pump-seek-avc-seek-700-eof",
+        "pump-seek-avc-seek-1420-fresh",
+        "pump-seek-avc-seek-1420-eof",
+        "pump-seek-avc-seek-2700-fresh",
+        "pump-seek-avc-seek-2700-eof",
+        "pump-seek-hevc-seek-0-fresh",
+        "pump-seek-hevc-seek-0-eof",
+        "pump-seek-hevc-seek-700-fresh",
+        "pump-seek-hevc-seek-700-eof",
+        "pump-seek-hevc-seek-1420-fresh",
+        "pump-seek-hevc-seek-1420-eof",
+        "pump-seek-hevc-seek-2700-fresh",
+        "pump-seek-hevc-seek-2700-eof",
+        "pump-seek-hevc-seek-no-default-0-fresh",
+        "pump-seek-hevc-seek-no-default-0-eof",
+        "pump-seek-hevc-seek-no-default-700-fresh",
+        "pump-seek-hevc-seek-no-default-700-eof",
+        "pump-seek-hevc-seek-no-default-1420-fresh",
+        "pump-seek-hevc-seek-no-default-1420-eof",
+        "pump-seek-hevc-seek-no-default-2700-fresh",
+        "pump-seek-hevc-seek-no-default-2700-eof",
+        "pump-seek-hevc-seek-no-cues-0-fresh",
+        "pump-seek-hevc-seek-no-cues-0-eof",
+        "pump-seek-hevc-seek-no-cues-700-fresh",
+        "pump-seek-hevc-seek-no-cues-700-eof",
+        "pump-seek-hevc-seek-no-cues-1420-fresh",
+        "pump-seek-hevc-seek-no-cues-1420-eof",
+        "pump-seek-hevc-seek-no-cues-2700-fresh",
+        "pump-seek-hevc-seek-no-cues-2700-eof"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    }
+  ],
+  "pending_module_requirements": [
+    "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+    "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek."
+  ],
+  "open_cases": [
+    {
+      "id": "fifo-startup-avc-high-b",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-startup-avc-high-b0",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-startup-avc-high-b1",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-startup-avc-pgs-early-canvas",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-startup-hevc-b0",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-startup-hevc-b1",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-startup-hevc-b3",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-startup-hevc-mixed",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-startup-hevc-no-default-duration",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-startup-hevc-repeated-configuration",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-startup-hevc-vps-timed-no-default",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-avc-seek-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-avc-seek-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-startup-avc-high-b",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-startup-avc-high-b0",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-startup-avc-high-b1",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-startup-avc-pgs-early-canvas",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-startup-hevc-b0",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-startup-hevc-b1",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-startup-hevc-b3",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-startup-hevc-mixed",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-startup-hevc-no-default-duration",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-startup-hevc-repeated-configuration",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-startup-hevc-vps-timed-no-default",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-avc-seek-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-avc-seek-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-startup-avc-high-b",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-startup-avc-high-b0",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-startup-avc-high-b1",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-startup-avc-pgs-early-canvas",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-startup-hevc-b0",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-startup-hevc-b1",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-startup-hevc-b3",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-startup-hevc-mixed",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-startup-hevc-no-default-duration",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-startup-hevc-repeated-configuration",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-startup-hevc-vps-timed-no-default",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-avc-seek-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-avc-seek-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-0-fresh",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-0-eof",
+      "requirement": "Read Matroska Block times and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. Compare the source nanoseconds and absent DTS with FFmpeg's millisecond-based duration or demux-supplied DTS.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-avc-seek-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-avc-seek-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-avc-seek-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-avc-seek-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-avc-seek-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-avc-seek-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-default-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fifo-seek-hevc-seek-no-cues-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-avc-seek-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-avc-seek-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-avc-seek-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-avc-seek-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-avc-seek-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-avc-seek-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-default-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ready-seek-hevc-seek-no-cues-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-avc-seek-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-avc-seek-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-avc-seek-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-avc-seek-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-avc-seek-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-avc-seek-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-default-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-1420-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-1420-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-2700-fresh",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "pump-seek-hevc-seek-no-cues-2700-eof",
+      "requirement": "Compare Matroska CuePoint and Cluster landing under RFC 9559 sections 5.1.3, 5.1.5 and 22. The player retains video preroll before the first packet returned by the FFmpeg demux seek.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ]
+}

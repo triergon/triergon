@@ -1,0 +1,861 @@
+{
+  "schema": 1,
+  "id": "playback-mp4-seek",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "playback-mp4-seek",
+  "candidate": "playback-views-worker",
+  "worker_operation": "mp4-seek-",
+  "reference": "ffmpeg-playback-views-native",
+  "contract": [
+    "Read the first packet before each backward seek and compare the landed video position and complete packet suffix.",
+    "Source sync seeks use sample composition time and demux seeks use the projected video clock. The reference seeks backward in the public MOV demux clock.",
+    "Compare track, PTS, DTS, duration, flags, size, payload, position, time base and encoded trim. Preserve every original range case, including start-up and Opus roll recovery.",
+    "For range playback compare the presentation duration in microseconds. Release seek checkpoints before the checkpoint control and compare the resulting seek.",
+    "Preload input outside the measurement window."
+  ],
+  "required_profiles": [
+    "regular-open",
+    "regular-seek",
+    "demux-regular-seek",
+    "variable-open",
+    "variable-seek",
+    "demux-variable-seek",
+    "fragmented-open",
+    "fragmented-before-sync",
+    "demux-fragmented-before-sync",
+    "fragmented-seek",
+    "demux-fragmented-seek",
+    "fragmented-rescaled-open",
+    "fragmented-rescaled-seek",
+    "demux-fragmented-rescaled-seek",
+    "dvh1-open",
+    "dvh1-seek",
+    "dvhe-open",
+    "dvhe-seek",
+    "dav1-open",
+    "dav1-seek",
+    "demux-dav1-seek",
+    "opus-open",
+    "opus-seek",
+    "demux-opus-seek",
+    "opus-seek-edit-boundary",
+    "demux-opus-seek-edit-boundary",
+    "opus-trim-end",
+    "opus-trim-rescaled",
+    "opus-crop-open",
+    "opus-crop-seek",
+    "demux-opus-crop-seek",
+    "opus-recovery-start",
+    "opus-recovery-seek",
+    "opus-recovery-edit-boundary",
+    "opus-recovery-long-roll",
+    "opus-recovery-composition-offset",
+    "quicktime-aac-open",
+    "quicktime-aac-seek",
+    "demux-quicktime-aac-seek",
+    "quicktime-aac-minimal-wave-open",
+    "quicktime-aac-minimal-wave-seek",
+    "demux-quicktime-aac-minimal-wave-seek",
+    "quicktime-aac-reordered-open",
+    "quicktime-aac-reordered-seek",
+    "demux-quicktime-aac-reordered-seek",
+    "quicktime-aac-fragmented-open",
+    "quicktime-aac-fragmented-seek",
+    "quicktime-aac-7-1-open",
+    "quicktime-aac-7-1-seek",
+    "demux-quicktime-aac-7-1-seek",
+    "rtp-hints-open",
+    "rtp-hints-seek",
+    "demux-rtp-hints-seek",
+    "aac-program-open",
+    "aac-program-seek",
+    "demux-aac-program-seek",
+    "fragmented-subtitles-open",
+    "fragmented-subtitles-seek-start",
+    "fragmented-subtitles-seek-during-cue",
+    "fragmented-subtitles-seek-after-cue",
+    "fragmented-subtitle-edit-open",
+    "fragmented-subtitle-edit-seek-start",
+    "demux-fragmented-subtitle-edit-seek-start",
+    "fragmented-subtitle-edit-seek-during-cue",
+    "demux-fragmented-subtitle-edit-seek-during-cue",
+    "fragmented-subtitle-edit-seek-after-cue",
+    "demux-fragmented-subtitle-edit-seek-after-cue",
+    "leading-video-edit-open",
+    "leading-video-edit-seek",
+    "demux-leading-video-edit-seek",
+    "leading-video-edit-seek-before-sync",
+    "demux-leading-video-edit-seek-before-sync",
+    "leading-video-edit-seek-at-sync",
+    "demux-leading-video-edit-seek-at-sync",
+    "leading-video-edit-trimmed-open",
+    "leading-video-edit-trimmed-seek",
+    "demux-leading-video-edit-trimmed-seek",
+    "unrepresentable-video-edit-audio-only",
+    "signed-video-edit-endpoint-audio-only",
+    "leading-video-edit-short-reordered",
+    "leading-video-edit-overlapping-sync-open",
+    "leading-video-edit-overlapping-sync-seek",
+    "demux-leading-video-edit-overlapping-sync-seek",
+    "fate-non-sync-prefix-open",
+    "fate-non-sync-prefix-seek",
+    "demux-fate-non-sync-prefix-seek",
+    "fate-shorter-track-open",
+    "fate-shorter-track-seek",
+    "demux-fate-shorter-track-seek",
+    "native-r-multitrack",
+    "native-f-multitrack",
+    "native-r-edits-repeat",
+    "native-r-description-change",
+    "native-encoded-avc-aac-native-seek",
+    "source-fragment-before-sync",
+    "source-fragment-at-sync",
+    "demux-fragment-leading-edit",
+    "movie-repeat-edit",
+    "movie-leading-empty-edit",
+    "movie-mapped-edit",
+    "checkpoint-discard"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "regular-open",
+        "regular-seek",
+        "demux-regular-seek",
+        "variable-open",
+        "variable-seek",
+        "demux-variable-seek",
+        "fragmented-open",
+        "fragmented-before-sync",
+        "demux-fragmented-before-sync",
+        "fragmented-seek",
+        "demux-fragmented-seek",
+        "fragmented-rescaled-open",
+        "fragmented-rescaled-seek",
+        "demux-fragmented-rescaled-seek",
+        "dvh1-open",
+        "dvh1-seek",
+        "dvhe-open",
+        "dvhe-seek",
+        "dav1-open",
+        "dav1-seek",
+        "demux-dav1-seek",
+        "opus-open",
+        "opus-seek",
+        "demux-opus-seek",
+        "opus-seek-edit-boundary",
+        "demux-opus-seek-edit-boundary",
+        "opus-trim-end",
+        "opus-trim-rescaled",
+        "opus-crop-open",
+        "opus-crop-seek",
+        "demux-opus-crop-seek",
+        "opus-recovery-start",
+        "opus-recovery-seek",
+        "opus-recovery-edit-boundary",
+        "opus-recovery-long-roll",
+        "opus-recovery-composition-offset",
+        "quicktime-aac-open",
+        "quicktime-aac-seek",
+        "demux-quicktime-aac-seek",
+        "quicktime-aac-minimal-wave-open",
+        "quicktime-aac-minimal-wave-seek",
+        "demux-quicktime-aac-minimal-wave-seek",
+        "quicktime-aac-reordered-open",
+        "quicktime-aac-reordered-seek",
+        "demux-quicktime-aac-reordered-seek",
+        "quicktime-aac-fragmented-open",
+        "quicktime-aac-fragmented-seek",
+        "quicktime-aac-7-1-open",
+        "quicktime-aac-7-1-seek",
+        "demux-quicktime-aac-7-1-seek",
+        "rtp-hints-open",
+        "rtp-hints-seek",
+        "demux-rtp-hints-seek",
+        "aac-program-open",
+        "aac-program-seek",
+        "demux-aac-program-seek",
+        "fragmented-subtitles-open",
+        "fragmented-subtitles-seek-start",
+        "fragmented-subtitles-seek-during-cue",
+        "fragmented-subtitles-seek-after-cue",
+        "fragmented-subtitle-edit-open",
+        "fragmented-subtitle-edit-seek-start",
+        "demux-fragmented-subtitle-edit-seek-start",
+        "fragmented-subtitle-edit-seek-during-cue",
+        "demux-fragmented-subtitle-edit-seek-during-cue",
+        "fragmented-subtitle-edit-seek-after-cue",
+        "demux-fragmented-subtitle-edit-seek-after-cue",
+        "leading-video-edit-open",
+        "leading-video-edit-seek",
+        "demux-leading-video-edit-seek",
+        "leading-video-edit-seek-before-sync",
+        "demux-leading-video-edit-seek-before-sync",
+        "leading-video-edit-seek-at-sync",
+        "demux-leading-video-edit-seek-at-sync",
+        "leading-video-edit-trimmed-open",
+        "leading-video-edit-trimmed-seek",
+        "demux-leading-video-edit-trimmed-seek",
+        "unrepresentable-video-edit-audio-only",
+        "signed-video-edit-endpoint-audio-only",
+        "leading-video-edit-short-reordered",
+        "leading-video-edit-overlapping-sync-open",
+        "leading-video-edit-overlapping-sync-seek",
+        "demux-leading-video-edit-overlapping-sync-seek",
+        "fate-non-sync-prefix-open",
+        "fate-non-sync-prefix-seek",
+        "demux-fate-non-sync-prefix-seek",
+        "fate-shorter-track-open",
+        "fate-shorter-track-seek",
+        "demux-fate-shorter-track-seek",
+        "native-r-multitrack",
+        "native-f-multitrack",
+        "native-r-edits-repeat",
+        "native-r-description-change",
+        "native-encoded-avc-aac-native-seek",
+        "source-fragment-before-sync",
+        "source-fragment-at-sync",
+        "demux-fragment-leading-edit",
+        "movie-repeat-edit",
+        "movie-leading-empty-edit",
+        "movie-mapped-edit",
+        "checkpoint-discard"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "regular-open",
+        "regular-seek",
+        "demux-regular-seek",
+        "variable-open",
+        "variable-seek",
+        "demux-variable-seek",
+        "fragmented-open",
+        "fragmented-before-sync",
+        "demux-fragmented-before-sync",
+        "fragmented-seek",
+        "demux-fragmented-seek",
+        "fragmented-rescaled-open",
+        "fragmented-rescaled-seek",
+        "demux-fragmented-rescaled-seek",
+        "dvh1-open",
+        "dvh1-seek",
+        "dvhe-open",
+        "dvhe-seek",
+        "dav1-open",
+        "dav1-seek",
+        "demux-dav1-seek",
+        "opus-open",
+        "opus-seek",
+        "demux-opus-seek",
+        "opus-seek-edit-boundary",
+        "demux-opus-seek-edit-boundary",
+        "opus-trim-end",
+        "opus-trim-rescaled",
+        "opus-crop-open",
+        "opus-crop-seek",
+        "demux-opus-crop-seek",
+        "opus-recovery-start",
+        "opus-recovery-seek",
+        "opus-recovery-edit-boundary",
+        "opus-recovery-long-roll",
+        "opus-recovery-composition-offset",
+        "quicktime-aac-open",
+        "quicktime-aac-seek",
+        "demux-quicktime-aac-seek",
+        "quicktime-aac-minimal-wave-open",
+        "quicktime-aac-minimal-wave-seek",
+        "demux-quicktime-aac-minimal-wave-seek",
+        "quicktime-aac-reordered-open",
+        "quicktime-aac-reordered-seek",
+        "demux-quicktime-aac-reordered-seek",
+        "quicktime-aac-fragmented-open",
+        "quicktime-aac-fragmented-seek",
+        "quicktime-aac-7-1-open",
+        "quicktime-aac-7-1-seek",
+        "demux-quicktime-aac-7-1-seek",
+        "rtp-hints-open",
+        "rtp-hints-seek",
+        "demux-rtp-hints-seek",
+        "aac-program-open",
+        "aac-program-seek",
+        "demux-aac-program-seek",
+        "fragmented-subtitles-open",
+        "fragmented-subtitles-seek-start",
+        "fragmented-subtitles-seek-during-cue",
+        "fragmented-subtitles-seek-after-cue",
+        "fragmented-subtitle-edit-open",
+        "fragmented-subtitle-edit-seek-start",
+        "demux-fragmented-subtitle-edit-seek-start",
+        "fragmented-subtitle-edit-seek-during-cue",
+        "demux-fragmented-subtitle-edit-seek-during-cue",
+        "fragmented-subtitle-edit-seek-after-cue",
+        "demux-fragmented-subtitle-edit-seek-after-cue",
+        "leading-video-edit-open",
+        "leading-video-edit-seek",
+        "demux-leading-video-edit-seek",
+        "leading-video-edit-seek-before-sync",
+        "demux-leading-video-edit-seek-before-sync",
+        "leading-video-edit-seek-at-sync",
+        "demux-leading-video-edit-seek-at-sync",
+        "leading-video-edit-trimmed-open",
+        "leading-video-edit-trimmed-seek",
+        "demux-leading-video-edit-trimmed-seek",
+        "unrepresentable-video-edit-audio-only",
+        "signed-video-edit-endpoint-audio-only",
+        "leading-video-edit-short-reordered",
+        "leading-video-edit-overlapping-sync-open",
+        "leading-video-edit-overlapping-sync-seek",
+        "demux-leading-video-edit-overlapping-sync-seek",
+        "fate-non-sync-prefix-open",
+        "fate-non-sync-prefix-seek",
+        "demux-fate-non-sync-prefix-seek",
+        "fate-shorter-track-open",
+        "fate-shorter-track-seek",
+        "demux-fate-shorter-track-seek",
+        "native-r-multitrack",
+        "native-f-multitrack",
+        "native-r-edits-repeat",
+        "native-r-description-change",
+        "native-encoded-avc-aac-native-seek",
+        "source-fragment-before-sync",
+        "source-fragment-at-sync",
+        "demux-fragment-leading-edit",
+        "movie-repeat-edit",
+        "movie-leading-empty-edit",
+        "movie-mapped-edit",
+        "checkpoint-discard"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "regular-open",
+        "regular-seek",
+        "demux-regular-seek",
+        "variable-open",
+        "variable-seek",
+        "demux-variable-seek",
+        "fragmented-open",
+        "fragmented-before-sync",
+        "demux-fragmented-before-sync",
+        "fragmented-seek",
+        "demux-fragmented-seek",
+        "fragmented-rescaled-open",
+        "fragmented-rescaled-seek",
+        "demux-fragmented-rescaled-seek",
+        "dvh1-open",
+        "dvh1-seek",
+        "dvhe-open",
+        "dvhe-seek",
+        "dav1-open",
+        "dav1-seek",
+        "demux-dav1-seek",
+        "opus-open",
+        "opus-seek",
+        "demux-opus-seek",
+        "opus-seek-edit-boundary",
+        "demux-opus-seek-edit-boundary",
+        "opus-trim-end",
+        "opus-trim-rescaled",
+        "opus-crop-open",
+        "opus-crop-seek",
+        "demux-opus-crop-seek",
+        "opus-recovery-start",
+        "opus-recovery-seek",
+        "opus-recovery-edit-boundary",
+        "opus-recovery-long-roll",
+        "opus-recovery-composition-offset",
+        "quicktime-aac-open",
+        "quicktime-aac-seek",
+        "demux-quicktime-aac-seek",
+        "quicktime-aac-minimal-wave-open",
+        "quicktime-aac-minimal-wave-seek",
+        "demux-quicktime-aac-minimal-wave-seek",
+        "quicktime-aac-reordered-open",
+        "quicktime-aac-reordered-seek",
+        "demux-quicktime-aac-reordered-seek",
+        "quicktime-aac-fragmented-open",
+        "quicktime-aac-fragmented-seek",
+        "quicktime-aac-7-1-open",
+        "quicktime-aac-7-1-seek",
+        "demux-quicktime-aac-7-1-seek",
+        "rtp-hints-open",
+        "rtp-hints-seek",
+        "demux-rtp-hints-seek",
+        "aac-program-open",
+        "aac-program-seek",
+        "demux-aac-program-seek",
+        "fragmented-subtitles-open",
+        "fragmented-subtitles-seek-start",
+        "fragmented-subtitles-seek-during-cue",
+        "fragmented-subtitles-seek-after-cue",
+        "fragmented-subtitle-edit-open",
+        "fragmented-subtitle-edit-seek-start",
+        "demux-fragmented-subtitle-edit-seek-start",
+        "fragmented-subtitle-edit-seek-during-cue",
+        "demux-fragmented-subtitle-edit-seek-during-cue",
+        "fragmented-subtitle-edit-seek-after-cue",
+        "demux-fragmented-subtitle-edit-seek-after-cue",
+        "leading-video-edit-open",
+        "leading-video-edit-seek",
+        "demux-leading-video-edit-seek",
+        "leading-video-edit-seek-before-sync",
+        "demux-leading-video-edit-seek-before-sync",
+        "leading-video-edit-seek-at-sync",
+        "demux-leading-video-edit-seek-at-sync",
+        "leading-video-edit-trimmed-open",
+        "leading-video-edit-trimmed-seek",
+        "demux-leading-video-edit-trimmed-seek",
+        "unrepresentable-video-edit-audio-only",
+        "signed-video-edit-endpoint-audio-only",
+        "leading-video-edit-short-reordered",
+        "leading-video-edit-overlapping-sync-open",
+        "leading-video-edit-overlapping-sync-seek",
+        "demux-leading-video-edit-overlapping-sync-seek",
+        "fate-non-sync-prefix-open",
+        "fate-non-sync-prefix-seek",
+        "demux-fate-non-sync-prefix-seek",
+        "fate-shorter-track-open",
+        "fate-shorter-track-seek",
+        "demux-fate-shorter-track-seek",
+        "native-r-multitrack",
+        "native-f-multitrack",
+        "native-r-edits-repeat",
+        "native-r-description-change",
+        "native-encoded-avc-aac-native-seek",
+        "source-fragment-before-sync",
+        "source-fragment-at-sync",
+        "demux-fragment-leading-edit",
+        "movie-repeat-edit",
+        "movie-leading-empty-edit",
+        "movie-mapped-edit",
+        "checkpoint-discard"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    }
+  ],
+  "pending_module_requirements": [
+    "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+    "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+    "Check source sync signalling against demux flags under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The AV1 sample extents and clocks match, while the reference marks a packet disposable.",
+    "Check MOV edit-list and track admission under ISO/IEC 14496-12 sections 8.3 and 8.6. The candidate rejects a plan or seek which the public MOV demuxer accepts.",
+    "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+    "Check the first eligible sync sample under ISO/IEC 14496-12 section 8.6.2. The source seek refuses with no preceding sync in the target configuration while the reference emits packets.",
+    "Verify the empty edit under ISO/IEC 14496-12 section 8.6.6. The movie seek reports an empty mapping and emits no packets, while FFmpeg's demux seek falls back to media.",
+    "Check the movie-to-media edit mapping under ISO/IEC 14496-12 section 8.6.6. Movie seek applies the mapped request and replays source state, while FFmpeg starts a demux packet suffix."
+  ],
+  "open_cases": [
+    {
+      "id": "regular-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "variable-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-before-sync",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-rescaled-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "opus-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "opus-seek-edit-boundary",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "opus-crop-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "quicktime-aac-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "quicktime-aac-minimal-wave-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "quicktime-aac-reordered-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "quicktime-aac-fragmented-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "quicktime-aac-7-1-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "rtp-hints-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "aac-program-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-subtitles-seek-start",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-subtitles-seek-during-cue",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-subtitle-edit-seek-start",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-subtitle-edit-seek-during-cue",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "leading-video-edit-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "leading-video-edit-seek-before-sync",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "leading-video-edit-seek-at-sync",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "leading-video-edit-trimmed-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "leading-video-edit-overlapping-sync-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fate-shorter-track-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "native-r-multitrack",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "native-f-multitrack",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "native-encoded-avc-aac-native-seek",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-fragment-before-sync",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "source-fragment-at-sync",
+      "requirement": "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-open",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-rescaled-open",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "opus-trim-end",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "opus-trim-rescaled",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "opus-crop-open",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-subtitles-seek-after-cue",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-subtitle-edit-open",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fragmented-subtitle-edit-seek-after-cue",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "unrepresentable-video-edit-audio-only",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "signed-video-edit-endpoint-audio-only",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "leading-video-edit-short-reordered",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fate-non-sync-prefix-open",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fate-shorter-track-open",
+      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "dav1-seek",
+      "requirement": "Check source sync signalling against demux flags under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The AV1 sample extents and clocks match, while the reference marks a packet disposable.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "demux-dav1-seek",
+      "requirement": "Check MOV edit-list and track admission under ISO/IEC 14496-12 sections 8.3 and 8.6. The candidate rejects a plan or seek which the public MOV demuxer accepts.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "demux-rtp-hints-seek",
+      "requirement": "Check MOV edit-list and track admission under ISO/IEC 14496-12 sections 8.3 and 8.6. The candidate rejects a plan or seek which the public MOV demuxer accepts.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "demux-opus-seek",
+      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "demux-opus-seek-edit-boundary",
+      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "demux-opus-crop-seek",
+      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "demux-quicktime-aac-seek",
+      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "demux-quicktime-aac-minimal-wave-seek",
+      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "demux-aac-program-seek",
+      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "demux-leading-video-edit-overlapping-sync-seek",
+      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "demux-fate-shorter-track-seek",
+      "requirement": "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "fate-non-sync-prefix-seek",
+      "requirement": "Check the first eligible sync sample under ISO/IEC 14496-12 section 8.6.2. The source seek refuses with no preceding sync in the target configuration while the reference emits packets.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "movie-leading-empty-edit",
+      "requirement": "Verify the empty edit under ISO/IEC 14496-12 section 8.6.6. The movie seek reports an empty mapping and emits no packets, while FFmpeg's demux seek falls back to media.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "movie-mapped-edit",
+      "requirement": "Check the movie-to-media edit mapping under ISO/IEC 14496-12 section 8.6.6. Movie seek applies the mapped request and replays source state, while FFmpeg starts a demux packet suffix.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ]
+}

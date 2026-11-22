@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "id": "playback-catalogue-replacement",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "playback-catalogue-replacement",
+  "candidate": "playback-views-worker",
+  "worker_operation": "catalogue-",
+  "reference": "ffmpeg-playback-views-native",
+  "contract": [
+    "Preload both inputs. Compare the first N packets of the old catalogue, a boundary record, and all packets of the new catalogue.",
+    "Exercise explicit prepare then commit and the combined replacement call. The reference opens the second demuxer after reading the first N packets."
+  ],
+  "required_profiles": [
+    "prepare-r-multitrack",
+    "replace-f-multitrack",
+    "replace-encoded-avc-aac-front"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "prepare-r-multitrack",
+        "replace-f-multitrack",
+        "replace-encoded-avc-aac-front"
+      ],
+      "cause": "The reference opens a second demuxer while the player commits a prepared catalogue."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "prepare-r-multitrack",
+        "replace-f-multitrack",
+        "replace-encoded-avc-aac-front"
+      ],
+      "cause": "The reference opens a second demuxer while the player commits a prepared catalogue."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "prepare-r-multitrack",
+        "replace-f-multitrack",
+        "replace-encoded-avc-aac-front"
+      ],
+      "cause": "The reference opens a second demuxer while the player commits a prepared catalogue."
+    }
+  ]
+}

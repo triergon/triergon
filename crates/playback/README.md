@@ -209,6 +209,9 @@ media request starts at the command's `start_offset()`.
 When the movie header's duration is unknown or exceeds the presentation clock,
 range playback finds the latest packet end while checking projections. It scans
 in merged order when the seek restarts could reach their count or storage limit.
+`Mp4RangePlayer::duration_us` reports the presentation duration in microseconds.
+`discard_seek_checkpoints` releases optional restart state and reports whether it
+released any. The player can still plan a seek from the sample tables.
 Fragmented files support an open-ended rate-one media edit. Forward playback
 applies it from the front movie, including tracks first seen in later fragments. A
 leading empty subtitle edit delays the subtitle packet clocks. When video
@@ -285,6 +288,21 @@ pinned separately.
 The MP4 range comparison includes two upstream samples, one with an initial
 non-sync AVC prefix and one with tracks shorter than the declared movie.
 It checks startup and backward seek through EOF for both.
+
+The [player seek comparison](../../harness/features/playback-mp4-seek/contract.json)
+checks video landing positions and packet suffixes for source-clock, demux-clock,
+movie-time and progressive seeks. It includes the full range playback corpus and
+a seek after releasing checkpoints. The
+[catalogue comparison](../../harness/features/playback-catalogue-replacement/contract.json)
+checks the packet prefix and suffix around an explicit source replacement.
+The [delivery comparison](../../harness/features/playback-delivery/contract.json)
+checks the packets returned by the FIFO and sink paths. The
+[track selection comparison](../../harness/features/playback-track-selection/contract.json)
+covers MP4, Matroska and MPEG-TS and includes an audio switch during a seek.
+The [MOV index comparison](../../harness/features/playback-mov-index/contract.json)
+includes every geometry from the terminal-media matrix. The
+[TS opener comparison](../../harness/features/playback-ts-open/contract.json)
+checks demux PES from independent segments, explicit private audio and finite startup.
 
 Fixture provenance: [MP4](tests/fixtures/mp4/README.md),
 [AV1](tests/fixtures/av1/README.md),

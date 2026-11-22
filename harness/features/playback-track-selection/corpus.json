@@ -1,0 +1,154 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "mkv-selected-video",
+      "profile": "mkv-selected-video",
+      "file": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska",
+        "video=1"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 4806,
+        "digest": 6913200193987984265
+      }
+    },
+    {
+      "id": "mkv-video-and-audio",
+      "profile": "mkv-video-and-audio",
+      "file": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska",
+        "video=1,audio=2"
+      ],
+      "expected": {
+        "packets": 57,
+        "bytes": 8874,
+        "digest": 8661506969625446522
+      }
+    },
+    {
+      "id": "mkv-reordered-video",
+      "profile": "mkv-reordered-video",
+      "file": "crates/playback/tests/fixtures/mkv-feed/avc-reordered-discovery.mkv",
+      "sha256": "4ad06aff1285ddae3f1e4684220a6666a83d150111c37951fd4c6c46efb256bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska",
+        "video=1"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1871,
+        "digest": 17454669043508806917
+      }
+    },
+    {
+      "id": "mkv-switch-audio",
+      "profile": "mkv-switch-audio",
+      "file": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "matroska",
+        "video=1,audio=2",
+        "20",
+        "1",
+        "600",
+        "video=1,audio=3"
+      ],
+      "expected": {
+        "packets": 47,
+        "bytes": 8043,
+        "digest": 14356535813224844551
+      }
+    },
+    {
+      "id": "mp4-selected-video",
+      "profile": "mp4-selected-video",
+      "file": ".research/mp4-range-fixtures/regular-avc-aac.mp4",
+      "sha256": "7f2f92cb0e7a97920828fc9f79daeec2471a58d990572305d7aa08c30fb512fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "video=1"
+      ],
+      "expected": {
+        "packets": 49,
+        "bytes": 48961,
+        "digest": 9862809373735154234
+      }
+    },
+    {
+      "id": "mp4-selected-audio",
+      "profile": "mp4-selected-audio",
+      "file": ".research/mp4-range-fixtures/fragmented-avc-aac.mp4",
+      "sha256": "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "audio=2"
+      ],
+      "expected": {
+        "packets": 62,
+        "bytes": 15652,
+        "digest": 9040201106846934279
+      }
+    },
+    {
+      "id": "mp4-selected-subtitle",
+      "profile": "mp4-selected-subtitle",
+      "file": "crates/playback/tests/fixtures/mp4/fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "video=1,subtitle=4"
+      ],
+      "expected": {
+        "packets": 37,
+        "bytes": 46172,
+        "digest": 17244039992287110025
+      }
+    },
+    {
+      "id": "ts-selected-video",
+      "profile": "ts-selected-video",
+      "file": "crates/playback/tests/fixtures/hls/media-00.ts",
+      "sha256": "3409e83a9dfae77c7e61e87046575e1c240ed8aeea921245faae19152d576dcc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "video=256"
+      ],
+      "expected": {
+        "packets": 61,
+        "bytes": 3192,
+        "digest": 4789047872115163936
+      }
+    },
+    {
+      "id": "ts-selected-audio",
+      "profile": "ts-selected-audio",
+      "file": "crates/playback/tests/fixtures/hls/media-01.ts",
+      "sha256": "336689426fbc79013f8b12bbdfedb15a1e65a9c1b5cab9bc1606993caa650212",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ts188",
+        "audio=257"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 8892,
+        "digest": 15881103611432416112
+      }
+    }
+  ]
+}

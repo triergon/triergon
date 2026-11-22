@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "id": "playback-track-selection",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "playback-track-selection",
+  "candidate": "playback-views-worker",
+  "worker_operation": "select-",
+  "reference": "ffmpeg-playback-views-native",
+  "contract": [
+    "Select at most one video, audio and subtitle track by container track ID. Fold only delivered packets.",
+    "In the reference set the discard policy on unselected streams. The switch case reads a packet prefix, seeks backward on video and selects the other audio track."
+  ],
+  "required_profiles": [
+    "mkv-selected-video",
+    "mkv-video-and-audio",
+    "mkv-reordered-video",
+    "mkv-switch-audio",
+    "mp4-selected-video",
+    "mp4-selected-audio",
+    "mp4-selected-subtitle",
+    "ts-selected-video",
+    "ts-selected-audio"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "mkv-selected-video",
+        "mkv-video-and-audio",
+        "mkv-reordered-video",
+        "mkv-switch-audio",
+        "mp4-selected-video",
+        "mp4-selected-audio",
+        "mp4-selected-subtitle",
+        "ts-selected-video",
+        "ts-selected-audio"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "mkv-selected-video",
+        "mkv-video-and-audio",
+        "mkv-reordered-video",
+        "mkv-switch-audio",
+        "mp4-selected-video",
+        "mp4-selected-audio",
+        "mp4-selected-subtitle",
+        "ts-selected-video",
+        "ts-selected-audio"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "mkv-selected-video",
+        "mkv-video-and-audio",
+        "mkv-reordered-video",
+        "mkv-switch-audio",
+        "mp4-selected-video",
+        "mp4-selected-audio",
+        "mp4-selected-subtitle",
+        "ts-selected-video",
+        "ts-selected-audio"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    }
+  ],
+  "pending_module_requirements": [
+    "Check Matroska Block clocks, media delay and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. The selected tracks are the same, but the source shows native clock precision or a missing duration where the demux projection supplies another value.",
+    "Verify the audio selection transition under the player seek contract and Matroska CuePoint semantics in RFC 9559 sections 5.1.5 and 22. Compare packets at the source time and the demuxer's projected time on each side of the audio switch."
+  ],
+  "open_cases": [
+    {
+      "id": "mkv-video-and-audio",
+      "requirement": "Check Matroska Block clocks, media delay and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. The selected tracks are the same, but the source shows native clock precision or a missing duration where the demux projection supplies another value.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mkv-reordered-video",
+      "requirement": "Check Matroska Block clocks, media delay and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. The selected tracks are the same, but the source shows native clock precision or a missing duration where the demux projection supplies another value.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mkv-switch-audio",
+      "requirement": "Verify the audio selection transition under the player seek contract and Matroska CuePoint semantics in RFC 9559 sections 5.1.5 and 22. Compare packets at the source time and the demuxer's projected time on each side of the audio switch.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ]
+}
