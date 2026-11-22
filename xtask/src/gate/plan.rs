@@ -61,6 +61,7 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ("ts-packet-fields", Coverage::Item("oracle-compare")),
     ("dts-core-header", Coverage::Item("oracle-compare")),
     ("av1-obu-wire", Coverage::Item("oracle-compare")),
+    ("bridge-av1-low-overhead", Coverage::Item("oracle-compare")),
     ("aac-adts-header", Coverage::Item("oracle-compare")),
     ("hevc-hvcc-prefix", Coverage::Item("oracle-compare")),
     ("vp9-config", Coverage::Item("oracle-compare")),
@@ -437,6 +438,9 @@ pub(super) fn items(
     ]);
     if let Some(session) = plan.session_codecs() {
         items.push(session);
+    }
+    if let Some(play) = plan.play_codecs() {
+        items.push(play);
     }
     for list in &WORKLOAD_LISTS {
         items.extend(plan.workloads(list));
@@ -1284,6 +1288,57 @@ impl Plan<'_> {
                 ),
                 self.codec_grade("codecs-session-grade", CORRECTNESS, &selected, &bin, &[]),
                 self.codec_summary("codecs-session-summary", "codecs-session-grade"),
+            ],
+        })
+    }
+
+    /// Grade the full playback output with the decode-profile reference.
+    fn play_codecs(&self) -> Option<Item> {
+        let selected = lanes::item(&self.lanes, "codecs-play")
+            .collect::<Vec<_>>()
+            .join(",");
+        if selected.is_empty() {
+            return None;
+        }
+        let grade = "codecs-play-grade";
+        Some(Item {
+            name: "codecs-play".into(),
+            weight: 1,
+            preflight: owned(&[
+                "--correctness",
+                &selected,
+                "--codecs",
+                "harness/codecs/play-workloads.json",
+            ]),
+            steps: vec![
+                step(
+                    grade,
+                    Stage::Timing,
+                    Placement::Free,
+                    xtask(&[
+                        "codecs",
+                        "grade",
+                        "--manifest",
+                        "harness/codecs/play-manifest.json",
+                        "--lanes",
+                        &selected,
+                        "--root",
+                        ".",
+                        "--bin",
+                        self.release,
+                        "--ffmpeg",
+                        &format!("{FFMPEG_BIN}/ffmpeg"),
+                        "--ffprobe",
+                        &format!("{FFMPEG_BIN}/ffprobe"),
+                        "--codec-worker",
+                        &format!("{}/play-views-worker", self.release),
+                        "--reference",
+                        "target/harness/ffmpeg-play-views-worker",
+                        "--out",
+                        &format!("{}/{grade}.jsonl", self.out),
+                    ]),
+                ),
+                self.codec_summary("codecs-play-summary", grade),
             ],
         })
     }
