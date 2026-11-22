@@ -687,28 +687,40 @@
     }
   ],
   "pending_module_requirements": [
-    "The extractor receives the signed Matroska block PTS at -715 ms. The reference demuxer clamps the negative timestamp to zero.",
-    "The extractor publishes an empty opaque ASS cue. The reference demuxer skips the zero-byte block and publishes no packet.",
-    "The MOV sample table stores duration 4294967295 ticks. The reference changes it to one tick during demux."
+    "The opaque extractor accepts a caller-supplied zero-byte payload. The demuxer omits the empty ASS block, so these calls compare a supplied packet with no admitted packet."
   ],
   "open_cases": [
     {
-      "id": "utf8-packet-negative-start",
-      "requirement": "The extractor receives the signed Matroska block PTS at -715 ms. The reference demuxer clamps the negative timestamp to zero.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "ass-empty-not-clear",
-      "requirement": "The extractor publishes an empty opaque ASS cue. The reference demuxer skips the zero-byte block and publishes no packet.",
+      "requirement": "The opaque extractor accepts a caller-supplied zero-byte payload. The demuxer omits the empty ASS block, so these calls compare a supplied packet with no admitted packet.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "The source view preserves a signed Matroska presentation time",
+      "clause": "RFC 9559 \u00a711.2, the signed Block timestamp and Cluster timestamp determine the presentation time; a negative result is discouraged",
+      "candidate": "keeps the calculated PTS of -715 ms",
+      "reference": "reports PTS zero",
+      "compat": "compat::matroska::clamp_negative_block_pts",
+      "cases": [
+        "utf8-packet-negative-start"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "capsule-mov-text-overflow-clock",
-      "requirement": "The MOV sample table stores duration 4294967295 ticks. The reference changes it to one tick during demux.",
+      "reading": "The source view preserves an unsigned stts delta of 4294967295",
+      "clause": "ISO/IEC 14496-12:2015 \u00a78.6.1.2, stts sample_delta is unsigned 32-bit",
+      "candidate": "retains the full 4294967295-tick duration",
+      "reference": "emits a one-tick packet",
+      "compat": "compat::mov::large_sample_delta_recovery",
+      "cases": [
+        "capsule-mov-text-overflow-clock"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
