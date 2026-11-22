@@ -202,6 +202,9 @@
       ],
       "unmeasured": "isobmff-dts-entry-source"
     },
+    {"area": "ISO BMFF segment indexes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "isobmff-segment-indexes"},
+    {"area": "ISO BMFF index landings", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "isobmff-index-landings"},
+    {"area": "MOV comparison models", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mov-reference-trace"},
     {
       "area": "MP4 range playback",
       "targets": [
@@ -232,15 +235,20 @@
       "targets": [
         "aarch64-unknown-linux-gnu"
       ],
-      "text": "packet reading in the codec workloads, seeks unmeasured"
+      "text": "Packet reading uses the file codec workloads. Ogg push and sequential packet outputs compare with the same reference rules. Sequential opens and seeks have unmeasured bounds."
     },
     {
       "area": "Audio elementary streams",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ],
-      "text": "FLAC and MPEG audio use the file codec workloads. ADTS, AC-3 and E-AC-3 bounds are unmeasured."
+      "text": "FLAC and MPEG audio use the file codec workloads. Push packet windows compare with blocking packet output. ADTS, AC-3 and E-AC-3 reader bounds and elementary seek bounds are unmeasured."
     },
+    {"area": "Ogg track properties", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ogg-tracks"},
+    {"area": "Ogg page parsing and writing", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ogg-pages"},
+    {"area": "Elementary stream metadata", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "elementary-metadata"},
+    {"area": "Elementary wire metadata", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "elementary-metadata-wire"},
+    {"area": "Media prefix classification", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "media-probe"},
     {
       "area": "MPEG-TS",
       "targets": [
@@ -530,6 +538,38 @@
         "thumbv7neon-unknown-linux-gnueabihf"
       ],
       "unmeasured": "aac-adts-header"
+    },
+    {
+      "area": "Codec configuration views",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "codec-config-views"
+    },
+    {
+      "area": "HEVC hvcC prefix",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "hevc-hvcc-prefix"
+    },
+    {
+      "area": "VP9 configuration record",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "vp9-config"
+    },
+    {
+      "area": "E-AC-3 bitstream information",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "unmeasured": "eac3-bsi"
     },
     {
       "area": "Length-prefixed NAL units",
