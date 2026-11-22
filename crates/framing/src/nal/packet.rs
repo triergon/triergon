@@ -214,8 +214,7 @@ impl NalPacketConfiguration {
     pub fn bytes(&self) -> &Bytes {
         self.record().bytes()
     }
-    /// The coding standard of the stream.
-    pub fn codec(&self) -> Codec {
+    pub(super) fn codec(&self) -> Codec {
         match self {
             Self::Avc(_) | Self::ReceiverAvc(_) => Codec::Avc,
             Self::Hevc(_) | Self::ReceiverHevc(_) => Codec::Hevc,

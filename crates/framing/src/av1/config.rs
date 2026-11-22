@@ -20,8 +20,7 @@ impl Av1ConfigSyntaxIssues {
     pub const fn bits(self) -> u8 {
         self.0
     }
-    /// True when the marker is set and every reserved bit is zero.
-    pub const fn is_empty(self) -> bool {
+    pub(super) const fn is_empty(self) -> bool {
         self.0 == 0
     }
 }

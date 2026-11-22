@@ -76,8 +76,7 @@ impl FlacStreamInfo {
 pub struct FlacMetadataBlock<'a> {
     /// Block type, 0 to 127, such as [`STREAMINFO`] and [`VORBIS_COMMENT`].
     pub kind: u8,
-    /// The last-block flag: no metadata block follows this one.
-    pub last: bool,
+    last: bool,
     /// The block's data, without its four-byte header.
     pub body: &'a [u8],
 }
@@ -236,9 +235,8 @@ pub struct FlacFrameHeader {
 }
 
 impl FlacFrameHeader {
-    /// The first sample of the frame, given STREAMINFO's maximum block size for fixed
-    /// blocking.
-    pub fn first_sample(&self, max_block_size: u16) -> Option<u64> {
+    #[cfg(test)]
+    fn first_sample(&self, max_block_size: u16) -> Option<u64> {
         match self.blocking {
             FlacBlocking::Variable => Some(self.number),
             FlacBlocking::Fixed => self.number.checked_mul(u64::from(max_block_size)),

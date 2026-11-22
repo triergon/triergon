@@ -126,9 +126,9 @@ impl AvcOrder {
         }
     }
 
-    /// PrevRefFrameNum (7.4.3), once a reference picture has been decoded.
+    #[cfg(test)]
     #[must_use]
-    pub fn prev_ref_frame_num(&self) -> Option<u32> {
+    pub(super) fn prev_ref_frame_num(&self) -> Option<u32> {
         self.prev_ref_frame_num
     }
 

@@ -182,29 +182,27 @@ impl<P> Entry<'_, P> {
         }
     }
 
-    /// Either field is used for reference.
+    #[cfg(test)]
     #[must_use]
-    pub fn is_reference(&self) -> bool {
+    fn is_reference(&self) -> bool {
         self.0.reference()
     }
 
-    /// Marked as "needed for output".
+    #[cfg(test)]
     #[must_use]
-    pub fn is_waiting(&self) -> bool {
+    fn is_waiting(&self) -> bool {
         self.0.waiting
     }
 
-    /// Output by the bumping process already; it stays stored while it is used
-    /// for reference or held.
+    #[cfg(test)]
     #[must_use]
-    pub fn was_output(&self) -> bool {
+    fn was_output(&self) -> bool {
         self.0.output
     }
 
-    /// Kept out of bumping ([`NewPicture::hold`]) until
-    /// [`release`](Self::release) or its second field.
+    #[cfg(test)]
     #[must_use]
-    pub fn is_held(&self) -> bool {
+    fn is_held(&self) -> bool {
         self.0.held
     }
 
@@ -409,9 +407,8 @@ impl<P> DecodedPictures<P> {
         self.stored.is_empty()
     }
 
-    /// The pictures needed for output.
     #[must_use]
-    pub fn waiting(&self) -> usize {
+    fn waiting(&self) -> usize {
         self.stored.iter().filter(|p| p.waiting).count()
     }
 

@@ -115,8 +115,7 @@ impl Av1ObuHeaderIssues {
     pub const fn bits(self) -> u8 {
         self.0
     }
-    /// True when no must-be-zero field is set.
-    pub const fn is_empty(self) -> bool {
+    pub(super) const fn is_empty(self) -> bool {
         self.0 == 0
     }
 }
@@ -144,12 +143,10 @@ impl Av1ObuHeader {
     pub const fn extension_present(self) -> bool {
         self.raw_byte & 4 != 0
     }
-    /// `obu_forbidden_bit` as coded; the specification has it zero.
-    pub const fn forbidden_bit(self) -> bool {
+    const fn forbidden_bit(self) -> bool {
         self.raw_byte & 0x80 != 0
     }
-    /// `obu_reserved_1bit` as coded; the specification has it zero.
-    pub const fn reserved_bit(self) -> bool {
+    const fn reserved_bit(self) -> bool {
         self.raw_byte & 1 != 0
     }
     /// The must-be-zero fields of the header that are set.

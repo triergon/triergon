@@ -21,17 +21,14 @@ pub enum DtsPacking {
     Words14Le,
 }
 impl DtsPacking {
-    /// Size of one storage unit in bytes: 1 for canonical bytes, 2 for words.
-    pub const fn source_unit_bytes(self) -> usize {
+    pub(super) const fn source_unit_bytes(self) -> usize {
         if matches!(self, Self::CanonicalBe) {
             1
         } else {
             2
         }
     }
-    /// Payload bits one storage unit carries: 8 for a canonical byte, 16 or 14
-    /// for a word.
-    pub const fn word_payload_bits(self) -> usize {
+    pub(super) const fn word_payload_bits(self) -> usize {
         match self {
             Self::CanonicalBe => 8,
             Self::Words16Le => 16,

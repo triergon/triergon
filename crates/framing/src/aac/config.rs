@@ -47,8 +47,7 @@ pub struct AacObjectType {
     /// The object type: `audioObjectType`, or 32 + `audioObjectTypeExt` when escaped.
     /// 2 is AAC LC, 5 SBR and 29 PS.
     pub code: u8,
-    /// Whether it is coded as the escape value 31 followed by `audioObjectTypeExt`.
-    pub escaped: bool,
+    escaped: bool,
 }
 
 /// A sampling frequency as an AudioSpecificConfig codes it.

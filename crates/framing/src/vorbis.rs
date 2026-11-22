@@ -18,12 +18,9 @@ pub struct VorbisIdentification {
     pub channels: u8,
     /// `audio_sample_rate` in Hz, at least 1.
     pub sample_rate: u32,
-    /// `bitrate_maximum`, a hint in bits per second; unset when 0 or negative.
-    pub bitrate_maximum: i32,
-    /// `bitrate_nominal`, a hint in bits per second; unset when 0 or negative.
-    pub bitrate_nominal: i32,
-    /// `bitrate_minimum`, a hint in bits per second; unset when 0 or negative.
-    pub bitrate_minimum: i32,
+    bitrate_maximum: i32,
+    bitrate_nominal: i32,
+    bitrate_minimum: i32,
     /// Short and long block sizes, powers of two from 64 to 8192.
     pub blocksize: [u16; 2],
 }
@@ -92,8 +89,7 @@ pub struct VorbisModes {
 /// The block an audio packet codes (Vorbis I section 4.3.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VorbisBlock {
-    /// The block has the long block size, as the block flag of its mode says.
-    pub long: bool,
+    long: bool,
     /// For a long block, whether the previous window is long, as its window flag states;
     /// `None` for a short block, whose window does not say.
     pub previous_long: Option<bool>,
@@ -163,13 +159,12 @@ impl VorbisModes {
         Err(Error::Invalid("Vorbis setup header mode configuration"))
     }
 
-    /// Number of modes, 1 to 64.
-    pub fn count(&self) -> u8 {
+    #[cfg(test)]
+    fn count(&self) -> u8 {
         self.count
     }
 
-    /// Whether mode `mode` codes long blocks.
-    pub fn is_long(&self, mode: u8) -> bool {
+    fn is_long(&self, mode: u8) -> bool {
         mode < self.count && self.long >> mode & 1 != 0
     }
 

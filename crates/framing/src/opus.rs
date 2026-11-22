@@ -14,8 +14,7 @@ pub const SAMPLE_RATE: u32 = 48_000;
 /// also preserves the encoder's informational input sample rate.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct OpusHead {
-    /// Version of the header, 0 to 15; 1 for a header read from a `dOps` box.
-    pub version: u8,
+    version: u8,
     /// Output channels, 1 to 255; 1 or 2 with mapping family 0.
     pub channels: u8,
     /// Samples at 48 kHz to discard from the start of the decoded stream.

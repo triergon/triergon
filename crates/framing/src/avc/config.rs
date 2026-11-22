@@ -85,14 +85,10 @@ impl AvcConfigFields {
     pub const fn length_size_minus_one(self) -> u8 {
         self.prefix[4] & 3
     }
-    /// The six reserved bits before `lengthSizeMinusOne`; 63 when all are set, as the
-    /// record format requires.
-    pub const fn length_reserved(self) -> u8 {
+    const fn length_reserved(self) -> u8 {
         self.prefix[4] >> 2
     }
-    /// The three reserved bits before `numOfSequenceParameterSets`; 7 when all are
-    /// set, as the record format requires.
-    pub const fn sequence_count_reserved(self) -> u8 {
+    const fn sequence_count_reserved(self) -> u8 {
         self.prefix[5] >> 5
     }
     /// Physical extension bytes, including all reserved fields and count. `None`

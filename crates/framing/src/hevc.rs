@@ -38,8 +38,7 @@ pub const RADL_R: u8 = 7;
 pub const RASL_N: u8 = 8;
 /// Slice segment of a random access skipped leading picture, sub-layer reference.
 pub const RASL_R: u8 = 9;
-/// The last type reserved for non-IRAP sub-layer non-reference pictures.
-pub const RSV_VCL_N14: u8 = 14;
+const RSV_VCL_N14: u8 = 14;
 /// Slice segment of a broken link access picture that may have leading pictures.
 pub const BLA_W_LP: u8 = 16;
 /// Slice segment of a broken link access picture without leading pictures.
@@ -50,8 +49,7 @@ pub const IDR_W_RADL: u8 = 19;
 pub const IDR_N_LP: u8 = 20;
 /// Slice segment of a clean random access picture.
 pub const CRA: u8 = 21;
-/// The last type reserved for IRAP pictures.
-pub const RSV_IRAP_23: u8 = 23;
+const RSV_IRAP_23: u8 = 23;
 /// Video parameter set.
 pub const VPS: u8 = 32;
 /// Sequence parameter set.

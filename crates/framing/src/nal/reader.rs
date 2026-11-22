@@ -321,8 +321,7 @@ impl NalReader {
         self.end_after_nal
     }
 
-    /// The source being read.
-    pub fn source(&self) -> SourceId {
+    pub(super) fn source(&self) -> SourceId {
         self.cursor.source()
     }
     pub(crate) fn input_wait_buffer_capacity(&self) -> Result<usize> {
@@ -332,8 +331,7 @@ impl NalReader {
         Ok(self.buffer.capacity())
     }
 
-    /// The pool input windows and NAL units are charged to.
-    pub fn budget(&self) -> &Budget {
+    pub(super) fn budget(&self) -> &Budget {
         self.cursor.budget()
     }
 

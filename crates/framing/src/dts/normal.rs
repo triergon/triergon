@@ -74,8 +74,8 @@ pub enum DtsExtentRelation {
 pub struct DtsCarrierTail {
     /// Index of the first tail bit in the frame's payload: `8 * (FSIZE + 1)`.
     pub start_bit: usize,
-    /// Number of tail bits, less than [`DtsPacking::word_payload_bits`]; 0 when the
-    /// payload ends with its byte `FSIZE`.
+    /// Tail bits, fewer than one source unit's payload of 8, 14 or 16 bits.
+    /// Zero when the payload ends with its byte `FSIZE`.
     pub bit_count: u8,
     /// The tail bits in stream order, the last of them in bit 0.
     pub value: u16,
@@ -88,13 +88,10 @@ pub struct DtsNormalFacts {
     pub identity: DtsSourceIdentity,
     /// The packing the frame is stored in.
     pub packing: DtsPacking,
-    /// Length of the frame in source bytes.
-    pub source_bytes: usize,
+    source_bytes: usize,
     /// Number of payload bits the frame carries: 8, 16 or 14 for each source unit.
     pub source_payload_bits: usize,
-    /// Length in bytes of the payload packed into bytes: `source_payload_bits` / 8,
-    /// rounded up.
-    pub storage_bytes: usize,
+    storage_bytes: usize,
     /// What ended the frame.
     pub boundary: DtsNormalBoundary,
     /// Number of normal or termination syncs that did not end the frame because fewer
@@ -274,15 +271,12 @@ impl DtsNormalSourceReader {
             completed: 0,
         })
     }
-    /// The request for the bytes at [`position`](Self::position). A failed reader
-    /// returns the request it had open when it failed.
+    /// The next source byte request. A failed reader returns the request it had open
+    /// when it failed.
     pub fn request(&self) -> InputRequest {
         self.input.request()
     }
-    /// Source offset of the next byte the reader takes from its input. After a frame
-    /// that ended at a following sync it is six bytes past the frame's end: the
-    /// reader has read that sync.
-    pub fn position(&self) -> u64 {
+    fn position(&self) -> u64 {
         self.input.position()
     }
     /// Generation of the reader's input cursor, which every frame carries in its

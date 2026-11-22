@@ -114,9 +114,7 @@ impl NalHeader {
         }
     }
 
-    /// The parameter set `nal_unit_type` names: H.264 types 7 and 8, H.265 types
-    /// 32 to 34; `None` for every other type.
-    pub const fn parameter_set_kind(self) -> Option<ParameterSetKind> {
+    pub(crate) const fn parameter_set_kind(self) -> Option<ParameterSetKind> {
         match self {
             Self::Avc {
                 nal_unit_type: 7, ..
