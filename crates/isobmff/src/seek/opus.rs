@@ -1,8 +1,4 @@
-//! Where a regular Opus track's decoder starts after a seek. [`OpusRecoveryLanding`]
-//! names the sample at the landing and the earlier sample its `roll` group points back
-//! to, which must give at least 80 ms of preroll unless it is the track's first sample.
-//!
-//! Specification: Opus in ISO BMFF §4.3.6.2.
+//! Opus seek preroll (Opus in ISO BMFF §4.3.6.2).
 
 use crate::{
     BuildStatus, Next, Sample,
@@ -12,15 +8,12 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Reservation, Result, Time, TimeBase, WorkBudget};
 
-/// Where the decoder of a regular Opus track starts after a seek, from the track's
-/// `roll` group, as the `with_opus_recovery` option of
-/// [`GlobalSeekJob`](crate::compat::mov::seek::GlobalSeekJob) and
-/// [`RangeSeekJob`](crate::compat::mov::seek::RangeSeekJob) reports it.
+/// A regular Opus track's decoder start after a seek, based on its `roll` group.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpusRecoveryLanding {
     /// `track_ID` of the Opus track.
     pub track_id: u32,
-    /// 1-based source ordinal of the audio sample at the video landing.
+    /// 1-based source ordinal of the audio sample the seek selects.
     pub sync_sample: u64,
     /// 1-based source ordinal at which the decoder must start; at most `sync_sample`,
     /// and 1 when recovery reaches back to the track's start.

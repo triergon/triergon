@@ -347,11 +347,9 @@ impl<'a> PhysicalSampleCursor<'a> {
     ) -> Result<Self> {
         Self::with_timing_policy(budget, tracks, None, limits, TimingRunPolicy::Strict)
     }
-    /// A merge that also checks every sample against `media_extents`, the payload extents
-    /// of the source's `mdat` boxes, which must ascend without overlap. A sample outside
-    /// them is `Error::Invalid` (as [`Sample::require_within`] decides). A backward layout
-    /// is refused only after every track's samples are checked, so it never hides a
-    /// malformed range.
+    /// Checks samples during polling against ascending, disjoint `mdat` payload extents.
+    /// A sample outside the extents is invalid. Backward layout is refused after every
+    /// track's ranges have been checked.
     pub fn new_with_media_extents(
         budget: &Budget,
         tracks: &[SourceTrack<'a>],
@@ -466,11 +464,9 @@ impl<'a> PhysicalSampleCursor<'a> {
     pub fn validated_samples(&self) -> u64 {
         self.validated
     }
-    /// After the backward-layout refusal of a cursor with media extents, continues with
-    /// each track's samples, one track after another in the order given; `false`, with
-    /// nothing changed, in any other state. A cursor without media extents refuses at the
-    /// first backward sample, before the rest are checked, and cannot continue; nor can one
-    /// with deferred media. The samples keep their ordinals but are not in byte order.
+    /// Continues in track order after a backward-layout refusal, if all samples were
+    /// checked against media extents and no media is deferred. Returns `false` without
+    /// advancing in any other state.
     pub fn resume_in_track_order(&mut self) -> bool {
         if self.phase != Phase::ValidateEnter
             || self.index != self.slots.len()

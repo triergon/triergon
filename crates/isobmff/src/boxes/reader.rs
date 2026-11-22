@@ -133,9 +133,8 @@ impl BoxReader {
         self.header = None;
         self.phase = Phase::Header;
     }
-    /// Reads the announced box into memory; later polls read it and report
-    /// [`BoxEvent::Metadata`]. `Error::Unsupported` for an `mdat` or a box of unknown size,
-    /// `Error::Limit` above the reader's metadata limit.
+    /// Requests [`BoxEvent::Metadata`] for the announced box. Fails for `mdat`, an
+    /// unknown size, a size above the metadata limit or no announced box.
     pub fn read_metadata(&mut self, input: &InputCursor) -> Result<()> {
         self.binding(input)?;
         if self.phase != Phase::Announced {
@@ -164,9 +163,8 @@ impl BoxReader {
         self.phase = Phase::Metadata { target: length };
         Ok(())
     }
-    /// Skips the announced box; the next poll reports [`BoxEvent::Skipped`]. With random
-    /// access the cursor requests the box's end at once, continuing from the current window
-    /// where the box ends inside it; otherwise the polls read through the box.
+    /// Requests [`BoxEvent::Skipped`] for the announced box. Ranges skip directly to
+    /// a known end; a forward-only source consumes the intervening bytes.
     pub fn skip(&mut self, input: &mut InputCursor) -> Result<()> {
         self.binding(input)?;
         if self.phase != Phase::Announced {
@@ -190,10 +188,9 @@ impl BoxReader {
         self.phase = Phase::Skipping;
         Ok(())
     }
-    /// Polls, serving the input it asks for from `feed`, until the next box event;
-    /// `None` at the end of the source. Each poll gets `work` units. A window needs one
-    /// poll, so with one-byte windows this loop runs once per byte; it is kept out of
-    /// line so that its state stays in registers.
+    /// Supplies input from `feed` until a box event, or returns `None` at source end.
+    /// Each poll gets `work` units.
+    // A one-byte window needs a poll per byte. This loop stays out of line.
     #[inline(never)]
     pub fn next_event<S: Read + Seek>(
         &mut self,

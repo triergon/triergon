@@ -1,10 +1,9 @@
 //! Bounded composition of the box, table and fragment readers into one movie.
 //!
-//! [`MovieOpen`] walks the root boxes, retains `ftyp`, `moov` and `moof`, walks the
-//! movie, builds each track's sample table and indexes every fragment. It performs
-//! no I/O: the caller answers its [`OpenStep::NeedInput`] through the shared
-//! [`InputCursor`]. A source without random access can stop at the first media
-//! after a front movie, which [`Movie::read_scope`] records.
+//! [`MovieOpen`] retains `ftyp`, `moov` and `moof` and indexes their tracks and
+//! fragments. The caller supplies each [`OpenStep::NeedInput`] through the
+//! [`InputCursor`]. [`Movie::read_scope`] records whether the open stopped at the
+//! first media box after a front movie or scanned the whole source.
 use crate::{
     BuildStatus, Limits, Next,
     boxes::{BoxChildren, BoxEvent, BoxHeader, BoxReader, BoxView},
@@ -26,7 +25,6 @@ fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
     v.try_push(x).map_err(|e| e.error)
 }
 /// A root box reader for the opener and for later root walks of the same source.
-/// Public for `triergon-playback` only.
 #[doc(hidden)]
 pub fn box_reader(
     input: &InputCursor,
@@ -333,12 +331,11 @@ pub struct MovieTrack {
     pub(crate) next_ordinal: u64,
 }
 
-// Bound the payload retained for indexed backward reads on a pipe.
-/// Public for `triergon-playback` only.
+/// Maximum retained payload bytes for backward reads on a forward-only source.
 #[doc(hidden)]
 pub const RETAINED_MEDIA_BYTES: usize = 32 * 1024;
 
-/// Public for `triergon-playback` only.
+/// A retained segment of media from a forward-only source.
 #[doc(hidden)]
 #[derive(Clone, Debug)]
 pub struct CachedMedia {
@@ -346,7 +343,7 @@ pub struct CachedMedia {
     pub(crate) bytes: Bytes,
 }
 
-/// Public for `triergon-playback` only.
+/// A bounded media segment being copied from the input cursor.
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct PendingMedia {
@@ -427,9 +424,7 @@ pub struct Movie {
     pub(crate) pool: Budget,
 }
 impl Movie {
-    /// The `ftyp` major brand, if the source has an `ftyp`. ISO/IEC 14496-12 §4.3 places
-    /// exactly one before any variable-length box; where a source has several, the first
-    /// counts.
+    /// The major brand from the first `ftyp` read.
     pub fn major_brand(&self) -> Option<[u8; 4]> {
         self.major_brand
     }
@@ -449,7 +444,7 @@ impl Movie {
     pub fn raw_roots(&self) -> &[BoxView] {
         self.raw_roots.as_slice()
     }
-    /// The movie header.
+    /// Clock and duration from `mvhd`.
     pub fn header(&self) -> &MovieHeader {
         &self.movie
     }
@@ -457,7 +452,7 @@ impl Movie {
     pub fn source(&self) -> triergon_core::SourceId {
         self.source
     }
-    /// The input generation the open read in.
+    /// Input generation at [`MovieOpen::finish`].
     pub fn generation(&self) -> u64 {
         self.generation
     }
@@ -477,12 +472,12 @@ impl Movie {
     pub fn trex(&self) -> &[Trex] {
         self.trex.as_slice()
     }
-    /// Public for `triergon-playback` only.
+    /// Retained media segments from a forward-only source, in file order.
     #[doc(hidden)]
     pub fn media_cache(&self) -> &[CachedMedia] {
         self.media_cache.as_slice()
     }
-    /// Public for `triergon-playback` only.
+    /// Budget shared by retained metadata and media segments.
     #[doc(hidden)]
     pub fn pool(&self) -> &Budget {
         &self.pool
@@ -497,7 +492,7 @@ impl MovieTrack {
     pub fn header(&self) -> &TrackHeader {
         &self.header
     }
-    /// The regular sample table.
+    /// Checked `stbl`, including the track's sample descriptions.
     pub fn table(&self) -> &SampleTable {
         &self.table
     }
@@ -510,7 +505,7 @@ impl MovieTrack {
     pub fn raw_dref(&self) -> &BoxView {
         &self.raw_dref
     }
-    /// The container ordinal the next fragment sample would take.
+    /// 1-based ordinal after the last regular or fragment sample.
     pub fn next_ordinal(&self) -> u64 {
         self.next_ordinal
     }
@@ -656,7 +651,7 @@ impl MovieOpen {
     pub fn is_ready(&self) -> bool {
         self.ready
     }
-    /// One bounded step. Cancellation is checked where input is read.
+    /// One bounded step. Cancellation is checked during input reads and the `moov` walk.
     pub fn advance(
         &mut self,
         input: &mut InputCursor,

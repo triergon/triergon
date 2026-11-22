@@ -25,8 +25,8 @@ pub enum TimingRunPolicy {
     /// The runs must count exactly the sample count; otherwise `Error::Invalid`.
     #[default]
     Strict,
-    /// Use the timing prefix covered by the sample sizes. The final decode
-    /// run and positive composition runs may extend past that prefix.
+    /// For a nonempty table, the final decode run may straddle the end and
+    /// composition runs may overrun it. Every run must declare at least one sample.
     BoundedPrefix,
 }
 
@@ -60,8 +60,7 @@ pub struct TimingRunSurplus {
     pub composition_samples: u64,
 }
 
-/// A checked regular sample table. It keeps the `stbl` boxes as stored and reads samples
-/// from them on demand.
+/// Checked `stbl` boxes, with no per-sample index.
 #[derive(Debug)]
 pub struct SampleTable {
     raw: BoxView,
@@ -124,7 +123,7 @@ impl SampleTable {
     pub(crate) fn has_partial_sync_samples(&self) -> bool {
         self.partial.as_ref().is_some_and(|table| table.count != 0)
     }
-    /// Whether the regular sample table declares composition offsets.
+    /// Whether the table includes `ctts`, even if it has no rows.
     pub fn has_composition_offsets(&self) -> bool {
         self.ctts.is_some()
     }
@@ -440,14 +439,13 @@ impl SampleTableBuilder {
         self.acceptance = Acceptance::LegacyDependencyFlags;
     }
 
-    /// A builder with strict policies for `raw`, an `stbl` stored in `budget`; see
-    /// [`with_policy`](Self::with_policy).
+    /// Validates an `stbl` with strict timing and sync counts. Fails for another box
+    /// type or budget pool, as in [`with_policy`](Self::with_policy).
     pub fn new(raw: BoxView, budget: Budget, limits: Limits) -> Result<Self> {
         Self::with_timing_policy(raw, budget, limits, TimingRunPolicy::Strict)
     }
 
-    /// Select how timing counts are checked against the sample sizes.
-    /// All other table fields use strict validation.
+    /// Selects timing validation while keeping sync entries strict.
     pub fn with_timing_policy(
         raw: BoxView,
         budget: Budget,

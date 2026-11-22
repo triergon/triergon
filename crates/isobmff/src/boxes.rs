@@ -35,9 +35,9 @@ pub enum HeaderRead {
 
 impl BoxHeader {
     /// Reads the header at absolute offset `start` from `prefix`, the bytes from there on.
-    /// `parent_end` is the end of the enclosing box or source, if known; a box crossing it
-    /// is `Error::Truncated`. A size-zero box runs to `parent_end` and is accepted only as
-    /// a `top_level` `mdat`; elsewhere it is `Error::Unsupported`.
+    /// A box crossing the known `parent_end` is truncated. A declared size below the
+    /// header length is invalid. Size zero is supported only for a top-level `mdat`
+    /// and extends to `parent_end` when known.
     pub fn parse(
         prefix: &[u8],
         start: u64,
@@ -116,8 +116,8 @@ impl BoxHeader {
     }
 }
 
-/// One complete box held in memory charged to the shared budget, with its parsed header.
-/// Media data is never held this way: an `mdat` is known only by its [`BoxHeader`].
+/// A complete box in budgeted memory. [`BoxReader`] only reports the header of an
+/// `mdat`; callers can construct a view from their own complete bytes.
 #[derive(Clone, Debug)]
 pub struct BoxView {
     bytes: Bytes,

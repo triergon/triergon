@@ -1,6 +1,3 @@
-//! The sample record every source reader reports: [`Sample`], with its byte range, exact
-//! clocks in ticks of the media timescale and access flags; [`CompositionOffset`] as
-//! stored; and [`SourceTimes`], the same clocks as core [`Time`] values.
 use std::ops::Range;
 use triergon_core::{Error, Result, Time, TimeBase};
 
@@ -102,8 +99,8 @@ impl Sample {
     pub fn is_container_sync(&self) -> bool {
         self.access == Access::ContainerSync
     }
-    /// The clocks as exact [`Time`] values in `base`, the track's media time base.
-    /// Unknown times stay `None`; nothing is rounded.
+    /// Converts ticks using the track's media time base. Unknown times stay `None`;
+    /// `Error::Overflow` if a clock cannot be represented exactly.
     pub fn source_times(&self, base: TimeBase) -> Result<SourceTimes> {
         Ok(SourceTimes {
             dts: self
