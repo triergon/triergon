@@ -39,7 +39,7 @@ pub(crate) struct SeekPlan {
 pub(crate) enum RecoveryAudio {
     Overlap,
     BlockStart,
-    CuedAac,
+    CuedAudio,
 }
 
 pub(crate) fn cued_aac_profile(tracks: &[crate::matroska::Track], track: usize) -> bool {
@@ -52,6 +52,24 @@ pub(crate) fn cued_aac_profile(tracks: &[crate::matroska::Track], track: usize) 
                 && t.codec_delay_ns == 0
                 && t.seek_preroll_ns == 0
         })
+}
+
+pub(crate) fn cued_ac3_profile(tracks: &[crate::matroska::Track], track: usize) -> bool {
+    tracks.len() == 1
+        && track == 0
+        && tracks.first().is_some_and(|t| {
+            t.kind == 2
+                && t.codec.as_str() == "A_AC3"
+                && t.codec_private.is_empty()
+                && t.sample_rate.to_bits() == 48_000_f64.to_bits()
+                && t.channels == 1
+                && t.codec_delay_ns == 0
+                && t.seek_preroll_ns == 0
+        })
+}
+
+pub(crate) fn cued_audio_profile(tracks: &[crate::matroska::Track], track: usize) -> bool {
+    cued_aac_profile(tracks, track) || cued_ac3_profile(tracks, track)
 }
 
 impl RecoveryAudio {
@@ -138,8 +156,8 @@ impl SeekPlanJob {
         first_cluster: u64,
         recovery_audio: RecoveryAudio,
     ) -> Result<Self> {
-        if !(recovery_audio == RecoveryAudio::CuedAac
-            && cued_aac_profile(configuration.tracks(), track))
+        if !(recovery_audio == RecoveryAudio::CuedAudio
+            && cued_audio_profile(configuration.tracks(), track))
             && configuration
                 .tracks()
                 .get(track)
@@ -249,7 +267,7 @@ impl SeekPlanJob {
                         });
                         self.best = cue;
                         if cue.is_none() {
-                            if self.recovery_audio == RecoveryAudio::CuedAac {
+                            if self.recovery_audio == RecoveryAudio::CuedAudio {
                                 return Err(Error::Unsupported(
                                     "audio seek requires a preceding Cue",
                                 ));
@@ -293,7 +311,7 @@ impl SeekPlanJob {
                 }
                 Phase::Stop => {
                     let cue = self.best.required("missing planned cue")?;
-                    if self.recovery_audio == RecoveryAudio::CuedAac {
+                    if self.recovery_audio == RecoveryAudio::CuedAudio {
                         self.finish(LandingPlan::Cue {
                             cue,
                             whole_cluster: false,

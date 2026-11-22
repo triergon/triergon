@@ -89,3 +89,34 @@ fn coded_fixture_seek_folds_every_packet_through_eof() {
     );
     std::fs::remove_file(path).unwrap();
 }
+
+#[test]
+fn cued_ac3_folds_both_cue_landings_through_eof() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-ac3/inputs/coded-cues.mkv");
+    assert_eq!(fixture.as_slice(), ebml::cued_ac3_coded());
+    let path = std::env::temp_dir().join(format!("triergon-cued-ac3-{}.mkv", std::process::id()));
+    std::fs::write(&path, fixture).unwrap();
+    for (target, expected) in [
+        (
+            "130000000",
+            "{\"packets\":4,\"bytes\":3072,\"digest\":4603375696001153562,\"eof\":true}\n",
+        ),
+        (
+            "127600000",
+            "{\"packets\":8,\"bytes\":6144,\"digest\":7084967468992935401,\"eof\":true}\n",
+        ),
+    ] {
+        let result = std::process::Command::new(env!("CARGO_BIN_EXE_media-worker"))
+            .args(["cued-ac3-fold", path.to_str().unwrap(), target])
+            .output()
+            .unwrap();
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        assert_eq!(String::from_utf8(result.stdout).unwrap(), expected);
+    }
+    std::fs::remove_file(path).unwrap();
+}

@@ -86,7 +86,7 @@ impl CueValidationJob {
         if !configuration.belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
-        if !super::seek::cued_aac_profile(configuration.tracks(), track)
+        if !super::seek::cued_audio_profile(configuration.tracks(), track)
             && configuration
                 .tracks()
                 .get(track)

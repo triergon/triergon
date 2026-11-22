@@ -138,3 +138,19 @@ fn audio_seek_refuses_missing_cue_and_other_configuration() {
         BlockingReader::open_seekable(Cursor::new(altered), Limits::default()).unwrap();
     assert!(reader.seek_cued_aac(0, 1_010_000_000, &cancel).is_err());
 }
+
+#[test]
+fn ac3_seek_refuses_unsupported_track_and_missing_preceding_cue() {
+    let bytes = ebml::cued_ac3_coded();
+    let cancel = AtomicBool::new(false);
+    let mut reader =
+        BlockingReader::open_seekable(Cursor::new(bytes.clone()), Limits::default()).unwrap();
+    assert!(reader.seek_cued_ac3(0, -1, &cancel).is_err());
+    let mut altered = bytes;
+    let rate = 48_000_f64.to_be_bytes();
+    let at = altered.windows(rate.len()).position(|w| w == rate).unwrap();
+    altered[at..at + rate.len()].copy_from_slice(&44_100_f64.to_be_bytes());
+    let mut reader =
+        BlockingReader::open_seekable(Cursor::new(altered), Limits::default()).unwrap();
+    assert!(reader.seek_cued_ac3(0, 130_000_000, &cancel).is_err());
+}

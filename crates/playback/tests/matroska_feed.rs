@@ -1758,6 +1758,118 @@ fn coded_cued_aac_playback_seek_invalidates_queue_and_feeds_indexed_suffix() {
 }
 
 #[test]
+fn coded_cued_ac3_player_seek_preserves_suffix_and_projects_clocks() {
+    let fixture =
+        include_bytes!("../../../harness/features/matroska-cued-ac3/inputs/coded-cues.mkv");
+    assert_eq!(fixture.as_slice(), cued_audio_fixture::cued_ac3_coded());
+    let (mut player, pool) = player_with_input(fixture, 7);
+    let cancel = AtomicBool::new(false);
+    let old = loop {
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
+        if let Some(output) = player.pop()
+            && matches!(output.event(), RawEvent::Matroska(Event::Packet(_)))
+        {
+            break output;
+        }
+    };
+    while player.queued() == 0 {
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
+    }
+    let target = Time::new(13, 100).unwrap();
+    assert!(
+        player
+            .seek_and_select(
+                TrackKey::Matroska(7),
+                target,
+                Selection::All,
+                &mut WorkBudget::new(1),
+                &cancel
+            )
+            .unwrap()
+    );
+    assert!(!player.current(&old));
+    assert_eq!(player.queued(), 0);
+    let outputs = collect_with_work(&mut player, 1);
+    let landing = outputs
+        .iter()
+        .find_map(|o| match o.event() {
+            RawEvent::Matroska(Event::Seek(s)) => Some(s),
+            _ => None,
+        })
+        .unwrap();
+    assert!(landing.used_index);
+    assert_eq!(landing.actual_ns, 128_000_000);
+    let configuration = outputs
+        .iter()
+        .find_map(|o| match o.event() {
+            RawEvent::Matroska(Event::Configuration(c)) => Some(c),
+            _ => None,
+        })
+        .unwrap();
+    let feed = hevc_dolby_setup(&pool, configuration, 0);
+    let packets: Vec<_> = outputs
+        .iter()
+        .filter(|o| matches!(o.event(), RawEvent::Matroska(Event::Packet(_))))
+        .collect();
+    assert_eq!(packets.len(), 4);
+    let mut probe = feed.native_dolby_clock_probe(&pool, 4).unwrap().unwrap();
+    for (i, (output, ms)) in packets.iter().zip([128, 160, 192, 224]).enumerate() {
+        let packet = hevc_dolby_frame(&feed, output);
+        assert_eq!(packet.source.packet.pts_ns, Some(ms * 1_000_000));
+        assert_eq!(packet.source.packet.data.len(), 768);
+        assert_eq!(
+            output.delivery(),
+            if ms < 130 {
+                Delivery::DecodeOnly { until: target }
+            } else {
+                Delivery::Present
+            }
+        );
+        assert_eq!(probe.push(&packet).unwrap(), i);
+    }
+    let clocks = probe.finish();
+    for (i, ms) in [128, 160, 192, 224].into_iter().enumerate() {
+        let t = clocks.timing(i).unwrap();
+        assert_eq!(
+            (t.pts_ns, t.dts_ns, t.duration_ns),
+            (Some(ms * 1_000_000), Some(ms * 1_000_000), Some(32_000_000))
+        );
+    }
+}
+
+#[test]
+fn cued_eac3_seek_refusal_preserves_player() {
+    let fixture = cued_audio_fixture::cued_eac3_opaque();
+    let (mut player, _) = player_with_input(&fixture, 7);
+    let cancel = AtomicBool::new(false);
+    let old = loop {
+        player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
+        if let Some(output) = player.pop()
+            && matches!(output.event(), RawEvent::Matroska(Event::Packet(_)))
+        {
+            break output;
+        }
+    };
+    assert!(
+        player
+            .seek_and_select(
+                TrackKey::Matroska(7),
+                Time::new(13, 100).unwrap(),
+                Selection::All,
+                &mut WorkBudget::new(1),
+                &cancel
+            )
+            .is_err()
+    );
+    assert!(player.current(&old));
+    assert!(
+        collect_with_work(&mut player, 1)
+            .iter()
+            .any(|o| matches!(o.event(), RawEvent::Matroska(Event::Packet(_))))
+    );
+}
+
+#[test]
 fn unsupported_matroska_audio_seek_preserves_playback() {
     let mut fixture =
         include_bytes!("../../../harness/features/matroska-cued-aac/inputs/coded-cues.mkv")

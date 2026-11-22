@@ -325,13 +325,38 @@ impl<R: Read> BlockingReader<R> {
         requested_ns: i64,
         cancel: &AtomicBool,
     ) -> Result<crate::matroska::SeekReceipt> {
+        if !crate::matroska::typed::seek::cued_aac_profile(self.reader.tracks(), track) {
+            self.reader.failed = true;
+            return Err(Error::Unsupported("seek requires single-track cued AAC-LC"));
+        }
         self.seek(
             SeekRequest {
                 track,
                 requested_ns,
                 playback_preroll: false,
             },
-            RecoveryAudio::CuedAac,
+            RecoveryAudio::CuedAudio,
+            cancel,
+        )
+    }
+    /// Seek to a validated preceding Cue in a single-track AC-3 Segment.
+    pub fn seek_cued_ac3(
+        &mut self,
+        track: usize,
+        requested_ns: i64,
+        cancel: &AtomicBool,
+    ) -> Result<crate::matroska::SeekReceipt> {
+        if !crate::matroska::typed::seek::cued_ac3_profile(self.reader.tracks(), track) {
+            self.reader.failed = true;
+            return Err(Error::Unsupported("seek requires single-track cued AC-3"));
+        }
+        self.seek(
+            SeekRequest {
+                track,
+                requested_ns,
+                playback_preroll: false,
+            },
+            RecoveryAudio::CuedAudio,
             cancel,
         )
     }

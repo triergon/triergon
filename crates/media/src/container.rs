@@ -261,10 +261,12 @@ impl ContainerReader for Reader {
             .target
             .to_nanoseconds(triergon_core::Rounding::Floor)?;
         if self.tracks()[track].kind == 2 {
-            if !crate::matroska::typed::seek::cued_aac_profile(self.tracks(), track) {
-                return Err(Error::Unsupported("seek requires single-track cued AAC-LC"));
+            if !crate::matroska::typed::seek::cued_audio_profile(self.tracks(), track) {
+                return Err(Error::Unsupported(
+                    "seek requires supported single-track cued audio",
+                ));
             }
-            return self.seek_cued_aac(track, requested_ns);
+            return self.seek_cued_audio(track, requested_ns);
         }
         match request.policy {
             SeekPolicy::PreviousRandomAccess => self.seek_previous(track, requested_ns),

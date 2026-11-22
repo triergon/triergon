@@ -175,6 +175,14 @@ its source clock and bytes; it does not validate or decode AAC payloads. The
 neutral `ContainerReader::request_seek` routes audio requests through this same
 checked operation; video requests retain their existing seek policies.
 
+The neutral reader also admits a single `A_AC3` track at 48 kHz and one
+channel, with empty CodecPrivate and zero delay and preroll. It requires a
+preceding validated Cue and returns source packet clocks and bytes without
+validating the payload. `BlockingReader::seek_cued_ac3` exposes the same seek.
+The [local comparison](../../harness/features/matroska-cued-ac3/README.md)
+checks an encoded packet suffix through EOF. Cue structure follows RFC 9559
+§§5.1.5 and 22; AC-3 syncframe timing follows ATSC A/52:2018.
+
 The `media-worker` and public libavformat reference expose the `cued-aac-`
 worker protocol. The reference uses a backward `av_seek_frame` and public flags
 that preserve demuxed fields. `trace`, `fold` and `memory` take a file and a
@@ -203,7 +211,7 @@ The playback AAC clock projects source PTS into DTS and infers a 23 ms
 duration in both fixtures. The pinned FFprobe decoder build reports those
 same projected fields for the coded fixture. With opaque payloads in the
 original fixture, FFprobe leaves durations unknown. Playback seek
-integration and native performance and memory qualification remain open.
+coverage and native performance and memory qualification remain open.
 
 **Colour.** `Track::colour` keeps every source field: bit depth, both chroma and Cb
 subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering value as
