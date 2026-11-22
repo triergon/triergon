@@ -951,6 +951,22 @@ Verification:
   includes an intact coded HEVC and 32 kHz E-AC-3 transport and six DVB subtitle
   inputs, one with a truncated final segment. Their requests explicitly declare
   the DVB namespace. The comparison opts in to reporting the subtitle prefix.
+- The [reader views](../../harness/features/ts-reader-views/contract.json) compare
+  track identity and configuration, packet time bases, AC-3 syncframes, DVB
+  subtitle segment boundaries and opaque elementary ranges. The
+  [continuity reader comparison](../../harness/features/ts-reader-container/contract.json)
+  also checks the packet outcome and carrier evidence of an opaque residue.
+- The [fault facts](../../harness/features/ts-fault-facts/contract.json) and
+  [recovery trace](../../harness/features/ts-recovery-trace/contract.json) compare
+  the packet consequences of damaged input, projected clocks and clean end.
+  The contracts retain the open differences in source admission and recovery.
+- The [indexed epoch seek comparison](../../harness/features/ts-epoch-index-seek/contract.json)
+  uses the exact clock and configuration pair for one entity, then checks the
+  landing and complete coded suffix. Repeated requests must reuse the index.
+- [Bounded source clocks](../../harness/features/ts-bounded-time/contract.json)
+  compare with FFmpeg where the anchor selects the same timestamp interval.
+  The [source-clock oracle](../../harness/features/ts-bounded-time-oracle/contract.json)
+  checks raw timestamps, exact time and refusals under PCR and PTS anchors.
 - The source view is compared field by field with an independent oracle over
   the corpus. The FFmpeg-compatible view is compared packet by packet
   (payload bytes, timestamps, flags, positions, stream-ID side data) with the

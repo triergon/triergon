@@ -3,6 +3,7 @@
 mod catalogue;
 mod mux;
 mod packets;
+mod time;
 
 use std::fs;
 use std::path::Path;
@@ -29,6 +30,7 @@ pub(crate) fn fixtures(paths: &crate::corpus::Paths) -> Result<String, String> {
     let dir = paths.fixtures("fixtures-transport-views")?;
     catalogue::fixtures(&dir)?;
     packets::fixtures(&dir)?;
+    time::fixtures(&paths.root, &dir)?;
     mux::fixtures(paths)?;
     Ok("Generated MPEG-TS catalogue, carrier and mux fixtures".into())
 }

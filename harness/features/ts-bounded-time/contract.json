@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "id": "ts-bounded-time",
+  "gate": "required",
+  "operation": "ts-bounded-time",
+  "candidate": "transport-views-worker",
+  "worker_operation": "ts-bounded-time-",
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-transport-views-native",
+  "contract": [
+    "Place the selected TS188 PID’s source clock in the caller’s bounded interval and compare against FFmpeg’s 90 kHz PES times on controls whose anchors choose the same interval.",
+    "Compare PID, timestamp field index and signed lifted ticks, in stream order, then clean end. The one-byte AVC PES control compares PTS only because no source DTS was encoded. The ADTS controls carry one complete frame per PES and explicitly encode both timestamps, which the candidate reads from the packet clock.",
+    "The separate ts-bounded-time-oracle contract compares raw words, exact time and ambiguity, identity and distance refusals."
+  ],
+  "required_profiles": [
+    "access-unit-wrap",
+    "linear",
+    "source-wrap"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "source-wrap",
+        "access-unit-wrap",
+        "linear"
+      ],
+      "cause": "The bounded source lift and the demux clock implement different policies."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "source-wrap",
+        "access-unit-wrap",
+        "linear"
+      ],
+      "cause": "The bounded source lift and the demux clock implement different policies."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "source-wrap",
+        "access-unit-wrap",
+        "linear"
+      ],
+      "cause": "The bounded source lift and the demux clock implement different policies."
+    }
+  ]
+}

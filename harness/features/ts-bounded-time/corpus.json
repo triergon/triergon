@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "source-wrap",
+      "profile": "source-wrap",
+      "file": "crates/playback/tests/fixtures/ts/pts-wrap-forward.ts",
+      "sha256": "150adc340bb4659189f7a817653196dda5d78592bb6f46e4e98879455a387258",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ref-pes",
+        "256",
+        "1",
+        "1",
+        "256",
+        "0",
+        "pts90",
+        "0",
+        "2700"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 0,
+        "digest": 9601712317872
+      }
+    },
+    {
+      "id": "access-unit-wrap",
+      "profile": "access-unit-wrap",
+      "file": ".research/fixtures-transport-views/clock-crossing.ts",
+      "sha256": "e25445135db5928edda75b7d7272307f518befee510694bb27ee1a71da459f7b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ref-au",
+        "257",
+        "1",
+        "1",
+        "257",
+        "0",
+        "pts90",
+        "0",
+        "2700"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 4738823543454334299
+      }
+    },
+    {
+      "id": "linear",
+      "profile": "linear",
+      "file": ".research/fixtures-transport-views/clock-linear.ts",
+      "sha256": "bf962f4487e92d24eaed9f56b18f7c6152e492b46b8995acd0aa1ee09215c29e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "ref-au",
+        "257",
+        "1",
+        "1",
+        "257",
+        "0",
+        "pts90",
+        "90000",
+        "600000"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 5614142879781709645
+      }
+    }
+  ]
+}

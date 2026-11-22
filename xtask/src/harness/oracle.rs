@@ -35,6 +35,7 @@ impl Kind {
             "opus-final-range",
             "ts-video-descriptors",
             "ts-packets",
+            "ts-time",
             "views-smoke",
             "pgs-segments",
             "text-extraction",

@@ -1,0 +1,1587 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "forbidden-five",
+      "profile": "forbidden-five",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/forbidden-five.ts",
+      "sha256": "e723cca9b2239ffa9a8ece95215d5ec2c0d4821b0f5aa32806dc4b51efdb84d6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 11277948698910861032
+      }
+    },
+    {
+      "id": "forbidden-zero",
+      "profile": "forbidden-zero",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/forbidden-zero.ts",
+      "sha256": "4e0d0aab763fd9ed3ea63a081f503d2b9a6e3daacd3d6906a60c2ab88e866ea9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 26,
+        "digest": 2095954110468180216
+      }
+    },
+    {
+      "id": "initial-pcr-discontinuity",
+      "profile": "initial-pcr-discontinuity",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/initial-pcr-discontinuity.ts",
+      "sha256": "39b68ddf54f5b6035f9b8a07576dcadc22d8304c75bd9600b8835cb1344ed374",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 244316537035128232
+      }
+    },
+    {
+      "id": "marker-0",
+      "profile": "marker-0",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/marker-0.ts",
+      "sha256": "8f4e7eafe2c71829eec9bb4dcd44f543946415ca816ca8df194c9c7f2ff68e88",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 14837623000803496457
+      }
+    },
+    {
+      "id": "marker-2",
+      "profile": "marker-2",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/marker-2.ts",
+      "sha256": "efc5681790b091d804c4da956f099ae5495543de32e8197e65f3e8c031c6cbd9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 13389130535870821961
+      }
+    },
+    {
+      "id": "marker-4",
+      "profile": "marker-4",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/marker-4.ts",
+      "sha256": "4b6cbd1478752b69a9e2c860de7a56d3c5630b5620782b4ebcaf9797e87211bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 10700272406022466185
+      }
+    },
+    {
+      "id": "marker-all",
+      "profile": "marker-all",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/marker-all.ts",
+      "sha256": "bc06c030bcba1ad1505f0c3db0f7c403105d334e42e7a9ef997d5f1c16fd6b6a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 1544904721207424907
+      }
+    },
+    {
+      "id": "marker-then-valid",
+      "profile": "marker-then-valid",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/marker-then-valid.ts",
+      "sha256": "20f5094292dfd55cdf622283919e6dea9d2c7100d56093600039ebc4b8fce0c8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 50,
+        "digest": 4447992002570037444
+      }
+    },
+    {
+      "id": "pcr-and-stuffing",
+      "profile": "pcr-and-stuffing",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/pcr-and-stuffing.ts",
+      "sha256": "19d64784c4e568ac55ef9ebf356c449f42bbf88f646e7bc9bb9dadbb82bfb403",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 244316537035128232
+      }
+    },
+    {
+      "id": "pcr-discontinuity-three",
+      "profile": "pcr-discontinuity-three",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/pcr-discontinuity-three.ts",
+      "sha256": "3ab3c37b38aff07861198a2ba810c2973d81d150a5fda3fedfabeb180e42b102",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 67,
+        "digest": 4514737901011931235
+      }
+    },
+    {
+      "id": "pcr-extension-300",
+      "profile": "pcr-extension-300",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/pcr-extension-300.ts",
+      "sha256": "3203131c218b0c09bdcc9a098f4cdb26da565a9b4f48a850b9d92c001cfd41c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 244316537035128232
+      }
+    },
+    {
+      "id": "pcr-extension-511",
+      "profile": "pcr-extension-511",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/pcr-extension-511.ts",
+      "sha256": "5e4cdc732fa010f661d54d1e2e89e5da3f47e441c47607782b2a626ecfc621e2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 244316537035128232
+      }
+    },
+    {
+      "id": "pcr-reserved-zero",
+      "profile": "pcr-reserved-zero",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/pcr-reserved-zero.ts",
+      "sha256": "b27f58688f634d1ed49227649b4032344b2c0d5c4d4c4f76669af3e88d9eafc8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 244316537035128232
+      }
+    },
+    {
+      "id": "scrambling-1",
+      "profile": "scrambling-1",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/scrambling-1.ts",
+      "sha256": "2786aba89c0d890854be19fb2cfaf32899a06ca79bd1f8761e8b5bc037c05b3d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 244316537035128232
+      }
+    },
+    {
+      "id": "scrambling-2",
+      "profile": "scrambling-2",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/scrambling-2.ts",
+      "sha256": "bf847c0b0cde334d97f938892a28b81cd9963adb6fe2240f85d9ebf9c2ca268a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 244316537035128232
+      }
+    },
+    {
+      "id": "scrambling-3",
+      "profile": "scrambling-3",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/scrambling-3.ts",
+      "sha256": "172394838bacf8b1fcd549f4cb5ddc99b1de6bacf185e03b490e0d58f1544a8c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 244316537035128232
+      }
+    },
+    {
+      "id": "scrambling-and-forbidden",
+      "profile": "scrambling-and-forbidden",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/scrambling-and-forbidden.ts",
+      "sha256": "53560589d001f9fe832bd39ca2f8ef72a693d8311e13d0ae57c2b288298daa7e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 11277948698910861032
+      }
+    },
+    {
+      "id": "tei-and-marker",
+      "profile": "tei-and-marker",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/tei-and-marker.ts",
+      "sha256": "88a2c37019f0004a4daddcecb4df19cdae452ba10b5041127e8817a37c3f8212",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 1544904721207424907
+      }
+    },
+    {
+      "id": "tei-and-scrambling",
+      "profile": "tei-and-scrambling",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/tei-and-scrambling.ts",
+      "sha256": "5f2ef7c050e7bd9e423cff5ad38596310f526c467790683b29125640c4ca7141",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 244316537035128232
+      }
+    },
+    {
+      "id": "tei-incomplete-finite",
+      "profile": "tei-incomplete-finite",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/tei-incomplete-finite.ts",
+      "sha256": "da89950f20f28df410d204be495f0ca50ec04b3fa67bd0859b08151b10d1b5aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 1619002472359860262
+      }
+    },
+    {
+      "id": "tei-then-valid",
+      "profile": "tei-then-valid",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/tei-then-valid.ts",
+      "sha256": "90c7282729c180cc86ce88525678b3123a84aaa19d107bd818137b619f635f76",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 50,
+        "digest": 8043689200336674567
+      }
+    },
+    {
+      "id": "tei",
+      "profile": "tei",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/tei.ts",
+      "sha256": "844b8d3ebf5f95811bcbd924a7ac74f8e0ac5b20d370676d75bbfa5924b108e8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 244316537035128232
+      }
+    },
+    {
+      "id": "valid-control",
+      "profile": "valid-control",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/valid-control.ts",
+      "sha256": "67b021b380f8fd19d36e1cf21c7ada58c74f653c3aa560331ec3ddd11c17dc42",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 244316537035128232
+      }
+    },
+    {
+      "id": "wrong-time-prefix",
+      "profile": "wrong-time-prefix",
+      "file": "crates/mpegts/tests/data/selected-faults-v1/wrong-time-prefix.ts",
+      "sha256": "4530c5c14e6880fbfda05e3c3529e69ab003f1da1a231004f286a0e612c95057",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 31,
+        "digest": 6559086074965407640
+      }
+    },
+    {
+      "id": "opcr-without-pcr-invalid",
+      "profile": "opcr-without-pcr-invalid",
+      "file": "crates/mpegts/tests/data/native-pes-v1/opcr-without-pcr-invalid.ts",
+      "sha256": "1aa6856c675fb2f6cfc2d4735b02577bb96870f6ad4f5aa280cc8181af71e4a7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 82,
+        "digest": 10267345629206951299
+      }
+    },
+    {
+      "id": "pes-optional-header-overrun-then-valid",
+      "profile": "pes-optional-header-overrun-then-valid",
+      "file": "crates/mpegts/tests/data/native-nonpass-v1/pes-optional-header-overrun-then-valid.ts",
+      "sha256": "eaf1ad645afbff14904d5bf8fc6f9eb4315a91835cb2c7ff90ce87ef147ca298",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 8448616646924264794
+      }
+    },
+    {
+      "id": "pes-start-prefix-invalid-then-valid",
+      "profile": "pes-start-prefix-invalid-then-valid",
+      "file": "crates/mpegts/tests/data/native-nonpass-v1/pes-start-prefix-invalid-then-valid.ts",
+      "sha256": "9192d1a1603f0c9bb5b1d246a6b7a02f13f7e6f5731b18d33048c72a95604136",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 8448616646924264794
+      }
+    },
+    {
+      "id": "valid-pes-optional-header-overrun-then-valid",
+      "profile": "valid-pes-optional-header-overrun-then-valid",
+      "file": "crates/mpegts/tests/data/native-nonpass-v1/valid-pes-optional-header-overrun-then-valid.ts",
+      "sha256": "d0858919a796fcf401d155bc92a90f36f1601ed7fbef6536323ae3b4ce199f71",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 82,
+        "digest": 18414198661899437344
+      }
+    },
+    {
+      "id": "valid-pes-start-prefix-invalid-then-valid",
+      "profile": "valid-pes-start-prefix-invalid-then-valid",
+      "file": "crates/mpegts/tests/data/native-nonpass-v1/valid-pes-start-prefix-invalid-then-valid.ts",
+      "sha256": "f01e0035901181b871b57c5e5812272d58c92f103049f15afc50cb7552832799",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 82,
+        "digest": 18414198661899437344
+      }
+    },
+    {
+      "id": "valid-transport-adaptation-overrun-then-valid",
+      "profile": "valid-transport-adaptation-overrun-then-valid",
+      "file": "crates/mpegts/tests/data/native-nonpass-v1/valid-transport-adaptation-overrun-then-valid.ts",
+      "sha256": "bb86e50b533b4ab29a5243d0981e0377629813b4b884f44fd015514e15fbe70e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 82,
+        "digest": 18414198661899437344
+      }
+    },
+    {
+      "id": "valid-transport-afc-reserved-then-valid",
+      "profile": "valid-transport-afc-reserved-then-valid",
+      "file": "crates/mpegts/tests/data/native-nonpass-v1/valid-transport-afc-reserved-then-valid.ts",
+      "sha256": "732263a3835d0e0af10c3f313955cd908bf4fd89b7fac6988e847b51a28e0f4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 82,
+        "digest": 18414198661899437344
+      }
+    },
+    {
+      "id": "valid-transport-sync-loss-then-valid",
+      "profile": "valid-transport-sync-loss-then-valid",
+      "file": "crates/mpegts/tests/data/native-nonpass-v1/valid-transport-sync-loss-then-valid.ts",
+      "sha256": "16986950a3ca49e38f277108c03a42dfc73176fce55743cb828e7161a3dc013e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 301763614231778749
+      }
+    },
+    {
+      "id": "crc-control-then-valid-pes",
+      "profile": "crc-control-then-valid-pes",
+      "file": "crates/mpegts/tests/data/packet-completion-v1/crc-control-then-valid-pes.ts",
+      "sha256": "59fbd7de3d2d22fd7079d6c299c744b68ba4bd13508a9ed38a8eb2cab3639867",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 8448616646924264825
+      }
+    },
+    {
+      "id": "inactive-pat-then-unrouted-pes",
+      "profile": "inactive-pat-then-unrouted-pes",
+      "file": "crates/mpegts/tests/data/packet-completion-v1/inactive-pat-then-unrouted-pes.ts",
+      "sha256": "33af9e70a2f08e48e4b730618aaf6fd1e23db95d8dc11523301ec341a2e476ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 301763614231778749
+      }
+    },
+    {
+      "id": "pes-on-declared-pmt-pid",
+      "profile": "pes-on-declared-pmt-pid",
+      "file": "crates/mpegts/tests/data/packet-completion-v1/pes-on-declared-pmt-pid.ts",
+      "sha256": "a76ee3c7bc186ca8c35d87385bca0e98d2454c855ed9782f26fddcd3054947d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "physical-truncated-tail",
+      "profile": "physical-truncated-tail",
+      "file": "crates/mpegts/tests/data/packet-completion-v1/physical-truncated-tail.ts",
+      "sha256": "75e936a5a331222dc208e0c2d1a5c1cf0070fbad96cf56fee6e674ad94254c39",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pmt-control-truncated-section",
+      "profile": "pmt-control-truncated-section",
+      "file": "crates/mpegts/tests/data/packet-completion-v1/pmt-control-truncated-section.ts",
+      "sha256": "a5862356a79f9b9c78272b2597888a4c121ff103f0b7b509cf99e94ea4352725",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "tei-rejected-control",
+      "profile": "tei-rejected-control",
+      "file": "crates/mpegts/tests/data/packet-completion-v1/tei-rejected-control.ts",
+      "sha256": "c828522c81c4ec9022d5682ecb4eb35c78e75dec4ea905cf25f9c4556c950de1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "unanchored-pmt-control",
+      "profile": "unanchored-pmt-control",
+      "file": "crates/mpegts/tests/data/packet-completion-v1/unanchored-pmt-control.ts",
+      "sha256": "e1caa6e1642d406fed46fc937f789a5f0d2c8567233082ec5beb8392af4146f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "unknown-pid-continuation-after-control",
+      "profile": "unknown-pid-continuation-after-control",
+      "file": "crates/mpegts/tests/data/packet-completion-v1/unknown-pid-continuation-after-control.ts",
+      "sha256": "e76bd798b25dcb807947abc329f1e041a30ffb3774b6377a9976c178f1bba8dc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "unknown-pid-pes-after-pat-control",
+      "profile": "unknown-pid-pes-after-pat-control",
+      "file": "crates/mpegts/tests/data/packet-completion-v1/unknown-pid-pes-after-pat-control.ts",
+      "sha256": "6999ce34811696d772473c1da0ec4c7398fcef3ed04b5c8926e9c52efed4c15b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pat-atomic-two-sections",
+      "profile": "pat-atomic-two-sections",
+      "file": "crates/mpegts/tests/data/pat-atomic-two-sections.ts",
+      "sha256": "4e12da68ea272260e22a2703e1b5e0085bf06c7a188a506144cd322097938a83",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pat-incomplete-version",
+      "profile": "pat-incomplete-version",
+      "file": "crates/mpegts/tests/data/pat-incomplete-version.ts",
+      "sha256": "fb32be9750b6f9b156e8edfe96127911ae0ae647141736769f188b6b165b72c2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "control"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pat-network-pid-not-track",
+      "profile": "pat-network-pid-not-track",
+      "file": "crates/mpegts/tests/data/pat-network-pid-not-track.ts",
+      "sha256": "d1ed7d3eb8623d7988c0678d3873714eefad51c935601e4d07c0025ae6a51f76",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "control"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pcr-extension-invalid",
+      "profile": "pcr-extension-invalid",
+      "file": "crates/mpegts/tests/data/pcr-extension-invalid.ts",
+      "sha256": "bda9a9a737d300d21f20b0bca3da9225f849e071d67feb3a1954b6e6c7af8316",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 301763614231778749
+      }
+    },
+    {
+      "id": "pcr-extension-preserved",
+      "profile": "pcr-extension-preserved",
+      "file": "crates/mpegts/tests/data/pcr-extension-preserved.ts",
+      "sha256": "9f96209a33669e71a36e3ca9835cd435b1bbe9f214fc7a2f0cba2c0181aeddb0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 301763614231778749
+      }
+    },
+    {
+      "id": "pcr-timeline-discontinuity",
+      "profile": "pcr-timeline-discontinuity",
+      "file": "crates/mpegts/tests/data/pcr-timeline-discontinuity.ts",
+      "sha256": "45f8097aa41daf9dccdb165586638a9b6aa0054b56f58fc49772c7e333e5fe03",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 58,
+        "digest": 5509681580825013703
+      }
+    },
+    {
+      "id": "pes-audio-zero-length-invalid",
+      "profile": "pes-audio-zero-length-invalid",
+      "file": "crates/mpegts/tests/data/pes-audio-zero-length-invalid.ts",
+      "sha256": "e3faae845ad4399024785e8a975a67f2953fccf27c3788dba706cdc4da335af4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 5163137376740456928
+      }
+    },
+    {
+      "id": "pes-finite-extra-payload",
+      "profile": "pes-finite-extra-payload",
+      "file": "crates/mpegts/tests/data/pes-finite-extra-payload.ts",
+      "sha256": "ff918dc326a6bbba7981549df0460c5ae25f06ede7f1b65960fddc88e719244c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 301763614231778749
+      }
+    },
+    {
+      "id": "pes-finite-truncated-eof",
+      "profile": "pes-finite-truncated-eof",
+      "file": "crates/mpegts/tests/data/pes-finite-truncated-eof.ts",
+      "sha256": "9bef79e6aec98edb39bcfec5ac741f273d91e36cd4e70e9ca39681368566b890",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 38,
+        "digest": 5560770016990461405
+      }
+    },
+    {
+      "id": "pes-forbidden-time-flags",
+      "profile": "pes-forbidden-time-flags",
+      "file": "crates/mpegts/tests/data/pes-forbidden-time-flags.ts",
+      "sha256": "ea3bb1e3c5c24d6d1cb8938be00e85bbd9294e15f7278b1352cd860098581609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 8728891588260501645
+      }
+    },
+    {
+      "id": "pes-header-every-byte",
+      "profile": "pes-header-every-byte",
+      "file": "crates/mpegts/tests/data/pes-header-every-byte.ts",
+      "sha256": "8ff5dfe33f55e77354e598b75803425df69660c3ab3e6800fac0ebff6b829321",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 301763614231778749
+      }
+    },
+    {
+      "id": "pes-multiple-ts",
+      "profile": "pes-multiple-ts",
+      "file": "crates/mpegts/tests/data/pes-multiple-ts.ts",
+      "sha256": "36623e57a6d79b1dc5cd315d760214a75a6f663746d391d628909303fedd2b47",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 526,
+        "digest": 3281822888220535606
+      }
+    },
+    {
+      "id": "pes-optional-header-overrun",
+      "profile": "pes-optional-header-overrun",
+      "file": "crates/mpegts/tests/data/pes-optional-header-overrun.ts",
+      "sha256": "638d1714d221a3135d3eaffe0df5232b1dafc55359e7663a7a98bb0cb681b5fa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pes-start-prefix-invalid",
+      "profile": "pes-start-prefix-invalid",
+      "file": "crates/mpegts/tests/data/pes-start-prefix-invalid.ts",
+      "sha256": "659cc94416d5086fb9c97b827df1ea36fd9145d6ebf8039f85cc9ef36dae934f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pes-time-unknown",
+      "profile": "pes-time-unknown",
+      "file": "crates/mpegts/tests/data/pes-time-unknown.ts",
+      "sha256": "0d0f32244ea0543fe4a2821c8e8b0caf9b9f9a972ddcc3755547c2532158e6d6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 16821683038234276651
+      }
+    },
+    {
+      "id": "pes-timestamp-marker",
+      "profile": "pes-timestamp-marker",
+      "file": "crates/mpegts/tests/data/pes-timestamp-marker.ts",
+      "sha256": "d13c6bcf9122c717a80fd66ba87e7058702c961a736ec0cb14fb0f891dcdb264",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 1934353176561563934
+      }
+    },
+    {
+      "id": "pes-unbounded-definitive-eof",
+      "profile": "pes-unbounded-definitive-eof",
+      "file": "crates/mpegts/tests/data/pes-unbounded-definitive-eof.ts",
+      "sha256": "353d11c558ff8406b08dd3fb44c9a555d2b3af699eeac3f375913ed1664b8723",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 14240462895478074816
+      }
+    },
+    {
+      "id": "pes-unbounded-next-pusi",
+      "profile": "pes-unbounded-next-pusi",
+      "file": "crates/mpegts/tests/data/pes-unbounded-next-pusi.ts",
+      "sha256": "3befc1e04a8141bfabcb44c0f7ea6a8bb870020a0f3f5eec98a6194c21004a01",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 59,
+        "digest": 11752869625486613283
+      }
+    },
+    {
+      "id": "pmt-descriptor-overrun",
+      "profile": "pmt-descriptor-overrun",
+      "file": "crates/mpegts/tests/data/pmt-descriptor-overrun.ts",
+      "sha256": "acce139050be1b1bbeeab82de769bf590b96fed2a3ddc06f18262d971878e6db",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pmt-multi-section-forbidden",
+      "profile": "pmt-multi-section-forbidden",
+      "file": "crates/mpegts/tests/data/pmt-multi-section-forbidden.ts",
+      "sha256": "1420c5b78a4e6087608885abda07627b3bb28fef9dbef30a6f99694ed44e7ffb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "control"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pmt-opaque-language-descriptors",
+      "profile": "pmt-opaque-language-descriptors",
+      "file": "crates/mpegts/tests/data/pmt-opaque-language-descriptors.ts",
+      "sha256": "0d5c791b6ce3a2f796c91de24e4663d1bb3a891e09221bebc57cc658689993a5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pmt-version-wrap-retypes-pid",
+      "profile": "pmt-version-wrap-retypes-pid",
+      "file": "crates/mpegts/tests/data/pmt-version-wrap-retypes-pid.ts",
+      "sha256": "fa37cb365078ead09193f8ff28d46eb31a4d3091cfb68a0f2e5751315b8a9900",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-crc-invalid",
+      "profile": "psi-crc-invalid",
+      "file": "crates/mpegts/tests/data/psi-crc-invalid.ts",
+      "sha256": "043ad5751083616d0f98dca7327946e7caa1b82a45e08546ce8a7fdb762a04fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "control"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-header-every-byte",
+      "profile": "psi-header-every-byte",
+      "file": "crates/mpegts/tests/data/psi-header-every-byte.ts",
+      "sha256": "bd02d08698bc7cf48c1ac7ead9ea1853533d3565b82b5e753b6caa00c165de4d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 17817909686729666805
+      }
+    },
+    {
+      "id": "psi-length-over-policy",
+      "profile": "psi-length-over-policy",
+      "file": "crates/mpegts/tests/data/psi-length-over-policy.ts",
+      "sha256": "eb1970a3bd892e3e273553d0913289b663c557a71c76e92eb52f505426672ced",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "control"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-pending-not-current",
+      "profile": "psi-pending-not-current",
+      "file": "crates/mpegts/tests/data/psi-pending-not-current.ts",
+      "sha256": "168aed08af176a89d3f5e718aae7712e6b27228dec4f83c5b5967994366c325b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "control"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-pointer-finishes-old-starts-new",
+      "profile": "psi-pointer-finishes-old-starts-new",
+      "file": "crates/mpegts/tests/data/psi-pointer-finishes-old-starts-new.ts",
+      "sha256": "018d27eca36c03cdf3b5598b6b680f636b5b6dce278ceec7539bc55373d0d135",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-pointer-overrun",
+      "profile": "psi-pointer-overrun",
+      "file": "crates/mpegts/tests/data/psi-pointer-overrun.ts",
+      "sha256": "7a4dd29b6eb3443c3b455408021fc5dd92533686ffaaf6b01362a957db3a8577",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-stuffing-tail-invalid",
+      "profile": "psi-stuffing-tail-invalid",
+      "file": "crates/mpegts/tests/data/psi-stuffing-tail-invalid.ts",
+      "sha256": "ed73a57ef84d585dabe93fa19466e848ca1ac279ebd58b614952da64e1c7f9cb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "control"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-truncated-eof",
+      "profile": "psi-truncated-eof",
+      "file": "crates/mpegts/tests/data/psi-truncated-eof.ts",
+      "sha256": "704f2b6328fc3908e165f9ad1bff609d1c989426b553507009a984a999caa136",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "control"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-two-sections-one-payload",
+      "profile": "psi-two-sections-one-payload",
+      "file": "crates/mpegts/tests/data/psi-two-sections-one-payload.ts",
+      "sha256": "6fc31b93ccac53d4aff8137834c9dcc135390753e04f315994ebae0c9aa6c726",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "transport-adaptation-overrun",
+      "profile": "transport-adaptation-overrun",
+      "file": "crates/mpegts/tests/data/transport-adaptation-overrun.ts",
+      "sha256": "416703f1c9dc4c70ff55bf1399e4c61d477fbb2fe1936ebe3703714d9cb55fa2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "transport-afc-reserved",
+      "profile": "transport-afc-reserved",
+      "file": "crates/mpegts/tests/data/transport-afc-reserved.ts",
+      "sha256": "a7e71884a941434472685b6deb6cc288a0738fdfbe612c3376a424c3d48d9283",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "transport-null-pid",
+      "profile": "transport-null-pid",
+      "file": "crates/mpegts/tests/data/transport-null-pid.ts",
+      "sha256": "a4e9a8755abec48791a099c9b8625149a33c86485056c902f9833333de977ed5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 301763614231778749
+      }
+    },
+    {
+      "id": "transport-partial-final-packet",
+      "profile": "transport-partial-final-packet",
+      "file": "crates/mpegts/tests/data/transport-partial-final-packet.ts",
+      "sha256": "819ad792840e42e71aed201bdda145386eab24a5a3b21a0316eb7c8e4146ac33",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 301763614231778749
+      }
+    },
+    {
+      "id": "transport-scrambled",
+      "profile": "transport-scrambled",
+      "file": "crates/mpegts/tests/data/transport-scrambled.ts",
+      "sha256": "98711c9c5209d844f6a13444738049959803327797030bfd4db3b4d1ad888e14",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 301763614231778749
+      }
+    },
+    {
+      "id": "transport-sync-loss",
+      "profile": "transport-sync-loss",
+      "file": "crates/mpegts/tests/data/transport-sync-loss.ts",
+      "sha256": "bc619e8aa33b71910fa06c3e8fe66f1ada0e81b0bd48af74e793ed61d40a2d94",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 301763614231778749
+      }
+    },
+    {
+      "id": "transport-tei",
+      "profile": "transport-tei",
+      "file": "crates/mpegts/tests/data/transport-tei.ts",
+      "sha256": "0285850f9cf9c14fa70a9ca36c422688224287251c38349d8d56f9015e448895",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "faults"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 41,
+        "digest": 301763614231778749
+      }
+    },
+    {
+      "id": "false188-7",
+      "profile": "false188-7",
+      "file": "crates/mpegts/tests/data/native-input-v1/false188-7.bin",
+      "sha256": "3fa695e493bb41050dff90ddb0cdf2d2006e25d1b7a617064326f0ad7a0fd569",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "input192"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "opaque-PES-1-carrier-192-tail-3",
+      "profile": "opaque-PES-1-carrier-192-tail-3",
+      "file": "crates/mpegts/tests/data/native-input-v1/opaque-PES-1-carrier-192-tail-3.m2ts",
+      "sha256": "a0c975fa3e503f55c6c84f4ec4a18523cde1fb068941b60ecf710dd782712b8d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "input192"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 2691570181265018332
+      }
+    },
+    {
+      "id": "original-valid-rebind-188",
+      "profile": "original-valid-rebind-188",
+      "file": "crates/mpegts/tests/data/native-input-v1/original-valid-rebind-188.ts",
+      "sha256": "6a58d3cd4e74c03e436cd6234380267fd34d228ac044f0e55263e1943a255c2f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "input188"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 888,
+        "digest": 6100838783783214862
+      }
+    },
+    {
+      "id": "original-valid-rebind-192",
+      "profile": "original-valid-rebind-192",
+      "file": "crates/mpegts/tests/data/native-input-v1/original-valid-rebind-192.m2ts",
+      "sha256": "beb6f56835bd2917fc6f5e72c9d8e55724517a0831ce6913eb200081330c23c7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "input192"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 888,
+        "digest": 7698982436369647614
+      }
+    },
+    {
+      "id": "seventh-sync-zero",
+      "profile": "seventh-sync-zero",
+      "file": "crates/mpegts/tests/data/native-input-v1/seventh-sync-zero.bin",
+      "sha256": "a29993fe31a1bf18c7b208862a19e8ce1de20ba50a00bc30479d5402e3d0857d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "input192"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 2691570181265018333
+      }
+    },
+    {
+      "id": "opaque-transport-tei",
+      "profile": "opaque-transport-tei",
+      "file": "crates/mpegts/tests/data/transport-tei.ts",
+      "sha256": "0285850f9cf9c14fa70a9ca36c422688224287251c38349d8d56f9015e448895",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "opaque"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 27,
+        "digest": 11506827807133465986
+      }
+    },
+    {
+      "id": "opaque-transport-scrambled",
+      "profile": "opaque-transport-scrambled",
+      "file": "crates/mpegts/tests/data/transport-scrambled.ts",
+      "sha256": "98711c9c5209d844f6a13444738049959803327797030bfd4db3b4d1ad888e14",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "opaque"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 27,
+        "digest": 11506827807133465986
+      }
+    },
+    {
+      "id": "opaque-transport-partial-final-packet",
+      "profile": "opaque-transport-partial-final-packet",
+      "file": "crates/mpegts/tests/data/transport-partial-final-packet.ts",
+      "sha256": "819ad792840e42e71aed201bdda145386eab24a5a3b21a0316eb7c8e4146ac33",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "opaque"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 27,
+        "digest": 11506827807133465986
+      }
+    },
+    {
+      "id": "opaque-transport-sync-loss",
+      "profile": "opaque-transport-sync-loss",
+      "file": "crates/mpegts/tests/data/transport-sync-loss.ts",
+      "sha256": "bc619e8aa33b71910fa06c3e8fe66f1ada0e81b0bd48af74e793ed61d40a2d94",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "opaque"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 27,
+        "digest": 11506827807133465986
+      }
+    },
+    {
+      "id": "opaque-pcr-extension-invalid",
+      "profile": "opaque-pcr-extension-invalid",
+      "file": "crates/mpegts/tests/data/pcr-extension-invalid.ts",
+      "sha256": "bda9a9a737d300d21f20b0bca3da9225f849e071d67feb3a1954b6e6c7af8316",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "opaque"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 27,
+        "digest": 11506827807133465986
+      }
+    },
+    {
+      "id": "opaque-pes-timestamp-marker",
+      "profile": "opaque-pes-timestamp-marker",
+      "file": "crates/mpegts/tests/data/pes-timestamp-marker.ts",
+      "sha256": "d13c6bcf9122c717a80fd66ba87e7058702c961a736ec0cb14fb0f891dcdb264",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "opaque"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 27,
+        "digest": 11506827807133465986
+      }
+    },
+    {
+      "id": "opaque-pes-forbidden-time-flags",
+      "profile": "opaque-pes-forbidden-time-flags",
+      "file": "crates/mpegts/tests/data/pes-forbidden-time-flags.ts",
+      "sha256": "ea3bb1e3c5c24d6d1cb8938be00e85bbd9294e15f7278b1352cd860098581609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "opaque"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 27,
+        "digest": 15547538707110244226
+      }
+    },
+    {
+      "id": "opaque-pes-finite-truncated-eof",
+      "profile": "opaque-pes-finite-truncated-eof",
+      "file": "crates/mpegts/tests/data/pes-finite-truncated-eof.ts",
+      "sha256": "9bef79e6aec98edb39bcfec5ac741f273d91e36cd4e70e9ca39681368566b890",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "opaque"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 24,
+        "digest": 9253337790415758199
+      }
+    },
+    {
+      "id": "opaque-pes-finite-extra-payload",
+      "profile": "opaque-pes-finite-extra-payload",
+      "file": "crates/mpegts/tests/data/pes-finite-extra-payload.ts",
+      "sha256": "ff918dc326a6bbba7981549df0460c5ae25f06ede7f1b65960fddc88e719244c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "1",
+        "256",
+        "opaque"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 27,
+        "digest": 11506827807133465986
+      }
+    }
+  ]
+}

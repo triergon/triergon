@@ -1,0 +1,5521 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "ts188-basic",
+      "profile": "ts188-basic",
+      "file": "crates/mpegts/tests/data/ts188-basic.ts",
+      "sha256": "be7ba9883bdb21233577517ffc8a1ada5d8193d32eaf8e6bbf3b25f37e7a8da9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 0,
+          "group": "source-ordinary",
+          "id": "ts188-basic"
+        },
+        {
+          "ordinal": 64,
+          "group": "composed-ordinary",
+          "id": "ts188-basic"
+        },
+        {
+          "ordinal": 128,
+          "group": "source-native-clock-v1",
+          "id": "ts188-basic"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "m2ts192-opaque-prefix",
+      "profile": "m2ts192-opaque-prefix",
+      "file": "crates/mpegts/tests/data/m2ts192-opaque-prefix.m2ts",
+      "sha256": "b530a81aced8a1e57049ad1986485297e94393b77b562fe6879d09f0d02f995e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 1,
+          "group": "source-ordinary",
+          "id": "m2ts192-opaque-prefix"
+        },
+        {
+          "ordinal": 65,
+          "group": "composed-ordinary",
+          "id": "m2ts192-opaque-prefix"
+        },
+        {
+          "ordinal": 129,
+          "group": "source-native-clock-v1",
+          "id": "m2ts192-opaque-prefix"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 8509129184707471149
+      }
+    },
+    {
+      "id": "pes-header-every-byte",
+      "profile": "pes-header-every-byte",
+      "file": "crates/mpegts/tests/data/pes-header-every-byte.ts",
+      "sha256": "8ff5dfe33f55e77354e598b75803425df69660c3ab3e6800fac0ebff6b829321",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 2,
+          "group": "source-ordinary",
+          "id": "pes-header-every-byte"
+        },
+        {
+          "ordinal": 66,
+          "group": "composed-ordinary",
+          "id": "pes-header-every-byte"
+        },
+        {
+          "ordinal": 130,
+          "group": "source-native-clock-v1",
+          "id": "pes-header-every-byte"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "psi-header-every-byte",
+      "profile": "psi-header-every-byte",
+      "file": "crates/mpegts/tests/data/psi-header-every-byte.ts",
+      "sha256": "bd02d08698bc7cf48c1ac7ead9ea1853533d3565b82b5e753b6caa00c165de4d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 3,
+          "group": "source-ordinary",
+          "id": "psi-header-every-byte"
+        },
+        {
+          "ordinal": 67,
+          "group": "composed-ordinary",
+          "id": "psi-header-every-byte"
+        },
+        {
+          "ordinal": 131,
+          "group": "source-native-clock-v1",
+          "id": "psi-header-every-byte"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 11199329351119951961
+      }
+    },
+    {
+      "id": "pes-multiple-ts",
+      "profile": "pes-multiple-ts",
+      "file": "crates/mpegts/tests/data/pes-multiple-ts.ts",
+      "sha256": "36623e57a6d79b1dc5cd315d760214a75a6f663746d391d628909303fedd2b47",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 4,
+          "group": "source-ordinary",
+          "id": "pes-multiple-ts"
+        },
+        {
+          "ordinal": 68,
+          "group": "composed-ordinary",
+          "id": "pes-multiple-ts"
+        },
+        {
+          "ordinal": 132,
+          "group": "source-native-clock-v1",
+          "id": "pes-multiple-ts"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 513,
+        "digest": 3015292577829627518
+      }
+    },
+    {
+      "id": "pes-unbounded-next-pusi",
+      "profile": "pes-unbounded-next-pusi",
+      "file": "crates/mpegts/tests/data/pes-unbounded-next-pusi.ts",
+      "sha256": "3befc1e04a8141bfabcb44c0f7ea6a8bb870020a0f3f5eec98a6194c21004a01",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 5,
+          "group": "source-ordinary",
+          "id": "pes-unbounded-next-pusi"
+        },
+        {
+          "ordinal": 69,
+          "group": "composed-ordinary",
+          "id": "pes-unbounded-next-pusi"
+        },
+        {
+          "ordinal": 133,
+          "group": "source-native-clock-v1",
+          "id": "pes-unbounded-next-pusi"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 32,
+        "digest": 3282601567086103822
+      }
+    },
+    {
+      "id": "pes-unbounded-definitive-eof",
+      "profile": "pes-unbounded-definitive-eof",
+      "file": "crates/mpegts/tests/data/pes-unbounded-definitive-eof.ts",
+      "sha256": "353d11c558ff8406b08dd3fb44c9a555d2b3af699eeac3f375913ed1664b8723",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 6,
+          "group": "source-ordinary",
+          "id": "pes-unbounded-definitive-eof"
+        },
+        {
+          "ordinal": 70,
+          "group": "composed-ordinary",
+          "id": "pes-unbounded-definitive-eof"
+        },
+        {
+          "ordinal": 134,
+          "group": "source-native-clock-v1",
+          "id": "pes-unbounded-definitive-eof"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "pes-time-unknown",
+      "profile": "pes-time-unknown",
+      "file": "crates/mpegts/tests/data/pes-time-unknown.ts",
+      "sha256": "0d0f32244ea0543fe4a2821c8e8b0caf9b9f9a972ddcc3755547c2532158e6d6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 7,
+          "group": "source-ordinary",
+          "id": "pes-time-unknown"
+        },
+        {
+          "ordinal": 71,
+          "group": "composed-ordinary",
+          "id": "pes-time-unknown"
+        },
+        {
+          "ordinal": 135,
+          "group": "source-native-clock-v1",
+          "id": "pes-time-unknown"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 5872805089148039457
+      }
+    },
+    {
+      "id": "pts-wrap-forward",
+      "profile": "pts-wrap-forward",
+      "file": "crates/mpegts/tests/data/pts-wrap-forward.ts",
+      "sha256": "150adc340bb4659189f7a817653196dda5d78592bb6f46e4e98879455a387258",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 8,
+          "group": "source-ordinary",
+          "id": "pts-wrap-forward"
+        },
+        {
+          "ordinal": 72,
+          "group": "composed-ordinary",
+          "id": "pts-wrap-forward"
+        },
+        {
+          "ordinal": 136,
+          "group": "source-native-clock-v1",
+          "id": "pts-wrap-forward"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3,
+        "digest": 13671929309507594841
+      }
+    },
+    {
+      "id": "pts-reorder",
+      "profile": "pts-reorder",
+      "file": "crates/mpegts/tests/data/pts-reorder.ts",
+      "sha256": "a106a1edc6396af5df05c98078d2005e4479052e8d5af1887409234fef1e87eb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 9,
+          "group": "source-ordinary",
+          "id": "pts-reorder"
+        },
+        {
+          "ordinal": 73,
+          "group": "composed-ordinary",
+          "id": "pts-reorder"
+        },
+        {
+          "ordinal": 137,
+          "group": "source-native-clock-v1",
+          "id": "pts-reorder"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3,
+        "digest": 12637789003334013817
+      }
+    },
+    {
+      "id": "pts-dts-common-epoch",
+      "profile": "pts-dts-common-epoch",
+      "file": "crates/mpegts/tests/data/pts-dts-common-epoch.ts",
+      "sha256": "6997f0498143ba7b71bc50b58014e5e46556b9ab30eeb6d05bcccbb9ac9bc44f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 10,
+          "group": "source-ordinary",
+          "id": "pts-dts-common-epoch"
+        },
+        {
+          "ordinal": 74,
+          "group": "composed-ordinary",
+          "id": "pts-dts-common-epoch"
+        },
+        {
+          "ordinal": 138,
+          "group": "source-native-clock-v1",
+          "id": "pts-dts-common-epoch"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3,
+        "digest": 1661011824096771137
+      }
+    },
+    {
+      "id": "pts-negative-against-dts",
+      "profile": "pts-negative-against-dts",
+      "file": "crates/mpegts/tests/data/pts-negative-against-dts.ts",
+      "sha256": "b789922555c03c8899d4783d3e2afaa1635f944daec67e048102a096a1508c6e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 11,
+          "group": "source-ordinary",
+          "id": "pts-negative-against-dts"
+        },
+        {
+          "ordinal": 75,
+          "group": "composed-ordinary",
+          "id": "pts-negative-against-dts"
+        },
+        {
+          "ordinal": 139,
+          "group": "source-native-clock-v1",
+          "id": "pts-negative-against-dts"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 2,
+        "digest": 4875881827105101822
+      }
+    },
+    {
+      "id": "pts-half-wrap-ambiguous",
+      "profile": "pts-half-wrap-ambiguous",
+      "file": "crates/mpegts/tests/data/pts-half-wrap-ambiguous.ts",
+      "sha256": "844d65103e84b1f3c38bb3ed6c888653c8016712534ea0af5015825ac7160fc0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 12,
+          "group": "source-ordinary",
+          "id": "pts-half-wrap-ambiguous"
+        },
+        {
+          "ordinal": 76,
+          "group": "composed-ordinary",
+          "id": "pts-half-wrap-ambiguous"
+        },
+        {
+          "ordinal": 140,
+          "group": "source-native-clock-v1",
+          "id": "pts-half-wrap-ambiguous"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3,
+        "digest": 7752544135920846201
+      }
+    },
+    {
+      "id": "cc-wrap-15-to-zero",
+      "profile": "cc-wrap-15-to-zero",
+      "file": "crates/mpegts/tests/data/cc-wrap-15-to-zero.ts",
+      "sha256": "11d8875a9e4d72969d06b7515819a088fc0323ba396189d6f790bae03408d7ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 13,
+          "group": "source-ordinary",
+          "id": "cc-wrap-15-to-zero"
+        },
+        {
+          "ordinal": 77,
+          "group": "composed-ordinary",
+          "id": "cc-wrap-15-to-zero"
+        },
+        {
+          "ordinal": 141,
+          "group": "source-native-clock-v1",
+          "id": "cc-wrap-15-to-zero"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3,
+        "digest": 12637789003334013817
+      }
+    },
+    {
+      "id": "cc-one-duplicate",
+      "profile": "cc-one-duplicate",
+      "file": "crates/mpegts/tests/data/cc-one-duplicate.ts",
+      "sha256": "e1c33ea6ced602b91d3c96f6360db4fc2f7f33b70dd292ec4fcd46c72d2d1d4b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 14,
+          "group": "source-ordinary",
+          "id": "cc-one-duplicate"
+        },
+        {
+          "ordinal": 78,
+          "group": "composed-ordinary",
+          "id": "cc-one-duplicate"
+        },
+        {
+          "ordinal": 142,
+          "group": "source-native-clock-v1",
+          "id": "cc-one-duplicate"
+        },
+        {
+          "ordinal": 225,
+          "group": "source-controls29",
+          "id": "cc-one-duplicate"
+        },
+        {
+          "ordinal": 254,
+          "group": "composed-controls29",
+          "id": "cc-one-duplicate"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 55,
+        "digest": 6435701905744465586
+      }
+    },
+    {
+      "id": "cc-third-copy",
+      "profile": "cc-third-copy",
+      "file": "crates/mpegts/tests/data/cc-third-copy.ts",
+      "sha256": "876a464706f21bc039dff21db573ebefc099443a2c7bd1a1e1251c0874e2a58f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 15,
+          "group": "source-ordinary",
+          "id": "cc-third-copy"
+        },
+        {
+          "ordinal": 79,
+          "group": "composed-ordinary",
+          "id": "cc-third-copy"
+        },
+        {
+          "ordinal": 143,
+          "group": "source-native-clock-v1",
+          "id": "cc-third-copy"
+        },
+        {
+          "ordinal": 226,
+          "group": "source-controls29",
+          "id": "cc-third-copy"
+        },
+        {
+          "ordinal": 255,
+          "group": "composed-controls29",
+          "id": "cc-third-copy"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 82,
+        "digest": 5201451601338335361
+      }
+    },
+    {
+      "id": "cc-same-counter-changed-payload",
+      "profile": "cc-same-counter-changed-payload",
+      "file": "crates/mpegts/tests/data/cc-same-counter-changed-payload.ts",
+      "sha256": "e00232ba31297d4897522e6b84800caf35e886244575c4ba86c166f5ae1dd2e7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 16,
+          "group": "source-ordinary",
+          "id": "cc-same-counter-changed-payload"
+        },
+        {
+          "ordinal": 80,
+          "group": "composed-ordinary",
+          "id": "cc-same-counter-changed-payload"
+        },
+        {
+          "ordinal": 144,
+          "group": "source-native-clock-v1",
+          "id": "cc-same-counter-changed-payload"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 37,
+        "digest": 670268414233718102
+      }
+    },
+    {
+      "id": "cc-adaptation-only",
+      "profile": "cc-adaptation-only",
+      "file": "crates/mpegts/tests/data/cc-adaptation-only.ts",
+      "sha256": "ba60b5b99452fe2ecefe6c16794bba10b1629ae4f2f5702c82a23a5d7c17b963",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 17,
+          "group": "source-ordinary",
+          "id": "cc-adaptation-only"
+        },
+        {
+          "ordinal": 81,
+          "group": "composed-ordinary",
+          "id": "cc-adaptation-only"
+        },
+        {
+          "ordinal": 145,
+          "group": "source-native-clock-v1",
+          "id": "cc-adaptation-only"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 29,
+        "digest": 4026407086156515933
+      }
+    },
+    {
+      "id": "cc-duplicate-pcr-update",
+      "profile": "cc-duplicate-pcr-update",
+      "file": "crates/mpegts/tests/data/cc-duplicate-pcr-update.ts",
+      "sha256": "380d375fd18d8e5aa96ebf37edaaf814b4ac2ab371cd37ccd7c373f412ab59b9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 18,
+          "group": "source-ordinary",
+          "id": "cc-duplicate-pcr-update"
+        },
+        {
+          "ordinal": 82,
+          "group": "composed-ordinary",
+          "id": "cc-duplicate-pcr-update"
+        },
+        {
+          "ordinal": 146,
+          "group": "source-native-clock-v1",
+          "id": "cc-duplicate-pcr-update"
+        },
+        {
+          "ordinal": 227,
+          "group": "source-controls29",
+          "id": "cc-duplicate-pcr-update"
+        },
+        {
+          "ordinal": 256,
+          "group": "composed-controls29",
+          "id": "cc-duplicate-pcr-update"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 55,
+        "digest": 6435701905744465586
+      }
+    },
+    {
+      "id": "cc-loss-mid-pes",
+      "profile": "cc-loss-mid-pes",
+      "file": "crates/mpegts/tests/data/cc-loss-mid-pes.ts",
+      "sha256": "5fbdbda3ec963a85ac39e89dc9d31b33ecdbcea8b8fd54004867c2cdb163ca02",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 19,
+          "group": "source-ordinary",
+          "id": "cc-loss-mid-pes"
+        },
+        {
+          "ordinal": 83,
+          "group": "composed-ordinary",
+          "id": "cc-loss-mid-pes"
+        },
+        {
+          "ordinal": 147,
+          "group": "source-native-clock-v1",
+          "id": "cc-loss-mid-pes"
+        },
+        {
+          "ordinal": 228,
+          "group": "source-controls29",
+          "id": "cc-loss-mid-pes"
+        },
+        {
+          "ordinal": 257,
+          "group": "composed-controls29",
+          "id": "cc-loss-mid-pes"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 355,
+        "digest": 11894665117182092841
+      }
+    },
+    {
+      "id": "cc-loss-clean-pusi",
+      "profile": "cc-loss-clean-pusi",
+      "file": "crates/mpegts/tests/data/cc-loss-clean-pusi.ts",
+      "sha256": "70fe583cd992cbb57b0c499537969476270d86d02995d7df99f52b2911c07ce5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 20,
+          "group": "source-ordinary",
+          "id": "cc-loss-clean-pusi"
+        },
+        {
+          "ordinal": 84,
+          "group": "composed-ordinary",
+          "id": "cc-loss-clean-pusi"
+        },
+        {
+          "ordinal": 148,
+          "group": "source-native-clock-v1",
+          "id": "cc-loss-clean-pusi"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 29,
+        "digest": 4026407086156515933
+      }
+    },
+    {
+      "id": "pcr-timeline-discontinuity",
+      "profile": "pcr-timeline-discontinuity",
+      "file": "crates/mpegts/tests/data/pcr-timeline-discontinuity.ts",
+      "sha256": "45f8097aa41daf9dccdb165586638a9b6aa0054b56f58fc49772c7e333e5fe03",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 21,
+          "group": "source-ordinary",
+          "id": "pcr-timeline-discontinuity"
+        },
+        {
+          "ordinal": 85,
+          "group": "composed-ordinary",
+          "id": "pcr-timeline-discontinuity"
+        },
+        {
+          "ordinal": 149,
+          "group": "source-native-clock-v1",
+          "id": "pcr-timeline-discontinuity"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 31,
+        "digest": 5265895557472553371
+      }
+    },
+    {
+      "id": "pcr-extension-preserved",
+      "profile": "pcr-extension-preserved",
+      "file": "crates/mpegts/tests/data/pcr-extension-preserved.ts",
+      "sha256": "9f96209a33669e71a36e3ca9835cd435b1bbe9f214fc7a2f0cba2c0181aeddb0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 22,
+          "group": "source-ordinary",
+          "id": "pcr-extension-preserved"
+        },
+        {
+          "ordinal": 86,
+          "group": "composed-ordinary",
+          "id": "pcr-extension-preserved"
+        },
+        {
+          "ordinal": 150,
+          "group": "source-native-clock-v1",
+          "id": "pcr-extension-preserved"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "pcr-extension-invalid",
+      "profile": "pcr-extension-invalid",
+      "file": "crates/mpegts/tests/data/pcr-extension-invalid.ts",
+      "sha256": "bda9a9a737d300d21f20b0bca3da9225f849e071d67feb3a1954b6e6c7af8316",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 23,
+          "group": "source-ordinary",
+          "id": "pcr-extension-invalid"
+        },
+        {
+          "ordinal": 87,
+          "group": "composed-ordinary",
+          "id": "pcr-extension-invalid"
+        },
+        {
+          "ordinal": 151,
+          "group": "source-native-clock-v1",
+          "id": "pcr-extension-invalid"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "transport-tei",
+      "profile": "transport-tei",
+      "file": "crates/mpegts/tests/data/transport-tei.ts",
+      "sha256": "0285850f9cf9c14fa70a9ca36c422688224287251c38349d8d56f9015e448895",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 24,
+          "group": "source-ordinary",
+          "id": "transport-tei"
+        },
+        {
+          "ordinal": 88,
+          "group": "composed-ordinary",
+          "id": "transport-tei"
+        },
+        {
+          "ordinal": 152,
+          "group": "source-native-clock-v1",
+          "id": "transport-tei"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "transport-scrambled",
+      "profile": "transport-scrambled",
+      "file": "crates/mpegts/tests/data/transport-scrambled.ts",
+      "sha256": "98711c9c5209d844f6a13444738049959803327797030bfd4db3b4d1ad888e14",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 25,
+          "group": "source-ordinary",
+          "id": "transport-scrambled"
+        },
+        {
+          "ordinal": 89,
+          "group": "composed-ordinary",
+          "id": "transport-scrambled"
+        },
+        {
+          "ordinal": 153,
+          "group": "source-native-clock-v1",
+          "id": "transport-scrambled"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "transport-afc-reserved",
+      "profile": "transport-afc-reserved",
+      "file": "crates/mpegts/tests/data/transport-afc-reserved.ts",
+      "sha256": "a7e71884a941434472685b6deb6cc288a0738fdfbe612c3376a424c3d48d9283",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 26,
+          "group": "source-ordinary",
+          "id": "transport-afc-reserved"
+        },
+        {
+          "ordinal": 90,
+          "group": "composed-ordinary",
+          "id": "transport-afc-reserved"
+        },
+        {
+          "ordinal": 154,
+          "group": "source-native-clock-v1",
+          "id": "transport-afc-reserved"
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 282257453037
+      }
+    },
+    {
+      "id": "transport-adaptation-overrun",
+      "profile": "transport-adaptation-overrun",
+      "file": "crates/mpegts/tests/data/transport-adaptation-overrun.ts",
+      "sha256": "416703f1c9dc4c70ff55bf1399e4c61d477fbb2fe1936ebe3703714d9cb55fa2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 27,
+          "group": "source-ordinary",
+          "id": "transport-adaptation-overrun"
+        },
+        {
+          "ordinal": 91,
+          "group": "composed-ordinary",
+          "id": "transport-adaptation-overrun"
+        },
+        {
+          "ordinal": 155,
+          "group": "source-native-clock-v1",
+          "id": "transport-adaptation-overrun"
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 282257453037
+      }
+    },
+    {
+      "id": "transport-null-pid",
+      "profile": "transport-null-pid",
+      "file": "crates/mpegts/tests/data/transport-null-pid.ts",
+      "sha256": "a4e9a8755abec48791a099c9b8625149a33c86485056c902f9833333de977ed5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 28,
+          "group": "source-ordinary",
+          "id": "transport-null-pid"
+        },
+        {
+          "ordinal": 92,
+          "group": "composed-ordinary",
+          "id": "transport-null-pid"
+        },
+        {
+          "ordinal": 156,
+          "group": "source-native-clock-v1",
+          "id": "transport-null-pid"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "transport-partial-final-packet",
+      "profile": "transport-partial-final-packet",
+      "file": "crates/mpegts/tests/data/transport-partial-final-packet.ts",
+      "sha256": "819ad792840e42e71aed201bdda145386eab24a5a3b21a0316eb7c8e4146ac33",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 29,
+          "group": "source-ordinary",
+          "id": "transport-partial-final-packet"
+        },
+        {
+          "ordinal": 93,
+          "group": "composed-ordinary",
+          "id": "transport-partial-final-packet"
+        },
+        {
+          "ordinal": 157,
+          "group": "source-native-clock-v1",
+          "id": "transport-partial-final-packet"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "transport-sync-loss",
+      "profile": "transport-sync-loss",
+      "file": "crates/mpegts/tests/data/transport-sync-loss.ts",
+      "sha256": "bc619e8aa33b71910fa06c3e8fe66f1ada0e81b0bd48af74e793ed61d40a2d94",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 30,
+          "group": "source-ordinary",
+          "id": "transport-sync-loss"
+        },
+        {
+          "ordinal": 94,
+          "group": "composed-ordinary",
+          "id": "transport-sync-loss"
+        },
+        {
+          "ordinal": 158,
+          "group": "source-native-clock-v1",
+          "id": "transport-sync-loss"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "psi-crc-invalid",
+      "profile": "psi-crc-invalid",
+      "file": "crates/mpegts/tests/data/psi-crc-invalid.ts",
+      "sha256": "043ad5751083616d0f98dca7327946e7caa1b82a45e08546ce8a7fdb762a04fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 31,
+          "group": "source-ordinary",
+          "id": "psi-crc-invalid"
+        },
+        {
+          "ordinal": 95,
+          "group": "composed-ordinary",
+          "id": "psi-crc-invalid"
+        },
+        {
+          "ordinal": 159,
+          "group": "source-native-clock-v1",
+          "id": "psi-crc-invalid"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-pointer-overrun",
+      "profile": "psi-pointer-overrun",
+      "file": "crates/mpegts/tests/data/psi-pointer-overrun.ts",
+      "sha256": "7a4dd29b6eb3443c3b455408021fc5dd92533686ffaaf6b01362a957db3a8577",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 32,
+          "group": "source-ordinary",
+          "id": "psi-pointer-overrun"
+        },
+        {
+          "ordinal": 96,
+          "group": "composed-ordinary",
+          "id": "psi-pointer-overrun"
+        },
+        {
+          "ordinal": 160,
+          "group": "source-native-clock-v1",
+          "id": "psi-pointer-overrun"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-length-over-policy",
+      "profile": "psi-length-over-policy",
+      "file": "crates/mpegts/tests/data/psi-length-over-policy.ts",
+      "sha256": "eb1970a3bd892e3e273553d0913289b663c557a71c76e92eb52f505426672ced",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 33,
+          "group": "source-ordinary",
+          "id": "psi-length-over-policy"
+        },
+        {
+          "ordinal": 97,
+          "group": "composed-ordinary",
+          "id": "psi-length-over-policy"
+        },
+        {
+          "ordinal": 161,
+          "group": "source-native-clock-v1",
+          "id": "psi-length-over-policy"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-pending-not-current",
+      "profile": "psi-pending-not-current",
+      "file": "crates/mpegts/tests/data/psi-pending-not-current.ts",
+      "sha256": "168aed08af176a89d3f5e718aae7712e6b27228dec4f83c5b5967994366c325b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 34,
+          "group": "source-ordinary",
+          "id": "psi-pending-not-current"
+        },
+        {
+          "ordinal": 98,
+          "group": "composed-ordinary",
+          "id": "psi-pending-not-current"
+        },
+        {
+          "ordinal": 162,
+          "group": "source-native-clock-v1",
+          "id": "psi-pending-not-current"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pat-atomic-two-sections",
+      "profile": "pat-atomic-two-sections",
+      "file": "crates/mpegts/tests/data/pat-atomic-two-sections.ts",
+      "sha256": "4e12da68ea272260e22a2703e1b5e0085bf06c7a188a506144cd322097938a83",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 35,
+          "group": "source-ordinary",
+          "id": "pat-atomic-two-sections"
+        },
+        {
+          "ordinal": 99,
+          "group": "composed-ordinary",
+          "id": "pat-atomic-two-sections"
+        },
+        {
+          "ordinal": 163,
+          "group": "source-native-clock-v1",
+          "id": "pat-atomic-two-sections"
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 282257453037
+      }
+    },
+    {
+      "id": "pat-incomplete-version",
+      "profile": "pat-incomplete-version",
+      "file": "crates/mpegts/tests/data/pat-incomplete-version.ts",
+      "sha256": "fb32be9750b6f9b156e8edfe96127911ae0ae647141736769f188b6b165b72c2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 36,
+          "group": "source-ordinary",
+          "id": "pat-incomplete-version"
+        },
+        {
+          "ordinal": 100,
+          "group": "composed-ordinary",
+          "id": "pat-incomplete-version"
+        },
+        {
+          "ordinal": 164,
+          "group": "source-native-clock-v1",
+          "id": "pat-incomplete-version"
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 282257453037
+      }
+    },
+    {
+      "id": "pat-network-pid-not-track",
+      "profile": "pat-network-pid-not-track",
+      "file": "crates/mpegts/tests/data/pat-network-pid-not-track.ts",
+      "sha256": "d1ed7d3eb8623d7988c0678d3873714eefad51c935601e4d07c0025ae6a51f76",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 37,
+          "group": "source-ordinary",
+          "id": "pat-network-pid-not-track"
+        },
+        {
+          "ordinal": 101,
+          "group": "composed-ordinary",
+          "id": "pat-network-pid-not-track"
+        },
+        {
+          "ordinal": 165,
+          "group": "source-native-clock-v1",
+          "id": "pat-network-pid-not-track"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-pointer-finishes-old-starts-new",
+      "profile": "psi-pointer-finishes-old-starts-new",
+      "file": "crates/mpegts/tests/data/psi-pointer-finishes-old-starts-new.ts",
+      "sha256": "018d27eca36c03cdf3b5598b6b680f636b5b6dce278ceec7539bc55373d0d135",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 38,
+          "group": "source-ordinary",
+          "id": "psi-pointer-finishes-old-starts-new"
+        },
+        {
+          "ordinal": 102,
+          "group": "composed-ordinary",
+          "id": "psi-pointer-finishes-old-starts-new"
+        },
+        {
+          "ordinal": 166,
+          "group": "source-native-clock-v1",
+          "id": "psi-pointer-finishes-old-starts-new"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-two-sections-one-payload",
+      "profile": "psi-two-sections-one-payload",
+      "file": "crates/mpegts/tests/data/psi-two-sections-one-payload.ts",
+      "sha256": "6fc31b93ccac53d4aff8137834c9dcc135390753e04f315994ebae0c9aa6c726",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 39,
+          "group": "source-ordinary",
+          "id": "psi-two-sections-one-payload"
+        },
+        {
+          "ordinal": 103,
+          "group": "composed-ordinary",
+          "id": "psi-two-sections-one-payload"
+        },
+        {
+          "ordinal": 167,
+          "group": "source-native-clock-v1",
+          "id": "psi-two-sections-one-payload"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "pmt-version-wrap-retypes-pid",
+      "profile": "pmt-version-wrap-retypes-pid",
+      "file": "crates/mpegts/tests/data/pmt-version-wrap-retypes-pid.ts",
+      "sha256": "fa37cb365078ead09193f8ff28d46eb31a4d3091cfb68a0f2e5751315b8a9900",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 40,
+          "group": "source-ordinary",
+          "id": "pmt-version-wrap-retypes-pid"
+        },
+        {
+          "ordinal": 104,
+          "group": "composed-ordinary",
+          "id": "pmt-version-wrap-retypes-pid"
+        },
+        {
+          "ordinal": 168,
+          "group": "source-native-clock-v1",
+          "id": "pmt-version-wrap-retypes-pid"
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 282258644677
+      }
+    },
+    {
+      "id": "pmt-opaque-language-descriptors",
+      "profile": "pmt-opaque-language-descriptors",
+      "file": "crates/mpegts/tests/data/pmt-opaque-language-descriptors.ts",
+      "sha256": "0d5c791b6ce3a2f796c91de24e4663d1bb3a891e09221bebc57cc658689993a5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 41,
+          "group": "source-ordinary",
+          "id": "pmt-opaque-language-descriptors"
+        },
+        {
+          "ordinal": 105,
+          "group": "composed-ordinary",
+          "id": "pmt-opaque-language-descriptors"
+        },
+        {
+          "ordinal": 169,
+          "group": "source-native-clock-v1",
+          "id": "pmt-opaque-language-descriptors"
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 282257453037
+      }
+    },
+    {
+      "id": "pmt-descriptor-overrun",
+      "profile": "pmt-descriptor-overrun",
+      "file": "crates/mpegts/tests/data/pmt-descriptor-overrun.ts",
+      "sha256": "acce139050be1b1bbeeab82de769bf590b96fed2a3ddc06f18262d971878e6db",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 42,
+          "group": "source-ordinary",
+          "id": "pmt-descriptor-overrun"
+        },
+        {
+          "ordinal": 106,
+          "group": "composed-ordinary",
+          "id": "pmt-descriptor-overrun"
+        },
+        {
+          "ordinal": 170,
+          "group": "source-native-clock-v1",
+          "id": "pmt-descriptor-overrun"
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 282257453037
+      }
+    },
+    {
+      "id": "pmt-multi-section-forbidden",
+      "profile": "pmt-multi-section-forbidden",
+      "file": "crates/mpegts/tests/data/pmt-multi-section-forbidden.ts",
+      "sha256": "1420c5b78a4e6087608885abda07627b3bb28fef9dbef30a6f99694ed44e7ffb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 43,
+          "group": "source-ordinary",
+          "id": "pmt-multi-section-forbidden"
+        },
+        {
+          "ordinal": 107,
+          "group": "composed-ordinary",
+          "id": "pmt-multi-section-forbidden"
+        },
+        {
+          "ordinal": 171,
+          "group": "source-native-clock-v1",
+          "id": "pmt-multi-section-forbidden"
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 282257453037
+      }
+    },
+    {
+      "id": "psi-stuffing-tail-invalid",
+      "profile": "psi-stuffing-tail-invalid",
+      "file": "crates/mpegts/tests/data/psi-stuffing-tail-invalid.ts",
+      "sha256": "ed73a57ef84d585dabe93fa19466e848ca1ac279ebd58b614952da64e1c7f9cb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 44,
+          "group": "source-ordinary",
+          "id": "psi-stuffing-tail-invalid"
+        },
+        {
+          "ordinal": 108,
+          "group": "composed-ordinary",
+          "id": "psi-stuffing-tail-invalid"
+        },
+        {
+          "ordinal": 172,
+          "group": "source-native-clock-v1",
+          "id": "psi-stuffing-tail-invalid"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "psi-truncated-eof",
+      "profile": "psi-truncated-eof",
+      "file": "crates/mpegts/tests/data/psi-truncated-eof.ts",
+      "sha256": "704f2b6328fc3908e165f9ad1bff609d1c989426b553507009a984a999caa136",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 45,
+          "group": "source-ordinary",
+          "id": "psi-truncated-eof"
+        },
+        {
+          "ordinal": 109,
+          "group": "composed-ordinary",
+          "id": "psi-truncated-eof"
+        },
+        {
+          "ordinal": 173,
+          "group": "source-native-clock-v1",
+          "id": "psi-truncated-eof"
+        }
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
+      }
+    },
+    {
+      "id": "carriage-ac3-dvb",
+      "profile": "carriage-ac3-dvb",
+      "file": "crates/mpegts/tests/data/carriage-ac3-dvb.ts",
+      "sha256": "b53541fdf555c58251f148ad48471e7ad38b9eea5d53d31256ccfc7007e25bb8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 46,
+          "group": "source-ordinary",
+          "id": "carriage-ac3-dvb"
+        },
+        {
+          "ordinal": 110,
+          "group": "composed-ordinary",
+          "id": "carriage-ac3-dvb"
+        },
+        {
+          "ordinal": 174,
+          "group": "source-native-clock-v1",
+          "id": "carriage-ac3-dvb"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 6442002097650752288
+      }
+    },
+    {
+      "id": "carriage-eac3-dvb",
+      "profile": "carriage-eac3-dvb",
+      "file": "crates/mpegts/tests/data/carriage-eac3-dvb.ts",
+      "sha256": "de7b6d9aa3a934a7f39d3f7de999c3487727517832bbb4f57e769e73869a7e1e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 47,
+          "group": "source-ordinary",
+          "id": "carriage-eac3-dvb"
+        },
+        {
+          "ordinal": 111,
+          "group": "composed-ordinary",
+          "id": "carriage-eac3-dvb"
+        },
+        {
+          "ordinal": 175,
+          "group": "source-native-clock-v1",
+          "id": "carriage-eac3-dvb"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 6716824986832890334
+      }
+    },
+    {
+      "id": "carriage-ac3-direct",
+      "profile": "carriage-ac3-direct",
+      "file": "crates/mpegts/tests/data/carriage-ac3-direct.ts",
+      "sha256": "132faaa121b30db4ff39b742ab7c2f6982e1d8d55d4a3d578937a640c631ab47",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 48,
+          "group": "source-ordinary",
+          "id": "carriage-ac3-direct"
+        },
+        {
+          "ordinal": 112,
+          "group": "composed-ordinary",
+          "id": "carriage-ac3-direct"
+        },
+        {
+          "ordinal": 176,
+          "group": "source-native-clock-v1",
+          "id": "carriage-ac3-direct"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 10507709702100717465
+      }
+    },
+    {
+      "id": "carriage-eac3-direct",
+      "profile": "carriage-eac3-direct",
+      "file": "crates/mpegts/tests/data/carriage-eac3-direct.ts",
+      "sha256": "7961b11911a3c549bb9c5cccc1f690e2f5bb9054d184af5c6c5dacf3c55b7818",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 49,
+          "group": "source-ordinary",
+          "id": "carriage-eac3-direct"
+        },
+        {
+          "ordinal": 113,
+          "group": "composed-ordinary",
+          "id": "carriage-eac3-direct"
+        },
+        {
+          "ordinal": 177,
+          "group": "source-native-clock-v1",
+          "id": "carriage-eac3-direct"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 11430780378663571677
+      }
+    },
+    {
+      "id": "carriage-aac-adts-direct",
+      "profile": "carriage-aac-adts-direct",
+      "file": "crates/mpegts/tests/data/carriage-aac-adts-direct.ts",
+      "sha256": "70f7e7d0f3ebaef7ec7d9e78d516710c0db7991cbd81519222395636be09e012",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 50,
+          "group": "source-ordinary",
+          "id": "carriage-aac-adts-direct"
+        },
+        {
+          "ordinal": 114,
+          "group": "composed-ordinary",
+          "id": "carriage-aac-adts-direct"
+        },
+        {
+          "ordinal": 178,
+          "group": "source-native-clock-v1",
+          "id": "carriage-aac-adts-direct"
+        },
+        {
+          "ordinal": 266,
+          "group": "source-registered-finite-v2",
+          "id": "carriage-aac-adts-direct"
+        },
+        {
+          "ordinal": 269,
+          "group": "composed-registered-finite-v2",
+          "id": "carriage-aac-adts-direct"
+        }
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 28,
+        "digest": 2826084967480385288
+      }
+    },
+    {
+      "id": "carriage-aac-latm-direct",
+      "profile": "carriage-aac-latm-direct",
+      "file": "crates/mpegts/tests/data/carriage-aac-latm-direct.ts",
+      "sha256": "c591276c90f760a6a1bd8bd1b95447075bb75afe94910a59c6158218c38cc781",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 51,
+          "group": "source-ordinary",
+          "id": "carriage-aac-latm-direct"
+        },
+        {
+          "ordinal": 115,
+          "group": "composed-ordinary",
+          "id": "carriage-aac-latm-direct"
+        },
+        {
+          "ordinal": 179,
+          "group": "source-native-clock-v1",
+          "id": "carriage-aac-latm-direct"
+        },
+        {
+          "ordinal": 267,
+          "group": "source-registered-finite-v2",
+          "id": "carriage-aac-latm-direct"
+        },
+        {
+          "ordinal": 270,
+          "group": "composed-registered-finite-v2",
+          "id": "carriage-aac-latm-direct"
+        }
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 28,
+        "digest": 14327859044241860648
+      }
+    },
+    {
+      "id": "carriage-hevc-direct",
+      "profile": "carriage-hevc-direct",
+      "file": "crates/mpegts/tests/data/carriage-hevc-direct.ts",
+      "sha256": "1d224472f3587f02cce8f687a11547bfa3b599b31dcaeba3353cda9cf5002b02",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 52,
+          "group": "source-ordinary",
+          "id": "carriage-hevc-direct"
+        },
+        {
+          "ordinal": 116,
+          "group": "composed-ordinary",
+          "id": "carriage-hevc-direct"
+        },
+        {
+          "ordinal": 180,
+          "group": "source-native-clock-v1",
+          "id": "carriage-hevc-direct"
+        },
+        {
+          "ordinal": 268,
+          "group": "source-registered-finite-v2",
+          "id": "carriage-hevc-direct"
+        },
+        {
+          "ordinal": 271,
+          "group": "composed-registered-finite-v2",
+          "id": "carriage-hevc-direct"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 361210835537841147
+      }
+    },
+    {
+      "id": "pes-timestamp-marker",
+      "profile": "pes-timestamp-marker",
+      "file": "crates/mpegts/tests/data/pes-timestamp-marker.ts",
+      "sha256": "d13c6bcf9122c717a80fd66ba87e7058702c961a736ec0cb14fb0f891dcdb264",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 53,
+          "group": "source-ordinary",
+          "id": "pes-timestamp-marker"
+        },
+        {
+          "ordinal": 117,
+          "group": "composed-ordinary",
+          "id": "pes-timestamp-marker"
+        },
+        {
+          "ordinal": 181,
+          "group": "source-native-clock-v1",
+          "id": "pes-timestamp-marker"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "pes-forbidden-time-flags",
+      "profile": "pes-forbidden-time-flags",
+      "file": "crates/mpegts/tests/data/pes-forbidden-time-flags.ts",
+      "sha256": "ea3bb1e3c5c24d6d1cb8938be00e85bbd9294e15f7278b1352cd860098581609",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 54,
+          "group": "source-ordinary",
+          "id": "pes-forbidden-time-flags"
+        },
+        {
+          "ordinal": 118,
+          "group": "composed-ordinary",
+          "id": "pes-forbidden-time-flags"
+        },
+        {
+          "ordinal": 182,
+          "group": "source-native-clock-v1",
+          "id": "pes-forbidden-time-flags"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 5872805089148039457
+      }
+    },
+    {
+      "id": "pes-optional-header-overrun",
+      "profile": "pes-optional-header-overrun",
+      "file": "crates/mpegts/tests/data/pes-optional-header-overrun.ts",
+      "sha256": "638d1714d221a3135d3eaffe0df5232b1dafc55359e7663a7a98bb0cb681b5fa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 55,
+          "group": "source-ordinary",
+          "id": "pes-optional-header-overrun"
+        },
+        {
+          "ordinal": 119,
+          "group": "composed-ordinary",
+          "id": "pes-optional-header-overrun"
+        },
+        {
+          "ordinal": 183,
+          "group": "source-native-clock-v1",
+          "id": "pes-optional-header-overrun"
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 282257453037
+      }
+    },
+    {
+      "id": "pes-start-prefix-invalid",
+      "profile": "pes-start-prefix-invalid",
+      "file": "crates/mpegts/tests/data/pes-start-prefix-invalid.ts",
+      "sha256": "659cc94416d5086fb9c97b827df1ea36fd9145d6ebf8039f85cc9ef36dae934f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 56,
+          "group": "source-ordinary",
+          "id": "pes-start-prefix-invalid"
+        },
+        {
+          "ordinal": 120,
+          "group": "composed-ordinary",
+          "id": "pes-start-prefix-invalid"
+        },
+        {
+          "ordinal": 184,
+          "group": "source-native-clock-v1",
+          "id": "pes-start-prefix-invalid"
+        }
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 0,
+        "digest": 282257453037
+      }
+    },
+    {
+      "id": "pes-finite-truncated-eof",
+      "profile": "pes-finite-truncated-eof",
+      "file": "crates/mpegts/tests/data/pes-finite-truncated-eof.ts",
+      "sha256": "9bef79e6aec98edb39bcfec5ac741f273d91e36cd4e70e9ca39681368566b890",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 57,
+          "group": "source-ordinary",
+          "id": "pes-finite-truncated-eof"
+        },
+        {
+          "ordinal": 121,
+          "group": "composed-ordinary",
+          "id": "pes-finite-truncated-eof"
+        },
+        {
+          "ordinal": 185,
+          "group": "source-native-clock-v1",
+          "id": "pes-finite-truncated-eof"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 25,
+        "digest": 8642096965232378479
+      }
+    },
+    {
+      "id": "pes-finite-extra-payload",
+      "profile": "pes-finite-extra-payload",
+      "file": "crates/mpegts/tests/data/pes-finite-extra-payload.ts",
+      "sha256": "ff918dc326a6bbba7981549df0460c5ae25f06ede7f1b65960fddc88e719244c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 58,
+          "group": "source-ordinary",
+          "id": "pes-finite-extra-payload"
+        },
+        {
+          "ordinal": 122,
+          "group": "composed-ordinary",
+          "id": "pes-finite-extra-payload"
+        },
+        {
+          "ordinal": 186,
+          "group": "source-native-clock-v1",
+          "id": "pes-finite-extra-payload"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "pes-audio-zero-length-invalid",
+      "profile": "pes-audio-zero-length-invalid",
+      "file": "crates/mpegts/tests/data/pes-audio-zero-length-invalid.ts",
+      "sha256": "e3faae845ad4399024785e8a975a67f2953fccf27c3788dba706cdc4da335af4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 59,
+          "group": "source-ordinary",
+          "id": "pes-audio-zero-length-invalid"
+        },
+        {
+          "ordinal": 123,
+          "group": "composed-ordinary",
+          "id": "pes-audio-zero-length-invalid"
+        },
+        {
+          "ordinal": 187,
+          "group": "source-native-clock-v1",
+          "id": "pes-audio-zero-length-invalid"
+        }
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 28,
+        "digest": 1210458730984086022
+      }
+    },
+    {
+      "id": "elementary-bytes-cross-pes",
+      "profile": "elementary-bytes-cross-pes",
+      "file": "crates/mpegts/tests/data/elementary-bytes-cross-pes.ts",
+      "sha256": "d96d208ad4915007951b1842fe25d8e4a691dd444e14e4c87c8a21f3467cca1a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 60,
+          "group": "source-ordinary",
+          "id": "elementary-bytes-cross-pes"
+        },
+        {
+          "ordinal": 124,
+          "group": "composed-ordinary",
+          "id": "elementary-bytes-cross-pes"
+        },
+        {
+          "ordinal": 188,
+          "group": "source-native-clock-v1",
+          "id": "elementary-bytes-cross-pes"
+        }
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 6,
+        "digest": 7370872235846003029
+      }
+    },
+    {
+      "id": "hls-contiguous-pes-carry",
+      "profile": "hls-contiguous-pes-carry",
+      "file": "crates/mpegts/tests/data/hls-contiguous-part-a.ts",
+      "sha256": "c865084091a692e5b62ca29e13331c843ffad69e30bb5112e759ae535dfd1676",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "hls-contiguous-part-b.ts"
+      ],
+      "entities": [
+        {
+          "file": "crates/mpegts/tests/data/hls-contiguous-part-a.ts",
+          "sha256": "c865084091a692e5b62ca29e13331c843ffad69e30bb5112e759ae535dfd1676"
+        },
+        {
+          "file": "crates/mpegts/tests/data/hls-contiguous-part-b.ts",
+          "sha256": "b2fcd617d1da46d748e8331cb0c0f93b1d0cef0324f1a554896875e3f37a24cf"
+        }
+      ],
+      "requests": [
+        {
+          "ordinal": 61,
+          "group": "source-ordinary",
+          "id": "hls-contiguous-pes-carry"
+        },
+        {
+          "ordinal": 125,
+          "group": "composed-ordinary",
+          "id": "hls-contiguous-pes-carry"
+        },
+        {
+          "ordinal": 189,
+          "group": "source-native-clock-v1",
+          "id": "hls-contiguous-pes-carry"
+        }
+      ],
+      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
+      "resolve_entity_paths": true,
+      "expected": {
+        "packets": 5,
+        "bytes": 513,
+        "digest": 3015292577829627518
+      }
+    },
+    {
+      "id": "hls-external-map",
+      "profile": "hls-external-map",
+      "file": "crates/mpegts/tests/data/hls-map-init.ts",
+      "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "hls-map-media.ts"
+      ],
+      "entities": [
+        {
+          "file": "crates/mpegts/tests/data/hls-map-init.ts",
+          "sha256": "12d6e70834e1ab911e424936efef406ec77ebf1eb50cbd34bdcae72a192dd257"
+        },
+        {
+          "file": "crates/mpegts/tests/data/hls-map-media.ts",
+          "sha256": "41cef5f0f1c63adc39cf1278e0a1379528138ea4ac38046af5cb376d23858793"
+        }
+      ],
+      "requests": [
+        {
+          "ordinal": 62,
+          "group": "source-ordinary",
+          "id": "hls-external-map"
+        },
+        {
+          "ordinal": 126,
+          "group": "composed-ordinary",
+          "id": "hls-external-map"
+        },
+        {
+          "ordinal": 190,
+          "group": "source-native-clock-v1",
+          "id": "hls-external-map"
+        }
+      ],
+      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
+      "resolve_entity_paths": true,
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "hls-explicit-discontinuity",
+      "profile": "hls-explicit-discontinuity",
+      "file": "crates/mpegts/tests/data/ts188-basic.ts",
+      "sha256": "be7ba9883bdb21233577517ffc8a1ada5d8193d32eaf8e6bbf3b25f37e7a8da9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "--discontinuity",
+        "hls-new-timeline.ts"
+      ],
+      "entities": [
+        {
+          "file": "crates/mpegts/tests/data/ts188-basic.ts",
+          "sha256": "be7ba9883bdb21233577517ffc8a1ada5d8193d32eaf8e6bbf3b25f37e7a8da9"
+        },
+        {
+          "file": "crates/mpegts/tests/data/hls-new-timeline.ts",
+          "sha256": "bf970d64d6a2da63189fbd66f31258fb691327098fcca494c3430391590c58c8"
+        }
+      ],
+      "requests": [
+        {
+          "ordinal": 63,
+          "group": "source-ordinary",
+          "id": "hls-explicit-discontinuity"
+        },
+        {
+          "ordinal": 127,
+          "group": "composed-ordinary",
+          "id": "hls-explicit-discontinuity"
+        },
+        {
+          "ordinal": 191,
+          "group": "source-native-clock-v1",
+          "id": "hls-explicit-discontinuity"
+        }
+      ],
+      "single_input_reference_refusal": "no single-input reference operation for more than one media entity",
+      "resolve_entity_paths": true,
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 7370380626944303253
+      }
+    },
+    {
+      "id": "dvb2-literals-fields",
+      "profile": "dvb2-literals-fields",
+      "file": "crates/mpegts/tests/data/dvb/dvb2-literals-fields.ts",
+      "sha256": "00aa0dab57c50532c438eacac22e0b6a9dc055d29853680070eefcf7a8512da0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "--dvb"
+      ],
+      "requests": [
+        {
+          "ordinal": 192,
+          "group": "source-dvb",
+          "id": "dvb2-literals-fields"
+        },
+        {
+          "ordinal": 198,
+          "group": "composed-dvb",
+          "id": "dvb2-literals-fields"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 129,
+        "digest": 5752685830687854997
+      }
+    },
+    {
+      "id": "dvb-ancillary-pages",
+      "profile": "dvb-ancillary-pages",
+      "file": "crates/mpegts/tests/data/dvb/dvb-ancillary-pages.ts",
+      "sha256": "dbe9d479ebcf72c93cb43b6c0725ed1f1726e66593d6d82bb49815bd1979b322",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "--dvb"
+      ],
+      "requests": [
+        {
+          "ordinal": 193,
+          "group": "source-dvb",
+          "id": "dvb-ancillary-pages"
+        },
+        {
+          "ordinal": 199,
+          "group": "composed-dvb",
+          "id": "dvb-ancillary-pages"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 113,
+        "digest": 13462560348985241103
+      }
+    },
+    {
+      "id": "dvb-default-clut2",
+      "profile": "dvb-default-clut2",
+      "file": "crates/mpegts/tests/data/dvb/dvb-default-clut2.ts",
+      "sha256": "7d82959a676f689a99d6253c1673204cd1fb88c2976d3b8b005283fec05d05cb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "--dvb"
+      ],
+      "requests": [
+        {
+          "ordinal": 194,
+          "group": "source-dvb",
+          "id": "dvb-default-clut2"
+        },
+        {
+          "ordinal": 200,
+          "group": "composed-dvb",
+          "id": "dvb-default-clut2"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 70,
+        "digest": 6650861517108406927
+      }
+    },
+    {
+      "id": "dvb-nonmodifying",
+      "profile": "dvb-nonmodifying",
+      "file": "crates/mpegts/tests/data/dvb/dvb-nonmodifying.ts",
+      "sha256": "6df991cb002b7da3594af097b103588b67500ce8bd94b31c0ae3450ba6e9b79e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "--dvb"
+      ],
+      "requests": [
+        {
+          "ordinal": 195,
+          "group": "source-dvb",
+          "id": "dvb-nonmodifying"
+        },
+        {
+          "ordinal": 201,
+          "group": "composed-dvb",
+          "id": "dvb-nonmodifying"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 115,
+        "digest": 17668218140693769897
+      }
+    },
+    {
+      "id": "dvb-partial-alpha-projection",
+      "profile": "dvb-partial-alpha-projection",
+      "file": "crates/mpegts/tests/data/dvb/dvb-partial-alpha-projection.ts",
+      "sha256": "560b9318d72a610406418ac38add69e20e4aff506e44e2d7c565f475a08b2d72",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "--dvb"
+      ],
+      "requests": [
+        {
+          "ordinal": 196,
+          "group": "source-dvb",
+          "id": "dvb-partial-alpha-projection"
+        },
+        {
+          "ordinal": 202,
+          "group": "composed-dvb",
+          "id": "dvb-partial-alpha-projection"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 113,
+        "digest": 5032122854579262952
+      }
+    },
+    {
+      "id": "dvb-truncated-segment",
+      "profile": "dvb-truncated-segment",
+      "file": "crates/mpegts/tests/data/dvb/dvb-truncated-segment.ts",
+      "sha256": "0636ec9bca068be600d2981d6d24c51c8c5674830554ec84b3e59ccdbda60cdd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "--dvb"
+      ],
+      "requests": [
+        {
+          "ordinal": 197,
+          "group": "source-dvb",
+          "id": "dvb-truncated-segment"
+        },
+        {
+          "ordinal": 203,
+          "group": "composed-dvb",
+          "id": "dvb-truncated-segment"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 107,
+        "digest": 1121139610041476578
+      }
+    },
+    {
+      "id": "pat-pointer-then-clean-pusi",
+      "profile": "pat-pointer-then-clean-pusi",
+      "file": "harness/fixtures/mpegts/pat-pointer-then-clean-pusi.ts",
+      "sha256": "b66e83143c72ae773e7b01e15444f58b77e5e2294bb105c8512d678ca0a1bed8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 204,
+          "group": "source-recovery",
+          "id": "pat-pointer-then-clean-pusi"
+        },
+        {
+          "ordinal": 206,
+          "group": "composed-recovery",
+          "id": "pat-pointer-then-clean-pusi"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 15914452838080804829
+      }
+    },
+    {
+      "id": "pmt-pointer-then-clean-pusi",
+      "profile": "pmt-pointer-then-clean-pusi",
+      "file": "harness/fixtures/mpegts/pmt-pointer-then-clean-pusi.ts",
+      "sha256": "5db9bcddcfccf1ec3159a60537e49a15b81f22858deb53b8fa4376b4569e19e0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 205,
+          "group": "source-recovery",
+          "id": "pmt-pointer-then-clean-pusi"
+        },
+        {
+          "ordinal": 207,
+          "group": "composed-recovery",
+          "id": "pmt-pointer-then-clean-pusi"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 15914452838080804829
+      }
+    },
+    {
+      "id": "di-continuous-pes-payload",
+      "profile": "di-continuous-pes-payload",
+      "file": "crates/mpegts/tests/data/continuity-v1/di-continuous-pes-payload.ts",
+      "sha256": "534b32bc0b0d9a3504db8c249323724a5157baa07c341d817a7101c2a1f05c88",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 208,
+          "group": "source-controls29",
+          "id": "di-continuous-pes-payload"
+        },
+        {
+          "ordinal": 237,
+          "group": "composed-controls29",
+          "id": "di-continuous-pes-payload"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 241,
+        "digest": 1871193040456789030
+      }
+    },
+    {
+      "id": "di-continuous-pes-header",
+      "profile": "di-continuous-pes-header",
+      "file": "crates/mpegts/tests/data/continuity-v1/di-continuous-pes-header.ts",
+      "sha256": "955b086a6fc4e286813cac752aeec419542e186f7eec871f5d5c493389366ad5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 209,
+          "group": "source-controls29",
+          "id": "di-continuous-pes-header"
+        },
+        {
+          "ordinal": 238,
+          "group": "composed-controls29",
+          "id": "di-continuous-pes-header"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 9681197487769248545
+      }
+    },
+    {
+      "id": "di-continuous-adaptation-only",
+      "profile": "di-continuous-adaptation-only",
+      "file": "crates/mpegts/tests/data/continuity-v1/di-continuous-adaptation-only.ts",
+      "sha256": "8aa1f63f07040ddf83e3634768acb87a79ab09cb91f71ad8dcd2f0bdfa296722",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 210,
+          "group": "source-controls29",
+          "id": "di-continuous-adaptation-only"
+        },
+        {
+          "ordinal": 239,
+          "group": "composed-controls29",
+          "id": "di-continuous-adaptation-only"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 241,
+        "digest": 1871193040456789030
+      }
+    },
+    {
+      "id": "di-duplicate-complete",
+      "profile": "di-duplicate-complete",
+      "file": "crates/mpegts/tests/data/continuity-v1/di-duplicate-complete.ts",
+      "sha256": "86f1ec3b70f293da219dcd0699e26323325f494dfa7405fa9754718b87e3758c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 211,
+          "group": "source-controls29",
+          "id": "di-duplicate-complete"
+        },
+        {
+          "ordinal": 240,
+          "group": "composed-controls29",
+          "id": "di-duplicate-complete"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 55,
+        "digest": 6435701905744465586
+      }
+    },
+    {
+      "id": "di-duplicate-start",
+      "profile": "di-duplicate-start",
+      "file": "crates/mpegts/tests/data/continuity-v1/di-duplicate-start.ts",
+      "sha256": "3f439a6f3ee9be406133217e9778e0035a969a4ece1f650a0163461585848cef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 212,
+          "group": "source-controls29",
+          "id": "di-duplicate-start"
+        },
+        {
+          "ordinal": 241,
+          "group": "composed-controls29",
+          "id": "di-duplicate-start"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 355,
+        "digest": 11928678281063101481
+      }
+    },
+    {
+      "id": "di-continuous-pat",
+      "profile": "di-continuous-pat",
+      "file": "crates/mpegts/tests/data/continuity-v1/di-continuous-pat.ts",
+      "sha256": "ab7dbff5611887fc0924500ea9498f5f367b8364b551d3f67f74217579a46908",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 213,
+          "group": "source-controls29",
+          "id": "di-continuous-pat"
+        },
+        {
+          "ordinal": 242,
+          "group": "composed-controls29",
+          "id": "di-continuous-pat"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 15914452838080804829
+      }
+    },
+    {
+      "id": "di-continuous-pmt",
+      "profile": "di-continuous-pmt",
+      "file": "crates/mpegts/tests/data/continuity-v1/di-continuous-pmt.ts",
+      "sha256": "fe0250d3fcdd3b449b0597c98a6d5be15ddc41b1d9a5ffbf4d3b77c208717324",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 214,
+          "group": "source-controls29",
+          "id": "di-continuous-pmt"
+        },
+        {
+          "ordinal": 243,
+          "group": "composed-controls29",
+          "id": "di-continuous-pmt"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 28,
+        "digest": 15914452838080804829
+      }
+    },
+    {
+      "id": "partial-start-duplicate",
+      "profile": "partial-start-duplicate",
+      "file": "crates/mpegts/tests/data/continuity-v1/partial-start-duplicate.ts",
+      "sha256": "1a53dd2ac0c2add15bd2b149a595457e0b867cd1daf3835e9d0bb06b1a7816c5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 215,
+          "group": "source-controls29",
+          "id": "partial-start-duplicate"
+        },
+        {
+          "ordinal": 244,
+          "group": "composed-controls29",
+          "id": "partial-start-duplicate"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 683,
+        "digest": 18139756751126014325
+      }
+    },
+    {
+      "id": "partial-middle-duplicate",
+      "profile": "partial-middle-duplicate",
+      "file": "crates/mpegts/tests/data/continuity-v1/partial-middle-duplicate.ts",
+      "sha256": "75456fe13c1578ddfd94b7743327ba35ebbd283bb1b1ed0b5831edea53edf19f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 216,
+          "group": "source-controls29",
+          "id": "partial-middle-duplicate"
+        },
+        {
+          "ordinal": 245,
+          "group": "composed-controls29",
+          "id": "partial-middle-duplicate"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 697,
+        "digest": 9892967198768815922
+      }
+    },
+    {
+      "id": "interleaved-other-pid-duplicate",
+      "profile": "interleaved-other-pid-duplicate",
+      "file": "crates/mpegts/tests/data/continuity-v1/interleaved-other-pid-duplicate.ts",
+      "sha256": "d52a7bfc102d55c9935a51f9ec28171ce71d71ec369a916a9b6efba0acd55443",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 217,
+          "group": "source-controls29",
+          "id": "interleaved-other-pid-duplicate"
+        },
+        {
+          "ordinal": 246,
+          "group": "composed-controls29",
+          "id": "interleaved-other-pid-duplicate"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 55,
+        "digest": 6435701905744465586
+      }
+    },
+    {
+      "id": "m2ts-prefix-only-duplicate",
+      "profile": "m2ts-prefix-only-duplicate",
+      "file": "crates/mpegts/tests/data/continuity-v1/m2ts-prefix-only-duplicate.m2ts",
+      "sha256": "86f8abc446d31d2aebd330ddd06551cbdf5f26c0da8896ae0ace4a50c8ff0fb8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 218,
+          "group": "source-controls29",
+          "id": "m2ts-prefix-only-duplicate"
+        },
+        {
+          "ordinal": 247,
+          "group": "composed-controls29",
+          "id": "m2ts-prefix-only-duplicate"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 55,
+        "digest": 5578361198633280294
+      }
+    },
+    {
+      "id": "same-content-new-counters",
+      "profile": "same-content-new-counters",
+      "file": "crates/mpegts/tests/data/continuity-v1/same-content-new-counters.ts",
+      "sha256": "4d9e9d7a8672e674a7bfbead0ff97f1dceff52f7083cd15e3e0cafbf6044a361",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 219,
+          "group": "source-controls29",
+          "id": "same-content-new-counters"
+        },
+        {
+          "ordinal": 248,
+          "group": "composed-controls29",
+          "id": "same-content-new-counters"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 55,
+        "digest": 6435701905744465586
+      }
+    },
+    {
+      "id": "loss-then-clean-pusi",
+      "profile": "loss-then-clean-pusi",
+      "file": "crates/mpegts/tests/data/continuity-v1/loss-then-clean-pusi.ts",
+      "sha256": "8dd5e10ad55e2a68e9e69e9c77da6d9562a577bb8d4b50c34a31e98130cbdc09",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 220,
+          "group": "source-controls29",
+          "id": "loss-then-clean-pusi"
+        },
+        {
+          "ordinal": 249,
+          "group": "composed-controls29",
+          "id": "loss-then-clean-pusi"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 529,
+        "digest": 616562234052137134
+      }
+    },
+    {
+      "id": "loss-at-clean-pusi",
+      "profile": "loss-at-clean-pusi",
+      "file": "crates/mpegts/tests/data/continuity-v1/loss-at-clean-pusi.ts",
+      "sha256": "bcfbeead9d2861f9a58a88981931f0ba280068b90955538083bd71c325c474a9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 221,
+          "group": "source-controls29",
+          "id": "loss-at-clean-pusi"
+        },
+        {
+          "ordinal": 250,
+          "group": "composed-controls29",
+          "id": "loss-at-clean-pusi"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 187,
+        "digest": 16223528451253676709
+      }
+    },
+    {
+      "id": "opcr-change-is-not-duplicate",
+      "profile": "opcr-change-is-not-duplicate",
+      "file": "crates/mpegts/tests/data/continuity-v1/opcr-change-is-not-duplicate.ts",
+      "sha256": "55a1f4865fa0bc26d7d601086ffc6153b7e0f9f2573f421fd8f452f41d580027",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 222,
+          "group": "source-controls29",
+          "id": "opcr-change-is-not-duplicate"
+        },
+        {
+          "ordinal": 251,
+          "group": "composed-controls29",
+          "id": "opcr-change-is-not-duplicate"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 55,
+        "digest": 6435701905744465586
+      }
+    },
+    {
+      "id": "third-middle-copy-then-clean",
+      "profile": "third-middle-copy-then-clean",
+      "file": "crates/mpegts/tests/data/continuity-v1/third-middle-copy-then-clean.ts",
+      "sha256": "cd54553d13d502e14c9c6888a474d3530ab3b1ddb5dcb3cbbf4b848e57b81de9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 223,
+          "group": "source-controls29",
+          "id": "third-middle-copy-then-clean"
+        },
+        {
+          "ordinal": 252,
+          "group": "composed-controls29",
+          "id": "third-middle-copy-then-clean"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 897,
+        "digest": 159431714293155350
+      }
+    },
+    {
+      "id": "opcr-without-pcr-invalid",
+      "profile": "opcr-without-pcr-invalid",
+      "file": "crates/mpegts/tests/data/native-pes-v1/opcr-without-pcr-invalid.ts",
+      "sha256": "1aa6856c675fb2f6cfc2d4735b02577bb96870f6ad4f5aa280cc8181af71e4a7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 224,
+          "group": "source-controls29",
+          "id": "opcr-without-pcr-invalid-draft-retained"
+        },
+        {
+          "ordinal": 253,
+          "group": "composed-controls29",
+          "id": "opcr-without-pcr-invalid-draft-retained"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 55,
+        "digest": 6435701905744465586
+      }
+    },
+    {
+      "id": "duplicate-middle-low-occupancy-finite",
+      "profile": "duplicate-middle-low-occupancy-finite",
+      "file": "harness/fixtures/mpegts/duplicate-middle-low-occupancy-finite.ts",
+      "sha256": "71a7bbab1be7cabe598221836686f38711e56df028c53e9109e1821ecf0f6fbb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 229,
+          "group": "source-controls29",
+          "id": "duplicate-middle-low-occupancy-finite"
+        },
+        {
+          "ordinal": 258,
+          "group": "composed-controls29",
+          "id": "duplicate-middle-low-occupancy-finite"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 465,
+        "digest": 14540272335412973702
+      }
+    },
+    {
+      "id": "duplicate-middle-low-occupancy-unbounded",
+      "profile": "duplicate-middle-low-occupancy-unbounded",
+      "file": "harness/fixtures/mpegts/duplicate-middle-low-occupancy-unbounded.ts",
+      "sha256": "368be9cdcbcfb5829706cab3ccb27d8afcb8983cb36e3bd7619fa78e1311dcc2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 230,
+          "group": "source-controls29",
+          "id": "duplicate-middle-low-occupancy-unbounded"
+        },
+        {
+          "ordinal": 259,
+          "group": "composed-controls29",
+          "id": "duplicate-middle-low-occupancy-unbounded"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 465,
+        "digest": 14540272335412973702
+      }
+    },
+    {
+      "id": "finite-continuation-body-400",
+      "profile": "finite-continuation-body-400",
+      "file": "harness/fixtures/mpegts/finite-continuation-body-400.ts",
+      "sha256": "b81f4d993ebfb937455b748236a89e4e048e76b59ebf448e7d0aebe1b7a5eb5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 231,
+          "group": "source-controls29",
+          "id": "finite-continuation-body-400"
+        },
+        {
+          "ordinal": 260,
+          "group": "composed-controls29",
+          "id": "finite-continuation-body-400"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 401,
+        "digest": 9826315605687806182
+      }
+    },
+    {
+      "id": "finite-continuation-body-401",
+      "profile": "finite-continuation-body-401",
+      "file": "harness/fixtures/mpegts/finite-continuation-body-401.ts",
+      "sha256": "c6c66a90c3ed57f3d83c804fdee4f728bbf02001486324c998edeac3360690ab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 232,
+          "group": "source-controls29",
+          "id": "finite-continuation-body-401"
+        },
+        {
+          "ordinal": 261,
+          "group": "composed-controls29",
+          "id": "finite-continuation-body-401"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 402,
+        "digest": 11491174720813535469
+      }
+    },
+    {
+      "id": "finite-continuation-body-408",
+      "profile": "finite-continuation-body-408",
+      "file": "harness/fixtures/mpegts/finite-continuation-body-408.ts",
+      "sha256": "ce9e52cd1445ed65eadb59c054596a94a5f6fd88b9efd198f92f79c4cac5c1c7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 233,
+          "group": "source-controls29",
+          "id": "finite-continuation-body-408"
+        },
+        {
+          "ordinal": 262,
+          "group": "composed-controls29",
+          "id": "finite-continuation-body-408"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 409,
+        "digest": 6653192362603106390
+      }
+    },
+    {
+      "id": "finite-continuation-body-409",
+      "profile": "finite-continuation-body-409",
+      "file": "harness/fixtures/mpegts/finite-continuation-body-409.ts",
+      "sha256": "88fcde79bb90e30bfe074bfb441199d5b4bc9b2277db7a4c0a99bf0b799571b9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 234,
+          "group": "source-controls29",
+          "id": "finite-continuation-body-409"
+        },
+        {
+          "ordinal": 263,
+          "group": "composed-controls29",
+          "id": "finite-continuation-body-409"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 410,
+        "digest": 17948644980260088173
+      }
+    },
+    {
+      "id": "finite-continuation-body-414",
+      "profile": "finite-continuation-body-414",
+      "file": "harness/fixtures/mpegts/finite-continuation-body-414.ts",
+      "sha256": "6b4df14444d0b1b9636e7ea59f0dbb97541d2b6e0bb2e7c5e923cdaded4d52fc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 235,
+          "group": "source-controls29",
+          "id": "finite-continuation-body-414"
+        },
+        {
+          "ordinal": 264,
+          "group": "composed-controls29",
+          "id": "finite-continuation-body-414"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 415,
+        "digest": 12808283882002355306
+      }
+    },
+    {
+      "id": "finite-continuation-body-415",
+      "profile": "finite-continuation-body-415",
+      "file": "harness/fixtures/mpegts/finite-continuation-body-415.ts",
+      "sha256": "398f03e0d81656200c7f9208d1a18f1e75b66965b4aaa577ab79ed909a6d62b1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1"
+      ],
+      "requests": [
+        {
+          "ordinal": 236,
+          "group": "source-controls29",
+          "id": "finite-continuation-body-415"
+        },
+        {
+          "ordinal": 265,
+          "group": "composed-controls29",
+          "id": "finite-continuation-body-415"
+        }
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 416,
+        "digest": 12217422736349621581
+      }
+    },
+    {
+      "id": "au-avc-one",
+      "profile": "au-avc-one",
+      "file": ".research/fixtures-mpegts-access-units/au-avc-one.ts",
+      "sha256": "b06c50aef6b2a0bb9e8ec95b97eeeb7902ca071329b53a1de91130b7787ca740",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "avc",
+        "pes": [
+          {
+            "payload_bytes": 2045,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 2046,
+        "digest": 9330697255073879691
+      }
+    },
+    {
+      "id": "au-avc-multiple-per-pes",
+      "profile": "au-avc-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-avc-multiple-per-pes.ts",
+      "sha256": "f960d7c10c72864924cec04fb49b8bfdd95e5e02d58b6b1e6bd38c80c9b3bd37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "avc",
+        "pes": [
+          {
+            "payload_bytes": 2670,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 2672,
+        "digest": 8203330671877610361
+      }
+    },
+    {
+      "id": "au-avc-header-across-pes",
+      "profile": "au-avc-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-avc-header-across-pes.ts",
+      "sha256": "f7f500aad85406dd697e8b127d7011e38d0bd32f71bc81f33d5d4008f9351472",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "avc",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 2043,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 2046,
+        "digest": 9330697255073879691
+      }
+    },
+    {
+      "id": "au-avc-body-across-pes",
+      "profile": "au-avc-body-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-avc-body-across-pes.ts",
+      "sha256": "1c72880548e137805189a876a580a83da05fc42a3c95578c41e154c2c43501d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "avc",
+        "pes": [
+          {
+            "payload_bytes": 1022,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 1023,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 2046,
+        "digest": 9330697255073879691
+      }
+    },
+    {
+      "id": "au-avc-header-only-eof",
+      "profile": "au-avc-header-only-eof",
+      "file": ".research/fixtures-mpegts-access-units/au-avc-header-only-eof.ts",
+      "sha256": "251042e50131e66d4f34e4e3a185429895ab20aeeb95ebe62d563f333299aa5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "avc",
+        "pes": [
+          {
+            "payload_bytes": 731,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 732,
+        "digest": 10448324405843153864
+      }
+    },
+    {
+      "id": "au-avc-final-au-at-eof",
+      "profile": "au-avc-final-au-at-eof",
+      "file": ".research/fixtures-mpegts-access-units/au-avc-final-au-at-eof.ts",
+      "sha256": "5201e18b83987e1daadfac8e63af1f675af2556f976b26f68d40acac1d4084ee",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "avc",
+        "pes": [
+          {
+            "payload_bytes": 2045,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 625,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 2672,
+        "digest": 5109604873366192258
+      }
+    },
+    {
+      "id": "au-avc-truncated-final",
+      "profile": "au-avc-truncated-final",
+      "file": ".research/fixtures-mpegts-access-units/au-avc-truncated-final.ts",
+      "sha256": "858e91d2062f98ab53eb91bd89000f81f0ae04b6292a7255ef9745cb775117a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "avc",
+        "pes": [
+          {
+            "payload_bytes": 2669,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 2671,
+        "digest": 13521856325296876316
+      }
+    },
+    {
+      "id": "au-avc-missing-clocks",
+      "profile": "au-avc-missing-clocks",
+      "file": ".research/fixtures-mpegts-access-units/au-avc-missing-clocks.ts",
+      "sha256": "7bd4b8518033494b0d1a838ca00b7db981e91b59de6d84b87772c9e9d7a113ca",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "avc",
+        "pes": [
+          {
+            "payload_bytes": 2670,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 2672,
+        "digest": 568008044095138169
+      }
+    },
+    {
+      "id": "au-avc-pts-dts",
+      "profile": "au-avc-pts-dts",
+      "file": ".research/fixtures-mpegts-access-units/au-avc-pts-dts.ts",
+      "sha256": "347ed4511f430a06f0448acec5bec3e83a2b3b91e5b6ad1925d5e43f5bf47960",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "avc",
+        "pes": [
+          {
+            "payload_bytes": 2045,
+            "pts_raw": 90000,
+            "dts_raw": 87000
+          },
+          {
+            "payload_bytes": 625,
+            "pts_raw": 93000,
+            "dts_raw": 90000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 2672,
+        "digest": 6706820672532655634
+      }
+    },
+    {
+      "id": "au-avc-clock-wrap",
+      "profile": "au-avc-clock-wrap",
+      "file": ".research/fixtures-mpegts-access-units/au-avc-clock-wrap.ts",
+      "sha256": "5af8f8befb3f019a1b9a7e9936708d45f929cb81f72b4643183bd5e191ca75be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "avc",
+        "pes": [
+          {
+            "payload_bytes": 2045,
+            "pts_raw": 8589933592,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 625,
+            "pts_raw": 2000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 2672,
+        "digest": 9645924445418244994
+      }
+    },
+    {
+      "id": "au-avc-m2ts192",
+      "profile": "au-avc-m2ts192",
+      "file": ".research/fixtures-mpegts-access-units/au-avc-m2ts192.m2ts",
+      "sha256": "ef00666b963e99be2a038c83dfa8925777e94ab77d554e11ca2ae74eb3abbd94",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "avc",
+        "pes": [
+          {
+            "payload_bytes": 2670,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 2672,
+        "digest": 2741040171019679105
+      }
+    },
+    {
+      "id": "au-hevc-one",
+      "profile": "au-hevc-one",
+      "file": ".research/fixtures-mpegts-access-units/au-hevc-one.ts",
+      "sha256": "d3fed5de8dbf4d611af7f03e50bc3bee7645eeb1def7cc41fb53e7054efe06fb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "hevc",
+        "pes": [
+          {
+            "payload_bytes": 4295,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 4296,
+        "digest": 1670369346943112998
+      }
+    },
+    {
+      "id": "au-hevc-multiple-per-pes",
+      "profile": "au-hevc-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-hevc-multiple-per-pes.ts",
+      "sha256": "fde64dbd51cde44e2314abb942184b1b5a92e965ac64f15b0be11ae2dd48081a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "hevc",
+        "pes": [
+          {
+            "payload_bytes": 5432,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 5434,
+        "digest": 9883748886296282638
+      }
+    },
+    {
+      "id": "au-hevc-header-across-pes",
+      "profile": "au-hevc-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-hevc-header-across-pes.ts",
+      "sha256": "2b9101dbd1b6defb72939994705a85cef45c1e354f32785fdc3383b78c26ee3c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "hevc",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 4293,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 4296,
+        "digest": 1670369346943112998
+      }
+    },
+    {
+      "id": "au-hevc-body-across-pes",
+      "profile": "au-hevc-body-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-hevc-body-across-pes.ts",
+      "sha256": "ba678d1d21588a90ee904647a64f2c0aca805a67fdc36b0d748efa6fe8201634",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "hevc",
+        "pes": [
+          {
+            "payload_bytes": 2147,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 2148,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 4296,
+        "digest": 1670369346943112998
+      }
+    },
+    {
+      "id": "au-hevc-header-only-eof",
+      "profile": "au-hevc-header-only-eof",
+      "file": ".research/fixtures-mpegts-access-units/au-hevc-header-only-eof.ts",
+      "sha256": "98e8e7e3add5226e72dd4d8c2dabcc9b3662f46628b32f65da98d8dfae41f88c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "hevc",
+        "pes": [
+          {
+            "payload_bytes": 2418,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 2419,
+        "digest": 4427189299268886922
+      }
+    },
+    {
+      "id": "au-hevc-final-au-at-eof",
+      "profile": "au-hevc-final-au-at-eof",
+      "file": ".research/fixtures-mpegts-access-units/au-hevc-final-au-at-eof.ts",
+      "sha256": "f4d897f275754d7a8e9ff6f13cda9a522550d2e7f7719f2780cdd2af33d01b51",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "hevc",
+        "pes": [
+          {
+            "payload_bytes": 4295,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 1137,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 5434,
+        "digest": 12291917360404484071
+      }
+    },
+    {
+      "id": "au-hevc-truncated-final",
+      "profile": "au-hevc-truncated-final",
+      "file": ".research/fixtures-mpegts-access-units/au-hevc-truncated-final.ts",
+      "sha256": "558a4e3eb7842b2aba7a1d9216c4d81abebd4fabe9441722d1821cc7d30112c7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "hevc",
+        "pes": [
+          {
+            "payload_bytes": 5431,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 5433,
+        "digest": 15048162744417199360
+      }
+    },
+    {
+      "id": "au-hevc-missing-clocks",
+      "profile": "au-hevc-missing-clocks",
+      "file": ".research/fixtures-mpegts-access-units/au-hevc-missing-clocks.ts",
+      "sha256": "3da36af9749980b3081bc55efdb95aad0d7268dc571c924aaae737ec2aef3744",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "hevc",
+        "pes": [
+          {
+            "payload_bytes": 5432,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 5434,
+        "digest": 5097335300793226254
+      }
+    },
+    {
+      "id": "au-hevc-pts-dts",
+      "profile": "au-hevc-pts-dts",
+      "file": ".research/fixtures-mpegts-access-units/au-hevc-pts-dts.ts",
+      "sha256": "a38d2ad52bf655dc538d9fcf1cef59b5644f5385c26d449ece3b8095505476c8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "hevc",
+        "pes": [
+          {
+            "payload_bytes": 4295,
+            "pts_raw": 90000,
+            "dts_raw": 87000
+          },
+          {
+            "payload_bytes": 1137,
+            "pts_raw": 93000,
+            "dts_raw": 90000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 5434,
+        "digest": 9397071499181933431
+      }
+    },
+    {
+      "id": "au-hevc-clock-wrap",
+      "profile": "au-hevc-clock-wrap",
+      "file": ".research/fixtures-mpegts-access-units/au-hevc-clock-wrap.ts",
+      "sha256": "f2b49b1644d50dff41db351d750654b9ab171a2b4bf6a7b6fb361b8b8ded4b6d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "hevc",
+        "pes": [
+          {
+            "payload_bytes": 4295,
+            "pts_raw": 8589933592,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 1137,
+            "pts_raw": 2000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 5434,
+        "digest": 2189697069228563175
+      }
+    },
+    {
+      "id": "au-hevc-m2ts192",
+      "profile": "au-hevc-m2ts192",
+      "file": ".research/fixtures-mpegts-access-units/au-hevc-m2ts192.m2ts",
+      "sha256": "c0bcb76f3c6c91fce758beb291aeec7998febbe59c8054ae147a5a9acfacefad",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "hevc",
+        "pes": [
+          {
+            "payload_bytes": 5432,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 5434,
+        "digest": 10343711180035454486
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-one",
+      "profile": "au-adts-aac-lc-one",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-one.ts",
+      "sha256": "5625b4f5fed464d370996e25725ae2e152398dd0e02b8ea22ab3d1df0a76a83f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 196,
+        "digest": 1803557593505026538
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-multiple-per-pes",
+      "profile": "au-adts-aac-lc-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-multiple-per-pes.ts",
+      "sha256": "e8d445dd9d0a015573b3f5d43bc93861addec5f9eefa129afbea62c702abf31d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 390,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 392,
+        "digest": 8773570201989963457
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-header-across-pes",
+      "profile": "au-adts-aac-lc-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-header-across-pes.ts",
+      "sha256": "2595af15414090b6c6aa8b5f3759ee300019c7526aa40201fe456a9067df01ea",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 193,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 196,
+        "digest": 1803557593505026538
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-body-across-pes",
+      "profile": "au-adts-aac-lc-body-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-body-across-pes.ts",
+      "sha256": "4a17f752469e50f149a1d7664221b8adcaed0ac8976d7c073cac7f7390d2707b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 97,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 98,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 196,
+        "digest": 1803557593505026538
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-header-only-eof",
+      "profile": "au-adts-aac-lc-header-only-eof",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-header-only-eof.ts",
+      "sha256": "9752768ad05a8a8f327194d14fa630b080cd29cc802c98363806515a25d1d6a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 7,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 8,
+        "digest": 11677205897514605244
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-final-au-at-eof",
+      "profile": "au-adts-aac-lc-final-au-at-eof",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-final-au-at-eof.ts",
+      "sha256": "aebe2ebb57033302feaf8e3270696b94ef0baabcba481e55c54d14d6d1ce1011",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 195,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 392,
+        "digest": 15105760751675664434
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-truncated-final",
+      "profile": "au-adts-aac-lc-truncated-final",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-truncated-final.ts",
+      "sha256": "d3813fc09ac2170d38296b75ff5e939ca2a90e8f6c5f8eb4e471baf7f89d000a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 389,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 391,
+        "digest": 12782614666039335480
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-missing-clocks",
+      "profile": "au-adts-aac-lc-missing-clocks",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-missing-clocks.ts",
+      "sha256": "a519e39c8f2e031a7b665f6cd1601ac45f32fff671dedd61fab39e014e22a37e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 390,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 392,
+        "digest": 18114449226460851393
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-pts-dts",
+      "profile": "au-adts-aac-lc-pts-dts",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-pts-dts.ts",
+      "sha256": "63bfd0f9918800645681123aef3efdca799d5fcc34818568f9e3cb3eda584ef8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": 87000
+          },
+          {
+            "payload_bytes": 195,
+            "pts_raw": 93000,
+            "dts_raw": 90000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 392,
+        "digest": 13275827117880474562
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-clock-wrap",
+      "profile": "au-adts-aac-lc-clock-wrap",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-clock-wrap.ts",
+      "sha256": "373ed6f45a8bc903581510d6619eddf99dee71619e9ab6ef196026a7873ea66a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 8589933592,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 195,
+            "pts_raw": 2000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 392,
+        "digest": 17982592538067694386
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-m2ts192",
+      "profile": "au-adts-aac-lc-m2ts192",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-m2ts192.m2ts",
+      "sha256": "73b448e1d49eaf8709e24b1521c3732e4bf07ebf0f796d547ddca538d1030433",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 390,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 392,
+        "digest": 12221908873728197069
+      }
+    },
+    {
+      "id": "au-dvb-ac3-one",
+      "profile": "au-dvb-ac3-one",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-one.ts",
+      "sha256": "62ab3f274edd017dd92be9e9983f19a2f28d77002a296657c039d1592c207498",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "codec": "dvb-ac3",
+        "pes": [
+          {
+            "payload_bytes": 384,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 5,
+        "bytes": 385,
+        "digest": 3242768478721625425
+      }
+    },
+    {
+      "id": "au-dvb-ac3-multiple-per-pes",
+      "profile": "au-dvb-ac3-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-multiple-per-pes.ts",
+      "sha256": "82c6e9500c90da3a4ba48da6947d7d804c923b8113e405b8f7bb7d051e3e71d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "codec": "dvb-ac3",
+        "pes": [
+          {
+            "payload_bytes": 768,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 770,
+        "digest": 14115395148781332580
+      }
+    },
+    {
+      "id": "au-dvb-ac3-header-across-pes",
+      "profile": "au-dvb-ac3-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-header-across-pes.ts",
+      "sha256": "4284c9e826e9631cac52a714455787e295cca48b8a3408de2ec1eb0e1e90a9b7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "codec": "dvb-ac3",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 382,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 5,
+        "bytes": 385,
+        "digest": 3242768478721625425
+      }
+    },
+    {
+      "id": "au-dvb-ac3-body-across-pes",
+      "profile": "au-dvb-ac3-body-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-body-across-pes.ts",
+      "sha256": "cf991fd81a6bc72022482dde211ea180ac8ec59fc07e2cc0484365b56950efb6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "codec": "dvb-ac3",
+        "pes": [
+          {
+            "payload_bytes": 192,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 192,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 5,
+        "bytes": 385,
+        "digest": 3242768478721625425
+      }
+    },
+    {
+      "id": "au-dvb-ac3-header-only-eof",
+      "profile": "au-dvb-ac3-header-only-eof",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-header-only-eof.ts",
+      "sha256": "afa20e3d1cb93595b8a20c0b2273615f09c015b30ec7a01a7ac9d3c152ff2d27",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "codec": "dvb-ac3",
+        "pes": [
+          {
+            "payload_bytes": 7,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 5,
+        "bytes": 8,
+        "digest": 10730565347549310897
+      }
+    },
+    {
+      "id": "au-dvb-ac3-final-au-at-eof",
+      "profile": "au-dvb-ac3-final-au-at-eof",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-final-au-at-eof.ts",
+      "sha256": "7fb4e23c7b2539f32f9723a84c877d2b5ff8230c0900f70905d398f9995fa701",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "codec": "dvb-ac3",
+        "pes": [
+          {
+            "payload_bytes": 384,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 384,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 770,
+        "digest": 2895804195035783313
+      }
+    },
+    {
+      "id": "au-dvb-ac3-truncated-final",
+      "profile": "au-dvb-ac3-truncated-final",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-truncated-final.ts",
+      "sha256": "11437fc0c7f00edcf0a7cd4dbe01c330f317d3601ab4e70f40d8ee94c9469fc6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "codec": "dvb-ac3",
+        "pes": [
+          {
+            "payload_bytes": 767,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 769,
+        "digest": 9987934222145710763
+      }
+    },
+    {
+      "id": "au-dvb-ac3-missing-clocks",
+      "profile": "au-dvb-ac3-missing-clocks",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-missing-clocks.ts",
+      "sha256": "4cd9ea78b68e933cb9de76f4f64c926240cf2ed4f1a66c9870b5ecd95c5692f5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "codec": "dvb-ac3",
+        "pes": [
+          {
+            "payload_bytes": 768,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 770,
+        "digest": 3930507235620173412
+      }
+    },
+    {
+      "id": "au-dvb-ac3-pts-dts",
+      "profile": "au-dvb-ac3-pts-dts",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-pts-dts.ts",
+      "sha256": "4630c447467ca4e6d7c0d9ce0fc4c4d00cb648f7cb547126135b7aa11f9129d1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "codec": "dvb-ac3",
+        "pes": [
+          {
+            "payload_bytes": 384,
+            "pts_raw": 90000,
+            "dts_raw": 87000
+          },
+          {
+            "payload_bytes": 384,
+            "pts_raw": 93000,
+            "dts_raw": 90000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 770,
+        "digest": 3218619415764038689
+      }
+    },
+    {
+      "id": "au-dvb-ac3-clock-wrap",
+      "profile": "au-dvb-ac3-clock-wrap",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-clock-wrap.ts",
+      "sha256": "a4bab81d795f4b04040a1999f49c5aa5459e69329c5513469f201d3e24c960a2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "codec": "dvb-ac3",
+        "pes": [
+          {
+            "payload_bytes": 384,
+            "pts_raw": 8589933592,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 384,
+            "pts_raw": 2000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 770,
+        "digest": 10444020003404819345
+      }
+    },
+    {
+      "id": "au-dvb-ac3-m2ts192",
+      "profile": "au-dvb-ac3-m2ts192",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-m2ts192.m2ts",
+      "sha256": "3a4a513896d4732ee3d9b0130c89becba3158991f69efd8b3c2a6b6f7bab8965",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "codec": "dvb-ac3",
+        "pes": [
+          {
+            "payload_bytes": 768,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 770,
+        "digest": 3139638547480668780
+      }
+    },
+    {
+      "id": "au-dvb-ac3-aac-interleaved-eof",
+      "profile": "au-dvb-ac3-aac-interleaved-eof",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-aac-interleaved-eof.ts",
+      "sha256": "dea117d4af5b3ba1b95b585b452df0cc23d673535fa5c2dfa815ca026d9e2755",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "pes": [
+          {
+            "pid": 256,
+            "codec": "dvb-ac3",
+            "payload_bytes": 384,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "pid": 257,
+            "codec": "adts-aac-lc",
+            "payload_bytes": 195,
+            "pts_raw": 6000000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 581,
+        "digest": 18190623658126648089
+      }
+    },
+    {
+      "id": "au-dvb-ac3-aac-interleaved-lookahead",
+      "profile": "au-dvb-ac3-aac-interleaved-lookahead",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-aac-interleaved-lookahead.ts",
+      "sha256": "5a86f805e1f11a2d409478f99d5c6a7e0ea2a39343bdd990aea3f8baaeb07113",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb"
+      ],
+      "construction": {
+        "pes": [
+          {
+            "pid": 256,
+            "codec": "dvb-ac3",
+            "payload_bytes": 384,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "pid": 257,
+            "codec": "adts-aac-lc",
+            "payload_bytes": 195,
+            "pts_raw": 6000000,
+            "dts_raw": null
+          },
+          {
+            "pid": 256,
+            "codec": "dvb-ac3",
+            "payload_bytes": 384,
+            "pts_raw": 92880,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 11,
+        "bytes": 966,
+        "digest": 6495559037836032977
+      }
+    },
+    {
+      "id": "au-adts-across-entities",
+      "profile": "au-adts-across-entities",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-across-entities-0.ts",
+      "sha256": "7f64f44d710db2ac19e81d24aec6f63f6bcf6d77b05a6b17d495548d80275e25",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "au-adts-across-entities-1.ts",
+        "au-adts-across-entities-2.ts"
+      ],
+      "entities": [
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-adts-across-entities-0.ts",
+          "sha256": "7f64f44d710db2ac19e81d24aec6f63f6bcf6d77b05a6b17d495548d80275e25",
+          "discontinuity": false
+        },
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-adts-across-entities-1.ts",
+          "sha256": "6fdf908f8c30bfae58185cd18235ce39a879caf2728984e9b3dd6f9e116ce38f",
+          "discontinuity": false
+        },
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-adts-across-entities-2.ts",
+          "sha256": "d654e3b922a1700f25d08e88d0fa26c425dee093d502e2ee70c4070e8ca141c9",
+          "discontinuity": false
+        }
+      ],
+      "resolve_entity_paths": true,
+      "expected": {
+        "packets": 4,
+        "bytes": 196,
+        "digest": 1803557593505026538
+      }
+    },
+    {
+      "id": "au-m2ts-initialization-entity",
+      "profile": "au-m2ts-initialization-entity",
+      "file": ".research/fixtures-mpegts-access-units/au-m2ts-initialization-entity-0.m2ts",
+      "sha256": "6dc31dd08cbca9374633652505d17548d095dad1209d3c04856296c817a65fa2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "au-m2ts-initialization-entity-1.m2ts"
+      ],
+      "entities": [
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-m2ts-initialization-entity-0.m2ts",
+          "sha256": "6dc31dd08cbca9374633652505d17548d095dad1209d3c04856296c817a65fa2",
+          "discontinuity": false
+        },
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-m2ts-initialization-entity-1.m2ts",
+          "sha256": "72b59825d1536313aa3084f1d6e497a5df5937aa6c037ece5f0d9b34ac29e5cf",
+          "discontinuity": false
+        }
+      ],
+      "resolve_entity_paths": true,
+      "expected": {
+        "packets": 6,
+        "bytes": 392,
+        "digest": 12221908873728197069
+      }
+    },
+    {
+      "id": "au-dvb-ac3-discontinuity-single-frame",
+      "profile": "au-dvb-ac3-discontinuity-single-frame",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-single-frame-0.ts",
+      "sha256": "62ab3f274edd017dd92be9e9983f19a2f28d77002a296657c039d1592c207498",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb",
+        "--discontinuity",
+        "au-dvb-ac3-discontinuity-single-frame-1.ts"
+      ],
+      "entities": [
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-single-frame-0.ts",
+          "sha256": "62ab3f274edd017dd92be9e9983f19a2f28d77002a296657c039d1592c207498",
+          "discontinuity": false
+        },
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-single-frame-1.ts",
+          "sha256": "7fb4e23c7b2539f32f9723a84c877d2b5ff8230c0900f70905d398f9995fa701",
+          "discontinuity": true
+        }
+      ],
+      "resolve_entity_paths": true,
+      "expected": {
+        "packets": 8,
+        "bytes": 770,
+        "digest": 9775627411116789993
+      }
+    },
+    {
+      "id": "au-dvb-ac3-discontinuity-two-frames",
+      "profile": "au-dvb-ac3-discontinuity-two-frames",
+      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-two-frames-0.ts",
+      "sha256": "82c6e9500c90da3a4ba48da6947d7d804c923b8113e405b8f7bb7d051e3e71d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--dvb",
+        "--discontinuity",
+        "au-dvb-ac3-discontinuity-two-frames-1.ts"
+      ],
+      "entities": [
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-two-frames-0.ts",
+          "sha256": "82c6e9500c90da3a4ba48da6947d7d804c923b8113e405b8f7bb7d051e3e71d9",
+          "discontinuity": false
+        },
+        {
+          "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-two-frames-1.ts",
+          "sha256": "7fb4e23c7b2539f32f9723a84c877d2b5ff8230c0900f70905d398f9995fa701",
+          "discontinuity": true
+        }
+      ],
+      "resolve_entity_paths": true,
+      "expected": {
+        "packets": 11,
+        "bytes": 1155,
+        "digest": 11670254496927315749
+      }
+    },
+    {
+      "id": "au-dvb-eac3-32000",
+      "profile": "au-dvb-eac3-32000",
+      "file": "harness/fixtures/hls/dvb-hevc-eac3-32000.ts",
+      "sha256": "67fbe16dea5d0466b122b69d4d03c46f2740080c5fa176fb4a0c3e4709e87969",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "--dvb"
+      ],
+      "expected": {
+        "packets": 177,
+        "bytes": 64274,
+        "digest": 14716894947963688139
+      }
+    },
+    {
+      "id": "au-atsc-ac3-multiple-per-pes",
+      "profile": "au-atsc-ac3-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-atsc-ac3-multiple-per-pes.ts",
+      "sha256": "d86cd51f03550e9e1163434e601d36b1d0d6285e5dbcbdcf411c3f39c4e617e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-ac3",
+        "pes": [
+          {
+            "payload_bytes": 768,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 770,
+        "digest": 2603308273339270025
+      }
+    },
+    {
+      "id": "au-atsc-eac3-multiple-per-pes",
+      "profile": "au-atsc-eac3-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-atsc-eac3-multiple-per-pes.ts",
+      "sha256": "80c8a95089e88c686ce7c059c3d17fb8c8967141a11d39f9f7314bf82b4ac5a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "--atsc"
+      ],
+      "construction": {
+        "codec": "atsc-eac3",
+        "pes": [
+          {
+            "payload_bytes": 768,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 770,
+        "digest": 10855327882270593828
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-two-opaque-pes",
+      "profile": "au-adts-aac-lc-two-opaque-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-two-opaque-pes.ts",
+      "sha256": "ad19642c04a5c8d8a020463dd34c8e470c1d16e18721b0c9d5365eb7887e6158",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 13,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 12,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 26,
+        "digest": 12031731025837099170
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-opaque-then-coded",
+      "profile": "au-adts-aac-lc-opaque-then-coded",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-opaque-then-coded.ts",
+      "sha256": "d9e64e34fe33f8a708f4f6b7b4d1db66e69751ec7d7cc91990ff1e32b432b70d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 13,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 195,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 210,
+        "digest": 6567138861812488786
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-coded-then-opaque",
+      "profile": "au-adts-aac-lc-coded-then-opaque",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-coded-then-opaque.ts",
+      "sha256": "8413c0db58be7a6cc33fc45af294ff5800f5c771e105bfc39cd5cf9b67951150",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 12,
+            "pts_raw": 180000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 209,
+        "digest": 1845107346276284044
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-opaque-prefix-in-pes",
+      "profile": "au-adts-aac-lc-opaque-prefix-in-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-opaque-prefix-in-pes.ts",
+      "sha256": "209f6f48dad83ad85ca5b1d1e8f6d3136efd646dec305dc2e0d7fc3dc5a32253",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 208,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 210,
+        "digest": 5001487526490887069
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-opaque-suffix-in-pes",
+      "profile": "au-adts-aac-lc-opaque-suffix-in-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-opaque-suffix-in-pes.ts",
+      "sha256": "7684fe4bda4bdbac3be89850000296590d650fb790e73bf4bf1188a5c21c04c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 207,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 209,
+        "digest": 9346198924968422621
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-recover-pat-pointer",
+      "profile": "au-adts-aac-lc-recover-pat-pointer",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-recover-pat-pointer.ts",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "sha256": "b54da1bcd218f01efaa6dbbda509e0249517e4e9fb2c0a89208e07814ca6ffc7",
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ],
+        "discarded_pointer_carrier": "pat"
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 196,
+        "digest": 5760776715006671014
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-recover-pmt-pointer",
+      "profile": "au-adts-aac-lc-recover-pmt-pointer",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-recover-pmt-pointer.ts",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "sha256": "f721644610eacc2e5a0c2fcc4909f058379a9f9376c2963795cd56ad8b8ef03f",
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ],
+        "discarded_pointer_carrier": "pmt"
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 196,
+        "digest": 5760776715006671014
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-three-frames-in-pes",
+      "profile": "au-latm-aac-lc-three-frames-in-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-three-frames-in-pes.ts",
+      "sha256": "c915cbe3d34aae637e32343e5e89db4460b7014a9bba7a895caa87913d334667",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 584,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 585,
+        "digest": 8646652153004912559
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-header-across-pes",
+      "profile": "au-latm-aac-lc-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-header-across-pes.ts",
+      "sha256": "3b6fdaa65daf6bf38b76b96a7d71ecbf01024219a956deb8ba6ed9255ce7b616",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 582,
+            "pts_raw": 180000,
+            "dts_raw": 179000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 586,
+        "digest": 10501318449829931068
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-opaque-prefix-in-pes",
+      "profile": "au-latm-aac-lc-opaque-prefix-in-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-opaque-prefix-in-pes.ts",
+      "sha256": "7690b508979ed1482bd072cb4232169a6b398060b080760211590e2615b72999",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 220,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 221,
+        "digest": 13216953346889749607
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-opaque-then-coded",
+      "profile": "au-latm-aac-lc-opaque-then-coded",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-opaque-then-coded.ts",
+      "sha256": "fe856cf7164bf07e75e3a017d81c6d2bf367d0742518e3ae35353d1ace64e396",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 22,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 198,
+            "pts_raw": 180000,
+            "dts_raw": 179000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 222,
+        "digest": 16051452223812140592
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-coded-then-opaque",
+      "profile": "au-latm-aac-lc-coded-then-opaque",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-coded-then-opaque.ts",
+      "sha256": "cdda104b0012664992e2da712655d4224ae4a29c6ead170084fac0322d76aec5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 198,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 22,
+            "pts_raw": 180000,
+            "dts_raw": 179000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 222,
+        "digest": 1541773693309665982
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-two-opaque-pes",
+      "profile": "au-latm-aac-lc-two-opaque-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-two-opaque-pes.ts",
+      "sha256": "7f903a0fe6755d3845c71eb375cc1e7be45da2ca89c41a835d5f461cea8656ab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 22,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 4,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 28,
+        "digest": 1288320069132411443
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-truncated-envelope",
+      "profile": "au-latm-aac-lc-truncated-envelope",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-truncated-envelope.ts",
+      "sha256": "34e60ad9a88822d6a7c896b15076196a552261f80d465dbe49144872e1cc764e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 197,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 198,
+        "digest": 17835429765557058082
+      }
+    },
+    {
+      "id": "au-latm-aac-lc-empty-envelope",
+      "profile": "au-latm-aac-lc-empty-envelope",
+      "file": ".research/fixtures-mpegts-access-units/au-latm-aac-lc-empty-envelope.ts",
+      "sha256": "0a5ff910cf3d24221749b1df719b4317560491b77ae03be7e430df3eb6cf0bdc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "latm-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 3,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 4,
+        "digest": 13927474519335800753
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-at-eof",
+      "profile": "au-adts-aac-lc-unbounded-at-eof",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-unbounded-at-eof.ts",
+      "sha256": "40f6eaf49cba6e017152410ed981551789a0c1fd363038a8ff9dff1a47c1b9d8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null,
+            "packet_length": 0
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 196,
+        "digest": 1803557593505026538
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-before-pes",
+      "profile": "au-adts-aac-lc-unbounded-before-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-unbounded-before-pes.ts",
+      "sha256": "c87c971df238d4313cbb9aed73928979f435ff6a13bd42f3eb85af6ddd30b016",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 195,
+            "pts_raw": 90000,
+            "dts_raw": null,
+            "packet_length": 0
+          },
+          {
+            "payload_bytes": 195,
+            "pts_raw": 180000,
+            "dts_raw": 179000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 392,
+        "digest": 5764962031683108426
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-split-frame",
+      "profile": "au-adts-aac-lc-unbounded-split-frame",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-unbounded-split-frame.ts",
+      "sha256": "0ca6d4bc08c55180ea2a90744478ff6d8d4c712d77a9b25b111a8eb2fee3d46a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 3,
+            "pts_raw": 90000,
+            "dts_raw": null,
+            "packet_length": 0
+          },
+          {
+            "payload_bytes": 192,
+            "pts_raw": 180000,
+            "dts_raw": 179000
+          }
+        ]
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 196,
+        "digest": 1803557593505026538
+      }
+    },
+    {
+      "id": "au-adts-aac-lc-unbounded-opaque-prefix",
+      "profile": "au-adts-aac-lc-unbounded-opaque-prefix",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-unbounded-opaque-prefix.ts",
+      "sha256": "efb62055d20430f48693afaa98e1872a3533d4d8c6386e80a5523e3e1492401f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "adts-aac-lc",
+        "pes": [
+          {
+            "payload_bytes": 208,
+            "pts_raw": 90000,
+            "dts_raw": null,
+            "packet_length": 0
+          }
+        ]
+      },
+      "expected": {
+        "packets": 6,
+        "bytes": 210,
+        "digest": 7658112286643713047
+      }
+    },
+    {
+      "id": "au-mpeg1-layer1-multiple-per-pes",
+      "profile": "au-mpeg1-layer1-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer1-multiple-per-pes.ts",
+      "sha256": "13c13980bb59184e3bb621f2ed7e248adc2c0d71833eb5f4a78f7fdc39f557d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer1",
+        "pes": [
+          {
+            "payload_bytes": 96,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 99,
+        "digest": 7484381401635272339
+      }
+    },
+    {
+      "id": "au-mpeg1-layer1-header-across-pes",
+      "profile": "au-mpeg1-layer1-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer1-header-across-pes.m2ts",
+      "sha256": "78993fe8220c78b48f2e7a8b10ba81f98f119556da5fd1fb4d36029a8645450b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer1",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 94,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 99,
+        "digest": 13154908746034949196
+      }
+    },
+    {
+      "id": "au-mpeg1-layer1-44100-multiple-per-pes",
+      "profile": "au-mpeg1-layer1-44100-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer1-44100-multiple-per-pes.ts",
+      "sha256": "c1f63cea4e6109cb282800c9f1cba42944dfdba7181c0f3df5cd21e8ca9d0393",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer1-44100",
+        "pes": [
+          {
+            "payload_bytes": 96,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 99,
+        "digest": 6678379787049663791
+      }
+    },
+    {
+      "id": "au-mpeg1-layer1-44100-header-across-pes",
+      "profile": "au-mpeg1-layer1-44100-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer1-44100-header-across-pes.m2ts",
+      "sha256": "d11efd357501a6baee24d5008f6a2281086d4db6cb47eb32a634f242aca8e78f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer1-44100",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 94,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 99,
+        "digest": 12348907131449340648
+      }
+    },
+    {
+      "id": "au-mpeg1-layer2-multiple-per-pes",
+      "profile": "au-mpeg1-layer2-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer2-multiple-per-pes.ts",
+      "sha256": "603c7b8c486ba9f46048bfa51b87bda2d8515d48cd7adabcdf76f67b4f147696",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer2",
+        "pes": [
+          {
+            "payload_bytes": 576,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 579,
+        "digest": 9350034976090726309
+      }
+    },
+    {
+      "id": "au-mpeg1-layer2-header-across-pes",
+      "profile": "au-mpeg1-layer2-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg1-layer2-header-across-pes.m2ts",
+      "sha256": "6476c45acf8fb0e27627afc5fc6580b9c1ed7b9cb34948a2bd13036c13c98710",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg1-layer2",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 574,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 579,
+        "digest": 13726092687750841822
+      }
+    },
+    {
+      "id": "au-mpeg2-layer2-multiple-per-pes",
+      "profile": "au-mpeg2-layer2-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg2-layer2-multiple-per-pes.ts",
+      "sha256": "63da217ef60a361bc9ecae92c658585ed6f56e0a81bee38ef214936ed0927d92",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg2-layer2",
+        "pes": [
+          {
+            "payload_bytes": 576,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 579,
+        "digest": 15649039029026435502
+      }
+    },
+    {
+      "id": "au-mpeg2-layer2-header-across-pes",
+      "profile": "au-mpeg2-layer2-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg2-layer2-header-across-pes.m2ts",
+      "sha256": "c4b77001f3727bd7ae3c2a1d476f5f194291954089d370e2e60deb17f6de753a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg2-layer2",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 574,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 579,
+        "digest": 1578352666976999399
+      }
+    },
+    {
+      "id": "au-mpeg2-layer3-multiple-per-pes",
+      "profile": "au-mpeg2-layer3-multiple-per-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg2-layer3-multiple-per-pes.ts",
+      "sha256": "9fab25de6757c74ca4baf25bd7b6f96c3ed51bdf60824bd15910e2db4c866cdb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg2-layer3",
+        "pes": [
+          {
+            "payload_bytes": 288,
+            "pts_raw": 90000,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 291,
+        "digest": 14654405649469505536
+      }
+    },
+    {
+      "id": "au-mpeg2-layer3-header-across-pes",
+      "profile": "au-mpeg2-layer3-header-across-pes",
+      "file": ".research/fixtures-mpegts-access-units/au-mpeg2-layer3-header-across-pes.m2ts",
+      "sha256": "c78e3367142a42f3e78dc8d4e9eebbc9b4be00e3acb0895f2305749657184c2b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7"
+      ],
+      "construction": {
+        "codec": "mpeg2-layer3",
+        "pes": [
+          {
+            "payload_bytes": 2,
+            "pts_raw": 90000,
+            "dts_raw": null
+          },
+          {
+            "payload_bytes": 286,
+            "pts_raw": null,
+            "dts_raw": null
+          }
+        ]
+      },
+      "expected": {
+        "packets": 8,
+        "bytes": 291,
+        "digest": 9859135337241920953
+      }
+    }
+  ]
+}
