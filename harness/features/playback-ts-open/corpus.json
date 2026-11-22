@@ -61,9 +61,9 @@
         "ts188:256=avc,257=dvb-ac3,258=dvbsub"
       ],
       "expected": {
-        "packets": 4,
-        "bytes": 180,
-        "digest": 15103458230865886410
+        "packets": 3,
+        "bytes": 54,
+        "digest": 12763101295087655160
       }
     },
     {

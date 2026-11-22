@@ -28,12 +28,14 @@ typedef struct {
     uint8_t *other;
     size_t other_size;
     const char *pes_selection, *mov_layout;
+    char *media_selection;
 } PlaybackPlayerCase;
 
 static void player_release(void *opaque)
 {
     PlaybackPlayerCase *player = opaque;
     free(player->other);
+    av_free(player->media_selection);
     free(player);
 }
 
@@ -312,6 +314,46 @@ done:
     return result;
 }
 
+/* The independent segment API emits video and audio PES. DVB subtitles
+ * remain transport source events and have their own PES operation. */
+static int player_prepare_pes(const ViewCase *input, PlaybackPlayerCase *player)
+{
+    TsProgramSelection selection;
+    if (input->argc != 2 || (strcmp(input->argv[0], "segment") &&
+        strcmp(input->argv[0], "private-audio") && strcmp(input->argv[0], "startup")) ||
+        ts_program_parse(input->argv[1], &selection) < 0)
+        return 0;
+    const char *argument = input->argv[1];
+    player->pes_selection = argument;
+    if (strcmp(input->argv[0], "segment") || !strstr(argument, "=dvbsub"))
+        return 1;
+
+    char *media = av_strdup(argument);
+    if (!media)
+        return 0;
+    player->media_selection = media;
+    size_t prefix = (size_t)(strchr(argument, ':') - argument) + 1;
+    const char *entry = argument + prefix;
+    char *out = media + prefix;
+    while (*entry) {
+        size_t len = strcspn(entry, ",");
+        const char dvb[] = "=dvbsub";
+        const size_t suffix = sizeof(dvb) - 1;
+        if (len <= suffix || memcmp(entry + len - suffix, dvb, suffix)) {
+            if (out != media + prefix)
+                *out++ = ',';
+            memcpy(out, entry, len);
+            out += len;
+        }
+        entry += len;
+        if (*entry == ',')
+            ++entry;
+    }
+    *out = 0;
+    player->pes_selection = media;
+    return ts_program_parse(media, &selection) == 0;
+}
+
 static int player_run(const ViewCase *input, ViewWork *work)
 {
     const PlaybackPlayerCase *player = input->prepared;
@@ -508,14 +550,9 @@ static int playback_player_prepare(ViewCase *input)
         player->operation = PLAYER_INDEX;
         valid = player_prepare_index(input, player);
     } else {
-        TsProgramSelection selection;
         input->name = "playback-ts-open";
         player->operation = PLAYER_PES_OPEN;
-        valid = input->argc == 2 && (!strcmp(input->argv[0], "segment") ||
-                  !strcmp(input->argv[0], "private-audio") || !strcmp(input->argv[0], "startup"))
-                  && ts_program_parse(input->argv[1], &selection) == 0;
-        if (valid)
-            player->pes_selection = input->argv[1];
+        valid = player_prepare_pes(input, player);
     }
     return valid && input->size <= 64U * 1024U * 1024U ? 0 : 2;
 }
