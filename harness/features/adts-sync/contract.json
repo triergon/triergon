@@ -356,20 +356,6 @@
       "cause": "Awaiting runtime, peak heap and total RSS collection on isolated AArch64 and ARMv7 gate hosts."
     }
   ],
-  "pending_module_requirements": [
-    "Preserve the first valid frame and reject the false sync inside its payload when junk follows the frame",
-    "Preserve the valid frame immediately before inserted junk during ADTS recovery"
-  ],
-  "open_cases": [
-    {
-      "id": "adts_mid_junk.aac",
-      "requirement": "Preserve the valid frame immediately before inserted junk during ADTS recovery"
-    },
-    {
-      "id": "junk-between-frames",
-      "requirement": "Preserve the first valid frame and reject the false sync inside its payload when junk follows the frame"
-    }
-  ],
   "open_deviations": [
     {
       "reading": "The declared frame must contain its whole header",
