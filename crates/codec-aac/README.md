@@ -154,6 +154,8 @@ on both targets; every other worker stays on stable.
 The [ADTS search comparison](../../harness/features/adts-sync/contract.json) checks
 `adts::find_frame` against the reference AAC parser's offsets, header fields and packet bytes.
 It includes protected headers, junk, false syncwords and truncated final frames.
+The search skips undersized headers, reserved frequency indices and nonzero
+layer codes that the reference parser can emit as packets.
 
 The `codecs-audio` item grades the stable scalar and nightly SIMD builds against the live
 reference. Its container priming lane compares retained PCM against FFmpeg with `-flags2
