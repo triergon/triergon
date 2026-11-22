@@ -31,23 +31,15 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "timeout_seconds": 120,
-  "pending_module_requirements": [
-    "libass silently draws nothing when its composite allocation fails; the crate returns `Allocation`"
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "outlines-71",
-      "requirement": "libass silently draws nothing when its composite allocation fails; the crate returns `Allocation`",
-      "targets": [
-        "thumbv7neon-unknown-linux-gnueabihf"
-      ]
-    },
-    {
-      "id": "outlines-83",
-      "requirement": "libass silently draws nothing when its composite allocation fails; the crate returns `Allocation`",
-      "targets": [
-        "thumbv7neon-unknown-linux-gnueabihf"
-      ]
+      "reading": "Composite allocation failure is distinguishable from an empty render",
+      "clause": "ISO C section 7.22.3 allows an allocation to fail. The raster API returns Error::Allocation to its caller",
+      "candidate": "Returns the allocation error for each composite.",
+      "reference": "The pinned ARMv7 build silently omits each composite.",
+      "compat": "compat::raster::omit_on_allocation_failure",
+      "cases": ["outlines-71", "outlines-83"],
+      "targets": ["thumbv7neon-unknown-linux-gnueabihf"]
     }
   ]
 }

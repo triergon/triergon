@@ -193,7 +193,7 @@
         }
       },
       "harness/features/raster-sweep/contract.json": {
-        "open_cases": {
+        "open_deviations": {
           "thumbv7neon-unknown-linux-gnueabihf": 2
         }
       },

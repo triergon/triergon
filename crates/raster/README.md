@@ -138,6 +138,9 @@ default `MAX_BITMAP_BYTES`, libass's own bound just under 2³¹ bytes, so only t
 budget limits what libass draws). Running out of work or exceeding a limit is
 `Error::Policy`. A bitmap beyond libass's bound is not drawn, and a blur whose
 intermediate planes would pass it leaves the bitmap unblurred, as in libass.
+The [raster sweep](../../harness/features/raster-sweep/contract.json) records
+composite allocation failures as `Error::Allocation` where the ARMv7
+reference omits the composite.
 
 Outline coordinates stay within ±(2²⁸ − 1); conversions and transforms that leave
 the range are `Error::Invalid`, and the glyph pipeline drops such outlines as
