@@ -62,6 +62,7 @@ impl PollOutput for CompactTraceEvent {
 }
 
 impl TransportStream {
+    // Checking the observed carrier take measured +5 instructions on reordered 48 kHz playback.
     #[expect(
         clippy::expect_used,
         reason = "an error return here measured with the span refusal: +0.24% (seek split-PES +0.72%)"
