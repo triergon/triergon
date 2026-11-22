@@ -2,14 +2,15 @@
   "schema": 1,
   "about": "What the gates require and every exception to them, counted from the feature contracts, the gate plan, every list under harness/ whose name starts with open_ (an entry counts once for each case it names, under each gate target it is open on) and the public features of each crate in harness/not-compared.json that no contract compares. `cargo xtask check-design` counts them again: a change that drops a requirement or adds an exception must change this file too.",
   "counts": {
-    "features": 142,
-    "required_by_check": 111,
+    "features": 143,
+    "required_by_check": 112,
     "on_demand": 3,
     "diagnostic": 1,
-    "gated_by_report": 86,
+    "gated_by_report": 87,
     "gated_by_another_command": 53,
     "not_gated": 3,
     "open": {
+      "harness/features/facade-probe/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 29043, "thumbv7neon-unknown-linux-gnueabihf": 29043}, "open_cases": {"aarch64-unknown-linux-gnu": 4306}},
       "harness/features/facade-mpegts/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 450, "thumbv7neon-unknown-linux-gnueabihf": 450}, "open_cases": {"aarch64-unknown-linux-gnu": 141, "thumbv7neon-unknown-linux-gnueabihf": 141}},
       "harness/features/facade-seek/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 24, "thumbv7neon-unknown-linux-gnueabihf": 24}},
       "harness/features/facade-seek/container-pins.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 855, "thumbv7neon-unknown-linux-gnueabihf": 855}, "open_cases": {"aarch64-unknown-linux-gnu": 158, "thumbv7neon-unknown-linux-gnueabihf": 158}},
