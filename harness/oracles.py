@@ -59,6 +59,7 @@ TRACE_ORACLES = {
     "mkv-codec-state": ("harness.matroska_metadata_oracle", "codec_state"),
     "ts-video-descriptors": ("harness.ts_descriptor_oracle", "trace"),
     "ts-packets": ("harness.ts_packet_oracle", "trace"),
+    "ts-time": ("harness.ts_time_oracle", "trace"),
     "views-smoke": ("harness.oracles", "views_smoke"),
 }
 
