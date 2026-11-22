@@ -1374,9 +1374,6 @@
       "compat": "compat::layout::AdtsConventionalSurround",
       "cases": [
         "aac-aac-lc-5.1.aac"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
