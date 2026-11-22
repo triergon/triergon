@@ -435,6 +435,7 @@ pub(super) fn items(
         plan.elementary_readers(),
         plan.codec_dsp(),
         plan.aac_access_units(),
+        plan.nal_workloads(),
     ]);
     if let Some(session) = plan.session_codecs() {
         items.push(session);
@@ -954,6 +955,58 @@ impl Plan<'_> {
     /// any vector that fails and is not a listed open case. The AAC decoder is built as
     /// `codec-aac-worker` builds it: by the pinned nightly with its `simd` feature, in the
     /// nightly workers' target directory; the AAC lane's output comes from that worker.
+    fn nal_workloads(&self) -> Item {
+        let bin = format!("{}/nal-workload-bin", self.out);
+        let worker = format!("{}/codec-views-worker", self.release);
+        let h264 = format!("video-h264={worker}");
+        let hevc = format!("video-hevc={worker}");
+        let selected = lanes::video_workloads();
+        let grade = "codecs-grade-nal-workloads";
+        let mut steps = Vec::new();
+        for (codec, package, example, name) in [
+            (
+                "h264",
+                "triergon-codec-h264",
+                "decode_h264",
+                "codec-h264-decode",
+            ),
+            (
+                "hevc",
+                "triergon-codec-hevc",
+                "decode_hevc",
+                "codec-hevc-decode",
+            ),
+        ] {
+            steps.push(step(
+                format!("nal-workloads-{codec}-bin"),
+                Stage::Timing,
+                Placement::Free,
+                self.codec_example(&bin, example, name, package, None, false),
+            ));
+        }
+        steps.push(self.codec_grade(
+            grade,
+            CORRECTNESS,
+            "h264,hevc",
+            &bin,
+            &[
+                "--only",
+                &selected,
+                "--codec-worker-for",
+                &h264,
+                "--codec-worker-for",
+                &hevc,
+            ],
+        ));
+        steps.push(self.codec_summary("codecs-summary-nal-workloads", grade));
+        Item {
+            name: "nal-workloads".into(),
+            weight: 1,
+            steps,
+            preflight: owned(&["--codecs", "harness/codecs/nal-workloads.json"]),
+        }
+    }
+
     fn audio_codecs(&self) -> Item {
         let (out, release) = (self.out, self.release);
         let audio_bin = format!("{out}/codec-audio-bin");
