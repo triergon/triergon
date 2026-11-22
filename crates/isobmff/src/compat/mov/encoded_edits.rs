@@ -1110,28 +1110,18 @@ impl<'a> EncodedEditJob<'a> {
     /// Dolby configurations, and the edit's clock. `false` when the budget ran out.
     fn poll_setup(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if let Some(recovery) = &mut self.recovery_contexts {
-            if !recovery.poll(work, cancel)? {
+            let Some(observation) = recovery.poll(work, cancel)? else {
                 return Ok(false);
-            }
-            self.recovery_observation = Some(
-                self.recovery_contexts
-                    .take()
-                    .ok_or(Error::Invalid(
-                        "encoded context view recovery result invariant",
-                    ))?
-                    .finish()?,
-            );
+            };
+            self.recovery_observation = Some(observation);
+            self.recovery_contexts = None;
         }
         if let Some(recovery) = &mut self.recovery_walk {
-            if !recovery.poll(work, cancel)? {
+            let Some(facts) = recovery.poll(work, cancel)? else {
                 return Ok(false);
-            }
-            self.recovery_facts = Some(
-                self.recovery_walk
-                    .take()
-                    .ok_or(Error::Invalid("recovery completion invariant"))?
-                    .finish()?,
-            );
+            };
+            self.recovery_facts = Some(facts);
+            self.recovery_walk = None;
         }
         if let Some(recovery) = &mut self.empty_recovery {
             if !recovery.poll(work)? {

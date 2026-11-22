@@ -151,20 +151,19 @@ fn source_result<T>(
 }
 #[derive(Debug)]
 pub(crate) struct RecoveryWalk {
-    children: Option<BoxChildren>,
+    children: BoxChildren,
     pending: Option<Pending>,
     seen: u8,
     facts: RecoveryFacts,
     maximum_indices: [u32; 2],
     limits: RecoveryLimits,
-    finished: bool,
     extended: bool,
     error_backing: Option<crate::boxes::BoxView>,
 }
 impl RecoveryWalk {
     pub(crate) fn new(table: &SampleTable, maximum: u64) -> Result<Self> {
         Ok(Self {
-            children: Some(table.raw().children(0, Limits::default())?),
+            children: table.raw().children(0, Limits::default())?,
             pending: None,
             seen: 0,
             facts: RecoveryFacts {
@@ -176,7 +175,6 @@ impl RecoveryWalk {
                 max_descriptions: 64,
                 max_runs: u32::try_from(maximum).unwrap_or(u32::MAX),
             },
-            finished: false,
             extended: false,
             error_backing: None,
         })
@@ -189,7 +187,11 @@ impl RecoveryWalk {
     pub(crate) fn error_backing(&self) -> Option<&crate::boxes::BoxView> {
         self.error_backing.as_ref()
     }
-    pub(crate) fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+    pub(crate) fn poll(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<RecoveryFacts>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -217,7 +219,7 @@ impl RecoveryWalk {
                                 &mut self.error_backing,
                             )? == BuildStatus::Yield
                             {
-                                return Ok(false);
+                                return Ok(None);
                             }
                             let entry = source_result(
                                 lookup.finish(),
@@ -245,7 +247,7 @@ impl RecoveryWalk {
                     } => {
                         if *row != source.run_count() {
                             if !work.try_charge(1) {
-                                return Ok(false);
+                                return Ok(None);
                             }
                             let (count, index) = source_result(
                                 source.run(*row),
@@ -309,11 +311,8 @@ impl RecoveryWalk {
                 }
                 continue;
             }
-            let Some(children) = &mut self.children else {
-                return Ok(self.finished);
-            };
-            match children.poll(work)? {
-                Next::Yield => return Ok(false),
+            match self.children.poll(work)? {
+                Next::Yield => return Ok(None),
                 Next::End => {
                     for (slot, group) in self.facts.groups.iter().enumerate() {
                         let count = group
@@ -325,9 +324,10 @@ impl RecoveryWalk {
                             return Err(Error::Invalid("encoded unresolved recovery description"));
                         }
                     }
-                    self.children = None;
-                    self.finished = true;
-                    return Ok(true);
+                    return Ok(Some(RecoveryFacts {
+                        groups: std::mem::take(&mut self.facts.groups),
+                        samples: self.facts.samples,
+                    }));
                 }
                 Next::Item(raw) => {
                     let description = match raw.header().kind {
@@ -413,11 +413,5 @@ impl RecoveryWalk {
                 }
             }
         }
-    }
-    pub(crate) fn finish(self) -> Result<RecoveryFacts> {
-        if !self.finished {
-            return Err(Error::Invalid("encoded recovery not ready"));
-        }
-        Ok(self.facts)
     }
 }

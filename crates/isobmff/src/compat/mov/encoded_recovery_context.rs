@@ -40,49 +40,34 @@ impl RecoveryObservation {
 }
 
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)] // Keep the validation walk inline without another allocation.
-enum Phase {
-    Validate {
-        scan: Option<BoxChildren>,
-        strict: RecoveryWalk,
-    },
-    Ready(RecoveryObservation),
-    Finished,
-}
-
-#[derive(Debug)]
 pub(crate) struct RecoveryContextReceiver {
     raw: BoxView,
     groups: u32,
-    phase: Phase,
+    scan: Option<BoxChildren>,
+    strict: RecoveryWalk,
 }
 impl RecoveryContextReceiver {
     pub(crate) fn new(table: &SampleTable, maximum: u64) -> Result<Self> {
         Ok(Self {
             raw: table.raw().clone(),
             groups: 0,
-            phase: Phase::Validate {
-                scan: Some(table.raw().children(0, Limits::default())?),
-                strict: RecoveryWalk::new_with_recovery_contexts(table, maximum)?,
-            },
+            scan: Some(table.raw().children(0, Limits::default())?),
+            strict: RecoveryWalk::new_with_recovery_contexts(table, maximum)?,
         })
     }
-    pub(crate) fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+    pub(crate) fn poll(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<RecoveryObservation>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            let (scan, strict) = match &mut self.phase {
-                Phase::Validate { scan, strict } => (scan, strict),
-                Phase::Ready(_) => return Ok(true),
-                Phase::Finished => {
-                    return Err(Error::Invalid("encoded context view recovery not ready"));
-                }
-            };
-            if let Some(children) = scan {
+            if let Some(children) = &mut self.scan {
                 match children.poll(work)? {
-                    Next::Yield => return Ok(false),
-                    Next::End => *scan = None,
+                    Next::Yield => return Ok(None),
+                    Next::End => self.scan = None,
                     Next::Item(raw) => {
                         let atom = raw.header().kind;
                         if atom == *b"sgpd" || atom == *b"sbgp" {
@@ -98,15 +83,9 @@ impl RecoveryContextReceiver {
                 }
                 continue;
             }
-            let outcome = match strict.poll(work, cancel) {
-                Ok(false) => return Ok(false),
-                Ok(true) => {
-                    let phase = std::mem::replace(&mut self.phase, Phase::Finished);
-                    let Phase::Validate { strict, .. } = phase else {
-                        continue;
-                    };
-                    Ok(strict.finish()?)
-                }
+            let outcome = match self.strict.poll(work, cancel) {
+                Ok(None) => return Ok(None),
+                Ok(Some(facts)) => Ok(facts),
                 Err(error) => {
                     if !matches!(
                         error,
@@ -114,7 +93,7 @@ impl RecoveryContextReceiver {
                     ) {
                         return Err(error);
                     }
-                    let Some(raw) = strict.error_backing().cloned() else {
+                    let Some(raw) = self.strict.error_backing().cloned() else {
                         return Err(error);
                     };
                     Err(SourceProfileFault {
@@ -124,17 +103,15 @@ impl RecoveryContextReceiver {
                     })
                 }
             };
-            self.phase = Phase::Ready(RecoveryObservation {
+            let observation = RecoveryObservation {
                 raw: self.raw.clone(),
                 groups: self.groups,
                 outcome,
-            });
-        }
-    }
-    pub(crate) fn finish(self) -> Result<RecoveryObservation> {
-        match self.phase {
-            Phase::Ready(observation) => Ok(observation),
-            _ => Err(Error::Invalid("encoded context view recovery not ready")),
+            };
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            return Ok(Some(observation));
         }
     }
 }
