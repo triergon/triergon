@@ -493,7 +493,9 @@ pub(super) fn decode_pins(root: &Path, listing: &mut Value, record: bool) -> Res
     let Some((_, Value::Array(cases))) = fields.iter_mut().find(|(key, _)| key == "cases") else {
         return Err("DTS manifest has no cases".into());
     };
+    let target = report::gate_target()?;
     let mut checked = 0;
+    let mut pinned = 0;
     for case in cases
         .iter_mut()
         .filter(|case| case.get("profile").and_then(Value::as_str) == Some("decode"))
@@ -547,17 +549,42 @@ pub(super) fn decode_pins(root: &Path, listing: &mut Value, record: bool) -> Res
                 "{id}: packed PCM {packed} differs from canonical PCM {unpacked}"
             ));
         }
+        // The reference decodes DTS with architecture-specific arithmetic, so its PCM is
+        // pinned per gate target and checked only on a target that has a pin.
+        let pin = case
+            .get("decode_md5")
+            .and_then(|pins| pins.get(&target))
+            .and_then(Value::as_str);
         if record {
-            validation::put(case, "decode_md5", Value::str(packed))?;
-        } else if case.get("decode_md5").and_then(Value::as_str) != Some(packed.as_str()) {
-            return Err(format!("{id}: decoded PCM {packed} differs from pin"));
+            let mut pins: Vec<(String, Value)> = match case.get("decode_md5") {
+                Some(Value::Object(pins)) => pins
+                    .iter()
+                    .filter(|(key, _)| *key != target)
+                    .cloned()
+                    .collect(),
+                _ => Vec::new(),
+            };
+            pins.push((target.clone(), Value::str(packed)));
+            pins.sort_by(|a, b| a.0.cmp(&b.0));
+            validation::put(case, "decode_md5", Value::Object(pins))?;
+        } else if let Some(pin) = pin {
+            if pin != packed {
+                return Err(format!("{id}: decoded PCM {packed} differs from pin"));
+            }
+            pinned += 1;
         }
         checked += 1;
     }
     if checked == 0 {
         return Err("DTS manifest has no decoded controls".into());
     }
-    println!("verified {checked} packed DTS PCM hashes");
+    if record {
+        println!("recorded {checked} packed DTS PCM hashes for {target}");
+    } else {
+        println!(
+            "verified {checked} packed DTS frames against their canonical form, {pinned} against PCM pins for {target}"
+        );
+    }
     Ok(())
 }
 

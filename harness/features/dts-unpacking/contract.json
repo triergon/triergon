@@ -8,7 +8,7 @@
   "contract": [
     "Compare DtsPackedPayloadJob and, for 14-bit words, Dts14BitUnpacker with the ETSI TS 102 114 packing oracle. Trace valid bit count, canonical storage including low zero alignment bits, and physical locations of the first header bits.",
     "The frames mode compares every canonical frame and source extent from Dts14SyncReader with the oracle on byte-exact aligned 14-bit inputs. The oracle computes the source span from each frame's declared size independently.",
-    "On the real first-frame repackings, separately decode each original packed input and the candidate's canonical frame to signed 16-bit little-endian PCM using the pinned decoder. Verify their nonempty PCM against the recorded decode_md5."
+    "On the real first-frame repackings, separately decode each original packed input and the candidate's canonical frame to signed 16-bit little-endian PCM using the pinned decoder. Verify that both decode to the same nonempty PCM, and compare it with the decode_md5 recorded for the gate target, where one is recorded."
   ],
   "required_profiles": [
     "be14",

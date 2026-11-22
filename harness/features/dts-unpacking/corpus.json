@@ -8286,7 +8286,7 @@
       "expected": {
         "trace_sha256": "c98f852fffd807083a2877c6a238a0e6ae3465e9bf20f6627431f49b29c5c698"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "core_51_24_48_768_0-first-le14",
@@ -8300,7 +8300,7 @@
       "expected": {
         "trace_sha256": "e59175aa5a6d957420a5ce95d5affba59692152bcdbe887d44a41e03a14129ca"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "core_51_24_48_768_0-first-le16",
@@ -8314,7 +8314,7 @@
       "expected": {
         "trace_sha256": "c09030079675c65ef240396a3a6ce36ef52ca7407737e837c809e42fe7a0f0be"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "core_51_24_48_768_1-first-be14",
@@ -8328,7 +8328,7 @@
       "expected": {
         "trace_sha256": "a381715b0144d4a8a9332d80de2d04e0d3d9bfda084aaa1e59296f0cc5e8d178"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "core_51_24_48_768_1-first-le14",
@@ -8342,7 +8342,7 @@
       "expected": {
         "trace_sha256": "5d24c8dbdc102ae90222c60f11ba96d451eb70e40d10d6b4380778a3d402c112"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "core_51_24_48_768_1-first-le16",
@@ -8356,7 +8356,7 @@
       "expected": {
         "trace_sha256": "daf7c378b22a1ae710e7ee47b64f32a6cbad53d881d9c000f144c4d51015d9b2"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "dts-first-be14",
@@ -8370,7 +8370,7 @@
       "expected": {
         "trace_sha256": "af8c1d9a2862d522afedf622c7d45117bece87cf4177bb24eea2361a32697098"
       },
-      "decode_md5": "772bfc75c3ac252afa0bc973f0d97fd7"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "772bfc75c3ac252afa0bc973f0d97fd7"}
     },
     {
       "id": "dts-first-le14",
@@ -8384,7 +8384,7 @@
       "expected": {
         "trace_sha256": "08d1798c93815a0af0fac6c470008bb094958b4e79704f5815a5dd25228bab32"
       },
-      "decode_md5": "772bfc75c3ac252afa0bc973f0d97fd7"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "772bfc75c3ac252afa0bc973f0d97fd7"}
     },
     {
       "id": "dts-first-le16",
@@ -8398,7 +8398,7 @@
       "expected": {
         "trace_sha256": "f88942d9eb2828942dc5a7cc5849a69a2399ec8843a87e62b591a2be3f69b5e3"
       },
-      "decode_md5": "772bfc75c3ac252afa0bc973f0d97fd7"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "772bfc75c3ac252afa0bc973f0d97fd7"}
     },
     {
       "id": "dts_es-first-be14",
@@ -8412,7 +8412,7 @@
       "expected": {
         "trace_sha256": "7e011642605d169f71a6dbe30fd0980a3d716b09b83520beb1de0d0edac54872"
       },
-      "decode_md5": "4a451fbdc5f881fbf60672551f56fb96"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "4a451fbdc5f881fbf60672551f56fb96"}
     },
     {
       "id": "dts_es-first-le14",
@@ -8426,7 +8426,7 @@
       "expected": {
         "trace_sha256": "c1fdf524e5bf917b021ba041999b0a61e3e34861811dc85d0e2b438b9663dee0"
       },
-      "decode_md5": "4a451fbdc5f881fbf60672551f56fb96"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "4a451fbdc5f881fbf60672551f56fb96"}
     },
     {
       "id": "dts_es-first-le16",
@@ -8440,7 +8440,7 @@
       "expected": {
         "trace_sha256": "94c48f5c01efa2528aadfa018ef5777bbb2a2b037144a4557953049b34f3d870"
       },
-      "decode_md5": "4a451fbdc5f881fbf60672551f56fb96"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "4a451fbdc5f881fbf60672551f56fb96"}
     },
     {
       "id": "dtsx_7.1.4_24bit-first-be14",
@@ -8454,7 +8454,7 @@
       "expected": {
         "trace_sha256": "76a5d2a189960879efe02a13868ba867b4fc3a8d04974d60ece385b9864c8e73"
       },
-      "decode_md5": "6dc6948994b3e70d6c71a5658f56df62"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "6dc6948994b3e70d6c71a5658f56df62"}
     },
     {
       "id": "dtsx_7.1.4_24bit-first-le14",
@@ -8468,7 +8468,7 @@
       "expected": {
         "trace_sha256": "a7fb6c25b3cf1045cd313f704dbec0651d67b99de2f22c5b52c4816a3e8a7d07"
       },
-      "decode_md5": "6dc6948994b3e70d6c71a5658f56df62"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "6dc6948994b3e70d6c71a5658f56df62"}
     },
     {
       "id": "dtsx_7.1.4_24bit-first-le16",
@@ -8482,7 +8482,7 @@
       "expected": {
         "trace_sha256": "02cf3bbbc4c086c2c23074080aec40fde5a18506efdea7c983fb5a394e5c5059"
       },
-      "decode_md5": "6dc6948994b3e70d6c71a5658f56df62"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "6dc6948994b3e70d6c71a5658f56df62"}
     },
     {
       "id": "master_audio_7.1_24bit-first-be14",
@@ -8496,7 +8496,7 @@
       "expected": {
         "trace_sha256": "52d20ca6c848cfc04ddf3cf302b6f0f23e79927577d29544acac88f476833bd1"
       },
-      "decode_md5": "95eb253bd2021e294a0f9f3b1a26fb74"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "95eb253bd2021e294a0f9f3b1a26fb74"}
     },
     {
       "id": "master_audio_7.1_24bit-first-le14",
@@ -8510,7 +8510,7 @@
       "expected": {
         "trace_sha256": "8b4b7d4bb782d207d22c621577c70bbce1e5f8f4878e467c78719dbf8f593cbd"
       },
-      "decode_md5": "95eb253bd2021e294a0f9f3b1a26fb74"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "95eb253bd2021e294a0f9f3b1a26fb74"}
     },
     {
       "id": "master_audio_7.1_24bit-first-le16",
@@ -8524,7 +8524,7 @@
       "expected": {
         "trace_sha256": "e2ac66b51f58be57113a9c9aa1ec24967b579b5cffbbe238e07b3a92a041e9da"
       },
-      "decode_md5": "95eb253bd2021e294a0f9f3b1a26fb74"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "95eb253bd2021e294a0f9f3b1a26fb74"}
     },
     {
       "id": "x96_51_24_96_1509-first-be14",
@@ -8538,7 +8538,7 @@
       "expected": {
         "trace_sha256": "03e7dea1e1abc314476cf534692eca4cb37562b5381d5166ee738f51822ce952"
       },
-      "decode_md5": "4072783b8efb99a9e5817067d68f61c6"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "4072783b8efb99a9e5817067d68f61c6"}
     },
     {
       "id": "x96_51_24_96_1509-first-le14",
@@ -8552,7 +8552,7 @@
       "expected": {
         "trace_sha256": "08ef5f76d9587cbd75333f696c364f56e0eef867dee252a29444536f006f9c84"
       },
-      "decode_md5": "4072783b8efb99a9e5817067d68f61c6"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "4072783b8efb99a9e5817067d68f61c6"}
     },
     {
       "id": "x96_51_24_96_1509-first-le16",
@@ -8566,7 +8566,7 @@
       "expected": {
         "trace_sha256": "515d0b8a27b54005dcd645802d7c922409bd3a4801fec877f2b4aa8f5b0e8007"
       },
-      "decode_md5": "4072783b8efb99a9e5817067d68f61c6"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "4072783b8efb99a9e5817067d68f61c6"}
     },
     {
       "id": "x96_xch_61_24_96_3840-first-be14",
@@ -8580,7 +8580,7 @@
       "expected": {
         "trace_sha256": "de509d8640cbbb61afba2beea5011bdae169bd5045c2bc5b83fab4952b457b7c"
       },
-      "decode_md5": "21eb7229dde310fab9cd2dbec6208123"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "21eb7229dde310fab9cd2dbec6208123"}
     },
     {
       "id": "x96_xch_61_24_96_3840-first-le14",
@@ -8594,7 +8594,7 @@
       "expected": {
         "trace_sha256": "e7596a65f50feb57fea5b6494b8d9b178fd2ad1fb0b19ebd03b61dd9d8c819d3"
       },
-      "decode_md5": "21eb7229dde310fab9cd2dbec6208123"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "21eb7229dde310fab9cd2dbec6208123"}
     },
     {
       "id": "x96_xch_61_24_96_3840-first-le16",
@@ -8608,7 +8608,7 @@
       "expected": {
         "trace_sha256": "bd3bf791e58fd217b3bfa038c006656bf848b6fc6eb54f75372a2bdc7a130980"
       },
-      "decode_md5": "21eb7229dde310fab9cd2dbec6208123"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "21eb7229dde310fab9cd2dbec6208123"}
     },
     {
       "id": "x96_xxch_71_24_96_3840-first-be14",
@@ -8622,7 +8622,7 @@
       "expected": {
         "trace_sha256": "4232abd74319fe3ff71868e3c9c5bec1d166604a8b0d9125f603a9fcb6a33026"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "x96_xxch_71_24_96_3840-first-le14",
@@ -8636,7 +8636,7 @@
       "expected": {
         "trace_sha256": "9877d4dcee46d495959e067beac8f5b1824a49386a43698c17f9672181cb39b2"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "x96_xxch_71_24_96_3840-first-le16",
@@ -8650,7 +8650,7 @@
       "expected": {
         "trace_sha256": "4aa9cc236aa14838955ee47bee6160b73ad4087e5ce739a7e2b4dae99358ce74"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "xbr_51_24_48_3840-first-be14",
@@ -8664,7 +8664,7 @@
       "expected": {
         "trace_sha256": "3b2446dc20672924d25d2b8f7c96684c0b0a218e7a8622341e2832fd9558b5a9"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "xbr_51_24_48_3840-first-le14",
@@ -8678,7 +8678,7 @@
       "expected": {
         "trace_sha256": "e4c575e855304488837e42bb87d2df0ec08223b6e6e0dc9e79b57b196745241b"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "xbr_51_24_48_3840-first-le16",
@@ -8692,7 +8692,7 @@
       "expected": {
         "trace_sha256": "4445279d4f78e59e9b1207285be45e81fd81b4923bbd1b76b9b85f87b7e4a495"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "xbr_xch_61_24_48_3840-first-be14",
@@ -8706,7 +8706,7 @@
       "expected": {
         "trace_sha256": "39f34d89ccef79c22f7cb35733a1dd8a5d3a4ee9e91ef723134fa28d471256ca"
       },
-      "decode_md5": "21eb7229dde310fab9cd2dbec6208123"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "21eb7229dde310fab9cd2dbec6208123"}
     },
     {
       "id": "xbr_xch_61_24_48_3840-first-le14",
@@ -8720,7 +8720,7 @@
       "expected": {
         "trace_sha256": "06e8ebd5398a071386ae672852df0cb32ed8811369f3441211fd6cb9734d095d"
       },
-      "decode_md5": "21eb7229dde310fab9cd2dbec6208123"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "21eb7229dde310fab9cd2dbec6208123"}
     },
     {
       "id": "xbr_xch_61_24_48_3840-first-le16",
@@ -8734,7 +8734,7 @@
       "expected": {
         "trace_sha256": "6a752ebe6b00e4278144d0a77741a4ea2bfcc930a88664ad13926eda082115f3"
       },
-      "decode_md5": "21eb7229dde310fab9cd2dbec6208123"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "21eb7229dde310fab9cd2dbec6208123"}
     },
     {
       "id": "xbr_xxch_71_24_48_3840-first-be14",
@@ -8748,7 +8748,7 @@
       "expected": {
         "trace_sha256": "0573ea967e734b44e2f6076f9b434016c25de2afdc8cc011189e01ba7ea6cd1e"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "xbr_xxch_71_24_48_3840-first-le14",
@@ -8762,7 +8762,7 @@
       "expected": {
         "trace_sha256": "ff9b0d50efb1842bcd29bd021b8cf0275860c06063f6ccf24cf9b48296d0748a"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "xbr_xxch_71_24_48_3840-first-le16",
@@ -8776,7 +8776,7 @@
       "expected": {
         "trace_sha256": "c3142666c07a5ac495e5b72f7f180f4412bc317aaea0a257d64186221d09fea3"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "xch_61_24_48_768-first-be14",
@@ -8790,7 +8790,7 @@
       "expected": {
         "trace_sha256": "de63926216cbdb90efb8d65dfcef0bed781eb201c58abae904c9f7c038cc5113"
       },
-      "decode_md5": "21eb7229dde310fab9cd2dbec6208123"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "21eb7229dde310fab9cd2dbec6208123"}
     },
     {
       "id": "xch_61_24_48_768-first-le14",
@@ -8804,7 +8804,7 @@
       "expected": {
         "trace_sha256": "39e365aa34c843a52a7ad506dc0422107037027a141db0a93961e438e60445e8"
       },
-      "decode_md5": "21eb7229dde310fab9cd2dbec6208123"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "21eb7229dde310fab9cd2dbec6208123"}
     },
     {
       "id": "xch_61_24_48_768-first-le16",
@@ -8818,7 +8818,7 @@
       "expected": {
         "trace_sha256": "f600017f522ed9bc6d4162af66059f8a65fb9af3304651d1427ec0e994a1e9d8"
       },
-      "decode_md5": "21eb7229dde310fab9cd2dbec6208123"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "21eb7229dde310fab9cd2dbec6208123"}
     },
     {
       "id": "xll_51_16_192_768_0-first-be14",
@@ -8832,7 +8832,7 @@
       "expected": {
         "trace_sha256": "8bcddf46e82a73b1e0a6b2518b2d75a69d666924d13b388b1a38490243c8ac70"
       },
-      "decode_md5": "1578cc53f9043ded91f8b64e513e3de8"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "1578cc53f9043ded91f8b64e513e3de8"}
     },
     {
       "id": "xll_51_16_192_768_0-first-le14",
@@ -8846,7 +8846,7 @@
       "expected": {
         "trace_sha256": "9a1c5f2a9e71cd0fd34c9592c197edcddc50e1a1f0e833db7d9761b2123f66b2"
       },
-      "decode_md5": "1578cc53f9043ded91f8b64e513e3de8"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "1578cc53f9043ded91f8b64e513e3de8"}
     },
     {
       "id": "xll_51_16_192_768_0-first-le16",
@@ -8860,7 +8860,7 @@
       "expected": {
         "trace_sha256": "58d046ef4ba13059a97add17afc93c7c12343d31632a1c5d6b4169c9102bf64f"
       },
-      "decode_md5": "1578cc53f9043ded91f8b64e513e3de8"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "1578cc53f9043ded91f8b64e513e3de8"}
     },
     {
       "id": "xll_51_16_192_768_1-first-be14",
@@ -8874,7 +8874,7 @@
       "expected": {
         "trace_sha256": "ee463da97b3c1320f92fae85a62d186c11ae867271dc29972acb9adac6eabf55"
       },
-      "decode_md5": "1578cc53f9043ded91f8b64e513e3de8"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "1578cc53f9043ded91f8b64e513e3de8"}
     },
     {
       "id": "xll_51_16_192_768_1-first-le14",
@@ -8888,7 +8888,7 @@
       "expected": {
         "trace_sha256": "aecc68f2ff4a8382b0553fd1d2a9ab8a633f767fb52502eab5d227ca626b3f7b"
       },
-      "decode_md5": "1578cc53f9043ded91f8b64e513e3de8"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "1578cc53f9043ded91f8b64e513e3de8"}
     },
     {
       "id": "xll_51_16_192_768_1-first-le16",
@@ -8902,7 +8902,7 @@
       "expected": {
         "trace_sha256": "42b9f69b881d731d4a70c64529210c8ecf1295494a9bad3c60d24f6a21fbb3f8"
       },
-      "decode_md5": "1578cc53f9043ded91f8b64e513e3de8"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "1578cc53f9043ded91f8b64e513e3de8"}
     },
     {
       "id": "xll_51_24_48_768-first-be14",
@@ -8916,7 +8916,7 @@
       "expected": {
         "trace_sha256": "0f0541e07140bbcd445afc8ee4f30a3958b57389f65a94ced55624363e25962c"
       },
-      "decode_md5": "d254eff2213698fff304beb7ccc81cac"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "d254eff2213698fff304beb7ccc81cac"}
     },
     {
       "id": "xll_51_24_48_768-first-le14",
@@ -8930,7 +8930,7 @@
       "expected": {
         "trace_sha256": "d1c1d951f07e7277f33acd742769ebdcd6a0cb0ed3ea3169989bd6ba02663d27"
       },
-      "decode_md5": "d254eff2213698fff304beb7ccc81cac"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "d254eff2213698fff304beb7ccc81cac"}
     },
     {
       "id": "xll_51_24_48_768-first-le16",
@@ -8944,7 +8944,7 @@
       "expected": {
         "trace_sha256": "2c77665bff39980bcc78cf24e1155c197186cc8ece56f2dbdfe9c57f8c3e7abb"
       },
-      "decode_md5": "d254eff2213698fff304beb7ccc81cac"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "d254eff2213698fff304beb7ccc81cac"}
     },
     {
       "id": "xll_71_24_48_768_0-first-be14",
@@ -8958,7 +8958,7 @@
       "expected": {
         "trace_sha256": "321ef2289ffd371cec596c647491a12daddcb7375ba2ebaa74df8c28b2c57f0e"
       },
-      "decode_md5": "3a964ef4f3e70210a51dedca4c3152eb"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "3a964ef4f3e70210a51dedca4c3152eb"}
     },
     {
       "id": "xll_71_24_48_768_0-first-le14",
@@ -8972,7 +8972,7 @@
       "expected": {
         "trace_sha256": "00b79595d1ec5a97427cfb8d923f5363907449619c8ff126b3aaceb206499f25"
       },
-      "decode_md5": "3a964ef4f3e70210a51dedca4c3152eb"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "3a964ef4f3e70210a51dedca4c3152eb"}
     },
     {
       "id": "xll_71_24_48_768_0-first-le16",
@@ -8986,7 +8986,7 @@
       "expected": {
         "trace_sha256": "57e49cc0ca18118d9d44d15c9561f9d3e1a45fa011f96f493fe851b4c5c4e0c8"
       },
-      "decode_md5": "3a964ef4f3e70210a51dedca4c3152eb"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "3a964ef4f3e70210a51dedca4c3152eb"}
     },
     {
       "id": "xll_71_24_48_768_1-first-be14",
@@ -9000,7 +9000,7 @@
       "expected": {
         "trace_sha256": "d019f2e6052814b3151e2b013189648604719e21d27b133986ce9d08a6fa2c0b"
       },
-      "decode_md5": "3a964ef4f3e70210a51dedca4c3152eb"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "3a964ef4f3e70210a51dedca4c3152eb"}
     },
     {
       "id": "xll_71_24_48_768_1-first-le14",
@@ -9014,7 +9014,7 @@
       "expected": {
         "trace_sha256": "7dc4190fd513eb33634d03d93448a075b5e57b08660ab582a10b592406911ad7"
       },
-      "decode_md5": "3a964ef4f3e70210a51dedca4c3152eb"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "3a964ef4f3e70210a51dedca4c3152eb"}
     },
     {
       "id": "xll_71_24_48_768_1-first-le16",
@@ -9028,7 +9028,7 @@
       "expected": {
         "trace_sha256": "67c6fe0ac163314365cedc135f6917ed0ff90610b4acca17ad0c79c85a589498"
       },
-      "decode_md5": "3a964ef4f3e70210a51dedca4c3152eb"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "3a964ef4f3e70210a51dedca4c3152eb"}
     },
     {
       "id": "xll_71_24_96_768-first-be14",
@@ -9042,7 +9042,7 @@
       "expected": {
         "trace_sha256": "a00d9641099b85ca7b2bd14eb481106b14ea5a8fcdef4a526d3e1e883782732b"
       },
-      "decode_md5": "672826a3cd29bb251c8ba8b9612d34f0"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "672826a3cd29bb251c8ba8b9612d34f0"}
     },
     {
       "id": "xll_71_24_96_768-first-le14",
@@ -9056,7 +9056,7 @@
       "expected": {
         "trace_sha256": "46feb30c9d216e801ab73ec8b1b538855a2884faa712f288727b39a497a7ee55"
       },
-      "decode_md5": "672826a3cd29bb251c8ba8b9612d34f0"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "672826a3cd29bb251c8ba8b9612d34f0"}
     },
     {
       "id": "xll_71_24_96_768-first-le16",
@@ -9070,7 +9070,7 @@
       "expected": {
         "trace_sha256": "f8010ef784fb2290aab18977d7ef2b97a857e53b5502c1b893675020eea8e6b2"
       },
-      "decode_md5": "672826a3cd29bb251c8ba8b9612d34f0"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "672826a3cd29bb251c8ba8b9612d34f0"}
     },
     {
       "id": "xll_x96_51_24_96_1509-first-be14",
@@ -9084,7 +9084,7 @@
       "expected": {
         "trace_sha256": "255e83b2909694f6a425bc143c7c6f05cefda08bf4cdf5fd73bd6bdcff249f08"
       },
-      "decode_md5": "191fc9682f4b9f9a2d86a3801bd72683"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "191fc9682f4b9f9a2d86a3801bd72683"}
     },
     {
       "id": "xll_x96_51_24_96_1509-first-le14",
@@ -9098,7 +9098,7 @@
       "expected": {
         "trace_sha256": "ddd9719dc1e0d3b5b95f50a9878d47365cbfb6a0b506b778fc6c9cecc7307129"
       },
-      "decode_md5": "191fc9682f4b9f9a2d86a3801bd72683"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "191fc9682f4b9f9a2d86a3801bd72683"}
     },
     {
       "id": "xll_x96_51_24_96_1509-first-le16",
@@ -9112,7 +9112,7 @@
       "expected": {
         "trace_sha256": "b0438de85ef83cdafeb0bb1a3fcab70f8673a27946b4f6884e90d964d85043bb"
       },
-      "decode_md5": "191fc9682f4b9f9a2d86a3801bd72683"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "191fc9682f4b9f9a2d86a3801bd72683"}
     },
     {
       "id": "xll_xch_61_24_48_768-first-be14",
@@ -9126,7 +9126,7 @@
       "expected": {
         "trace_sha256": "2e4f2f7aa3724c09f2d8561e799744d7bbc2e6a806e18087498b91f3b7ce91b4"
       },
-      "decode_md5": "a8e9032a1b136f74a51592a4e8a62e8e"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "a8e9032a1b136f74a51592a4e8a62e8e"}
     },
     {
       "id": "xll_xch_61_24_48_768-first-le14",
@@ -9140,7 +9140,7 @@
       "expected": {
         "trace_sha256": "049c92d375bb0af8320356d855f02a89240014e9fac49276c62a3918e3da56bd"
       },
-      "decode_md5": "a8e9032a1b136f74a51592a4e8a62e8e"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "a8e9032a1b136f74a51592a4e8a62e8e"}
     },
     {
       "id": "xll_xch_61_24_48_768-first-le16",
@@ -9154,7 +9154,7 @@
       "expected": {
         "trace_sha256": "5d00dbf09d347677dc2733636521dd5fd62724e809a08f86d653df98e268432c"
       },
-      "decode_md5": "a8e9032a1b136f74a51592a4e8a62e8e"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "a8e9032a1b136f74a51592a4e8a62e8e"}
     },
     {
       "id": "xxch_71_24_48_2046-first-be14",
@@ -9168,7 +9168,7 @@
       "expected": {
         "trace_sha256": "0573ea967e734b44e2f6076f9b434016c25de2afdc8cc011189e01ba7ea6cd1e"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "xxch_71_24_48_2046-first-le14",
@@ -9182,7 +9182,7 @@
       "expected": {
         "trace_sha256": "ff9b0d50efb1842bcd29bd021b8cf0275860c06063f6ccf24cf9b48296d0748a"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     },
     {
       "id": "xxch_71_24_48_2046-first-le16",
@@ -9196,7 +9196,7 @@
       "expected": {
         "trace_sha256": "c3142666c07a5ac495e5b72f7f180f4412bc317aaea0a257d64186221d09fea3"
       },
-      "decode_md5": "ff1ce2018aa17fe600fca636b126dbe4"
+      "decode_md5": {"aarch64-unknown-linux-gnu": "ff1ce2018aa17fe600fca636b126dbe4"}
     }
   ]
 }
