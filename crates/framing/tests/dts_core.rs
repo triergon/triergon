@@ -787,7 +787,7 @@ fn cancel_during_partial_header_and_body_releases_private_storage_exactly() {
 }
 
 #[test]
-fn future_encoder_and_extension_sources_keep_required_gaps_explicit() {
+fn future_encoder_versions_and_standalone_extension_sync_refuse_core_probe() {
     for id in [
         "version-8",
         "version-15",
@@ -797,6 +797,10 @@ fn future_encoder_and_extension_sources_keep_required_gaps_explicit() {
         let error = dts::probe_core_header(&fixture(HEADERS, id)).unwrap_err();
         assert_eq!(class(error), "unsupported", "{id}");
     }
+}
+
+#[test]
+fn malformed_extension_preserves_the_completed_core() {
     let observed = drive(
         &fixture(STREAMS, "good-then-extension"),
         1,
@@ -804,9 +808,67 @@ fn future_encoder_and_extension_sources_keep_required_gaps_explicit() {
         false,
         limits(),
     );
-    assert_eq!(observed.terminal, "unsupported");
+    assert_eq!(
+        observed.error,
+        Some(Error::Invalid("DTS extension-substream extent geometry"))
+    );
     assert_eq!(observed.frames.len(), 1);
     assert_eq!(observed.frames[0].facts().offset, 0);
+}
+
+#[test]
+fn extension_sizes_skip_exactly_to_the_next_core() {
+    let core = fixture(STREAMS, "minimum");
+    // Table 7-2: 8/16 or 12/20-bit size fields, each coded minus one.
+    // The declared 16-byte header and 32-byte frame are DWORD aligned.
+    let short = [0x64, 0x58, 0x20, 0x25, 0, 1, 0xe0, 3, 0xe0];
+    let long = [0x64, 0x58, 0x20, 0x25, 0, 0x20, 0x1e, 0, 3, 0xe0];
+    for prefix in [short.as_slice(), long.as_slice()] {
+        let mut extension = prefix.to_vec();
+        extension.resize(32, 0);
+        // A sync word inside the opaque asset must not end the extension.
+        extension[16..20].copy_from_slice(&core[..4]);
+        let stream = [core.as_slice(), &extension, &core].concat();
+        let mut policy = limits();
+        policy.maximum_frames = 2;
+        let observed = drive(&stream, 1, 1, false, policy);
+        assert_eq!(observed.error, None);
+        assert_eq!(observed.end_offset, Some(stream.len() as u64));
+        assert_eq!(observed.frames.len(), 2);
+        assert_eq!(observed.frames[1].facts().offset, 128);
+        for frame in observed.frames {
+            assert_eq!(frame.bytes().as_ref(), core);
+        }
+
+        policy.maximum_frames = 1;
+        let observed = drive(&stream[..128], 1, 1, false, policy);
+        assert_eq!(observed.error, None);
+        assert_eq!(observed.end_offset, Some(128));
+        assert_eq!(observed.frames.len(), 1);
+        for truncated in [5, prefix.len() - 1, 31] {
+            let observed = drive(&stream[..96 + truncated], 1, 1, false, policy);
+            assert_eq!(observed.frames.len(), 1);
+            assert_eq!(observed.error, Some(Error::Truncated));
+        }
+    }
+}
+
+#[test]
+fn extension_extent_obeys_the_frame_byte_limit() {
+    let mut bytes = fixture(STREAMS, "minimum");
+    // A 16-byte header and a 128-byte extent.
+    bytes.extend([0x64, 0x58, 0x20, 0x25, 0, 1, 0xe0, 15, 0xe0]);
+    let mut policy = limits();
+    policy.maximum_frame_bytes = 96;
+    let observed = drive(&bytes, 1, 1, false, policy);
+    assert_eq!(observed.frames.len(), 1);
+    assert_eq!(
+        observed.error,
+        Some(Error::Limit {
+            requested: 128,
+            maximum: 96,
+        })
+    );
 }
 
 #[test]

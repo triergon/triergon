@@ -1,7 +1,10 @@
 //! Core frame headers of a canonical DTS stream and the frames they declare
 //! (ETSI TS 102 114 V1.6.1 §3.4, §5.3, §5.4.2). Coded audio and the extensions
 //! inside a frame stay unread source bytes.
-use crate::dts::reader::source_error;
+use crate::dts::{
+    extent::{DtsFrameExtentLimits, probe_extension_substream_extent},
+    reader::source_error,
+};
 use crate::{ReaderInput, freeze_whole, retryable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::{BitCursor, BitSource};
@@ -304,10 +307,10 @@ pub fn probe_core_header(input: &[u8]) -> Result<DtsCoreHeader> {
 /// The bounds a [`DtsCoreFrameReader`] enforces. None may be zero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsCoreFrameLimits {
-    /// Largest frame accepted, in bytes (`FSIZE + 1`).
+    /// Largest core frame or individual extension substream accepted, in bytes.
     pub maximum_frame_bytes: usize,
-    /// Most frames the reader returns. Input that continues after that many
-    /// is refused.
+    /// Most core frames the reader returns. Extensions of the last core frame
+    /// can still be traversed.
     pub maximum_frames: usize,
     /// Most bytes one input window may carry.
     pub maximum_input_window: usize,
@@ -358,6 +361,10 @@ enum HeaderPart {
     Kind,
     /// The whole header: 13 bytes, or 15 with `HCRC`.
     Whole(usize),
+    /// The extension header through `bHeaderSizeType`.
+    ExtensionKind,
+    /// The extension header through both declared sizes.
+    ExtensionSizes(usize),
 }
 
 impl HeaderPart {
@@ -366,7 +373,8 @@ impl HeaderPart {
         match self {
             Self::Sync => 4,
             Self::Kind => 11,
-            Self::Whole(bytes) => bytes,
+            Self::Whole(bytes) | Self::ExtensionSizes(bytes) => bytes,
+            Self::ExtensionKind => 6,
         }
     }
 }
@@ -387,6 +395,8 @@ enum Frame {
         header: DtsCoreHeader,
         bytes: Bytes,
     },
+    /// The extension's size prefix was checked. Skip these remaining bytes.
+    ExtensionBody(usize),
     /// The source ended after the last frame.
     Ended(SourceLocation),
 }
@@ -411,7 +421,10 @@ enum BodyStep {
 /// Reads the core frames of an aligned stream: canonical big-endian
 /// frames back to back, the first at offset zero. The reader never searches for
 /// a sync word: bytes that are not a frame header where one is due are an error.
-/// It does not convert word packings and refuses extension substreams.
+/// After a core it skips aligned extension substreams by their declared sizes
+/// (ETSI TS 102 114 §7.5.2), preserving the next core's physical offset. It
+/// refuses extension-only input and does not convert word packings or inspect
+/// extension assets or CRCs.
 ///
 /// Reading input and copying into the frame are each charged one unit of work per
 /// byte; the sync check, reading `CPF`, the header probe, the allocation,
@@ -524,7 +537,8 @@ impl DtsCoreFrameReader {
     /// a frame boundary.
     ///
     /// Fails with `Cancelled` when `cancel` is set; `Truncated` when the source ends
-    /// inside a frame; the error of [`probe_core_header`] for a header it refuses;
+    /// inside a core or extension; the error of [`probe_core_header`] or
+    /// [`probe_extension_substream_extent`] for a header it refuses;
     /// `Limit` when a frame exceeds `maximum_frame_bytes` or what the pool can hold, and
     /// when input continues after `maximum_frames` frames; `Backpressure` or
     /// `Allocation` when the frame's storage cannot be allocated: after these two, and
@@ -575,8 +589,23 @@ impl DtsCoreFrameReader {
                         return Ok(Step::Yield);
                     }
                     self.frame = match part {
+                        HeaderPart::Sync
+                            if self.completed != 0
+                                && self.prefix[..4] == EXTENSION_SYNC.to_be_bytes() =>
+                        {
+                            Frame::Header(HeaderPart::ExtensionKind)
+                        }
                         HeaderPart::Sync => {
                             check_sync(&self.prefix[..4])?;
+                            if self.completed >= self.limits.maximum_frames {
+                                return Err(Error::Limit {
+                                    requested: self
+                                        .completed
+                                        .checked_add(1)
+                                        .ok_or(Error::Overflow)?,
+                                    maximum: self.limits.maximum_frames,
+                                });
+                            }
                             Frame::Header(HeaderPart::Kind)
                         }
                         HeaderPart::Kind => {
@@ -587,6 +616,21 @@ impl DtsCoreFrameReader {
                             }))
                         }
                         HeaderPart::Whole(_) => self.probe()?,
+                        HeaderPart::ExtensionKind => {
+                            let end = if self.prefix[5] & 0x20 == 0 { 9 } else { 10 };
+                            Frame::Header(HeaderPart::ExtensionSizes(end))
+                        }
+                        HeaderPart::ExtensionSizes(end) => {
+                            let maximum = self.limits.maximum_frame_bytes;
+                            let extent = probe_extension_substream_extent(
+                                &self.prefix[..end],
+                                DtsFrameExtentLimits {
+                                    maximum_header_bytes: maximum,
+                                    maximum_frame_bytes: maximum,
+                                },
+                            )?;
+                            Frame::ExtensionBody(extent.frame_bytes - end)
+                        }
                     };
                 }
                 Frame::Body {
@@ -693,6 +737,24 @@ impl DtsCoreFrameReader {
                     self.frame = Frame::Header(HeaderPart::Sync);
                     return self.publish(header, bytes);
                 }
+                Frame::ExtensionBody(remaining) => {
+                    match self.input.cursor()?.read_discard(
+                        (*remaining).min(MAXIMUM_COPY),
+                        work,
+                        cancel,
+                    )? {
+                        Step::Ready(count) => {
+                            *remaining -= count;
+                            if *remaining == 0 {
+                                self.prefix_len = 0;
+                                self.frame = Frame::Header(HeaderPart::Sync);
+                            }
+                        }
+                        Step::NeedInput(needed) => return Ok(Step::NeedInput(needed)),
+                        Step::Yield => return Ok(Step::Yield),
+                        Step::End(_) => return Err(Error::Truncated),
+                    }
+                }
                 Frame::Ended(end) => return Ok(Step::End(*end)),
             }
         }
@@ -716,12 +778,6 @@ impl DtsCoreFrameReader {
             Step::Ready(count) => {
                 if count == 0 {
                     return Err(Error::Invalid("empty DTS header read"));
-                }
-                if self.completed >= self.limits.maximum_frames {
-                    return Err(Error::Limit {
-                        requested: self.completed.checked_add(1).ok_or(Error::Overflow)?,
-                        maximum: self.limits.maximum_frames,
-                    });
                 }
                 self.prefix_len = self.prefix_len.checked_add(count).ok_or(Error::Overflow)?;
                 if self.prefix_len == part.end() {
