@@ -336,7 +336,8 @@ assert_eq!(out.len() % 188, 0);
 ```
 
 - Tables: PAT, PMT and a DVB SDT with one service descriptor (ETSI EN 300 468),
-  version 0, serialised once at `Muxer::new`. The SDT is repeated every 500 ms and
+  version 0, serialised once at `Muxer::new`. An SDT longer than one packet continues
+  in the next packets of its PID. The SDT is repeated every 500 ms and
   PAT/PMT every 100 ms of PCR time; PAT/PMT also precede a key picture that follows
   a non-key picture.
 - PES: stream_id 0xE0, unbounded length, PTS and DTS. The first packet's
@@ -347,10 +348,12 @@ assert_eq!(out.len() % 188, 0);
 - `MuxConfig::default()`: transport_stream_id 1, original_network_id 0xFF01,
   program 1, PMT PID 0x1000, video PID 0x0100, stream type 0x01, provider
   "Triergon", service "Service01".
-- `Muxer::new` returns `Error::Unsupported` for names that are not printable ASCII
-  or do not fit one SDT packet together (158 bytes), program number 0, a PMT or
-  video PID outside 0x0020–0x1FFE, equal PMT and video PIDs, and stream types other
-  than 0x01 and 0x02.
+- Names: printable ASCII is written as it is; other text as UTF-8 behind the 0x15
+  selector of EN 300 468 Annex A.
+- `Muxer::new` returns `Error::Unsupported` for names with control characters,
+  encoded names longer than 252 bytes together (one service descriptor), program
+  number 0, a PMT or video PID outside 0x0020–0x1FFE, equal PMT and video PIDs, and
+  stream types other than 0x01, 0x02 and 0x1b.
 
 The [mux read-back comparison](../../harness/features/ts-mux-readback/contract.json)
 checks the table cadence, continuity, PCR and PES headers, stuffing and coded
