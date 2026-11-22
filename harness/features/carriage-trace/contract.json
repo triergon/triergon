@@ -887,9 +887,6 @@
       "compat": "compat::matroska::omit_empty_ass_blocks",
       "cases": [
         "ass-empty-not-clear"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -900,9 +897,6 @@
       "compat": "compat::matroska::suppress_negative_block_pts",
       "cases": [
         "utf8-packet-negative-start"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -917,9 +911,6 @@
         "mkv-vtt-relative-inline-time",
         "mkv-vtt-unknown-addition-opaque",
         "mkv-vtt-truncated-addition"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -930,9 +921,6 @@
       "compat": "compat::mov::large_sample_delta_recovery",
       "cases": [
         "capsule-mov-text-overflow-clock"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
