@@ -317,6 +317,9 @@ fn classify(row: &Value, lane: &str) -> String {
     let ds = get(decoder, "status").or_else(|| get(row, "status"));
     let os = get(output, "status");
     let is = |v: Option<&Value>, s: &str| text(v) == Some(s);
+    if super::correctness::output_only_lane(lane) {
+        return if is(os, "pass") { "pass" } else { "FAIL" }.into();
+    }
     if super::correctness::decoder_only_lane(lane) {
         return if is(ds, "pass") { "pass" } else { "FAIL" }.into();
     }
