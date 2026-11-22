@@ -270,8 +270,8 @@ fn projected(
                     codec_tag: stream.codec_tag,
                     codec: stream.codec().name(),
                     language: stream.language.as_slice(),
-                    hearing_impaired: false,
-                    visual_impaired: false,
+                    hearing_impaired: stream.hearing_impaired,
+                    visual_impaired: stream.visual_impaired,
                     dvb: None,
                 }
                 .write(program.program, work, out)?;

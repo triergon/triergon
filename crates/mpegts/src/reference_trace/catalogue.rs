@@ -46,6 +46,10 @@ pub struct Stream {
     /// The ISO 639 language codes of the first language descriptor, comma separated; empty without
     /// one.
     pub language: BudgetVec<u8>,
+    /// Whether the selected language descriptor includes audio type 2.
+    pub hearing_impaired: bool,
+    /// Whether the selected language descriptor includes audio type 3.
+    pub visual_impaired: bool,
     /// Index into [`Catalogue::evidence`] of the section the entry was read from.
     pub evidence: usize,
     codec: CatalogueCodec,
@@ -656,6 +660,8 @@ impl Catalogue {
             let codec = self.codec(stream, map.program_descriptors.as_ref())?;
             let mut codec_tag = u32::from(stream.stream_type);
             let mut language = BudgetVec::new(&self.budget);
+            let mut hearing_impaired = false;
+            let mut visual_impaired = false;
             for descriptor in stream.descriptors() {
                 if cancel.load(Ordering::Relaxed) {
                     return Err(Error::Cancelled);
@@ -699,6 +705,8 @@ impl Catalogue {
                             language.try_push(b',').map_err(|e| e.error)?;
                         }
                         language.try_extend_from_slice(&e.language_code)?;
+                        hearing_impaired |= e.audio_type == 2;
+                        visual_impaired |= e.audio_type == 3;
                     }
                 }
             }
@@ -712,6 +720,8 @@ impl Catalogue {
                 old.codec_tag = codec_tag;
                 old.codec = codec;
                 old.language = language;
+                old.hearing_impaired = hearing_impaired;
+                old.visual_impaired = visual_impaired;
                 old.evidence = evidence;
             } else {
                 if self.streams.len() >= self.limits.streams {
@@ -724,6 +734,8 @@ impl Catalogue {
                         codec_tag,
                         codec,
                         language,
+                        hearing_impaired,
+                        visual_impaired,
                         evidence,
                     })
                     .map_err(|e| e.error)?;

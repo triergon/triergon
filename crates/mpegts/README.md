@@ -61,7 +61,8 @@ Everything else lives in its module:
   The catalogue keeps PMT stream types alongside registered HEVC and E-AC-3
   codec tags and accepts matching private audio descriptors in a declared
   ATSC namespace. PMT types 0x03 and 0x04 identify MPEG audio without
-  specifying a layer.
+  specifying a layer. The first ISO 639 language list supplies the ordered
+  languages and hearing-impaired and visual-impaired audio dispositions.
 
 `compat::pes::PacketCompletion` confirms that one physical input contained only
 control traffic. Poll the source with `TransportStream::poll_observed` and

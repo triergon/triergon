@@ -484,6 +484,8 @@ fn decode_rejected_pmt(
         }
         let desc = &raw[at + 5..end];
         let mut language = BudgetVec::new(budget);
+        let mut hearing_impaired = false;
+        let mut visual_impaired = false;
         let mut walked = 0usize;
         for item in Descriptors::new(desc) {
             cancelled(cancel)?;
@@ -524,6 +526,8 @@ fn decode_rejected_pmt(
                         language.try_push(b',').map_err(|e| e.error)?;
                     }
                     language.try_extend_from_slice(&entry.language_code)?;
+                    hearing_impaired |= entry.audio_type == 2;
+                    visual_impaired |= entry.audio_type == 3;
                 }
             }
             walked = walked.checked_add(d.source.len()).ok_or(Error::Overflow)?;
@@ -539,6 +543,8 @@ fn decode_rejected_pmt(
                     CatalogueCodec::Hevc
                 },
                 language,
+                hearing_impaired,
+                visual_impaired,
                 evidence: 0,
             })
             .map_err(|e| e.error)?;
@@ -859,6 +865,8 @@ impl Catalogue {
                 old.codec_tag = decoded.codec_tag;
                 old.codec = decoded.codec;
                 old.language = language;
+                old.hearing_impaired = decoded.hearing_impaired;
+                old.visual_impaired = decoded.visual_impaired;
                 old.evidence = index;
             } else {
                 if self.streams.len() >= self.limits.streams {
@@ -871,6 +879,8 @@ impl Catalogue {
                         codec_tag: decoded.codec_tag,
                         codec: decoded.codec,
                         language,
+                        hearing_impaired: decoded.hearing_impaired,
+                        visual_impaired: decoded.visual_impaired,
                         evidence: index,
                     })
                     .map_err(|e| e.error)?;

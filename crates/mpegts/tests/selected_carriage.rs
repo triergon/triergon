@@ -273,6 +273,29 @@ fn truncated_or_unrelated_registrations_do_not_publish_streams() {
 }
 
 #[test]
+fn iso_639_dispositions_preserve_all_roles_in_the_first_language_list() {
+    let desc = b"\x0a\x0ceng\x00deu\x02fra\x03\x0a\x04spa\x00";
+    let pmt = pmt_carrier(0, &[(0x0f, 256, desc)]);
+    let data = [&BASIC[..188], &pmt].concat();
+    for (input, languages, visual) in [
+        (data.as_slice(), b"eng,deu,fra".as_slice(), true),
+        (
+            include_bytes!("data/pmt-opaque-language-descriptors.ts").as_slice(),
+            b"eng,fra".as_slice(),
+            false,
+        ),
+    ] {
+        let budget = Budget::new(8 * 1024 * 1024).unwrap();
+        let run = parsed(input, &budget, PacketFormat::Ts188, 1);
+        let projection = project(&run, &budget, PacketFormat::Ts188).unwrap();
+        let stream = &projection.streams()[0];
+        assert_eq!(stream.language.as_slice(), languages);
+        assert!(stream.hearing_impaired);
+        assert_eq!(stream.visual_impaired, visual);
+    }
+}
+
+#[test]
 fn mpeg_audio_catalogue_uses_the_pmt_even_when_the_pes_header_is_split() {
     let pes = [
         0x00, 0x00, 0x01, 0xc0, 0x00, 0x07, 0x80, 0x00, 0x00, 0xff, 0xfd, 0x84, 0x00,
