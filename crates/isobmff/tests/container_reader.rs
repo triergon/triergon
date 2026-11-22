@@ -10,7 +10,9 @@ use triergon_core::{
     Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceId, Step, Time,
     WorkBudget,
 };
-use triergon_isobmff::{Packet, Reader, ReaderEvent, ReaderLimits};
+use triergon_isobmff::{
+    BoxStep, BoxView, EntryLayout, Limits, Packet, Reader, ReaderEvent, ReaderLimits,
+};
 
 fn capabilities(file: &[u8]) -> SourceCapabilities {
     SourceCapabilities {
@@ -200,7 +202,13 @@ fn track_colour_does_not_take_values_from_a_later_description() {
     let file = include_bytes!("fixtures/r-colour-config-change.mov");
     let pool = Budget::new(16 << 20).unwrap();
     let mut reader = open(&pool, file);
-    read(&mut reader, &pool, file, 3, 5).unwrap();
+    let reading = read(&mut reader, &pool, file, 3, 5).unwrap();
+    let selected: Vec<_> = reading
+        .packets
+        .iter()
+        .map(|packet| packet.sample().description_index)
+        .collect();
+    assert_eq!(selected, [1, 1, 1, 2, 2, 2]);
     let track = &reader.tracks()[0];
     assert!(track.colour().is_none());
     assert_eq!(track.descriptions().len(), 2);
@@ -211,6 +219,60 @@ fn track_colour_does_not_take_values_from_a_later_description() {
             .windows(4)
             .any(|kind| kind == b"colr")
     );
+    let description = track
+        .descriptions()
+        .iter()
+        .find(|description| Some(&description.index) == selected.last())
+        .unwrap();
+    let mut children = description
+        .extensions(EntryLayout::Visual, Limits::default())
+        .unwrap();
+    let mut colour = None;
+    loop {
+        match children.poll(&mut WorkBudget::new(1)).unwrap() {
+            BoxStep::Box(child) => {
+                if let Some(found) = child.colour_parameter() {
+                    assert!(colour.replace(found).is_none());
+                }
+            }
+            BoxStep::End => break,
+            BoxStep::Yield => panic!("one unit should admit a child"),
+        }
+    }
+    let colour = colour.unwrap();
+    use triergon_core::container::{ColourRange, Origin};
+    assert_eq!(
+        (colour.primaries.value, colour.primaries.origin),
+        (9, Origin::Container)
+    );
+    assert_eq!(
+        (colour.transfer.value, colour.transfer.origin),
+        (16, Origin::Container)
+    );
+    assert_eq!(
+        (colour.matrix.value, colour.matrix.origin),
+        (9, Origin::Container)
+    );
+    assert_eq!(
+        (colour.range.value, colour.range.origin),
+        (ColourRange::Unspecified, Origin::Absent)
+    );
+    assert!(colour.chroma_siting.is_none());
+    assert!(colour.mastering.is_none());
+    assert!(colour.content_light.is_none());
+}
+
+#[test]
+fn colour_parameter_rejects_other_and_unsupported_boxes() {
+    let pool = Budget::new(1024).unwrap();
+    for bytes in [
+        &b"\0\0\0\x12freenclc\0\x09\0\x10\0\x09"[..],
+        &b"\0\0\0\x0ccolrprof"[..],
+        &b"\0\0\0\x0bcolrncl"[..],
+    ] {
+        let view = BoxView::new(Bytes::copy_from_slice(&pool, bytes).unwrap(), 0).unwrap();
+        assert!(view.colour_parameter().is_none());
+    }
 }
 
 #[test]

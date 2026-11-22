@@ -881,6 +881,19 @@ fn step_entry_scan(
     Ok(false)
 }
 
+impl BoxView {
+    /// Interpret a supported `colr` box as source colour metadata.
+    ///
+    /// Returns `None` for other box kinds, unsupported colour types, or malformed
+    /// colour parameters. `nclc` reports an absent range.
+    pub fn colour_parameter(&self) -> Option<ColourDescription> {
+        if self.header().kind != *b"colr" {
+            return None;
+        }
+        parse_colour(self.payload()).map(EntryColour::description)
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct EntryColour {
     primaries: u16,
