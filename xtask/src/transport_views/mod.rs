@@ -3,12 +3,16 @@
 mod catalogue;
 mod mux;
 mod packets;
+mod signatures;
 mod time;
 
 use std::fs;
 use std::path::Path;
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
+    if args == ["fixtures", "--write-manifest", "source-signatures"] {
+        return signatures::write_manifest(root);
+    }
     if args == ["fixtures", "catalogue-packets"] {
         let paths = crate::corpus::Paths {
             root: root.into(),
@@ -31,6 +35,7 @@ pub(crate) fn fixtures(paths: &crate::corpus::Paths) -> Result<String, String> {
     catalogue::fixtures(&dir)?;
     packets::fixtures(&dir)?;
     time::fixtures(&paths.root, &dir)?;
+    signatures::fixtures(&dir)?;
     mux::fixtures(paths)?;
     Ok("Generated MPEG-TS catalogue, carrier and mux fixtures".into())
 }

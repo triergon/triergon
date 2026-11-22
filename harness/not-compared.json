@@ -118,12 +118,6 @@
     "triergon-codec-vorbis": [],
     "triergon-core": [
       {
-        "name": "source-signatures",
-        "entry_points": ["signature"],
-        "degree": "step",
-        "needs": "Media, facade and playback probes compare their selected policies, transport width and replay where exposed. The generic selector still needs a direct comparison over caller-supplied box sets, Ogg enablement, both tie policies and exact Need lengths."
-      },
-      {
         "name": "reader-protocol",
         "entry_points": ["InputCursor", "container::ContainerReader", "blocking::Blocking", "blocking::Feed"],
         "degree": "step",

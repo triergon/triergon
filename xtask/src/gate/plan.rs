@@ -98,6 +98,7 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ("ycbcr-palette", Coverage::Item("oracle-compare")),
     ("rbsp-unescape", Coverage::Item("oracle-compare")),
     ("core-budgets", Coverage::Item("oracle-compare")),
+    ("source-signatures", Coverage::Item("oracle-compare")),
     ("ac3-features", Coverage::Item("oracle-compare")),
     ("elementary-metadata-wire", Coverage::Item("oracle-compare")),
     ("dsp-windows", Coverage::Item("oracle-compare")),

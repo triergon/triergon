@@ -258,7 +258,7 @@
     {"area": "Ogg page parsing and writing", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "ogg-pages"},
     {"area": "Elementary stream metadata", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "elementary-metadata"},
     {"area": "Elementary wire metadata", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "elementary-metadata-wire"},
-    {"area": "Media prefix classification", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "media-probe"},
+    {"area": "Media prefix classification", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "media-probe", "parity": {"aarch64-unknown-linux-gnu": "7,333/9,164 matching [probe verdicts](../harness/features/media-probe/contract.json), 1,831 declared differences and 14/14 [caller-policy oracle cases](../harness/features/source-signatures/contract.json)."}},
     {
       "area": "MPEG-TS",
       "targets": [

@@ -32,6 +32,7 @@ impl Kind {
             "windows",
             "divide",
             "core-budgets",
+            "source-signatures",
             "ac3-features",
             "elementary-metadata",
             "opus-final-range",

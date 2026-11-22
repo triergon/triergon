@@ -9,6 +9,7 @@ mod packets;
 #[path = "../../../../framing/examples/framing_views/protocol.rs"]
 mod protocol;
 mod reader;
+mod signatures;
 mod source;
 
 use std::process::ExitCode;
@@ -29,6 +30,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
     ("ts-epoch-index-seek-", reader::operation),
     ("ts-bounded-time-", reader::operation),
     ("ts-mux-", mux::operation),
+    ("source-signatures-", signatures::operation),
 ];
 
 #[cfg_attr(test, allow(dead_code))]

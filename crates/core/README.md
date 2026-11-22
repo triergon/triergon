@@ -175,4 +175,8 @@ semantic contract is described in
 The arithmetic follows exact rational semantics; there is no external specification.
 `cargo xtask core-time` compares the time arithmetic with an independent Python
 `fractions.Fraction` oracle. The crate forbids `unsafe` code and has no dependencies.
+The [source signature gate](../../harness/features/source-signatures/contract.json)
+checks caller-selected box types, Ogg recognition, both transport tie policies and
+exact prefix requests against independent wire-field and policy observations.
+
 Project-wide gates: [docs/quality.md](../../docs/quality.md).
