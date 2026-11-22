@@ -77,11 +77,6 @@ impl Track {
         self.link
     }
 
-    /// The mapping the first packet identifies.
-    pub fn mapping(&self) -> Mapping {
-        self.mapping
-    }
-
     /// Whether every header packet has been read (or the mapping has none).
     pub fn is_configured(&self) -> bool {
         self.configured
