@@ -13,7 +13,6 @@ fn collect(ts: &Transport, window: usize, work: u64) -> Vec<Packet> {
     while let Some(event) = drive.next().unwrap() {
         if let Event::Packet(packet) = event {
             assert_eq!(packet.track_info().codec(), CodecId::Vvc);
-            assert_eq!(packet.random_access(), RandomAccess::Unknown);
             assert!(matches!(packet.access_unit(), AccessUnit::Vvc(_)));
             output.push(packet);
         }
@@ -37,6 +36,11 @@ fn pictures_cross_finite_pes_and_carriers() {
         for (window, work) in [(1, 1), (188, 200)] {
             let output = collect(&ts, window, work);
             assert_eq!(output.len(), 2, "split at {at}");
+            assert!(
+                output
+                    .iter()
+                    .all(|packet| packet.random_access() == RandomAccess::Unknown)
+            );
             assert_eq!(output[0].payload(), first);
             assert_eq!(output[0].pts(), Some(90_000));
             assert_eq!(output[0].dts(), Some(88_000));
@@ -55,6 +59,48 @@ fn pictures_cross_finite_pes_and_carriers() {
                 }
                 assert_eq!(end, range.end);
             }
+        }
+    }
+}
+
+#[test]
+fn idr_types_survive_split_pes_and_mixed_pictures_remain_unknown() {
+    // A standalone picture header permits multiple slices in one picture.
+    let slice = |kind: u8| [0, 0, 1, 0, (kind << 3) | 1, 0x40];
+    for (types, expected) in [
+        (vec![7], RandomAccess::Sync),
+        (vec![8], RandomAccess::Sync),
+        (vec![7, 7], RandomAccess::Sync),
+        (vec![8, 8], RandomAccess::Sync),
+        (vec![0], RandomAccess::Unknown),
+        (vec![9], RandomAccess::Unknown),
+        (vec![10], RandomAccess::Unknown),
+        (vec![7, 0], RandomAccess::Unknown),
+        (vec![0, 7], RandomAccess::Unknown),
+    ] {
+        let mut picture = PH.to_vec();
+        for &kind in &types {
+            picture.extend_from_slice(&slice(kind));
+        }
+        for split in 1..picture.len() {
+            let mut ts = Transport::new();
+            ts.tables(&[(0x33, PID, &[])], 0);
+            ts.pes(PID, 0xe0, &picture[..split], Some(90_000), None);
+            ts.pes(PID, 0xe0, &picture[split..], None, None);
+            ts.pes(PID, 0xe0, NEXT, None, None);
+            let output = collect(&ts, 1, 1);
+            assert_eq!(output.len(), 2);
+            assert_eq!(output[0].payload(), picture, "split {split}");
+            assert_eq!(
+                output[0].random_access(),
+                expected,
+                "types {types:?}, split {split}"
+            );
+            let AccessUnit::Vvc(unit) = output[0].access_unit() else {
+                panic!("VVC")
+            };
+            assert_eq!(unit.first_vcl_type, types[0]);
+            assert_eq!(output[1].random_access(), RandomAccess::Unknown);
         }
     }
 }
@@ -170,7 +216,7 @@ fn original_vvc_pictures_wrapped_in_transport_match_the_reference() {
                 "-f",
                 "mpegts",
                 "-show_entries",
-                "packet=pts,dts,size,data_hash",
+                "packet=pts,dts,size,flags,data_hash",
                 "-show_data_hash",
                 "sha256",
                 "-of",
@@ -187,6 +233,20 @@ fn original_vvc_pictures_wrapped_in_transport_match_the_reference() {
         assert!(output.status.success(), "{:?}", output.stderr);
         let reference = String::from_utf8(output.stdout).unwrap();
         let packets = collect(&ts, 17, 5);
+        let reference_fields: Vec<_> = reference
+            .lines()
+            .map(|line| {
+                let (mut fields, mut sync) = (Vec::new(), None);
+                for field in line.trim_end_matches('|').split('|') {
+                    if let Some(flags) = field.strip_prefix("flags=") {
+                        assert!(sync.replace(flags.contains('K')).is_none());
+                    } else {
+                        fields.push(field);
+                    }
+                }
+                (fields.join("|"), sync.unwrap())
+            })
+            .collect();
         let actual = packets
             .iter()
             .map(|packet| {
@@ -205,9 +265,19 @@ fn original_vvc_pictures_wrapped_in_transport_match_the_reference() {
             .collect::<Vec<_>>();
         assert_eq!(
             actual.iter().map(String::as_str).collect::<Vec<_>>(),
-            reference
-                .lines()
-                .map(|line| line.trim_end_matches('|'))
+            reference_fields
+                .iter()
+                .map(|(row, _)| row.as_str())
+                .collect::<Vec<_>>(),
+            "split at {split}"
+        );
+        let sync = |packet: &Packet| packet.random_access() == RandomAccess::Sync;
+        assert!(packets.iter().any(sync));
+        assert_eq!(
+            packets.iter().map(sync).collect::<Vec<_>>(),
+            reference_fields
+                .iter()
+                .map(|(_, sync)| *sync)
                 .collect::<Vec<_>>(),
             "split at {split}"
         );

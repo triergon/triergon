@@ -166,6 +166,10 @@ validates exactly one access unit in a complete retained payload, charging one w
 unit per scanned byte. It owns the charged `Bytes` input and returns the same
 complete extent without copying. Terminal errors and cancellation release its handle.
 
+The incremental reader reports the first coded VCL NAL type and whether every
+framed VCL NAL has an IDR type. These are header facts; it does not validate
+picture payloads or parameter sets.
+
 The original [FATE VVC inputs](https://fate-suite.ffmpeg.org/vvc/) have 121
 matching positions, lengths and packet hashes across 12 of 13 files in the
 strict path. `curr-ltrp-alias.vvc` omits the zero byte at an embedded picture

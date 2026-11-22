@@ -569,6 +569,7 @@ impl PacketInfo for Packet {
         match &self.0.unit {
             AccessUnit::Video(unit) if unit.random_access => RandomAccess::Sync,
             AccessUnit::Video(unit) if unit.has_vcl => RandomAccess::NotSync,
+            AccessUnit::Vvc(unit) if unit.all_vcl_idr => RandomAccess::Sync,
             _ => RandomAccess::Unknown,
         }
     }
