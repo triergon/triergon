@@ -109,12 +109,6 @@
         "needs": "ts-source-poll compares the PES output of all five poll forms and checks their source spans. Table, continuity, timeline and diagnostic events have no equivalent full reference trace."
       },
       {
-        "name": "demux-observer-forms",
-        "entry_points": ["compat::pes::DemuxObserver::new", "compat::pes::DemuxObserver::push_with_input", "compat::pes::DemuxObserver::poll_compact_payload_with_input", "compat::pes::CompactPayload", "compat::pes::PayloadCursor::current", "compat::pes::PayloadCursor::next_span", "compat::pes::DemuxSpanViews", "compat::pes::CompactDemuxPacket::time_header"],
-        "degree": "step",
-        "needs": "ts-observer-forms compares full packet output from the three observer forms and directly checks constructor scope. Exact borrowed span provenance and source contexts remain trace-only."
-      },
-      {
         "name": "fault-and-completion-facts",
         "entry_points": ["compat::pes::PesFaultHeader", "compat::pes::TransportFaultHeader", "compat::pes::TransportTailConfirmation", "compat::pes::PacketCompletion", "compat::pes::NoMediaConfirmation", "compat::pes::MalformedInputCompletion::new", "compat::pes::MalformedInputFact", "compat::pes::NoPacketsConfirmation", "compat::opaque_video::RecoveredOpaque", "compat::UnboundedPes", "compat::PesPacket"],
         "degree": "step",

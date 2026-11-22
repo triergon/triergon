@@ -273,6 +273,9 @@ demuxer emits, beside the strict source view. A `DemuxPacket` may be partial and
 says why it ended. Carriages: `RegisteredCarriage` (AVC, HEVC, AAC ADTS and LATM),
 `PrivateAudioCarriage` (AC-3, E-AC-3) and `DvbSubtitlesDescriptors`. `PesCutter`
 cuts any stream type, including PGS (`0x90`), teletext and caption-carrying video.
+The [observer comparison](../../harness/features/ts-observer-forms/contract.json)
+checks each owned and borrowed span against its input carrier and checks the
+source context and ordering returned by the compact cursor.
 `DemuxClock` places timestamps in the demuxer's 33-bit interval beside the raw
 values. Contexts outside the observed profile return `Error::Unsupported`.
 The [recovery comparison](../../harness/features/ts-recovery-trace/contract.json)

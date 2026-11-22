@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -221,6 +222,7 @@ impl Output<'_, '_> {
             for part in payload {
                 body.push(part.as_ref());
             }
+            Ok(())
         })
     }
 
@@ -228,7 +230,7 @@ impl Output<'_, '_> {
         &mut self,
         fields: [u64; 8],
         stream_id: u8,
-        payload: impl FnOnce(&mut PacketBody<'_>),
+        payload: impl FnOnce(&mut PacketBody<'_>) -> Result<(), String>,
     ) -> Result<(), String> {
         let digest = &mut self.work.digest;
         for value in fields {
@@ -239,7 +241,7 @@ impl Output<'_, '_> {
             trace: self.trace.is_some().then_some(0),
             bytes: 0,
         };
-        payload(&mut body);
+        payload(&mut body)?;
         let PacketBody {
             digest,
             trace,
@@ -594,6 +596,7 @@ struct Observer {
     demux: DemuxObserver,
     form: ObserverForm,
     position_base: u64,
+    carriers: BTreeMap<(u64, u64), (usize, u64, SourceContext)>,
 }
 
 impl Observer {
@@ -676,13 +679,53 @@ impl Observer {
             demux,
             form,
             position_base: sequence_position(request, input.source(), 0),
+            carriers: BTreeMap::new(),
         })
+    }
+
+    fn remember_carrier(
+        &mut self,
+        packet: &TransportPacket,
+        facts: SourceContext,
+    ) -> Result<(), String> {
+        let entity = packet.source_id.ok_or("observer carrier without source")?;
+        self.carriers.insert(
+            (entity.0, packet.source_offset),
+            (packet.source.len(), packet.payload_source_offset, facts),
+        );
+        Ok(())
+    }
+
+    fn check_span(
+        &self,
+        request: &Request,
+        source: SourceRange,
+        transport: SourceRange,
+        context: SourceContext,
+        bytes: &[u8],
+    ) -> Result<(), String> {
+        let &(width, payload, offered) = self
+            .carriers
+            .get(&(transport.entity.0, transport.offset))
+            .ok_or("observer span has no offered carrier")?;
+        let end = transport.offset + width as u64;
+        if source.entity != transport.entity
+            || transport.bytes != width
+            || source.offset < payload
+            || source.offset.saturating_add(source.bytes as u64) > end
+            || context != offered
+            || range_bytes(request, source) != Some(bytes)
+        {
+            return Err("observer span differs from its carrier or source context".into());
+        }
+        Ok(())
     }
 
     fn drain(
         &mut self,
         input: &InputCursor,
         clock: &mut DemuxClock,
+        request: &Request,
         output: &mut Output<'_, '_>,
     ) -> Result<(), String> {
         loop {
@@ -694,7 +737,7 @@ impl Observer {
                     .map_err(err)?
                 {
                     AssemblyStep::Output(packet) => {
-                        compact_packet(packet, self.position_base, clock, output)?;
+                        compact_packet(packet, self, request, clock, output)?;
                     }
                     AssemblyStep::Yield => {}
                     AssemblyStep::NeedPayload | AssemblyStep::Finished => return Ok(()),
@@ -708,6 +751,15 @@ impl Observer {
                 .map_err(err)?;
                 match step {
                     AssemblyStep::Output(packet) => {
+                        for span in packet.spans.as_slice() {
+                            self.check_span(
+                                request,
+                                span.source,
+                                span.transport,
+                                span.context,
+                                span.as_ref(),
+                            )?;
+                        }
                         owned_packet(&packet, self.position_base, clock, output)?;
                     }
                     AssemblyStep::Yield => {}
@@ -753,7 +805,8 @@ fn owned_packet(
 
 fn compact_packet(
     packet: CompactDemuxPacket,
-    base: u64,
+    observer: &Observer,
+    request: &Request,
     clock: &mut DemuxClock,
     output: &mut Output<'_, '_>,
 ) -> Result<(), String> {
@@ -764,13 +817,22 @@ fn compact_packet(
         pts,
         dts,
         signed(packet.duration90_raw),
-        (packet.position as u64).wrapping_add(base),
+        (packet.position as u64).wrapping_add(observer.position_base),
         u64::from(packet.flags),
         packet.payload_len as u64,
     ];
-    if output.trace.is_some() {
-        let spans: DemuxSpanViews<'_> = packet.payload.spans();
-        for span in spans {
+    let spans: DemuxSpanViews<'_> = packet.payload.spans();
+    let mut expected = Vec::new();
+    for span in spans {
+        observer.check_span(
+            request,
+            span.source,
+            span.transport,
+            span.context,
+            span.as_ref(),
+        )?;
+        expected.push((span.source, span.transport, span.context));
+        if output.trace.is_some() {
             output.note(format_args!(
                 "demux-span {} {} {} {} {} {} {:?}",
                 span.source.entity.0,
@@ -785,12 +847,31 @@ fn compact_packet(
     }
     let mut cursor = packet.payload.into_cursor();
     output.packet_from(fields, packet.stream_id, |body| {
-        while cursor.next_span().is_some() {
-            if let Some(span) = cursor.current() {
-                body.push(span.as_ref());
+        let mut expected = expected.into_iter();
+        while let Some(next) = cursor.next_span() {
+            let facts = (next.source, next.transport, next.context);
+            let span = cursor
+                .current()
+                .ok_or("compact cursor lost its current span")?;
+            if expected.next() != Some(facts)
+                || facts != (span.source, span.transport, span.context)
+            {
+                return Err("compact cursor changed the borrowed span order or context".into());
             }
+            observer.check_span(
+                request,
+                span.source,
+                span.transport,
+                span.context,
+                span.as_ref(),
+            )?;
+            body.push(span.as_ref());
             cursor.retire_current();
         }
+        if expected.next().is_some() {
+            return Err("compact cursor omitted a payload span".into());
+        }
+        Ok(())
     })
 }
 
@@ -914,13 +995,14 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
                                 epochs,
                                 byte_run_epoch: None,
                             };
+                            observer.remember_carrier(&packet, facts)?;
                             if observer.form == ObserverForm::Unregistered {
                                 observer.demux.push(packet, facts)
                             } else {
                                 observer.demux.push_with_input(packet, facts, &input)
                             }
                             .map_err(|refusal| err(refusal.error))?;
-                            observer.drain(&input, &mut clock, output)?;
+                            observer.drain(&input, &mut clock, request, output)?;
                         }
                     }
                     TraceEvent::Diagnostic(fault) => {
@@ -957,7 +1039,7 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
                         }
                         if let Some(observer) = &mut observer {
                             observer.demux.end_of_source().map_err(err)?;
-                            observer.drain(&input, &mut clock, output)?;
+                            observer.drain(&input, &mut clock, request, output)?;
                         }
                         return Ok(());
                     }
