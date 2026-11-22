@@ -49,12 +49,14 @@ output, without container trims. `--reset-at N` resets the decoder before access
   joint stereo and dual channel give two (`FL`, `FR`). A stream may change mode, sample
   rate or layer between frames.
 
-Free-format Layer I and III frames are accepted by `Decoder::decode_framed` and
+Free-format Layers I–III frames are accepted by `Decoder::decode_framed` and
 `AudioDecoder::decode` when the caller supplies exactly one complete frame,
 including its header and optional CRC.
 The header does not encode its extent, so the decoder cannot verify the boundary.
 Layer I extents are multiples of four, including the header, any CRC and any
-padding slot. Free-format Layer II remains unsupported. `decode_frame` requires
+padding slot. Layer II uses table B.2a at 48 kHz, B.2b at 44.1 and 32 kHz,
+and the low-frequency allocation table for MPEG-2 and 2.5. See ISO/IEC 11172-3
+Annex B, Tables B.2a and B.2b, and ISO/IEC 13818-3, Table B.1. `decode_frame` requires
 the header to specify the frame length.
 
 ## Behaviour and limits
@@ -119,6 +121,19 @@ CARGO_INCREMENTAL=0 TRIERGON_MPG123=/path/to/mpg123 \
 The comparison reads complete access units through the normal reader and
 uses each decoder's PCM before gapless trimming. It reports the worst RMS and
 peak sample differences across all frames and channels.
+
+Four authored six-frame Layer II mono signals alternate padded and unpadded
+frames. With the original headers, mpg123 1.33.7 matches the 48 kHz MPEG-1
+and 22.05 kHz MPEG-2 signals (RMS 1.147e-7, peak 2.384e-7). The 44.1 kHz and
+32 kHz MPEG-1 signals differ (RMS 1.509, peak 2.905). Changing only the reference
+bitrate field to declare each original frame extent gives a match for all four.
+The original-header differences remain open. Other Layer II modes have no
+independent PCM coverage.
+
+```sh
+TRIERGON_MPG123=/path/to/mpg123 CARGO_INCREMENTAL=0 \
+  cargo test -p triergon-codec-mp3 --test decoder free_layer_two_matches_mpg123 -- --ignored --nocapture
+```
 
 The free-format Layer I control contains six signal-bearing frames with alternating
 four-byte padding. With the original headers, mpg123 1.33.7 exposes one byte of each

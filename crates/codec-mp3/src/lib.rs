@@ -124,7 +124,7 @@ impl Decoder {
         self.decode_packet::<false>(au, out)
     }
 
-    /// Decode an exactly framed access unit. For free-format Layer I and III the caller
+    /// Decode an exactly framed access unit. For free-format frames the caller
     /// supplies the complete frame extent, including its header and any CRC. The
     /// extent cannot be inferred or verified from a free-format header alone.
     /// Other frames have the same truncation and trailing-byte behaviour as
@@ -194,8 +194,13 @@ fn check_free_format(header: &MpegAudioHeader, length: usize) -> Result<(), Deco
         }
         return Ok(());
     }
-    if header.layer != MpegLayer::III {
-        return Err(DecodeError::Unsupported("free-format frame"));
+    if header.layer == MpegLayer::II {
+        let minimum = 4 + usize::from(header.crc) * 2 + usize::from(header.padding);
+        return if length >= minimum {
+            Ok(())
+        } else {
+            Err(DecodeError::Invalid("free-format Layer II frame extent"))
+        };
     }
     let prefix = 4 + usize::from(header.crc) * 2 + header.side_info_bytes();
     let main_data = length
