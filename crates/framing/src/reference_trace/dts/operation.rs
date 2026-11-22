@@ -10,7 +10,8 @@
 use crate::dts::sync14::header_payload;
 use crate::dts::{
     Dts14CarrierLimits, Dts14CarrierPacket, Dts14CarrierReader, Dts14CarrierSyntax, Dts14SyncFrame,
-    Dts14SyncLimits, Dts14SyncReader, DtsCoreHeader, DtsSourceIdentity, DtsWordOrder,
+    Dts14SyncLimits, Dts14SyncReader, DtsCoreHeader, DtsFrameExtentLimits, DtsSourceIdentity,
+    DtsWordOrder, probe_core_header, probe_extension_substream_extent,
 };
 use std::{
     ops::Range,
@@ -77,8 +78,8 @@ pub struct ParserClock {
     /// Core sample rate of the first accepted header, in Hz; 0 before one is
     /// accepted.
     pub codec_sample_rate: u32,
-    /// The parser's profile number: -99 before a header is accepted, 20 from then
-    /// on.
+    /// The parser's profile number: -99 before a header is accepted, 20 for core,
+    /// 30 for a core channel extension, or 40 for a core frequency extension.
     pub profile: i32,
     /// Whether the packet's own header gave these values.
     pub disposition: ParserClockDisposition,
@@ -89,8 +90,8 @@ pub enum ParserClockDisposition {
     /// The packet is opaque or shorter than 18 bytes. No header is read: the
     /// duration is 0 and the rate and profile are those of the packets before.
     OpaqueOrShort,
-    /// The packet's first 18 bytes hold a normal core header without `EXT_AUDIO`,
-    /// and the duration comes from it.
+    /// The packet's first 18 bytes hold a core header, and the duration comes
+    /// from its core clock even when the profile names an extension.
     SelectedCorePrefix,
 }
 #[derive(Clone, Copy)]
@@ -132,26 +133,34 @@ impl ClockState {
             .try_into()
             .map_err(|_| Error::Truncated)?;
         let bits = header_payload(&prefix, self.order)?;
-        let header = crate::dts::probe_core_header(&bits);
-        let header = match header {
-            Ok(h) if h.extension == 0 => h,
-            _ => {
+        let (header, profile) = match clock_header(bits) {
+            Ok(facts) => facts,
+            Err(_) => {
                 self.unknown = true;
                 return Err(Error::Unsupported(
                     "DTS clock outside selected normal core prefix",
                 ));
             }
         };
-        // The reference parser looks for an extension substream at the coded
-        // FSIZE offset rounded up to four bytes in its own packet, not at a source
-        // frame boundary. A substream sync there is refused: its profile is not
-        // derived.
+        // This is a parser-packet offset, independent of the physical core
+        // boundary. An isolated sync word has no extension extent (TS 102 114
+        // section 7.5.2). A complete substream would need asset inspection.
         let at = header.frame_bytes.checked_add(3).ok_or(Error::Overflow)? / 4 * 4;
         if packet
             .source_bytes()
             .as_ref()
-            .get(at..at.checked_add(4).ok_or(Error::Overflow)?)
-            == Some(&[0x64, 0x58, 0x20, 0x25])
+            .get(at..)
+            .filter(|bytes| bytes.starts_with(&[0x64, 0x58, 0x20, 0x25]))
+            .is_some_and(|bytes| {
+                probe_extension_substream_extent(
+                    bytes,
+                    DtsFrameExtentLimits {
+                        maximum_header_bytes: bytes.len(),
+                        maximum_frame_bytes: bytes.len(),
+                    },
+                )
+                .is_ok()
+            })
         {
             self.unknown = true;
             return Err(Error::Unsupported(
@@ -172,12 +181,27 @@ impl ClockState {
             / u64::from(header.core_rate_hz);
         output.duration = i64::try_from(rounded).map_err(|_| Error::Overflow)?;
         output.codec_sample_rate = rate;
-        output.profile = 20;
+        output.profile = profile;
         output.disposition = ParserClockDisposition::SelectedCorePrefix;
         self.rate = rate;
-        self.profile = 20;
+        self.profile = profile;
         Ok(output)
     }
+}
+
+fn clock_header(mut bits: [u8; 15]) -> Result<(DtsCoreHeader, i32)> {
+    // TS 102 114 Table 5-11 assigns the type independently of SFREQ and NBLKS.
+    // The parser keeps the core clock for reserved extension IDs as well.
+    let profile = match (bits[10] & 0x10 != 0, bits[10] >> 5) {
+        (true, 0 | 6) => 30,
+        (true, 2) => 40,
+        (true, _) => {
+            bits[10] &= !0x10;
+            20
+        }
+        (false, _) => 20,
+    };
+    Ok((probe_core_header(&bits)?, profile))
 }
 
 /// One packet of the parser-packet reader together with the parser's clock for it.
@@ -247,10 +271,9 @@ impl ParserPacket {
     /// frame's coding window.
     ///
     /// Fails with [`Error::Unsupported`] where the parser's clock is not modelled: the
-    /// header in the packet's first 18 bytes is refused or sets `EXT_AUDIO`, the packet
-    /// holds the extension substream sync `64 58 20 25` at the byte offset `FSIZE` + 1
-    /// rounded up to a multiple of four, or an earlier packet of the operation had one
-    /// of these.
+    /// core header in the packet's first 18 bytes is refused, the packet holds a
+    /// complete extension substream extent at `FSIZE + 1` rounded up to a multiple
+    /// of four, or an earlier packet of the operation had one of these.
     pub fn clock(&self) -> Result<ParserClock> {
         self.clock
     }
@@ -592,9 +615,9 @@ impl ParserOperation {
         }
         loop {
             if self.pending_packet.is_some() {
-                // A bound for the 120-bit header probe and the clock arithmetic,
-                // paid across calls so that a budget of one unit still progresses.
-                while self.clock_charge < 128 {
+                // Bound the core probe, optional extension extent and clock
+                // arithmetic even when the caller grants one unit at a time.
+                while self.clock_charge < 168 {
                     if !work.try_charge(1) {
                         return Ok(ParserOperationStep::Yield);
                     }
@@ -681,6 +704,28 @@ impl ParserOperation {
                 }
                 Err(error) => return self.refused(lane, error),
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn core_extension_profiles_keep_the_core_clock() {
+        let mut prefix = [
+            0x7f, 0xfe, 0x80, 0x01, 0xfc, 0x3c, 0x05, 0xf0, 0xb5, 0xe0, 0x01, 0x38, 0, 0, 0,
+        ];
+        for (id, expected) in [30, 20, 40, 20, 20, 20, 30, 20].into_iter().enumerate() {
+            prefix[10] = (id as u8) << 5 | 0x11;
+            let (header, profile) = clock_header(prefix).unwrap();
+            assert_eq!(
+                (header.core_rate_hz, header.coding_window_samples),
+                (48000, 512)
+            );
+            assert_eq!(profile, expected);
+            assert_eq!(probe_core_header(&prefix).is_ok(), expected != 20);
         }
     }
 }
