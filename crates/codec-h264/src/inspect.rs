@@ -109,7 +109,7 @@ pub fn inspect(data: &[u8]) -> StreamFeatures {
                         .insert((s.pic_width_in_mbs * 16, s.frame_height_in_mbs() * 16));
                     f.frame_mbs_only.insert(s.frame_mbs_only);
                     f.mbaff_sps |= s.mb_adaptive_frame_field;
-                    f.poc_types.insert(s.poc_type);
+                    f.poc_types.insert(s.poc.code());
                     f.scaling_matrices |= s.seq_scaling_matrix_present;
                     f.gaps_allowed |= s.gaps_in_frame_num_allowed;
                     f.lossless |= s.qpprime_y_zero_transform_bypass;
@@ -183,7 +183,7 @@ pub fn inspect(data: &[u8]) -> StreamFeatures {
                         }
                         f.ref_list_mods |= !sh.ref_mods[0].is_empty() || !sh.ref_mods[1].is_empty();
                         for m in &sh.mmcos {
-                            f.mmco_ops.insert(m.op);
+                            f.mmco_ops.insert(m.op());
                         }
                         f.long_term_idr |= sh.long_term_reference_flag;
                     }

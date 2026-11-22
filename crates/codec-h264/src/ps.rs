@@ -56,12 +56,7 @@ pub(crate) struct Sps {
     pub(crate) scaling4: [[u8; 16]; 6],
     pub(crate) scaling8: [[u8; 64]; 6],
     pub(crate) log2_max_frame_num: u32,
-    pub(crate) poc_type: u32,
-    pub(crate) log2_max_poc_lsb: u32,
-    pub(crate) delta_pic_order_always_zero: bool,
-    pub(crate) offset_for_non_ref_pic: i32,
-    pub(crate) offset_for_top_to_bottom_field: i32,
-    pub(crate) offset_for_ref_frame: Vec<i32>,
+    pub(crate) poc: PocType,
     pub(crate) max_num_ref_frames: u32,
     pub(crate) gaps_in_frame_num_allowed: bool,
     pub(crate) pic_width_in_mbs: u32,
@@ -71,6 +66,36 @@ pub(crate) struct Sps {
     pub(crate) direct_8x8_inference: bool,
     pub(crate) crop: [u32; 4], // left, right, top, bottom in frame_crop_*_offset units
     pub(crate) vui: Option<Vui>,
+}
+
+/// How the slices of a sequence code picture order counts: pic_order_cnt_type and the
+/// fields that go with it (7.4.2.1.1, 8.2.1).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum PocType {
+    /// 0: each slice header carries pic_order_cnt_lsb of `log2_max_lsb` bits.
+    Lsb { log2_max_lsb: u32 },
+    /// 1: an expected count from the cycle of reference frame offsets, adjusted by the
+    /// slice header's delta_pic_order_cnt unless `delta_always_zero`.
+    Cycle {
+        delta_always_zero: bool,
+        offset_for_non_ref_pic: i32,
+        offset_for_top_to_bottom_field: i32,
+        offset_for_ref_frame: Vec<i32>,
+    },
+    /// 2: the count follows frame_num.
+    FrameNum,
+}
+
+impl PocType {
+    /// pic_order_cnt_type.
+    #[cfg(feature = "inspect")]
+    pub(crate) fn code(&self) -> u32 {
+        match self {
+            PocType::Lsb { .. } => 0,
+            PocType::Cycle { .. } => 1,
+            PocType::FrameNum => 2,
+        }
+    }
 }
 
 impl Sps {
@@ -319,12 +344,7 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
         scaling4: [[16; 16]; 6],
         scaling8: [[16; 64]; 6],
         log2_max_frame_num: 4,
-        poc_type: 0,
-        log2_max_poc_lsb: 4,
-        delta_pic_order_always_zero: false,
-        offset_for_non_ref_pic: 0,
-        offset_for_top_to_bottom_field: 0,
-        offset_for_ref_frame: Vec::new(),
+        poc: PocType::FrameNum,
         max_num_ref_frames: 0,
         gaps_in_frame_num_allowed: false,
         pic_width_in_mbs: 0,
@@ -366,29 +386,32 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
     if sps.log2_max_frame_num > 16 {
         return Err(inval("log2_max_frame_num_minus4"));
     }
-    sps.poc_type = r.ue();
-    match sps.poc_type {
+    sps.poc = match r.ue() {
         0 => {
-            sps.log2_max_poc_lsb = r.ue().wrapping_add(4);
-            if sps.log2_max_poc_lsb > 16 {
+            let log2_max_lsb = r.ue().wrapping_add(4);
+            if log2_max_lsb > 16 {
                 return Err(inval("log2_max_pic_order_cnt_lsb_minus4"));
             }
+            PocType::Lsb { log2_max_lsb }
         }
         1 => {
-            sps.delta_pic_order_always_zero = r.bit();
-            sps.offset_for_non_ref_pic = r.se();
-            sps.offset_for_top_to_bottom_field = r.se();
+            let delta_always_zero = r.bit();
+            let offset_for_non_ref_pic = r.se();
+            let offset_for_top_to_bottom_field = r.se();
             let n = r.ue();
             if n > 255 {
                 return Err(inval("num_ref_frames_in_pic_order_cnt_cycle"));
             }
-            for _ in 0..n {
-                sps.offset_for_ref_frame.push(r.se());
+            PocType::Cycle {
+                delta_always_zero,
+                offset_for_non_ref_pic,
+                offset_for_top_to_bottom_field,
+                offset_for_ref_frame: (0..n).map(|_| r.se()).collect(),
             }
         }
-        2 => {}
+        2 => PocType::FrameNum,
         _ => return Err(inval("pic_order_cnt_type")),
-    }
+    };
     sps.max_num_ref_frames = r.ue();
     if sps.max_num_ref_frames > 16 {
         return Err(inval("max_num_ref_frames"));

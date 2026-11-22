@@ -4,8 +4,8 @@
 
 use crate::DecodeError;
 use crate::picture::*;
-use crate::ps::Sps;
-use crate::slice::{SliceHeader, SliceType};
+use crate::ps::{PocType, Sps};
+use crate::slice::{ListModification, Mmco, SliceHeader, SliceType};
 use triergon_framing::picture_output::{Entry, Marking, View};
 
 /// A stored frame store and its marking, read for reference lists and marking.
@@ -78,46 +78,56 @@ pub(crate) struct PocState {
 /// Returns ([top, bottom], frame_num_offset). The offsets and counts come from
 /// unbounded Exp-Golomb values, so the sums wrap as two's complement.
 pub(crate) fn compute_poc(sps: &Sps, sh: &SliceHeader, st: &PocState) -> ([i32; 2], i32) {
-    let max_frame_num = sps.max_frame_num() as i32;
     let fnum = sh.frame_num as i32;
-    if sps.poc_type == 0 {
-        let max_lsb = 1i32 << sps.log2_max_poc_lsb;
-        let (prev_msb, prev_lsb) = if sh.idr {
-            (0, 0)
-        } else {
-            (st.prev_poc_msb, st.prev_poc_lsb)
-        };
-        let lsb = sh.poc_lsb as i32;
-        let msb = if lsb < prev_lsb && (prev_lsb - lsb) >= max_lsb / 2 {
-            prev_msb.wrapping_add(max_lsb)
-        } else if lsb > prev_lsb && (lsb - prev_lsb) > max_lsb / 2 {
-            prev_msb.wrapping_sub(max_lsb)
-        } else {
-            prev_msb
-        };
-        let mut poc = [0; 2];
-        if !sh.field_pic {
-            poc[0] = msb.wrapping_add(lsb);
-            poc[1] = poc[0].wrapping_add(sh.delta_poc_bottom);
-        } else if !sh.bottom_field {
-            poc[0] = msb.wrapping_add(lsb);
-            poc[1] = poc[0];
-        } else {
-            poc[1] = msb.wrapping_add(lsb);
-            poc[0] = poc[1];
-        }
-        (poc, msb)
-    } else {
-        let offset = if sh.idr {
+    // FrameNumOffset (8-6, 8-11) of the types that count from frame_num.
+    let frame_num_offset = || {
+        if sh.idr {
             0
         } else if st.prev_frame_num as i32 > fnum {
-            st.prev_frame_num_offset.wrapping_add(max_frame_num)
+            st.prev_frame_num_offset
+                .wrapping_add(sps.max_frame_num() as i32)
         } else {
             st.prev_frame_num_offset
-        };
-        let nonref = sh.nal.nal_ref_idc == 0;
-        if sps.poc_type == 1 {
-            let n = sps.offset_for_ref_frame.len() as i32;
+        }
+    };
+    let nonref = sh.nal.nal_ref_idc == 0;
+    match &sps.poc {
+        &PocType::Lsb { log2_max_lsb } => {
+            let max_lsb = 1i32 << log2_max_lsb;
+            let (prev_msb, prev_lsb) = if sh.idr {
+                (0, 0)
+            } else {
+                (st.prev_poc_msb, st.prev_poc_lsb)
+            };
+            let lsb = sh.poc_lsb as i32;
+            let msb = if lsb < prev_lsb && (prev_lsb - lsb) >= max_lsb / 2 {
+                prev_msb.wrapping_add(max_lsb)
+            } else if lsb > prev_lsb && (lsb - prev_lsb) > max_lsb / 2 {
+                prev_msb.wrapping_sub(max_lsb)
+            } else {
+                prev_msb
+            };
+            let mut poc = [0; 2];
+            if !sh.field_pic {
+                poc[0] = msb.wrapping_add(lsb);
+                poc[1] = poc[0].wrapping_add(sh.delta_poc_bottom);
+            } else if !sh.bottom_field {
+                poc[0] = msb.wrapping_add(lsb);
+                poc[1] = poc[0];
+            } else {
+                poc[1] = msb.wrapping_add(lsb);
+                poc[0] = poc[1];
+            }
+            (poc, msb)
+        }
+        PocType::Cycle {
+            offset_for_non_ref_pic,
+            offset_for_top_to_bottom_field,
+            offset_for_ref_frame,
+            ..
+        } => {
+            let offset = frame_num_offset();
+            let n = offset_for_ref_frame.len() as i32;
             let mut abs = if n != 0 { offset.wrapping_add(fnum) } else { 0 };
             if nonref && abs > 0 {
                 abs -= 1;
@@ -127,15 +137,14 @@ pub(crate) fn compute_poc(sps: &Sps, sh: &SliceHeader, st: &PocState) -> ([i32; 
                 let cycle = (abs - 1) / n;
                 let in_cycle = (abs - 1) % n;
                 let sum = |o: &[i32]| o.iter().fold(0i32, |s, &v| s.wrapping_add(v));
-                let delta_cycle = sum(&sps.offset_for_ref_frame);
+                let delta_cycle = sum(offset_for_ref_frame);
                 expected = cycle.wrapping_mul(delta_cycle);
-                expected =
-                    expected.wrapping_add(sum(&sps.offset_for_ref_frame[..=in_cycle as usize]));
+                expected = expected.wrapping_add(sum(&offset_for_ref_frame[..=in_cycle as usize]));
             }
             if nonref {
-                expected = expected.wrapping_add(sps.offset_for_non_ref_pic);
+                expected = expected.wrapping_add(*offset_for_non_ref_pic);
             }
-            let to_bottom = sps.offset_for_top_to_bottom_field;
+            let to_bottom = *offset_for_top_to_bottom_field;
             let mut poc = [0; 2];
             if !sh.field_pic {
                 poc[0] = expected.wrapping_add(sh.delta_poc[0]);
@@ -150,7 +159,9 @@ pub(crate) fn compute_poc(sps: &Sps, sh: &SliceHeader, st: &PocState) -> ([i32; 
                 poc[0] = poc[1];
             }
             (poc, offset)
-        } else {
+        }
+        PocType::FrameNum => {
+            let offset = frame_num_offset();
             let temp = if sh.idr {
                 0
             } else if nonref {
@@ -403,7 +414,7 @@ pub(crate) fn modify_ref_list(
     dpb: &[View<'_, FrameStore>],
     nums: &PicNums,
     list: &mut Vec<RefPic>,
-    mods: &[(u32, u32)],
+    mods: &[ListModification],
     num_active: usize,
 ) -> Result<(), DecodeError> {
     let field = nums.structure.is_field();
@@ -441,12 +452,12 @@ pub(crate) fn modify_ref_list(
         let mut pred = curr;
         let mut ref_idx = 0usize;
         list.truncate(num_active);
-        for &(idc, v) in mods {
-            let pic = match idc {
-                0 | 1 => {
+        for &m in mods {
+            let pic = match m {
+                ListModification::Subtract(abs_minus1) | ListModification::Add(abs_minus1) => {
                     // abs_diff_pic_num_minus1 is not range checked: the sums wrap.
-                    let abs = (v as i32).wrapping_add(1);
-                    let no_wrap = if idc == 0 {
+                    let abs = (abs_minus1 as i32).wrapping_add(1);
+                    let no_wrap = if let ListModification::Subtract(_) = m {
                         let d = pred.wrapping_sub(abs);
                         if d < 0 { d.wrapping_add(maxp) } else { d }
                     } else {
@@ -463,9 +474,9 @@ pub(crate) fn modify_ref_list(
                         "ref_pic_list_modification: missing short-term picture",
                     ))?
                 }
-                _ => find(v as i32, Marking::LongTerm).ok_or(DecodeError::Invalid(
-                    "ref_pic_list_modification: missing long-term picture",
-                ))?,
+                ListModification::LongTerm(num) => find(num as i32, Marking::LongTerm).ok_or(
+                    DecodeError::Invalid("ref_pic_list_modification: missing long-term picture"),
+                )?,
             };
             if ref_idx > list.len() {
                 return Err(DecodeError::Invalid("ref_pic_list_modification index"));
@@ -595,10 +606,13 @@ pub(crate) fn apply_mmcos(
     let field = nums.structure.is_field();
     let curr = nums.curr_pic_num();
     let mut mmco5 = false;
-    for m in &sh.mmcos {
-        match m.op {
-            1 | 3 => {
-                let pn = curr.wrapping_sub((m.diff_pic_nums_minus1 as i32).wrapping_add(1));
+    for &m in &sh.mmcos {
+        match m {
+            Mmco::ShortTermUnused { difference_minus1 }
+            | Mmco::ShortTermToLongTerm {
+                difference_minus1, ..
+            } => {
+                let pn = curr.wrapping_sub((difference_minus1 as i32).wrapping_add(1));
                 // Locate the short-term picture/field with PicNum pn.
                 let mut found = None;
                 for (i, d) in dpb.iter().enumerate() {
@@ -623,14 +637,11 @@ pub(crate) fn apply_mmcos(
                     }
                 }
                 let Some((i, par)) = found else { continue };
-                if m.op == 1 {
-                    if par == Structure::Frame {
-                        dpb[i].set_marking(None, Marking::Unused);
-                    } else {
-                        dpb[i].set_marking(Some(par.parity()), Marking::Unused);
-                    }
-                } else {
-                    let idx = m.long_term_frame_idx;
+                if let Mmco::ShortTermToLongTerm {
+                    long_term_frame_idx: idx,
+                    ..
+                } = m
+                {
                     // Free any other frame using this LongTermFrameIdx.
                     for (j, d) in dpb.iter_mut().enumerate() {
                         if j != i
@@ -660,10 +671,14 @@ pub(crate) fn apply_mmcos(
                         d.set_marking(None, Marking::LongTerm);
                     }
                     d.picture_mut().long_term_frame_idx = idx;
+                } else if par == Structure::Frame {
+                    dpb[i].set_marking(None, Marking::Unused);
+                } else {
+                    dpb[i].set_marking(Some(par.parity()), Marking::Unused);
                 }
             }
-            2 => {
-                let lpn = m.long_term_pic_num as i32;
+            Mmco::LongTermUnused { long_term_pic_num } => {
+                let lpn = long_term_pic_num as i32;
                 for (i, d) in dpb.iter_mut().enumerate() {
                     if !field {
                         if !cur.is(i)
@@ -685,12 +700,8 @@ pub(crate) fn apply_mmcos(
                     }
                 }
             }
-            4 => {
-                *max_lt_idx = if m.max_long_term_frame_idx_plus1 == 0 {
-                    None
-                } else {
-                    Some(m.max_long_term_frame_idx_plus1 - 1)
-                };
+            Mmco::MaxLongTermIdx { plus1 } => {
+                *max_lt_idx = plus1.checked_sub(1);
                 for (i, d) in dpb.iter_mut().enumerate() {
                     if cur.is(i) {
                         continue;
@@ -704,7 +715,7 @@ pub(crate) fn apply_mmcos(
                     }
                 }
             }
-            5 => {
+            Mmco::AllUnused => {
                 for (i, d) in dpb.iter_mut().enumerate() {
                     if !cur.is(i) {
                         d.set_marking(None, Marking::Unused);
@@ -713,8 +724,9 @@ pub(crate) fn apply_mmcos(
                 *max_lt_idx = None;
                 mmco5 = true;
             }
-            6 => {
-                let idx = m.long_term_frame_idx;
+            Mmco::CurrentToLongTerm {
+                long_term_frame_idx: idx,
+            } => {
                 for (j, d) in dpb.iter_mut().enumerate() {
                     if !cur.is(j)
                         && d.has(Marking::LongTerm)
@@ -742,7 +754,6 @@ pub(crate) fn apply_mmcos(
                     }
                 }
             }
-            _ => {}
         }
     }
     mmco5

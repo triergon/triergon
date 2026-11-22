@@ -38,8 +38,8 @@ use dpb::{Current, NewMarking, PicNums, PocState, Stored as _};
 use mbinfo::{MbInfo, MbWidth, SliceDbk};
 use nal::{parse_header, unescape};
 use picture::*;
-use ps::{Pps, Sps, Vui};
-use slice::{SliceHeader, SliceType};
+use ps::{PocType, Pps, Sps, Vui};
+use slice::{Mmco, SliceHeader, SliceType};
 use slicedec::{ColInfo, CurPic, Refs, SliceCtx, SliceDecoder, Wp};
 use std::collections::VecDeque;
 use tables::*;
@@ -605,9 +605,13 @@ impl Decoder {
                     || a.field_pic != sh.field_pic
                     || (sh.field_pic && a.bottom_field != sh.bottom_field)
                     || (a.nal.nal_ref_idc == 0) != (sh.nal.nal_ref_idc == 0)
-                    || (sps.poc_type == 0
-                        && (a.poc_lsb != sh.poc_lsb || a.delta_poc_bottom != sh.delta_poc_bottom))
-                    || (sps.poc_type == 1 && a.delta_poc != sh.delta_poc)
+                    || match sps.poc {
+                        PocType::Lsb { .. } => {
+                            a.poc_lsb != sh.poc_lsb || a.delta_poc_bottom != sh.delta_poc_bottom
+                        }
+                        PocType::Cycle { .. } => a.delta_poc != sh.delta_poc,
+                        PocType::FrameNum => false,
+                    }
                     || a.idr != sh.idr
                     || (sh.idr && a.idr && a.idr_pic_id != sh.idr_pic_id)
             }
@@ -883,7 +887,7 @@ impl Decoder {
             } else {
                 self.poc_state.prev_frame_num_offset
             };
-            let poc = if sps.poc_type != 0 {
+            let poc = if !matches!(sps.poc, PocType::Lsb { .. }) {
                 let mut fake = SliceHeader {
                     frame_num: unused,
                     idr: false,
@@ -1134,7 +1138,10 @@ impl Decoder {
                 if sh.adaptive_ref_pic_marking {
                     mmco5 =
                         dpb::apply_mmcos(&mut entries, &mut cur, &nums, sh, &mut self.max_lt_idx);
-                    marked_long = sh.mmcos.iter().any(|m| m.op == 6);
+                    marked_long = sh
+                        .mmcos
+                        .iter()
+                        .any(|m| matches!(m, Mmco::CurrentToLongTerm { .. }));
                 } else {
                     let first_is_short = first.is_some_and(|at| {
                         entries[at].mark(structure.opposite()) == Marking::ShortTerm

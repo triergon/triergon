@@ -4,7 +4,7 @@
 use crate::DecodeError;
 use crate::nal::NalHeader;
 use crate::picture::Structure;
-use crate::ps::{Pps, R, Sps};
+use crate::ps::{PocType, Pps, R, Sps};
 use triergon_bitstream::BitReader;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,13 +22,52 @@ impl SliceType {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct Mmco {
-    pub(crate) op: u32,
-    pub(crate) diff_pic_nums_minus1: u32,
-    pub(crate) long_term_pic_num: u32,
-    pub(crate) long_term_frame_idx: u32,
-    pub(crate) max_long_term_frame_idx_plus1: u32,
+/// One memory_management_control_operation with its operands (7.3.3.3, Table 7-9).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Mmco {
+    /// 1: the short-term picture `difference_of_pic_nums_minus1 + 1` below the current
+    /// picture number becomes unused.
+    ShortTermUnused { difference_minus1: u32 },
+    /// 2: the long-term picture `long_term_pic_num` becomes unused.
+    LongTermUnused { long_term_pic_num: u32 },
+    /// 3: that short-term picture becomes long-term with `long_term_frame_idx`.
+    ShortTermToLongTerm {
+        difference_minus1: u32,
+        long_term_frame_idx: u32,
+    },
+    /// 4: long-term indices from `max_long_term_frame_idx_plus1` on become unused.
+    MaxLongTermIdx { plus1: u32 },
+    /// 5: every reference becomes unused.
+    AllUnused,
+    /// 6: the current picture becomes long-term with `long_term_frame_idx`.
+    CurrentToLongTerm { long_term_frame_idx: u32 },
+}
+
+impl Mmco {
+    /// memory_management_control_operation.
+    #[cfg(feature = "inspect")]
+    pub(crate) fn op(self) -> u32 {
+        match self {
+            Mmco::ShortTermUnused { .. } => 1,
+            Mmco::LongTermUnused { .. } => 2,
+            Mmco::ShortTermToLongTerm { .. } => 3,
+            Mmco::MaxLongTermIdx { .. } => 4,
+            Mmco::AllUnused => 5,
+            Mmco::CurrentToLongTerm { .. } => 6,
+        }
+    }
+}
+
+/// One reordering command of ref_pic_list_modification(), by its
+/// modification_of_pic_nums_idc (7.3.3.1, Table 7-7).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ListModification {
+    /// 0: the picture number prediction minus `abs_diff_pic_num_minus1 + 1`.
+    Subtract(u32),
+    /// 1: the picture number prediction plus `abs_diff_pic_num_minus1 + 1`.
+    Add(u32),
+    /// 2: the long-term picture `long_term_pic_num`.
+    LongTerm(u32),
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -53,8 +92,7 @@ pub(crate) struct SliceHeader {
     pub(crate) redundant_pic_cnt: u32,
     pub(crate) direct_spatial_mv_pred: bool,
     pub(crate) num_ref_idx_active: [u32; 2],
-    /// (modification_of_pic_nums_idc, value) per list.
-    pub(crate) ref_mods: [Vec<(u32, u32)>; 2],
+    pub(crate) ref_mods: [Vec<ListModification>; 2],
     pub(crate) luma_log2_wd: u32,
     pub(crate) chroma_log2_wd: u32,
     pub(crate) weights: Option<Box<[[WeightEntry; 32]; 2]>>,
@@ -140,17 +178,23 @@ pub(crate) fn parse_slice_header(
     let mut poc_lsb = 0;
     let mut delta_poc_bottom = 0;
     let mut delta_poc = [0; 2];
-    if sps.poc_type == 0 {
-        poc_lsb = r.read(sps.log2_max_poc_lsb);
-        if pps.bottom_field_pic_order_in_frame_present && !field_pic {
-            delta_poc_bottom = r.se();
+    match sps.poc {
+        PocType::Lsb { log2_max_lsb } => {
+            poc_lsb = r.read(log2_max_lsb);
+            if pps.bottom_field_pic_order_in_frame_present && !field_pic {
+                delta_poc_bottom = r.se();
+            }
         }
-    }
-    if sps.poc_type == 1 && !sps.delta_pic_order_always_zero {
-        delta_poc[0] = r.se();
-        if pps.bottom_field_pic_order_in_frame_present && !field_pic {
-            delta_poc[1] = r.se();
+        PocType::Cycle {
+            delta_always_zero: false,
+            ..
+        } => {
+            delta_poc[0] = r.se();
+            if pps.bottom_field_pic_order_in_frame_present && !field_pic {
+                delta_poc[1] = r.se();
+            }
         }
+        PocType::Cycle { .. } | PocType::FrameNum => {}
     }
     let mut redundant_pic_cnt = 0;
     if pps.redundant_pic_cnt_present {
@@ -182,7 +226,7 @@ pub(crate) fn parse_slice_header(
     if matches!(nal.nal_unit_type, 20 | 21) {
         return Err(DecodeError::Unsupported("MVC/SVC slice extension"));
     }
-    let mut ref_mods: [Vec<(u32, u32)>; 2] = [Vec::new(), Vec::new()];
+    let mut ref_mods: [Vec<ListModification>; 2] = [Vec::new(), Vec::new()];
     for list in 0..2 {
         let present = if list == 0 {
             !slice_type.is_intra()
@@ -195,11 +239,15 @@ pub(crate) fn parse_slice_header(
                 if idc == 3 {
                     break;
                 }
-                if idc > 3 || ref_mods[list].len() > 64 || r.overrun() {
+                if ref_mods[list].len() > 64 || r.overrun() {
                     return Err(inval("modification_of_pic_nums_idc"));
                 }
-                let v = r.ue();
-                ref_mods[list].push((idc, v));
+                ref_mods[list].push(match idc {
+                    0 => ListModification::Subtract(r.ue()),
+                    1 => ListModification::Add(r.ue()),
+                    2 => ListModification::LongTerm(r.ue()),
+                    _ => return Err(inval("modification_of_pic_nums_idc")),
+                });
             }
         }
     }
@@ -262,26 +310,27 @@ pub(crate) fn parse_slice_header(
                     if op == 0 {
                         break;
                     }
-                    if op > 6 || mmcos.len() > 66 || r.overrun() {
+                    if mmcos.len() > 66 || r.overrun() {
                         return Err(inval("memory_management_control_operation"));
                     }
-                    let mut m = Mmco {
-                        op,
-                        ..Default::default()
-                    };
-                    if op == 1 || op == 3 {
-                        m.diff_pic_nums_minus1 = r.ue();
-                    }
-                    if op == 2 {
-                        m.long_term_pic_num = r.ue();
-                    }
-                    if op == 3 || op == 6 {
-                        m.long_term_frame_idx = r.ue();
-                    }
-                    if op == 4 {
-                        m.max_long_term_frame_idx_plus1 = r.ue();
-                    }
-                    mmcos.push(m);
+                    mmcos.push(match op {
+                        1 => Mmco::ShortTermUnused {
+                            difference_minus1: r.ue(),
+                        },
+                        2 => Mmco::LongTermUnused {
+                            long_term_pic_num: r.ue(),
+                        },
+                        3 => Mmco::ShortTermToLongTerm {
+                            difference_minus1: r.ue(),
+                            long_term_frame_idx: r.ue(),
+                        },
+                        4 => Mmco::MaxLongTermIdx { plus1: r.ue() },
+                        5 => Mmco::AllUnused,
+                        6 => Mmco::CurrentToLongTerm {
+                            long_term_frame_idx: r.ue(),
+                        },
+                        _ => return Err(inval("memory_management_control_operation")),
+                    });
                 }
             }
         }
