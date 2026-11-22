@@ -897,6 +897,7 @@ impl Reader {
                     return Ok(Step::Yield);
                 }
             }
+            // Splitting the seek phases raised previous-audio seek instructions by at least 0.83%.
             if let Some(Probing { packet, probe, .. }) = seek.probing.take() {
                 match &mut seek.phase {
                     Phase::Scan(scan) => {
