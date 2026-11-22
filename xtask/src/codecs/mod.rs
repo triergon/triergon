@@ -56,13 +56,14 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  classify a grading run against the declared lane selection; with
                  --require-pass fail on any vector that fails and is not a listed open case
   readers --manifest M.json --root R --ffprobe FP --codec-worker W --out OUT.jsonl
-          [--seeks S.json] [--only SUBSTR,...]
+          [--seeks S.json] [--views-worker W] [--only SUBSTR,...]
                  compare every packet the container readers emit, and Ogg's compat view,
                  with ffprobe by harness/codecs/reader-rules.json and the reviewed
                  difference lists of reader-differences.json, and the packets after
-                 each seek case of S.json (lane reader-ogg-seek); appends one row per
-                 case, writes the observed lists to OUT.differences.json, and fails
-                 when a case fails
+                 each seek case of S.json; appends one row per case and writes
+                 the observed lists to OUT.differences.json. Push, sequential Ogg
+                 and elementary seek lanes use --views-worker. Reviewed seek
+                 differences must reproduce their recorded observations.
   isobmff-reader --ffprobe FP --codec-worker W --out OUT.jsonl [--only SUBSTR,...]
                  compare every packet the neutral ISO BMFF reader emits, read through and
                  after a seek, with ffprobe by harness/features/isobmff-reader/rules.json and
@@ -482,6 +483,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "root",
                     "ffprobe",
                     "codec-worker",
+                    "views-worker",
                     "out",
                     "only",
                     "seeks",
@@ -493,6 +495,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 root: a.path("root")?,
                 ffprobe: a.required("ffprobe")?.to_owned(),
                 codec_worker: a.path("codec-worker")?,
+                views_worker: a.get("views-worker").map(PathBuf::from),
                 out: a.path("out")?,
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
                 rules: readers::Rules::load(root)?,

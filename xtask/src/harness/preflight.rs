@@ -449,26 +449,16 @@ fn codec_inputs(root: &Path, workloads: &Path) -> R<String> {
 /// The reader comparison's manifest and seek cases.
 const READER_MANIFEST: &str = "harness/codecs/reader-manifest.json";
 const READER_SEEKS: &str = "harness/codecs/reader-seeks.json";
-/// The lane of the seek cases, which read reader-ogg's vectors.
-const SEEK_LANE: &str = "reader-ogg-seek";
-
-/// The reader comparison's vectors of `lanes`, as paths with their pins, after the
-/// manifests that list them.
+/// Resolve derived reader lanes to their pinned input vectors.
 fn reader_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<String>)>> {
-    let mut wanted: Vec<&str> = lanes
-        .iter()
-        .map(String::as_str)
-        .filter(|lane| *lane != SEEK_LANE)
-        .collect();
-    let mut seeks = Vec::new();
-    if lanes.iter().any(|lane| lane == SEEK_LANE) {
-        seeks.push((root.join(READER_SEEKS), None));
-        if !wanted.contains(&"reader-ogg") {
-            wanted.push("reader-ogg");
-        }
-    }
+    use crate::codecs::readers::base_lane;
+    let mut wanted: Vec<_> = lanes.iter().map(|lane| base_lane(lane)).collect();
+    wanted.sort_unstable();
+    wanted.dedup();
     let mut files = lane_files(root, READER_MANIFEST, &wanted)?;
-    files.splice(1..1, seeks);
+    if lanes.iter().any(|lane| lane.ends_with("-seek")) {
+        files.insert(1, (root.join(READER_SEEKS), None));
+    }
     Ok(files)
 }
 

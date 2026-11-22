@@ -30,6 +30,7 @@ impl Kind {
             "windows",
             "divide",
             "core-budgets",
+            "elementary-metadata",
             "opus-final-range",
             "views-smoke",
             "pgs-segments",

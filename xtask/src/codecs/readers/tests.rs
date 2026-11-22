@@ -319,22 +319,31 @@ fn the_repository_rules_load() {
         .count();
     assert_eq!(ogg_vectors, OGG_CASES);
     assert_eq!(vectors.len(), READER_CASES);
+    let mut ogg_seeks = 0;
     for seek in &seeks {
+        let lane = vectors
+            .iter()
+            .find(|v| v.get("name").and_then(Value::as_str) == Some(seek.input.as_str()))
+            .and_then(|v| v.get("lane"))
+            .and_then(Value::as_str);
         assert!(
-            vectors.iter().any(|v| {
-                v.get("name").and_then(Value::as_str) == Some(seek.input.as_str())
-                    && v.get("lane").and_then(Value::as_str) == Some("reader-ogg")
-            }),
+            matches!(
+                lane,
+                Some("reader-ogg" | "reader-flac" | "reader-mp3" | "reader-aac" | "reader-ac3")
+            ),
             "{}",
             seek.name
         );
+        ogg_seeks += usize::from(lane == Some("reader-ogg"));
     }
+    assert_eq!(ogg_seeks, 26);
+    assert_eq!(seeks.iter().filter(|case| case.open.is_some()).count(), 33);
 }
 
 /// The committed manifests' case counts, raised with every case added.
-const READER_CASES: usize = 316;
+const READER_CASES: usize = 318;
 const OGG_CASES: usize = 45;
-const SEEK_CASES: usize = 26;
+const SEEK_CASES: usize = 92;
 const MANIFEST: &str = "harness/codecs/reader-manifest.json";
 const SEEKS: &str = "harness/codecs/reader-seeks.json";
 
@@ -364,6 +373,7 @@ fn a_seek_must_land_at_or_before_its_target() {
         seconds: "1.5".into(),
         policy: "exact".into(),
         reference_seconds: "1.5".into(),
+        open: None,
     };
     // Packets of 48 kHz ticks; the receipt in seconds.
     let landed = |landing: &str, first: i128| {

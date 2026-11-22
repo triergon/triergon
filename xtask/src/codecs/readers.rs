@@ -55,7 +55,23 @@ const RULES: &str = "harness/codecs/reader-rules.json";
 const DIFFERENCES: &str = "harness/codecs/reader-differences.json";
 pub const SEEKS_SCHEMA: &str = "triergon.codecs.reader-seeks.v1";
 /// The lane of seek case rows.
-const SEEK_LANE: &str = "reader-ogg-seek";
+const STREAM_LANE: &str = "reader-ogg-stream";
+
+pub fn base_lane(lane: &str) -> &str {
+    lane.strip_suffix("-push")
+        .or_else(|| lane.strip_suffix("-seek"))
+        .or_else(|| (lane == STREAM_LANE).then_some("reader-ogg"))
+        .unwrap_or(lane)
+}
+
+const PUSH_LANES: &[(&str, &str)] = &[
+    ("reader-ogg", "reader-ogg-push"),
+    ("reader-flac", "reader-flac-push"),
+    ("reader-mp3", "reader-mp3-push"),
+    ("reader-aac", "reader-aac-push"),
+    ("reader-ac3", "reader-ac3-push"),
+    ("reader-eac3", "reader-eac3-push"),
+];
 pub const DIFFERENCES_SCHEMA: &str = "triergon.codecs.reader-differences.v1";
 /// The columns of one recorded difference.
 pub(super) const COLUMNS: [&str; 7] = [
@@ -70,7 +86,7 @@ pub(super) const COLUMNS: [&str; 7] = [
 
 /// The demuxer a reader lane forces on both sides.
 pub fn format(lane: &str) -> Option<&'static str> {
-    Some(match lane {
+    Some(match base_lane(lane) {
         "reader-ogg" => "ogg",
         "reader-flac" => "flac",
         "reader-mp3" => "mp3",
@@ -505,6 +521,7 @@ pub struct Options {
     pub root: PathBuf,
     pub ffprobe: String,
     pub codec_worker: PathBuf,
+    pub views_worker: Option<PathBuf>,
     pub out: PathBuf,
     pub only: Option<String>,
     pub rules: Rules,
@@ -524,6 +541,14 @@ pub struct SeekCase {
     policy: String,
     /// Where FFmpeg is asked to seek: `seconds` less the preroll the reader applies.
     reference_seconds: String,
+    /// The exact observable differences of a reviewed open seek.
+    open: Option<OpenSeek>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct OpenSeek {
+    reason: String,
+    expected: Value,
 }
 
 /// A decimal number of seconds as `codec-worker seek` and `ffprobe` take it.
@@ -572,6 +597,7 @@ impl SeekCase {
                 seconds: text("seconds")?,
                 policy: text("policy")?,
                 reference_seconds: text("reference_seconds")?,
+                open: None,
             };
             if !decimal(&case.seconds) || !decimal(&case.reference_seconds) {
                 return Err(format!("{}: seconds are not decimal", case.name));
@@ -589,6 +615,41 @@ impl SeekCase {
                 return Err(format!("{}: listed twice", case.name));
             }
             cases.push(case);
+        }
+        if let Some(open) = document.get("open_cases") {
+            for row in open.as_array().ok_or("open_cases is not an array")? {
+                let name = row
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .ok_or("open seek without name")?;
+                let case = cases
+                    .iter_mut()
+                    .find(|case| case.name == name)
+                    .ok_or_else(|| format!("open seek {name}: no such case"))?;
+                let cause = row
+                    .get("reason")
+                    .and_then(Value::as_str)
+                    .filter(|reason| !reason.is_empty())
+                    .ok_or_else(|| format!("open seek {name}: missing reason"))?;
+                let expected = row
+                    .get("expected")
+                    .filter(|expected| {
+                        expected
+                            .get("difference_sha256")
+                            .and_then(Value::as_str)
+                            .is_some_and(|sha| {
+                                sha.len() == 64 && sha.bytes().all(|byte| byte.is_ascii_hexdigit())
+                            })
+                    })
+                    .ok_or_else(|| format!("open seek {name}: no pinned difference"))?;
+                if case.open.is_some() {
+                    return Err(format!("open seek {name}: listed twice"));
+                }
+                case.open = Some(OpenSeek {
+                    reason: cause.to_owned(),
+                    expected: expected.clone(),
+                });
+            }
         }
         Ok(cases)
     }
@@ -681,6 +742,7 @@ fn reference(
     path: &str,
     media: &[String],
     seek: Option<&str>,
+    sequential: bool,
 ) -> Result<Reference, Stop> {
     let mut argv: Vec<String> = [ffprobe, "-v", "error", "-f", format]
         .map(String::from)
@@ -694,10 +756,18 @@ fn reference(
             "stream=index,codec_type,time_base:packet=stream_index,pts,dts,duration,size,pos:packet_side_data=skip_samples,discard_padding",
             "-of",
             "json",
-            path,
+            if sequential { "pipe:0" } else { path },
         ]
         .map(String::from),
     );
+    // Give ffprobe a pipe protocol input backed by standard input. The file path
+    // is a positional argument, independent of the fixed shell program.
+    if sequential {
+        argv.splice(
+            0..0,
+            ["/bin/sh", "-c", "exec \"$@\" < \"$0\"", path].map(String::from),
+        );
+    }
     let done = run_text(&argv, RUN_TIMEOUT)?;
     let document = python::loads(&done.stdout).unwrap_or(Value::Null);
     let mut reference = Reference {
@@ -761,36 +831,139 @@ fn reference(
     Ok(reference)
 }
 
-fn candidate(
+#[derive(Clone, Copy)]
+enum Mode<'a> {
+    Blocking,
+    Push,
+    Stream,
+    Seek(&'a SeekCase),
+}
+
+impl<'a> Mode<'a> {
+    fn seek(self) -> Option<&'a SeekCase> {
+        match self {
+            Self::Seek(seek) => Some(seek),
+            _ => None,
+        }
+    }
+
+    fn uses_views(self, format: &str) -> bool {
+        match self {
+            Self::Blocking => false,
+            Self::Seek(_) => format != "ogg",
+            Self::Push | Self::Stream => true,
+        }
+    }
+}
+
+fn packet_output(
     worker: &Path,
+    command: &str,
     format: &str,
     path: &str,
-    seek: Option<&SeekCase>,
-    streams: Streams,
-    audio: &[i128],
-) -> Result<Result<Candidate, String>, Stop> {
+    arguments: &[String],
+) -> Result<Result<String, String>, Stop> {
     let mut argv = vec![
         python::path(worker),
-        if seek.is_some() { "seek" } else { "packets" }.to_owned(),
+        command.to_owned(),
         format.to_owned(),
         path.to_owned(),
     ];
-    if let Some(seek) = seek {
-        argv.extend([
-            seek.track.to_string(),
-            seek.seconds.clone(),
-            seek.policy.clone(),
-        ]);
-    }
+    argv.extend_from_slice(arguments);
     let done = run_text(&argv, RUN_TIMEOUT)?;
-    if done.code != 0 {
-        return Ok(Err(format!(
-            "codec-worker exited {}: {}",
+    Ok(if done.code == 0 {
+        Ok(done.stdout)
+    } else {
+        Err(format!(
+            "{} exited {}: {}",
+            worker.display(),
             done.code,
             python::tail(&done.stderr, 300)
-        )));
+        ))
+    })
+}
+
+fn candidate(
+    options: &Options,
+    format: &str,
+    path: &str,
+    mode: Mode<'_>,
+    streams: Streams,
+    audio: &[i128],
+    fields: &mut Vec<(String, Value)>,
+) -> Result<Result<Candidate, String>, Stop> {
+    let worker = if mode.uses_views(format) {
+        options
+            .views_worker
+            .as_ref()
+            .ok_or_else(|| Stop::Fatal("this reader lane requires --views-worker".into()))?
+    } else {
+        &options.codec_worker
+    };
+    let (worker_for_rows, command, args) = match mode {
+        Mode::Seek(seek) => (
+            worker,
+            "seek",
+            vec![
+                seek.track.to_string(),
+                seek.seconds.clone(),
+                seek.policy.clone(),
+            ],
+        ),
+        Mode::Stream => (worker, "packets-stream", Vec::new()),
+        Mode::Blocking | Mode::Push => (&options.codec_worker, "packets", Vec::new()),
+    };
+    let stdout = match packet_output(worker_for_rows, command, format, path, &args)? {
+        Ok(stdout) => stdout,
+        Err(error) => return Ok(Err(error)),
+    };
+    if matches!(mode, Mode::Push) {
+        let mut receipts = Vec::new();
+        let mut differences = Vec::new();
+        for window in [1, 7, 4096] {
+            for pool in ["small", "default"] {
+                let args = [window.to_string(), pool.to_owned()];
+                let output = match packet_output(worker, "packets-push", format, path, &args)? {
+                    Ok(output) => output,
+                    Err(error) => {
+                        differences.push(Value::str(format!("{window}/{pool}: {error}")));
+                        continue;
+                    }
+                };
+                let (header, rows) = output.split_once('\n').unwrap_or(("", &output));
+                let stats = python::loads(header).unwrap_or(Value::Null);
+                if int(stats.get("window")) != Some(window) || int(stats.get("pool")).is_none() {
+                    differences.push(Value::str(format!("{window}/{pool}: invalid push receipt")));
+                } else if rows != stdout {
+                    let line = rows
+                        .lines()
+                        .zip(stdout.lines())
+                        .take_while(|(a, b)| a == b)
+                        .count();
+                    differences.push(Value::object([
+                        ("window", Value::int(window)),
+                        ("pool", Value::str(pool)),
+                        ("first_differing_row", Value::int(line as i128 + 1)),
+                        (
+                            "push",
+                            rows.lines().nth(line).map_or(Value::Null, Value::str),
+                        ),
+                        (
+                            "blocking",
+                            stdout.lines().nth(line).map_or(Value::Null, Value::str),
+                        ),
+                    ]));
+                }
+                receipts.push(stats);
+            }
+        }
+        fields.push(("push_receipts".into(), Value::Array(receipts)));
+        if !differences.is_empty() {
+            fields.push(("push_differences".into(), Value::Array(differences)));
+            return Ok(Err("push rows differ from blocking rows".into()));
+        }
     }
-    Ok(parse_candidate(&done.stdout, streams, audio))
+    Ok(parse_candidate(&stdout, streams, audio))
 }
 
 /// Read `codec-worker packets` output; an error describes output that breaks its format.
@@ -1572,8 +1745,9 @@ fn grade_case(
     format: &str,
     path: &str,
     case: (&str, &str),
-    seek: Option<&SeekCase>,
+    mode: Mode<'_>,
 ) -> Result<CaseGrade, Stop> {
+    let seek = mode.seek();
     let rules = options.rules.format(format)?;
     let mut theirs = reference(
         &options.ffprobe,
@@ -1581,6 +1755,7 @@ fn grade_case(
         path,
         &rules.media,
         seek.map(|s| s.reference_seconds.as_str()),
+        matches!(mode, Mode::Stream),
     )?;
     let mut fields = vec![
         ("ffprobe_rc".to_owned(), Value::int(theirs.code)),
@@ -1594,12 +1769,13 @@ fn grade_case(
         ),
     ];
     let mut ours = match candidate(
-        &options.codec_worker,
+        options,
         format,
         path,
-        seek,
+        mode,
         rules.streams,
         &theirs.tracks,
+        &mut fields,
     )? {
         Ok(reading) => reading,
         Err(error) => {
@@ -1646,6 +1822,7 @@ fn grade_case(
         "candidate_end".into(),
         ours.error.clone().map_or(Value::str("eof"), Value::str),
     ));
+    let mut landing_difference = None;
     if seek.is_some() {
         fields.push((
             "receipt".into(),
@@ -1653,7 +1830,11 @@ fn grade_case(
         ));
         fields.push((
             "reference_before_landing".into(),
-            count(before_landing(&ours, &mut theirs)),
+            count(if format == "ogg" {
+                before_landing(&ours, &mut theirs)
+            } else {
+                elementary_before_landing(&ours, &mut theirs, &mut landing_difference)
+            }),
         ));
     }
     // After a seek the two sides may deliver different links of the same sizes, so
@@ -1726,6 +1907,35 @@ fn grade_case(
     {
         fields.push(("landing_error".into(), Value::str(error)));
         status = "fail".into();
+    }
+    if let Some(error) = landing_difference {
+        fields.push(("landing_frame_difference".into(), error));
+        status = "fail".into();
+    }
+    if seek.is_some() && format != "ogg" && ours.receipt.is_some() {
+        let expected = match format {
+            "flac" => 0,
+            "mp3" => 2,
+            "aac" | "ac3" => 1,
+            _ => {
+                return Err(Stop::Fatal(format!(
+                    "no elementary preroll rule for {format}"
+                )));
+            }
+        };
+        let actual = int(ours
+            .receipt
+            .as_ref()
+            .and_then(|receipt| receipt.get("preroll_frames")));
+        if actual != Some(expected) {
+            fields.push((
+                "preroll_frames_error".into(),
+                Value::str(format!(
+                    "expected {expected} preroll frames, got {actual:?}"
+                )),
+            ));
+            status = "fail".into();
+        }
     }
     let proposals = views
         .iter()
@@ -1848,12 +2058,77 @@ fn before_landing(ours: &Candidate, theirs: &mut Reference) -> Vec<(i128, usize)
     dropped
 }
 
+/// For exact elementary landings, count reference frames before the
+/// candidate position. For estimates, the start itself is compared.
+fn elementary_before_landing(
+    ours: &Candidate,
+    theirs: &mut Reference,
+    difference: &mut Option<Value>,
+) -> Vec<(i128, usize)> {
+    let Some((stream, rows)) = ours.streams.first() else {
+        return Vec::new();
+    };
+    let Some(position) = rows.first().and_then(|row| row.native[POSITION]) else {
+        return Vec::new();
+    };
+    let Some((_, reference)) = theirs.streams.iter_mut().find(|(index, _)| index == stream) else {
+        return Vec::new();
+    };
+    let basis = ours
+        .receipt
+        .as_ref()
+        .and_then(|receipt| receipt.get("basis"))
+        .and_then(Value::as_str);
+    if basis.is_some_and(|basis| basis != "Exact") {
+        let first = reference.first().and_then(|row| row[POSITION]);
+        if first != Some(position) {
+            *difference = Some(Value::object([
+                ("candidate", Value::int(position)),
+                ("reference", first.map_or(Value::Null, Value::int)),
+            ]));
+        }
+        return Vec::new();
+    }
+    let count = reference
+        .iter()
+        .take_while(|row| row[POSITION].is_some_and(|at| at < position))
+        .count();
+    reference.drain(..count);
+    if count == 0 {
+        Vec::new()
+    } else {
+        vec![(*stream, count)]
+    }
+}
+
 fn view_status(row: &Value, view: &str) -> Option<String> {
     row.get("views")
         .and_then(|v| v.get(view))
         .and_then(|v| v.get("status"))
         .and_then(Value::as_str)
         .map(str::to_owned)
+}
+
+fn seek_observation(row: &Value) -> Value {
+    let field = |name| row.get(name).cloned().unwrap_or(Value::Null);
+    Value::object([
+        ("candidate_end", field("candidate_end")),
+        ("candidate_packets", field("candidate_packets")),
+        ("reference_packets", field("reference_packets")),
+        (
+            "landing_frame_difference",
+            field("landing_frame_difference"),
+        ),
+        ("landing_error", field("landing_error")),
+        (
+            "difference_sha256",
+            row.get("views")
+                .and_then(|v| v.get("native"))
+                .and_then(|v| v.get("difference_sha256"))
+                .cloned()
+                .unwrap_or(Value::Null),
+        ),
+    ])
 }
 
 /// Compare every reader row of the manifest (or those `--only` selects), appending one
@@ -1874,32 +2149,53 @@ pub fn run(options: &Options) -> Result<(), String> {
     let mut counts: Vec<(String, usize)> = Vec::new();
     let mut proposals = Vec::new();
     let mut failed = 0;
+    let mut known_open = 0;
     let text = |v: &Value, key: &str| -> Result<String, String> {
         v.get(key)
             .and_then(Value::as_str)
             .map(str::to_owned)
             .ok_or_else(|| format!("vector without {key}"))
     };
-    // Every vector once, then every seek case on its vector.
-    let mut jobs: Vec<(&Value, Option<&SeekCase>)> = vectors.iter().map(|v| (v, None)).collect();
+    let selected = |lane: &str| only.as_ref().is_some_and(|only| only.contains(&lane));
+    // Variants reuse the original vector and its pin. Push uses the original
+    // disposition name only after every byte-for-byte window comparison.
+    let mut jobs = Vec::new();
+    for vector in vectors {
+        if vector.get("seek_only").is_some_and(Value::truthy) {
+            continue;
+        }
+        let lane = text(vector, "lane")?;
+        jobs.push((vector, lane.clone(), Mode::Blocking));
+        if let Some((_, push)) = PUSH_LANES.iter().find(|(base, _)| *base == lane)
+            && selected(push)
+        {
+            jobs.push((vector, (*push).to_owned(), Mode::Push));
+        }
+        if lane == "reader-ogg" && selected(STREAM_LANE) {
+            jobs.push((vector, STREAM_LANE.to_owned(), Mode::Stream));
+        }
+    }
     for seek in &options.seeks {
         let vector = vectors
             .iter()
             .find(|v| v.get("name").and_then(Value::as_str) == Some(seek.input.as_str()))
             .ok_or_else(|| format!("seek {}: no vector {}", seek.name, seek.input))?;
-        jobs.push((vector, Some(seek)));
+        let base = text(vector, "lane")?;
+        let lane = format!("{base}-seek");
+        if !matches!(
+            base.as_str(),
+            "reader-ogg" | "reader-flac" | "reader-mp3" | "reader-aac" | "reader-ac3"
+        ) {
+            return Err(format!("seek {}: {base} has no seeking lane", seek.name));
+        }
+        jobs.push((vector, lane, Mode::Seek(seek)));
     }
-    for (v, seek) in jobs {
-        let mut lane = text(v, "lane")?;
+    for (v, lane, mode) in jobs {
         let Some(format) = format(&lane) else {
             continue;
         };
         let (mut name, relative, sha) = (text(v, "name")?, text(v, "path")?, text(v, "sha256")?);
-        if let Some(seek) = seek {
-            if lane != "reader-ogg" {
-                return Err(format!("seek {}: {lane} has no seeking reader", seek.name));
-            }
-            SEEK_LANE.clone_into(&mut lane);
+        if let Some(seek) = mode.seek() {
             name.clone_from(&seek.name);
         }
         if let Some(only) = &only
@@ -1919,7 +2215,7 @@ pub fn run(options: &Options) -> Result<(), String> {
         } else if file_sha(Path::new(&path))? != sha {
             "input-hash-mismatch".to_owned()
         } else {
-            match grade_case(options, format, &path, (&name, &sha), seek) {
+            match grade_case(options, format, &path, (&name, &sha), mode) {
                 Ok(graded) => {
                     row.extend(graded.fields);
                     proposals.extend(graded.proposals);
@@ -1932,14 +2228,25 @@ pub fn run(options: &Options) -> Result<(), String> {
                 Err(Stop::Fatal(message)) => return Err(message),
             }
         };
-        if ![
+        let accepted = [
             "pass",
             "reproduced-by-compat",
             "disposition",
             "refused-by-both",
         ]
-        .contains(&status.as_str())
-        {
+        .contains(&status.as_str());
+        if let Some(open) = mode.seek().and_then(|seek| seek.open.as_ref()) {
+            if status == "fail"
+                && !row.iter().any(|(key, _)| key == "preroll_frames_error")
+                && seek_observation(&Value::Object(row.clone())) == open.expected
+            {
+                known_open += 1;
+                row.push(("open_case_reason".into(), Value::str(&open.reason)));
+            } else {
+                failed += 1;
+                row.push(("open_case_changed".into(), Value::Bool(true)));
+            }
+        } else if !accepted {
             failed += 1;
         }
         row.push(("status".into(), Value::str(status.as_str())));
@@ -1989,6 +2296,9 @@ pub fn run(options: &Options) -> Result<(), String> {
     counts.sort();
     for (key, n) in &counts {
         println!("COUNT {key} {n}");
+    }
+    if known_open > 0 {
+        println!("{known_open} open seek cases reproduced their pinned differences");
     }
     println!("DONE");
     if failed > 0 {
