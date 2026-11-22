@@ -103,7 +103,8 @@ fn recovery_corpus(root: &Path, out: &Path) -> Result<()> {
         names.sort_unstable();
         for name in &names {
             let name = name.to_str().ok_or("non-UTF-8 recovery fixture name")?;
-            if name.ends_with(".mov") && name.starts_with("tail-") == (mode == "physical") {
+            let is_movie = Path::new(name).extension().is_some_and(|ext| ext == "mov");
+            if is_movie && name.starts_with("tail-") == (mode == "physical") {
                 add(&prefix, name, mode, root)?;
             }
         }
