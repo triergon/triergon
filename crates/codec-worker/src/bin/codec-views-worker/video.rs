@@ -448,11 +448,7 @@ fn output_picture(
                     u64::from(colour.primaries),
                     u64::from(colour.transfer),
                     u64::from(colour.matrix),
-                    if colour.video_signal_type_present {
-                        1 + u64::from(colour.full_range)
-                    } else {
-                        0
-                    },
+                    1 + u64::from(colour.full_range),
                     0,
                 ],
                 hashes,

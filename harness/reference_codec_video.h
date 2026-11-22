@@ -119,6 +119,10 @@ typedef struct {
 static int codec_video_frame(CodecVideo *state, enum AVCodecID id)
 {
     AVFrame *frame = state->frame;
+    /* The hashes read visible bytes directly, so the conformance window need
+     * not be rounded to align a plane's first sample. */
+    if (av_frame_apply_cropping(frame, AV_FRAME_CROP_UNALIGNED) < 0)
+        return 2;
     const AVPixFmtDescriptor *format = av_pix_fmt_desc_get(frame->format);
     int strides[4];
     if (!format || av_image_fill_linesizes(strides, frame->format, frame->width) < 0)
@@ -151,9 +155,9 @@ static int codec_video_frame(CodecVideo *state, enum AVCodecID id)
         words[count++] = (uint64_t)frame->color_primaries;
         words[count++] = (uint64_t)frame->color_trc;
         words[count++] = (uint64_t)frame->colorspace;
-        words[count++] = id == AV_CODEC_ID_H264 ? (uint64_t)(frame->color_range == AVCOL_RANGE_JPEG)
-                                                : (uint64_t)frame->color_range;
-        words[count++] = id == AV_CODEC_ID_H264 && (frame->flags & AV_FRAME_FLAG_INTERLACED);
+        /* H.265 Annex E infers narrow range when no flag is signalled. */
+        words[count++] = (id == AV_CODEC_ID_HEVC) + (frame->color_range == AVCOL_RANGE_JPEG);
+        words[count++] = id == AV_CODEC_ID_H264 && frame->opaque != NULL;
     } else {
         words[count++] = frame->pts != AV_NOPTS_VALUE;
         if (frame->pts != AV_NOPTS_VALUE)
@@ -192,54 +196,101 @@ static int codec_video_receive(AVCodecContext *context, CodecVideo *state)
     }
 }
 
-static int codec_video_packet(AVCodecContext *context, const AVCodecParserContext *parser,
-                              const uint8_t *data, size_t size, void *opaque)
+static int codec_video_send(AVCodecContext *decoder, CodecVideo *state)
 {
-    (void)parser;
-    CodecVideo *state = opaque;
-    state->packet->data = (uint8_t *)data;
-    state->packet->size = (int)size;
     state->packet->pts = state->pts++;
-    const int status = avcodec_send_packet(context, state->packet);
+    const int status = avcodec_send_packet(decoder, state->packet);
     if (status == AVERROR_INVALIDDATA)
         state->refused = 1;
     else if (status < 0)
         return 2;
-    return codec_video_receive(context, state);
+    return codec_video_receive(decoder, state);
 }
 
 static int codec_video_decode(const ViewCase *input, ViewWork *work)
 {
     const enum AVCodecID id = !strcmp(input->argv[0], "h264") ? AV_CODEC_ID_H264 : AV_CODEC_ID_HEVC;
     const AVCodec *codec = avcodec_find_decoder(id);
+    ReaderInput source = {0};
     AVCodecContext *context = avcodec_alloc_context3(codec);
+    AVCodecContext *parser_context = NULL;
+    AVCodecParserContext *parser = NULL;
     CodecVideo state = {.packet = av_packet_alloc(), .frame = av_frame_alloc(),
                         .md5 = av_md5_alloc(), .work = work, .properties = input->argc == 1};
     int status = 2;
     if (!codec || !context || !state.packet || !state.frame || !state.md5)
         goto done;
+    int opened = reader_open(&source, input, input->argv[0]);
+    if (opened >= 0)
+        opened = avformat_find_stream_info(source.format, NULL);
+    if (opened == AVERROR(ENOMEM))
+        goto done;
+    const int track = opened < 0 ? opened :
+        av_find_best_stream(source.format, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
+    if (track < 0) {
+        state.refused = 1;
+        status = 0;
+        goto done;
+    }
+    const AVCodecParameters *parameters = source.format->streams[track]->codecpar;
+    if (avcodec_parameters_to_context(context, parameters) < 0)
+        goto done;
+    /* Output with unknown geometry is unusable if the decoder never emits a picture. */
+    state.refused = parameters->width <= 0 || parameters->height <= 0;
     context->thread_count = 1;
+    context->apply_cropping = 0;
+    if (state.properties && id == AV_CODEC_ID_H264) {
+        parser = av_parser_init(id);
+        parser_context = avcodec_alloc_context3(codec);
+        if (!parser || !parser_context)
+            goto done;
+        parser->flags |= PARSER_FLAG_COMPLETE_FRAMES;
+        context->flags |= AV_CODEC_FLAG_COPY_OPAQUE;
+    }
     if (avcodec_open2(context, codec, NULL) < 0)
         goto done;
-    status = codec_parse_packets(input, context, id, codec_video_packet, &state);
-    if (status == 0) {
-        const int end = avcodec_send_packet(context, NULL);
-        if (end < 0 && end != AVERROR_EOF && end != AVERROR_INVALIDDATA)
-            status = 2;
-        else
-            status = codec_video_receive(context, &state);
+    int read;
+    while ((read = av_read_frame(source.format, state.packet)) >= 0) {
+        if (state.packet->stream_index == track) {
+            if (parser) {
+                static int field_picture;
+                uint8_t *data;
+                int size;
+                if (av_parser_parse2(parser, parser_context, &data, &size, state.packet->data,
+                                     state.packet->size, AV_NOPTS_VALUE, AV_NOPTS_VALUE,
+                                     state.packet->pos) < 0)
+                    goto done;
+                /* MBAFF frame pictures can have an interlaced display flag. */
+                state.packet->opaque =
+                    parser->picture_structure == AV_PICTURE_STRUCTURE_TOP_FIELD ||
+                    parser->picture_structure == AV_PICTURE_STRUCTURE_BOTTOM_FIELD ? &field_picture : NULL;
+            }
+            if (codec_video_send(context, &state))
+                goto done;
+        }
+        av_packet_unref(state.packet);
     }
+    if (read == AVERROR(ENOMEM))
+        goto done;
+    state.refused |= read != AVERROR_EOF;
+    const int end = avcodec_send_packet(context, NULL);
+    if (end >= 0 || end == AVERROR_EOF || end == AVERROR_INVALIDDATA)
+        status = codec_video_receive(context, &state);
+
+done:
     if (!status && state.refused && !work->packets) {
         view_record(work, 8, NULL, 0, NULL, 0);
         if (work->trace)
             puts("8");
     }
-
-done:
     av_free(state.md5);
     av_frame_free(&state.frame);
     av_packet_free(&state.packet);
+    if (parser)
+        av_parser_close(parser);
+    avcodec_free_context(&parser_context);
     avcodec_free_context(&context);
+    reader_close(&source);
     return status;
 }
 
@@ -556,7 +607,7 @@ static int codec_video_prepare(ViewCase *input)
             return 2;
         input->name = properties ? "picture-properties" : "video-nal-input";
         input->run = codec_video_decode;
-        return codec_parser_prepare(input, input->size + 1);
+        return 0;
     }
     if (!strcmp(input->prefix, "h264-inspect-") && !input->argc) {
         input->name = "h264-stream-inspection";
