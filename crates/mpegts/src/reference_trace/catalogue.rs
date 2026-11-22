@@ -67,6 +67,8 @@ pub enum CatalogueCodec {
     AacAdts,
     /// AAC in LATM.
     AacLatm,
+    /// MPEG-1 or MPEG-2 audio, without identifying an audio layer.
+    MpegAudio,
     /// AC-3 audio.
     Ac3,
     /// E-AC-3 audio.
@@ -80,6 +82,7 @@ impl CatalogueCodec {
             Self::Hevc => "hevc",
             Self::AacAdts => "aac",
             Self::AacLatm => "aac_latm",
+            Self::MpegAudio => "mpeg-audio",
             Self::Ac3 => "ac3",
             Self::Eac3 => "eac3",
         }
@@ -181,6 +184,7 @@ impl Catalogue {
             _ if !self.selected_carriage => Err(Error::Unsupported(
                 "demux video catalogue supports only AVC and HEVC stream types",
             )),
+            0x03 | 0x04 => Ok(CatalogueCodec::MpegAudio),
             0x0f => Ok(CatalogueCodec::AacAdts),
             0x11 => Ok(CatalogueCodec::AacLatm),
             6 | 0x81 | 0x87 => {
@@ -628,7 +632,10 @@ impl Catalogue {
             }
             if !(matches!(stream.stream_type, 0x1b | 0x24)
                 || self.selected_carriage
-                    && matches!(stream.stream_type, 0x0f | 0x11 | 6 | 0x81 | 0x87))
+                    && matches!(
+                        stream.stream_type,
+                        0x03 | 0x04 | 0x0f | 0x11 | 6 | 0x81 | 0x87
+                    ))
             {
                 return Err(Error::Unsupported(
                     "demux video catalogue supports only AVC and HEVC stream types",

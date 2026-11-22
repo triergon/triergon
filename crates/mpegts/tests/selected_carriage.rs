@@ -137,6 +137,21 @@ fn pmt_carrier(version: u8, streams: &[(u8, u16, &[u8])]) -> [u8; 188] {
     carrier
 }
 
+fn audio_carrier(counter: u8, bytes: &[u8]) -> [u8; 188] {
+    let mut carrier = [0xff; 188];
+    let start = 188 - bytes.len();
+    carrier[..6].copy_from_slice(&[
+        0x47,
+        if counter == 0 { 0x41 } else { 0x01 },
+        0,
+        0x30 | counter,
+        u8::try_from(start - 5).unwrap(),
+        0,
+    ]);
+    carrier[start..].copy_from_slice(bytes);
+    carrier
+}
+
 fn project(run: &Run, budget: &Budget, format: PacketFormat) -> Result<Catalogue, Error> {
     let mut projection = catalogue(budget, format);
     for (event, _) in run.events() {
@@ -254,6 +269,51 @@ fn truncated_or_unrelated_registrations_do_not_publish_streams() {
         let budget = Budget::new(8 * 1024 * 1024).unwrap();
         let run = parsed(&data, &budget, PacketFormat::Ts188, 7);
         assert!(project(&run, &budget, PacketFormat::Ts188).is_err());
+    }
+}
+
+#[test]
+fn mpeg_audio_catalogue_uses_the_pmt_even_when_the_pes_header_is_split() {
+    let pes = [
+        0x00, 0x00, 0x01, 0xc0, 0x00, 0x07, 0x80, 0x00, 0x00, 0xff, 0xfd, 0x84, 0x00,
+    ];
+    for kind in [0x03, 0x04] {
+        let pmt = pmt_carrier(0, &[(0x1b, 257, b""), (kind, 256, b"\x0a\x04eng\x00")]);
+        for split in [4, pes.len()] {
+            let mut data = [&BASIC[..188], &pmt, &audio_carrier(0, &pes[..split])].concat();
+            if split < pes.len() {
+                data.extend_from_slice(&audio_carrier(1, &pes[split..]));
+            }
+            let budget = Budget::new(8 * 1024 * 1024).unwrap();
+            let run = parsed(&data, &budget, PacketFormat::Ts188, 1);
+            assert!(
+                run.events()
+                    .any(|(event, _)| matches!(event, TraceEvent::Pes(_)))
+            );
+            let projection = project(&run, &budget, PacketFormat::Ts188).unwrap();
+            let [video, audio] = projection.streams() else {
+                panic!("expected both PMT entries");
+            };
+            assert_eq!((video.pid, audio.pid), (257, 256));
+            assert_eq!(
+                (
+                    audio.stream_type,
+                    audio.codec_tag,
+                    audio.codec(),
+                    audio.language.as_slice()
+                ),
+                (
+                    kind,
+                    u32::from(kind),
+                    CatalogueCodec::MpegAudio,
+                    b"eng".as_slice()
+                )
+            );
+            assert_eq!(
+                projection.evidence()[audio.evidence].bytes.as_slice()[0].as_ref(),
+                &pmt[5..8 + usize::from(pmt[7])]
+            );
+        }
     }
 }
 

@@ -60,7 +60,8 @@ Everything else lives in its module:
   carriers), `catalogue` (programs and streams), `dvb` and `input`.
   The catalogue keeps PMT stream types alongside registered HEVC and E-AC-3
   codec tags and accepts matching private audio descriptors in a declared
-  ATSC namespace.
+  ATSC namespace. PMT types 0x03 and 0x04 identify MPEG audio without
+  specifying a layer.
 
 `compat::pes::PacketCompletion` confirms that one physical input contained only
 control traffic. Poll the source with `TransportStream::poll_observed` and
