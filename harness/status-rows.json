@@ -934,6 +934,12 @@
     {"area": "Capture configurations", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "11 stream cases awaiting measurement"},
     {"area": "Playback input probes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-probe"},
     {"area": "Playback source packets and tracks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-source-view"},
+    {"area": "MP4 player seeks and duration", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-mp4-seek"},
+    {"area": "MP4 catalogue replacement", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-catalogue-replacement"},
+    {"area": "Player FIFO and sink delivery", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-delivery"},
+    {"area": "Player track selection", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-track-selection"},
+    {"area": "MOV index and terminal media", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-mov-index"},
+    {"area": "MPEG-TS PES openers", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-ts-open"},
     {"area": "MP4 source clocks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mp4-source-clock"},
     {"area": "Facade input probes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "facade-probe"},
     {
