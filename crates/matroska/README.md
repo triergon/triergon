@@ -1,6 +1,6 @@
-# Matroska / WebM reader (triergon-matroska)
+# triergon-matroska
 
-Package `triergon-matroska`. A bounded Matroska and WebM demuxer: EBML parsing, tracks,
+A bounded Matroska and WebM demuxer: EBML parsing, tracks,
 packets with lacing and content encoding, Cues-based seeking, static colour/HDR, block
 additions and segment metadata (Info, chapters, tags, attachments). It is a format-layer
 crate on top of [triergon-core](../core/README.md) and
@@ -45,6 +45,12 @@ expose their allocation accounting through `Configuration::budget()`.
 
 `examples/matroska_packets.rs FILE` prints the tracks and packets of a file.
 
+## Features
+
+| Feature | Default | Effect |
+|---|---|---|
+| `reference-trace` | off | `reference_trace`: the initial trim after a seek, the zlib inflater on its own (`reference_trace::zlib::decompress`) and `Colour::trace_fields`, the colour values FFmpeg reports |
+
 Push / poll reader (no I/O; the caller supplies bytes):
 
 ```rust
@@ -81,15 +87,15 @@ loop {
 `Reader::seek_previous` / `seek_for_playback` return the first `InputRequest`;
 the seek completes with `Event::Seek(SeekReceipt)` before any packet.
 
-`typed::Reader` also implements `triergon_core::container::ContainerReader`, so it
-works in generic code and inside `triergon::AnyReader`:
+`Reader` also implements `triergon_core::container::ContainerReader`, so it works in
+generic code and inside `triergon::AnyReader`:
 
 | Neutral view | Matroska source |
 |---|---|
-| `PacketInfo` | `typed::Packet`: time base nanoseconds (TimestampScale applied), `pts`/`duration` from the packet, `dts` `None`, `RandomAccess` from the Block keyframe flag, `Trim::end` from DiscardPadding |
+| `PacketInfo` | `TypedPacket`: time base nanoseconds (TimestampScale applied), `pts`/`duration` from the packet, `dts` `None`, `RandomAccess` from the Block keyframe flag, `Trim::end` from DiscardPadding |
 | `TrackInfo` | `matroska::Track`: `TrackId` = TrackNumber, `codec_tag` = CodecID, `codec` from an exact CodecID match with any other CodecID as `CodecId::Other`, `configuration` = CodecPrivate, effective language, default and forced flags, `colour` as a `ColourDescription` with `Origin::SpecificationDefault` for omitted Colour children |
 | `Event::Seek` | `matroska::SeekReceipt::neutral()`: method `Index` or `BoundedScan`; Cue and preroll detail stay on the Matroska receipt |
-| `Event::Other` | the other `typed::Event`s (Envelope, Configuration, Document) |
+| `Event::Other` | the other `Event`s (Envelope, Configuration, Document) |
 
 `request_seek` maps the `TrackId` to a track index (`Error::Invalid` when absent),
 floors the target to nanoseconds and calls `seek_previous` for
@@ -151,7 +157,7 @@ duration is known, and fractional lace durations and negative PTS are kept.
 Segment ticks that reproduces FFmpeg's packet clock, including its omissions.
 
 **Content encoding.** Encodings apply in descending `ContentEncodingOrder`, and each
-laced frame is decoded separately. `zlib::decompress` reads one complete RFC 1950 stream
+laced frame is decoded separately. The zlib inflater reads one complete RFC 1950 stream
 (stored, fixed and dynamic blocks), checks Adler-32 before returning anything and rejects
 trailing bytes.
 
@@ -170,8 +176,7 @@ or cancellation the caller must seek or `reset` before reading more packets.
 **Colour.** `Track::colour` keeps every source field: bit depth, both chroma and Cb
 subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering value as
 exact `f64`. Zero-length numbers take the schema default. Duplicates, bad widths,
-non-finite values, negative luminance and chromaticity outside [0, 1] fail. With the
-`reference-trace` feature, `Colour::trace_fields()` gives the values FFmpeg reports.
+non-finite values, negative luminance and chromaticity outside [0, 1] fail.
 
 **Reference compatibility.** The reader follows the specifications. The `compat`
 modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and
@@ -187,7 +192,7 @@ string or payload copies. Attachments stay valid after the reader is dropped. Ch
 times are exact unsigned nanoseconds; ordered editions are reported, not executed.
 Building a document validates every node once in resumable, work-charged steps.
 
-## Standards
+## Conformance
 
 Authored from RFC 8794 §§4–7, 11 (EBML) and RFC 9559 §§5, 10–11, 22 (Matroska:
 §5.1.3.5 block side data, §5.1.4.1.16–17 block addition mappings,
@@ -195,5 +200,7 @@ Authored from RFC 8794 §§4–7, 11 (EBML) and RFC 9559 §§5, 10–11, 22 (Mat
 chapters/tags/attachments), RFC 1950/1951 (zlib/DEFLATE) and ITU-T T.35
 HDR10+ Application 4 carriage.
 
-Verification: the Matroska harness contract in [docs/quality.md](../../docs/quality.md);
-results in [docs/status.md](../../docs/status.md).
+The reader is compared with FFmpeg's Matroska demuxer by the `harness/features/matroska-*`
+features, through [media-worker](../media-worker/README.md) and, for the playback clocks
+and startup seeks, [playback-worker](../playback-worker/README.md); results are in
+[docs/status.md](../../docs/status.md).
