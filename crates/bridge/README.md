@@ -107,6 +107,9 @@ cue bytes, bitmap geometry and pixels, palettes, and presentation clocks
 against the corresponding FFmpeg decoder outputs. MP4 captions use
 sample-table time before applying movie edits. Teletext clear events carry a
 timestamp and cues also carry their display duration when known.
+With the subtitle decoder corpora and pinned subtitles `ffprobe` prepared,
+`python3 harness/subtitles/bridge_corpora.py` verifies the three bridge manifests.
+It retains the first authored input with each SHA-256 and complete selector.
 The text comparison preserves the source cue extent and text even when the
 reference decoder normalizes or suppresses it.
 
