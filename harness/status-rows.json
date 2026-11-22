@@ -920,7 +920,7 @@
         "capture-c15-noise-480-bottomup"
       ]
     },
-    {"area": "Capture configurations", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "not yet measured"},
+    {"area": "Capture configurations", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "11 stream cases awaiting measurement"},
     {"area": "Playback input probes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-probe"},
     {"area": "Playback source packets and tracks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "playback-source-view"},
     {"area": "MP4 source clocks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mp4-source-clock"},
