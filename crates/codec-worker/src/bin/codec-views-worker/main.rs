@@ -7,6 +7,7 @@ mod protocol;
 // The reader lanes share the measured reader's packet and track output.
 mod audio;
 mod blocks;
+mod core_reader_protocol;
 #[allow(
     dead_code,
     reason = "The shared packet module also dispatches MOV reads."
@@ -47,6 +48,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
     ("windows-", oracles::operation),
     ("divide-", oracles::operation),
     ("budget-", oracles::operation),
+    ("core-reader-protocol-", core_reader_protocol::operation),
     ("mpeg1-budget-", mpeg1_budget::operation),
     ("opus-range-", oracles::operation),
 ];

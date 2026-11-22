@@ -974,6 +974,7 @@
       ],
       "unmeasured": "core-budgets"
     },
+    {"area": "Core reader protocol", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "Source requests, input windows, EOF, backpressure and blocking drivers", "unmeasured": "core-reader-protocol", "parity": {"aarch64-unknown-linux-gnu": "All three controls match byte ranges, lifecycle outcomes and original ADTS packets and clocks after driver retry or seek."}},
     {
       "area": "Inverse MDCT and DCT-IV",
       "targets": [

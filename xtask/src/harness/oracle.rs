@@ -32,6 +32,7 @@ impl Kind {
             "windows",
             "divide",
             "core-budgets",
+            "core-reader-protocol",
             "source-signatures",
             "facade-source-control",
             "facade-mpegts-controls",

@@ -37,6 +37,7 @@ dependencies = [
  "triergon-codec-hevc",
  "triergon-codec-mpeg1",
  "triergon-codec-opus",
+ "triergon-core",
  "triergon-harness-protocol",
  "triergon-harness-runner",
  "triergon-isobmff",

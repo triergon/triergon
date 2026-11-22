@@ -58,14 +58,7 @@
     "triergon-codec-mpeg1": [],
     "triergon-codec-opus": [],
     "triergon-codec-vorbis": [],
-    "triergon-core": [
-      {
-        "name": "reader-protocol",
-        "entry_points": ["InputCursor", "container::ContainerReader", "blocking::Blocking", "blocking::Feed"],
-        "degree": "step",
-        "needs": "Push comparisons exercise request windows, Yield and Backpressure resume against the blocking rows. Coverage does not establish every ContainerReader, InputCursor, Blocking and Feed entry point or the full failure and reset domain."
-      }
-    ],
+    "triergon-core": [],
     "triergon-elementary": [
       {
         "name": "seeking",

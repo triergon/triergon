@@ -119,6 +119,13 @@ Reads come in four forms: `read_into` (copy into a slice), `read_append` (copy i
 alias of the window); `buffered()` peeks without consuming. A read that yields, starves
 or hits backpressure keeps its position, so the caller retries the same call.
 
+The [reader protocol comparison](../../harness/features/core-reader-protocol/contract.json)
+checks input windows, refusals, and restart transitions. It checks `Feed` against
+the source bytes and compares the packets, clocks, failures and seeks of
+`Blocking` over an ADTS reader. The
+[facade lifecycle comparison](../../harness/features/facade-source-control/contract.json)
+also checks the `ContainerReader` failure and reset contract in four container readers.
+
 **Work and cancellation.** Every read charges one `WorkBudget` unit per byte.
 Format crates also charge parsing, decompression, indexing and pixel work before
 doing it; an exhausted budget returns `Step::Yield` (or the format's equivalent)
