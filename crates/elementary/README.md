@@ -3,7 +3,10 @@
 Readers for audio elementary streams: native FLAC, MPEG audio (Layer I, II and III,
 with ID3 and APE tags and Xing/Info/VBRI frames), AAC in ADTS, and AC-3/E-AC-3. Each
 is a `triergon_core::container::ContainerReader` with one track and does no I/O;
-`BlockingReader` drives one from `std::io::Read + Seek`.
+`BlockingReader` drives one from `std::io::Read + Seek`, and `probe` selects the format
+from a prefix.
+
+## Usage
 
 ```rust
 use std::io::Cursor;
@@ -25,11 +28,7 @@ assert_eq!((track.codec_tag(), track.sample_rate()), (b"mp3".as_slice(), 44100))
 # Ok::<(), triergon_core::Error>(())
 ```
 
-## Behaviour
-
-The [media probe comparison](../../harness/features/media-probe/contract.json)
-checks `probe` format selection over four prefix lengths, including ID3v2,
-marker-less FLAC, and prefixes without a recognized elementary stream.
+## Behaviour and limits
 
 All four formats run one frame-stream engine: leading ID3v2 tags, the format's
 opening, a sync confirmed by the frames after it, then access units until a trailing
@@ -69,17 +68,16 @@ frames from the start (`SeekMethod::Restart`). A playback seek lands
 `Format::PREROLL` frames early (two for MPEG audio, one for ADTS and AC-3, none for
 FLAC).
 
-## Limits
-
 `Limits` bounds the largest access unit (4 MiB: a verbatim FLAC frame of 65535 samples
 of eight 32-bit channels is about 2.2 MB), retained tags and metadata (4 MiB in all),
 sync search (1 MiB), input window (64 KiB), SEEKTABLE points (65536) and bisection
 jumps (64). Every input-dependent allocation is charged to the reader's `Budget`;
 exceeding a limit is a typed error.
 
-## Differences from FFmpeg
+## Conformance
 
-Packets differ from FFmpeg 9.0.2's (`ffprobe -show_packets`) only where FFmpeg:
+Packets are compared with FFmpeg 9.0.2's (`ffprobe -show_packets`) and differ only
+where FFmpeg:
 
 - delivers a FLAC frame's duration rescaled to the first frame's rate when the rate
   changes, no duration at 768 kHz, and the last frame of a stream with varying block
@@ -97,10 +95,12 @@ Packets differ from FFmpeg 9.0.2's (`ffprobe -show_packets`) only where FFmpeg:
   file, where this reader reports the stream as truncated.
 
 The reviewed differences are in
-[reader-differences.json](../../harness/codecs/reader-differences.json); results in
+[reader-differences.json](../../harness/codecs/reader-differences.json). The
+[media probe comparison](../../harness/features/media-probe/contract.json) checks
+`probe` over four prefix lengths, including ID3v2, marker-less FLAC and prefixes without
+a recognised elementary stream. The
+[track metadata comparison](../../harness/features/elementary-metadata/contract.json)
+checks ADTS and E-AC-3 rates and channel counts against the first physical frame, and
+the [wire comparison](../../harness/features/elementary-metadata-wire/contract.json)
+original FLAC metadata, seek points, frame headers and tag envelopes. Results are in
 [docs/status.md](../../docs/status.md).
-
-The [track metadata comparison](../../harness/features/elementary-metadata/contract.json)
-checks ADTS and E-AC-3 rates and channel counts against the first physical
-frame. The [wire comparison](../../harness/features/elementary-metadata-wire/contract.json)
-checks original FLAC metadata, seek points, frame headers and tag envelopes.

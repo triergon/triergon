@@ -3,10 +3,10 @@
 Picture types and the fixed pixel conversions shared by the capture, playback and
 subtitle sides: borrowed views of decoded pictures, a macroblock-aligned YUV 4:2:0
 picture, RGBA → YUV 4:2:0 with ITU-R BT.601 coefficients, a letterbox that converts a
-decoded 4:2:0 picture into a 1920×1080 RGBA canvas exactly as FFmpeg's scale/pad
-chain does, and the Y'CbCr → RGB of subtitle palette entries. It is the pixel layer
-below the codec crates and depends only on `std`. It does no general scaling, colour
-management or other canvas sizes.
+decoded 4:2:0 picture into an RGBA canvas (1920×1080 by default) exactly as FFmpeg's
+scale/pad chain does, and the Y'CbCr → RGB of subtitle palette entries. It is the pixel
+layer below the codec crates and depends only on `std`. It does no other scaling and no
+colour management.
 
 ## Usage
 
@@ -51,7 +51,7 @@ let view = PictureView {
     sar: (1, 1),
     colour: Colour { matrix: 1, full_range: false },
 };
-let canvas = Canvas::default();                     // 1920x1080; Canvas::new(w, h) for others
+let canvas = Canvas::default();                     // 1920x1080; Canvas::new(w, h) for another size
 let mut scaler = Scaler::new(canvas);               // caches per-geometry filter plans
 let mut rgba = vec![0u8; canvas.bytes()];
 scaler.letterbox(&view, &mut rgba);                 // writes the whole canvas
@@ -113,8 +113,8 @@ and PGS subtitle decoders convert palette entries, and how its MP4 demuxer conve
 a DVD colour table (half a step below).
 
 **Letterbox.** `Scaler::letterbox` writes the complete canvas: opaque black padding and
-the fitted picture. It reproduces FFmpeg's
-`scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=rgba`
+the fitted picture. For a canvas of W×H it reproduces FFmpeg's
+`scale=W:H:force_original_aspect_ratio=decrease,pad=W:H:(ow-iw)/2:(oh-ih)/2,format=rgba`
 bit for bit:
 
 - `fit` scales the display size to fit, rounded to nearest; the offset is
@@ -127,8 +127,9 @@ bit for bit:
   32-byte aligned; the scaler widens the picture by the part of a left crop FFmpeg
   keeps, read from the plane `offset`.
 
-`letterbox` panics if the canvas is not exactly `CANVAS_BYTES` long. Plane data must
-cover the declared size and offsets. Filter plans are cached per width, height and
+`Canvas::new` refuses a side of zero or above `Canvas::MAX_SIDE` (65535). `letterbox`
+panics unless the RGBA slice is `Canvas::bytes()` long and the plane data covers the
+declared size and offsets. Filter plans are cached per width, height and
 bit depth.
 
 ## Conformance

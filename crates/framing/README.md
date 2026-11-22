@@ -75,6 +75,12 @@ assert_eq!(decoder_input, [
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+## Features
+
+| Feature | Default | Effect |
+|---|---|---|
+| `reference-trace` | off | `reference_trace::dts`, FFmpeg's DTS parser model, and the accessors that report the return codes FFmpeg's packet receivers give |
+
 ## Supported
 
 | Module | Entry points | Output |
@@ -94,14 +100,13 @@ assert_eq!(decoder_input, [
 | `opus` | `OpusHead`, `packet_samples`, `canonical_configuration` | Identification, TOC duration and canonical Opus configuration |
 | `vorbis` | `VorbisHeaders`, `VorbisIdentification`, `VorbisModes`, `canonical_configuration` | Xiph-laced headers, modes and canonical Vorbis configuration |
 | `mpeg_audio` | `MpegAudioHeader`, `info_frame` | Layers I–III frame headers with MPEG-2.5 rates, Xing, Info and VBRI |
-| `reference_trace::dts` | `ParserOperation` (`reference-trace` feature) | Source frame and demuxer parser packet, clock and position comparisons |
+| `reference_trace::dts` | `ParserOperation` | Source frame and demuxer parser packet, clock and position comparisons |
 
 ## Behaviour and limits
 
 **Reference compatibility.** The format modules follow the specifications.
 `compat::nal` reproduces FFmpeg's `mp4toannexb` packet receiver where a consumer needs
-its result, and names the FFmpeg revision it reproduces. Comparison-only projections
-need the non-default `reference-trace` feature.
+its result, and names the FFmpeg revision it reproduces.
 
 **Input model.** Incremental readers own a core `InputCursor` and accept same-pool
 windows of any size with the exact token, source and offset. An empty window is
@@ -169,6 +174,6 @@ and key flags FFmpeg's raw H.264/HEVC demuxers produce for the paired streams;
 `hevc-eos.hevc` is `hevc-aud0.hevc` with an end of sequence before its second VPS and an
 end of bitstream at the end.
 
-Verification: the [packet-framing
-harness](../../harness/features/packet-framing/README.md); results in
-[docs/status.md](../../docs/status.md).
+The [packet-framing comparison](../../harness/features/packet-framing/README.md) and
+the codec configuration and parser view features compare these outputs with FFmpeg;
+results are in [docs/status.md](../../docs/status.md).

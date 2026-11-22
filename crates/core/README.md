@@ -67,6 +67,12 @@ assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 203
 | Container model | module `container`: `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `CodecId`, `RandomAccess`, `Trim`, seek and colour types |
 | Errors | `Error`, `Result`, `Refused<T>` retains a value whose operation failed |
 
+## Features
+
+| Feature | Default | Effect |
+|---|---|---|
+| `reference-trace` | off | `Blocking::into_inner`, which hands back the source at its position so a comparison can check the reader's input handoff |
+
 ## Behaviour and limits
 
 **Time.** `Time` is an exact, always-reduced rational number of seconds. Unknown
@@ -119,13 +125,6 @@ Reads come in four forms: `read_into` (copy into a slice), `read_append` (copy i
 alias of the window); `buffered()` peeks without consuming. A read that yields, starves
 or hits backpressure keeps its position, so the caller retries the same call.
 
-The [reader protocol comparison](../../harness/features/core-reader-protocol/contract.json)
-checks input windows, refusals, and restart transitions. It checks `Feed` against
-the source bytes and compares the packets, clocks, failures and seeks of
-`Blocking` over an ADTS reader. The
-[facade lifecycle comparison](../../harness/features/facade-source-control/contract.json)
-also checks the `ContainerReader` failure and reset contract in four container readers.
-
 **Work and cancellation.** Every read charges one `WorkBudget` unit per byte.
 Format crates also charge parsing, decompression, indexing and pixel work before
 doing it; an exhausted budget returns `Step::Yield` (or the format's equivalent)
@@ -171,19 +170,23 @@ numeric, and a conflict between container and bitstream colour is reported as tw
 descriptions, never resolved. Readers are concrete types used through generics or
 one closed enum; there is no registry and no dynamic dispatch on the packet path
 (`Track` may be `dyn TrackInfo` for a closed enum). Implementations:
-`triergon_matroska::typed::Reader`, `triergon_isobmff::Reader`,
+`triergon_matroska::Reader`, `triergon_isobmff::Reader`,
 `triergon_mpegts::Reader`, `triergon_ogg::Reader`, `triergon_elementary::Reader` and
 the facade's `triergon::AnyReader`. The
 semantic contract is described in
 [docs/architecture.md](../../docs/architecture.md#container-contract).
 
-## Verification
+## Conformance
 
 The arithmetic follows exact rational semantics; there is no external specification.
 `cargo xtask core-time` compares the time arithmetic with an independent Python
-`fractions.Fraction` oracle. The crate forbids `unsafe` code and has no dependencies.
-The [source signature gate](../../harness/features/source-signatures/contract.json)
+`fractions.Fraction` oracle. The
+[reader protocol comparison](../../harness/features/core-reader-protocol/contract.json)
+checks input windows, refusals and restart transitions, checks `Feed` against the source
+bytes, and compares the packets, clocks, failures and seeks of `Blocking` over an ADTS
+reader. The [facade lifecycle comparison](../../harness/features/facade-source-control/contract.json)
+checks the `ContainerReader` failure and reset contract in four container readers, and
+the [source signature comparison](../../harness/features/source-signatures/contract.json)
 checks caller-selected box types, Ogg recognition, both transport tie policies and
-exact prefix requests against independent wire-field and policy observations.
-
-Project-wide gates: [docs/quality.md](../../docs/quality.md).
+exact prefix requests against independent wire-field and policy observations. The gates
+are in [docs/quality.md](../../docs/quality.md).
