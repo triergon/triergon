@@ -309,6 +309,98 @@ static int nal_declared_extents_fit(const char *layout, size_t size)
     return 1;
 }
 
+static int nal_layout_field(const char **layout, size_t maximum, size_t *value)
+{
+    const char *start = *layout;
+    const size_t digits = strspn(start, "0123456789");
+    if (!digits || (start[digits] != ',' && start[digits] != ';'))
+        return 0;
+    for (*value = 0; start < *layout + digits; ++start) {
+        const size_t digit = (size_t)(*start - '0');
+        if (digit > maximum || *value > (maximum - digit) / 10)
+            return 0;
+        *value = *value * 10 + digit;
+    }
+    *layout = start + 1;
+    return 1;
+}
+
+/* Independently apply the caller's array and length-field ranges. The fixed
+ * unit headers follow H.264 §7.3.1 and H.265 §7.3.1.2. */
+static int nal_layout_rows(ViewWork *work, enum AVCodecID codec, NalView source,
+                           const char *layout, size_t sample_width)
+{
+    const int hevc = codec == AV_CODEC_ID_HEVC;
+    size_t previous_array_end = 0, arrays = 0, count = 0;
+    const uint64_t width_word = sample_width;
+    if (work)
+        nal_record(work, 6, &width_word, 1, (NalView){0});
+    while (*layout) {
+        size_t declared_type, completeness, start, end;
+        if (++arrays > 256 ||
+            !nal_layout_field(&layout, hevc ? 63 : 31, &declared_type) || layout[-1] != ',')
+            return 0;
+        if (layout[0] == '-' && layout[1] == ',') {
+            completeness = 2;
+            layout += 2;
+        } else if (!nal_layout_field(&layout, 1, &completeness) || layout[-1] != ',') {
+            return 0;
+        }
+        if (!nal_layout_field(&layout, source.size, &start) || layout[-1] != ',' ||
+            !nal_layout_field(&layout, source.size, &end) || start < previous_array_end || end < start)
+            return 0;
+        const uint64_t array_words[] = {declared_type, completeness, start, end};
+        if (work)
+            nal_record(work, 4, array_words, 4, (NalView){source.data + start, end - start});
+        size_t previous_nal_end = start;
+        while (layout[-1] == ',') {
+            size_t length_start, payload, nal_end;
+            if (++count > 4096 ||
+                !nal_layout_field(&layout, end, &length_start) || layout[-1] != ',' ||
+                !nal_layout_field(&layout, end, &payload) || layout[-1] != ',' ||
+                !nal_layout_field(&layout, end, &nal_end) ||
+                length_start < previous_nal_end || payload <= length_start ||
+                payload - length_start > 4 || nal_end < payload ||
+                nal_end - payload < (size_t)(hevc ? 2 : 1))
+                return 0;
+            NalView unit = {source.data + payload, nal_end - payload};
+            const unsigned width = (unsigned)(payload - length_start);
+            if (nal_be(source.data + length_start, width) != unit.size ||
+                (unit.data[0] & 0x80) || (hevc && !(unit.data[1] & 7)))
+                return 0;
+            const unsigned type = nal_type(codec, unit);
+            if (work) {
+                const uint64_t range_words[] = {length_start, payload, nal_end, type != declared_type};
+                const uint64_t unit_words[] = {type, unit.size};
+                nal_record(work, 5, range_words, 4, (NalView){source.data + length_start, width});
+                nal_record(work, 1, unit_words, 2, unit);
+            }
+            previous_nal_end = nal_end;
+        }
+        previous_array_end = end;
+    }
+    const uint64_t end_word = count;
+    if (work)
+        nal_record(work, 7, &end_word, 1, (NalView){0});
+    return 1;
+}
+
+static int nal_layout_run(const ViewCase *input, ViewWork *work)
+{
+    const enum AVCodecID codec = nal_codec(input->argv[1]);
+    const NalView source = {input->data, input->size};
+    const char *layout = input->argv[3];
+    const size_t width = (size_t)(input->argv[2][0] - '0');
+    const uint64_t size = source.size;
+    if (size && size <= (1U << 20)) {
+        nal_record(work, 2, &size, 1, source);
+        if (nal_layout_rows(NULL, codec, source, layout, width))
+            return nal_layout_rows(work, codec, source, layout, width) ? 0 : 2;
+    }
+    nal_refusal(work, NULL, 0, AVERROR_INVALIDDATA);
+    return 0;
+}
+
 /* Extraction requires a decoder configuration. An isolated VPS can instead
  * be observed through the record writer without asking the reference to
  * interpret its RBSP or supplying other parameter sets. */
@@ -457,13 +549,16 @@ static int nal_units_prepare(ViewCase *input)
         input->name = "nal-units";
         input->run = nal_units_run;
     } else if (!strcmp(input->prefix, "nal-config-")) {
+        const int layout = input->argc == 4 && !strcmp(input->argv[0], "layout");
         if ((input->argc != 2 || strcmp(input->argv[0], "annexb")) &&
-            (input->argc != 4 || strcmp(input->argv[0], "declared")))
+            (input->argc != 4 || (strcmp(input->argv[0], "declared") && !layout)))
             return 2;
         if (!nal_codec(input->argv[1]))
             return 2;
+        if (layout && (strspn(input->argv[2], "1234") != 1 || strlen(input->argv[2]) != 1))
+            return 2;
         input->name = "nal-config";
-        input->run = nal_config_run;
+        input->run = layout ? nal_layout_run : nal_config_run;
     } else {
         if (input->argc != 1 || (strcmp(input->argv[0], "all") && strcmp(input->argv[0], "decoder")))
             return 2;

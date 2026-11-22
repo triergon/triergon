@@ -10,6 +10,7 @@
   "contract": [
     "Read Annex B configuration with AnnexBConfigParser and compare ordered parameter sets with the side data produced by extract_extradata. When extraction produces no side data for an isolated HEVC VPS, compare its bytes through a single-array hvcC conversion without inserting other parameter sets. Otherwise absence of configuration side data or a remaining non-parameter NAL is a refusal. AnnexBWriter must emit the four-byte start code before each candidate parameter set. The complete NAL sequences of configuration blobs also run as length-prefixed samples.",
     "For declared avcC and hvcC layouts, verify the retained record through Configuration::declared_record and DeclaredConfigParser. Fold kind 2 with the retained length and bytes, using the padded input record handed to the reference filter. The reference converts the record through MP4-to-Annex-B initialization; a nonempty record passed through byte for byte supplies no converted units. Both sides refuse ranges that extend outside the record. The candidate also checks the type, completeness and relative ranges of the caller's declaration.",
+    "For layout mode an independent range reader validates the caller’s array ranges, NAL length fields and fixed NAL headers. Fold kind 6 with sample length width, kind 4 with declared type, completeness (2 means absent), bounds and every array byte, and kind 5 with length-field start, payload bounds, type mismatch and the length-field bytes before folding that NAL. Both modes retain and fold the complete record.",
     "Fold kind 1 with parameter set or NAL type and the length and bytes, including the header. Remove start codes and Annex B zero padding, including a terminal run of at least three zero bytes. Fold kind 7 with unit count or kind 8 on refusal. Kind 3 preserves output that did not convert to Annex B.",
     "Input loading and reading the caller declarations take place outside the operation. Parser and filter setup, writing, folding and teardown are inside."
   ],
@@ -56,15 +57,6 @@
         "hevc-aud0-dangling-prefix",
         "avc-authored-dangling-prefix"
       ]
-    }
-  ],
-  "pending_module_requirements": [
-    "The caller supplies a layout and ranges independent of the ISO record layout. The converter does not consume those declarations. Compare against an independent reader of the same declared ranges, preserving the original extent and per-range errors."
-  ],
-  "open_cases": [
-    {
-      "id": "declared-opaque-test-layout",
-      "requirement": "The caller supplies a layout and ranges independent of the ISO record layout. The converter does not consume those declarations. Compare against an independent reader of the same declared ranges, preserving the original extent and per-range errors."
     }
   ],
   "open_unmeasured": [

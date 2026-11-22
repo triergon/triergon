@@ -203,14 +203,22 @@ pub(super) fn operation<'a>(
                 }),
             })
         }
-        ("nal-config-", ["declared", codec, width, declarations]) => {
+        ("nal-config-", [mode @ ("declared" | "layout"), codec, width, declarations]) => {
+            let compare_layout = *mode == "layout";
             let codec = parse_codec(codec)?;
             let width = LengthSize::new(width.parse::<u8>().map_err(message)?).map_err(message)?;
             let layout = parse_layout(declarations)?;
             Ok(Operation {
                 name: "nal-config",
                 run: Box::new(move |work, trace| {
-                    declared_config(input, codec, width, &layout, &mut Output { work, trace })
+                    declared_config(
+                        input,
+                        codec,
+                        width,
+                        &layout,
+                        compare_layout,
+                        &mut Output { work, trace },
+                    )
                 }),
             })
         }
@@ -368,6 +376,7 @@ fn declared_config(
     codec: Codec,
     width: LengthSize,
     layout: &[DeclaredArray],
+    compare_layout: bool,
     output: &mut Output<'_, '_>,
 ) -> Result<(), String> {
     let pool = Budget::new(POOL_BYTES).map_err(message)?;
@@ -419,6 +428,40 @@ fn declared_config(
     };
     if config.source_bytes().as_ref() != raw.source_bytes().as_ref() {
         return Err("declared parser changed the source record".into());
+    }
+    if compare_layout {
+        output.record(6, &[u64::from(config.sample_length_size().bytes())], &[])?;
+        for array in config.arrays() {
+            let range = array.source_range();
+            let indices = array.nal_indices();
+            let completeness = array.declared_completeness().map_or(2, u64::from);
+            output.record(
+                4,
+                &[
+                    u64::from(array.declared_nal_unit_type()),
+                    completeness,
+                    range.start as u64,
+                    range.end as u64,
+                ],
+                array.source_bytes(),
+            )?;
+            for nal in &config.nals()[indices] {
+                let payload = nal.source_range();
+                let length = nal.length_field_bytes();
+                output.record(
+                    5,
+                    &[
+                        (payload.start - length.len()) as u64,
+                        payload.start as u64,
+                        payload.end as u64,
+                        u64::from(nal.array_type_mismatch()),
+                    ],
+                    length,
+                )?;
+                output.config_unit(nal.header().nal_unit_type(), nal.source_bytes())?;
+            }
+        }
+        return output.record(7, &[config.nals().len() as u64], &[]);
     }
     for nal in config.nals() {
         output.config_unit(nal.header().nal_unit_type(), nal.source_bytes())?;

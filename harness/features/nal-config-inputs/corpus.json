@@ -2106,15 +2106,15 @@
       "rights": "authored-synthetic",
       "required": true,
       "arguments": [
-        "declared",
+        "layout",
         "avc",
         "4",
         "7,0,1,6,2,4,6;31,-,6,10,7,9,10;"
       ],
       "expected": {
-        "packets": 2,
-        "bytes": 11,
-        "digest": 6676127231470940522
+        "packets": 9,
+        "bytes": 27,
+        "digest": 13507674384688101512
       }
     },
     {

@@ -177,18 +177,20 @@ impl Corpora<'_> {
         id: &str,
         codec: Codec,
         bytes: &[u8],
-        custom: Option<&str>,
+        custom: Option<(&str, usize, &str)>,
     ) -> Result<()> {
         let file = format!("{id}.record");
-        let width = codec.width(bytes).to_string();
-        let layout = custom.map_or_else(|| declarations(codec, bytes), str::to_owned);
+        let (operation, width, layout) = match custom {
+            Some((operation, width, layout)) => (operation, width, layout.to_owned()),
+            None => ("declared", codec.width(bytes), declarations(codec, bytes)),
+        };
         store(&self.output.join(&file), bytes)?;
         self.config.add(
             &file,
             id,
             "declared",
             &sha256::hex(bytes),
-            &["declared", codec.name(), &width, &layout],
+            &[operation, codec.name(), &width.to_string(), &layout],
         );
         Ok(())
     }
@@ -663,13 +665,13 @@ fn samples(paths: &Paths, corpora: &mut Corpora<'_>) -> Result<()> {
         "declared-opaque-test-layout",
         Codec::Avc,
         &[0xaa, 0xf1, 0, 2, 0x67, 0xe3, 0xbe, 0, 1, 0x1f, 0xcc],
-        Some("7,0,1,6,2,4,6;31,-,6,10,7,9,10;"),
+        Some(("layout", 4, "7,0,1,6,2,4,6;31,-,6,10,7,9,10;")),
     )?;
     corpora.declared(
         "declared-invalid-range",
         Codec::Avc,
         &Codec::Avc.empty(4),
-        Some("7,-,5,8,6,7,8;"),
+        Some(("declared", 4, "7,-,5,8,6,7,8;")),
     )?;
     Ok(())
 }
