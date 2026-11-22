@@ -47,7 +47,7 @@ charges a caller's `Budget`.
 | Slices | One slice per picture; DC and vector predictors run across row ends, and per-row quantiser changes travel in macroblock_quant fields |
 | Motion | Forward half-sample vectors, search window ±64 luma samples, f_code up to 4; skipped macroblocks; a P macroblock is intra coded when that is cheaper. A picture whose luma repeats the previous source picture's is predicted at the zero vector without a search |
 | Quantiser | quantizer_scale 2–31 |
-| Rate control | GOP bit allocation by the MPEG-2 Test Model 5 complexity rule (I/P only); one quantiser per picture from a per-type `bits ≈ α · activity / q` model, rows deviating by a bounded amount; VBV modelled as the variable-rate case of Annex C; vbv_delay 0xFFFF |
+| Rate control | GOP bit allocation by the MPEG-2 Test Model 5 complexity rule (I/P only); one quantiser per picture from a per-type model, `bits ≈ α · activity / q` for P pictures and `side + α · activity / q` for I pictures, whose side bits (macroblock headers, DC differentials, end_of_block) no quantiser changes, measured by the first I picture's trial pass; rows deviating by a bounded amount; VBV modelled as the variable-rate case of Annex C; vbv_delay 0xFFFF |
 
 ## Behaviour and limits
 
@@ -108,6 +108,6 @@ levels, reconstruction oddification and saturation, half-sample rounding, motion
 search and bounds, the zero-residual shortcut against the complete transform, the
 inverse transform over a block's nonzero coefficients and the forward rows against a
 butterfly transform, skips reused for a repeated picture against the computed path,
-and rate plans against the headers already written and pictures cut short by the VBV
-guard. `tests/encoder.rs` covers configuration, geometry refusal and exact output
+rate plans against the headers already written and an I picture's side bits, and
+pictures cut short by the VBV guard. `tests/encoder.rs` covers configuration, geometry refusal and exact output
 after a budget retry. See the [quality gates](../../docs/quality.md).

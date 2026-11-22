@@ -91,13 +91,29 @@ impl Encoder {
             censored |= tight;
             match kind {
                 PictureType::Intra => {
-                    self.intra_mb(input, mb_x, mb_y, address, s, PictureType::Intra, tight);
+                    self.intra_mb::<false>(
+                        input,
+                        mb_x,
+                        mb_y,
+                        address,
+                        s,
+                        PictureType::Intra,
+                        tight,
+                    );
                 }
                 PictureType::Predicted => {
                     let a = self.analysis[address];
                     if a.intra && !tight {
                         self.skipped_at[address] = 0;
-                        self.intra_mb(input, mb_x, mb_y, address, s, PictureType::Predicted, false);
+                        self.intra_mb::<false>(
+                            input,
+                            mb_x,
+                            mb_y,
+                            address,
+                            s,
+                            PictureType::Predicted,
+                            false,
+                        );
                     } else {
                         let mv = if a.intra { Mv::ZERO } else { a.mv };
                         let inter = Inter {
@@ -128,12 +144,14 @@ impl Encoder {
     }
 
     /// Code an intra macroblock of an I or P picture and reconstruct it; `dc_only`
-    /// drops every AC coefficient (the VBV guard).
+    /// drops every AC coefficient (the VBV guard). Returns the bits of its AC
+    /// coefficient codes, end_of_block excluded, when `MEASURE` (the trial pass),
+    /// and 0 otherwise.
     #[expect(
         clippy::too_many_arguments,
         reason = "a per-macroblock call whose arguments a struct would pass through memory"
     )]
-    pub(crate) fn intra_mb(
+    pub(crate) fn intra_mb<const MEASURE: bool>(
         &mut self,
         input: &Picture,
         mb_x: usize,
@@ -142,7 +160,7 @@ impl Encoder {
         s: &mut SliceState,
         kind: PictureType,
         dc_only: bool,
-    ) {
+    ) -> usize {
         let g = self.cfg.geometry;
         if s.last_intra.is_none_or(|a| address - a > 1) {
             s.dc_pred = [128; 3];
@@ -162,6 +180,7 @@ impl Encoder {
         }
         let mut coeffs = [0i32; 64];
         let mut levels = [0i32; 64];
+        let mut coefficient_bits = 0;
         for b in 0..6 {
             let (plane, stride, x, y, comp) = block_origin(g, b, mb_x, mb_y);
             let src = match plane {
@@ -184,7 +203,11 @@ impl Encoder {
             } else {
                 self.quant.intra(&coeffs, s.q, &mut levels)
             };
+            let start = self.writer.bit_len() + END_OF_BLOCK.1 as usize;
             write_coefficients(&mut self.writer, &levels, mask, true);
+            if MEASURE {
+                coefficient_bits += self.writer.bit_len() - start;
+            }
             block::dequant_intra(&levels, mask, dc, s.q, &mut coeffs);
             dct::idct(&mut coeffs, mask | 1);
             let dst = match plane {
@@ -201,6 +224,7 @@ impl Encoder {
         }
         s.last_intra = Some(address);
         s.pmv = Mv::ZERO;
+        coefficient_bits
     }
 
     /// Code a P macroblock with forward prediction, as a skipped macroblock where

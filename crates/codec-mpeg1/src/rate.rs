@@ -3,11 +3,15 @@
 //! Bit allocation across a GOP follows the published MPEG-2 Test Model 5
 //! complexity rule (I/P only, I quantiser ≈ 0.8× the P quantiser). Each
 //! picture then uses one quantiser, chosen from a per-type model
-//! `bits ≈ α · activity / q` whose α is learned from the previous picture of
-//! the same type; a uniform quantiser within a picture is what keeps the
-//! distortion low for a given size. Rows only deviate from it by a bounded
-//! amount when the running total drifts from the activity-weighted plan, or
-//! when the VBV would otherwise underflow.
+//! `bits ≈ side + α · activity / q` whose α is learned from the previous picture
+//! of the same type; a uniform quantiser within a picture is what keeps the
+//! distortion low for a given size. For I pictures `side` is what no quantiser
+//! changes: every macroblock's header and every block's DC differential and
+//! end_of_block, which outweigh the AC coefficients when a large picture has few
+//! bits per macroblock. P pictures model all their bits as `α · activity / q`.
+//! Rows only deviate from the quantiser by a bounded amount when the running
+//! total drifts from the plan (side bits evenly per row, the rest by activity),
+//! or when the VBV would otherwise underflow.
 //!
 //! The VBV model is the variable-rate case of ISO/IEC 11172-2 Annex C /
 //! H.262 Annex C: the buffer fills at `max_rate` until full and each picture
@@ -34,6 +38,8 @@ pub(crate) struct Plan {
     pub(crate) target: f64,
     /// Remaining target after those actual headers; never negative.
     pub(crate) texture_target: f64,
+    /// Of `texture_target`, the bits planned for what no quantiser changes.
+    side_bits: f64,
     /// Physical VBV occupancy available for this picture. Any emitted
     /// overshoot is still reported by `end`, never converted into credit.
     pub(crate) hard_limit: f64,
@@ -56,6 +62,9 @@ pub(crate) struct RateControl {
     x_p: f64,
     alpha_i: Option<f64>,
     alpha_p: Option<f64>,
+    /// Bits of an I picture's macroblocks that no quantiser changes (headers, DC
+    /// differentials, end_of_block codes), as the trial pass measured them.
+    side_i: f64,
     kind: PictureType,
     plan: Plan,
     activity: f64,
@@ -98,12 +107,14 @@ impl RateControl {
             x_p: 60.0 * b / 115.0,
             alpha_i: None,
             alpha_p: None,
+            side_i: 0.0,
             kind: PictureType::Intra,
             plan: Plan {
                 q: 8,
                 q_exact: 8.0,
                 target: 0.0,
                 texture_target: 0.0,
+                side_bits: 0.0,
                 hard_limit: 0.0,
             },
             activity: 1.0,
@@ -118,9 +129,18 @@ impl RateControl {
         self.alpha_i.is_none()
     }
 
-    /// Seed α for intra pictures from a sampled trial encode.
-    pub(crate) fn seed_intra(&mut self, bits: f64, q: u32, activity: f64) {
-        self.alpha_i = Some(bits * q as f64 / activity.max(1.0));
+    /// Seed the intra model from a sampled trial encode: `coefficient_bits` of AC
+    /// coefficients at quantiser `q` over `activity`, and `side_bits` estimated for
+    /// the whole picture.
+    pub(crate) fn seed_intra(
+        &mut self,
+        side_bits: f64,
+        coefficient_bits: f64,
+        q: u32,
+        activity: f64,
+    ) {
+        self.alpha_i = Some(coefficient_bits.max(1.0) * q as f64 / activity.max(1.0));
+        self.side_i = side_bits;
     }
 
     /// Plan a complete picture, debiting the actual headers already emitted
@@ -144,17 +164,18 @@ impl RateControl {
             .min(TARGET_VBV_SHARE * hard_limit);
         let texture_target = (target - header_bits as f64).max(0.0);
         let activity = activity.max(1.0);
-        let alpha = match kind {
-            PictureType::Intra => self.alpha_i,
+        let (alpha, side_bits) = match kind {
+            PictureType::Intra => (self.alpha_i, self.side_i.min(texture_target)),
             // Before the first P picture, inter residual costs are taken to
-            // follow the intra model scaled by K_p.
-            PictureType::Predicted => self.alpha_p.or(self.alpha_i.map(|a| a * KP)),
+            // follow the intra coefficient model scaled by K_p.
+            PictureType::Predicted => (self.alpha_p.or(self.alpha_i.map(|a| a * KP)), 0.0),
         };
-        let q_exact = if texture_target == 0.0 {
+        let coefficient_target = texture_target - side_bits;
+        let q_exact = if coefficient_target == 0.0 {
             31.0
         } else {
             match alpha {
-                Some(a) => a * activity / texture_target,
+                Some(a) => a * activity / coefficient_target,
                 None => self.last_q as f64,
             }
         }
@@ -176,16 +197,24 @@ impl RateControl {
             q_exact,
             target,
             texture_target,
+            side_bits,
             hard_limit,
         };
         self.plan
     }
 
+    /// The texture bits planned for the rows coded so far: `rows_done` of the
+    /// picture's rows (a share) carrying `activity_done` of its activity.
+    fn planned(&self, rows_done: f64, activity_done: f64) -> f64 {
+        let side = self.plan.side_bits;
+        side * rows_done + (self.plan.texture_target - side) * activity_done / self.activity
+    }
+
     /// Quantiser for the next row: the model quantiser scaled by the ratio of
-    /// bits spent to bits planned for the activity coded so far, rounded, and
-    /// kept within -2/+3 of the picture quantiser. Rows therefore mix the
-    /// neighbours of a fractional quantiser instead of swinging widely.
-    pub(crate) fn row_q(&self, bits_so_far: f64, activity_done: f64) -> u32 {
+    /// bits spent to bits planned for the rows coded so far, rounded, and kept
+    /// within -2/+3 of the picture quantiser. Rows therefore mix the neighbours
+    /// of a fractional quantiser instead of swinging widely.
+    pub(crate) fn row_q(&self, bits_so_far: f64, rows_done: f64, activity_done: f64) -> u32 {
         let base = self.plan.q_exact;
         if self.plan.texture_target == 0.0 {
             return 31;
@@ -193,7 +222,7 @@ impl RateControl {
         if activity_done <= 0.0 {
             return self.plan.q;
         }
-        let expected = (self.plan.texture_target * activity_done / self.activity).max(1.0);
+        let expected = self.planned(rows_done, activity_done).max(1.0);
         let ratio = (bits_so_far / expected).clamp(0.5, 2.0);
         (base * ratio)
             .clamp(base - 2.0, base + 3.0)
@@ -203,7 +232,8 @@ impl RateControl {
 
     /// The quantiser of the next row, and whether the rest of the picture must take
     /// the cheapest codes. `written` is the picture's bits so far, headers included,
-    /// and `floor` the least the remaining rows can cost.
+    /// `floor` the least the remaining rows can cost, and `rows_done` and
+    /// `activity_done` what [`row_q`](Self::row_q) takes.
     ///
     /// The quantiser escalates by 4 above the picture's once the remainder, at the
     /// planned pace or at its least cost (whichever is larger), would no longer fit
@@ -214,10 +244,13 @@ impl RateControl {
         written: usize,
         header_bits: usize,
         floor: f64,
+        rows_done: f64,
         activity_done: f64,
     ) -> (u32, bool) {
-        let mut q = self.row_q((written - header_bits) as f64, activity_done);
-        let planned_rest = self.plan.texture_target * (1.0 - activity_done / self.activity);
+        let mut q = self.row_q((written - header_bits) as f64, rows_done, activity_done);
+        let side = self.plan.side_bits;
+        let planned_rest = side * (1.0 - rows_done)
+            + (self.plan.texture_target - side) * (1.0 - activity_done / self.activity);
         let written = written as f64;
         if written + floor.max(planned_rest) > self.plan.hard_limit * ESCALATION_SHARE {
             q = q.max(self.plan.q + 4).min(31);
@@ -233,7 +266,12 @@ impl RateControl {
     pub(crate) fn end(&mut self, bits: f64, texture_bits: Option<f64>, mean_q: f64) {
         if let Some(texture_bits) = texture_bits {
             let complexity = bits * mean_q;
-            let measured = texture_bits.max(1.0) * mean_q / self.activity;
+            // An I picture's coefficients cost what its side bits leave.
+            let modelled = match self.kind {
+                PictureType::Intra => texture_bits - self.side_i,
+                PictureType::Predicted => texture_bits,
+            };
+            let measured = modelled.max(1.0) * mean_q / self.activity;
             let smooth =
                 |old: Option<f64>| Some(old.map_or(measured, |o| 0.5 * o + 0.5 * measured));
             match self.kind {

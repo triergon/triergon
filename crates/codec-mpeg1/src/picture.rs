@@ -76,11 +76,16 @@ impl Encoder {
         let mut economy = false;
         let mut censored = false;
         let mut activity_done = 0.0;
+        let rows = g.macroblock_height() as f64;
         for mb_y in 0..g.macroblock_height() {
             let floor = (g.macroblock_height() - mb_y) as f64 * min_row_bits;
-            let (q, past_guard) =
-                self.rc
-                    .row(self.writer.bit_len(), header_bits, floor, activity_done);
+            let (q, past_guard) = self.rc.row(
+                self.writer.bit_len(),
+                header_bits,
+                floor,
+                mb_y as f64 / rows,
+                activity_done,
+            );
             economy |= past_guard;
             q_sum += u64::from(q) * g.macroblock_width() as u64;
             let s = slice.get_or_insert_with(|| {
@@ -112,20 +117,22 @@ impl Encoder {
     }
 
     /// First intra picture of a session: trial-encode every second row at a
-    /// fixed quantiser into scratch bits to seed the intra rate model. The
-    /// reconstruction it leaves behind is overwritten by the real pass.
+    /// fixed quantiser into scratch bits to seed the intra rate model, its side
+    /// bits scaled to every row. The reconstruction it leaves behind is
+    /// overwritten by the real pass.
     fn probe_intra(&mut self, input: &Picture, mut scratch: BitWriter) -> Result<()> {
         const PROBE_Q: u32 = 8;
         let g = self.cfg.geometry;
         std::mem::swap(&mut self.writer, &mut scratch);
         let mut activity = 0.0;
+        let mut coefficient_bits = 0;
         // Only the bit count is used: dropping each row's bytes once counted keeps
         // the scratch to one row.
         let mut discarded = 0;
         for mb_y in (0..g.macroblock_height()).step_by(2) {
             let mut s = SliceState::new(PROBE_Q);
             for mb_x in 0..g.macroblock_width() {
-                self.intra_mb(
+                coefficient_bits += self.intra_mb::<true>(
                     input,
                     mb_x,
                     mb_y,
@@ -138,10 +145,14 @@ impl Encoder {
             activity += self.row_activity[mb_y];
             discarded += self.writer.discard_flushed();
         }
-        let bits = (discarded * 8 + self.writer.bit_len()) as f64;
+        let coefficient_bits = coefficient_bits as f64;
+        let side_bits = (discarded * 8 + self.writer.bit_len()) as f64 - coefficient_bits;
         std::mem::swap(&mut self.writer, &mut scratch);
         scratch.check_bound()?;
-        self.rc.seed_intra(bits, PROBE_Q, activity);
+        let rows = g.macroblock_height();
+        let side_bits = side_bits * rows as f64 / rows.div_ceil(2) as f64;
+        self.rc
+            .seed_intra(side_bits, coefficient_bits, PROBE_Q, activity);
         Ok(())
     }
 }
