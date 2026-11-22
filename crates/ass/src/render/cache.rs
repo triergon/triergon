@@ -25,8 +25,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
 
-/// What libass counts for an entry beyond its value: its record of the
-/// entry, six pointers and two sizes.
+/// What libass counts for an entry beyond its value: eight words.
 const ITEM_BYTES: usize = sizes::item(size_of::<usize>());
 
 /// No entry: the end of the use queue or of a hash chain.
@@ -724,48 +723,47 @@ impl<K: CacheKey, T> Cache<K, T> {
 }
 
 /// What the caches count for an entry, as libass counts it: an outline 1;
-/// a bitmap its key, bitmap and outline value records, in words of the
-/// target and bytes, its pixels, 8 bytes an outline point and 1 a segment;
-/// a composite its key and value records, a record per glyph and its
-/// pixels; each but an outline also libass's record of the entry. Those
+/// a bitmap a fixed part for its key, its bitmap and its outline, in words
+/// of the target and bytes, then its pixels, 8 bytes an outline point and 1
+/// a segment; a composite a fixed part for its key and value, a part per
+/// glyph and its pixels; each but an outline also an entry's [`item`]. Those
 /// counts make the caches cut in the order libass's do, which the
 /// `cache-eviction.ass` fixture of `ass-render` observes through change
 /// values. Each takes the word size, so both targets' counts are checked.
 pub(super) mod sizes {
     const WORD: usize = size_of::<usize>();
 
-    /// libass's record of an entry: six pointers and two sizes.
+    /// An entry: eight words.
     pub(super) const fn item(word: usize) -> usize {
         8 * word
     }
 
-    /// A bitmap record: four `int32_t`, a stride and a pointer.
+    /// A bitmap: 16 bytes and two words.
     const fn bitmap_record(word: usize) -> usize {
         16 + 2 * word
     }
 
-    /// A bitmap's key record: an outline pointer and four vectors.
+    /// A bitmap's key: a word and 32 bytes.
     const fn bitmap_key(word: usize) -> usize {
         word + 32
     }
 
-    /// An outline's value record: a flag, two outlines of six words, a box
-    /// and three `int`s, padded to a word.
+    /// An outline: 13 words and 28 bytes, rounded up to a whole word.
     const fn outline_value(word: usize) -> usize {
         (13 * word + 28).next_multiple_of(word)
     }
 
-    /// A composite's key record: its filter's six `int`s, a count, a pointer.
+    /// A composite's key: 24 bytes and two words.
     const fn composite_key(word: usize) -> usize {
         24 + 2 * word
     }
 
-    /// A composite's value record: three bitmap records.
+    /// A composite's value: three bitmaps.
     const fn composite_value(word: usize) -> usize {
         3 * bitmap_record(word)
     }
 
-    /// A composite key's record of a glyph: two bitmap pointers, two vectors.
+    /// A glyph of a composite's key: two words and 16 bytes.
     const fn bitmap_ref(word: usize) -> usize {
         2 * word + 16
     }
@@ -799,9 +797,9 @@ pub(super) mod sizes {
     mod tests {
         use super::*;
 
-        /// libass's records as 64-bit and 32-bit ARM lay them out: an entry's,
-        /// a bitmap's key, a bitmap, an outline's value, a composite's key
-        /// and value, and a composite key's record of a glyph.
+        /// The parts on 64-bit and on 32-bit ARM: an entry, a bitmap's key, a
+        /// bitmap, an outline, a composite's key and value, and a glyph of a
+        /// composite's key.
         const LAYOUTS: [(usize, [usize; 7]); 2] = [
             (8, [64, 40, 32, 136, 40, 96, 32]),
             (4, [32, 36, 24, 80, 32, 72, 24]),
