@@ -44,16 +44,14 @@ impl PsiCompatibility {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PsiCompatibilityPolicies(u8);
 impl PsiCompatibilityPolicies {
-    /// No policy.
-    pub const NONE: Self = Self(0);
+    const NONE: Self = Self(0);
     /// Every policy.
     pub const ALL: Self = Self(7);
     /// The set holding only `policy`.
     pub fn one(policy: PsiCompatibility) -> Self {
         Self(policy.bit())
     }
-    /// Whether the set holds `policy`.
-    pub fn contains(self, policy: PsiCompatibility) -> bool {
+    fn contains(self, policy: PsiCompatibility) -> bool {
         self.0 & policy.bit() != 0
     }
 }

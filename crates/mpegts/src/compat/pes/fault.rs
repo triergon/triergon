@@ -103,8 +103,7 @@ impl PesFaultCarrier {
             Self::Rejected(packet) => packet.bytes(),
         }
     }
-    /// Byte offset of the carrier's first byte in the source entity.
-    pub fn source_offset(&self) -> u64 {
+    fn source_offset(&self) -> u64 {
         match self {
             Self::Transport(packet) => packet.source_offset,
             Self::Rejected(packet) => packet.source_offset(),

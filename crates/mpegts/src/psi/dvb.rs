@@ -151,8 +151,7 @@ pub enum DvbViewProfile {
 #[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbSingleServiceView<'a> {
-    /// The view profile this view follows.
-    pub profile: DvbViewProfile,
+    profile: DvbViewProfile,
     /// The service entry the view is taken from.
     pub source: DvbSubtitlingService<'a>,
     /// compID_be, ancillaryID_be, type. Raw language stays in `source`.

@@ -255,16 +255,16 @@ impl Catalogue {
     pub fn evidence(&self) -> &[CatalogueEvidence] {
         self.evidence.as_slice()
     }
-    /// Current raw PAT section seen, but no complete strict table yet.
-    pub fn has_pending_current_pat(&self) -> bool {
+    #[cfg(test)]
+    fn has_pending_current_pat(&self) -> bool {
         self.pending_pat.is_some()
     }
     /// Whether logical EOF has been observed.
     pub fn is_ended(&self) -> bool {
         self.ended
     }
-    /// The error that stopped the catalogue; every later call returns it.
-    pub fn fault(&self) -> Option<Error> {
+    #[cfg(test)]
+    fn fault(&self) -> Option<Error> {
         self.fault
     }
     /// Work units for atomically admitting one bounded source event.

@@ -57,8 +57,7 @@ impl DiagnosticCarrier {
             Self::Rejected(p) => p.bytes(),
         }
     }
-    /// Byte offset of the carrier's first byte in the source entity.
-    pub fn source_offset(&self) -> u64 {
+    fn source_offset(&self) -> u64 {
         match self {
             Self::Transport(p) => p.source_offset,
             Self::Rejected(p) => p.source_offset(),

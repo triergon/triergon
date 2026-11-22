@@ -92,9 +92,7 @@ pub struct SourceRange {
 }
 
 impl SourceRange {
-    /// The offset one past the last byte. Fails with `Overflow` when that does not fit
-    /// in a `u64`.
-    pub fn end(self) -> Result<u64> {
+    pub(crate) fn end(self) -> Result<u64> {
         self.offset
             .checked_add(u64::try_from(self.bytes).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)

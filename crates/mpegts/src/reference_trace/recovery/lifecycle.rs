@@ -261,8 +261,7 @@ impl<'a> PatSelection<'a> {
 /// whenever its raw sections/descriptors are needed after the borrowed job.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PmtBinding {
-    /// The PAT route the PMT was bound through.
-    pub route: PatRoute,
+    route: PatRoute,
     /// The 5-bit PMT version.
     pub version: u8,
     /// The 13-bit PCR PID of the PMT.

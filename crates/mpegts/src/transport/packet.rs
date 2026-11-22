@@ -140,8 +140,7 @@ impl TransportPacket {
             .as_ref()
             .is_some_and(|field| field.discontinuity)
     }
-    /// Whether this is a null packet (PID 0x1FFF).
-    pub fn is_null(&self) -> bool {
+    pub(crate) fn is_null(&self) -> bool {
         self.pid == 0x1fff
     }
     pub(crate) fn ts_bytes(&self) -> &[u8] {

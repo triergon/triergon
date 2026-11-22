@@ -219,8 +219,8 @@ impl PacketCompletion {
     pub fn source_diagnostics(&self) -> &[(TraceFault, SourceContext)] {
         self.diagnostics.as_slice()
     }
-    /// The confirmation, once [`confirm_no_media`](Self::confirm_no_media) has issued it.
-    pub fn confirmation(&self) -> Option<NoMediaConfirmation> {
+    #[cfg(test)]
+    fn confirmation(&self) -> Option<NoMediaConfirmation> {
         self.confirmation
     }
     /// Track control-only completion for either TS188 or M2TS192. The selected program must
@@ -239,8 +239,8 @@ impl PacketCompletion {
     pub fn fault(&self) -> Option<Error> {
         self.fault
     }
-    /// The first reason the input cannot be confirmed as control-only, if any.
-    pub fn empty_refusal(&self) -> Option<Error> {
+    #[cfg(test)]
+    fn empty_refusal(&self) -> Option<Error> {
         self.no_media_blocker
     }
     /// Work units [`observe_issued`](Self::observe_issued) charges to admit `event`; a smaller
@@ -888,9 +888,8 @@ impl PacketCompletion {
         self.physical_end = Some(end.clone());
         Ok(true)
     }
-    /// Real EOF and source Finished are mandatory even on the ordinary scoped
-    /// branch. This method does not reinterpret transport failure as EOF.
-    pub fn validate_finished(
+    // Recheck physical EOF after the parser has issued Finished.
+    fn validate_finished(
         &self,
         input: &mut InputCursor,
         work: &mut WorkBudget,

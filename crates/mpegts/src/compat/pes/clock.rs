@@ -277,6 +277,7 @@ impl DemuxClock {
         })
     }
     /// The nonzero 16-bit program number configured when this clock was created.
+    #[cfg(feature = "reference-trace")]
     pub fn selected_program(&self) -> u16 {
         self.program
     }

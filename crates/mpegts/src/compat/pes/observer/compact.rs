@@ -116,16 +116,16 @@ impl CompactPayload {
         let logical = records.len();
         Self::new(records, logical, false)
     }
-    /// Number of logical spans, including those represented by a stored run.
-    pub fn len(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
         self.logical
     }
     /// Whether the payload contains no logical spans.
     pub fn is_empty(&self) -> bool {
         self.logical == 0
     }
-    /// Charged span slots, including slots represented by a run.
-    pub fn capacity(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) fn capacity(&self) -> usize {
         self.records.capacity()
     }
     /// Allocation pool for the span arena. Individual backing pools remain
