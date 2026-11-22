@@ -1840,9 +1840,6 @@
       "reason": "Flexible macroblock ordering (more than one slice group)",
       "clause": "ITU-T H.264 (08/2024) §§7.4.2.2 and 8.2.2",
       "detail": "AVC flexible macroblock ordering",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ],
       "cases": [
         {"id": "FM1_FT_E.264-nal", "sha256": "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade", "candidate": {"packets": 119, "bytes": 5712, "digest": 6468946432365744375}},
         {"id": "FM1_FT_E.264-nals-split", "sha256": "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade", "candidate": {"packets": 119, "bytes": 5712, "digest": 6468946432365744375}}
@@ -1852,9 +1849,6 @@
       "reason": "4:2:2 and 4:4:4 chroma",
       "clause": "ITU-T H.264 (08/2024) §7.4.2.1.1 and Annex A",
       "detail": "chroma format 4:2:2 / 4:4:4",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ],
       "cases": [
         {"id": "Hi422FR10_SONY_B.264-nal", "sha256": "8aed60728f2b8be7dd4886a94e73702532941557d712e04680ce8c258be7ccec", "candidate": {"packets": 1, "bytes": 0, "digest": 8}},
         {"id": "Hi422FR10_SONY_B.264-nals-split", "sha256": "8aed60728f2b8be7dd4886a94e73702532941557d712e04680ce8c258be7ccec", "candidate": {"packets": 1, "bytes": 0, "digest": 8}},
@@ -1866,9 +1860,6 @@
       "reason": "Bit depth above 8",
       "clause": "ITU-T H.264 (08/2024) §7.4.2.1.1 and Annex A",
       "detail": "bit depth > 8 (High 10 / High 4:2:2 / High 4:4:4)",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ],
       "cases": [
         {"id": "Hi422FR13_SONY_B.264-nal", "sha256": "aa55f7064732a83c86fe228ba3cf8ab065b3129cf0f107c9fba469e57dd59881", "candidate": {"packets": 1, "bytes": 0, "digest": 8}},
         {"id": "Hi422FR13_SONY_B.264-nals-split", "sha256": "aa55f7064732a83c86fe228ba3cf8ab065b3129cf0f107c9fba469e57dd59881", "candidate": {"packets": 1, "bytes": 0, "digest": 8}},
@@ -1908,9 +1899,6 @@
       "reason": "SP/SI slices",
       "clause": "ITU-T H.264 (08/2024) §§7.4.3 and 8.6.2",
       "detail": "SP/SI slices (Extended profile)",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ],
       "cases": [
         {"id": "sp1_bt_a.h264-nal", "sha256": "2126d0489811e0bae6c3fd751506f883a673f9ecf1e4687d2cc1fbf791f6223f", "candidate": {"packets": 361, "bytes": 17328, "digest": 16260705715616122845}},
         {"id": "sp1_bt_a.h264-nals-split", "sha256": "2126d0489811e0bae6c3fd751506f883a673f9ecf1e4687d2cc1fbf791f6223f", "candidate": {"packets": 361, "bytes": 17328, "digest": 16260705715616122845}},
@@ -1922,9 +1910,6 @@
       "reason": "4:2:2 chroma",
       "clause": "ITU-T H.265 (01/2026) §7.4.3.2.1 and Annex A",
       "detail": "chroma_format_idc 2 (4:2:2, RExt)",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ],
       "cases": [
         {"id": "ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit-nal", "sha256": "6063fb81c57d8596af226960f17b8dea06eb0661f97d76509ce331fa99e1ba46", "candidate": {"packets": 1, "bytes": 0, "digest": 8}},
         {"id": "IPCM_A_RExt_NEC.bit-nal", "sha256": "0e707edd0d6c46427bddff2ded8dafe2420ffe1bc57a81501097d068ae293562", "candidate": {"packets": 1, "bytes": 0, "digest": 8}},
@@ -1936,9 +1921,6 @@
       "reason": "4:4:4 chroma",
       "clause": "ITU-T H.265 (01/2026) §7.4.3.2.1 and Annex A",
       "detail": "chroma_format_idc 3 (4:4:4, RExt)",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ],
       "cases": [
         {"id": "IPCM_B_RExt_NEC.bit-nal", "sha256": "39f97b25079ce5f12340cce43c9dbd5821c5e23f44da58dd6f1942e135bc93b5", "candidate": {"packets": 1, "bytes": 0, "digest": 8}},
         {"id": "PERSIST_RPARAM_A_RExt_Sony_1.bit-nal", "sha256": "e5e83ec018379e9bf83cad62a8f18ea7502261c8a554ab93cad16849154eca36", "candidate": {"packets": 1, "bytes": 0, "digest": 8}},
@@ -1951,9 +1933,6 @@
       "reason": "Intra 4×4 transform-skip rotation",
       "clause": "ITU-T H.265 (01/2026) §7.4.3.2.2 and §8.6",
       "detail": "transform_skip_rotation_enabled_flag (RExt)",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ],
       "cases": [
         {"id": "WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit-nal", "sha256": "2b7110f868bfb62da8282a0a6300408d7abad70a5a940a6a0ba1fbc69536f870", "candidate": {"packets": 1, "bytes": 0, "digest": 8}}
       ]
@@ -1969,9 +1948,6 @@
       "cases": [
         "h264-damaged-slice-nal",
         "h264-damaged-slice-nals-split"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
