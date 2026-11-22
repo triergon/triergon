@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "mpeg1-encoder-budget",
+  "gate": "required",
+  "operation": "mpeg1-encoder-budget",
+  "candidate": "codec-views-worker",
+  "worker_operation": "mpeg1-budget-",
+  "oracle": "mpeg1-encoder-budget",
+  "contract": [
+    "Compare the caller-owned encoder pool with the documented Encoder constructor and encode contracts. An undersized constructor must report a permanent limit and release its charges. A live charge that prevents the first output must report backpressure without changing the buffer or advancing the picture index.",
+    "Release the live charge and compare three complete MPEG-1 pictures byte for byte with the ordinary constructor. Check coded dimensions, picture rate code, bit rate and VBV size directly in each sequence header. The native capture comparison covers encoded output quality and reconstructed pictures.",
+    "Grade the constructor refusal, transactional retry, picture indices and GOP positions, coded dimensions, rate and VBV units after the caller pool drains."
+  ],
+  "required_profiles": ["aligned", "padded"],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["aligned", "padded"], "cause": "The encoder pool policy is checked with a specification oracle."},
+    {"bound": "heap", "cases": ["aligned", "padded"], "cause": "The encoder pool policy is checked with a specification oracle."},
+    {"bound": "total_rss", "cases": ["aligned", "padded"], "cause": "The encoder pool policy is checked with a specification oracle."}
+  ]
+}

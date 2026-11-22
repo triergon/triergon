@@ -35,6 +35,7 @@ dependencies = [
  "triergon-codec-dca",
  "triergon-codec-h264",
  "triergon-codec-hevc",
+ "triergon-codec-mpeg1",
  "triergon-codec-opus",
  "triergon-harness-protocol",
  "triergon-harness-runner",

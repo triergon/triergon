@@ -101,6 +101,7 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ("source-signatures", Coverage::Item("oracle-compare")),
     ("facade-source-control", Coverage::Item("oracle-compare")),
     ("facade-mpegts-controls", Coverage::Item("oracle-compare")),
+    ("mpeg1-encoder-budget", Coverage::Item("oracle-compare")),
     ("playback-probe-lifecycle", Coverage::Item("oracle-compare")),
     ("bridge-text-control", Coverage::Item("oracle-compare")),
     ("ac3-features", Coverage::Item("oracle-compare")),

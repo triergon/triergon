@@ -35,6 +35,7 @@ impl Kind {
             "source-signatures",
             "facade-source-control",
             "facade-mpegts-controls",
+            "mpeg1-encoder-budget",
             "playback-probe-lifecycle",
             "bridge-text-control",
             "ac3-features",

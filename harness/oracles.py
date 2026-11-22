@@ -46,6 +46,7 @@ TRACE_ORACLES = {
     "source-signatures": ("harness.signature_oracle", "trace"),
     "facade-source-control": ("harness.oracles", "facade_source_control"),
     "facade-mpegts-controls": ("harness.ts_facade_oracle", "trace"),
+    "mpeg1-encoder-budget": ("harness.oracles", "mpeg1_encoder_budget"),
     "playback-probe-lifecycle": ("harness.oracles", "playback_probe_lifecycle"),
     "bridge-text-control": ("harness.oracles", "bridge_text_control"),
     "ac3-features": ("harness.ac3_audblk_oracle", "trace"),
@@ -102,6 +103,12 @@ def playback_probe_lifecycle(path):
         "3 abort close",
         "4 abort close",
     ]
+
+
+def mpeg1_encoder_budget(path):
+    width, height = (int(field) for field in path.read_text().split())
+    return ["1", "2", "3 0 1", "3 1 0", "3 2 1",
+            f"4 {width} {height} {(320001 + 399) // 400} {(32001 + 16383) // 16384}"]
 
 
 def bridge_text_control(_path, kind, container, codec, ordinal, program):

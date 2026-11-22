@@ -62,14 +62,7 @@
       }
     ],
     "triergon-codec-mp3": [],
-    "triergon-codec-mpeg1": [
-      {
-        "name": "encoder",
-        "entry_points": ["Encoder", "Encoder::encode", "EncoderConfig"],
-        "degree": "step",
-        "needs": "capture qualification compares construction and encoding at additional geometries, rates, VBV sizes and GOP lengths, including the refusal of an undersized VBV buffer. The budget-taking entry points need separate comparison"
-      }
-    ],
+    "triergon-codec-mpeg1": [],
     "triergon-codec-opus": [],
     "triergon-codec-vorbis": [],
     "triergon-core": [

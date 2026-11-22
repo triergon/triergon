@@ -84,3 +84,7 @@ Annex C VBV model). The reference is FFmpeg 9.0.2 `mpeg1video` with an I/P GOP o
 driven through the capture pipeline ([triergon-capture](../capture/README.md)); the
 comparison is described in [harness/capture](../../harness/capture/README.md) and its
 results in [docs/status.md](../../docs/status.md).
+
+The [encoder budget comparison](../../harness/features/mpeg1-encoder-budget/contract.json)
+checks constructor limits, storage release, and byte-identical output after
+backpressure for aligned and padded pictures.

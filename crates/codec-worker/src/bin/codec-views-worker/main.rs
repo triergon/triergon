@@ -13,6 +13,7 @@ mod blocks;
 )]
 #[path = "../../isobmff_packets.rs"]
 mod isobmff_packets;
+mod mpeg1_budget;
 mod oracles;
 #[allow(dead_code, reason = "Reader operations do not emit packet rows yet.")]
 #[path = "../../packets.rs"]
@@ -46,6 +47,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
     ("windows-", oracles::operation),
     ("divide-", oracles::operation),
     ("budget-", oracles::operation),
+    ("mpeg1-budget-", mpeg1_budget::operation),
     ("opus-range-", oracles::operation),
 ];
 
