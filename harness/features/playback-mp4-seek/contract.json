@@ -8,8 +8,8 @@
   "worker_operation": "mp4-seek-",
   "reference": "ffmpeg-playback-views-native",
   "contract": [
-    "Read the first packet before each backward seek and compare the landed video position and complete packet suffix.",
-    "Source sync seeks use sample composition time and demux seeks use the projected video clock. The reference uses the public backward MOV demux seek for the packet suffix.",
+    "Compare the landed video position and complete packet suffix for each backward seek.",
+    "Source-clock seeks select in unedited composition time and carry the preceding sync sample within its description. Compare the entire physical replay with black-box demux packet bytes and coded sample durations, descriptions and sync flags. Demux-clock seeks use the projected video clock and the public backward MOV demux seek.",
     "A movie-time request inside an empty edit emits an empty mapping and no packets. The AV1 source seek compares the coded sync flag and traces the demuxer disposable assertion.",
     "Compare track, PTS, DTS, duration, flags, size, payload, position, time base and encoded trim. Preserve every original range case, including start-up and Opus roll recovery.",
     "For range playback compare the nonzero usable MovieHeaderBox duration in microseconds, or the maximum packet presentation endpoint of the playable tracks when the header has no usable duration. Preserve the reference stream-info estimate in the trace. Release seek checkpoints before the checkpoint control and compare the resulting seek.",
@@ -449,237 +449,11 @@
     }
   ],
   "pending_module_requirements": [
-    "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-    "Compare the two source seeks after the last fragmented subtitle cue in the source composition domain. The earlier duration difference was in other cases.",
     "Admit valid edited AV1 and RTP hint tracks in the demux seek plan. The basic EditCursor rejects the reordered or zero-delta input before an index or packet can be delivered.",
     "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
-    "Map the movie request through the track edit and compare the resulting replay, including secondary audio before the mapped video landing. The reference currently seeks directly in its demux clock."
+    "Compare mapped replay from the same physical landing, including early secondary audio. Apply each selected track edit to the replay so its last partial encoded packet reports the clipped duration and tail discard."
   ],
   "open_cases": [
-    {
-      "id": "regular-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "variable-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-before-sync",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-rescaled-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "opus-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "opus-seek-edit-boundary",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "opus-crop-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "quicktime-aac-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "quicktime-aac-minimal-wave-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "quicktime-aac-reordered-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "quicktime-aac-fragmented-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "quicktime-aac-7-1-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "rtp-hints-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "aac-program-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-subtitles-seek-start",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-subtitles-seek-during-cue",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-subtitle-edit-seek-start",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-subtitle-edit-seek-during-cue",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "leading-video-edit-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "leading-video-edit-seek-before-sync",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "leading-video-edit-seek-at-sync",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "leading-video-edit-trimmed-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "leading-video-edit-overlapping-sync-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fate-shorter-track-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "native-r-multitrack",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "native-f-multitrack",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "native-encoded-avc-aac-native-seek",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-fragment-before-sync",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-fragment-at-sync",
-      "requirement": "Compare source sync requests against an independent source sample walk. The existing reference seeks on its edited demux clock and applies different secondary-track admission.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-subtitles-seek-after-cue",
-      "requirement": "Compare the two source seeks after the last fragmented subtitle cue in the source composition domain. The earlier duration difference was in other cases.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-subtitle-edit-seek-after-cue",
-      "requirement": "Compare the two source seeks after the last fragmented subtitle cue in the source composition domain. The earlier duration difference was in other cases.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
     {
       "id": "demux-dav1-seek",
       "requirement": "Admit valid edited AV1 and RTP hint tracks in the demux seek plan. The basic EditCursor rejects the reordered or zero-delta input before an index or packet can be delivered.",
@@ -752,22 +526,7 @@
     },
     {
       "id": "movie-mapped-edit",
-      "requirement": "Map the movie request through the track edit and compare the resulting replay, including secondary audio before the mapped video landing. The reference currently seeks directly in its demux clock.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    }
-  ],
-  "open_deviations": [
-    {
-      "reading": "A backward source seek has no preceding sync sample in the configuration",
-      "clause": "ISO/IEC 14496-12:2015 sections 8.6.2 and 8.6.6 describe declared sync samples and edit preroll. Mp4SyncSeekJob requires a preceding sync sample in the target configuration.",
-      "candidate": "Refuses the backward request with no MP4 sync in target configuration at source time 91091 ticks.",
-      "reference": "Logs that it cannot find a preceding index entry, then starts at the first available video key with PTS 93093 and an audio prefix.",
-      "compat": "compat::mov::seek_first_later_sync for consumers that recover with a later point instead of a strict backward seek.",
-      "cases": [
-        "fate-non-sync-prefix-seek"
-      ],
+      "requirement": "Compare mapped replay from the same physical landing, including early secondary audio. Apply each selected track edit to the replay so its last partial encoded packet reports the clipped duration and tail discard.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

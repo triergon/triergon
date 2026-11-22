@@ -68,14 +68,6 @@ static int player_packet(PacketWork *work, const PlaybackPlayerCase *player,
         duration = av_rescale_q(duration, time, ns);
         flags &= AV_PKT_FLAG_KEY;
     }
-    uint32_t tag = stream->codecpar->codec_tag;
-    if (player->operation == PLAYER_SEEK && player->seek == PLAYER_SYNC &&
-        (stream->codecpar->codec_id == AV_CODEC_ID_AV1 ||
-         tag == MKTAG('d','a','v','1') || tag == MKTAG('a','v','0','1'))) {
-        if (work->trace && (flags & AV_PKT_FLAG_DISPOSABLE))
-            fprintf(stderr, "AV1 demux marked sample at %" PRId64 " disposable\n", packet->pos);
-        flags &= ~(uint64_t)AV_PKT_FLAG_DISPOSABLE;
-    }
     packet_fold(work, player_track(player->format, stream), pts, dts,
                 duration > 0 ? (uint64_t)duration : 0, flags, packet->data,
                 (size_t)packet->size);
@@ -276,6 +268,326 @@ static int player_movie_empty(Mp4View input, uint32_t track_id, int64_t timestam
     return AVERROR_STREAM_NOT_FOUND;
 }
 
+typedef struct {
+    int64_t position, pts, dts, duration;
+    size_t order;
+    uint32_t description;
+    int stream, size, key, disposable;
+} PlayerSourceSample;
+
+typedef struct {
+    PlayerSourceSample *rows;
+    size_t count, used;
+} PlayerSourceTrack;
+
+static int player_source_track_order(const void *a, const void *b)
+{
+    const PlayerSourceSample *left = a, *right = b;
+    if (left->stream != right->stream)
+        return left->stream < right->stream ? -1 : 1;
+    return (left->order > right->order) - (left->order < right->order);
+}
+
+static int player_source_file_order(const void *a, const void *b)
+{
+    const PlayerSourceSample *left = a, *right = b;
+    if (left->position != right->position)
+        return left->position < right->position ? -1 : 1;
+    return (left->order > right->order) - (left->order < right->order);
+}
+
+static int player_source_descriptions(Mp4View table, PlayerSourceTrack *track)
+{
+    if (!track->used)
+        return 0;
+    Mp4View map = mp4_box(table, MKBETAG('s','t','s','c'));
+    Mp4View chunks = mp4_box(table, MKBETAG('s','t','c','o'));
+    if (!chunks.data)
+        chunks = mp4_box(table, MKBETAG('c','o','6','4'));
+    if (map.size < 8 || chunks.size < 8)
+        return AVERROR_INVALIDDATA;
+    const uint64_t last_chunk = (uint64_t)AV_RB32(chunks.data + 4) + 1;
+    const uint32_t runs = AV_RB32(map.data + 4);
+    if (runs > (map.size - 8) / 12)
+        return AVERROR_INVALIDDATA;
+    size_t written = 0;
+    uint64_t first = 1;
+    for (uint32_t i = 0; i < runs; ++i) {
+        const uint8_t *row = map.data + 8 + (size_t)i * 12;
+        uint64_t next = i + 1 < runs ? AV_RB32(row + 12) : last_chunk;
+        uint32_t samples = AV_RB32(row + 4), description = AV_RB32(row + 8);
+        if (AV_RB32(row) != first || next <= first || next > last_chunk ||
+            !samples || !description || next - first > (track->used - written) / samples)
+            return AVERROR_INVALIDDATA;
+        size_t end = written + (size_t)(next - first) * samples;
+        while (written < end)
+            track->rows[written++].description = description;
+        first = next;
+    }
+    return written == track->used ? 0 : AVERROR_INVALIDDATA;
+}
+
+/* Sample deltas and sync signalling are table facts. For example, demux can
+ * present all hint or text packets as keys and infer a duration for a coded
+ * zero delta. The source seek uses the declared media values. */
+static int player_source_sample_table(Mp4View table, PlayerSourceTrack *track)
+{
+    Mp4View timing = mp4_box(table, MKBETAG('s','t','t','s'));
+    Mp4View sync = mp4_box(table, MKBETAG('s','t','s','s'));
+    uint32_t keys = sync.data && sync.size >= 8 ? AV_RB32(sync.data + 4) : 0;
+    if ((sync.data && sync.size < 8) || (keys && keys > (sync.size - 8) / 4))
+        return AVERROR_INVALIDDATA;
+    if (!timing.data)
+        return 0;
+    if (timing.size < 8)
+        return AVERROR_INVALIDDATA;
+    uint32_t runs = AV_RB32(timing.data + 4);
+    if (runs > (timing.size - 8) / 8)
+        return AVERROR_INVALIDDATA;
+    uint32_t key = 0;
+    for (uint32_t i = 0; i < runs; ++i) {
+        const uint8_t *entry = timing.data + 8 + (size_t)i * 8;
+        const uint32_t count = AV_RB32(entry), delta = AV_RB32(entry + 4);
+        if (count > track->count - track->used)
+            return AVERROR_INVALIDDATA;
+        for (uint32_t sample = 0; sample < count; ++sample) {
+            PlayerSourceSample *row = &track->rows[track->used++];
+            row->duration = delta;
+            row->key = !sync.data ||
+                       (key < keys && AV_RB32(sync.data + 8 + (size_t)key * 4) == track->used);
+            if (sync.data && row->key)
+                ++key;
+        }
+    }
+    if (key != keys)
+        return AVERROR_INVALIDDATA;
+    return player_source_descriptions(table, track);
+}
+
+static int player_source_fragment(Mp4View root, Mp4View traf, uint32_t id,
+                                  PlayerSourceTrack *track)
+{
+    Mp4View tfhd = mp4_box(traf, MKBETAG('t','f','h','d'));
+    if (tfhd.size < 8 || AV_RB32(tfhd.data + 4) != id)
+        return 0;
+    Mp4View defaults = mp4_box(mp4_box(root, MKBETAG('m','o','o','v')), MKBETAG('m','v','e','x'));
+    uint32_t kind, duration = 0, flags = 0, description = 0;
+    Mp4View body;
+    while (mp4_box_next(&defaults, &kind, &body)) {
+        if (kind == MKBETAG('t','r','e','x') && body.size >= 24 && AV_RB32(body.data + 4) == id) {
+            description = AV_RB32(body.data + 8);
+            duration = AV_RB32(body.data + 12);
+            flags = AV_RB32(body.data + 20);
+            break;
+        }
+    }
+    const uint32_t fields = AV_RB24(tfhd.data + 1);
+    size_t at = fields & 1 ? 16 : 8;
+    size_t end = at + (fields & 2 ? 4 : 0) + (fields & 8 ? 4 : 0) +
+                      (fields & 16 ? 4 : 0) + (fields & 32 ? 4 : 0);
+    if (end > tfhd.size)
+        return AVERROR_INVALIDDATA;
+    if (fields & 2) {
+        description = AV_RB32(tfhd.data + at);
+        at += 4;
+    }
+    if (fields & 8) {
+        duration = AV_RB32(tfhd.data + at);
+        at += 4;
+    }
+    if (fields & 16)
+        at += 4;
+    if (fields & 32)
+        flags = AV_RB32(tfhd.data + at);
+    while (mp4_box_next(&traf, &kind, &body)) {
+        if (kind != MKBETAG('t','r','u','n'))
+            continue;
+        if (body.size < 8)
+            return AVERROR_INVALIDDATA;
+        const uint32_t layout = AV_RB24(body.data + 1), count = AV_RB32(body.data + 4);
+        at = layout & 1 ? 12 : 8;
+        uint32_t first = flags;
+        if (layout & 4) {
+            if (at + 4 > body.size)
+                return AVERROR_INVALIDDATA;
+            first = AV_RB32(body.data + at);
+            at += 4;
+        }
+        const unsigned stride = 4 * (!!(layout & 0x100) + !!(layout & 0x200) +
+                                     !!(layout & 0x400) + !!(layout & 0x800));
+        if (at > body.size || count > track->count - track->used ||
+            (stride && count > (body.size - at) / stride))
+            return AVERROR_INVALIDDATA;
+        for (uint32_t i = 0; i < count; ++i, at += stride) {
+            PlayerSourceSample *row = &track->rows[track->used++];
+            unsigned offset = (layout & 0x100 ? 4 : 0) + (layout & 0x200 ? 4 : 0);
+            uint32_t coded = (layout & 0x400) ? AV_RB32(body.data + at + offset)
+                                             : i == 0 ? first : flags;
+            row->description = description;
+            row->duration = layout & 0x100 ? AV_RB32(body.data + at) : duration;
+            row->key = !(coded & 0x00010000);
+        }
+    }
+    return 0;
+}
+
+static int player_source_track(Mp4View input, uint32_t id, PlayerSourceTrack *track)
+{
+    int result = player_source_sample_table(mp4_sample_table(input, id), track);
+    if (result < 0)
+        return result;
+    Mp4View roots = input, root;
+    uint32_t kind;
+    while (track->used < track->count && mp4_box_next(&roots, &kind, &root)) {
+        if (kind != MKBETAG('m','o','o','f'))
+            continue;
+        Mp4View traf;
+        while (mp4_box_next(&root, &kind, &traf)) {
+            if (kind != MKBETAG('t','r','a','f'))
+                continue;
+            result = player_source_fragment(input, traf, id, track);
+            if (result < 0)
+                return result;
+        }
+    }
+    return track->used == track->count ? 0 : AVERROR_INVALIDDATA;
+}
+
+/* The source seek selects in composition time, carries the preceding sync
+ * of that sample's description, and replays in physical sample order. */
+static int player_source_seek(const ViewCase *input, const PlaybackPlayerCase *player,
+                              PacketWork *work)
+{
+    const size_t maximum = 2000000;
+    PacketInput reader = {input->data, (int64_t)input->size, 0, player->window};
+    AVFormatContext *format = NULL;
+    AVPacket *packet = av_packet_alloc();
+    PlayerSourceSample *rows = NULL;
+    size_t count = 0, capacity = 0;
+    if (!packet)
+        return AVERROR(ENOMEM);
+    int rc = source_view_open_mp4(&format, &reader, player->seekable);
+    if (rc < 0)
+        goto done;
+    int video = player_stream(format, PLAYER_MOV, AVMEDIA_TYPE_VIDEO, player->video);
+    if (video < 0) {
+        rc = video;
+        goto done;
+    }
+    while ((rc = av_read_frame(format, packet)) >= 0) {
+        if (count == maximum || packet->pos < 0 || packet->pos > reader.size ||
+            packet->size < 0 || packet->size > reader.size - packet->pos ||
+            (packet->size && memcmp(packet->data, input->data + packet->pos, (size_t)packet->size))) {
+            rc = AVERROR_INVALIDDATA;
+            goto done;
+        }
+        if (count == capacity) {
+            capacity = capacity ? FFMIN(capacity * 2, maximum) : 256;
+            PlayerSourceSample *expanded = av_realloc_array(rows, capacity, sizeof(*rows));
+            if (!expanded) {
+                rc = AVERROR(ENOMEM);
+                goto done;
+            }
+            rows = expanded;
+        }
+        rows[count] = (PlayerSourceSample){
+            .position = packet->pos, .pts = packet->pts, .dts = packet->dts,
+            .order = count, .stream = packet->stream_index, .size = packet->size,
+            .disposable = !!(packet->flags & AV_PKT_FLAG_DISPOSABLE),
+        };
+        ++count;
+        av_packet_unref(packet);
+    }
+    if (rc != AVERROR_EOF)
+        goto done;
+    if (!count) {
+        rc = AVERROR_INVALIDDATA;
+        goto done;
+    }
+    qsort(rows, count, sizeof(*rows), player_source_track_order);
+    for (size_t at = 0; at < count;) {
+        size_t end = at + 1;
+        int stream = rows[at].stream;
+        while (end < count && rows[end].stream == stream)
+            ++end;
+        PlayerSourceTrack track = {rows + at, end - at, 0};
+        rc = player_source_track((Mp4View){input->data, input->size},
+                                 (uint32_t)format->streams[stream]->id, &track);
+        if (rc < 0)
+            goto done;
+        at = end;
+    }
+    size_t previous_sync = SIZE_MAX, landing = SIZE_MAX;
+    uint32_t description = 0;
+    int64_t nearest = INT64_MIN;
+    for (size_t i = 0; i < count; ++i) {
+        const PlayerSourceSample *sample = &rows[i];
+        if (sample->stream != video)
+            continue;
+        if (sample->description != description) {
+            description = sample->description;
+            previous_sync = SIZE_MAX;
+        }
+        if (sample->key)
+            previous_sync = sample->order;
+        if (sample->pts != AV_NOPTS_VALUE && sample->pts <= player->timestamp && sample->pts > nearest) {
+            nearest = sample->pts;
+            landing = previous_sync;
+        }
+    }
+    if (landing == SIZE_MAX) {
+        rc = AVERROR_INVALIDDATA;
+        goto done;
+    }
+    qsort(rows, count, sizeof(*rows), player_source_file_order);
+    size_t sync = 0;
+    while (rows[sync].order != landing)
+        ++sync;
+    const int64_t cutoff = FFMIN(rows[sync].pts, player->timestamp);
+    const AVRational video_base = format->streams[video]->time_base;
+    size_t start = 0;
+    while (start < sync) {
+        const PlayerSourceSample *sample = &rows[start];
+        const AVStream *track = format->streams[sample->stream];
+        if (sample->stream != video) {
+            int64_t end;
+            if (track->codecpar->codec_type != AVMEDIA_TYPE_AUDIO ||
+                sample->pts == AV_NOPTS_VALUE || sample->pts != sample->dts ||
+                sample->duration <= 0 ||
+                __builtin_add_overflow(sample->pts, sample->duration, &end) ||
+                av_compare_ts(end, track->time_base, cutoff, video_base) > 0)
+                break;
+        }
+        ++start;
+    }
+    rc = 0;
+    for (size_t i = start; i < count; ++i) {
+        const PlayerSourceSample *sample = &rows[i];
+        if (i < sync && sample->stream == video)
+            continue;
+        if (i == sync)
+            player_field(work, 4, (uint64_t)sample->position);
+        const AVStream *track = format->streams[sample->stream];
+        if (work->trace && sample->disposable &&
+            (track->codecpar->codec_id == AV_CODEC_ID_AV1 ||
+             track->codecpar->codec_tag == MKTAG('d','a','v','1') ||
+             track->codecpar->codec_tag == MKTAG('a','v','0','1')))
+            fprintf(stderr, "AV1 demux marked sample at %" PRId64 " disposable\n", sample->position);
+        AVPacket source = {.pts = sample->pts, .dts = sample->dts,
+                           .duration = sample->duration, .flags = sample->key ? AV_PKT_FLAG_KEY : 0,
+                           .data = (uint8_t *)input->data + sample->position,
+                           .size = sample->size, .pos = sample->position};
+        rc = player_packet(work, player, track, &source);
+        if (rc < 0)
+            break;
+    }
+done:
+    av_free(rows);
+    av_packet_free(&packet);
+    packet_close(&format);
+    return rc;
+}
+
 static int player_seek(AVFormatContext *format, AVPacket *packet,
                        const ViewCase *input, const PlaybackPlayerCase *player,
                        PacketWork *work)
@@ -301,6 +613,8 @@ static int player_seek(AVFormatContext *format, AVPacket *packet,
     }
     if (player->seek == PLAYER_OPEN)
         return player_read(format, packet, player, work, -1, -1, -1, 1);
+    if (player->seek == PLAYER_SYNC)
+        return player_source_seek(input, player, work);
     int video = player_stream(format, PLAYER_MOV, AVMEDIA_TYPE_VIDEO, player->video);
     if (video < 0)
         return video;
