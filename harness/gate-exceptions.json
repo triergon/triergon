@@ -2,27 +2,31 @@
   "schema": 1,
   "about": "What the gates require and every exception to them, counted from the feature contracts, the gate plan, every list under harness/ whose name starts with open_ (an entry counts once for each case it names, under each gate target it is open on) and the public features of each crate in harness/not-compared.json that no contract compares. `cargo xtask check-design` counts them again: a change that drops a requirement or adds an exception must change this file too.",
   "counts": {
-    "features": 125,
-    "required_by_check": 94,
+    "features": 128,
+    "required_by_check": 97,
     "on_demand": 3,
     "diagnostic": 1,
-    "gated_by_report": 73,
+    "gated_by_report": 76,
     "gated_by_another_command": 49,
     "not_gated": 3,
     "open": {
+      "harness/features/ts-source-poll/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 380, "thumbv7neon-unknown-linux-gnueabihf": 380}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 1455, "thumbv7neon-unknown-linux-gnueabihf": 1455}},
+      "harness/features/ts-pes-assembler/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 304, "thumbv7neon-unknown-linux-gnueabihf": 304}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 1164, "thumbv7neon-unknown-linux-gnueabihf": 1164}},
+      "harness/features/ts-observer-forms/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 56, "thumbv7neon-unknown-linux-gnueabihf": 56}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 873, "thumbv7neon-unknown-linux-gnueabihf": 873}},
       "harness/features/ogg-pages/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 162, "thumbv7neon-unknown-linux-gnueabihf": 162}, "open_cases": {"aarch64-unknown-linux-gnu": 4, "thumbv7neon-unknown-linux-gnueabihf": 4}},
       "harness/features/ogg-tracks/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 159, "thumbv7neon-unknown-linux-gnueabihf": 159}, "open_cases": {"aarch64-unknown-linux-gnu": 15, "thumbv7neon-unknown-linux-gnueabihf": 15}},
       "harness/features/elementary-metadata/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 846, "thumbv7neon-unknown-linux-gnueabihf": 846}, "open_cases": {"aarch64-unknown-linux-gnu": 23, "thumbv7neon-unknown-linux-gnueabihf": 23}},
       "harness/features/elementary-metadata-wire/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 66, "thumbv7neon-unknown-linux-gnueabihf": 66}},
       "harness/features/media-probe/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 29076, "thumbv7neon-unknown-linux-gnueabihf": 29076}, "open_cases": {"aarch64-unknown-linux-gnu": 1948, "thumbv7neon-unknown-linux-gnueabihf": 1948}},
       "harness/codecs/reader-seeks.json": {"open_cases": {"aarch64-unknown-linux-gnu": 33, "thumbv7neon-unknown-linux-gnueabihf": 33}},
+      "harness/codecs/reader-differences.json": {"elementary_deviations": {"aarch64-unknown-linux-gnu": 16, "thumbv7neon-unknown-linux-gnueabihf": 16}},
       "harness/features/codec-config-views/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 507, "thumbv7neon-unknown-linux-gnueabihf": 507}, "open_cases": {"aarch64-unknown-linux-gnu": 28, "thumbv7neon-unknown-linux-gnueabihf": 28}},
       "harness/features/hevc-hvcc-prefix/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 477, "thumbv7neon-unknown-linux-gnueabihf": 477}},
       "harness/features/vp9-config/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 162, "thumbv7neon-unknown-linux-gnueabihf": 162}},
       "harness/features/eac3-bsi/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 1032, "thumbv7neon-unknown-linux-gnueabihf": 1032}},
       "harness/features/isobmff-index-landings/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 12, "thumbv7neon-unknown-linux-gnueabihf": 12}},
       "harness/features/isobmff-segment-indexes/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 762, "thumbv7neon-unknown-linux-gnueabihf": 762}},
-      "harness/features/mov-reference-trace/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 4}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 561, "thumbv7neon-unknown-linux-gnueabihf": 561}},
+      "harness/features/mov-reference-trace/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 1}, "open_deviations": {"aarch64-unknown-linux-gnu": 1}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 561, "thumbv7neon-unknown-linux-gnueabihf": 561}},
       "harness/codecs/session-cases.json": {"open_cases": {"aarch64-unknown-linux-gnu": 321, "thumbv7neon-unknown-linux-gnueabihf": 321}},
       "harness/codecs/packed-dts.json": {"open_cases": {"aarch64-unknown-linux-gnu": 3, "thumbv7neon-unknown-linux-gnueabihf": 3}},
       "harness/codecs/nodither-streams.json": {"open_cases": {"aarch64-unknown-linux-gnu": 7, "thumbv7neon-unknown-linux-gnueabihf": 7}},
@@ -172,9 +176,9 @@
           "aarch64-unknown-linux-gnu": 150,
           "thumbv7neon-unknown-linux-gnueabihf": 150
         },
-        "open_cases": {
-          "aarch64-unknown-linux-gnu": 30,
-          "thumbv7neon-unknown-linux-gnueabihf": 30
+        "open_deviations": {
+          "aarch64-unknown-linux-gnu": 26,
+          "thumbv7neon-unknown-linux-gnueabihf": 26
         }
       },
       "harness/features/mov-encoded-views/contract.json": {
@@ -182,7 +186,7 @@
           "aarch64-unknown-linux-gnu": 159,
           "thumbv7neon-unknown-linux-gnueabihf": 159
         },
-        "open_cases": {
+        "open_deviations": {
           "aarch64-unknown-linux-gnu": 19,
           "thumbv7neon-unknown-linux-gnueabihf": 19
         }
@@ -192,19 +196,19 @@
           "aarch64-unknown-linux-gnu": 63,
           "thumbv7neon-unknown-linux-gnueabihf": 63
         },
-        "open_cases": {
+        "open_deviations": {
           "aarch64-unknown-linux-gnu": 14,
           "thumbv7neon-unknown-linux-gnueabihf": 14
         }
       },
       "harness/features/mov-run-recovery/contract.json": {
         "open_unmeasured": {
-          "aarch64-unknown-linux-gnu": 462,
-          "thumbv7neon-unknown-linux-gnueabihf": 462
+          "aarch64-unknown-linux-gnu": 432,
+          "thumbv7neon-unknown-linux-gnueabihf": 432
         },
-        "open_cases": {
-          "aarch64-unknown-linux-gnu": 44,
-          "thumbv7neon-unknown-linux-gnueabihf": 44
+        "open_deviations": {
+          "aarch64-unknown-linux-gnu": 42,
+          "thumbv7neon-unknown-linux-gnueabihf": 42
         }
       },
       "harness/features/quicktime-pcm-samples/contract.json": {
@@ -212,7 +216,7 @@
           "aarch64-unknown-linux-gnu": 63,
           "thumbv7neon-unknown-linux-gnueabihf": 63
         },
-        "open_cases": {
+        "open_deviations": {
           "aarch64-unknown-linux-gnu": 14,
           "thumbv7neon-unknown-linux-gnueabihf": 14
         }
@@ -223,8 +227,8 @@
           "thumbv7neon-unknown-linux-gnueabihf": 63
         }
       },
-      "harness/features/mov-track-seek/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 548, "thumbv7neon-unknown-linux-gnueabihf": 548}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 8832, "thumbv7neon-unknown-linux-gnueabihf": 8832}},
-      "harness/features/isobmff-source-seek/contract.json": {"open_cases": {"aarch64-unknown-linux-gnu": 161, "thumbv7neon-unknown-linux-gnueabihf": 161}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 13362, "thumbv7neon-unknown-linux-gnueabihf": 13362}},
+      "harness/features/mov-track-seek/contract.json": {"open_deviations": {"aarch64-unknown-linux-gnu": 205, "thumbv7neon-unknown-linux-gnueabihf": 205}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 8832, "thumbv7neon-unknown-linux-gnueabihf": 8832}},
+      "harness/features/isobmff-source-seek/contract.json": {"open_deviations": {"aarch64-unknown-linux-gnu": 115, "thumbv7neon-unknown-linux-gnueabihf": 115}, "open_unmeasured": {"aarch64-unknown-linux-gnu": 13362, "thumbv7neon-unknown-linux-gnueabihf": 13362}},
       "harness/status-rows.json": {
         "open_cells": {
           "aarch64-unknown-linux-gnu": 29,
