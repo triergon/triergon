@@ -75,6 +75,8 @@ implementations come with the crate:
   size as libass does: a glyph whose first lookup is through a code point that
   `rotates` (U+02F1 and above) advances by its default-load vertical advance,
   and a glyph first asked for an advance or extents stays horizontal.
+  The [rotation gate](../../harness/features/libass-rotations/contract.json) compares
+  the advances visible to the caller after character, advance and extents lookups.
 
 `Scale` reproduces HarfBuzz's scaling arithmetic, including hinting device tables
 when a ppem is set.

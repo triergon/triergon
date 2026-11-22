@@ -301,14 +301,7 @@
         "needs": "The session lanes compare RGBA output and reported timestamps. Unsupported profiles and an AVC mid-GOP reset remain open. Clocked video with defined input PTS still needs coverage."
       }
     ],
-    "triergon-shape": [
-      {
-        "name": "libass-rotation-cache-accessors",
-        "entry_points": ["compat::libass::GlyphRotations::get", "compat::libass::GlyphRotations::len", "compat::libass::GlyphRotations::is_empty"],
-        "degree": "unit-tests",
-        "needs": "libass-rotations compares the metrics and their lookup orders. Only tests call the cache inspection methods, and the public libass API exposes no decision, count or emptiness accessor. Review these methods for removal from the public surface."
-      }
-    ],
+    "triergon-shape": [],
     "triergon-subtitles": [],
     "triergon-worker-entry": []
   }
