@@ -10,6 +10,9 @@
   "contract": [
     "Play Matroska, MOV/MP4, TS188 and M2TS192 through Player and the PGS, DVD and DVB subtitle bridges. The pinned FFmpeg subtitles build demuxes the same track and calls avcodec_decode_subtitle2. The plain link serves future measurement.",
     "Fold each published bitmap event, its presentation clock, rectangle count, geometry, forced flag, every declared ARGB palette entry and every visible index row. DVD also compares start and end display offsets. The DVB queue exposes its presentation clock without a display duration; Matroska block DTS is absent at the source boundary, so the reference's inferred DTS is diagnostic only.",
+    "Compare DVB through the bitmap queue boundary: the first eight decoder rectangles in order, zero for the unanchored queue clock, and the first encoded 33-bit epoch for transport DVB. The trace retains the uncapped decoded event and its clock.",
+    "Unprobed Matroska PGS playback compares clocks before generic stream discovery and timestamp fill-in.",
+    "Matroska PGS startup cases fold the projected packet clock, duration and complete bytes before decode. The reference consumes public pre-probe packet clocks and applies the same caller-selected prefix boundary and duration-based clock projection. Raw packet clocks remain in the trace. Include explicit selections for both DVB service descriptor arrangements.",
     "Matroska PGS startup cases also fold the startup clock projection, packet duration and codec bytes for every selected packet, against the demuxer's packet view. Include single-service DVB files and explicit service-selection cases for both descriptor arrangements. Alternate decoder-only configuration modes are covered by the standalone subtitle contracts.",
     "Preload the container on both sides. Opening and reading the container, decoding, folding and teardown are inside the operation."
   ],
@@ -76,7 +79,6 @@
         "pgs-long-movie-mkv",
         "pgs-long-movie-ts",
         "pgs-gold-independent89--clock-unknown-nonzero-raw-ts",
-        "pgs-gold-independent89--clock-unknown-zero-ts",
         "pgs-gold-independent89--fragment-early-17x3-ts",
         "pgs-gold-independent89--fragment-early-1x1-ts",
         "pgs-gold-independent89--fragment-early-2x1-ts",
@@ -120,17 +122,14 @@
         "pgs-gold-independent89--physical-tail-declared-19-actual-3-ts",
         "pgs-gold-independent89--physical-tail-declared-19-actual-4-ts",
         "pgs-gold-independent89--physical-tail-declared-19-actual-7-ts",
-        "pgs-gold-independent89--physical-tail-declared-65535-actual-1-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-11-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-13-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-2-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-3-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-4-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-7-ts",
-        "pgs-gold-independent89--physical-tail-declared-71-actual-1-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-11-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-13-ts",
-        "pgs-gold-independent89--physical-tail-declared-71-actual-2-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-3-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-4-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-7-ts",
@@ -224,7 +223,6 @@
         "pgs-gold-original140--matrix-height-577-ts",
         "pgs-gold-original140--matrix-per-entry-at-update-time-ts",
         "pgs-gold-original140--multiple-displays-one-packet-ts",
-        "pgs-gold-original140--multiple-objects-wire-order-ts",
         "pgs-gold-original140--normal-window-replacement-ts",
         "pgs-gold-original140--object-replacement-version-0-ts",
         "pgs-gold-original140--object-replacement-version-2-ts",
@@ -274,9 +272,6 @@
         "pgs-gold-original140--same-palette-version-new-values-ts",
         "pgs-gold-original140--source-position-outside-canvas-ts",
         "pgs-gold-original140--three-source-objects-native-two-reference-limit-ts",
-        "pgs-gold-original140--truncated-first-header-01-ts",
-        "pgs-gold-original140--truncated-first-header-02-ts",
-        "pgs-gold-original140--truncated-first-header-03-ts",
         "pgs-gold-original140--truncated-first-header-04-ts",
         "pgs-gold-original140--truncated-first-header-05-ts",
         "pgs-gold-original140--truncated-first-header-06-ts",
@@ -404,34 +399,20 @@
         "dvb-pes-unbounded-ts",
         "dvb-pts-wrap-ts",
         "dvb-recorded-dvb-ancillary-pages--matroska-segments-ts",
-        "dvb-recorded-dvb-ancillary-pages--pes-data-field-ts",
         "dvb-recorded-dvb-geometry-window--matroska-segments-ts",
-        "dvb-recorded-dvb-geometry-window--pes-data-field-ts",
         "dvb-recorded-dvb-map2to4--matroska-segments-ts",
-        "dvb-recorded-dvb-map2to4--pes-data-field-ts",
         "dvb-recorded-dvb-map2to8--matroska-segments-ts",
-        "dvb-recorded-dvb-map2to8--pes-data-field-ts",
         "dvb-recorded-dvb-map4to8--matroska-segments-ts",
-        "dvb-recorded-dvb-map4to8--pes-data-field-ts",
         "dvb-recorded-dvb-nonmodifying--matroska-segments-ts",
-        "dvb-recorded-dvb-nonmodifying--pes-data-field-ts",
         "dvb-recorded-dvb-palette-update-clear--matroska-segments-ts",
         "dvb-recorded-dvb-partial-alpha-projection--matroska-segments-ts",
-        "dvb-recorded-dvb-partial-alpha-projection--pes-data-field-ts",
         "dvb-recorded-dvb2-literals-fields--matroska-segments-ts",
-        "dvb-recorded-dvb2-literals-fields--pes-data-field-ts",
         "dvb-recorded-dvb2-repeat-top--matroska-segments-ts",
-        "dvb-recorded-dvb2-repeat-top--pes-data-field-ts",
         "dvb-recorded-dvb2-run-branches--matroska-segments-ts",
-        "dvb-recorded-dvb2-run-branches--pes-data-field-ts",
         "dvb-recorded-dvb4-literals-fields--matroska-segments-ts",
-        "dvb-recorded-dvb4-literals-fields--pes-data-field-ts",
         "dvb-recorded-dvb4-run-branches--matroska-segments-ts",
-        "dvb-recorded-dvb4-run-branches--pes-data-field-ts",
         "dvb-recorded-dvb8-literals-fields--matroska-segments-ts",
-        "dvb-recorded-dvb8-literals-fields--pes-data-field-ts",
         "dvb-recorded-dvb8-run-branches--matroska-segments-ts",
-        "dvb-recorded-dvb8-run-branches--pes-data-field-ts",
         "dvb-recorded-full-alpha-ts",
         "dvb-recorded-full-depth2-ts",
         "dvb-recorded-full-depth4-ts",
@@ -486,7 +467,6 @@
         "dvb-research-dvb-ancillary-eod-native-v1-observed--foreign-end-filter-control",
         "dvb-research-dvb-ancillary-eod-native-v1-observed--shared-ancillary-end",
         "dvb-research-dvb-ancillary-eod-native-v1-observed--shared-composition-end-compat",
-        "dvb-research-dvb-nonmodifying-observed--dvb2-literal-flag0",
         "dvb-research-dvb-nonmodifying-observed--dvb2-literal-flag1",
         "dvb-research-dvb-nonmodifying-observed--dvb2-run-flag0",
         "dvb-research-dvb-nonmodifying-observed--dvb2-run-flag1",
@@ -535,8 +515,6 @@
         "dvb-source-separate-descriptors",
         "dvb-source-separate-descriptors-service-0",
         "dvb-source-separate-descriptors-service-1",
-        "fixture-pgs-basic-m2ts",
-        "fixture-dvd-commands",
         "probe-all-unknown",
         "mkv-bitmap-all-unknown",
         "probe-bad-first-canvas",
@@ -608,7 +586,6 @@
         "pgs-long-movie-mkv",
         "pgs-long-movie-ts",
         "pgs-gold-independent89--clock-unknown-nonzero-raw-ts",
-        "pgs-gold-independent89--clock-unknown-zero-ts",
         "pgs-gold-independent89--fragment-early-17x3-ts",
         "pgs-gold-independent89--fragment-early-1x1-ts",
         "pgs-gold-independent89--fragment-early-2x1-ts",
@@ -652,17 +629,14 @@
         "pgs-gold-independent89--physical-tail-declared-19-actual-3-ts",
         "pgs-gold-independent89--physical-tail-declared-19-actual-4-ts",
         "pgs-gold-independent89--physical-tail-declared-19-actual-7-ts",
-        "pgs-gold-independent89--physical-tail-declared-65535-actual-1-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-11-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-13-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-2-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-3-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-4-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-7-ts",
-        "pgs-gold-independent89--physical-tail-declared-71-actual-1-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-11-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-13-ts",
-        "pgs-gold-independent89--physical-tail-declared-71-actual-2-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-3-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-4-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-7-ts",
@@ -756,7 +730,6 @@
         "pgs-gold-original140--matrix-height-577-ts",
         "pgs-gold-original140--matrix-per-entry-at-update-time-ts",
         "pgs-gold-original140--multiple-displays-one-packet-ts",
-        "pgs-gold-original140--multiple-objects-wire-order-ts",
         "pgs-gold-original140--normal-window-replacement-ts",
         "pgs-gold-original140--object-replacement-version-0-ts",
         "pgs-gold-original140--object-replacement-version-2-ts",
@@ -806,9 +779,6 @@
         "pgs-gold-original140--same-palette-version-new-values-ts",
         "pgs-gold-original140--source-position-outside-canvas-ts",
         "pgs-gold-original140--three-source-objects-native-two-reference-limit-ts",
-        "pgs-gold-original140--truncated-first-header-01-ts",
-        "pgs-gold-original140--truncated-first-header-02-ts",
-        "pgs-gold-original140--truncated-first-header-03-ts",
         "pgs-gold-original140--truncated-first-header-04-ts",
         "pgs-gold-original140--truncated-first-header-05-ts",
         "pgs-gold-original140--truncated-first-header-06-ts",
@@ -936,34 +906,20 @@
         "dvb-pes-unbounded-ts",
         "dvb-pts-wrap-ts",
         "dvb-recorded-dvb-ancillary-pages--matroska-segments-ts",
-        "dvb-recorded-dvb-ancillary-pages--pes-data-field-ts",
         "dvb-recorded-dvb-geometry-window--matroska-segments-ts",
-        "dvb-recorded-dvb-geometry-window--pes-data-field-ts",
         "dvb-recorded-dvb-map2to4--matroska-segments-ts",
-        "dvb-recorded-dvb-map2to4--pes-data-field-ts",
         "dvb-recorded-dvb-map2to8--matroska-segments-ts",
-        "dvb-recorded-dvb-map2to8--pes-data-field-ts",
         "dvb-recorded-dvb-map4to8--matroska-segments-ts",
-        "dvb-recorded-dvb-map4to8--pes-data-field-ts",
         "dvb-recorded-dvb-nonmodifying--matroska-segments-ts",
-        "dvb-recorded-dvb-nonmodifying--pes-data-field-ts",
         "dvb-recorded-dvb-palette-update-clear--matroska-segments-ts",
         "dvb-recorded-dvb-partial-alpha-projection--matroska-segments-ts",
-        "dvb-recorded-dvb-partial-alpha-projection--pes-data-field-ts",
         "dvb-recorded-dvb2-literals-fields--matroska-segments-ts",
-        "dvb-recorded-dvb2-literals-fields--pes-data-field-ts",
         "dvb-recorded-dvb2-repeat-top--matroska-segments-ts",
-        "dvb-recorded-dvb2-repeat-top--pes-data-field-ts",
         "dvb-recorded-dvb2-run-branches--matroska-segments-ts",
-        "dvb-recorded-dvb2-run-branches--pes-data-field-ts",
         "dvb-recorded-dvb4-literals-fields--matroska-segments-ts",
-        "dvb-recorded-dvb4-literals-fields--pes-data-field-ts",
         "dvb-recorded-dvb4-run-branches--matroska-segments-ts",
-        "dvb-recorded-dvb4-run-branches--pes-data-field-ts",
         "dvb-recorded-dvb8-literals-fields--matroska-segments-ts",
-        "dvb-recorded-dvb8-literals-fields--pes-data-field-ts",
         "dvb-recorded-dvb8-run-branches--matroska-segments-ts",
-        "dvb-recorded-dvb8-run-branches--pes-data-field-ts",
         "dvb-recorded-full-alpha-ts",
         "dvb-recorded-full-depth2-ts",
         "dvb-recorded-full-depth4-ts",
@@ -1018,7 +974,6 @@
         "dvb-research-dvb-ancillary-eod-native-v1-observed--foreign-end-filter-control",
         "dvb-research-dvb-ancillary-eod-native-v1-observed--shared-ancillary-end",
         "dvb-research-dvb-ancillary-eod-native-v1-observed--shared-composition-end-compat",
-        "dvb-research-dvb-nonmodifying-observed--dvb2-literal-flag0",
         "dvb-research-dvb-nonmodifying-observed--dvb2-literal-flag1",
         "dvb-research-dvb-nonmodifying-observed--dvb2-run-flag0",
         "dvb-research-dvb-nonmodifying-observed--dvb2-run-flag1",
@@ -1067,8 +1022,6 @@
         "dvb-source-separate-descriptors",
         "dvb-source-separate-descriptors-service-0",
         "dvb-source-separate-descriptors-service-1",
-        "fixture-pgs-basic-m2ts",
-        "fixture-dvd-commands",
         "probe-all-unknown",
         "mkv-bitmap-all-unknown",
         "probe-bad-first-canvas",
@@ -1140,7 +1093,6 @@
         "pgs-long-movie-mkv",
         "pgs-long-movie-ts",
         "pgs-gold-independent89--clock-unknown-nonzero-raw-ts",
-        "pgs-gold-independent89--clock-unknown-zero-ts",
         "pgs-gold-independent89--fragment-early-17x3-ts",
         "pgs-gold-independent89--fragment-early-1x1-ts",
         "pgs-gold-independent89--fragment-early-2x1-ts",
@@ -1184,17 +1136,14 @@
         "pgs-gold-independent89--physical-tail-declared-19-actual-3-ts",
         "pgs-gold-independent89--physical-tail-declared-19-actual-4-ts",
         "pgs-gold-independent89--physical-tail-declared-19-actual-7-ts",
-        "pgs-gold-independent89--physical-tail-declared-65535-actual-1-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-11-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-13-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-2-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-3-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-4-ts",
         "pgs-gold-independent89--physical-tail-declared-65535-actual-7-ts",
-        "pgs-gold-independent89--physical-tail-declared-71-actual-1-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-11-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-13-ts",
-        "pgs-gold-independent89--physical-tail-declared-71-actual-2-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-3-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-4-ts",
         "pgs-gold-independent89--physical-tail-declared-71-actual-7-ts",
@@ -1288,7 +1237,6 @@
         "pgs-gold-original140--matrix-height-577-ts",
         "pgs-gold-original140--matrix-per-entry-at-update-time-ts",
         "pgs-gold-original140--multiple-displays-one-packet-ts",
-        "pgs-gold-original140--multiple-objects-wire-order-ts",
         "pgs-gold-original140--normal-window-replacement-ts",
         "pgs-gold-original140--object-replacement-version-0-ts",
         "pgs-gold-original140--object-replacement-version-2-ts",
@@ -1338,9 +1286,6 @@
         "pgs-gold-original140--same-palette-version-new-values-ts",
         "pgs-gold-original140--source-position-outside-canvas-ts",
         "pgs-gold-original140--three-source-objects-native-two-reference-limit-ts",
-        "pgs-gold-original140--truncated-first-header-01-ts",
-        "pgs-gold-original140--truncated-first-header-02-ts",
-        "pgs-gold-original140--truncated-first-header-03-ts",
         "pgs-gold-original140--truncated-first-header-04-ts",
         "pgs-gold-original140--truncated-first-header-05-ts",
         "pgs-gold-original140--truncated-first-header-06-ts",
@@ -1468,34 +1413,20 @@
         "dvb-pes-unbounded-ts",
         "dvb-pts-wrap-ts",
         "dvb-recorded-dvb-ancillary-pages--matroska-segments-ts",
-        "dvb-recorded-dvb-ancillary-pages--pes-data-field-ts",
         "dvb-recorded-dvb-geometry-window--matroska-segments-ts",
-        "dvb-recorded-dvb-geometry-window--pes-data-field-ts",
         "dvb-recorded-dvb-map2to4--matroska-segments-ts",
-        "dvb-recorded-dvb-map2to4--pes-data-field-ts",
         "dvb-recorded-dvb-map2to8--matroska-segments-ts",
-        "dvb-recorded-dvb-map2to8--pes-data-field-ts",
         "dvb-recorded-dvb-map4to8--matroska-segments-ts",
-        "dvb-recorded-dvb-map4to8--pes-data-field-ts",
         "dvb-recorded-dvb-nonmodifying--matroska-segments-ts",
-        "dvb-recorded-dvb-nonmodifying--pes-data-field-ts",
         "dvb-recorded-dvb-palette-update-clear--matroska-segments-ts",
         "dvb-recorded-dvb-partial-alpha-projection--matroska-segments-ts",
-        "dvb-recorded-dvb-partial-alpha-projection--pes-data-field-ts",
         "dvb-recorded-dvb2-literals-fields--matroska-segments-ts",
-        "dvb-recorded-dvb2-literals-fields--pes-data-field-ts",
         "dvb-recorded-dvb2-repeat-top--matroska-segments-ts",
-        "dvb-recorded-dvb2-repeat-top--pes-data-field-ts",
         "dvb-recorded-dvb2-run-branches--matroska-segments-ts",
-        "dvb-recorded-dvb2-run-branches--pes-data-field-ts",
         "dvb-recorded-dvb4-literals-fields--matroska-segments-ts",
-        "dvb-recorded-dvb4-literals-fields--pes-data-field-ts",
         "dvb-recorded-dvb4-run-branches--matroska-segments-ts",
-        "dvb-recorded-dvb4-run-branches--pes-data-field-ts",
         "dvb-recorded-dvb8-literals-fields--matroska-segments-ts",
-        "dvb-recorded-dvb8-literals-fields--pes-data-field-ts",
         "dvb-recorded-dvb8-run-branches--matroska-segments-ts",
-        "dvb-recorded-dvb8-run-branches--pes-data-field-ts",
         "dvb-recorded-full-alpha-ts",
         "dvb-recorded-full-depth2-ts",
         "dvb-recorded-full-depth4-ts",
@@ -1550,7 +1481,6 @@
         "dvb-research-dvb-ancillary-eod-native-v1-observed--foreign-end-filter-control",
         "dvb-research-dvb-ancillary-eod-native-v1-observed--shared-ancillary-end",
         "dvb-research-dvb-ancillary-eod-native-v1-observed--shared-composition-end-compat",
-        "dvb-research-dvb-nonmodifying-observed--dvb2-literal-flag0",
         "dvb-research-dvb-nonmodifying-observed--dvb2-literal-flag1",
         "dvb-research-dvb-nonmodifying-observed--dvb2-run-flag0",
         "dvb-research-dvb-nonmodifying-observed--dvb2-run-flag1",
@@ -1599,8 +1529,6 @@
         "dvb-source-separate-descriptors",
         "dvb-source-separate-descriptors-service-0",
         "dvb-source-separate-descriptors-service-1",
-        "fixture-pgs-basic-m2ts",
-        "fixture-dvd-commands",
         "probe-all-unknown",
         "mkv-bitmap-all-unknown",
         "probe-bad-first-canvas",
@@ -1631,238 +1559,85 @@
     }
   ],
   "measurement_reference": "ffmpeg-playback-subtitle-views-plain-native",
-  "pending_module_requirements": [
-    "The DVB queue exposes at most eight regions. The reference decoder returns the full region list.",
-    "The DVB queue uses zero when the decode event has no clock. The reference AVSubtitle preserves the unknown clock.",
-    "The selected page and its ancillary pages come from the PMT descriptor. The reference's stream-wide service and page selection publishes a different display set or clear.",
-    "The player's strict subtitle PES path does not publish this length-zero private stream packet. The reference demuxer recovers its DVB segment payload.",
-    "The source player uses an explicit epoch-zero 33-bit clock. The reference demuxer reports a signed continuation across the MPEG-TS wrap.",
-    "The bridge binds to a strict, explicitly signalled DVB service and default construction requires one service. The reference demuxer can infer, merge or replace descriptor information.",
-    "The Matroska VobSub bridge requires track initialization. The reference decoder supplies default palette and canvas values when it receives an unconfigured packet.",
-    "The bridge retains the MP4 sample-table clock. The reference decoder receives the demuxer's edit-list timeline.",
-    "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "dvb-automatic-ranks-ts",
-      "requirement": "The DVB queue exposes at most eight regions. The reference decoder returns the full region list.",
+      "reading": "VobSub needs its stored palette and canvas",
+      "clause": "Matroska codec mappings draft 21 section 3.5.13 puts the VobSub palette and size lines in CodecPrivate.",
+      "candidate": "Refuses the track without its initialization.",
+      "reference": "Decodes the DVD pictures with defaults, including a first picture at time zero with a 1137-ms stop.",
+      "compat": "compat::matroska::vobsub_default_canvas for consumers recovering tracks without VobSub initialization.",
+      "cases": [
+        "dvd-mkv-private-no-private"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "dvb-clut-flags-ranges-ts",
-      "requirement": "The DVB queue exposes at most eight regions. The reference decoder returns the full region list.",
+      "reading": "DVB subtitle PES must have a finite length",
+      "clause": "ETSI EN 300 743 V1.6.1 section 6.2 Table 2 requires private_stream_1 PES and a specified length. ITU-T H.222.0 (08/2023) section 2.4.3.7 permits length zero only for TS video.",
+      "candidate": "Completes with no decoded event for the unbounded private PES.",
+      "reference": "Accepts the PES and publishes a picture at 1000000 us.",
+      "compat": "compat::dvb::accept_unbounded_subtitle_pes for consumers recovering malformed subtitle input.",
+      "cases": [
+        "dvb-pes-unbounded-ts"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "dvb-no-pts-between-ts",
-      "requirement": "The DVB queue uses zero when the decode event has no clock. The reference AVSubtitle preserves the unknown clock.",
+      "reading": "Default DVB binding needs one unambiguous service",
+      "clause": "ETSI EN 300 743 V1.6.1 section 6.1 permits several subtitle services in one PID. EN 300 468 V1.18.1 section 6.2.41 binds the chosen service to the named composition and ancillary pages. DvbTsBridge::new requires a single service.",
+      "candidate": "Refuses implicit binding with multiple service entries or descriptors. Explicit descriptor and entry operations remain in the corpus.",
+      "reference": "Implicitly opens and selects pages, returning a picture, a clear or no event depending on the source.",
+      "compat": "compat::dvb::default_demux_service for consumers using the reference service selection.",
+      "cases": [
+        "dvb-services-two-ts",
+        "dvb-services-two-ordered-ts",
+        "dvb-source-combined-services",
+        "dvb-source-separate-descriptors"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "dvb-no-pts-first-ts",
-      "requirement": "The DVB queue uses zero when the decode event has no clock. The reference AVSubtitle preserves the unknown clock.",
+      "reading": "Only the selected DVB composition and ancillary page IDs affect the queue",
+      "clause": "ETSI EN 300 468 V1.18.1 section 6.2.41 identifies the composition and ancillary pages to decode for the selected service.",
+      "candidate": "Uses the signalled ancillary data when it follows the selected composition and emits one rectangle. Emits nothing for the other-page and unsignalled-only sources.",
+      "reference": "Emits a clear with zero rectangles for the ancillary-after and other-page cases and one rectangle for the unsignalled page.",
+      "compat": "compat::dvb::demux_page_filter for clients reproducing the reference page admission.",
+      "cases": [
+        "dvb-pages-ancillary-after-ts",
+        "dvb-pages-other-first-ts",
+        "dvb-pages-unsignalled-ts"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "dvb-no-pts-palette-then-fill-ts",
-      "requirement": "The DVB queue uses zero when the decode event has no clock. The reference AVSubtitle preserves the unknown clock.",
+      "reading": "The first DVB descriptor remains explicitly selectable",
+      "clause": "ETSI EN 300 468 V1.18.1 section 6.2.41 selects the service by its language and page IDs and does not make the last descriptor override it.",
+      "candidate": "Opens descriptor zero and emits the selected page clear at 1000000 us.",
+      "reference": "Publishes no event when asked for that service; the black-box demux exposes the later descriptor.",
+      "cases": [
+        "dvb-source-separate-descriptors-service-0"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "dvb-pages-ancillary-after-ts",
-      "requirement": "The selected page and its ancillary pages come from the PMT descriptor. The reference's stream-wide service and page selection publishes a different display set or clear.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvb-pages-other-first-ts",
-      "requirement": "The selected page and its ancillary pages come from the PMT descriptor. The reference's stream-wide service and page selection publishes a different display set or clear.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvb-pages-unsignalled-ts",
-      "requirement": "The selected page and its ancillary pages come from the PMT descriptor. The reference's stream-wide service and page selection publishes a different display set or clear.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvb-pes-unbounded-ts",
-      "requirement": "The player's strict subtitle PES path does not publish this length-zero private stream packet. The reference demuxer recovers its DVB segment payload.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvb-pts-wrap-ts",
-      "requirement": "The source player uses an explicit epoch-zero 33-bit clock. The reference demuxer reports a signed continuation across the MPEG-TS wrap.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvb-recorded-dvb-palette-update-clear--matroska-segments-ts",
-      "requirement": "The source player uses an explicit epoch-zero 33-bit clock. The reference demuxer reports a signed continuation across the MPEG-TS wrap.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvb-services-two-ts",
-      "requirement": "The bridge binds to a strict, explicitly signalled DVB service and default construction requires one service. The reference demuxer can infer, merge or replace descriptor information.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvb-services-two-ordered-ts",
-      "requirement": "The bridge binds to a strict, explicitly signalled DVB service and default construction requires one service. The reference demuxer can infer, merge or replace descriptor information.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvb-fate-dvbsubtest_filter",
-      "requirement": "The bridge binds to a strict, explicitly signalled DVB service and default construction requires one service. The reference demuxer can infer, merge or replace descriptor information.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvd-mkv-private-no-private",
-      "requirement": "The Matroska VobSub bridge requires track initialization. The reference decoder supplies default palette and canvas values when it receives an unconfigured packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvd-mp4-edit-list",
-      "requirement": "The bridge retains the MP4 sample-table clock. The reference decoder receives the demuxer's edit-list timeline.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvb-source-combined-services",
-      "requirement": "The bridge binds to a strict, explicitly signalled DVB service and default construction requires one service. The reference demuxer can infer, merge or replace descriptor information.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvb-source-separate-descriptors",
-      "requirement": "The bridge binds to a strict, explicitly signalled DVB service and default construction requires one service. The reference demuxer can infer, merge or replace descriptor information.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dvb-source-separate-descriptors-service-0",
-      "requirement": "The selected page and its ancillary pages come from the PMT descriptor. The reference's stream-wide service and page selection publishes a different display set or clear.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "probe-bad-first-canvas",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-bitmap-bad-first-canvas",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "probe-combined-leading",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-bitmap-combined-leading",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-bitmap-duration-after-known",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "probe-early-canvas",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-bitmap-early-canvas",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-bitmap-known-anchor",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-bitmap-observed-relative",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "probe-packet-cap",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-bitmap-packet-cap",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-bitmap-running-relative",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "probe-observed-relative-live",
-      "requirement": "Matroska block times and inferred durations reach the candidate's bounded startup or source projection. FFmpeg rounds, anchors or leaves these laced clocks unknown along its own demux path.",
+      "reading": "Unset reserved PID bits prevent transport catalogue admission",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.4.4 and 2.4.4.9 define the reserved bits before program, PCR and elementary PIDs. The PAT reader requires those bits to be set.",
+      "candidate": "Does not admit the selected DVB stream. The input PAT encodes program_map_PID as 0010 with all reserved bits clear, and the PMT also clears them.",
+      "reference": "Accepts the signalling and publishes the DVB subtitle on PID 0x19b1, including a clear at 79679896578 us.",
+      "compat": "compat::psi::allow_zero_pid_reserved_bits for callers recovering nonconforming captured tables.",
+      "cases": [
+        "dvb-fate-dvbsubtest_filter"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

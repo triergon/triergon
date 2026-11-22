@@ -41,7 +41,8 @@ record, `compat::matroska::legacy_aac_lc_initialization` derives AAC-LC
 configuration from the Audio element's indexed sampling frequency and a count
 of one to six channels. A present Audio element can use the EBML defaults for
 its children. Larger layouts require explicit initialization. The feed
-preserves the source packet bytes.
+preserves the source packet bytes. Discovery replays packets in source
+order with the original signed Block time and exact nanosecond CodecDelay.
 The legacy compatibility clock keeps a missing duration unknown.
 
 **Generations.** Feeds, bridges, clocks and subtitle receivers are bound to one
@@ -63,6 +64,9 @@ table of an `mp4s` entry, and its `Mp4DvdTrack` hands each sample to
 `DvdReceiver`; a subpicture without a stop ends with its packet's duration.
 A Matroska VobSub track's `vobsub_settings` reads its palette and canvas; the
 DVD queue places pictures on that canvas.
+The DVB queue exposes up to eight rectangles per picture in decoder order
+and uses zero before it has a presentation clock. Explicit service binding
+keeps the selected composition and ancillary pages.
 Teletext pages and closed captions become opaque ASS `TextSource`s, which
 `TextBridge` reports as it reports a Matroska ASS track's cues; an empty
 teletext page is a clear. A teletext decode needs the decoder's whole packet
@@ -103,6 +107,8 @@ cue bytes, bitmap geometry and pixels, palettes, and presentation clocks
 against the corresponding FFmpeg decoder outputs. MP4 captions use
 sample-table time before applying movie edits. Teletext clear events carry a
 timestamp and cues also carry their display duration when known.
+The text comparison preserves the source cue extent and text even when the
+reference decoder normalizes or suppresses it.
 
 The integration tests (`tests/it`) read the fixtures of `crates/playback/tests/fixtures`.
 Fixture provenance: [AV1](../playback/tests/fixtures/av1/README.md),

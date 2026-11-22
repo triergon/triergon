@@ -806,26 +806,6 @@
       }
     },
     {
-      "id": "pgs-gold-independent89--clock-unknown-zero-ts",
-      "profile": "ts-pgs-ts-pgs",
-      "file": ".research/subtitle-corpus/pgs/gold-independent89--clock-unknown-zero.ts",
-      "sha256": "a4b31788400e185555ed358eb3d8439c6f9f8ceb129df24bfed83e2bede53b39",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-unknown-zero/input.bin",
-      "arguments": [
-        "ts-pgs",
-        "ts",
-        "pgs",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 260,
-        "bytes": 2,
-        "digest": 7531269039980164849
-      }
-    },
-    {
       "id": "pgs-gold-independent89--fragment-early-17x3-ts",
       "profile": "ts-pgs-ts-pgs",
       "file": ".research/subtitle-corpus/pgs/gold-independent89--fragment-early-17x3.ts",
@@ -1686,26 +1666,6 @@
       }
     },
     {
-      "id": "pgs-gold-independent89--physical-tail-declared-65535-actual-1-ts",
-      "profile": "ts-pgs-ts-pgs",
-      "file": ".research/subtitle-corpus/pgs/gold-independent89--physical-tail-declared-65535-actual-1.ts",
-      "sha256": "fd991f6db9e210778fd46fe3a9f98b974caabe3f8c0a2096803467bf381189a0",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-1/input.bin",
-      "arguments": [
-        "ts-pgs",
-        "ts",
-        "pgs",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 279
-      }
-    },
-    {
       "id": "pgs-gold-independent89--physical-tail-declared-65535-actual-11-ts",
       "profile": "ts-pgs-ts-pgs",
       "file": ".research/subtitle-corpus/pgs/gold-independent89--physical-tail-declared-65535-actual-11.ts",
@@ -1826,26 +1786,6 @@
       }
     },
     {
-      "id": "pgs-gold-independent89--physical-tail-declared-71-actual-1-ts",
-      "profile": "ts-pgs-ts-pgs",
-      "file": ".research/subtitle-corpus/pgs/gold-independent89--physical-tail-declared-71-actual-1.ts",
-      "sha256": "fd991f6db9e210778fd46fe3a9f98b974caabe3f8c0a2096803467bf381189a0",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-1/input.bin",
-      "arguments": [
-        "ts-pgs",
-        "ts",
-        "pgs",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 279
-      }
-    },
-    {
       "id": "pgs-gold-independent89--physical-tail-declared-71-actual-11-ts",
       "profile": "ts-pgs-ts-pgs",
       "file": ".research/subtitle-corpus/pgs/gold-independent89--physical-tail-declared-71-actual-11.ts",
@@ -1872,26 +1812,6 @@
       "sha256": "7bb402e4aa9b0843a2c3fbcfb677f4305523e1fd647848d563d13f6f01f6e96a",
       "rights": "authored-synthetic",
       "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-13/input.bin",
-      "arguments": [
-        "ts-pgs",
-        "ts",
-        "pgs",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 279
-      }
-    },
-    {
-      "id": "pgs-gold-independent89--physical-tail-declared-71-actual-2-ts",
-      "profile": "ts-pgs-ts-pgs",
-      "file": ".research/subtitle-corpus/pgs/gold-independent89--physical-tail-declared-71-actual-2.ts",
-      "sha256": "4b52ef24ce84effd8eb1d92d30264d918fac43a08689ef165c8b3634b08b0c11",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-2/input.bin",
       "arguments": [
         "ts-pgs",
         "ts",
@@ -3768,26 +3688,6 @@
       }
     },
     {
-      "id": "pgs-gold-original140--multiple-objects-wire-order-ts",
-      "profile": "ts-pgs-ts-pgs",
-      "file": ".research/subtitle-corpus/pgs/gold-original140--multiple-objects-wire-order.ts",
-      "sha256": "344cfa6dfeb82b0dbfcfae0ca2293eb1ff12cc190c502223698f973b2aca3930",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--multiple-objects-wire-order/input.bin",
-      "arguments": [
-        "ts-pgs",
-        "ts",
-        "pgs",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 519,
-        "bytes": 4,
-        "digest": 17593602150758629078
-      }
-    },
-    {
       "id": "pgs-gold-original140--normal-window-replacement-ts",
       "profile": "ts-pgs-ts-pgs",
       "file": ".research/subtitle-corpus/pgs/gold-original140--normal-window-replacement.ts",
@@ -4768,66 +4668,6 @@
       }
     },
     {
-      "id": "pgs-gold-original140--truncated-first-header-01-ts",
-      "profile": "ts-pgs-ts-pgs",
-      "file": ".research/subtitle-corpus/pgs/gold-original140--truncated-first-header-01.ts",
-      "sha256": "fd991f6db9e210778fd46fe3a9f98b974caabe3f8c0a2096803467bf381189a0",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-01/input.bin",
-      "arguments": [
-        "ts-pgs",
-        "ts",
-        "pgs",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 279
-      }
-    },
-    {
-      "id": "pgs-gold-original140--truncated-first-header-02-ts",
-      "profile": "ts-pgs-ts-pgs",
-      "file": ".research/subtitle-corpus/pgs/gold-original140--truncated-first-header-02.ts",
-      "sha256": "4b52ef24ce84effd8eb1d92d30264d918fac43a08689ef165c8b3634b08b0c11",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-02/input.bin",
-      "arguments": [
-        "ts-pgs",
-        "ts",
-        "pgs",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 279
-      }
-    },
-    {
-      "id": "pgs-gold-original140--truncated-first-header-03-ts",
-      "profile": "ts-pgs-ts-pgs",
-      "file": ".research/subtitle-corpus/pgs/gold-original140--truncated-first-header-03.ts",
-      "sha256": "7b26aaa9aa14a41f0b225e6d7113006b5722a56dd89a5e01b382c0720b4dbde9",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-03/input.bin",
-      "arguments": [
-        "ts-pgs",
-        "ts",
-        "pgs",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 279
-      }
-    },
-    {
       "id": "pgs-gold-original140--truncated-first-header-04-ts",
       "profile": "ts-pgs-ts-pgs",
       "file": ".research/subtitle-corpus/pgs/gold-original140--truncated-first-header-04.ts",
@@ -5262,9 +5102,9 @@
         "1"
       ],
       "expected": {
-        "packets": 249,
-        "bytes": 477,
-        "digest": 5632364405521238478
+        "packets": 173,
+        "bytes": 451,
+        "digest": 17101922651144899285
       }
     },
     {
@@ -5522,9 +5362,9 @@
         "1"
       ],
       "expected": {
-        "packets": 1976,
-        "bytes": 504,
-        "digest": 3013694868541979495
+        "packets": 842,
+        "bytes": 192,
+        "digest": 15091174120950250584
       }
     },
     {
@@ -6664,7 +6504,7 @@
       "expected": {
         "packets": 89,
         "bytes": 384,
-        "digest": 11938571028356329665
+        "digest": 2715198991501553857
       }
     },
     {
@@ -6684,7 +6524,7 @@
       "expected": {
         "packets": 67,
         "bytes": 288,
-        "digest": 7388887686296917605
+        "digest": 16612259723151693413
       }
     },
     {
@@ -6704,7 +6544,7 @@
       "expected": {
         "packets": 111,
         "bytes": 480,
-        "digest": 11979343047563263929
+        "digest": 2755971010708488121
       }
     },
     {
@@ -7344,33 +7184,13 @@
       "expected": {
         "packets": 46,
         "bytes": 192,
-        "digest": 4427562579740679985
+        "digest": 659224879904602520
       }
     },
     {
       "id": "dvb-recorded-dvb-ancillary-pages--matroska-segments-ts",
       "profile": "ts-dvb-ts-dvb",
       "file": ".research/subtitle-corpus/dvb/recorded-dvb-ancillary-pages--matroska-segments.ts",
-      "sha256": "ca5e9512374681cf6f8b6f1e3c7a06efb741b8ee947c1f0d8f8b175eb5b77349",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 9,
-        "bytes": 8,
-        "digest": 18109754273453416377
-      }
-    },
-    {
-      "id": "dvb-recorded-dvb-ancillary-pages--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb-ancillary-pages--pes-data-field.ts",
       "sha256": "ca5e9512374681cf6f8b6f1e3c7a06efb741b8ee947c1f0d8f8b175eb5b77349",
       "rights": "authored-synthetic",
       "source": "harness/subtitles/dvb_streams.py",
@@ -7408,49 +7228,9 @@
       }
     },
     {
-      "id": "dvb-recorded-dvb-geometry-window--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb-geometry-window--pes-data-field.ts",
-      "sha256": "5a6e376fef0938bcc83824f3d7eec4cd6b2c87fce6863394021e31cb27b37d5a",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 9,
-        "bytes": 8,
-        "digest": 15414869417073768504
-      }
-    },
-    {
       "id": "dvb-recorded-dvb-map2to4--matroska-segments-ts",
       "profile": "ts-dvb-ts-dvb",
       "file": ".research/subtitle-corpus/dvb/recorded-dvb-map2to4--matroska-segments.ts",
-      "sha256": "700132bacac6827dd2be6ef70b419ee431467ba868576d3fb363429f85305948",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 21,
-        "bytes": 8,
-        "digest": 5172167120064827666
-      }
-    },
-    {
-      "id": "dvb-recorded-dvb-map2to4--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb-map2to4--pes-data-field.ts",
       "sha256": "700132bacac6827dd2be6ef70b419ee431467ba868576d3fb363429f85305948",
       "rights": "authored-synthetic",
       "source": "harness/subtitles/dvb_streams.py",
@@ -7488,49 +7268,9 @@
       }
     },
     {
-      "id": "dvb-recorded-dvb-map2to8--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb-map2to8--pes-data-field.ts",
-      "sha256": "96242f863b04c6c09cf0d496d7366ba3cfc29f8ae93d141ae215177eee49bc45",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 261,
-        "bytes": 8,
-        "digest": 15043308813308063802
-      }
-    },
-    {
       "id": "dvb-recorded-dvb-map4to8--matroska-segments-ts",
       "profile": "ts-dvb-ts-dvb",
       "file": ".research/subtitle-corpus/dvb/recorded-dvb-map4to8--matroska-segments.ts",
-      "sha256": "56b0ef96af1af81465d66664d85a9f0a741461df6c93e6535eef8d16138645fe",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 261,
-        "bytes": 16,
-        "digest": 13721737859808712254
-      }
-    },
-    {
-      "id": "dvb-recorded-dvb-map4to8--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb-map4to8--pes-data-field.ts",
       "sha256": "56b0ef96af1af81465d66664d85a9f0a741461df6c93e6535eef8d16138645fe",
       "rights": "authored-synthetic",
       "source": "harness/subtitles/dvb_streams.py",
@@ -7568,26 +7308,6 @@
       }
     },
     {
-      "id": "dvb-recorded-dvb-nonmodifying--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb-nonmodifying--pes-data-field.ts",
-      "sha256": "b44dcf4ab32c872852ab432c8af30b58a7b9a900b4f332f680e7007018be07c8",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 9,
-        "bytes": 12,
-        "digest": 11543321600253466173
-      }
-    },
-    {
       "id": "dvb-recorded-dvb-palette-update-clear--matroska-segments-ts",
       "profile": "ts-dvb-ts-dvb",
       "file": ".research/subtitle-corpus/dvb/recorded-dvb-palette-update-clear--matroska-segments.ts",
@@ -7604,33 +7324,13 @@
       "expected": {
         "packets": 18,
         "bytes": 16,
-        "digest": 16409277799982200286
+        "digest": 17186944479671561029
       }
     },
     {
       "id": "dvb-recorded-dvb-partial-alpha-projection--matroska-segments-ts",
       "profile": "ts-dvb-ts-dvb",
       "file": ".research/subtitle-corpus/dvb/recorded-dvb-partial-alpha-projection--matroska-segments.ts",
-      "sha256": "1c0e748d2a9d752b47e1c9487ec19d5d62dd231f3de1603a3ff2d04c91618233",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 9,
-        "bytes": 8,
-        "digest": 5622765858130884601
-      }
-    },
-    {
-      "id": "dvb-recorded-dvb-partial-alpha-projection--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb-partial-alpha-projection--pes-data-field.ts",
       "sha256": "1c0e748d2a9d752b47e1c9487ec19d5d62dd231f3de1603a3ff2d04c91618233",
       "rights": "authored-synthetic",
       "source": "harness/subtitles/dvb_streams.py",
@@ -7668,49 +7368,9 @@
       }
     },
     {
-      "id": "dvb-recorded-dvb2-literals-fields--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb2-literals-fields--pes-data-field.ts",
-      "sha256": "c1f23d98834827a41321d11f5b05961907675e333038a65a05d322baa53fb72f",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 11,
-        "bytes": 32,
-        "digest": 11519016696670224191
-      }
-    },
-    {
       "id": "dvb-recorded-dvb2-repeat-top--matroska-segments-ts",
       "profile": "ts-dvb-ts-dvb",
       "file": ".research/subtitle-corpus/dvb/recorded-dvb2-repeat-top--matroska-segments.ts",
-      "sha256": "c77904374186452d44b0c981cf520fdf6ff9e73a6a43a4b3db0037698234e456",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 11,
-        "bytes": 16,
-        "digest": 1441621134047072947
-      }
-    },
-    {
-      "id": "dvb-recorded-dvb2-repeat-top--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb2-repeat-top--pes-data-field.ts",
       "sha256": "c77904374186452d44b0c981cf520fdf6ff9e73a6a43a4b3db0037698234e456",
       "rights": "authored-synthetic",
       "source": "harness/subtitles/dvb_streams.py",
@@ -7748,49 +7408,9 @@
       }
     },
     {
-      "id": "dvb-recorded-dvb2-run-branches--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb2-run-branches--pes-data-field.ts",
-      "sha256": "8768a95bacfaab987dd96eb159e4cf78ada831127ab8ccb207595bcec663f853",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 9,
-        "bytes": 736,
-        "digest": 9256393691857648485
-      }
-    },
-    {
       "id": "dvb-recorded-dvb4-literals-fields--matroska-segments-ts",
       "profile": "ts-dvb-ts-dvb",
       "file": ".research/subtitle-corpus/dvb/recorded-dvb4-literals-fields--matroska-segments.ts",
-      "sha256": "bb92d974a24e33e0828fadef6bc765284f05c33f6dd56456206e5dfd6a0cee89",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 21,
-        "bytes": 12,
-        "digest": 1281071308652661201
-      }
-    },
-    {
-      "id": "dvb-recorded-dvb4-literals-fields--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb4-literals-fields--pes-data-field.ts",
       "sha256": "bb92d974a24e33e0828fadef6bc765284f05c33f6dd56456206e5dfd6a0cee89",
       "rights": "authored-synthetic",
       "source": "harness/subtitles/dvb_streams.py",
@@ -7828,26 +7448,6 @@
       }
     },
     {
-      "id": "dvb-recorded-dvb4-run-branches--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb4-run-branches--pes-data-field.ts",
-      "sha256": "00004b5c1ef2bf6454309d05d5daa834895a5f16604a2a99f13eff68af852b94",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 21,
-        "bytes": 728,
-        "digest": 11004961829832620254
-      }
-    },
-    {
       "id": "dvb-recorded-dvb8-literals-fields--matroska-segments-ts",
       "profile": "ts-dvb-ts-dvb",
       "file": ".research/subtitle-corpus/dvb/recorded-dvb8-literals-fields--matroska-segments.ts",
@@ -7868,49 +7468,9 @@
       }
     },
     {
-      "id": "dvb-recorded-dvb8-literals-fields--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb8-literals-fields--pes-data-field.ts",
-      "sha256": "7ca438f036c6660fbf1877f27b4e05d3680f7bc2cf6c90926ccb0b9a65245d43",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 261,
-        "bytes": 12,
-        "digest": 11950810673341019516
-      }
-    },
-    {
       "id": "dvb-recorded-dvb8-run-branches--matroska-segments-ts",
       "profile": "ts-dvb-ts-dvb",
       "file": ".research/subtitle-corpus/dvb/recorded-dvb8-run-branches--matroska-segments.ts",
-      "sha256": "86ac02eb96f203c2eab6174fa392e7f02fd3df76f8de9228b0edff9fea26b7db",
-      "rights": "authored-synthetic",
-      "source": "harness/subtitles/dvb_streams.py",
-      "arguments": [
-        "ts-dvb",
-        "ts",
-        "dvb",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 261,
-        "bytes": 518,
-        "digest": 10641262462244413507
-      }
-    },
-    {
-      "id": "dvb-recorded-dvb8-run-branches--pes-data-field-ts",
-      "profile": "ts-dvb-ts-dvb",
-      "file": ".research/subtitle-corpus/dvb/recorded-dvb8-run-branches--pes-data-field.ts",
       "sha256": "86ac02eb96f203c2eab6174fa392e7f02fd3df76f8de9228b0edff9fea26b7db",
       "rights": "authored-synthetic",
       "source": "harness/subtitles/dvb_streams.py",
@@ -9013,26 +8573,6 @@
       }
     },
     {
-      "id": "dvb-research-dvb-nonmodifying-observed--dvb2-literal-flag0",
-      "profile": "mkv-bitmap-mkv-dvb",
-      "file": ".research/subtitle-corpus/dvb/research/dvb-nonmodifying-observed--dvb2-literal-flag0.mkv",
-      "sha256": "ac86a3f4bc475c4341d154b06104c4348c2c8545ef38a8c6df2a6ad2bf3a6288",
-      "rights": "authored-synthetic",
-      "source": ".research/dvb-nonmodifying-observed/inputs/dvb2-literal-flag0.mkv",
-      "arguments": [
-        "mkv-bitmap",
-        "mkv",
-        "dvb",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 9,
-        "bytes": 10,
-        "digest": 7100559366339367294
-      }
-    },
-    {
       "id": "dvb-research-dvb-nonmodifying-observed--dvb2-literal-flag1",
       "profile": "mkv-bitmap-mkv-dvb",
       "file": ".research/subtitle-corpus/dvb/research/dvb-nonmodifying-observed--dvb2-literal-flag1.mkv",
@@ -9807,9 +9347,9 @@
         "0"
       ],
       "expected": {
-        "packets": 123,
-        "bytes": 16918,
-        "digest": 1041497721207996205
+        "packets": 155,
+        "bytes": 23782,
+        "digest": 10151183031162379944
       }
     },
     {
@@ -9999,46 +9539,6 @@
       }
     },
     {
-      "id": "fixture-pgs-basic-m2ts",
-      "profile": "ts-pgs-m2ts-pgs",
-      "file": "crates/playback/tests/fixtures/subtitles/pgs-basic.m2ts",
-      "sha256": "92a2d25df2e6a322be96a67be382acc0a777815c04082f0dd11bc5abd96001d3",
-      "rights": "authored-synthetic",
-      "source": "crates/playback/tests/fixtures/subtitles/pgs-basic.m2ts",
-      "arguments": [
-        "ts-pgs",
-        "m2ts",
-        "pgs",
-        "0",
-        "1"
-      ],
-      "expected": {
-        "packets": 320,
-        "bytes": 24000,
-        "digest": 7463299765863720690
-      }
-    },
-    {
-      "id": "fixture-dvd-commands",
-      "profile": "mp4-dvd-mov-dvd",
-      "file": "crates/playback/tests/fixtures/subtitles/dvd-commands.mp4",
-      "sha256": "34a22e6f89a858d78f5cd1cd0fd5b62843ffa0c9634fe71f1447e0a8d5e4087f",
-      "rights": "authored-synthetic",
-      "source": "crates/playback/tests/fixtures/subtitles/dvd-commands.mp4",
-      "arguments": [
-        "mp4-dvd",
-        "mov",
-        "dvd",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 155,
-        "bytes": 3168,
-        "digest": 12203238094179226260
-      }
-    },
-    {
       "id": "probe-all-unknown",
       "profile": "mkv-bitmap-probe-mkv-pgs",
       "file": "crates/playback/tests/fixtures/matroska-subtitle-probe/all-unknown.mkv",
@@ -10095,7 +9595,7 @@
       "expected": {
         "packets": 266,
         "bytes": 78,
-        "digest": 13468888043765028250
+        "digest": 5030621106753495282
       }
     },
     {
@@ -10115,7 +9615,7 @@
       "expected": {
         "packets": 260,
         "bytes": 2,
-        "digest": 16754641076834940657
+        "digest": 7531269039980164849
       }
     },
     {
@@ -10135,7 +9635,7 @@
       "expected": {
         "packets": 265,
         "bytes": 88,
-        "digest": 15990710791626897074
+        "digest": 17882944201151040514
       }
     },
     {
@@ -10155,7 +9655,7 @@
       "expected": {
         "packets": 260,
         "bytes": 2,
-        "digest": 16754641076834940657
+        "digest": 7531269039980164849
       }
     },
     {
@@ -10195,7 +9695,7 @@
       "expected": {
         "packets": 260,
         "bytes": 2,
-        "digest": 9161757951432499425
+        "digest": 13170386334495091713
       }
     },
     {
@@ -10215,7 +9715,7 @@
       "expected": {
         "packets": 265,
         "bytes": 73,
-        "digest": 5492780650538468321
+        "digest": 9170897714895078113
       }
     },
     {
@@ -10235,7 +9735,7 @@
       "expected": {
         "packets": 260,
         "bytes": 2,
-        "digest": 16754641076834940657
+        "digest": 7531269039980164849
       }
     },
     {
@@ -10275,7 +9775,7 @@
       "expected": {
         "packets": 260,
         "bytes": 2,
-        "digest": 11692718993233313169
+        "digest": 6630796909631685681
       }
     },
     {
@@ -10395,7 +9895,7 @@
       "expected": {
         "packets": 260,
         "bytes": 2,
-        "digest": 16754641076834940657
+        "digest": 7531269039980164849
       }
     },
     {
@@ -10415,7 +9915,7 @@
       "expected": {
         "packets": 267,
         "bytes": 106,
-        "digest": 11844091699083144819
+        "digest": 766521637966676507
       }
     },
     {
@@ -10435,7 +9935,7 @@
       "expected": {
         "packets": 260,
         "bytes": 2,
-        "digest": 16754641076834940657
+        "digest": 7531269039980164849
       }
     },
     {
@@ -10475,7 +9975,7 @@
       "expected": {
         "packets": 260,
         "bytes": 2,
-        "digest": 13357298974534572497
+        "digest": 6630796909631685681
       }
     },
     {
@@ -10536,7 +10036,7 @@
       "expected": {
         "packets": 265,
         "bytes": 73,
-        "digest": 9170897714895078113
+        "digest": 5492780650538468321
       }
     }
   ]

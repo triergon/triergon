@@ -187,10 +187,15 @@ static int subtitle_bridge_text_event(ViewWork *work, const AVSubtitle *subtitle
 static void subtitle_bridge_bitmap_event(ViewWork *work, const AVSubtitle *subtitle, enum AVCodecID codec)
 {
     int dvd = codec == AV_CODEC_ID_DVD_SUBTITLE;
-    uint64_t fields[] = {(uint64_t)subtitle->pts, dvd ? subtitle->start_display_time : 0,
-                         dvd ? subtitle->end_display_time : BRIDGE_ABSENT, subtitle->num_rects};
+    int dvb = codec == AV_CODEC_ID_DVB_SUBTITLE;
+    /* Apply the public DVB queue's clock fallback and region capacity.
+     * The diagnostic decoder event still carries every region and its clock. */
+    int64_t pts = dvb && subtitle->pts == AV_NOPTS_VALUE ? 0 : subtitle->pts;
+    unsigned regions = dvb && subtitle->num_rects > 8 ? 8 : subtitle->num_rects;
+    uint64_t fields[] = {(uint64_t)pts, dvd ? subtitle->start_display_time : 0,
+                         dvd ? subtitle->end_display_time : BRIDGE_ABSENT, regions};
     subtitle_bridge_record(work, 4, fields, 4, NULL, 0);
-    for (unsigned i = 0; i < subtitle->num_rects; ++i) {
+    for (unsigned i = 0; i < regions; ++i) {
         const AVSubtitleRect *rect = subtitle->rects[i];
         const uint32_t *palette = rect->type == SUBTITLE_BITMAP ? (const uint32_t *)rect->data[1] : NULL;
         int colors = palette ? rect->nb_colors : 0;
@@ -262,6 +267,166 @@ static int subtitle_bridge_decode(BridgeDecode *run, AVPacket *packet)
     }
     avsubtitle_free(&event);
     return result;
+}
+
+typedef struct {
+    int64_t next, shift;
+    int anchored;
+} BridgePgsClock;
+
+typedef struct {
+    AVPacket *packet;
+    int relative;
+} BridgePgsRow;
+
+/* Apply the caller's clock boundary to the public, pre-probe demux packet
+ * stream. A duration advances the clock, and the first known PTS anchors
+ * all relative stamps within the retained prefix. */
+static int subtitle_bridge_pgs_stamp(BridgePgsClock *clock, AVPacket *packet, int *relative)
+{
+    *relative = 0;
+    if (packet->pts != AV_NOPTS_VALUE) {
+        if (!clock->anchored) {
+            if (__builtin_sub_overflow(packet->pts, clock->next, &clock->shift))
+                return AVERROR_INVALIDDATA;
+            clock->anchored = 1;
+        }
+        clock->next = packet->pts;
+    } else if (packet->duration > 0) {
+        packet->pts = clock->next;
+        *relative = !clock->anchored;
+    }
+    if (__builtin_add_overflow(clock->next, packet->duration, &clock->next))
+        return AVERROR_INVALIDDATA;
+    return 0;
+}
+
+static int subtitle_bridge_pgs_decode(BridgeDecode *run, AVPacket *packet, int relative,
+                                     int64_t shift)
+{
+    if (relative && __builtin_add_overflow(packet->pts, shift, &packet->pts))
+        return AVERROR_INVALIDDATA;
+    return subtitle_bridge_decode(run, packet);
+}
+
+static int subtitle_bridge_pgs_probe(const ViewCase *input, BridgeDecode *run,
+                                    AVFormatContext *format, AVPacket *packet, int selected)
+{
+    const size_t limit = 65536;
+    size_t boundary = limit;
+    const char option[] = "opt:probe_packets=";
+    for (int i = 5; i < input->argc; ++i) {
+        if (!strncmp(input->argv[i], option, sizeof(option) - 1)) {
+            const char *value = input->argv[i] + sizeof(option) - 1;
+            char *end;
+            unsigned long count = strtoul(value, &end, 10);
+            if (value == end || *end || count > limit)
+                return AVERROR_INVALIDDATA;
+            boundary = (size_t)count;
+        }
+    }
+
+    BridgePgsClock clock = {0};
+    BridgePgsRow *rows = NULL;
+    size_t leading = 0, untimed = 0, used = 0, capacity = 0, fill = 0;
+    int64_t first = 0, span = 0;
+    int saw_duration = 0, relative_fill = 1;
+    int rc = 0;
+    while (used < boundary && (rc = av_read_frame(format, packet)) >= 0) {
+        if (packet->stream_index != selected) {
+            av_packet_unref(packet);
+            continue;
+        }
+        if (run->work->trace)
+            fprintf(stderr, "PGS source packet %zu: PTS %" PRId64 ", duration %" PRId64 "\n",
+                    used, packet->pts, packet->duration);
+        if (!saw_duration && packet->duration > 0) {
+            saw_duration = 1;
+            fill = leading;
+            span = packet->duration;
+            if (fill && clock.anchored) {
+                int64_t back;
+                relative_fill = 0;
+                if (__builtin_mul_overflow(span, (int64_t)untimed, &back) ||
+                    __builtin_sub_overflow(clock.shift, back, &first))
+                    goto invalid;
+                if (untimed)
+                    fill = untimed;
+            }
+            if (fill && fill == used) {
+                int64_t elapsed;
+                if (__builtin_mul_overflow(span, (int64_t)fill, &elapsed) ||
+                    __builtin_add_overflow(first, elapsed, &clock.next))
+                    goto invalid;
+            }
+        } else if (!saw_duration && leading == used &&
+                   (packet->pts == AV_NOPTS_VALUE || !clock.anchored || clock.shift == packet->pts)) {
+            ++leading;
+            if (!clock.anchored && packet->pts == AV_NOPTS_VALUE)
+                ++untimed;
+        }
+        int relative;
+        rc = subtitle_bridge_pgs_stamp(&clock, packet, &relative);
+        if (rc < 0)
+            goto done;
+        if (used == capacity) {
+            capacity = capacity ? capacity * 2 : 16;
+            BridgePgsRow *grown = av_realloc_array(rows, capacity, sizeof(*rows));
+            if (!grown)
+                goto no_memory;
+            rows = grown;
+        }
+        AVPacket *retained = av_packet_alloc();
+        if (!retained)
+            goto no_memory;
+        av_packet_move_ref(retained, packet);
+        rows[used++] = (BridgePgsRow){retained, relative};
+    }
+    if (rc < 0 && rc != AVERROR_EOF)
+        goto done;
+    for (size_t i = 0; i < used; ++i) {
+        BridgePgsRow *row = &rows[i];
+        if (i < fill) {
+            int64_t elapsed;
+            if (__builtin_mul_overflow(span, (int64_t)i, &elapsed) ||
+                __builtin_add_overflow(first, elapsed, &row->packet->pts))
+                goto invalid;
+            row->packet->duration = span;
+            row->relative = relative_fill;
+        }
+        const int result = subtitle_bridge_pgs_decode(run, row->packet, row->relative, clock.shift);
+        if (result < 0) {
+            rc = result;
+            goto done;
+        }
+    }
+    if (rc == AVERROR_EOF)
+        goto done;
+    while ((rc = av_read_frame(format, packet)) >= 0) {
+        if (packet->stream_index == selected) {
+            if (run->work->trace)
+                fprintf(stderr, "PGS live source packet: PTS %" PRId64 ", duration %" PRId64 "\n",
+                        packet->pts, packet->duration);
+            int relative;
+            rc = subtitle_bridge_pgs_stamp(&clock, packet, &relative);
+            if (rc >= 0)
+                rc = subtitle_bridge_pgs_decode(run, packet, relative, clock.shift);
+        }
+        av_packet_unref(packet);
+        if (rc < 0)
+            goto done;
+    }
+    goto done;
+invalid:
+    rc = AVERROR_INVALIDDATA;
+    goto done;
+no_memory:
+    rc = AVERROR(ENOMEM);
+done:
+    for (size_t i = 0; i < used; ++i)
+        av_packet_free(&rows[i].packet);
+    av_free(rows);
+    return rc;
 }
 
 static int subtitle_bridge_open_video(AVCodecContext **context, const AVStream *stream)
@@ -386,6 +551,13 @@ static int subtitle_bridge_consume(const ViewCase *input, ViewWork *work)
     const char *carrier = input->argv[1];
     enum AVCodecID codec = subtitle_bridge_codec(input->argv[2]);
     int from_video = codec == AV_CODEC_ID_EIA_608;
+    /* MatroskaBitmapTrack::packet feeds the pre-probe clock to PGS. */
+    int probe_pgs = codec == AV_CODEC_ID_HDMV_PGS_SUBTITLE &&
+                    !strcmp(input->argv[0], "mkv-bitmap-probe");
+    int preprobe_pgs = probe_pgs || (codec == AV_CODEC_ID_HDMV_PGS_SUBTITLE &&
+                       !strcmp(input->argv[0], "mkv-bitmap"));
+    if (preprobe_pgs)
+        format->flags |= AVFMT_FLAG_NOPARSE | AVFMT_FLAG_NOFILLIN;
     const char *family = !strcmp(carrier, "mov") ? "mov" :
                          !strcmp(carrier, "mkv") ? "matroska" : "mpegts";
     const AVInputFormat *demuxer = av_find_input_format(family);
@@ -393,9 +565,13 @@ static int subtitle_bridge_consume(const ViewCase *input, ViewWork *work)
         rc = AVERROR_DEMUXER_NOT_FOUND;
         goto done;
     }
-    /* The MOV caption bridge consumes sample-table clocks. */
-    if (!strcmp(carrier, "mov") && from_video &&
+    /* The MOV caption and DVD bridges consume sample-table clocks. */
+    if (!strcmp(carrier, "mov") && (from_video || codec == AV_CODEC_ID_DVD_SUBTITLE) &&
         (rc = av_dict_set(&demux_options, "ignore_editlist", "1", 0)) < 0)
+        goto done;
+    /* Select the source's first 33-bit epoch for transport DVB. */
+    if (!strcmp(input->argv[0], "ts-dvb") &&
+        (rc = av_dict_set(&demux_options, "correct_ts_overflow", "0", 0)) < 0)
         goto done;
     if ((rc = avformat_open_input(&format, NULL, demuxer, &demux_options)) < 0)
         goto done;
@@ -403,7 +579,7 @@ static int subtitle_bridge_consume(const ViewCase *input, ViewWork *work)
         rc = AVERROR_OPTION_NOT_FOUND;
         goto done;
     }
-    if ((rc = avformat_find_stream_info(format, NULL)) < 0)
+    if (!preprobe_pgs && (rc = avformat_find_stream_info(format, NULL)) < 0)
         goto done;
     int selected = subtitle_bridge_select(format, codec, from_video, strtol(input->argv[3], NULL, 10), strtol(input->argv[4], NULL, 10));
     if (selected < 0) {
@@ -443,15 +619,19 @@ static int subtitle_bridge_consume(const ViewCase *input, ViewWork *work)
     BridgeDecode run = {.decoder = decoder, .work = work, .codec = codec, .base = stream->time_base,
                         .text = !strcmp(input->argv[0], "text"),
                         .probe = !strcmp(input->argv[0], "mkv-bitmap-probe")};
-    while ((rc = av_read_frame(format, packet)) >= 0) {
-        if (packet->stream_index == selected) {
-            if (work->trace && !strcmp(carrier, "mkv") && codec == AV_CODEC_ID_DVB_SUBTITLE)
-                printf("# Matroska DVB demux DTS %" PRId64 "\n", packet->dts);
-            rc = from_video ? subtitle_bridge_decode_video(&run, video, frame, packet, caption) : subtitle_bridge_decode(&run, packet);
+    if (probe_pgs) {
+        rc = subtitle_bridge_pgs_probe(input, &run, format, packet, selected);
+    } else {
+        while ((rc = av_read_frame(format, packet)) >= 0) {
+            if (packet->stream_index == selected) {
+                if (work->trace && !strcmp(carrier, "mkv") && codec == AV_CODEC_ID_DVB_SUBTITLE)
+                    printf("# Matroska DVB demux DTS %" PRId64 "\n", packet->dts);
+                rc = from_video ? subtitle_bridge_decode_video(&run, video, frame, packet, caption) : subtitle_bridge_decode(&run, packet);
+            }
+            av_packet_unref(packet);
+            if (rc < 0)
+                goto done;
         }
-        av_packet_unref(packet);
-        if (rc < 0)
-            goto done;
     }
     if (rc != AVERROR_EOF)
         goto done;
