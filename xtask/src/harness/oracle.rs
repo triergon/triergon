@@ -35,6 +35,7 @@ impl Kind {
             "source-signatures",
             "facade-source-control",
             "facade-mpegts-controls",
+            "playback-probe-lifecycle",
             "ac3-features",
             "elementary-metadata",
             "opus-final-range",

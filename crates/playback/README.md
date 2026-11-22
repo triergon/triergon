@@ -134,6 +134,9 @@ checks that the selected format agrees with the handoff over fixed prefixes
 and checks the bytes delivered after selection. It also checks carrier-width
 evidence when a prefix supplies the three TS188 sync positions before the playback
 probe has enough bytes to select.
+The [probe lifecycle comparison](../../harness/features/playback-probe-lifecycle/contract.json)
+checks that a sequential source is never rewound and that handoff, failure
+and cancellation invalidate or close its source owner as specified.
 The [source-view comparison](../../harness/features/playback-source-view/contract.json)
 checks direct-player track metadata and complete forward packet streams. For
 Matroska it reads CodecID and effective language independently from TrackEntry

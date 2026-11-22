@@ -22,6 +22,7 @@ use triergon_harness_protocol::digest::fold;
 
 const RUNNERS: &[(&str, runner::Run)] = &[
     ("views-smoke-", smoke),
+    ("probe-lifecycle-", probe::run_lifecycle),
     ("probe-", probe::run),
     ("source-view-", source_view::run),
     ("mp4-seek-", player::run),

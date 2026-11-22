@@ -193,12 +193,6 @@
     "triergon-pixel": [],
     "triergon-playback": [
       {
-        "name": "container-probe",
-        "entry_points": ["probe::Probe", "probe::detect_container", "probe::SELECTION", "probe::CONTAINER_SIGNATURE_BYTES", "probe::ReplaySource", "probe::SelectedInput"],
-        "degree": "unit-tests",
-        "needs": "a worker operation probing each corpus input at several prefix lengths and window sizes, folding the selected format and the replayed bytes against the reference's av_probe_input_format3 over the same prefix"
-      },
-      {
         "name": "demux-view-entry-points-outside-the-gated-operations",
         "entry_points": ["compat::mov::index", "compat::mov::index_encoded_range", "compat::pes::open_private_audio", "compat::pes::open_segment", "compat::pes::startup::Startup::new"],
         "degree": "recorded",

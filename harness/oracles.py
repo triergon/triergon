@@ -46,6 +46,7 @@ TRACE_ORACLES = {
     "source-signatures": ("harness.signature_oracle", "trace"),
     "facade-source-control": ("harness.oracles", "facade_source_control"),
     "facade-mpegts-controls": ("harness.ts_facade_oracle", "trace"),
+    "playback-probe-lifecycle": ("harness.oracles", "playback_probe_lifecycle"),
     "ac3-features": ("harness.ac3_audblk_oracle", "trace"),
     "divide": ("harness.codec_dsp_oracle", "divide"),
     "windows": ("harness.codec_dsp_oracle", "windows"),
@@ -86,6 +87,20 @@ def facade_source_control(path, container):
             rows.extend((f"1 {length} 0", f"2 {length} 0"))
         rows.extend((f"1 {length} 1", f"2 {length} 1"))
     return rows
+
+
+def playback_probe_lifecycle(path):
+    """The documented sequential handoff and owned source callbacks."""
+    from hashlib import md5
+
+    source = path.read_bytes()
+    return [
+        "1 abort close",
+        "2 invalidate invalidate abort close",
+        f"5 {len(source)} {md5(source).hexdigest()}",
+        "3 abort close",
+        "4 abort close",
+    ]
 
 
 # Oracles that read no input file.

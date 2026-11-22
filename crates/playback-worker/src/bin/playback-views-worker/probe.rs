@@ -1,5 +1,7 @@
 //! Container selection and the bytes replayed to a consumer after probing.
 
+mod lifecycle;
+
 use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
@@ -22,6 +24,10 @@ use triergon_raw_video::{
 
 const ID: SourceId = SourceId(1);
 const WORK: u64 = 1 << 16;
+
+pub(super) fn run_lifecycle(args: &[String]) -> Result<()> {
+    lifecycle::run(args)
+}
 
 pub(super) fn run(args: &[String]) -> Result<()> {
     let invocation = Invocation::parse(args, "probe-", " playback|raw PREFIX WINDOW", 3..=3, true)?;
