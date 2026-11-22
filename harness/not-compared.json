@@ -60,14 +60,7 @@
       }
     ],
     "triergon-codec": [],
-    "triergon-codec-aac": [
-      {
-        "name": "inspection-aids",
-        "entry_points": ["Decoder::enable_stats", "Decoder::stats", "Decoder::sbr_fill_ranges", "Decoder::ps_input"],
-        "degree": "no-reference",
-        "needs": "none: per-frame statistics of the decoder's own state behind the inspect feature, which no reference reports"
-      }
-    ],
+    "triergon-codec-aac": [],
     "triergon-codec-ac3": [
       {
         "name": "decoder-options",
