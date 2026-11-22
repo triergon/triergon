@@ -218,7 +218,16 @@ enum State {
 #[derive(Debug)]
 enum Extent {
     Parsing(AacAscParser),
-    Parsed(AacAscScopeOutcome),
+    Parsed(Option<AacAscScopeOutcome>),
+}
+
+impl Extent {
+    fn take_outcome(&mut self) -> Option<AacAscScopeOutcome> {
+        match self {
+            Self::Parsing(_) => None,
+            Self::Parsed(outcome) => outcome.take(),
+        }
+    }
 }
 
 impl AacAscScopeParser {
@@ -310,8 +319,10 @@ impl AacAscScopeParser {
         for extent in extents.into_iter().flatten() {
             let bytes = match extent {
                 Extent::Parsing(parser) => parser.descriptor_storage_bytes()?,
-                Extent::Parsed(AacAscScopeOutcome::Parsed(c)) => c.descriptor_storage_bytes()?,
-                Extent::Parsed(AacAscScopeOutcome::Refused(_)) => 0,
+                Extent::Parsed(Some(AacAscScopeOutcome::Parsed(c))) => {
+                    c.descriptor_storage_bytes()?
+                }
+                Extent::Parsed(Some(AacAscScopeOutcome::Refused(_)) | None) => 0,
             };
             total = total.checked_add(bytes).ok_or(Error::Overflow)?;
         }
@@ -347,7 +358,9 @@ impl AacAscScopeParser {
     ) -> Result<BuildStep<AacAscScopeViews>> {
         loop {
             let State::Reading {
-                declared, physical, ..
+                raw,
+                declared,
+                physical,
             } = &mut self.state
             else {
                 return match self.state {
@@ -364,7 +377,7 @@ impl AacAscScopeParser {
             };
             if let Extent::Parsing(parser) = extent {
                 match Self::outcome(parser.step(work, cancel)) {
-                    Ok(Some(outcome)) => *extent = Extent::Parsed(outcome),
+                    Ok(Some(outcome)) => *extent = Extent::Parsed(Some(outcome)),
                     Ok(None) => return Ok(BuildStep::Yield),
                     Err(e) => return Err(self.refusal(e)),
                 }
@@ -373,25 +386,15 @@ impl AacAscScopeParser {
             if !work.try_charge(1) {
                 return Ok(BuildStep::Yield);
             }
-            let State::Reading {
-                raw,
-                declared,
-                physical: Extent::Parsed(physical),
-            } = std::mem::replace(&mut self.state, State::Complete)
-            else {
-                unreachable!("both extents are parsed")
-            };
-            let declared = declared.map(|extent| match extent {
-                Extent::Parsed(outcome) => outcome,
-                Extent::Parsing(_) => unreachable!("the declared extent is parsed first"),
-            });
-            return Ok(BuildStep::Ready(AacAscScopeViews {
-                raw,
+            let views = physical.take_outcome().map(|physical| AacAscScopeViews {
+                raw: raw.clone(),
                 source: self.source,
                 declared_bits: self.bits,
-                declared,
+                declared: declared.as_mut().and_then(Extent::take_outcome),
                 physical,
-            }));
+            });
+            self.state = State::Complete;
+            return Ok(views.map_or(BuildStep::Complete, BuildStep::Ready));
         }
     }
 }
