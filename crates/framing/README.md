@@ -82,6 +82,7 @@ assert_eq!(decoder_input, [
 | NAL units in memory | `AnnexBUnits`, `start_code`, `split_length_prefixed`; `NalHeader::parse`; `avc`, `hevc` | An access unit's or stream's NAL units without their start codes or length prefixes; validated fixed headers; H.264 and H.265 type values and the HEVC type classes (slice, access-unit start, IRAP, IDR, BLA, RASL, RADL) |
 | Parameter-set walks | `skip_avc_scaling_matrix`, `skip_vui_to_timing`, `skip_hevc_profile_tier_level` | Pass over an SPS's H.264 scaling matrix, VUI fields before the timing, or H.265 profile-tier-level, over any `BitSource`, so each caller keeps its own emulation-prevention strictness and errors |
 | H.264 headers | `read_avc_sps`, `read_avc_pps`, `read_avc_slice_header`, `avc_slice_pps_id`; `AvcSps`, `AvcVui`, `AvcPocSyntax`, `AvcPps`, `AvcSliceHeader`, `AvcSliceDepth`, `AvcReading` | The SPS, PPS and slice header fields that picture order and output need (order count syntax, `frame_num` and `gaps_in_frame_num_value_allowed_flag`, fields, VUI timing and bitstream restriction, `no_output_of_prior_pics_flag`, `memory_management_control_operation` 5); `00 00 00` to `00 00 02` inside an RBSP refused or read as data |
+| VVC Annex B | `VvcNalHeader`, `VvcAnnexBUnits`, `VvcAccessUnits` | Fixed headers and borrowed NAL bytes. Layer zero access units follow AUD or picture headers. |
 | Picture output | `picture_output::{DecodedPictures, Entry, View, NewPicture, Leave, Marking, Parity, PictureId, HevcLimits, HevcPicture, AvcPicture, StoreError, Refused, LateOutput}`, `picture_output::order::{AvcOrder, HevcOrder, AfterMmco5, AfterGap}`, `picture_output::levels::{max_dpb_mbs, max_dpb_frames}` | The decoded picture buffer of H.264 Annex C.4 (gap frames C.4.2, C.4.4, C.4.5, field pairs, bumping C.4.5.3) and H.265 Annex C.5.2 (C.5.2.2–C.5.2.4), generic over the stored picture, driven by marking, removal, storage and flush events, each stored picture readable by position and markable by field, and plain storage and bumping for a caller with its own output conditions; the output of the H.264 and HEVC decoders and of caption extraction; picture order counts of H.264 8.2.1 (types 0, 1, 2, `memory_management_control_operation` 5, `frame_num` gaps) and H.265 8.3.1; MaxDpbMbs and MaxDpbFrames of Table A-1; FFmpeg's observed departures as separate steps and options |
 | Raw Annex-B access units | `RawAnnexBReader`, `RawAccessUnit` | Groups an elementary AVC/HEVC stream into access units (H.264 §7.4.1.2.3–4, H.265 §7.4.2.4.4; an HEVC end of sequence or bitstream starts the next one, as in FFmpeg's parser); reports IDR/IRAP; keeps original start codes and padding |
 | avcC | `AvcConfigParser` | Full record: fixed fields, SPS/PPS/SPS-ext arrays, high-profile extension, trailing bytes |
@@ -155,8 +156,28 @@ published. A `NalPacketSession` frames packets, records and outputs of at most
   termination frames. HCRC is reported, not checked.
 
 VVC inspection exposes the fixed two-byte header, including reserved values.
-The Annex B iterator borrows NAL bytes from a complete buffer under an explicit
-byte limit.
+The Annex B iterator borrows NAL bytes from a complete buffer under a byte
+limit. `VvcAccessUnits::with_delimiters` groups single-slice units with an AUD
+at each boundary. `with_picture_headers` recognizes standalone or embedded
+picture headers and groups consecutive slices sharing a standalone header.
+Both constructors require layer zero and a zero byte before each unit's prefix.
+Picture syntax beyond framing remains opaque.
+
+The original [FATE VVC inputs](https://fate-suite.ffmpeg.org/vvc/) have 121
+matching positions, lengths and packet hashes across 12 of 13 files in the
+strict path. `curr-ltrp-alias.vvc` omits the zero byte at an embedded picture
+boundary. `compat::vvc::access_units` accepts that three-byte prefix and matches
+all 13 files, 151 packets. Both paths preserve the original bytes, and the
+comparison checks the strict refusal separately. Put the 13 files in a directory
+and run:
+
+```sh
+CARGO_INCREMENTAL=0 TRIERGON_VVC_FATE=/path/to/vvc TRIERGON_VVC_FFPROBE=/path/to/ffprobe \
+  cargo test -p triergon-framing --test vvc original_fate_vvc_packet_comparison -- --ignored --nocapture
+```
+
+The test pins each source SHA-256 and uses FFprobe 9.0.2. Native runtime and
+memory qualification remain open.
 
 ## Conformance
 
@@ -166,6 +187,7 @@ Implemented from these specifications:
 |---|---|
 | H.264 NAL / Annex B / AU | ITU-T H.264 (08/2024) §7.3.1, §7.4.1 Table 7-1, §§7.3.2.1.1, 7.3.2.2, 7.3.3, 7.4.1.2.3–4, Annex B |
 | HEVC NAL / Annex B / AU | ITU-T H.265 (07/2024) §7.3.1.2, §7.4.2 Table 7-1, §7.4.2.4.4, Annex B |
+| VVC NAL / delimited AU | ITU-T H.266 (09/2023) §§7.3.1.2, 7.3.2.10, 7.3.7, 7.4.2.2, 7.4.2.4.3–4, Annex B |
 | Picture output | ITU-T H.264 (08/2024) §8.2.1, §8.2.5.3–4, §A.3.1 Table A-1, Annex C.4.4–C.4.5; ITU-T H.265 (07/2024) §8.1.3, §8.3.1–8.3.2, Annex C.5.2 |
 | avcC | ISO/IEC 14496-15:2010 with the 2006 FRExt amendment |
 | hvcC, AAC ASC/ADTS | ISO/IEC 14496-15 and 14496-3 record layouts, from licensed interoperability references |
