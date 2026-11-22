@@ -480,24 +480,15 @@
   "open_cases": [
     {
       "id": "mp4-forward-progressive-pending-unknown-clock",
-      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
+      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit."
     },
     {
       "id": "mp4-forward-progressive-f-no-second-tfdt",
-      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
+      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit."
     },
     {
       "id": "mp4-forward-progressive-unknown-clock-terminal",
-      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
+      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit."
     }
   ],
   "open_deviations": [
@@ -509,9 +500,6 @@
       "compat": "The existing compat::mov front demux view replays a bounded media extent in native order.",
       "cases": [
         "mp4-forward-progressive-pending-reverse-ranges"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -522,9 +510,6 @@
       "compat": "A consumer requiring native demux admission and terminal handling uses the existing compat::mov recovery mode.",
       "cases": [
         "progressive-pending-empty-endpoint"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -536,9 +521,6 @@
       "cases": [
         "mp4-forward-regular-r-multitrack",
         "mp4-forward-regular-f-multitrack"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -550,9 +532,6 @@
       "cases": [
         "ts-program-program-private-avc-dvb",
         "source-program-private-avc-dvb"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -564,9 +543,6 @@
       "cases": [
         "ts-program-program-pmt-retype",
         "source-program-pmt-retype"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -575,8 +551,7 @@
       "candidate": "Emits all nine packets with the first three source PTS and DTS absent and the remaining source clocks from 3000 through 8000.",
       "reference": "Emits the same nine packets, starting the first three PTS and DTS at 0, 1000 and 2000 as for a file with a known beginning.",
       "compat": "compat::mov::front_source_media_start",
-      "cases": ["mp4-forward-progressive-first-source-clock-unknown"],
-      "targets": ["aarch64-unknown-linux-gnu"]
+      "cases": ["mp4-forward-progressive-first-source-clock-unknown"]
     },
     {
       "reading": "A fragment source packet requires the complete declared sample extent",
@@ -584,8 +559,7 @@
       "candidate": "Emits both complete video packets and reports data refusal. The first AAC sample starts at byte 3189 and declares 176 bytes. The file ends at byte 3240.",
       "reference": "Emits both video packets and the 51 available bytes of the AAC sample as a corrupt packet, then reports end.",
       "compat": "compat::mov::deliver_truncated_sample",
-      "cases": ["mp4-forward-progressive-fragment-aac-short"],
-      "targets": ["aarch64-unknown-linux-gnu"]
+      "cases": ["mp4-forward-progressive-fragment-aac-short"]
     },
     {
       "reading": "DefaultDuration is carried in exact nanoseconds",
@@ -598,9 +572,6 @@
         "matroska-startup-seek-startup-avc-high-b0",
         "matroska-startup-seek-startup-avc-high-b1",
         "matroska-startup-seek-seek-avc-seek-0-fresh"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -613,9 +584,6 @@
         "matroska-startup-seek-startup-hevc-no-default-duration",
         "matroska-startup-seek-startup-hevc-vps-timed-no-default",
         "matroska-startup-seek-seek-hevc-seek-no-default-0-fresh"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -632,9 +600,6 @@
         "matroska-startup-seek-startup-hevc-repeated-configuration",
         "matroska-startup-seek-seek-hevc-seek-0-fresh",
         "matroska-startup-seek-seek-hevc-seek-no-cues-0-fresh"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -646,9 +611,6 @@
       "cases": [
         "matroska-startup-seek-startup-avc-mixed",
         "matroska-startup-seek-startup-hevc-mixed"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -659,9 +621,6 @@
       "compat": "A caller needing bounded prefix recovery selects TimingRunPolicy::BoundedPrefix and the compat::mov index.",
       "cases": [
         "mp4-bad-ctts-count-mismatch"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -672,9 +631,6 @@
       "compat": "A caller needing bounded prefix recovery selects TimingRunPolicy::BoundedPrefix and the compat::mov index.",
       "cases": [
         "mp4-bad-stts-count-mismatch"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -685,9 +641,6 @@
       "compat": "A repair-oriented PES reader that accepts malformed timestamp markers would use compat::mpegts::pes_timestamp_marker_recovery.",
       "cases": [
         "source-pes-timestamp-marker"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -698,9 +651,6 @@
       "compat": "A salvage consumer that needs the available part of an incomplete PES would use compat::mpegts::partial_pes_payload_at_eof.",
       "cases": [
         "source-hls-contiguous-part-a"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -712,9 +662,6 @@
       "cases": [
         "ts-program-program-eof-avc-aac",
         "source-program-eof-avc-aac"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
