@@ -710,6 +710,14 @@ fn graph(root: &Path, args: &[String]) -> Task {
 }
 
 fn report(root: &Path, args: &[String]) -> ExitCode {
+    report_with_inputs(root, args, None)
+}
+
+fn report_with_inputs(
+    root: &Path,
+    args: &[String],
+    optional: Option<&test_skips::ParityInputs>,
+) -> ExitCode {
     let mut options = harness::report::Options::defaults(root);
     let mut corpus = None;
     let mut rest = args.iter();
@@ -775,7 +783,7 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
         };
         Ok(())
     })();
-    exit(parsed.and_then(|()| harness::report::run(root, &options)))
+    exit(parsed.and_then(|()| harness::report::run_with_inputs(root, &options, optional)))
 }
 
 fn compare(root: &Path, args: &[String]) -> Task {
@@ -1262,7 +1270,7 @@ fn generator_main(root: &Path, generator: &generators::Generator, args: &[String
                 .reports(root, rest)
                 .and_then(|reports| (generator.write_inputs)(root).map(|()| reports))
             {
-                Ok(reports) => return run_reports(root, &reports),
+                Ok(reports) => return run_reports(root, &reports, None),
                 Err(error) => Err(error),
             }
         }
@@ -1273,11 +1281,15 @@ fn generator_main(root: &Path, generator: &generators::Generator, args: &[String
 
 /// The reports `COMMAND compare` stands for; exits with the first failing one's
 /// code.
-fn run_reports(root: &Path, reports: &[Vec<String>]) -> ExitCode {
+fn run_reports(
+    root: &Path,
+    reports: &[Vec<String>],
+    optional: Option<&test_skips::ParityInputs>,
+) -> ExitCode {
     let mut result = ExitCode::SUCCESS;
     for args in reports {
         println!("$ cargo xtask report {}", args.join(" "));
-        let code = report(root, args);
+        let code = report_with_inputs(root, args, optional);
         if result == ExitCode::SUCCESS {
             result = code;
         }
@@ -1306,11 +1318,17 @@ fn check_features(root: &Path) -> Task {
         .join(".research/feature-reports")
         .join(format!("check-{}-{stamp}", std::process::id()));
     harness::report::create_output(&output)?;
+    let optional = test_skips::ParityInputs::load(root)?;
     for contract in contracts
         .iter()
         .filter(|contract| contract.document.get("oracle").is_some())
     {
-        if harness::oracle_compare::compare(root, &contract.path, &output.join(&contract.id))? != 0
+        if harness::oracle_compare::compare_with_inputs(
+            root,
+            &contract.path,
+            &output.join(&contract.id),
+            Some(&optional),
+        )? != 0
         {
             return Err(format!(
                 "{}: required oracle comparison failed",
@@ -1370,7 +1388,7 @@ fn check_features(root: &Path) -> Task {
             ])
         })
         .collect::<Result<Vec<_>, String>>()?;
-    if run_reports(root, &reports) != ExitCode::SUCCESS {
+    if run_reports(root, &reports, Some(&optional)) != ExitCode::SUCCESS {
         return Err(format!(
             "required feature comparison failed; reports in {}",
             output.display()

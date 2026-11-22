@@ -222,6 +222,15 @@ impl<'a> TraceOracle<'a> {
 }
 
 pub fn compare(root: &Path, file: &Path, output: &Path) -> R<i32> {
+    compare_with_inputs(root, file, output, None)
+}
+
+pub(crate) fn compare_with_inputs(
+    root: &Path,
+    file: &Path,
+    output: &Path,
+    optional: Option<&crate::test_skips::ParityInputs>,
+) -> R<i32> {
     let contract = json::read(file)?;
     let contract_sha = super::linux::file_sha(file)?;
     let oracle = TraceOracle::new(&contract)?;
@@ -253,15 +262,29 @@ pub fn compare(root: &Path, file: &Path, output: &Path) -> R<i32> {
         {
             return Err(format!("invalid oracle case id: {case_id}"));
         }
-        let parity = match oracle.compare_case(
-            root,
-            &corpus,
-            case,
-            &candidate,
-            CaseOutput::Files(&output.join(case_id)),
-        ) {
+        let parity = match optional
+            .map(|inputs| inputs.skipped(root, &corpus, case))
+            .transpose()?
+            .flatten()
+            .map_or_else(
+                || {
+                    oracle.compare_case(
+                        root,
+                        &corpus,
+                        case,
+                        &candidate,
+                        CaseOutput::Files(&output.join(case_id)),
+                    )
+                },
+                Ok,
+            ) {
             Ok(parity) => {
-                println!("{case_id} {}", worker::status(&parity));
+                if worker::status(&parity) == "skipped" {
+                    let reason = validation::text(&parity, "reason")?;
+                    eprintln!("skipped: {id} {case_id}: {reason}");
+                } else {
+                    println!("{case_id} {}", worker::status(&parity));
+                }
                 parity
             }
             Err(error) => {
@@ -289,7 +312,8 @@ pub fn compare(root: &Path, file: &Path, output: &Path) -> R<i32> {
         return Err("oracle contract or corpus changed during comparison".into());
     }
     // Operational failures cannot satisfy an open parity difference.
-    let passed = report::ratchet(id, &rows, &open) && !execution_failed;
+    let passed =
+        report::ratchet_with_skips(id, &rows, &open, optional.is_some()) && !execution_failed;
     let record = Value::object([
         ("schema", Value::int(1)),
         ("contract_id", Value::str(id)),

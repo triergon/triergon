@@ -972,6 +972,14 @@ fn reserve_case_outputs(output: &Path, cases: &[Value]) -> Result<(), String> {
 /// Run the report; returns 0 for matching parity, 1 for a failed case and 2
 /// when required acceptance was withheld.
 pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
+    run_with_inputs(root, options, None)
+}
+
+pub(crate) fn run_with_inputs(
+    root: &Path,
+    options: &Options,
+    optional: Option<&crate::test_skips::ParityInputs>,
+) -> Result<i32, String> {
     create_output(&options.output)?;
     match gate_key(root, options, &[])? {
         Some(key) => reuse::step(root, &options.output, &key, options.full, || {
@@ -1255,7 +1263,13 @@ pub(crate) fn collect(
             return Err("input escapes corpus".into());
         }
         let sha = s(case, "sha256").unwrap_or_default();
-        let parity = if !path.is_file() {
+        let skipped = optional
+            .map(|inputs| inputs.skipped(root, &corpus, case))
+            .transpose()?
+            .flatten();
+        let parity = if let Some(skipped) = skipped {
+            skipped
+        } else if !path.is_file() {
             Value::object([("status", Value::str("missing-sample"))])
         } else if digest(&path)? != sha {
             Value::object([("status", Value::str("input-hash-mismatch"))])
@@ -1382,6 +1396,12 @@ pub(crate) fn collect(
             }
         };
         match s(&parity, "reason") {
+            Some(reason) if s(&parity, "status") == Some("skipped") => {
+                eprintln!(
+                    "skipped: {} {id}: {reason}",
+                    contract_id.as_deref().unwrap_or_default()
+                );
+            }
             Some(reason) => println!(
                 "{id} {}: {reason}",
                 s(&parity, "status").unwrap_or_default()
@@ -1580,7 +1600,7 @@ pub(crate) fn collect(
     if (options.require_slice_acceptance && !slice) || (options.require_acceptance && !accepted) {
         return Ok(2);
     }
-    let parity_matches = ratchet(&label, &rows, &open);
+    let parity_matches = ratchet_with_skips(&label, &rows, &open, optional.is_some());
     Ok(i32::from(
         !parity_matches || !controls_valid || !identity_valid,
     ))
@@ -1698,6 +1718,15 @@ pub(crate) fn open_cases(
 /// every other case passes and every open case still fails: a listed case that
 /// starts to pass must leave the list, so the list only shrinks.
 pub(crate) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
+    ratchet_with_skips(label, rows, open, false)
+}
+
+pub(super) fn ratchet_with_skips(
+    label: &str,
+    rows: &[Value],
+    open: &[String],
+    allow_skips: bool,
+) -> bool {
     let passed = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("pass");
     let listed = |row: &Value| open.iter().any(|id| s(row, "id") == Some(id));
     let ids = |keep: &dyn Fn(&Value) -> bool| -> Vec<&str> {
@@ -1707,9 +1736,20 @@ pub(crate) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
             .collect()
     };
     let unpinned = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("unpinned");
-    let failing = ids(&|row| !passed(row) && !listed(row) && !unpinned(row));
+    let skipped = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("skipped");
+    let missing = |row: &Value| {
+        matches!(
+            row.get("parity").and_then(|p| s(p, "status")),
+            Some("missing-sample" | "missing-entity" | "missing-companion")
+        )
+    };
+    let failing = ids(&|row| {
+        missing(row)
+            || (skipped(row) && !allow_skips)
+            || (!passed(row) && !listed(row) && !unpinned(row) && !skipped(row))
+    });
     let reported = ids(&unpinned);
-    let still_open = ids(&|row| !passed(row) && listed(row));
+    let still_open = ids(&|row| !passed(row) && listed(row) && !skipped(row) && !missing(row));
     let closed = ids(&|row| passed(row) && listed(row));
     let refused = ids(&|row| {
         passed(row)
@@ -1718,6 +1758,13 @@ pub(crate) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
     });
     let passing = rows.iter().filter(|row| passed(row)).count() - refused.len();
     println!("{label}: {passing} of {} cases pass", rows.len());
+    let skipped = ids(&skipped);
+    if !skipped.is_empty() {
+        println!(
+            "{label}: {} checks did not run for absent inputs; the gate runs them",
+            skipped.len()
+        );
+    }
     if !refused.is_empty() {
         println!(
             "{label}: {} registered refusals: {}",

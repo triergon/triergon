@@ -12,7 +12,7 @@
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Write};
-use std::path::Path;
+use std::path::{Component, Path};
 use std::process::{Command, Stdio};
 
 use crate::json::{self, Value};
@@ -77,6 +77,142 @@ const IMAGE_INPUTS: &[&str] = &[
     "ogg-page-inputs",
     "opus-testvectors",
 ];
+
+/// Media kept for the gate image whose exact bytes CI cannot prepare.
+const PARITY_PRIVATE: &[&str] = &[
+    ".research/codec-inputs",
+    ".research/codec-layout-inputs",
+    ".research/codec-variants",
+    ".research/elementary",
+    ".research/elementary-reader-authored",
+    ".research/flac-generated",
+    ".research/mp3",
+    ".research/ogg-generated",
+    ".research/ogg-page-inputs",
+    ".research/opus-generated",
+    ".research/speex-generated",
+    ".research/subtitle-corpus",
+];
+
+/// The evidence pins eligible for a workspace comparison to report an absent
+/// input. Direct comparisons and gate runs always require their inputs.
+pub(crate) struct ParityInputs(BTreeMap<String, String>);
+
+impl ParityInputs {
+    pub(crate) fn load(root: &Path) -> Result<Self, String> {
+        let mut pins = BTreeMap::new();
+        for set in crate::evidence::sets(root)? {
+            let text = |key| set.get(key).and_then(Value::as_str);
+            if !text("name").is_some_and(|name| IMAGE_INPUTS.contains(&name))
+                || text("retention") != Some("retained")
+                || text("unpacked_at") != Some("repository")
+            {
+                continue;
+            }
+            for file in set
+                .get("files")
+                .and_then(Value::as_array)
+                .unwrap_or_default()
+            {
+                let path = crate::harness::validation::text(file, "path")?;
+                if !PARITY_PRIVATE
+                    .iter()
+                    .any(|prefix| Path::new(path).starts_with(prefix))
+                    || Path::new(path).starts_with(".research/subtitle-corpus/fate")
+                {
+                    continue;
+                }
+                let pin = crate::harness::validation::hash(file, "sha256")?;
+                if pins
+                    .insert(path.to_owned(), pin.to_owned())
+                    .is_some_and(|old| old != pin)
+                {
+                    return Err(format!("{path}: conflicting gate image pins"));
+                }
+            }
+        }
+        Ok(Self(pins))
+    }
+
+    /// A case may be left out only when all its missing files have matching
+    /// gate pins, and all the available files still match their case pins.
+    pub(crate) fn skipped(
+        &self,
+        root: &Path,
+        corpus: &Path,
+        case: &Value,
+    ) -> Result<Option<Value>, String> {
+        use crate::harness::validation::{hash, text};
+
+        let mut rows = vec![case];
+        for field in ["entities", "companions"] {
+            rows.extend(
+                case.get(field)
+                    .and_then(Value::as_array)
+                    .unwrap_or_default(),
+            );
+        }
+        let mut present = Vec::new();
+        let mut missing = Vec::new();
+        for input in rows {
+            let relative = Path::new(text(input, "file")?);
+            if !relative
+                .components()
+                .all(|p| matches!(p, Component::Normal(_)))
+            {
+                return Err("input escapes corpus".into());
+            }
+            let path = corpus.join(relative);
+            let pin = hash(input, "sha256")?;
+            match std::fs::symlink_metadata(&path) {
+                Ok(_) => present.push((path, pin)),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    let relative = path.strip_prefix(root).map_err(|e| e.to_string())?;
+                    if relative
+                        .components()
+                        .any(|part| !matches!(part, Component::Normal(_) | Component::CurDir))
+                    {
+                        return Err("input escapes the repository".into());
+                    }
+                    let key = relative
+                        .components()
+                        .filter(|part| *part != Component::CurDir)
+                        .collect::<std::path::PathBuf>();
+                    let key = key.to_str().ok_or("non-UTF-8 input path")?;
+                    if self.0.get(key).map(String::as_str) != Some(pin) {
+                        return Ok(None);
+                    }
+                    if !missing.iter().any(|name| name == key) {
+                        missing.push(key.to_owned());
+                    }
+                }
+                Err(error) => return Err(format!("{}: {error}", path.display())),
+            }
+        }
+        if missing.is_empty() {
+            return Ok(None);
+        }
+        for (path, pin) in present {
+            if crate::harness::linux::file_sha(&path)? != pin {
+                return Err(format!(
+                    "{}: input hash differs from its pin",
+                    path.display()
+                ));
+            }
+        }
+        Ok(Some(Value::object([
+            ("status", Value::str("skipped")),
+            (
+                "reason",
+                Value::str(format!(
+                    "absent inputs from the gate image: {}",
+                    missing.join(", ")
+                )),
+            ),
+            ("missing_inputs", Value::strings(missing)),
+        ])))
+    }
+}
 
 /// One check a test binary reported it did not run.
 #[derive(Debug, PartialEq, Eq)]
@@ -344,6 +480,36 @@ exit 3";
              crates/codec-aac/tests/fate_vectors.rs: 1\n  \
              crates/codec-ac3/tests/vectors.rs: 1\n  target/debug/deps/other-3d: 1"
         );
+    }
+
+    #[test]
+    fn only_missing_files_with_exact_gate_pins_can_leave_a_case_out() {
+        let root = crate::walk::scratch("parity-skips");
+        let pin = crate::sha256::hex(b"file");
+        let case = Value::object([
+            ("file", Value::str("absent")),
+            ("sha256", Value::str(&pin)),
+            (
+                "companions",
+                Value::Array(vec![Value::object([
+                    ("file", Value::str("companion")),
+                    ("sha256", Value::str(&pin)),
+                ])]),
+            ),
+        ]);
+        let optional = ParityInputs(BTreeMap::from([("absent".to_owned(), pin)]));
+        assert_eq!(optional.skipped(&root, &root, &case).unwrap(), None);
+        std::fs::write(root.join("companion"), b"other").unwrap();
+        assert!(optional.skipped(&root, &root, &case).is_err());
+        std::fs::write(root.join("companion"), b"file").unwrap();
+        let skip = optional.skipped(&root, &root, &case).unwrap().unwrap();
+        assert_eq!(
+            skip.get("missing_inputs"),
+            Some(&Value::strings(["absent"]))
+        );
+        std::fs::write(root.join("absent"), b"file").unwrap();
+        assert_eq!(optional.skipped(&root, &root, &case).unwrap(), None);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     /// The kept sets a gate image is built with, listing one file below each input
