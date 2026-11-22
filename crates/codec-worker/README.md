@@ -101,3 +101,8 @@ layout, HEVC access-unit, H.264 inspection, and decoded picture contracts in
 [`harness/features`](../../harness/features/). Its video workload commands
 feed complete NAL units individually and produce the same letterboxed RGBA
 record format as `codec-worker`.
+
+The picture properties and NAL input reports verify registered AVC and HEVC
+profile refusals against the input SHA-256, the decoder's first typed
+unsupported error and both complete folds. Successful refusals have their
+own count in the parity report.
