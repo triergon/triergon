@@ -116,13 +116,6 @@
   ],
   "open_cases": [
     {
-      "id": "regular-unknown-clock-terminal",
-      "requirement": "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "progressive-pending-unknown-clock",
       "requirement": "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved.",
       "targets": [
