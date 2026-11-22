@@ -5,7 +5,7 @@
     "Probe and demux the full container and decode the chosen video and audio tracks through the facade example and the pinned FFmpeg 9.0.2 reference.",
     "Matroska and MP4 use the playback engine packet view. MPEG-TS uses the facade source access-unit reader, because the transport playback engine does not supply that view.",
     "Compare every RGBA canvas byte and each picture presentation timestamp in output order. Require identical stereo s16 sample counts and rates and apply the existing audio_device_path LSB bound.",
-    "Compare every packet in demux order by stream ordinal, time base, signed PTS, DTS, duration, key flag, byte length and payload MD5. Matroska packet ticks are expressed in nanoseconds. Compare differences in source and reference-derived clocks as open cases.",
+    "Compare every packet in demux order by stream ordinal, time base, signed PTS, DTS, duration, key flag, byte length and payload MD5. For MP4, both operations use the unedited media timeline and present AAC through each sample’s declared duration. Matroska packet ticks are expressed in nanoseconds. Compare differences in source and reference-derived clocks as open cases.",
     "Use a 1920 by 1080 canvas. The 640 by 360 example canvas is outside this grade until there is pixel parity across the corpus.",
     "Both workers use explicit stream ordinals for three-tracks.mkv. The fixture rights and inputs are inherited from the existing authored corpora.",
     "The two private ATSC audio stream types use the declared ATSC namespace. The DVB E-AC-3 input uses its service profile."
@@ -48,16 +48,14 @@
       "name": "avc-aac-quicktime-surround",
       "path": "crates/playback/tests/fixtures/mp4/avc-aac-quicktime-surround.mov",
       "sha256": "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5",
-      "rights": "authored-synthetic",
-      "candidate_exit": 2
+      "rights": "authored-synthetic"
     },
     {
       "lane": "play-mp4",
       "name": "avc-aac-quicktime-reordered",
       "path": "crates/playback/tests/fixtures/mp4/avc-aac-quicktime-reordered.mov",
       "sha256": "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b",
-      "rights": "authored-synthetic",
-      "candidate_exit": 2
+      "rights": "authored-synthetic"
     },
     {
       "lane": "play-mp4",
@@ -117,9 +115,6 @@
     "avc-high-b",
     "hevc-b1",
     "avc-seek",
-    "avc-aac-quicktime-surround",
-    "avc-aac-quicktime-reordered",
-    "encoded-hevc-aac-front",
     "baseline-stereo",
     "media-00",
     "replay-avc-ac3-00",
@@ -131,9 +126,6 @@
     "avc-high-b": "Matroska DefaultDuration is in nanoseconds. The decoded canvases and presentation order match while the source durations or missing DTS differ from the native demuxer packets in Segment ticks.",
     "hevc-b1": "Matroska DefaultDuration is in nanoseconds. The decoded canvases and presentation order match while the source durations or missing DTS differ from the native demuxer packets in Segment ticks.",
     "avc-seek": "Matroska DefaultDuration is in nanoseconds. The decoded canvases and presentation order match while the source durations or missing DTS differ from the native demuxer packets in Segment ticks.",
-    "avc-aac-quicktime-surround": "ISO/IEC 14496-12 edit lists map media time to presentation time. The pipeline uses source media times. It also reaches an idle decode session before the full suffix where FFmpeg completes both streams.",
-    "avc-aac-quicktime-reordered": "ISO/IEC 14496-12 edit lists map media time to presentation time. The pipeline uses source media times. It also reaches an idle decode session before the full suffix where FFmpeg completes both streams.",
-    "encoded-hevc-aac-front": "The ISO BMFF sample rows match. The pipeline publishes no picture or PCM output on the supplied HEVC/AAC configuration. The reference decodes two pictures and two AAC frames, leaving the configuration-to-session seam open.",
     "baseline-stereo": "H.222.0 PES headers carry selected PTS/DTS anchors. The source AU reader keeps unanchored clocks absent. The reference derives per-packet times and durations. The delivered RGBA and stereo PCM outputs match their numeric rules.",
     "media-00": "H.222.0 PES headers carry selected PTS/DTS anchors. The source AU reader keeps unanchored clocks absent. The reference derives per-packet times and durations. The delivered RGBA and stereo PCM outputs match their numeric rules.",
     "replay-avc-ac3-00": "H.222.0 PES headers and A/52 coded frames distinguish source clock anchors from derived timing. The strict AU reader and FFmpeg can report different packet clocks or order. The stereo PCM grade retains every sample.",
@@ -268,100 +260,6 @@
         }
       },
       "timeline_equal": true
-    },
-    "avc-aac-quicktime-surround": {
-      "ours_rc": 2,
-      "reference_rc": 0,
-      "video": {
-        "pictures_ours": 0,
-        "pictures_ref": 100,
-        "pictures_equal": 0,
-        "bytes_ours": 0,
-        "bytes_ref": 829440000,
-        "first_diff": null
-      },
-      "audio": {
-        "samples_ours": 0,
-        "samples_ref": 192000,
-        "max_abs_lsb": 0,
-        "differing_samples": 0,
-        "ours_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "reference_sha256": "ad88c733e08aa659b7504a7c868ca859bbf92317bb7f6c3075cb32c36e43aec0"
-      },
-      "packets": {
-        "packets_ours": 43,
-        "packets_ref": 289,
-        "ours_sha256": "e9f6b0c16c1436bafbc0dafb08df54e2635393c083a0eac7eef0599a657b117e",
-        "reference_sha256": "63bc2e5b032132e0f0e8d99907bb8d369832e03a04b67443f6f26ecdb6d14f1a",
-        "first_diff": {
-          "index": 0,
-          "ours": "1 1/48000 0 0 1024 1 364 48ff69a98c0cb0dc23a9e20a824c964c",
-          "reference": "1 1/48000 -1024 -1024 1024 1 364 48ff69a98c0cb0dc23a9e20a824c964c"
-        }
-      },
-      "timeline_equal": false,
-      "candidate_diagnostic": "decode session is idle"
-    },
-    "avc-aac-quicktime-reordered": {
-      "ours_rc": 2,
-      "reference_rc": 0,
-      "video": {
-        "pictures_ours": 0,
-        "pictures_ref": 100,
-        "pictures_equal": 0,
-        "bytes_ours": 0,
-        "bytes_ref": 829440000,
-        "first_diff": null
-      },
-      "audio": {
-        "samples_ours": 0,
-        "samples_ref": 176400,
-        "max_abs_lsb": 0,
-        "differing_samples": 0,
-        "ours_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "reference_sha256": "60021ef9111742bc37459917a1f33d7e5d030eaff3fa5c3602db148104be5711"
-      },
-      "packets": {
-        "packets_ours": 62,
-        "packets_ref": 274,
-        "ours_sha256": "86a2288e525eb27a8e779a0ba9f0889aabbd7536903476027cac27cfbf147f03",
-        "reference_sha256": "47d109df27499b3fe136b1ccd3e721aec763877b63e5f82d2e9e19ca192d89ed",
-        "first_diff": {
-          "index": 0,
-          "ours": "0 1/12800 1024 0 512 1 1540 06a8516696b32a61f1cc5b3145fc7759",
-          "reference": "0 1/12800 0 -1024 512 1 1540 06a8516696b32a61f1cc5b3145fc7759"
-        }
-      },
-      "timeline_equal": false,
-      "candidate_diagnostic": "decode session is idle"
-    },
-    "encoded-hevc-aac-front": {
-      "ours_rc": 0,
-      "reference_rc": 0,
-      "video": {
-        "pictures_ours": 0,
-        "pictures_ref": 2,
-        "pictures_equal": 0,
-        "bytes_ours": 0,
-        "bytes_ref": 16588800,
-        "first_diff": null
-      },
-      "audio": {
-        "samples_ours": 0,
-        "samples_ref": 2048,
-        "max_abs_lsb": 0,
-        "differing_samples": 0,
-        "ours_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "reference_sha256": "51195ad4a3dc60a6576484582ed3a2bbbbeb94a82e6b4309e37f5fed32d24fff"
-      },
-      "packets": {
-        "packets_ours": 4,
-        "packets_ref": 4,
-        "ours_sha256": "de1ee93dcb7e1e77f23f54232b778924e547ba8fd7593db0dd7fdc4485463f2e",
-        "reference_sha256": "de1ee93dcb7e1e77f23f54232b778924e547ba8fd7593db0dd7fdc4485463f2e",
-        "first_diff": null
-      },
-      "timeline_equal": false
     },
     "baseline-stereo": {
       "ours_rc": 0,

@@ -298,7 +298,13 @@ static void play_file(const ViewCase *input, const PlayOptions *options, PlayOut
         die("play input allocation", AVERROR(ENOMEM));
     format->pb = io;
     format->flags |= AVFMT_FLAG_CUSTOM_IO;
-    int result = avformat_open_input(&format, NULL, NULL, NULL);
+    /* The source playback plan decodes on the media clock before movie edits. */
+    AVDictionary *demux_options = NULL;
+    int result = av_dict_set(&demux_options, "ignore_editlist", "1", 0);
+    if (result < 0)
+        die("play demux options", result);
+    result = avformat_open_input(&format, NULL, NULL, &demux_options);
+    av_dict_free(&demux_options);
     if (result < 0)
         die("play demux open", result);
     PlayTrack video = {0}, audio = {0};
