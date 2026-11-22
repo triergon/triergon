@@ -3,6 +3,71 @@
   "note": "Upstream regression samples and local remuxes used by the comparison corpora. Samples are fetched into the ignored corpus cache by these hashes and never redistributed. Their redistribution rights are unreviewed.",
   "samples": [
     {
+      "path": "fate/vvc/Hierarchical.bit",
+      "sha256": "c5c5016395e99219c153538b03f3cd4ea11d0b4f5d05bc3ab20f46253582e7b9",
+      "source": "https://fate-suite.ffmpeg.org/vvc/Hierarchical.bit"
+    },
+    {
+      "path": "fate/vvc/curr-ltrp-alias.vvc",
+      "sha256": "224a58ce7f2b690f4f26bac7af2d137c8047ab04dff640f5f0b48e70af2ee91d",
+      "source": "https://fate-suite.ffmpeg.org/vvc/curr-ltrp-alias.vvc"
+    },
+    {
+      "path": "fate/vvc/frame-packing-nested.vvc",
+      "sha256": "b42ad5e790ea4fa2cefc03dd4ab1191630b7bd0db99e4284ff7fa55ef1867023",
+      "source": "https://fate-suite.ffmpeg.org/vvc/frame-packing-nested.vvc"
+    },
+    {
+      "path": "fate/vvc/frame-packing-not-output.vvc",
+      "sha256": "1b2b3aa2f8f1f7b74faef937e2b688bf2ab042ee7ed92d51b7f003e0a5f014e6",
+      "source": "https://fate-suite.ffmpeg.org/vvc/frame-packing-not-output.vvc"
+    },
+    {
+      "path": "fate/vvc/frame-packing-reorder.vvc",
+      "sha256": "1b4943b4600cb44bb084249b5f331bd785c830e2e3fa57086aebf403065a0050",
+      "source": "https://fate-suite.ffmpeg.org/vvc/frame-packing-reorder.vvc"
+    },
+    {
+      "path": "fate/vvc/frame-packing-sequence.vvc",
+      "sha256": "7903df2a4f32fecdcd415207c3e7b0fba38e6784f65273a75c394af8c19c0933",
+      "source": "https://fate-suite.ffmpeg.org/vvc/frame-packing-sequence.vvc"
+    },
+    {
+      "path": "fate/vvc/frame-packing-temporal.vvc",
+      "sha256": "744a9aaf0be6d008199e565f53558532d8931d387d7e2a364f48f0a2ca76f2da",
+      "source": "https://fate-suite.ffmpeg.org/vvc/frame-packing-temporal.vvc"
+    },
+    {
+      "path": "fate/vvc/frame-packing-upsampled.vvc",
+      "sha256": "329b9ec4bf52c0304bed96a74aaae5521fecbf440c9637040e58e5401c1d53c7",
+      "source": "https://fate-suite.ffmpeg.org/vvc/frame-packing-upsampled.vvc"
+    },
+    {
+      "path": "fate/vvc/mv-clip-wrap.vvc",
+      "sha256": "757766c97e854f5108fa9129b6899c7355a3d2ae2d0a3a3d3b1f59ffbc5a4597",
+      "source": "https://fate-suite.ffmpeg.org/vvc/mv-clip-wrap.vvc"
+    },
+    {
+      "path": "fate/vvc/rpr-weighted-pred.vvc",
+      "sha256": "58a2cc27d10793a954a1b00715825ac9ce8749d7a8079cd8198b3758a741de32",
+      "source": "https://fate-suite.ffmpeg.org/vvc/rpr-weighted-pred.vvc"
+    },
+    {
+      "path": "fate/vvc/vvc-16bit-mc.vvc",
+      "sha256": "aa874c3d69d77b780bd734cba4d50cb9528beb5531c609e30c962beb515d9a17",
+      "source": "https://fate-suite.ffmpeg.org/vvc/vvc-16bit-mc.vvc"
+    },
+    {
+      "path": "fate/vvc/vvc_frames_with_ltr.vvc",
+      "sha256": "2a31b362d606946f31b7418d4e6372b8728e46ccca34e4af4416ee94bf04799a",
+      "source": "https://fate-suite.ffmpeg.org/vvc/vvc_frames_with_ltr.vvc"
+    },
+    {
+      "path": "fate/vvc/wpp-single-slice-pic.vvc",
+      "sha256": "3e84f434f351d6b6a38be6d398b15fa5f6ab184efab6e26b29e869e71612c4bb",
+      "source": "https://fate-suite.ffmpeg.org/vvc/wpp-single-slice-pic.vvc"
+    },
+    {
       "path": ".research/fixtures-mpegts-dts-discovery/false-sync.ts",
       "sha256": "861185df4157bd517cd77e982340b2c906ef51c3373be8d07a9c66c3cfadd297",
       "source": "FATE dts/dts.ts; reproducible false-sync mutation by cargo xtask fixture transport-dts-discovery"

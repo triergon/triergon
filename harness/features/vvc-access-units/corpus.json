@@ -1,0 +1,175 @@
+{
+  "schema": 1,
+  "directory": ".research/fate-vvc",
+  "cases": [
+    {
+      "id": "hierarchical",
+      "profile": "hierarchical",
+      "file": "vvc/Hierarchical.bit",
+      "sha256": "c5c5016395e99219c153538b03f3cd4ea11d0b4f5d05bc3ab20f46253582e7b9",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/Hierarchical.bit",
+      "expected": {
+        "packets": 30,
+        "bytes": 103502,
+        "digest": 4406659395549766021
+      }
+    },
+    {
+      "id": "curr-ltrp-alias",
+      "profile": "curr-ltrp-alias",
+      "file": "vvc/curr-ltrp-alias.vvc",
+      "sha256": "224a58ce7f2b690f4f26bac7af2d137c8047ab04dff640f5f0b48e70af2ee91d",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/curr-ltrp-alias.vvc",
+      "expected": {
+        "packets": 30,
+        "bytes": 374,
+        "digest": 671624956096734924
+      }
+    },
+    {
+      "id": "frame-packing-nested",
+      "profile": "frame-packing-nested",
+      "file": "vvc/frame-packing-nested.vvc",
+      "sha256": "b42ad5e790ea4fa2cefc03dd4ab1191630b7bd0db99e4284ff7fa55ef1867023",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/frame-packing-nested.vvc",
+      "expected": {
+        "packets": 10,
+        "bytes": 33552,
+        "digest": 8164362893897691789
+      }
+    },
+    {
+      "id": "frame-packing-not-output",
+      "profile": "frame-packing-not-output",
+      "file": "vvc/frame-packing-not-output.vvc",
+      "sha256": "1b2b3aa2f8f1f7b74faef937e2b688bf2ab042ee7ed92d51b7f003e0a5f014e6",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/frame-packing-not-output.vvc",
+      "expected": {
+        "packets": 16,
+        "bytes": 1990,
+        "digest": 7125178877292280106
+      }
+    },
+    {
+      "id": "frame-packing-reorder",
+      "profile": "frame-packing-reorder",
+      "file": "vvc/frame-packing-reorder.vvc",
+      "sha256": "1b4943b4600cb44bb084249b5f331bd785c830e2e3fa57086aebf403065a0050",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/frame-packing-reorder.vvc",
+      "expected": {
+        "packets": 10,
+        "bytes": 33446,
+        "digest": 16730682913980640603
+      }
+    },
+    {
+      "id": "frame-packing-sequence",
+      "profile": "frame-packing-sequence",
+      "file": "vvc/frame-packing-sequence.vvc",
+      "sha256": "7903df2a4f32fecdcd415207c3e7b0fba38e6784f65273a75c394af8c19c0933",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/frame-packing-sequence.vvc",
+      "expected": {
+        "packets": 2,
+        "bytes": 3924,
+        "digest": 4341261573322490444
+      }
+    },
+    {
+      "id": "frame-packing-temporal",
+      "profile": "frame-packing-temporal",
+      "file": "vvc/frame-packing-temporal.vvc",
+      "sha256": "744a9aaf0be6d008199e565f53558532d8931d387d7e2a364f48f0a2ca76f2da",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/frame-packing-temporal.vvc",
+      "expected": {
+        "packets": 10,
+        "bytes": 33433,
+        "digest": 11565046004837690111
+      }
+    },
+    {
+      "id": "frame-packing-upsampled",
+      "profile": "frame-packing-upsampled",
+      "file": "vvc/frame-packing-upsampled.vvc",
+      "sha256": "329b9ec4bf52c0304bed96a74aaae5521fecbf440c9637040e58e5401c1d53c7",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/frame-packing-upsampled.vvc",
+      "expected": {
+        "packets": 10,
+        "bytes": 33452,
+        "digest": 4890706357435109948
+      }
+    },
+    {
+      "id": "mv-clip-wrap",
+      "profile": "mv-clip-wrap",
+      "file": "vvc/mv-clip-wrap.vvc",
+      "sha256": "757766c97e854f5108fa9129b6899c7355a3d2ae2d0a3a3d3b1f59ffbc5a4597",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/mv-clip-wrap.vvc",
+      "expected": {
+        "packets": 2,
+        "bytes": 161,
+        "digest": 7383954028370286129
+      }
+    },
+    {
+      "id": "rpr-weighted-pred",
+      "profile": "rpr-weighted-pred",
+      "file": "vvc/rpr-weighted-pred.vvc",
+      "sha256": "58a2cc27d10793a954a1b00715825ac9ce8749d7a8079cd8198b3758a741de32",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/rpr-weighted-pred.vvc",
+      "expected": {
+        "packets": 3,
+        "bytes": 145,
+        "digest": 3633583577320710205
+      }
+    },
+    {
+      "id": "vvc-16bit-mc",
+      "profile": "vvc-16bit-mc",
+      "file": "vvc/vvc-16bit-mc.vvc",
+      "sha256": "aa874c3d69d77b780bd734cba4d50cb9528beb5531c609e30c962beb515d9a17",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/vvc-16bit-mc.vvc",
+      "expected": {
+        "packets": 7,
+        "bytes": 4758,
+        "digest": 6301027739257377781
+      }
+    },
+    {
+      "id": "vvc-frames-with-ltr",
+      "profile": "vvc-frames-with-ltr",
+      "file": "vvc/vvc_frames_with_ltr.vvc",
+      "sha256": "2a31b362d606946f31b7418d4e6372b8728e46ccca34e4af4416ee94bf04799a",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/vvc_frames_with_ltr.vvc",
+      "expected": {
+        "packets": 20,
+        "bytes": 1028787,
+        "digest": 9284006039656029099
+      }
+    },
+    {
+      "id": "wpp-single-slice-pic",
+      "profile": "wpp-single-slice-pic",
+      "file": "vvc/wpp-single-slice-pic.vvc",
+      "sha256": "3e84f434f351d6b6a38be6d398b15fa5f6ab184efab6e26b29e869e71612c4bb",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/vvc/wpp-single-slice-pic.vvc",
+      "expected": {
+        "packets": 1,
+        "bytes": 1953,
+        "digest": 8988142499340728179
+      }
+    }
+  ]
+}
