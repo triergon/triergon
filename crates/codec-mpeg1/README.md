@@ -47,7 +47,7 @@ charges a caller's `Budget`.
 | Slices | One slice per picture; DC and vector predictors run across row ends, and per-row quantiser changes travel in macroblock_quant fields |
 | Motion | Forward half-sample vectors, search window ±64 luma samples, f_code up to 4; skipped macroblocks; a P macroblock is intra coded when that is cheaper. A picture whose luma repeats the previous source picture's is predicted at the zero vector without a search |
 | Quantiser | quantizer_scale 2–31 |
-| Rate control | GOP bit allocation by the MPEG-2 Test Model 5 complexity rule (I/P only) over the bits a quantiser changes, an I picture's side bits paid first; one quantiser per picture from a per-type model, `bits ≈ α · activity / q` for P pictures and `side + α · activity / q` for I pictures, whose side bits (macroblock headers, DC differentials, end_of_block) no quantiser changes, measured by the first I picture's trial pass; rows deviating by a bounded amount; VBV modelled as the variable-rate case of Annex C; vbv_delay 0xFFFF |
+| Rate control | GOP bit allocation by the MPEG-2 Test Model 5 complexity rule (I/P only) over the bits a quantiser changes, an I picture's side bits paid first, a P picture starting from TM5's initial complexity for a picture predicted from the one before; one quantiser per picture from a per-type model, `bits ≈ α · activity / q` for P pictures and `side + α · activity / q` for I pictures, whose side bits (macroblock headers, DC differentials, end_of_block) no quantiser changes, measured by the first I picture's trial pass; rows deviating by a bounded amount; VBV modelled as the variable-rate case of Annex C; vbv_delay 0xFFFF |
 
 ## Behaviour and limits
 

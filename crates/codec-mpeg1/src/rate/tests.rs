@@ -269,6 +269,15 @@ fn the_i_target_pays_its_side_bits_before_the_tm5_split() {
 }
 
 #[test]
+fn the_first_i_target_expects_p_pictures_predicted_from_the_picture_before() {
+    let mut rc = RateControl::new(30_000, 42_000, 30_000, 30, 30.0);
+    rc.seed_intra(0.0, 1600.0, 4, 1.0);
+    let plan = rc.begin(PictureType::Intra, 1.0, 0);
+    // TM5's I share with 29 P pictures at its initial 42 : 160 complexity.
+    assert_eq!(plan.target, 30_000.0 / (1.0 + 29.0 * 42.0 / (160.0 * KP)));
+}
+
+#[test]
 fn side_bits_filling_the_vbv_select_the_coarsest_quantiser() {
     let mut rc = RateControl::new(30_000, 42_000, 1000, 1, 30.0);
     rc.seed_intra(1200.0, 1600.0, 4, 1.0);

@@ -105,8 +105,11 @@ impl RateControl {
             fullness: vbv_bits as f64,
             bank: 0.0,
             left_p: 0,
+            // TM5's initial complexities. Its P value (60) is for P pictures three
+            // pictures after their reference; every P picture here predicts from
+            // the picture before it, which TM5 initialises as a B picture (42).
             x_i: 160.0 * b / 115.0,
-            x_p: 60.0 * b / 115.0,
+            x_p: 42.0 * b / 115.0,
             alpha_i: None,
             alpha_p: None,
             side_i: 0.0,
