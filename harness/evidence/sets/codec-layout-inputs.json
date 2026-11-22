@@ -2,10 +2,10 @@
  "name": "codec-layout-inputs",
  "path": "codec-layout-inputs",
  "retention": "retained",
- "reason": "Synthetic Vorbis and Opus streams with one through eight separately excited channels, compared by codec-layouts.",
- "key": "evidence/codec-layout-inputs/c99829b40ab0e3a096a1975601b655b0caf56de83b2c4c6be7a69a9ecc699eda.tar.gz",
- "sha256": "c99829b40ab0e3a096a1975601b655b0caf56de83b2c4c6be7a69a9ecc699eda",
- "bytes": 98040,
+ "reason": "Synthetic one- to eight-channel Vorbis and Opus streams and two long-pre-skip Opus controls, compared by codec-layouts.",
+ "key": "evidence/codec-layout-inputs/9c76302e67864e38bbbefd1a280e3cc27f16b891e4924916dd7db2c4274426a3.tar.gz",
+ "sha256": "9c76302e67864e38bbbefd1a280e3cc27f16b891e4924916dd7db2c4274426a3",
+ "bytes": 974927,
  "unpacked_at": "repository",
  "files": [
   {
@@ -71,6 +71,14 @@
   {
    "path": ".research/codec-layout-inputs/vorbis-8.ogg",
    "sha256": "a011b9a54f188f69a9fac2070e110d5e6271fddef9e2210f04234a0eaa48ac0c"
+  },
+  {
+   "path": ".research/codec-variants/long-preskip-1272.opus",
+   "sha256": "b27f5e56a4a19c067303ddb06aa5519cdaf876cad646e13cafc7d405b317ea25"
+  },
+  {
+   "path": ".research/codec-variants/long-preskip-2232.opus",
+   "sha256": "b2e61f36876bea5321498da4e73ea55fc53f547077a7f80ff360efeff015d6cc"
   }
  ]
 }
