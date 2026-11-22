@@ -12,7 +12,7 @@
 
 mod blocking;
 pub mod compat;
-pub mod mapping;
+mod mapping;
 mod packets;
 pub mod page;
 mod queue;
@@ -22,7 +22,6 @@ mod timing;
 mod track;
 
 pub use blocking::BlockingReader;
-pub use mapping::Mapping;
 pub use page::PageHeader;
 pub use reader::{Limits, Reader, ReaderEvent};
 pub use track::{Packet, Track};

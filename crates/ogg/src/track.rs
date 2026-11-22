@@ -146,8 +146,8 @@ impl TrackInfo for Track {
     fn codec(&self) -> CodecId {
         self.mapping.codec()
     }
-    /// The canonical configuration the header packets form (see [`crate::mapping`]);
-    /// for an unknown mapping, its first packet.
+    /// The canonical configuration the header packets form (see the crate
+    /// documentation's mapping table); for an unknown mapping, its first packet.
     fn configuration(&self) -> &[u8] {
         &self.config.bytes[self.config.configuration.clone()]
     }

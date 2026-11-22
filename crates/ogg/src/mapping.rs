@@ -23,9 +23,8 @@ use triergon_framing::{
 };
 
 /// The mapping a logical stream's first packet identifies.
-#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Mapping {
+pub(crate) enum Mapping {
     /// Vorbis I: the first packet is the identification header (`\x01vorbis`).
     Vorbis,
     /// Opus (RFC 7845): the first packet is `OpusHead`.
@@ -66,7 +65,7 @@ const UNKNOWN_TAG: usize = 8;
 
 impl Mapping {
     /// The mapping and its identifying magic (the codec tag) of a first packet.
-    pub fn identify(first: &[u8]) -> (Mapping, &[u8]) {
+    pub(crate) fn identify(first: &[u8]) -> (Mapping, &[u8]) {
         if vorbis::header_type(first) == Some(1) {
             return (Mapping::Vorbis, &first[..7]);
         }
@@ -94,7 +93,7 @@ impl Mapping {
     }
 
     /// What the mapping codes.
-    pub fn kind(self) -> MediaKind {
+    pub(crate) fn kind(self) -> MediaKind {
         match self {
             Mapping::Vorbis | Mapping::Opus | Mapping::Flac | Mapping::Speex => MediaKind::Audio,
             Mapping::Theora => MediaKind::Video,
@@ -103,7 +102,7 @@ impl Mapping {
     }
 
     /// The neutral codec.
-    pub fn codec(self) -> CodecId {
+    pub(crate) fn codec(self) -> CodecId {
         match self {
             Mapping::Vorbis => CodecId::Vorbis,
             Mapping::Opus => CodecId::Opus,

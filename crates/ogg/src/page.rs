@@ -12,9 +12,9 @@ pub const BEGIN_OF_STREAM: u8 = 2;
 pub const END_OF_STREAM: u8 = 4;
 
 /// The capture pattern every page starts with.
-pub const CAPTURE: &[u8; 4] = b"OggS";
+pub(crate) const CAPTURE: &[u8; 4] = b"OggS";
 /// Bytes of a page header before its lacing values.
-pub const FIXED_HEADER: usize = 27;
+pub(crate) const FIXED_HEADER: usize = 27;
 /// The largest page: a full header and 255 segments of 255 bytes.
 pub const MAX_PAGE: usize = FIXED_HEADER + 255 + 255 * 255;
 
@@ -126,7 +126,7 @@ impl PageHeader {
 
     /// The packet pieces of the body of `page`, in order, with whether each one ends its
     /// packet (a final run of 255-byte segments continues on the next page).
-    pub fn pieces<'a>(
+    pub(crate) fn pieces<'a>(
         &self,
         page: &'a [u8],
     ) -> impl Iterator<Item = (core::ops::Range<usize>, bool)> + 'a {
@@ -155,7 +155,7 @@ impl PageHeader {
     }
 
     /// Number of packets that end on `page`.
-    pub fn completed_packets(&self, page: &[u8]) -> usize {
+    pub(crate) fn completed_packets(&self, page: &[u8]) -> usize {
         self.lacing(page)
             .iter()
             .filter(|&&value| value < 255)
