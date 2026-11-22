@@ -9,6 +9,7 @@
     "Open Matroska, indexed MP4, progressive MP4 and one MPEG-TS program through the direct player. Use source clocks and read every selected packet. The explicit bounded timing controls use the bounded opener and compatibility index while retaining source PacketInfo clocks. For ordered transport entities, continue the same player to the second entity and explicitly finish the logical source. The reference reads the same concatenated byte stream.",
     "The reference calls avformat_open_input and av_read_frame without stream discovery. Set ignore_editlist=1 for MOV and suppress elementary parsing and filling for MPEG-TS PES. Select the named PIDs of program 1 when the case declares PIDs. Matroska timestamps are in nanoseconds, MP4 in media timescale ticks, and transport in raw 90 kHz PES ticks.",
     "Fold kind 2 with each initial track ID, media kind, framed codec name, source codec tag, configuration, optional language and tri-state default and forced flags. The reference uses the public stream ID or the one-based stream ordinal if it has no positive ID. For Matroska, read the literal CodecID and effective language independently from TrackEntry, keyed by the track number. Retain the native codec identity, decoder configuration and dispositions. The trace retains the native tag and language for diagnosis.",
+    "For MPEG-TS, compare the first neutral ISO 639 language with the first native language when the reference joins codes. Fold kind 4 with PID, three literal language bytes and audio type for every entry in the selected initial PMT. Read the wire tuples independently on the reference side.",
     "For MOV, read the first sample description in the source catalogue, comparing the entry body for raw formats and the decoder record for encoded formats. Keep native stream language and dispositions in diagnostics. For a verified regular sample extent, read stts and ctts clocks and stss sync, preserving other native packet flags. For a matched fragment sample, read sync from the resolved trun flags and project clocks when the fragment has an explicit tfdt. Match track, position, extent and every payload byte before applying those source projections.",
     "Fold kind 1 with the shared packet row: track ID, optional PTS and DTS, duration, flags, size and every payload byte. Fold 7 on clean end or 8 on data refusal. Trace the candidate demux clock and trim for diagnosis. For transport, read stream_type from a complete verified PMT when available. For each native packet matched byte for byte to a complete PES, read the original timestamps and compare the PES row. Preserve native packet fields in the trace.",
     "For raw Annex B, fold kind 4 with the stream rate from the active SPS timing and FFmpeg codec parameters. Fold kind 3 per unit with the queue-boundary timestamp in ns, zero for an unstamped packet. Trace any additional source VUI fields and the reference sample aspect ratio. Raw views run for parity only."
@@ -474,8 +475,7 @@
     }
   ],
   "pending_module_requirements": [
-    "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
-    "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.18. Compare a literal ISO 639 descriptor row as source evidence, or require that source TrackInfo interprets the descriptor on a video/private route as native demuxers do for a language-selector consumer."
+    "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit."
   ],
   "open_cases": [
     {
@@ -495,20 +495,6 @@
     {
       "id": "mp4-forward-progressive-unknown-clock-terminal",
       "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "ts-program-pmt-opaque-language-descriptors",
-      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.18. Compare a literal ISO 639 descriptor row as source evidence, or require that source TrackInfo interprets the descriptor on a video/private route as native demuxers do for a language-selector consumer.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "source-pmt-opaque-language-descriptors",
-      "requirement": "Owner question under ITU-T H.222.0 (08/2023) sections 2.4.4.10 and 2.6.18. Compare a literal ISO 639 descriptor row as source evidence, or require that source TrackInfo interprets the descriptor on a video/private route as native demuxers do for a language-selector consumer.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

@@ -574,7 +574,8 @@ static int source_pes_clock(CatalogueField source, size_t width, unsigned pid,
 
 /* AVStream's codec tag can come from an elementary registration descriptor.
  * The source catalogue's coding tag is the PMT's separate stream_type octet. */
-static int catalogue_pmt_type(CatalogueField source, size_t width, int pmt_pid, int pid)
+static int catalogue_pmt_type(CatalogueField source, size_t width, int pmt_pid, int pid,
+                              CatalogueField *descriptors)
 {
     const AVCRC *crc = av_crc_get_table(AV_CRC_32_IEEE);
     for (size_t at = 0; source.size - at >= width; at += width) {
@@ -597,6 +598,7 @@ static int catalogue_pmt_type(CatalogueField source, size_t width, int pmt_pid, 
         size_t item = 12 + (AV_RB16(section + 10) & 0x0fff);
         const size_t end = length - 4;
         int code = -1;
+        CatalogueField loop = {0};
         while (item <= end && end - item >= 5) {
             const size_t next = item + 5 + (AV_RB16(section + item + 3) & 0x0fff);
             if (next > end)
@@ -605,11 +607,14 @@ static int catalogue_pmt_type(CatalogueField source, size_t width, int pmt_pid, 
                 if (code >= 0)
                     return -1;
                 code = section[item];
+                loop = (CatalogueField){section + item + 5, next - item - 5};
             }
             item = next;
         }
-        if (item == end && code >= 0)
+        if (item == end && code >= 0) {
+            *descriptors = loop;
             return code;
+        }
     }
     return -1;
 }
@@ -665,9 +670,30 @@ static uint64_t source_view_track_id(const AVStream *stream)
     return stream->id > 0 ? (uint64_t)stream->id : (uint64_t)stream->index + 1;
 }
 
+static void source_view_languages(ViewWork *work, uint64_t id, CatalogueField descriptors)
+{
+    for (size_t at = 0; descriptors.size - at >= 2;) {
+        const uint8_t *tag = descriptors.data + at;
+        const size_t size = tag[1];
+        if (size > descriptors.size - at - 2)
+            break;
+        if (tag[0] == 0x0a && size % 4 == 0) {
+            for (size_t entry = 2; entry < size + 2; entry += 4) {
+                const uint8_t *language = tag + entry;
+                const uint64_t words[] = {id, language[0], language[1], language[2], language[3]};
+                view_record(work, 4, words, 5, NULL, 0);
+                if (work->trace)
+                    printf("4 %" PRIu64 " %u %u %u %u\n", id, language[0], language[1],
+                           language[2], language[3]);
+            }
+        }
+        at += size + 2;
+    }
+}
+
 static int source_view_track(ViewWork *work, const AVStream *stream,
                              const PlaybackSourceCase *source, CatalogueField tracks,
-                             SourceMovSamples *samples, int coded_type)
+                             SourceMovSamples *samples, int coded_type, CatalogueField descriptors)
 {
     const AVCodecParameters *parameters = stream->codecpar;
     const char *codec = source_view_codec(parameters);
@@ -718,6 +744,8 @@ static int source_view_track(ViewWork *work, const AVStream *stream,
                     id, tag, stream->disposition);
         if (coded_type >= 0)
             codec_tag = (CatalogueField){&source_type, 1};
+        if (language)
+            lang.size = strcspn(language->value, ",");
         default_track = forced = 0;
     }
     fold(&work->digest, 2);
@@ -743,6 +771,8 @@ static int source_view_track(ViewWork *work, const AVStream *stream,
             printf(" None");
         printf(" %" PRIu64 " %" PRIu64 "\n", default_track, forced);
     }
+    if (source->transport)
+        source_view_languages(work, id, descriptors);
     return 0;
 }
 
@@ -896,12 +926,13 @@ static int source_view_run(const ViewCase *input, ViewWork *work)
             if (format->programs[i]->program_num == 1)
                 pmt_pid = format->programs[i]->pmt_pid;
     for (unsigned i = 0; i < track_count; ++i) {
+        CatalogueField descriptors = {0};
         const int coded = pmt_pid >= 0 ? catalogue_pmt_type(
             (CatalogueField){reader.data, (size_t)reader.size}, (size_t)source->transport,
-            pmt_pid, format->streams[i]->id) : -1;
+            pmt_pid, format->streams[i]->id, &descriptors) : -1;
         if (source_view_selected(format, format->streams[i], source) &&
             source_view_track(work, format->streams[i], source, tracks, samples ? &samples[i] : NULL,
-                              coded) < 0) {
+                              coded, descriptors) < 0) {
             av_free(samples);
             packet_close(&format);
             return 2;

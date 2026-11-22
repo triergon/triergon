@@ -26,7 +26,7 @@ mod worker {
     };
     use triergon_playback::{
         ByteSource, ClockChoice, Engine, Event, Format, Player, PlayerPolicy, Progress, Selection,
-        SourceOwner, TrackKey,
+        SourceOwner, Track, TrackKey,
         mp4::{Mp4IndexJob, Mp4Open, OpenLimits, OpenProgress, PlanLimits, ProgressiveLimits},
         probe::SelectedInput,
     };
@@ -466,7 +466,7 @@ mod worker {
             self.work.bytes += value.len() as u64;
         }
 
-        fn track(&mut self, track: &impl TrackInfo) {
+        fn track(&mut self, track: &Track<'_>) {
             if self.clock_only {
                 return;
             }
@@ -504,6 +504,23 @@ mod worker {
                     language,
                 );
                 eprintln!("track {} colour: {:?}", track.id().0, track.colour());
+            }
+            if let Track::Ts { stream, .. } = track {
+                for descriptor in stream.descriptors().filter_map(std::result::Result::ok) {
+                    let Ok(languages) = descriptor.languages() else {
+                        continue;
+                    };
+                    for language in languages {
+                        self.field(&[
+                            4,
+                            track.id().0,
+                            u64::from(language.language_code[0]),
+                            u64::from(language.language_code[1]),
+                            u64::from(language.language_code[2]),
+                            u64::from(language.audio_type),
+                        ]);
+                    }
+                }
             }
         }
 
