@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "directory": ".research/fate-samples",
+  "cases": [
+    {
+      "id": "original-hevc-aac",
+      "profile": "original-hevc-aac",
+      "file": "mpegts/loewe.ts",
+      "sha256": "f93d2b5d78e4f04027c635e8e1dd866dcf35c233a0fa508f3bcc6a656fba286e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "188",
+        "769",
+        "--discover-ts188"
+      ],
+      "expected": {
+        "packets": 23,
+        "bytes": 85990,
+        "digest": 8005868861097246031,
+        "eof": true
+      },
+      "source": "fate-suite/mpegts/loewe.ts"
+    }
+  ]
+}

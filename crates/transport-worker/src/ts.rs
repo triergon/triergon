@@ -43,6 +43,7 @@ use triergon_mpegts::{
 };
 
 pub(crate) mod au_recovery;
+mod discovery;
 
 pub const PREFIX: &str = "ts-";
 const OPERATION: &str = "mpegts-pes-packets";
@@ -1034,15 +1035,26 @@ pub fn run(args: &[String]) -> Result<()> {
     let invocation = Invocation::parse(
         args,
         PREFIX,
-        " SIZE PROGRAM [--dvb] [[--discontinuity] ENTITY]...",
+        " SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]... | 188 PROGRAM --discover-ts188",
         2..=usize::MAX,
         false,
     )?;
     let pool = Budget::new(256 * 1024 * 1024)?;
-    let request = parse(&pool, Path::new(invocation.path), invocation.arguments)?;
+    let (discover, arguments) = match invocation.arguments.split_last() {
+        Some((last, rest)) if last == "--discover-ts188" => (true, rest),
+        _ => (false, invocation.arguments),
+    };
+    if discover && !matches!(arguments, [size, _] if size == "188") {
+        return Err("--discover-ts188 requires one TS188 entity and no namespace".into());
+    }
+    let request = parse(&pool, Path::new(invocation.path), arguments)?;
     let cancel = AtomicBool::new(false);
     measure(&invocation, OPERATION, Some(&pool), || {
-        operation(&pool, std::hint::black_box(&request), &cancel)
+        if discover {
+            discovery::operation(&pool, std::hint::black_box(&request), &cancel)
+        } else {
+            operation(&pool, std::hint::black_box(&request), &cancel)
+        }
     })
 }
 
@@ -1071,6 +1083,272 @@ mod tests {
             "{file}: charged storage outlived the operation"
         );
         totals
+    }
+
+    #[test]
+    #[ignore = "requires the cached original mpegts/loewe.ts"]
+    fn discovered_original_replays_from_the_source_grid_each_run() {
+        let pool = Budget::new(64 * 1024 * 1024).unwrap();
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.research/fate-samples/mpegts/loewe.ts");
+        let request = parse(&pool, &path, &["188".into(), "769".into()]).unwrap();
+        for _ in 0..2 {
+            let totals =
+                super::discovery::operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+            assert!(totals.refusal.is_none());
+            assert_eq!(
+                (totals.packets, totals.bytes, totals.digest),
+                (23, 85_990, 8_005_868_861_097_246_031)
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "requires the cached original mpegts/loewe.ts"]
+    fn discovery_keeps_counters_across_direct_continuations_and_pes_starts() {
+        const CARRIER: usize = 188;
+        let pool = Budget::new(64 * 1024 * 1024).unwrap();
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.research/fate-samples/mpegts/loewe.ts");
+        let mut request = parse(&pool, &path, &["188".into(), "769".into()]).unwrap();
+        let mut data = request.input.as_ref().to_vec();
+        for (destination, source, pid) in [(0, 512, 0), (1, 513, 1363)] {
+            let from = 1 + source * CARRIER;
+            let to = 1 + destination * CARRIER;
+            assert_eq!(
+                (u16::from(data[from + 1] & 31) << 8) | u16::from(data[from + 2]),
+                pid
+            );
+            // Install the tables before the first complete PES without moving
+            // any PES byte positions. Both replaced fragments precede its start.
+            assert_eq!(data[to + 1] & 0x40, 0);
+            data.copy_within(from..from + CARRIER, to);
+            data[from + 1..from + 4].copy_from_slice(&[0x1f, 0xff, 0x10]);
+        }
+        request.input = Bytes::copy_from_slice(&pool, &data).unwrap();
+        let totals = super::discovery::operation(&pool, &request, &AtomicBool::new(false)).unwrap();
+        assert!(totals.refusal.is_none());
+        assert_eq!(
+            (totals.packets, totals.bytes, totals.digest),
+            (23, 85_990, 8_005_868_861_097_246_031)
+        );
+    }
+
+    #[test]
+    #[ignore = "requires the cached original mpegts/loewe.ts"]
+    fn discovery_replay_checks_non_pat_syntax_before_the_map() {
+        let pool = Budget::new(64 * 1024 * 1024).unwrap();
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.research/fate-samples/mpegts/loewe.ts");
+        let mut request = parse(&pool, &path, &["188".into(), "769".into()]).unwrap();
+        let mut data = request.input.as_ref().to_vec();
+        // Outside the carrier grid's initial seven-header probe.
+        let bad_flags = 1 + 10 * 188 + 3;
+        data[bad_flags] &= !0x30;
+        request.input = Bytes::copy_from_slice(&pool, &data).unwrap();
+        let cancel = AtomicBool::new(false);
+        let Err(error) = super::discovery::operation(&pool, &request, &cancel) else {
+            panic!("replay must report the transport syntax error");
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("discovery source fault: Transport"),
+            "{error}"
+        );
+
+        // Discovery has no active map when its only PMT carrier is absent.
+        let pmt = 1 + 513 * 188;
+        data[pmt + 1..pmt + 4].copy_from_slice(&[0x1f, 0xff, 0x10]);
+        request.input = Bytes::copy_from_slice(&pool, &data).unwrap();
+        let Err(error) = super::discovery::operation(&pool, &request, &cancel) else {
+            panic!("the program cannot be selected without a map");
+        };
+        assert_eq!(error.to_string(), "requested program has no active PMT");
+    }
+
+    #[test]
+    #[ignore = "requires the cached original mpegts/loewe.ts"]
+    fn discovery_refuses_a_changed_clock_interval() {
+        let pool = Budget::new(64 * 1024 * 1024).unwrap();
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.research/fate-samples/mpegts/loewe.ts");
+        let mut request = parse(&pool, &path, &["188".into(), "769".into()]).unwrap();
+        let mut data = request.input.as_ref().to_vec();
+        let start = (0..188)
+            .find(|&i| {
+                data.get(i) == Some(&0x47)
+                    && data.get(i + 188) == Some(&0x47)
+                    && data.get(i + 376) == Some(&0x47)
+            })
+            .unwrap();
+        let mut pcrs = 0;
+        for packet in data[start..].chunks_exact_mut(188) {
+            if packet[3] & 0x20 != 0 && packet[4] >= 7 && packet[5] & 0x10 != 0 {
+                pcrs += 1;
+                if pcrs == 3 {
+                    packet[5] |= 0x80;
+                    break;
+                }
+            }
+        }
+        assert_eq!(pcrs, 3);
+        request.input = Bytes::copy_from_slice(&pool, &data).unwrap();
+        let Err(error) = super::discovery::operation(&pool, &request, &AtomicBool::new(false))
+        else {
+            panic!("changed clock must be refused");
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("discovery clock interval changed"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires the cached original mpegts/loewe.ts"]
+    fn discovery_refuses_selected_duplicate_and_non_pcr_counter_breaks() {
+        const START: u8 = 0x40;
+        const BODY: u8 = 0x10;
+        let pool = Budget::new(64 * 1024 * 1024).unwrap();
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.research/fate-samples/mpegts/loewe.ts");
+        let request = parse(&pool, &path, &["188".into(), "769".into()]).unwrap();
+        let original = request.input.clone();
+
+        let selected_carrier = |pid, start| {
+            original.as_ref()[1..]
+                .chunks_exact(188)
+                .enumerate()
+                // Allow discovery and the first PES to establish their state.
+                .skip(200)
+                .find(|(_, p)| {
+                    let actual = (u16::from(p[1] & 31) << 8) | u16::from(p[2]);
+                    actual == pid
+                        && p[3] & BODY != 0
+                        && (p[1] & START != 0) == start
+                        && (p[3] & 0x20 == 0 || (1..=182).contains(&p[4]))
+                })
+                .map(|(i, p)| (1 + i * 188, <[u8; 188]>::try_from(p).unwrap()))
+                .expect("pinned selected carrier")
+        };
+        let mut request = request;
+        let mut refuses = |name, bytes: &[u8]| {
+            request.input = Bytes::copy_from_slice(&pool, bytes).unwrap();
+            let Err(error) = super::discovery::operation(&pool, &request, &AtomicBool::new(false))
+            else {
+                panic!("selected continuity fault must be refused");
+            };
+            assert!(
+                error.to_string().contains("discovery continuity fault"),
+                "{name}: {error}"
+            );
+        };
+
+        let (at, same) = selected_carrier(1361, false);
+        let mut duplicate = original.as_ref().to_vec();
+        drop(duplicate.splice(at..at, same));
+        refuses("duplicate HEVC continuation", &duplicate);
+        for start in [true, false] {
+            let (at, mut carrier) = selected_carrier(1362, start);
+            // Rebuild the first adaptation byte to signal discontinuity on
+            // this non-PCR PID, and jump the expected payload counter.
+            let counter = (carrier[3] + 3) & 15;
+            if carrier[3] & 0x20 == 0 {
+                carrier.copy_within(4..186, 6);
+                carrier[4] = 1;
+                carrier[5] = 0;
+            }
+            carrier[3] = 0x30 | counter;
+            carrier[5] |= 0x80;
+            let mut data = original.as_ref().to_vec();
+            data[at..at + 188].copy_from_slice(&carrier);
+            refuses(
+                if start {
+                    "AAC PES start"
+                } else {
+                    "AAC continuation"
+                },
+                &data,
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "requires the cached original mpegts/loewe.ts"]
+    fn discovery_refuses_adaptation_only_counter_breaks_on_program_routes() {
+        const CARRIER: usize = 188;
+        let pool = Budget::new(64 * 1024 * 1024).unwrap();
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.research/fate-samples/mpegts/loewe.ts");
+        let mut request = parse(&pool, &path, &["188".into(), "769".into()]).unwrap();
+        let original = request.input.clone();
+        let mut data = original.as_ref().to_vec();
+        let at = 1 + 522 * CARRIER;
+        assert_eq!(&data[at..at + 3], &[0x47, 0x1f, 0xff]);
+        for (pid, previous) in [(0u16, 1), (1363, 1), (1361, 6), (1362, 9)] {
+            let [high, low] = pid.to_be_bytes();
+            data[at..at + CARRIER].fill(0xff);
+            data[at..at + 6].copy_from_slice(&[0x47, high, low, 0x20 | (previous + 3), 183, 0x80]);
+            request.input = Bytes::copy_from_slice(&pool, &data).unwrap();
+            let Err(error) = super::discovery::operation(&pool, &request, &AtomicBool::new(false))
+            else {
+                panic!("signalled break on PID {pid} must be refused");
+            };
+            assert!(
+                error.to_string().contains("discovery continuity fault"),
+                "PID {pid}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "requires the cached original mpegts/loewe.ts"]
+    fn discovery_refuses_a_replacement_program_map() {
+        let pool = Budget::new(64 * 1024 * 1024).unwrap();
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.research/fate-samples/mpegts/loewe.ts");
+        let mut request = parse(&pool, &path, &["188".into(), "769".into()]).unwrap();
+        let mut bytes = request.input.as_ref().to_vec();
+        let mut replacement: [u8; 188] = bytes[1..]
+            .chunks_exact(188)
+            .find(|carrier| {
+                let pid = (u16::from(carrier[1] & 31) << 8) | u16::from(carrier[2]);
+                pid == 1363 && carrier[1] & 0x40 != 0 && carrier[3] & 0x10 != 0
+            })
+            .expect("pinned program map")
+            .try_into()
+            .unwrap();
+        replacement[3] = (replacement[3] & 0xf0) | ((replacement[3] + 1) & 15);
+        let payload = if replacement[3] & 0x20 != 0 {
+            5 + usize::from(replacement[4])
+        } else {
+            4
+        };
+        let at = payload + 1 + usize::from(replacement[payload]);
+        let length =
+            3 + (usize::from(replacement[at + 1] & 15) << 8) + usize::from(replacement[at + 2]);
+        let section = &mut replacement[at..at + length];
+        assert_eq!(section[0], 2, "pinned PMT table identifier");
+        let first_es = 12 + (usize::from(section[10] & 15) << 8) + usize::from(section[11]);
+        assert_eq!(section[first_es], 0x24, "pinned HEVC stream type");
+        section[first_es] = 0x1b;
+        section[5] = (section[5] & 0xc1) | ((((section[5] >> 1) + 1) & 31) << 1);
+        let end = section.len() - 4;
+        let crc = triergon_mpegts::psi::PsiCrc32::of(&section[..end]);
+        section[end..].copy_from_slice(&crc.to_be_bytes());
+        let last_complete = bytes.len() - (bytes.len() - 1) % 188;
+        drop(bytes.splice(last_complete..last_complete, replacement));
+        request.input = Bytes::copy_from_slice(&pool, &bytes).unwrap();
+        let Err(error) = super::discovery::operation(&pool, &request, &AtomicBool::new(false))
+        else {
+            panic!("changed map must be refused");
+        };
+        assert!(
+            error.to_string().contains("discovery program map changed"),
+            "{error}"
+        );
     }
 
     #[test]

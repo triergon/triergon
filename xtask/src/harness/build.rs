@@ -854,6 +854,24 @@ const PROFILE_REFERENCES: &[ProfileReference] = &[
     },
     ProfileReference {
         profile: ".research/reference-formats",
+        binary: "ffmpeg-ts188-discovery-worker",
+        define: Some("-DTRIERGON_HLS_REFERENCE=1"),
+        record: "ffmpeg-ts188-discovery",
+        kind: "FFmpeg MPEG-TS PES with automatic carrier and program discovery",
+        libraries: "ts188_discovery_reference",
+        packages: CONTAINER_PACKAGES,
+        options: &[
+            "-O3",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-DTRIERGON_TS188_DISCOVERY=1",
+        ],
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
         binary: "ffmpeg-ts-eac3-worker",
         source: "harness/reference_ts_eac3_worker.c",
         record: "ffmpeg-ts-eac3",

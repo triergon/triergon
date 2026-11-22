@@ -1,0 +1,17 @@
+fault Transport 1505 Invalid("adaptation stuffing")
+fault Transport 10153 Invalid("adaptation stuffing")
+fault Transport 18613 Invalid("adaptation stuffing")
+fault Transport 27073 Invalid("adaptation stuffing")
+fault Transport 34781 Invalid("adaptation stuffing")
+fault Transport 42489 Invalid("adaptation stuffing")
+fault Transport 50197 Invalid("adaptation stuffing")
+fault Transport 57905 Invalid("adaptation stuffing")
+fault Transport 65425 Invalid("adaptation stuffing")
+fault Transport 73321 Invalid("adaptation stuffing")
+fault Transport 81029 Invalid("adaptation stuffing")
+fault Transport 88737 Invalid("adaptation stuffing")
+pat 96262
+pmt 96450
+fault Transport 99829 Truncated
+finished
+eof carriers 531 payload_bytes 0

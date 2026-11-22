@@ -72,11 +72,13 @@ candidate PES operation requires a program-level reader on both sources. The
 candidate access-unit operation reports a PSI diagnostic for `pmtchange.ts` and
 a transport diagnostic for `loewe.ts`. These comparisons remain open.
 
-Run the source-only program reader controls with the hash-pinned originals in
-`.research/fate-samples/mpegts`:
+Run the program reader and reference clock controls with the hash-pinned
+originals in `.research/fate-samples/mpegts` and the prepared formats probe.
 
 ```sh
+CARGO_INCREMENTAL=0 cargo xtask prepare-ffmpeg --profile formats
 CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test original_program -- --ignored
+CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test pes_cutter authored_reference_clock_and_terminal_controls -- --ignored
 ```
 
 The controls assert the same source events for one-byte and 32 KiB delivery.
@@ -87,6 +89,10 @@ replacement routes in each version. It yields four complete video PES packets
 (138,514 payload bytes) and diagnostics for five CRC-valid table-ID `0xc0`
 sections on PMT PID 73 and one truncated audio PES. The regular sync grid of
 `loewe.ts` starts at offset one. The aligned reader reports 532 transport faults
-through EOF and discovers no tracks. The original inputs also cover open
-compatibility work on PMT merging, foreign-table filtering, incomplete audio and
-unaligned startup.
+through EOF and discovers no tracks. The explicit prefix probe returns offset
+one on the same input. Starting the transport cursor there gives program 769,
+PMT PID 1363, PCR PID 1361 and HEVC/AAC track PIDs 1361/1362, matching the pinned
+program probe. The control checks all complete carriers at their original
+offsets, including rejected carriers, and the partial tail at offset 99,829.
+Full probe metadata and packet-fold parity remain open, including PMT merging,
+foreign-table filtering and incomplete audio recovery.

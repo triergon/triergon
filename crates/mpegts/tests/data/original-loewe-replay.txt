@@ -1,0 +1,56 @@
+fault Transport 1505 Invalid("adaptation stuffing")
+fault Transport 10153 Invalid("adaptation stuffing")
+fault Transport 18613 Invalid("adaptation stuffing")
+fault Transport 27073 Invalid("adaptation stuffing")
+fault Transport 34781 Invalid("adaptation stuffing")
+fault Transport 42489 Invalid("adaptation stuffing")
+fault Transport 50197 Invalid("adaptation stuffing")
+fault Transport 57905 Invalid("adaptation stuffing")
+fault Transport 65425 Invalid("adaptation stuffing")
+fault Transport 73321 Invalid("adaptation stuffing")
+fault Transport 81029 Invalid("adaptation stuffing")
+fault Transport 88737 Invalid("adaptation stuffing")
+pat 96262
+pmt 96450
+fault Transport 99829 Truncated
+replay 1361
+fault Transport 1505 Invalid("adaptation stuffing")
+replayed 1361 Some(2863340144) Some(2863336544) 1091 520335d0485f3ed19841ecf41e96a23ca168f7cccd3d8e6e369b3ab676b02cfb
+replayed 1361 Some(2863338344) None 182 1baf1bd88df82203c193ba7baa01d14d81df51a1d56413a185aa846703aafdbd
+replayed 1361 Some(2863341944) Some(2863340144) 208 60f2700d0593d11d75d831e8bd54d6e289ed2a4044e43f42e34f9731b303af47
+fault Transport 10153 Invalid("adaptation stuffing")
+replayed 1361 Some(2863350944) Some(2863341944) 7608 139c8c46c5601ce57eff5e5a8e3ad8e9539a8521a7286d255cebdf2553c37bae
+replayed 1361 Some(2863347344) Some(2863343744) 946 dc01783e120e9f61da7e03a7ce6141b5b18695cb8a29cd1573d45a300b4b0d8a
+replayed 1361 Some(2863345544) None 165 080e566793b8fbac9d3b54e40bd8b80d876c1bc23c6d47987e417d9897fa1265
+replayed 1361 Some(2863349144) Some(2863347344) 211 2282f441b74eed270691b9990464c1303e333ca69512c7e09e6535ee06161024
+fault Transport 18613 Invalid("adaptation stuffing")
+fault Transport 27073 Invalid("adaptation stuffing")
+replayed 1361 Some(2863358144) Some(2863349144) 11218 e5112a7cbb77c95d5282dec823ab127506a79230586feee940b59e6ae1e9af46
+replayed 1361 Some(2863354544) Some(2863350944) 838 83b3d68eb97ef8b20c8fe66665159a27cf2bf083c9c5ea0b693575184e91369d
+replayed 1361 Some(2863352744) None 183 03d6afa1a20d5753ce1b45846bb3a280bef454cac9191c6fad7bd27762724c80
+replayed 1361 Some(2863356344) Some(2863354544) 182 afea614303bed0bef51ec853f853a2b2a5444c2f039bfed2dc84fb77f5e25b4a
+fault Transport 34781 Invalid("adaptation stuffing")
+fault Transport 42489 Invalid("adaptation stuffing")
+replayed 1362 Some(2863278584) None 4123 08f9dd3097db926ed08f6facdd66c02ae33e08b49878c9a9fa6b40218718a40a
+fault Transport 50197 Invalid("adaptation stuffing")
+fault Transport 57905 Invalid("adaptation stuffing")
+fault Transport 65425 Invalid("adaptation stuffing")
+replayed 1361 Some(2863365344) Some(2863356344) 31218 e295ae0d1834e6d475717a8f31739709cf91d36f2b6febd9c2cc87df520fed1d
+replayed 1361 Some(2863361744) Some(2863358144) 842 d841670f026e99eadb7df0d32e1cc16322fb25a4877c32e6561f8288233f1898
+replayed 1361 Some(2863359944) None 190 75fab4487bed6abcd0adca60fe15a20bca41e915aeb22e2a3e76f07b73a5a840
+replayed 1361 Some(2863363544) Some(2863361744) 184 80440562d034993e898b49ea02e9d4c41d774d38a9807ab056c687ceeaf3bbfc
+fault Transport 73321 Invalid("adaptation stuffing")
+replayed 1362 Some(2863290104) None 4028 b40e23329bf86e92ed65f3b51d69a2ae56a2e2335d83e2be03ce163153eaa855
+fault Transport 81029 Invalid("adaptation stuffing")
+replayed 1361 Some(2863372544) Some(2863363544) 11760 550bc153d37d1fb95bf27e93ba90f55a7383ac7930ef40f67815b23c34d25bc8
+replayed 1361 Some(2863368944) Some(2863365344) 776 b8ea1d2f62aa272b3020eba71157815aeb1c3a9af9ead256be225c8a57e92190
+replayed 1361 Some(2863367144) None 145 e9a343d6017997d4bb888b328412120b119ea9d5bb20587876648e53185cc617
+replayed 1361 Some(2863370744) Some(2863368944) 181 8f9c00547ba9c9f4b79e979c15dea32be3c8a3695913115fdbd6c4e762d25efc
+fault Transport 88737 Invalid("adaptation stuffing")
+pat 96262
+pmt 96450
+fault Transport 99829 Truncated
+replayed 1361 Some(2863379744) Some(2863370744) 6597 f947eb0fc05291c74c15b5856e29118ed3eb5e12761914c73405514e52376c3f
+replay fault Truncated
+finished
+eof carriers 531 payload_bytes 0

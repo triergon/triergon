@@ -10,6 +10,11 @@ transport-worker PREFIXbench  FILE ITERATIONS SIZE PROGRAM [--dvb|--atsc] [[--di
 transport-worker PREFIXmemory FILE SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]...
 ```
 
+The `ts-` modes also accept `188 PROGRAM --discover-ts188` for a single seekable
+entity. Each run discovers the TS188 grid and active program map, then replays
+registered HEVC and ADTS AAC tracks in source order. Other track types, changes to
+the selected program map or clock interval, and unsupported source faults are refused.
+
 SIZE is 188 or 192. Use `ts-` for PES packets
 ([contract](../../harness/features/mpegts-pes/contract.json)) and `ts-au-` for access
 units ([contract](../../harness/features/mpegts-access-units/contract.json)). `ts-au-`

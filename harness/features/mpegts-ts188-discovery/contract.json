@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "mpegts-ts188-discovery",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "mpegts-pes-packets",
+  "candidate": "transport-worker",
+  "worker_operation": "ts-",
+  "reference": "ffmpeg-ts188-discovery",
+  "contract": [
+    "Read one original preloaded TS188 entity and discover its carrier offset and requested program during every operation. Replay from the detected grid so earlier PES are available when the active PMT identifies the HEVC and AAC tracks.",
+    "The pinned FFmpeg MPEG-TS demuxer processes the same complete source with NOPARSE and NOFILLIN. It detects the carrier grid and discovers the program internally. Both workers fold the selected stream order, wire PID, PTS and DTS, duration, source position, flags, payload and stream-ID side data through physical EOF.",
+    "The original FATE mpegts/loewe.ts sample is fetched and SHA-256 checked. No source prefix, packet or metadata field is removed. The separate clock, terminal PES and input granularity controls remain part of the reader tests."
+  ],
+  "required_profiles": [
+    "original-hevc-aac"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "fetch_fate_cases": true
+}
