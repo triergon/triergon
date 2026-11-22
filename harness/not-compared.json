@@ -58,9 +58,9 @@
     "triergon-codec-ac3": [
       {
         "name": "decoder-options",
-        "entry_points": ["DecoderOptions", "Decoder::with_options", "CrcPolicy::Reject", "NoiseMode::Off"],
-        "degree": "step",
-        "needs": "The CRC and dither-free lanes compare these options. FFmpeg crccheck can emit a different number of frames, and exact dither-free AC-3 PCM and error-free strips still have open cases."
+        "entry_points": ["NoiseMode::Off"],
+        "degree": "no-reference",
+        "needs": "The reference has no option equivalent to disabling all dither, AHT zero-bin noise and spectral extension noise. The dither-free lane compares Off where stripping the input gives an equivalent computation. The CRC lanes compare Decoder::with_options with Reject."
       },
       {
         "name": "decoder-modes",
@@ -77,8 +77,8 @@
       {
         "name": "bit-position-trace",
         "entry_points": ["Decoder::set_trace", "Decoder::trace", "Trace"],
-        "degree": "step",
-        "needs": "The dither-stripped stream pins exercise the trace product. Exact AC-3 PCM and complete reference decoding of all stripped inputs remain open."
+        "degree": "no-reference",
+        "needs": "The reference does not publish coded bit positions or full per-block trace state. The dither-free lane compares the pinned result of rewriting the coded dither fields and grades the stripped stream."
       }
     ],
     "triergon-codec-dca": [],
