@@ -128,6 +128,10 @@ The [track reset comparison](../../harness/codecs/session-cases.json) covers
 audio, Opus and Vorbis packets. The [AAC access-unit comparison](../../harness/features/aac-access-units/contract.json)
 covers configured fixed and program layouts, and the clocked video gate
 exercises both standalone video factories.
+The [audio lifecycle comparison](../../harness/features/audio-session-lifecycle/contract.json)
+checks the session's clock lead, cross-packet discard, rate-separated blocks,
+drain timestamps, backpressure, reset and both decoder-refusal policies in
+addition to the native codec session comparisons.
 
 The letterbox and downmix rules are native observations of FFmpeg 9.0.2, recorded in
 [rgba-contract.json](../../harness/codecs/rgba-contract.json) and

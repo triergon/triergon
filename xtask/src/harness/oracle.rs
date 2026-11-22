@@ -34,6 +34,7 @@ impl Kind {
             "core-budgets",
             "core-reader-protocol",
             "video-session-clock",
+            "audio-session-lifecycle",
             "source-signatures",
             "facade-source-control",
             "facade-mpegts-controls",

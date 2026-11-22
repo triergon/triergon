@@ -6,6 +6,7 @@
 mod protocol;
 // The reader lanes share the measured reader's packet and track output.
 mod audio;
+mod audio_session_lifecycle;
 mod blocks;
 mod core_reader_protocol;
 #[allow(
@@ -32,6 +33,10 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
     ("picture-props-", video::operation),
     ("h264-inspect-", video::operation),
     ("video-session-clock-", video::operation),
+    (
+        "audio-session-lifecycle-",
+        audio_session_lifecycle::operation,
+    ),
     ("hevc-access-units-", video::operation),
     ("video-nal-", video::operation),
     ("adts-sync-", audio::operation),

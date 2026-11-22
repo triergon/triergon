@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "lifecycle",
+      "profile": "lifecycle",
+      "file": "harness/features/audio-session-lifecycle/pcm-units.bin",
+      "sha256": "b9e3724620e35f03670a7a4f234bdcd243ad7ab15257c728987c922dd0d9cc01",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "lifecycle"
+      ],
+      "expected": {
+        "trace_sha256": "7308a3674624f4b87a5327de394014d3eb21c26f4de298ac3cfc4f0168852f83"
+      }
+    },
+    {
+      "id": "refusals",
+      "profile": "refusals",
+      "file": "harness/features/audio-session-lifecycle/pcm-units.bin",
+      "sha256": "b9e3724620e35f03670a7a4f234bdcd243ad7ab15257c728987c922dd0d9cc01",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "refusals"
+      ],
+      "expected": {
+        "trace_sha256": "1d7642d63141dfc67e36c08742c6110b5c1434643ba97a2818880974af17f002"
+      }
+    }
+  ]
+}

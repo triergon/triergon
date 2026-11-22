@@ -105,14 +105,7 @@
     ],
     "triergon-raster": [],
     "triergon-raw-video": [],
-    "triergon-session": [
-      {
-        "name": "audio-session",
-        "entry_points": ["AudioSession", "PcmBlock", "StreamSelection", "QueueLimits", "Discard", "OnRefusal"],
-        "degree": "step",
-        "needs": "The session lanes compare PCM, device output and block clocks. Damaged input, trim and drain timestamps, rate changes and reset behaviour have open parity cases."
-      }
-    ],
+    "triergon-session": [],
     "triergon-shape": [],
     "triergon-subtitles": [],
     "triergon-worker-entry": []
