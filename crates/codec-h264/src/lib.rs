@@ -260,7 +260,6 @@ pub struct Decoder {
     spare_bufs: Vec<std::sync::Arc<FrameBuf>>,
     /// Motion arrays of non-reference pictures (never co-located), kept for reuse.
     spare_motion: Vec<Motion>,
-    errors: u64,
 }
 
 /// Spare buffers kept for reuse beyond the frame stores.
@@ -402,10 +401,8 @@ fn dpb_frames(sps: &Sps) -> usize {
     )
     .unwrap_or(696_320);
     let mut n = (level_mbs / frame_mbs).clamp(1, 16) as usize;
-    if let Some(v) = &sps.vui
-        && v.bitstream_restriction
-    {
-        n = (v.max_dec_frame_buffering as usize)
+    if let Some(restriction) = sps.vui.and_then(|v| v.restriction) {
+        n = (restriction.max_dec_frame_buffering as usize)
             .max(1)
             .max(sps.max_num_ref_frames as usize)
             .min(16);
@@ -456,7 +453,6 @@ impl Decoder {
             mb_samples: inter::MbSamples::new(),
             spare_bufs: Vec::new(),
             spare_motion: Vec::new(),
-            errors: 0,
         }
     }
 
@@ -475,10 +471,7 @@ impl Decoder {
         let mut first_err = None;
         for nal in AnnexBUnits::new(data) {
             if let Err(e) = self.decode_nal(nal) {
-                self.errors += 1;
-                if first_err.is_none() {
-                    first_err = Some(e);
-                }
+                first_err.get_or_insert(e);
             }
         }
         match first_err {
@@ -490,11 +483,7 @@ impl Decoder {
     /// Feed a single NAL unit (without start code prefix).
     pub fn send_nal(&mut self, nal: &[u8], pts: Option<i64>) -> Result<(), DecodeError> {
         self.pending_pts = pts;
-        let r = self.decode_nal(nal);
-        if r.is_err() {
-            self.errors += 1;
-        }
-        r
+        self.decode_nal(nal)
     }
 
     /// Pop the next picture in output order.
@@ -766,7 +755,7 @@ impl Decoder {
             fs.pts = self.pending_pts;
             fs.non_existing = false;
             fs.idr = sh.idr;
-            let vui = sps.vui.clone().unwrap_or_else(Vui::inferred);
+            let vui = sps.vui.unwrap_or_else(Vui::inferred);
             fs.info = OutputInfo {
                 crop: sps.crop_rect(),
                 sar: vui.sar,
@@ -1249,9 +1238,8 @@ impl Decoder {
         let dpb_size = dpb_frames(sps);
         let reorder = sps
             .vui
-            .as_ref()
-            .filter(|v| v.bitstream_restriction)
-            .map(|v| v.max_num_reorder_frames as usize);
+            .and_then(|v| v.restriction)
+            .map(|r| r.max_num_reorder_frames as usize);
         while (self.dpb.len() > dpb_size || reorder.is_some_and(|r| self.dpb.bumpable() > r))
             && self.dpb.bump(leave(&mut self.out, &mut self.free))
         {}

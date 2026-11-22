@@ -10,24 +10,23 @@ fn inval(what: &'static str) -> DecodeError {
     DecodeError::Invalid(what)
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+/// The VUI fields the decoder uses (Annex E.1.1).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct Vui {
     pub(crate) sar: (u32, u32),
     pub(crate) video_full_range: bool,
-    pub(crate) colour_description_present: bool,
     pub(crate) colour_primaries: u8,
     pub(crate) transfer_characteristics: u8,
     pub(crate) matrix_coefficients: u8,
-    pub(crate) timing: Option<(u32, u32, bool)>,
-    pub(crate) bitstream_restriction: bool,
+    /// bitstream_restriction_flag set and its fields read in full.
+    pub(crate) restriction: Option<Restriction>,
+}
+
+/// The bitstream restriction fields of the VUI that bound output delay.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Restriction {
     pub(crate) max_num_reorder_frames: u32,
     pub(crate) max_dec_frame_buffering: u32,
-    pub(crate) pic_struct_present: bool,
-    pub(crate) nal_hrd: bool,
-    pub(crate) vcl_hrd: bool,
-    pub(crate) cpb_removal_delay_len: u8,
-    pub(crate) dpb_output_delay_len: u8,
-    pub(crate) time_offset_len: u8,
 }
 
 impl Vui {
@@ -122,7 +121,6 @@ pub(crate) struct Pps {
     pub(crate) weighted_pred: bool,
     pub(crate) weighted_bipred_idc: u32,
     pub(crate) pic_init_qp: i32,
-    pub(crate) pic_init_qs: i32,
     pub(crate) chroma_qp_index_offset: i32,
     pub(crate) second_chroma_qp_index_offset: i32,
     pub(crate) deblocking_filter_control_present: bool,
@@ -215,7 +213,8 @@ fn parse_scaling_matrix(
     Ok(())
 }
 
-fn hrd(r: &mut BitReader<'_>, v: &mut Vui) -> R<()> {
+/// hrd_parameters() (E.1.2), which the decoder skips.
+fn hrd(r: &mut BitReader<'_>) -> R<()> {
     let cpb_cnt = r.ue().wrapping_add(1);
     if cpb_cnt > 32 {
         return Err(inval("cpb_cnt_minus1"));
@@ -227,10 +226,9 @@ fn hrd(r: &mut BitReader<'_>, v: &mut Vui) -> R<()> {
         r.ue();
         r.bit();
     }
-    r.read(5);
-    v.cpb_removal_delay_len = r.read(5) as u8 + 1;
-    v.dpb_output_delay_len = r.read(5) as u8 + 1;
-    v.time_offset_len = r.read(5) as u8;
+    // initial_cpb_removal_delay_length_minus1, cpb_removal_delay_length_minus1,
+    // dpb_output_delay_length_minus1 and time_offset_length, 5 bits each.
+    r.skip(20);
     Ok(())
 }
 
@@ -253,7 +251,6 @@ fn parse_vui(r: &mut BitReader<'_>) -> R<Vui> {
         r.read(3); // video_format
         v.video_full_range = r.bit();
         if r.bit() {
-            v.colour_description_present = true;
             v.colour_primaries = r.read(8) as u8;
             v.transfer_characteristics = r.read(8) as u8;
             v.matrix_coefficients = r.read(8) as u8;
@@ -264,41 +261,38 @@ fn parse_vui(r: &mut BitReader<'_>) -> R<Vui> {
         r.ue();
     }
     if r.bit() {
-        let a = r.read(32);
-        let b = r.read(32);
-        let f = r.bit();
-        v.timing = Some((a, b, f));
+        // num_units_in_tick, time_scale and fixed_frame_rate_flag.
+        r.skip(65);
     }
-    v.nal_hrd = r.bit();
-    if v.nal_hrd {
-        hrd(r, &mut v)?;
+    let nal_hrd = r.bit();
+    if nal_hrd {
+        hrd(r)?;
     }
-    v.vcl_hrd = r.bit();
-    if v.vcl_hrd {
-        hrd(r, &mut v)?;
+    let vcl_hrd = r.bit();
+    if vcl_hrd {
+        hrd(r)?;
     }
-    if v.nal_hrd || v.vcl_hrd {
+    if nal_hrd || vcl_hrd {
         r.bit(); // low_delay_hrd_flag
     }
-    v.pic_struct_present = r.bit();
+    r.bit(); // pic_struct_present_flag
     // Truncated VUIs exist in the wild; stop before reading past the end.
     if r.left() <= 0 {
         return Ok(v);
     }
-    v.bitstream_restriction = r.bit();
-    if v.bitstream_restriction {
+    if r.bit() {
+        // motion_vectors_over_pic_boundaries_flag, max_bytes_per_pic_denom,
+        // max_bits_per_mb_denom and the two log2_max_mv_length fields.
         r.bit();
         r.ue();
         r.ue();
         r.ue();
         r.ue();
-        v.max_num_reorder_frames = r.ue();
-        v.max_dec_frame_buffering = r.ue();
-        if r.overrun() {
-            v.bitstream_restriction = false;
-            v.max_num_reorder_frames = 0;
-            v.max_dec_frame_buffering = 0;
-        }
+        let restriction = Restriction {
+            max_num_reorder_frames: r.ue(),
+            max_dec_frame_buffering: r.ue(),
+        };
+        v.restriction = (!r.overrun()).then_some(restriction);
     }
     Ok(v)
 }
@@ -474,7 +468,7 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
     let weighted_bipred_idc = r.read(2);
     // Unchecked here: the slice header checks SliceQPY.
     let pic_init_qp = r.se().wrapping_add(26);
-    let pic_init_qs = r.se().wrapping_add(26);
+    r.se(); // pic_init_qs_minus26
     let chroma_qp_index_offset = r.se();
     if !(-12..=12).contains(&chroma_qp_index_offset) {
         return Err(inval("chroma_qp_index_offset"));
@@ -514,7 +508,6 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
         weighted_pred,
         weighted_bipred_idc,
         pic_init_qp,
-        pic_init_qs,
         chroma_qp_index_offset,
         second_chroma_qp_index_offset: second,
         deblocking_filter_control_present,
