@@ -807,9 +807,6 @@
         "research-dvb-nonmodifying-observed--dvb8-run-flag1",
         "research-mkv-bitmap-dvb-v1--carrier",
         "research-mkv-bitmap-dvb-v1--valid-video-carrier"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
