@@ -66,18 +66,27 @@ from the Xing table of contents or the bit rate (`SeekBasis::Toc`, `SeekBasis::B
 and counts from the start when the estimate falls past the end. Where the frame found
 after the jump estimates past the target, the bytes skipped to reach it are no frame
 and join its packet, as when reading; the seek lands on that packet, at the jump, with
-the estimate there, which is at or before the target. The [seek
-comparison](../../harness/codecs/reader-seeks.json) checks each format's receipt,
-landing basis, preroll and packets after the landing against FFmpeg's. ADTS and AC-3 count
+the estimate there, which is at or before the target. ADTS and AC-3 count
 frames from the start (`SeekMethod::Restart`). A playback seek lands
 `Format::PREROLL` frames early (two for MPEG audio, one for ADTS and AC-3, none for
 FLAC).
 
 `Limits` bounds the largest access unit (4 MiB: a verbatim FLAC frame of 65535 samples
 of eight 32-bit channels is about 2.2 MB), retained tags and metadata (4 MiB in all),
-sync search (1 MiB), input window (64 KiB), SEEKTABLE points (65536) and bisection
-jumps (64). Every input-dependent allocation is charged to the reader's `Budget`;
-exceeding a limit is a typed error.
+sync search (1 MiB), SEEKTABLE points (65536) and bisection jumps (64); `Reader::new`
+takes the largest input window (`BlockingReader` reads 64 KiB). Every input-dependent
+allocation is charged to the reader's `Budget`; exceeding a limit is a typed error. A
+full pool is `Step::Backpressure`, and the step resumes once output is released;
+`BlockingReader` returns it as `Error::Backpressure`, and its next call resumes.
+
+`probe` names the format a prefix starts, after any ID3v2 tag: native FLAC by its
+marker, MPEG audio, ADTS and AC-3 by two frames from the first byte (the second needs
+only its header), FLAC without its marker by a frame header the next one numbers on
+from. After other bytes, MPEG audio, ADTS and AC-3 need three frames that agree on the
+stream, and FLAC a first frame its CRC-16 confirms. The end of the prefix is never
+taken as the end of the stream: one frame, or one and a second header cut short, is
+`None`, and the readers, which confirm a first frame by the frame after it, do not
+read such a source either.
 
 ## Conformance
 
@@ -107,5 +116,7 @@ a recognised elementary stream. The
 [track metadata comparison](../../harness/features/elementary-metadata/contract.json)
 checks ADTS and E-AC-3 rates and channel counts against the first physical frame, and
 the [wire comparison](../../harness/features/elementary-metadata-wire/contract.json)
-original FLAC metadata, seek points, frame headers and tag envelopes. Results are in
+original FLAC metadata, seek points, frame headers and tag envelopes. The
+[seek comparison](../../harness/codecs/reader-seeks.json) checks each format's
+receipt, landing basis, preroll and packets after the landing. Results are in
 [docs/status.md](../../docs/status.md).
