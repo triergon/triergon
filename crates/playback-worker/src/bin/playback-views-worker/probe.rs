@@ -2,7 +2,10 @@
 
 use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, Step, WorkBudget};
+use triergon_core::{
+    Budget, Bytes, InputCursor, SourceCapabilities, SourceId, Step, WorkBudget,
+    signature::TransportSync,
+};
 use triergon_framing::nal::{Codec, RawAnnexBLimits};
 use triergon_harness_protocol::{
     digest::{fold, fold_bytes},
@@ -64,7 +67,7 @@ fn compare(pool: &Budget, data: &Bytes, window: usize, raw: bool, trace: bool) -
             match probe.advance(&mut WorkBudget::new(WORK), &cancel) {
                 Ok(PlaybackProbeStep::Detected(kind)) => break kind,
                 Ok(PlaybackProbeStep::NeedInput(_) | PlaybackProbeStep::Yield) => {}
-                Err(error) => return refused(error, trace),
+                Err(error) => return refused(error, data, trace),
             }
         };
         if trace {
@@ -87,15 +90,20 @@ fn compare(pool: &Budget, data: &Bytes, window: usize, raw: bool, trace: bool) -
             match probe.advance(&mut WorkBudget::new(WORK), &cancel) {
                 Ok(ProbeProgress::Selected(_)) => break,
                 Ok(ProbeProgress::NeedInput(_) | ProbeProgress::Yield) => {}
-                Err(error) => return refused(error, trace),
+                Err(error) => return refused(error, data, trace),
             }
         }
         handoff(probe.finish()?, &cancel)?
     };
+    let width = if verdict == 8 {
+        width
+    } else {
+        observed_width(data)
+    };
     Ok(record(verdict, width, replay, trace))
 }
 
-fn refused(error: triergon_core::Error, trace: bool) -> Result<Totals> {
+fn refused(error: triergon_core::Error, data: &[u8], trace: bool) -> Result<Totals> {
     match error {
         triergon_core::Error::Unsupported(_)
         | triergon_core::Error::Invalid(_)
@@ -104,9 +112,19 @@ fn refused(error: triergon_core::Error, trace: bool) -> Result<Totals> {
             if trace {
                 eprintln!("probe refusal: {error}");
             }
-            Ok(record(0, 0, None, trace))
+            Ok(record(0, observed_width(data), None, trace))
         }
         _ => Err(error.into()),
+    }
+}
+
+fn observed_width(data: &[u8]) -> u64 {
+    let ts = TransportSync::Ts188.observed(data) == Some(true);
+    let m2ts = TransportSync::M2ts192.observed(data) == Some(true);
+    match (ts, m2ts) {
+        (true, false) => 188,
+        (false, true) => 192,
+        _ => 0,
     }
 }
 

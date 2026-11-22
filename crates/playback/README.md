@@ -128,7 +128,9 @@ and `mdat`. For TS, exactly one three-sync pattern must match in the
 
 The [probe comparison](../../harness/features/playback-probe/contract.json)
 checks detection over fixed prefixes and checks the bytes delivered after
-container selection. The [source-view comparison](../../harness/features/playback-source-view/contract.json)
+container selection. It also checks carrier-width evidence when a prefix supplies
+the three TS188 sync positions before the playback probe has enough bytes to select.
+The [source-view comparison](../../harness/features/playback-source-view/contract.json)
 checks direct-player track metadata and complete forward packet streams.
 The [MP4 clock oracle](../../harness/features/mp4-source-clock/contract.json)
 checks sample decode and composition times before the movie's edit list.
