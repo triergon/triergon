@@ -350,7 +350,7 @@ impl Reader {
             failed: None,
         })
     }
-    /// Every track once [`ReaderEvent::Movie`] has been delivered, otherwise none.
+    /// Track catalogue in `moov` order, empty until [`ReaderEvent::Movie`].
     pub fn tracks(&self) -> &[Track] {
         if self.movie_open() {
             self.tracks.as_slice()

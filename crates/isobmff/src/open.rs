@@ -24,7 +24,8 @@ use triergon_core::{
 fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
     v.try_push(x).map_err(|e| e.error)
 }
-/// A root box reader for the opener and for later root walks of the same source.
+/// Reads roots from the current input generation with a metadata cap in bytes.
+/// Recovery mode admits a terminal `mdat` that extends past the known source length.
 #[doc(hidden)]
 pub fn box_reader(
     input: &InputCursor,
@@ -336,15 +337,19 @@ pub struct PendingMedia {
 }
 
 impl CachedMedia {
+    /// Absolute offset of the first retained byte.
     pub fn start(&self) -> u64 {
         self.start
     }
+    /// The original contiguous media bytes, charged to the input budget.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
 }
 
 impl PendingMedia {
+    /// Reserves `length` bytes in `pool` for media starting at absolute offset `start`.
+    /// Returns a budget or allocation error if the reservation fails.
     pub fn new(start: u64, length: usize, pool: &Budget) -> Result<Self> {
         let mut buffer = BudgetVec::new(pool);
         buffer.try_reserve_exact(length)?;
@@ -355,6 +360,9 @@ impl PendingMedia {
         })
     }
 
+    /// Reads exactly the reserved byte count from the caller-positioned cursor.
+    /// Propagates input requests, cancellation and premature end. A ready result
+    /// owns the pooled bytes.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,

@@ -105,7 +105,7 @@ impl BoxReader {
             MediaDataPolicy::PreserveTerminalDeclaration,
         )
     }
-    /// The source the reader is bound to.
+    /// Source identifier captured at construction and carried by every input request.
     pub fn source(&self) -> SourceId {
         self.source
     }

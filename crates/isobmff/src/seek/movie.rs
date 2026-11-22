@@ -516,7 +516,7 @@ pub enum MovieSeekStatus {
 /// The outcome of a movie-time seek.
 #[derive(Debug)]
 pub struct MovieSeekResult<'a> {
-    /// How the seek ended.
+    /// Whether the movie time produced a plan, an empty edit or a clock-selection refusal.
     pub status: MovieSeekStatus,
     /// The media point the movie time maps to; `None` for an empty edit or a time
     /// outside the timeline.

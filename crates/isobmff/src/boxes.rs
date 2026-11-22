@@ -146,11 +146,11 @@ impl BoxView {
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
-    /// The parsed header.
+    /// Type, absolute byte offset and declared size of this complete box.
     pub fn header(&self) -> &BoxHeader {
         &self.header
     }
-    /// The bytes after the header.
+    /// Bytes after the 8- or 16-byte header, including the extended type of a `uuid` box.
     pub fn payload(&self) -> &[u8] {
         &self.bytes[usize::from(self.header.header_size)..]
     }

@@ -13,7 +13,7 @@ use triergon_core::{Bytes, Error, Result, Rounding, Time, TimeBase};
 /// An edit-list entry placed on the movie timeline.
 #[derive(Clone, Copy, Debug)]
 pub struct ProjectedEdit {
-    /// The `elst` entry.
+    /// The source edit with duration in movie ticks and origin in media ticks.
     pub entry: EditEntry,
     /// The presentation time at which the edit starts: the sum of the durations of
     /// the entries before it.

@@ -91,7 +91,7 @@ impl SampleTable {
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
-    /// The entries of `stsd`, in order.
+    /// Declared `stsd` entries in 1-based index order, including unused entries.
     pub fn descriptions(&self) -> &[SampleDescription] {
         self.descriptions.as_slice()
     }
@@ -1061,7 +1061,7 @@ impl<'a> SampleCursor<'a> {
     pub(crate) fn position(&self) -> SampleCursorPosition {
         self.at
     }
-    /// The next sample, for one work unit.
+    /// Projects the next sample in decode order, yielding when one work unit is unavailable.
     #[inline]
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if self.at.ordinal == self.table.sample_count() {

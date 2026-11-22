@@ -103,7 +103,7 @@ impl SoundDescriptionV0 {
     pub fn revision(&self) -> u16 {
         self.revision
     }
-    /// Vendor code.
+    /// Four vendor bytes in wire order, including a possible all-zero code.
     pub fn vendor(&self) -> [u8; 4] {
         self.vendor
     }
@@ -175,7 +175,7 @@ pub struct PcmSourcePacket {
     complete_frames: usize,
 }
 impl PcmSourcePacket {
-    /// The sample and its bytes.
+    /// Source ordinal, absolute range and bytes of this sample's complete PCM frames.
     pub fn packet(&self) -> &SourcePacket {
         &self.packet
     }
@@ -183,7 +183,7 @@ impl PcmSourcePacket {
     pub fn description(&self) -> &SoundDescriptionV0 {
         &self.description
     }
-    /// Channel and byte layout for the complete frames in this payload.
+    /// Mono or stereo layout and the entry's sample rate in 16.16 fixed-point Hz.
     pub fn layout(&self) -> PcmLayout {
         self.layout
     }

@@ -299,7 +299,7 @@ impl FragmentIndex {
             .map(|r| r.wire.fields)
             .ok_or(Error::Invalid("fragment source run absent"))
     }
-    /// The `traf` box as read.
+    /// Complete `traf`, including its run declarations and any children the index skips.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
@@ -334,7 +334,7 @@ impl FragmentIndex {
     pub fn decode_end(&self) -> Option<i128> {
         self.decode_end
     }
-    /// A cursor over the samples in run order.
+    /// Starts at the first sample and walks runs in `trun` order, without reading media.
     pub fn cursor(&self) -> FragmentCursor<'_> {
         self.resume(FragmentCursorPosition::default())
     }

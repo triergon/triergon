@@ -314,7 +314,7 @@ impl RecoveryPacketCursor<'_> {
     ) -> Result<crate::CursorStatus> {
         self.inner.poll(work, cancel)
     }
-    /// Takes the ready packet.
+    /// Consumes the selected packet after `CursorStatus::Ready`, or returns `None`.
     pub fn take_occurrence(&mut self) -> Result<RecoveryOccurrence> {
         let row = self.inner.take_occurrence()?;
         Ok(RecoveryOccurrence {
@@ -360,7 +360,7 @@ impl RecoveryIndexCursor<'_> {
     ) -> Result<crate::CursorStatus> {
         self.inner.poll(work, cancel)
     }
-    /// Takes the ready entry.
+    /// Consumes the current index entry after `CursorStatus::Ready`, or returns `None`.
     pub fn take_entry(&mut self) -> Result<RecoveryIndexEntry> {
         let e = self.inner.take_entry()?;
         Ok(RecoveryIndexEntry {

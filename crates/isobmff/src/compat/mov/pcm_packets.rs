@@ -711,7 +711,7 @@ pub struct PcmPayload {
     token: InputToken,
 }
 impl PcmPayload {
-    /// The packet that was read.
+    /// Packet metadata and the absolute byte range that produced this payload.
     pub fn plan(&self) -> &PcmPacket {
         &self.plan
     }

@@ -563,7 +563,7 @@ pub struct SourceSeekPlan<'a> {
     landing: SourceSeekLanding,
 }
 impl SourceSeekPlan<'_> {
-    /// Where the plan lands.
+    /// Target, preceding sync and decode start, with available and missing preroll counts.
     pub fn landing(&self) -> &SourceSeekLanding {
         &self.landing
     }

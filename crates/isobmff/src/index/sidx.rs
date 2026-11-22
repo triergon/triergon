@@ -139,7 +139,7 @@ impl SegmentIndex {
     pub fn first_offset(&self) -> u64 {
         self.first_offset
     }
-    /// Number of references in the box.
+    /// Declared 16-bit number of references, including references to nested indexes.
     pub fn reference_count(&self) -> u16 {
         self.count
     }

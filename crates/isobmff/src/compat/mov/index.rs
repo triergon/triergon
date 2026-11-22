@@ -515,7 +515,7 @@ impl Default for SeekLimits {
 pub struct SeekLanding {
     /// The requested timestamp, in ticks of the track's demux time base.
     pub requested_timestamp: i64,
-    /// The index entry the seek selected.
+    /// Latest key at or before the adjusted seek time, or the first entry on fallback.
     pub selected: IndexEntry,
     /// How many of the track's index entries the seek read.
     pub scanned_entries: u64,
@@ -892,7 +892,7 @@ impl<'a> SeekJob<'a> {
     }
 }
 impl<'a> SeekPlan<'a> {
-    /// Where the seek landed.
+    /// Selected index entry and the target in demux ticks, with the fallback decision.
     pub fn landing(&self) -> &SeekLanding {
         &self.landing
     }
@@ -1472,7 +1472,7 @@ impl<'a> GlobalSeekSetup<'a> {
     }
 }
 impl<'a> GlobalSeekPlan<'a> {
-    /// Where the reference track landed.
+    /// Selection and fallback for the requested reference track, in its demux clock.
     pub fn landing(&self) -> &SeekLanding {
         &self.reference
     }

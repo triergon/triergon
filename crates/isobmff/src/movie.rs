@@ -303,7 +303,7 @@ impl EditList {
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
-    /// Number of entries.
+    /// Number of declared `elst` rows, including empty edits.
     pub fn len(&self) -> u32 {
         self.count
     }

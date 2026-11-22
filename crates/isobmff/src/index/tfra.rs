@@ -91,7 +91,7 @@ impl TrackFragmentRandomAccess {
     pub fn track_id(&self) -> u32 {
         self.track_id
     }
-    /// `number_of_entry`: the number of rows.
+    /// Declared 32-bit number of random-access rows for this track.
     pub fn entry_count(&self) -> u32 {
         self.count
     }

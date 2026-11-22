@@ -201,7 +201,8 @@ impl PartialSampleReader {
             bounds,
         })
     }
-    /// Reads the available bytes.
+    /// Reads the available prefix, leaving the sample declaration intact. Input,
+    /// work and cancellation are handled as in [`SampleReader::poll`].
     pub fn poll(
         &mut self,
         input: &mut InputCursor,

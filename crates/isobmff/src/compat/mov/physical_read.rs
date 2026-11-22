@@ -153,7 +153,7 @@ impl PhysicalRead {
 pub struct PhysicalPayload {
     /// The description event the bytes belong to, unchanged.
     pub event: DescriptionEvent,
-    /// The plan the bytes were read under.
+    /// The declared packet and bounded read range that produced the payload.
     pub plan: PhysicalRead,
     /// The bytes of the plan's [`available`](PhysicalRead::available) range.
     pub payload: Bytes,

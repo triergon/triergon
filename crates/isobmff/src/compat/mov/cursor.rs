@@ -100,7 +100,7 @@ pub struct EditIdentity {
     pub sequence: u64,
     /// 1-based index of the producing entry in the edit list.
     pub edit_ordinal: u32,
-    /// Where the packet's duration comes from.
+    /// Whether the edit uses the source delta, a timestamp difference or an endpoint.
     pub duration_basis: DurationBasis,
 }
 /// Where a packet's decode time comes from. A derived time is never written back to
@@ -127,9 +127,9 @@ pub enum ClockOrigin {
 pub struct PredecessorClock {
     /// 1-based ordinal of the previous sample.
     pub predecessor_sample: u64,
-    /// The previous packet's decode time.
+    /// Previous packet's decode time in media ticks, with any edit offset applied.
     pub predecessor_demux_dts_ticks: i128,
-    /// The previous sample's decode delta.
+    /// Previous sample's decode delta in media ticks, added to the edited decode time.
     pub predecessor_duration_ticks: u32,
     /// Whether the previous sample's own source decode time is known.
     pub predecessor_source_dts_known: bool,
@@ -1254,7 +1254,7 @@ impl<'a> PacketCursor<'a> {
         };
         Ok(IndexedOccurrence { packet, source_run })
     }
-    /// The ready packet, without taking it.
+    /// Borrows the selected packet after `CursorStatus::Ready`, until it is taken.
     pub fn occurrence(&self) -> Option<&PacketOccurrence> {
         self.ready_slot().map(|(_, occurrence)| occurrence)
     }
