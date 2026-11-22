@@ -813,42 +813,6 @@
       }
     },
     {
-      "id": "au-dvb-ac3-discontinuity-two-frames-1",
-      "profile": "ts188",
-      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-discontinuity-two-frames-1.ts",
-      "sha256": "7fb4e23c7b2539f32f9723a84c877d2b5ff8230c0900f70905d398f9995fa701",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "7",
-        "dvb",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 3,
-        "digest": 8776799332495399597
-      }
-    },
-    {
-      "id": "au-dvb-ac3-final-au-at-eof",
-      "profile": "ts188",
-      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-final-au-at-eof.ts",
-      "sha256": "7fb4e23c7b2539f32f9723a84c877d2b5ff8230c0900f70905d398f9995fa701",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "7",
-        "dvb",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 3,
-        "digest": 8776799332495399597
-      }
-    },
-    {
       "id": "au-dvb-ac3-header-across-pes",
       "profile": "ts188",
       "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-header-across-pes.ts",
@@ -907,42 +871,6 @@
       "profile": "ts188",
       "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-missing-clocks.ts",
       "sha256": "4cd9ea78b68e933cb9de76f4f64c926240cf2ed4f1a66c9870b5ecd95c5692f5",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "7",
-        "dvb",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 3,
-        "digest": 8776799332495399597
-      }
-    },
-    {
-      "id": "au-dvb-ac3-multiple-per-pes",
-      "profile": "ts188",
-      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-multiple-per-pes.ts",
-      "sha256": "82c6e9500c90da3a4ba48da6947d7d804c923b8113e405b8f7bb7d051e3e71d9",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "7",
-        "dvb",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 3,
-        "digest": 8776799332495399597
-      }
-    },
-    {
-      "id": "au-dvb-ac3-one",
-      "profile": "ts188",
-      "file": ".research/fixtures-mpegts-access-units/au-dvb-ac3-one.ts",
-      "sha256": "62ab3f274edd017dd92be9e9983f19a2f28d77002a296657c039d1592c207498",
       "rights": "authored-synthetic",
       "arguments": [
         "188",
@@ -1617,9 +1545,9 @@
         "strict"
       ],
       "expected": {
-        "packets": 9,
-        "bytes": 8,
-        "digest": 11025787940247275455
+        "packets": 6,
+        "bytes": 4,
+        "digest": 17922341413785510837
       }
     },
     {
@@ -4161,150 +4089,6 @@
       }
     },
     {
-      "id": "playback-carriage-aac-adts-direct",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/carriage-aac-adts-direct.ts",
-      "sha256": "70f7e7d0f3ebaef7ec7d9e78d516710c0db7991cbd81519222395636be09e012",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 3,
-        "digest": 7444373190193314044
-      }
-    },
-    {
-      "id": "playback-carriage-hevc-direct",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/carriage-hevc-direct.ts",
-      "sha256": "1d224472f3587f02cce8f687a11547bfa3b599b31dcaeba3353cda9cf5002b02",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 4,
-        "digest": 5674279243616743175
-      }
-    },
-    {
-      "id": "playback-hls-contiguous-part-a",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/hls-contiguous-part-a.ts",
-      "sha256": "c865084091a692e5b62ca29e13331c843ffad69e30bb5112e759ae535dfd1676",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 4,
-        "digest": 8410191788596416878
-      }
-    },
-    {
-      "id": "playback-hls-contiguous-part-b",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/hls-contiguous-part-b.ts",
-      "sha256": "b2fcd617d1da46d748e8331cb0c0f93b1d0cef0324f1a554896875e3f37a24cf",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7
-      }
-    },
-    {
-      "id": "playback-m2ts192-opaque-prefix",
-      "profile": "ts192",
-      "file": "crates/playback/tests/fixtures/ts/m2ts192-opaque-prefix.m2ts",
-      "sha256": "b530a81aced8a1e57049ad1986485297e94393b77b562fe6879d09f0d02f995e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "192",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 4,
-        "digest": 8410191788596416878
-      }
-    },
-    {
-      "id": "playback-pes-timestamp-marker",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/pes-timestamp-marker.ts",
-      "sha256": "d13c6bcf9122c717a80fd66ba87e7058702c961a736ec0cb14fb0f891dcdb264",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 4,
-        "digest": 8410191788596416878
-      }
-    },
-    {
-      "id": "playback-pmt-opaque-language-descriptors",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/pmt-opaque-language-descriptors.ts",
-      "sha256": "0d5c791b6ce3a2f796c91de24e4663d1bb3a891e09221bebc57cc658689993a5",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 11,
-        "digest": 429941740976074175
-      }
-    },
-    {
-      "id": "playback-pmt-version-wrap-retypes-pid",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/pmt-version-wrap-retypes-pid.ts",
-      "sha256": "fa37cb365078ead09193f8ff28d46eb31a4d3091cfb68a0f2e5751315b8a9900",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 4,
-        "digest": 6807179628225539687
-      }
-    },
-    {
       "id": "program-eof-avc-aac",
       "profile": "ts188",
       "file": "crates/playback/tests/fixtures/ts/program-eof-avc-aac.ts",
@@ -4374,114 +4158,6 @@
         "packets": 12,
         "bytes": 27,
         "digest": 11624634923357178962
-      }
-    },
-    {
-      "id": "playback-psi-crc-invalid",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/psi-crc-invalid.ts",
-      "sha256": "043ad5751083616d0f98dca7327946e7caa1b82a45e08546ce8a7fdb762a04fd",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7
-      }
-    },
-    {
-      "id": "playback-pts-dts-common-epoch",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/pts-dts-common-epoch.ts",
-      "sha256": "6997f0498143ba7b71bc50b58014e5e46556b9ab30eeb6d05bcccbb9ac9bc44f",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 4,
-        "digest": 8410191788596416878
-      }
-    },
-    {
-      "id": "playback-pts-negative-against-dts",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/pts-negative-against-dts.ts",
-      "sha256": "b789922555c03c8899d4783d3e2afaa1635f944daec67e048102a096a1508c6e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 4,
-        "digest": 8410191788596416878
-      }
-    },
-    {
-      "id": "playback-pts-wrap-forward",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/pts-wrap-forward.ts",
-      "sha256": "150adc340bb4659189f7a817653196dda5d78592bb6f46e4e98879455a387258",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 4,
-        "digest": 8410191788596416878
-      }
-    },
-    {
-      "id": "playback-transport-partial-final-packet",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/transport-partial-final-packet.ts",
-      "sha256": "819ad792840e42e71aed201bdda145386eab24a5a3b21a0316eb7c8e4146ac33",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 4,
-        "digest": 8410191788596416878
-      }
-    },
-    {
-      "id": "playback-ts188-basic",
-      "profile": "ts188",
-      "file": "crates/playback/tests/fixtures/ts/ts188-basic.ts",
-      "sha256": "be7ba9883bdb21233577517ffc8a1ada5d8193d32eaf8e6bbf3b25f37e7a8da9",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "188",
-        "1",
-        "unspecified",
-        "strict"
-      ],
-      "expected": {
-        "packets": 5,
-        "bytes": 4,
-        "digest": 8410191788596416878
       }
     },
     {

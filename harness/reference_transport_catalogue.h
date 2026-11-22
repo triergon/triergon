@@ -137,11 +137,17 @@ static int transport_catalogue_run(const ViewCase *input, ViewWork *work)
     }
     if (status == AVERROR_EOF && source.format) {
         const AVFormatContext *format = source.format;
+        const int selected_program = !strcmp(input->prefix, "ts-catalogue-")
+            ? atoi(input->argv[1]) : 0;
         for (unsigned i = 0; i != format->nb_programs; ++i) {
             const AVProgram *program = format->programs[i];
+            const int include_map = !selected_program || program->program_num == selected_program;
             const uint64_t words[] = {0, (uint64_t)program->program_num, (uint64_t)program->pmt_pid,
-                                      (uint64_t)program->pcr_pid, (uint64_t)program->pmt_version};
+                                      include_map ? (uint64_t)program->pcr_pid : 0,
+                                      include_map ? (uint64_t)program->pmt_version : UINT64_MAX};
             transport_view_row(work, 5, words, 5, NULL, 0);
+            if (!include_map)
+                continue;
             for (unsigned j = 0; j != program->nb_stream_indexes; ++j)
                 transport_catalogue_stream(work, (unsigned)program->program_num,
                                            format->streams[program->stream_index[j]]);

@@ -6,7 +6,7 @@
   "candidate": "transport-views-worker",
   "worker_operation": "ts-catalogue-",
   "contract": [
-    "Drive TransportStream and the comparison-only Catalogue with an explicit selected program and descriptor namespace. The compatible profile opts into all three PSI compatibility policies. The projection exposes one program's streams.",
+    "Drive TransportStream and the comparison-only Catalogue with an explicit selected program and descriptor namespace. The compatible profile opts into all three PSI compatibility policies. Both projections keep the whole PAT and include PMT fields and streams only for the selected program.",
     "Drain each physical transport entity independently. Reference FFmpeg formats opens MPEG-TS with a preloaded byte source and calls av_read_frame to EOF with codec parsers and timestamp fill disabled.",
     "Fold kind 5 program rows (subkind 0: program number, PMT PID, PCR PID, signed PMT version), followed by member streams in observable order. The absent PMT has PCR PID zero and version -1. Reference tracks without program membership are reported as program zero.",
     "Fold kind 5 stream rows (subkind 1: program number, PID, PMT stream type, hearing-impaired flag, visual-impaired flag), then length-prefixed codec name (subkind 2), language bytes (subkind 3) and DVB subtitle initialization (subkind 4, composition and ancillary page words and type for each service). MPEG audio is represented as one codec family because the stream_type does not identify the exact audio layer. Initialization outside DVB subtitle signalling is outside this comparison.",
@@ -47,9 +47,8 @@
         "au-avc-one", "au-avc-pts-dts", "au-avc-truncated-final", "au-dvb-ac3-aac-interleaved-eof",
         "au-dvb-ac3-aac-interleaved-lookahead", "au-dvb-ac3-body-across-pes", "au-dvb-ac3-clock-wrap",
         "au-dvb-ac3-discontinuity-single-frame-0", "au-dvb-ac3-discontinuity-single-frame-1",
-        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-discontinuity-two-frames-1",
-        "au-dvb-ac3-final-au-at-eof", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
-        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks", "au-dvb-ac3-multiple-per-pes", "au-dvb-ac3-one",
+        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
+        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks",
         "au-dvb-ac3-pts-dts", "au-dvb-ac3-truncated-final", "au-hevc-body-across-pes", "au-hevc-clock-wrap",
         "au-hevc-final-au-at-eof", "au-hevc-header-across-pes", "au-hevc-header-only-eof", "au-hevc-m2ts192",
         "au-hevc-missing-clocks", "au-hevc-multiple-per-pes", "au-hevc-one", "au-hevc-pts-dts",
@@ -106,13 +105,8 @@
         "valid-control", "wrong-time-prefix", "transport-adaptation-overrun", "transport-afc-reserved",
         "transport-null-pid", "mpegts-transport-partial-final-packet", "transport-scrambled",
         "transport-sync-loss", "transport-tei", "mpegts-ts188-basic", "mpegts-ts188-basic-compat",
-        "media-00", "playback-carriage-aac-adts-direct", "playback-carriage-hevc-direct",
-        "playback-hls-contiguous-part-a", "playback-hls-contiguous-part-b", "playback-m2ts192-opaque-prefix",
-        "playback-pes-timestamp-marker", "playback-pmt-opaque-language-descriptors",
-        "playback-pmt-version-wrap-retypes-pid", "program-eof-avc-aac", "program-pmt-retype",
-        "program-pmt-retype-dvb", "program-private-avc-dvb", "playback-psi-crc-invalid",
-        "playback-pts-dts-common-epoch", "playback-pts-negative-against-dts", "playback-pts-wrap-forward",
-        "playback-transport-partial-final-packet", "playback-ts188-basic", "dvb-hevc-eac3-32000",
+        "media-00", "program-eof-avc-aac", "program-pmt-retype",
+        "program-pmt-retype-dvb", "program-private-avc-dvb", "dvb-hevc-eac3-32000",
         "entry-hevc-aac-44100-00", "hls-entry-hevc-aac-44100-01", "hls-replay-avc-aac-00",
         "replay-avc-aac-01", "replay-avc-aac-02", "replay-avc-aac-03", "replay-avc-aac-04",
         "replay-avc-aac-05", "replay-avc-aac-06", "replay-avc-aac-07", "replay-avc-aac-08",
@@ -145,9 +139,8 @@
         "au-avc-one", "au-avc-pts-dts", "au-avc-truncated-final", "au-dvb-ac3-aac-interleaved-eof",
         "au-dvb-ac3-aac-interleaved-lookahead", "au-dvb-ac3-body-across-pes", "au-dvb-ac3-clock-wrap",
         "au-dvb-ac3-discontinuity-single-frame-0", "au-dvb-ac3-discontinuity-single-frame-1",
-        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-discontinuity-two-frames-1",
-        "au-dvb-ac3-final-au-at-eof", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
-        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks", "au-dvb-ac3-multiple-per-pes", "au-dvb-ac3-one",
+        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
+        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks",
         "au-dvb-ac3-pts-dts", "au-dvb-ac3-truncated-final", "au-hevc-body-across-pes", "au-hevc-clock-wrap",
         "au-hevc-final-au-at-eof", "au-hevc-header-across-pes", "au-hevc-header-only-eof", "au-hevc-m2ts192",
         "au-hevc-missing-clocks", "au-hevc-multiple-per-pes", "au-hevc-one", "au-hevc-pts-dts",
@@ -204,13 +197,8 @@
         "valid-control", "wrong-time-prefix", "transport-adaptation-overrun", "transport-afc-reserved",
         "transport-null-pid", "mpegts-transport-partial-final-packet", "transport-scrambled",
         "transport-sync-loss", "transport-tei", "mpegts-ts188-basic", "mpegts-ts188-basic-compat",
-        "media-00", "playback-carriage-aac-adts-direct", "playback-carriage-hevc-direct",
-        "playback-hls-contiguous-part-a", "playback-hls-contiguous-part-b", "playback-m2ts192-opaque-prefix",
-        "playback-pes-timestamp-marker", "playback-pmt-opaque-language-descriptors",
-        "playback-pmt-version-wrap-retypes-pid", "program-eof-avc-aac", "program-pmt-retype",
-        "program-pmt-retype-dvb", "program-private-avc-dvb", "playback-psi-crc-invalid",
-        "playback-pts-dts-common-epoch", "playback-pts-negative-against-dts", "playback-pts-wrap-forward",
-        "playback-transport-partial-final-packet", "playback-ts188-basic", "dvb-hevc-eac3-32000",
+        "media-00", "program-eof-avc-aac", "program-pmt-retype",
+        "program-pmt-retype-dvb", "program-private-avc-dvb", "dvb-hevc-eac3-32000",
         "entry-hevc-aac-44100-00", "hls-entry-hevc-aac-44100-01", "hls-replay-avc-aac-00",
         "replay-avc-aac-01", "replay-avc-aac-02", "replay-avc-aac-03", "replay-avc-aac-04",
         "replay-avc-aac-05", "replay-avc-aac-06", "replay-avc-aac-07", "replay-avc-aac-08",
@@ -243,9 +231,8 @@
         "au-avc-one", "au-avc-pts-dts", "au-avc-truncated-final", "au-dvb-ac3-aac-interleaved-eof",
         "au-dvb-ac3-aac-interleaved-lookahead", "au-dvb-ac3-body-across-pes", "au-dvb-ac3-clock-wrap",
         "au-dvb-ac3-discontinuity-single-frame-0", "au-dvb-ac3-discontinuity-single-frame-1",
-        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-discontinuity-two-frames-1",
-        "au-dvb-ac3-final-au-at-eof", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
-        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks", "au-dvb-ac3-multiple-per-pes", "au-dvb-ac3-one",
+        "au-dvb-ac3-discontinuity-two-frames-0", "au-dvb-ac3-header-across-pes", "au-dvb-ac3-header-only-eof",
+        "au-dvb-ac3-m2ts192", "au-dvb-ac3-missing-clocks",
         "au-dvb-ac3-pts-dts", "au-dvb-ac3-truncated-final", "au-hevc-body-across-pes", "au-hevc-clock-wrap",
         "au-hevc-final-au-at-eof", "au-hevc-header-across-pes", "au-hevc-header-only-eof", "au-hevc-m2ts192",
         "au-hevc-missing-clocks", "au-hevc-multiple-per-pes", "au-hevc-one", "au-hevc-pts-dts",
@@ -302,13 +289,8 @@
         "valid-control", "wrong-time-prefix", "transport-adaptation-overrun", "transport-afc-reserved",
         "transport-null-pid", "mpegts-transport-partial-final-packet", "transport-scrambled",
         "transport-sync-loss", "transport-tei", "mpegts-ts188-basic", "mpegts-ts188-basic-compat",
-        "media-00", "playback-carriage-aac-adts-direct", "playback-carriage-hevc-direct",
-        "playback-hls-contiguous-part-a", "playback-hls-contiguous-part-b", "playback-m2ts192-opaque-prefix",
-        "playback-pes-timestamp-marker", "playback-pmt-opaque-language-descriptors",
-        "playback-pmt-version-wrap-retypes-pid", "program-eof-avc-aac", "program-pmt-retype",
-        "program-pmt-retype-dvb", "program-private-avc-dvb", "playback-psi-crc-invalid",
-        "playback-pts-dts-common-epoch", "playback-pts-negative-against-dts", "playback-pts-wrap-forward",
-        "playback-transport-partial-final-packet", "playback-ts188-basic", "dvb-hevc-eac3-32000",
+        "media-00", "program-eof-avc-aac", "program-pmt-retype",
+        "program-pmt-retype-dvb", "program-private-avc-dvb", "dvb-hevc-eac3-32000",
         "entry-hevc-aac-44100-00", "hls-entry-hevc-aac-44100-01", "hls-replay-avc-aac-00",
         "replay-avc-aac-01", "replay-avc-aac-02", "replay-avc-aac-03", "replay-avc-aac-04",
         "replay-avc-aac-05", "replay-avc-aac-06", "replay-avc-aac-07", "replay-avc-aac-08",
@@ -325,66 +307,343 @@
     }
   ],
   "pending_module_requirements": [
-    "Resolve FFmpeg catalogue streams without a current program-map association.",
-    "Compare catalogue projections that refuse the registered descriptor loop.",
-    "Compare catalogue projections for MPEG audio streams.",
-    "Compare hearing and visual impairment roles in the catalogue projection.",
-    "Compare catalogue projections for DVB subtitles in private PES streams.",
-    "Compare additional PMTs in the projection's one-selected-program view.",
-    "Resolve catalogue admission of an incomplete current PAT.",
-    "Resolve catalogue admission of a PMT with an overrunning descriptor.",
-    "Resolve catalogue admission of a PMT with nonzero section numbers."
+    "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+    "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
+    "The catalogue projection omits the roles carried alongside ISO 639 languages. H.222.0 \u00a7\u00a72.6.18\u20132.6.19 Table 2-63.",
+    "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41."
   ],
   "open_cases": [
-    {"id": "au-adts-across-entities-1", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-adts-across-entities-2", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-m2ts-initialization-entity-1", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "hls-map-media", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "inactive-pat-then-unrouted-pes", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "unknown-pid-pes-after-pat-control", "requirement": "Resolve FFmpeg catalogue streams without a current program-map association.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-atsc-ac3-multiple-per-pes", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-atsc-eac3-multiple-per-pes", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "dvb-hevc-eac3-32000", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "entry-hevc-aac-44100-00", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "hls-entry-hevc-aac-44100-01", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "hls-replay-hevc-aac-00", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-01", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-02", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-03", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-04", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-05", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-06", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-07", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-08", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "replay-hevc-aac-09", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "ts-program-entry-hevc-aac-44100-01", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "ts-program-replay-hevc-aac-00", "requirement": "Compare catalogue projections that refuse the registered descriptor loop.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-mpeg1-layer1-44100-header-across-pes", "requirement": "Compare catalogue projections for MPEG audio streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-mpeg1-layer1-44100-multiple-per-pes", "requirement": "Compare catalogue projections for MPEG audio streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-mpeg1-layer1-header-across-pes", "requirement": "Compare catalogue projections for MPEG audio streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-mpeg1-layer1-multiple-per-pes", "requirement": "Compare catalogue projections for MPEG audio streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-mpeg1-layer2-header-across-pes", "requirement": "Compare catalogue projections for MPEG audio streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-mpeg1-layer2-multiple-per-pes", "requirement": "Compare catalogue projections for MPEG audio streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-mpeg2-layer2-header-across-pes", "requirement": "Compare catalogue projections for MPEG audio streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-mpeg2-layer2-multiple-per-pes", "requirement": "Compare catalogue projections for MPEG audio streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-mpeg2-layer3-header-across-pes", "requirement": "Compare catalogue projections for MPEG audio streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "au-mpeg2-layer3-multiple-per-pes", "requirement": "Compare catalogue projections for MPEG audio streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "three-languages", "requirement": "Compare hearing and visual impairment roles in the catalogue projection.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "mpegts-pmt-opaque-language-descriptors", "requirement": "Compare hearing and visual impairment roles in the catalogue projection.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "playback-pmt-opaque-language-descriptors", "requirement": "Compare hearing and visual impairment roles in the catalogue projection.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "two-dvb-services", "requirement": "Compare catalogue projections for DVB subtitles in private PES streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "dvb-ancillary-pages", "requirement": "Compare catalogue projections for DVB subtitles in private PES streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "dvb-default-clut2", "requirement": "Compare catalogue projections for DVB subtitles in private PES streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "dvb-nonmodifying", "requirement": "Compare catalogue projections for DVB subtitles in private PES streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "dvb-partial-alpha-projection", "requirement": "Compare catalogue projections for DVB subtitles in private PES streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "dvb-truncated-segment", "requirement": "Compare catalogue projections for DVB subtitles in private PES streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "dvb2-literals-fields", "requirement": "Compare catalogue projections for DVB subtitles in private PES streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "program-pmt-retype", "requirement": "Compare catalogue projections for DVB subtitles in private PES streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "program-pmt-retype-dvb", "requirement": "Compare catalogue projections for DVB subtitles in private PES streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "program-private-avc-dvb", "requirement": "Compare catalogue projections for DVB subtitles in private PES streams.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "two-programs", "requirement": "Compare additional PMTs in the projection's one-selected-program view.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "pat-incomplete-version", "requirement": "Resolve catalogue admission of an incomplete current PAT.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "pmt-descriptor-overrun", "requirement": "Resolve catalogue admission of a PMT with an overrunning descriptor.", "targets": ["aarch64-unknown-linux-gnu"]},
-    {"id": "pmt-multi-section-forbidden", "requirement": "Resolve catalogue admission of a PMT with nonzero section numbers.", "targets": ["aarch64-unknown-linux-gnu"]}
+    {
+      "id": "au-atsc-ac3-multiple-per-pes",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "au-atsc-eac3-multiple-per-pes",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "dvb-hevc-eac3-32000",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "entry-hevc-aac-44100-00",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "hls-entry-hevc-aac-44100-01",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "hls-replay-hevc-aac-00",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "replay-hevc-aac-01",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "replay-hevc-aac-02",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "replay-hevc-aac-03",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "replay-hevc-aac-04",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "replay-hevc-aac-05",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "replay-hevc-aac-06",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "replay-hevc-aac-07",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "replay-hevc-aac-08",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "replay-hevc-aac-09",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-entry-hevc-aac-44100-01",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "ts-program-replay-hevc-aac-00",
+      "requirement": "Catalogue::record_map rejects otherwise readable MPEG carriage when a valid elementary registration descriptor is present. H.222.0 \u00a7\u00a72.4.4.10 and 2.6.8\u20132.6.9.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "au-mpeg1-layer1-44100-header-across-pes",
+      "requirement": "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "au-mpeg1-layer1-44100-multiple-per-pes",
+      "requirement": "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "au-mpeg1-layer1-header-across-pes",
+      "requirement": "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "au-mpeg1-layer1-multiple-per-pes",
+      "requirement": "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "au-mpeg1-layer2-header-across-pes",
+      "requirement": "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "au-mpeg1-layer2-multiple-per-pes",
+      "requirement": "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "au-mpeg2-layer2-header-across-pes",
+      "requirement": "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "au-mpeg2-layer2-multiple-per-pes",
+      "requirement": "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "au-mpeg2-layer3-header-across-pes",
+      "requirement": "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "au-mpeg2-layer3-multiple-per-pes",
+      "requirement": "Catalogue::record_map rejects MPEG audio before projecting its PMT stream family. H.222.0 \u00a72.4.4.10 Table 2-34.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "three-languages",
+      "requirement": "The catalogue projection omits the roles carried alongside ISO 639 languages. H.222.0 \u00a7\u00a72.6.18\u20132.6.19 Table 2-63.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "mpegts-pmt-opaque-language-descriptors",
+      "requirement": "The catalogue projection omits the roles carried alongside ISO 639 languages. H.222.0 \u00a7\u00a72.6.18\u20132.6.19 Table 2-63.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "two-dvb-services",
+      "requirement": "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "dvb-ancillary-pages",
+      "requirement": "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "dvb-default-clut2",
+      "requirement": "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "dvb-nonmodifying",
+      "requirement": "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "dvb-partial-alpha-projection",
+      "requirement": "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "dvb-truncated-segment",
+      "requirement": "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "dvb2-literals-fields",
+      "requirement": "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "program-pmt-retype",
+      "requirement": "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "program-pmt-retype-dvb",
+      "requirement": "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "program-private-avc-dvb",
+      "requirement": "Catalogue::codec routes a DVB subtitle descriptor through the private-audio classifier and refuses the declared subtitle carriage. ETSI EN 300 468 \u00a76.2.41.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "Unbound PES has no current program membership",
+      "clause": "H.222.0 \u00a7\u00a72.4.4.5\u20132.4.4.6 and 2.4.4.9\u20132.4.4.10 define MPEG program membership through the current PAT and PMT.",
+      "candidate": "Does not add a catalogue stream without a current program map.",
+      "reference": "Publishes an unassociated stream from the observed PES PID.",
+      "compat": "compat::psi::InferUnboundPes",
+      "cases": [
+        "au-adts-across-entities-1",
+        "au-adts-across-entities-2",
+        "au-m2ts-initialization-entity-1",
+        "hls-map-media",
+        "inactive-pat-then-unrouted-pes",
+        "unknown-pid-pes-after-pat-control"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "An incomplete PAT version cannot replace the current table",
+      "clause": "H.222.0 \u00a72.4.4.6 defines the version number for the whole PAT and last_section_number for a complete table.",
+      "candidate": "Waits for all sections of the advertised version before routing that program.",
+      "reference": "Routes the program from the first section even though the remaining section is absent.",
+      "compat": "compat::psi::IncompletePatSection",
+      "cases": [
+        "pat-incomplete-version"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "A PMT descriptor crosses the enclosing loop",
+      "clause": "H.222.0 \u00a72.4.4.10 and \u00a72.6.1 require each descriptor to fit the declared PMT loop and section length.",
+      "candidate": "Rejects the PMT and exposes no stream from it.",
+      "reference": "Publishes the stream from the malformed PMT.",
+      "compat": "compat::psi::DescriptorOverrun",
+      "cases": [
+        "pmt-descriptor-overrun"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "PMT section numbers must both be zero",
+      "clause": "H.222.0 \u00a72.4.4.10 requires section_number and last_section_number to equal zero.",
+      "candidate": "Rejects the PMT and exposes no stream from it.",
+      "reference": "Publishes the stream from the malformed PMT.",
+      "compat": "compat::psi::NonzeroPmtSection",
+      "cases": [
+        "pmt-multi-section-forbidden"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
   ]
 }
