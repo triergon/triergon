@@ -70,7 +70,7 @@ jobs:
           # The image's package lists usually still serve these; refresh them only
           # when they do not.
           packages='build-essential pkg-config zlib1g-dev nasm rsync zstd'
-          if [ "${{ matrix.part }}" = parity ]; then
+          if [ "${{ matrix.part }}" = lint ] || [ "${{ matrix.part }}" = parity ]; then
             packages="$packages autoconf automake libtool autopoint gettext flac"
           fi
           sudo apt-get install -y $packages ||
