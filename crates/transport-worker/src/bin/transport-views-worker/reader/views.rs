@@ -344,6 +344,32 @@ fn ac3_header(packet: &Packet) -> Option<Ac3FrameHeader> {
     }
 }
 
+fn ac3_declared_extent(bytes: &[u8]) -> Option<usize> {
+    let [0x0b, 0x77, frame_hi, frame_lo, size_code, bitstream_id, ..] = *bytes else {
+        return None;
+    };
+    // A/52 Table 5.18 and Annex E §E.2.3.1.3. The size is available before
+    // the longer bitstream information required by the framing header probe.
+    let bsid = bitstream_id >> 3;
+    if (11..=16).contains(&bsid) {
+        return Some(2 * (1 + ((usize::from(frame_hi & 7) << 8) | usize::from(frame_lo))));
+    }
+    if bsid > 8 {
+        return None;
+    }
+    const BIT_RATES: [usize; 19] = [
+        32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 576, 640,
+    ];
+    let bitrate = BIT_RATES.get(usize::from((size_code & 0x3f) >> 1))?;
+    let words = match size_code >> 6 {
+        0 => bitrate * 2,
+        1 => bitrate * 320 / 147 + usize::from(size_code & 1),
+        2 => bitrate * 3,
+        _ => return None,
+    };
+    Some(2 * words)
+}
+
 fn ac3_duration(packet: &Packet, known: bool) -> Result<i64, String> {
     if !known {
         return Ok(0);
@@ -399,11 +425,26 @@ impl Output<'_, '_> {
         if self.tracks.insert(pid, epoch) == Some(epoch) || self.container {
             return Ok(());
         }
-        let tag = *track
-            .codec_tag()
-            .first()
-            .ok_or("track is missing its transport stream type")?;
-        let config = track.configuration();
+        let stream = track.stream();
+        let tag = crate::catalogue::published_codec_tag(stream)?;
+        let mut dvb = Vec::new();
+        if track.codec() == CodecId::DvbSubtitle {
+            for descriptor in stream.descriptors() {
+                let descriptor = descriptor.map_err(explain)?;
+                if descriptor.tag == 0x59 {
+                    for service in descriptor.dvb_subtitling().map_err(explain)?.services() {
+                        dvb.extend_from_slice(&service.composition_page_id.to_be_bytes());
+                        dvb.extend_from_slice(&service.ancillary_page_id.to_be_bytes());
+                        dvb.push(service.subtitling_type);
+                    }
+                }
+            }
+        }
+        let config = if dvb.is_empty() {
+            track.configuration()
+        } else {
+            &dvb
+        };
         self.row(
             2,
             &[
@@ -524,6 +565,11 @@ impl Output<'_, '_> {
                 AccessUnit::Ac3(unit) => {
                     for frame in unit.syncframes() {
                         self.row(4, &[6, frame.header.frame_bytes as u64], &[])?;
+                    }
+                }
+                AccessUnit::IncompleteAudio { bytes, .. } => {
+                    if let Some(extent) = ac3_declared_extent(bytes.as_ref()) {
+                        self.row(4, &[8, bytes.len() as u64, extent as u64], &[])?;
                     }
                 }
                 AccessUnit::DvbSubtitle(unit) => {

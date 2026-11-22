@@ -1392,7 +1392,7 @@
       "expected": {
         "packets": 2,
         "bytes": 0,
-        "digest": 282258644677
+        "digest": 282258645638
       }
     },
     {
@@ -2221,7 +2221,7 @@
       "expected": {
         "packets": 5,
         "bytes": 28,
-        "digest": 7370380626944303253
+        "digest": 7898590393771257496
       }
     },
     {
@@ -4229,7 +4229,7 @@
       "expected": {
         "packets": 5,
         "bytes": 8,
-        "digest": 10730565347549310897
+        "digest": 606132447256779995
       }
     },
     {
@@ -4288,7 +4288,7 @@
       "expected": {
         "packets": 8,
         "bytes": 769,
-        "digest": 9987934222145710763
+        "digest": 14478055707164279073
       }
     },
     {
@@ -4581,7 +4581,7 @@
       "expected": {
         "packets": 8,
         "bytes": 770,
-        "digest": 9775627411116789993
+        "digest": 10201976927510058668
       }
     },
     {
@@ -4611,9 +4611,9 @@
       ],
       "resolve_entity_paths": true,
       "expected": {
-        "packets": 11,
+        "packets": 12,
         "bytes": 1155,
-        "digest": 11670254496927315749
+        "digest": 39906458011440978
       }
     },
     {

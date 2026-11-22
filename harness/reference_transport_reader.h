@@ -36,6 +36,9 @@ static int transport_bounded_time(const ViewCase *input, ViewWork *work)
 
 
 /* Share the same public AVIO entity protocol as the access-unit reference. */
+#include <limits.h>
+#include <libavcodec/ac3_parser.h>
+
 static void transport_reader_quote(const char *text)
 {
     putchar('"');
@@ -59,6 +62,127 @@ static void transport_reader_quote(const char *text)
 typedef struct {
     uint64_t epoch, elementary;
 } TransportReaderTrack;
+
+typedef struct {
+    size_t offset;
+    uint64_t epoch;
+    unsigned pid, type;
+} TransportRouteEpoch;
+
+typedef struct {
+    TransportRouteEpoch entries[16];
+    size_t count;
+} TransportRouteEpochs;
+
+static int transport_reader_section(const uint8_t *ts, const uint8_t **section, size_t *size)
+{
+    if (!(ts[1] & 64) || !(ts[3] & 16))
+        return 0;
+    const size_t payload = ts[3] & 32 ? 5u + ts[4] : 4u;
+    if (payload >= 188 || payload + 1u + ts[payload] > 185)
+        return AVERROR_INVALIDDATA;
+    const size_t first = payload + 1u + ts[payload];
+    const uint8_t *p = ts + first;
+    const size_t length = 3u + ((size_t)(p[1] & 15) << 8) + p[2];
+    if (length < 12 || length > 188 - first || !(p[1] & 0x80) || p[6] || p[7])
+        return AVERROR_INVALIDDATA;
+    uint32_t crc = UINT32_MAX;
+    for (size_t i = 0; i < length; ++i) {
+        crc ^= (uint32_t)p[i] << 24;
+        for (unsigned bit = 0; bit < 8; ++bit)
+            crc = (crc << 1) ^ ((crc >> 31) ? UINT32_C(0x04c11db7) : 0);
+    }
+    if (crc)
+        return AVERROR_INVALIDDATA;
+    if (!(p[5] & 1))
+        return 0;
+    *section = p;
+    *size = length;
+    return 1;
+}
+
+/* These controls have one route and wholly contained PAT and PMT sections.
+ * Count source routing transitions independently of when AVProgram publishes
+ * its most recent PMT version. */
+static int transport_reader_route_epochs(const TsEntities *source, size_t width,
+                                         unsigned program, TransportRouteEpochs *epochs)
+{
+    uint64_t epoch = 0;
+    unsigned pmt = UINT_MAX, tsid = UINT_MAX, version = UINT_MAX;
+    const uint8_t *last_map = NULL;
+    size_t last_size = 0;
+    for (size_t i = 0; i < source->count; ++i) {
+        const TsEntity *entity = &source->entities[i];
+        if (entity->discontinuity) {
+            ++epoch;
+            pmt = tsid = version = UINT_MAX;
+            last_map = NULL;
+        }
+        if (entity->size % width)
+            return AVERROR_INVALIDDATA;
+        for (size_t at = 0; at < entity->size; at += width) {
+            const uint8_t *ts = entity->bytes + at + width - 188;
+            unsigned pid = ((unsigned)(ts[1] & 31) << 8) | ts[2];
+            if (ts[0] != 0x47)
+                return AVERROR_INVALIDDATA;
+            if (pid && pid != pmt)
+                continue;
+            const uint8_t *section;
+            size_t size;
+            int status = transport_reader_section(ts, &section, &size);
+            if (status < 0)
+                return status;
+            if (!status)
+                continue;
+            unsigned extension = ((unsigned)section[3] << 8) | section[4];
+            if (pid == 0) {
+                if (section[0] || size != 16 ||
+                    (((unsigned)section[8] << 8) | section[9]) != program)
+                    return AVERROR_INVALIDDATA;
+                unsigned announced = ((unsigned)(section[10] & 31) << 8) | section[11];
+                if (announced != pmt || extension != tsid) {
+                    ++epoch;
+                    pmt = announced;
+                    tsid = extension;
+                    version = UINT_MAX;
+                    last_map = NULL;
+                }
+                continue;
+            }
+            if (section[0] != 2 || extension != program || size < 21)
+                return AVERROR_INVALIDDATA;
+            if (last_map && size == last_size && !memcmp(section, last_map, size))
+                continue;
+            unsigned current = (section[5] >> 1) & 31;
+            size_t es = 12u + (((size_t)section[10] & 15) << 8) + section[11];
+            if (current == version || es + 5 > size - 4 ||
+                es + 5 + (((size_t)section[es + 3] & 15) << 8) + section[es + 4] != size - 4 ||
+                epochs->count == sizeof(epochs->entries) / sizeof(*epochs->entries))
+                return AVERROR_INVALIDDATA;
+            unsigned track = ((unsigned)(section[es + 1] & 31) << 8) | section[es + 2];
+            epochs->entries[epochs->count++] = (TransportRouteEpoch){
+                entity->base + at, ++epoch, track, section[es]};
+            last_map = section;
+            last_size = size;
+            version = current;
+        }
+    }
+    return epochs->count ? 0 : AVERROR_INVALIDDATA;
+}
+
+static uint64_t transport_reader_epoch_at(const TransportRouteEpochs *epochs, int64_t position,
+                                          const AVStream *stream, uint64_t previous)
+{
+    if (position < 0)
+        return previous;
+    for (size_t index = epochs->count; index; --index) {
+        const TransportRouteEpoch *entry = &epochs->entries[index - 1];
+        if (entry->offset <= (uint64_t)position)
+            return entry->pid == (unsigned)stream->id && entry->type == stream->codecpar->codec_tag
+                ? entry->epoch : 0;
+    }
+    return 0;
+}
 
 static uint64_t transport_reader_codec(enum AVCodecID codec)
 {
@@ -158,8 +282,16 @@ static int transport_reader_ac3(ViewWork *work, const AVPacket *packet,
         status = av_parser_parse2(parser, context, &output, &length, NULL, 0,
                                   AV_NOPTS_VALUE, AV_NOPTS_VALUE, -1);
         if (status >= 0 && length) {
-            const uint64_t row[] = {6, (uint64_t)length};
-            transport_view_row(work, 4, row, 2, NULL, 0);
+            uint8_t bitstream_id;
+            uint16_t declared;
+            if (av_ac3_parse_header(output, (size_t)length, &bitstream_id, &declared) >= 0 &&
+                length < declared) {
+                const uint64_t row[] = {8, (uint64_t)length, declared};
+                transport_view_row(work, 4, row, 3, NULL, 0);
+            } else {
+                const uint64_t row[] = {6, (uint64_t)length};
+                transport_view_row(work, 4, row, 2, NULL, 0);
+            }
             ++produced;
         }
     }
@@ -219,6 +351,16 @@ static int transport_reader_views(const ViewCase *view, ViewWork *work)
     const size_t carrier_size = (size_t)atoi(view->argv[0]);
     const int container = !strcmp(view->prefix, "ts-reader-container-");
     const TsEntities *source = view->prepared;
+    TransportRouteEpochs route_epochs = {0};
+    int source_epochs = 0;
+    if (!container &&
+        transport_reader_route_epochs(source, carrier_size, (unsigned)program, &route_epochs) >= 0) {
+        for (size_t i = 1; i < source->count; ++i)
+            source_epochs |= source->entities[i].discontinuity;
+        for (size_t i = 1; i < route_epochs.count; ++i)
+            source_epochs |= route_epochs.entries[i].pid != route_epochs.entries[i - 1].pid ||
+                             route_epochs.entries[i].type != route_epochs.entries[i - 1].type;
+    }
     TsEntityInput input = {source, 0, 0, ts_next_boundary(source, 1), 0};
     AVFormatContext *format = avformat_alloc_context();
     AVIOContext *io = NULL;
@@ -265,8 +407,16 @@ static int transport_reader_views(const ViewCase *view, ViewWork *work)
                 ++epoch;
                 pmt_version = selected->pmt_version;
             }
-            if (!container)
-                transport_reader_track(work, stream, track, epoch);
+            if (!container) {
+                uint64_t track_epoch = source_epochs
+                    ? transport_reader_epoch_at(&route_epochs, packet->pos, stream, track->epoch)
+                    : epoch;
+                if (!track_epoch) {
+                    status = AVERROR_INVALIDDATA;
+                    break;
+                }
+                transport_reader_track(work, stream, track, track_epoch);
+            }
             const uint64_t fields[] = {
                 (uint64_t)packet->stream_index, (uint64_t)stream->id,
                 (uint64_t)packet->pts, (uint64_t)packet->dts, (uint64_t)packet->duration,
@@ -317,8 +467,18 @@ static int transport_reader_views(const ViewCase *view, ViewWork *work)
                 ++epoch;
             for (unsigned index = 0; index < selected->nb_stream_indexes; ++index) {
                 const AVStream *stream = format->streams[selected->stream_index[index]];
-                if (stream->id >= 0 && stream->id < 8192)
-                    transport_reader_track(work, stream, &tracks[stream->id], epoch);
+                if (stream->id >= 0 && stream->id < 8192) {
+                    TransportReaderTrack *track = &tracks[stream->id];
+                    uint64_t track_epoch = source_epochs
+                        ? transport_reader_epoch_at(&route_epochs, (int64_t)source->size,
+                                                    stream, track->epoch)
+                        : epoch;
+                    if (!track_epoch) {
+                        status = AVERROR_INVALIDDATA;
+                        goto done;
+                    }
+                    transport_reader_track(work, stream, track, track_epoch);
+                }
             }
         }
         if (opaque_pid >= 0)
