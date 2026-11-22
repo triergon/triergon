@@ -66,10 +66,16 @@ pub struct Extractor {
     iso_tx3g: bool,
     limits: Limits,
     generation: u64,
-    pending: Option<Input>,
-    session: Option<Session>,
-    failed: Option<Error>,
+    pending: Option<Pending>,
     finished: bool,
+}
+
+/// The input being read: its session, or the error that ended it, which
+/// stays until [`Extractor::reset`].
+#[derive(Debug)]
+struct Pending {
+    input: Input,
+    session: std::result::Result<Session, Error>,
 }
 
 impl Extractor {
@@ -92,8 +98,6 @@ impl Extractor {
             limits,
             generation,
             pending: None,
-            session: None,
-            failed: None,
             finished: false,
         }
     }
@@ -110,8 +114,10 @@ impl Extractor {
     pub fn provide(&mut self, input: Input) -> std::result::Result<(), Refused<Input>> {
         match self.check_input(&input) {
             Ok(()) => {
-                self.session = Some(Session::new(&input, &self.pool, self.iso_tx3g));
-                self.pending = Some(input);
+                self.pending = Some(Pending {
+                    session: Ok(Session::new(&input, self.iso_tx3g)),
+                    input,
+                });
                 Ok(())
             }
             Err(error) => Err(Refused {
@@ -169,9 +175,7 @@ impl Extractor {
     /// Drops the pending input and any sticky error, reopens input and
     /// accepts inputs of `generation`. Cues already returned stay valid.
     pub fn reset(&mut self, generation: u64) {
-        self.session = None;
         self.pending = None;
-        self.failed = None;
         self.generation = generation;
         self.finished = false;
     }
@@ -181,33 +185,27 @@ impl Extractor {
     /// [`reset`](Self::reset).
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
         unicode::cancelled(cancel)?;
-        if let Some(error) = self.failed {
-            return Err(error);
-        }
-        let Some(input) = self.pending.as_ref() else {
+        let Some(pending) = self.pending.as_mut() else {
             return Ok(if self.finished {
                 Status::Finished
             } else {
                 Status::NeedInput
             });
         };
+        let session = match &mut pending.session {
+            Ok(session) => session,
+            Err(error) => return Err(*error),
+        };
         if work.remaining() == 0 {
             return Ok(Status::Yield);
         }
-        let result = self
-            .session
-            .as_mut()
-            .ok_or(Error::Invalid("missing text session"))?
-            .step(input, &self.pool, self.limits, work, cancel);
-        match result {
+        match session.step(&pending.input, &self.pool, self.limits, work, cancel) {
             Ok(Action::Yield) => Ok(Status::Yield),
             Ok(Action::Cue(cue)) => {
-                self.session = None;
                 self.pending = None;
                 Ok(Status::Cue(cue))
             }
             Ok(Action::Complete) => {
-                self.session = None;
                 self.pending = None;
                 Ok(if self.finished {
                     Status::Finished
@@ -218,10 +216,9 @@ impl Extractor {
             Err(Error::Backpressure { .. }) => Ok(Status::NeedOutput),
             Err(Error::Cancelled) => Err(Error::Cancelled),
             Err(error) => {
-                // Prefix outputs retain their owners. A fatal operation error
-                // frees private construction and remains explicit until reset.
-                self.session = None;
-                self.failed = Some(error);
+                // Cues already returned keep their storage; the session's
+                // own is released, and the error stays until reset.
+                pending.session = Err(error);
                 Err(error)
             }
         }
