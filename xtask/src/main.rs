@@ -1165,6 +1165,7 @@ fn prepare_check(part: Option<Part>) -> Task {
             &["fixtures"],
             &["fetch-vectors"],
             &["codec-views", "fixtures", "media"],
+            &["subtitle-views", "fixtures", "corpus"],
             &["fonts", "prepare"],
             &["fonts", "fetch"],
             &["shape", "prepare"],

@@ -91,7 +91,6 @@ const PARITY_PRIVATE: &[&str] = &[
     ".research/ogg-page-inputs",
     ".research/opus-generated",
     ".research/speex-generated",
-    ".research/subtitle-corpus",
 ];
 
 /// The evidence pins eligible for a workspace comparison to report an absent
@@ -118,7 +117,7 @@ impl ParityInputs {
                 if !PARITY_PRIVATE
                     .iter()
                     .any(|prefix| Path::new(path).starts_with(prefix))
-                    || Path::new(path).starts_with(".research/subtitle-corpus/fate")
+                    && !crate::subtitle_views::private_input(Path::new(path))
                 {
                     continue;
                 }

@@ -1,9 +1,16 @@
 //! Inputs and reference pins for the subtitle views worker.
 
+mod inputs;
+
 use std::path::Path;
 use std::process::Command;
 
+pub(crate) use inputs::private_input;
+
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
+    if args == ["fixtures", "corpus"] {
+        return inputs::prepare(root);
+    }
     if let [command, flag, output] = args
         && command == "fixtures"
         && flag == "--write-to"
