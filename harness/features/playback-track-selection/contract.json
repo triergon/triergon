@@ -76,28 +76,30 @@
       "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
     }
   ],
-  "pending_module_requirements": [
-    "Check Matroska Block clocks, media delay and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. The selected tracks are the same, but the source shows native clock precision or a missing duration where the demux projection supplies another value.",
-    "Verify the audio selection transition under the player seek contract and Matroska CuePoint semantics in RFC 9559 sections 5.1.5 and 22. Compare packets at the source time and the demuxer's projected time on each side of the audio switch."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "mkv-video-and-audio",
-      "requirement": "Check Matroska Block clocks, media delay and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. The selected tracks are the same, but the source shows native clock precision or a missing duration where the demux projection supplies another value.",
+      "reading": "Selected Matroska AVC keeps the exact frame duration",
+      "clause": "RFC 9559 section 5.1.4.1.13 expresses DefaultDuration in nanoseconds.",
+      "candidate": "Keeps DefaultDuration at native precision, for example 41666666 ns.",
+      "reference": "Publishes 41000000 ns on the corresponding packets in its millisecond clock.",
+      "compat": "compat::matroska::demux_packet_duration for consumers needing the reference millisecond durations.",
+      "cases": [
+        "mkv-reordered-video"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "mkv-reordered-video",
-      "requirement": "Check Matroska Block clocks, media delay and DefaultDuration under RFC 9559 sections 5.1.4.1.13 and 11.2. The selected tracks are the same, but the source shows native clock precision or a missing duration where the demux projection supplies another value.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mkv-switch-audio",
-      "requirement": "Verify the audio selection transition under the player seek contract and Matroska CuePoint semantics in RFC 9559 sections 5.1.5 and 22. Compare packets at the source time and the demuxer's projected time on each side of the audio switch.",
+      "reading": "Matroska AAC selection keeps the source clock, including after an audio switch",
+      "clause": "RFC 9559 sections 5.1.4.1.25 and 11.2 subtract nanosecond CodecDelay from the exact Block presentation timestamp. RFC 9559 section 5.1.4.1.13 expresses DefaultDuration in nanoseconds.",
+      "candidate": "Keeps DTS absent. First AAC PTS is -21333333 ns with duration 21333333 ns and the switch keeps the new track’s -23219955 ns delay.",
+      "reference": "Fills AAC DTS from PTS. First AAC PTS is -21000000 ns with duration 21000000 ns and AAC times after the switch are on its millisecond grid.",
+      "compat": "compat::matroska::demux_packet_clocks for consumers using the reference DTS fill-in and duration quantization.",
+      "cases": [
+        "mkv-video-and-audio",
+        "mkv-switch-audio"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
