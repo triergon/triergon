@@ -870,15 +870,17 @@ fn packet_output(
         path.to_owned(),
     ];
     argv.extend_from_slice(arguments);
-    let done = run_text(&argv, RUN_TIMEOUT)?;
+    let os_args: Vec<std::ffi::OsString> = argv.iter().map(std::ffi::OsString::from).collect();
+    let done = crate::harness::worker::run(&os_args, &[], RUN_TIMEOUT)?
+        .ok_or_else(|| Stop::Timeout(argv))?;
     Ok(if done.code == 0 {
-        Ok(done.stdout)
+        String::from_utf8(done.stdout).map_err(|error| format!("{}: {error}", worker.display()))
     } else {
         Err(format!(
             "{} exited {}: {}",
             worker.display(),
             done.code,
-            python::tail(&done.stderr, 300)
+            python::tail(&python::text(&done.stderr), 300)
         ))
     })
 }
