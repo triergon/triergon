@@ -86,6 +86,21 @@ pub(crate) fn cued_audio_profile(tracks: &[crate::matroska::Track], track: usize
     cued_aac_profile(tracks, track)
         || cued_ac3_profile(tracks, track)
         || cued_eac3_profile(tracks, track)
+        || cued_opus_profile(tracks, track)
+}
+
+pub(crate) fn cued_opus_profile(tracks: &[crate::matroska::Track], track: usize) -> bool {
+    tracks.len() == 1
+        && track == 0
+        && tracks.first().is_some_and(|t| {
+            t.kind == 2
+                && t.codec.as_str() == "A_OPUS"
+                && t.sample_rate.to_bits() == 48_000_f64.to_bits()
+                && t.channels == 2
+                && t.codec_private.as_ref() == b"OpusHead\x01\x02\x38\x01\x80\xbb\0\0\0\0\0"
+                && t.codec_delay_ns == 7_000_000
+                && t.seek_preroll_ns == 80_000_000
+        })
 }
 
 impl RecoveryAudio {

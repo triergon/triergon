@@ -348,18 +348,21 @@ impl Reader {
             self.failed = true;
             return Err(Error::Unsupported("seek requires single-track cued AAC-LC"));
         }
-        self.seek_cued_audio(track, requested_ns)
+        self.seek_cued_audio(track, requested_ns, false)
     }
     pub(crate) fn seek_cued_audio(
         &mut self,
         track: usize,
         requested_ns: i64,
+        playback_preroll: bool,
     ) -> Result<InputRequest> {
+        let playback_preroll = playback_preroll
+            && crate::matroska::typed::seek::cued_opus_profile(self.tracks(), track);
         self.begin_seek(
             SeekRequest {
                 track,
                 requested_ns,
-                playback_preroll: false,
+                playback_preroll,
             },
             RecoveryAudio::CuedAudio,
         )

@@ -4,9 +4,12 @@ mod ebml;
 use ebml::{element, mkv, uint};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
-    ContainerReader, Event, MediaKind, Origin, PacketInfo, RandomAccess, TrackId, TrackInfo,
+    ContainerReader, Event, MediaKind, Origin, PacketInfo, RandomAccess, SeekPolicy, SeekRequest,
+    TrackId, TrackInfo,
 };
-use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget};
+use triergon_core::{
+    Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, Time, WorkBudget,
+};
 use triergon_matroska::{Limits, typed::Reader};
 
 /// One video track with explicit primaries and range only, then two blocks.
@@ -35,6 +38,55 @@ fn source() -> Vec<u8> {
         .concat(),
     );
     mkv(&[element(0x1654ae6b, &track), cluster].concat())
+}
+
+#[test]
+fn opus_index_seek_through_container_reader_replays_source_suffix() {
+    let raw = include_bytes!("fixtures/seek/cued-opus.mka");
+    let pool = Budget::new(1 << 20).unwrap();
+    let capabilities = SourceCapabilities {
+        length: Some(raw.len() as u64),
+        random_access: true,
+    };
+    let mut reader =
+        Reader::new(&pool, SourceId(3), capabilities, Limits::default(), 4096).unwrap();
+    let all = packets(&mut reader, raw, &pool);
+    for (target, policy, expected) in [
+        (100, SeekPolicy::PlaybackPreroll, -7),
+        (180, SeekPolicy::PlaybackPreroll, 74),
+        (500, SeekPolicy::PlaybackPreroll, 374),
+        (180, SeekPolicy::PreviousRandomAccess, 174),
+        (500, SeekPolicy::PreviousRandomAccess, 474),
+    ] {
+        let request = ContainerReader::request_seek(
+            &mut reader,
+            SeekRequest {
+                track: TrackId(1),
+                target: Time::new(target, 1000).unwrap(),
+                policy,
+            },
+        )
+        .unwrap();
+        let at = request.offset as usize;
+        let end = raw.len().min(at + request.maximum);
+        reader
+            .provide(
+                &InputWindow::new(
+                    request.source,
+                    request.token,
+                    request.offset,
+                    Bytes::copy_from_slice(&pool, &raw[at..end]).unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let suffix = packets(&mut reader, raw, &pool);
+        let start = all
+            .iter()
+            .position(|p| p.2 == Some(expected * 1_000_000))
+            .unwrap();
+        assert_eq!(suffix, all[start..]);
+    }
 }
 
 /// Generic over any container reader: what a generic caller sees.
