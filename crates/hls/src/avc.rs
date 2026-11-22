@@ -157,29 +157,16 @@ struct Anchor {
     clock: AvcTsClock,
 }
 
-#[derive(Debug)]
-struct Chunk {
-    offset: usize,
-}
-
+/// A PES whose payload the reader is assembling, one span of its cursor at a time.
 #[derive(Debug)]
 struct PendingPes {
     spans: PayloadCursor,
+    /// Payload bytes in the spans not yet admitted from the cursor.
     remaining: usize,
+    /// Whether the PES's extent may still size the assembly buffer, once.
     may_reserve: bool,
-}
-
-/// Retires the chunk being read, which is the pending PES's current span.
-#[expect(
-    clippy::expect_used,
-    reason = "a chunk is read only from the pending PES's spans"
-)]
-fn retire_chunk(pending: &mut Option<PendingPes>) {
-    pending
-        .as_mut()
-        .expect("pending PES chunk")
-        .spans
-        .retire_current();
+    /// Bytes of the cursor's current span already read.
+    offset: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -261,7 +248,6 @@ pub struct AvcTsReader {
     config: AdmittedCarriage,
     source_clock_epoch: Option<(SourceId, u64)>,
     pending_pes: Option<PendingPes>,
-    input: Option<Chunk>,
     pes_anchors: [Option<Anchor>; 4],
     pes_anchor: Option<u8>,
     pes_serial: u64,
@@ -309,7 +295,6 @@ impl AvcTsReader {
             config,
             source_clock_epoch: None,
             pending_pes: None,
-            input: None,
             pes_anchors: [None; 4],
             pes_anchor: None,
             pes_serial: 0,
@@ -374,7 +359,7 @@ impl AvcTsReader {
         if self.ended {
             return Err(Error::Invalid("AVC TS input after EOF"));
         }
-        if self.input.is_some() || self.pending_pes.is_some() {
+        if self.pending_pes.is_some() {
             return Ok(false);
         }
         let Some(packet) = mailbox.as_ref() else {
@@ -424,6 +409,7 @@ impl AvcTsReader {
                 remaining,
                 spans: payload.into_cursor(),
                 may_reserve: true,
+                offset: 0,
             });
         }
         Ok(true)
@@ -492,7 +478,6 @@ impl AvcTsReader {
         if !matches!(error, Error::Allocation | Error::Backpressure { .. }) {
             self.failure = Some(error);
             self.pending_pes = None;
-            self.input = None;
             self.bytes = BudgetVec::new(&self.pool);
             self.sps = BudgetVec::new(&self.pool);
             self.pps = BudgetVec::new(&self.pool);
@@ -542,97 +527,93 @@ impl AvcTsReader {
                 }
                 continue;
             }
-            if self.input.is_none()
-                && let Some(pending) = &mut self.pending_pes
+            if let Some(PendingPes {
+                spans,
+                remaining,
+                may_reserve,
+                offset,
+            }) = &mut self.pending_pes
             {
-                if pending.spans.remaining() != 0 {
-                    if !work.try_charge(1) {
+                if let Some(span) = spans.current_bytes() {
+                    let span_len = span.len();
+                    if *offset == span_len {
+                        spans.retire_current();
+                        continue;
+                    }
+                    let available = &span.as_ref()[*offset..];
+                    let count = available.len().min(work.remaining().min(4096) as usize);
+                    if count == 0 {
                         return Ok(AvcTsStep::Yield);
                     }
-                    let bytes = pending
-                        .spans
-                        .next_bytes()
-                        .ok_or(Error::Invalid("AVC TS missing PES span"))?;
-                    if !bytes.belongs_to(&self.pool) {
-                        return Err(Error::ForeignPool);
+                    let first = available[0];
+                    // Within a NAL, isolated zeros followed by data cannot
+                    // begin a start code. Leave possible split prefixes for accept.
+                    let copy = if first != 0
+                        && self.prefix.is_none()
+                        && self.zeroes < 2
+                        && self.nal.is_some()
+                    {
+                        nal_body_prefix_len(&available[..count])
+                    } else {
+                        1
+                    };
+                    let limit = self.limits.maximum_access_unit_bytes + LOOKAHEAD;
+                    append(&mut self.bytes, &available[..copy], limit, |len, growth| {
+                        // Once a slice has started, parameter set processing for
+                        // this picture is complete.
+                        self.nal.as_ref().filter(|nal| matches!(nal.kind, 1 | 5))?;
+                        if !*may_reserve {
+                            return None;
+                        }
+                        let extent = len
+                            .checked_add(available.len())?
+                            .checked_add(*remaining)?
+                            .checked_add(LOOKAHEAD)?;
+                        // A PES can contain multiple pictures. Limit the hint
+                        // relative to ordinary growth and try it once per PES.
+                        if extent <= growth || extent > limit.min(growth.saturating_mul(4)) {
+                            return None;
+                        }
+                        *may_reserve = false;
+                        Some(extent)
+                    })?;
+                    *offset += copy;
+                    if *offset == span_len {
+                        spans.retire_current();
                     }
-                    pending.remaining = pending
-                        .remaining
-                        .checked_sub(bytes.len())
-                        .ok_or(Error::Invalid("AVC TS PES payload extent"))?;
-                    self.input = Some(Chunk { offset: 0 });
-                } else {
-                    if pending.remaining != 0 {
+                    work.try_charge(copy as u64);
+                    if copy == 1 {
+                        self.accept(first)?;
+                    } else {
+                        self.zeroes = 0;
+                        self.nal_data_end = self.bytes.len();
+                    }
+                    continue;
+                }
+                if spans.remaining() == 0 {
+                    if *remaining != 0 {
                         return Err(Error::Invalid("AVC TS PES payload extent"));
                     }
                     self.spent.spans = self
                         .pending_pes
                         .take()
                         .map(|pending| pending.spans.into_spans());
-                }
-            }
-            if let Some(chunk) = &mut self.input {
-                let (span, remaining, may_reserve) = match self.pending_pes.as_mut() {
-                    Some(PendingPes {
-                        spans,
-                        remaining,
-                        may_reserve,
-                    }) => (spans.current_bytes(), *remaining, Some(may_reserve)),
-                    None => (None, 0, None),
-                };
-                let span = span.ok_or(Error::Invalid("AVC TS missing PES span"))?;
-                let span_len = span.len();
-                if chunk.offset == span_len {
-                    retire_chunk(&mut self.pending_pes);
-                    self.input = None;
+                } else {
+                    if !work.try_charge(1) {
+                        return Ok(AvcTsStep::Yield);
+                    }
+                    let bytes = spans
+                        .next_bytes()
+                        .ok_or(Error::Invalid("AVC TS missing PES span"))?;
+                    if !bytes.belongs_to(&self.pool) {
+                        return Err(Error::ForeignPool);
+                    }
+                    *remaining = remaining
+                        .checked_sub(bytes.len())
+                        .ok_or(Error::Invalid("AVC TS PES payload extent"))?;
+                    *offset = 0;
                     continue;
                 }
-                let available = &span.as_ref()[chunk.offset..];
-                let count = available.len().min(work.remaining().min(4096) as usize);
-                if count == 0 {
-                    return Ok(AvcTsStep::Yield);
-                }
-                let first = available[0];
-                // Within a NAL, isolated zeros followed by data cannot
-                // begin a start code. Leave possible split prefixes for accept.
-                let copy =
-                    if first != 0 && self.prefix.is_none() && self.zeroes < 2 && self.nal.is_some()
-                    {
-                        nal_body_prefix_len(&available[..count])
-                    } else {
-                        1
-                    };
-                let limit = self.limits.maximum_access_unit_bytes + LOOKAHEAD;
-                append(&mut self.bytes, &available[..copy], limit, |len, growth| {
-                    // Once a slice has started, parameter set processing for
-                    // this picture is complete.
-                    self.nal.as_ref().filter(|nal| matches!(nal.kind, 1 | 5))?;
-                    let may_reserve = may_reserve.filter(|reserve| **reserve)?;
-                    let extent = len
-                        .checked_add(available.len())?
-                        .checked_add(remaining)?
-                        .checked_add(LOOKAHEAD)?;
-                    // A PES can contain multiple pictures. Limit the hint
-                    // relative to ordinary growth and try it once per PES.
-                    if extent <= growth || extent > limit.min(growth.saturating_mul(4)) {
-                        return None;
-                    }
-                    *may_reserve = false;
-                    Some(extent)
-                })?;
-                chunk.offset += copy;
-                if chunk.offset == span_len {
-                    retire_chunk(&mut self.pending_pes);
-                    self.input = None;
-                }
-                work.try_charge(copy as u64);
-                if copy == 1 {
-                    self.accept(first)?;
-                } else {
-                    self.zeroes = 0;
-                    self.nal_data_end = self.bytes.len();
-                }
-                continue;
             }
             if !self.ended {
                 return Ok(AvcTsStep::NeedInput);
