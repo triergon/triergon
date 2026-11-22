@@ -8,6 +8,7 @@
   "worker_operation": "ts-observer-",
   "reference": "ffmpeg-transport-views-native",
   "contract": [
+    "Scope-refusal controls compare the actual constructor or compact-selection refusal with the scope established independently from the reference catalogue after draining. The remaining cases use the mpegts-pes packet projection.",
     "The unregistered observer uses the AVC constructor and literal payload output. The input-bound and compact observers select the carriage from the accepted PMT and use the actual cursor. Compact output is consumed through its span cursor.",
     "The candidate folds the observer packet fields and the demux clock projection of its applicable header. The compact span trace retains payload range, carrier range and source context.",
     "The pinned formats worker opens the selected program with public MPEG-TS AVIO, NOPARSE and NOFILLIN, without stream discovery. It delivers ordinary entities in one AVIO source and flushes at a declared discontinuity.",
@@ -1014,240 +1015,136 @@
     }
   ],
   "pin_note": "Reference folds are recorded from the formats views worker and match the mpegts-pes pins for the same ordered inputs.",
-  "pending_module_requirements": [
-    "Review the bare observer at a source PCR discontinuity",
-    "Review PES output from carriers with invalid PCR or OPCR",
-    "Review PES output from damaged or scrambled carriers",
-    "Review finite input binding on a broken transport grid",
-    "Review the AVC-only unregistered observer on other carriages",
-    "Review compact payload admission for private PES",
-    "Review rejected PES timing syntax",
-    "Review malformed PES header refusal versus an empty demux result"
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "pcr-timeline-discontinuity-unregistered",
-      "requirement": "Review the bare observer at a source PCR discontinuity"
+      "reading": "PCR extension outside its modulus",
+      "clause": "H.222.0 \u00a72.4.3.5 defines PCR extension as the system-clock count modulo 300.",
+      "candidate": "Rejects the affected carrier and emits no PES from it.",
+      "reference": "Returns the 27-byte PES payload at PTS 90000.",
+      "compat": "compat::pes::IgnoreInvalidPcrExtension",
+      "cases": [
+        "pcr-extension-invalid-unregistered",
+        "pcr-extension-invalid-input-bound",
+        "pcr-extension-invalid-compact"
+      ]
     },
     {
-      "id": "pcr-timeline-discontinuity-input-bound",
-      "requirement": "Review the bare observer at a source PCR discontinuity"
+      "reading": "OPCR is signalled without PCR",
+      "clause": "H.222.0 \u00a72.4.3.5 permits OPCR only in a transport packet containing PCR.",
+      "candidate": "The strict source walk rejects the unpaired OPCR carrier and none of the three observers emits a packet.",
+      "reference": "Returns both 27-byte packets.",
+      "compat": "compat::pes::IgnoreUnpairedOpcr",
+      "cases": [
+        "opcr-without-pcr-invalid-unregistered",
+        "opcr-without-pcr-invalid-input-bound",
+        "opcr-without-pcr-invalid-compact"
+      ]
     },
     {
-      "id": "pcr-timeline-discontinuity-compact",
-      "requirement": "Review the bare observer at a source PCR discontinuity"
+      "reading": "Transport error indication marks untrustworthy payload",
+      "clause": "H.222.0 \u00a72.4.3.3 defines TEI as at least one uncorrectable error in the transport packet.",
+      "candidate": "Does not publish a PES from the errored carrier.",
+      "reference": "Returns 27 bytes at PTS 90000 without a corrupt flag.",
+      "compat": "compat::pes::DeliverTeiPayload",
+      "cases": [
+        "transport-tei-unregistered",
+        "transport-tei-input-bound",
+        "transport-tei-compact"
+      ]
     },
     {
-      "id": "pcr-extension-invalid-unregistered",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
+      "reading": "User-defined scrambling flag requires an interpretation before clear payload delivery",
+      "clause": "H.222.0 \u00a72.4.3.3 Table 2-4 distinguishes scrambling from clear payload.",
+      "candidate": "Does not publish a PES from the scrambled carrier.",
+      "reference": "Returns the 27 bytes and PTS 90000 as a packet.",
+      "compat": "compat::pes::DeliverScrambledPayload",
+      "cases": [
+        "transport-scrambled-unregistered",
+        "transport-scrambled-input-bound",
+        "transport-scrambled-compact"
+      ]
     },
     {
-      "id": "pcr-extension-invalid-input-bound",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
+      "reading": "A zero PTS marker bit violates the PES header grammar",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.6\u20132.4.3.7 Table 2-21 requires the timestamp marker bits.",
+      "candidate": "Rejects the malformed header and emits no PES.",
+      "reference": "Returns 27 bytes with PTS and DTS 90000.",
+      "compat": "compat::pes::IgnoreTimestampMarkers",
+      "cases": [
+        "pes-timestamp-marker-unregistered",
+        "pes-timestamp-marker-input-bound",
+        "pes-timestamp-marker-compact"
+      ]
     },
     {
-      "id": "pcr-extension-invalid-compact",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
+      "reading": "PES timestamp flag value 01 is forbidden",
+      "clause": "H.222.0 \u00a72.4.3.7 forbids PTS_DTS_flags 01.",
+      "candidate": "Rejects the malformed header and emits no PES.",
+      "reference": "Returns 27 bytes with both clocks absent.",
+      "compat": "compat::pes::IgnoreForbiddenTimeFlags",
+      "cases": [
+        "pes-forbidden-time-flags-unregistered",
+        "pes-forbidden-time-flags-input-bound",
+        "pes-forbidden-time-flags-compact"
+      ]
     },
     {
-      "id": "opcr-without-pcr-invalid-unregistered",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
+      "reading": "Finite startup requires complete transport carriers",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.1\u20132.4.3.2 fix the 188-byte packet extent. The finite observer binding validates the supplied entity before delivery.",
+      "candidate": "Refuses the finite source with a partial final carrier.",
+      "reference": "Emits the 27-byte packet on the complete prefix.",
+      "compat": "compat::input::DiscardPartialCarrier",
+      "cases": [
+        "transport-partial-final-packet-input-bound",
+        "transport-partial-final-packet-compact"
+      ]
     },
     {
-      "id": "opcr-without-pcr-invalid-input-bound",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
+      "reading": "Finite startup requires sync on the supplied grid",
+      "clause": "H.222.0 \u00a72.4.3.3 requires 0x47 at the start of each carrier. The finite observer binding validates every sync byte.",
+      "candidate": "Refuses the broken finite grid.",
+      "reference": "Emits the 27-byte packet on the intact portion.",
+      "compat": "compat::input::ResyncTransport",
+      "cases": [
+        "transport-sync-loss-input-bound",
+        "transport-sync-loss-compact"
+      ]
     },
     {
-      "id": "opcr-without-pcr-invalid-compact",
-      "requirement": "Review PES output from carriers with invalid PCR or OPCR"
+      "reading": "PES optional data exceeds the finite packet length",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.6\u20132.4.3.7 place the optional header within the declared PES length.",
+      "candidate": "Refuses the malformed header with Invalid.",
+      "reference": "Silently reaches EOF with no selected packet.",
+      "compat": "compat::pes::SkipInvalidHeaders",
+      "cases": [
+        "pes-optional-header-overrun-unregistered",
+        "pes-optional-header-overrun-input-bound",
+        "pes-optional-header-overrun-compact"
+      ]
     },
     {
-      "id": "transport-tei-unregistered",
-      "requirement": "Review PES output from damaged or scrambled carriers"
+      "reading": "PES lacks the start-code prefix",
+      "clause": "H.222.0 \u00a72.4.3.7 requires start-code prefix 0x000001.",
+      "candidate": "Refuses the invalid prefix with Invalid.",
+      "reference": "Silently reaches EOF with no selected packet.",
+      "compat": "compat::pes::SkipInvalidHeaders",
+      "cases": [
+        "pes-start-prefix-invalid-unregistered",
+        "pes-start-prefix-invalid-input-bound",
+        "pes-start-prefix-invalid-compact"
+      ]
     },
     {
-      "id": "transport-tei-input-bound",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-tei-compact",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-unregistered",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-input-bound",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-scrambled-compact",
-      "requirement": "Review PES output from damaged or scrambled carriers"
-    },
-    {
-      "id": "transport-partial-final-packet-input-bound",
-      "requirement": "Review finite input binding on a broken transport grid"
-    },
-    {
-      "id": "transport-partial-final-packet-compact",
-      "requirement": "Review finite input binding on a broken transport grid"
-    },
-    {
-      "id": "transport-sync-loss-input-bound",
-      "requirement": "Review finite input binding on a broken transport grid"
-    },
-    {
-      "id": "transport-sync-loss-compact",
-      "requirement": "Review finite input binding on a broken transport grid"
-    },
-    {
-      "id": "pmt-version-wrap-retypes-pid-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "carriage-ac3-dvb-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "carriage-eac3-dvb-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "carriage-ac3-direct-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "carriage-eac3-direct-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "carriage-aac-adts-direct-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "carriage-aac-latm-direct-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "carriage-hevc-direct-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "pes-audio-zero-length-invalid-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "dvb2-literals-fields-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "dvb-ancillary-pages-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "dvb-default-clut2-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "dvb-nonmodifying-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "dvb-partial-alpha-projection-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "dvb-truncated-segment-unregistered",
-      "requirement": "Review the AVC-only unregistered observer on other carriages"
-    },
-    {
-      "id": "carriage-ac3-dvb-compact",
-      "requirement": "Review compact payload admission for private PES"
-    },
-    {
-      "id": "carriage-eac3-dvb-compact",
-      "requirement": "Review compact payload admission for private PES"
-    },
-    {
-      "id": "carriage-ac3-direct-compact",
-      "requirement": "Review compact payload admission for private PES"
-    },
-    {
-      "id": "carriage-eac3-direct-compact",
-      "requirement": "Review compact payload admission for private PES"
-    },
-    {
-      "id": "dvb2-literals-fields-compact",
-      "requirement": "Review compact payload admission for private PES"
-    },
-    {
-      "id": "dvb-ancillary-pages-compact",
-      "requirement": "Review compact payload admission for private PES"
-    },
-    {
-      "id": "dvb-default-clut2-compact",
-      "requirement": "Review compact payload admission for private PES"
-    },
-    {
-      "id": "dvb-nonmodifying-compact",
-      "requirement": "Review compact payload admission for private PES"
-    },
-    {
-      "id": "dvb-partial-alpha-projection-compact",
-      "requirement": "Review compact payload admission for private PES"
-    },
-    {
-      "id": "dvb-truncated-segment-compact",
-      "requirement": "Review compact payload admission for private PES"
-    },
-    {
-      "id": "pes-timestamp-marker-unregistered",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-timestamp-marker-input-bound",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-timestamp-marker-compact",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-unregistered",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-input-bound",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-forbidden-time-flags-compact",
-      "requirement": "Review rejected PES timing syntax"
-    },
-    {
-      "id": "pes-optional-header-overrun-unregistered",
-      "requirement": "Review malformed PES header refusal versus an empty demux result"
-    },
-    {
-      "id": "pes-optional-header-overrun-input-bound",
-      "requirement": "Review malformed PES header refusal versus an empty demux result"
-    },
-    {
-      "id": "pes-optional-header-overrun-compact",
-      "requirement": "Review malformed PES header refusal versus an empty demux result"
-    },
-    {
-      "id": "pes-start-prefix-invalid-unregistered",
-      "requirement": "Review malformed PES header refusal versus an empty demux result"
-    },
-    {
-      "id": "pes-start-prefix-invalid-input-bound",
-      "requirement": "Review malformed PES header refusal versus an empty demux result"
-    },
-    {
-      "id": "pes-start-prefix-invalid-compact",
-      "requirement": "Review malformed PES header refusal versus an empty demux result"
+      "reading": "A bare observer requires explicit confirmation of the PCR timeline boundary",
+      "clause": "H.222.0 \u00a72.4.3.5 distinguishes system time-base discontinuity from continuity-counter discontinuity. The bare observer requires separate clock policy before combining packets across the boundary.",
+      "candidate": "Publishes the first PES at 90000 ticks, then refuses the new source-clock boundary.",
+      "reference": "Publishes the first PES at 90000 ticks and a second PES at 10 ticks without a separate caller confirmation.",
+      "compat": "compat::pes::TransportFaultRecovery::confirm_source_timeline",
+      "cases": [
+        "pcr-timeline-discontinuity-unregistered",
+        "pcr-timeline-discontinuity-input-bound",
+        "pcr-timeline-discontinuity-compact"
+      ]
     }
   ]
 }

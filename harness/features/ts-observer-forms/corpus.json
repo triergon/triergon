@@ -4211,7 +4211,8 @@
       "arguments": [
         "188",
         "1",
-        "unregistered"
+        "unregistered",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -4231,9 +4232,9 @@
         }
       ],
       "expected": {
-        "packets": 0,
+        "packets": 1,
         "bytes": 0,
-        "digest": 0
+        "digest": 8
       }
     },
     {
@@ -4823,7 +4824,8 @@
       "arguments": [
         "188",
         "1",
-        "unregistered"
+        "unregistered",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -4844,8 +4846,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529075
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -4891,7 +4893,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -4912,8 +4915,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529075
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -4925,7 +4928,8 @@
       "arguments": [
         "188",
         "1",
-        "unregistered"
+        "unregistered",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -4946,8 +4950,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529075
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -4993,7 +4997,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -5014,8 +5019,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529075
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -5027,7 +5032,8 @@
       "arguments": [
         "188",
         "1",
-        "unregistered"
+        "unregistered",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -5048,8 +5054,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529075
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -5095,7 +5101,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -5116,8 +5123,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529075
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -5129,7 +5136,8 @@
       "arguments": [
         "188",
         "1",
-        "unregistered"
+        "unregistered",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -5150,8 +5158,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529075
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -5197,7 +5205,8 @@
       "arguments": [
         "188",
         "1",
-        "compact"
+        "compact",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -5218,8 +5227,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529075
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -5231,7 +5240,8 @@
       "arguments": [
         "188",
         "1",
-        "unregistered"
+        "unregistered",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -5262,8 +5272,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529078
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -5363,7 +5373,8 @@
       "arguments": [
         "188",
         "1",
-        "unregistered"
+        "unregistered",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -5394,8 +5405,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529078
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -5495,7 +5506,8 @@
       "arguments": [
         "188",
         "1",
-        "unregistered"
+        "unregistered",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -5526,8 +5538,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 6277932050482529110
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -6239,7 +6251,8 @@
       "arguments": [
         "188",
         "1",
-        "unregistered"
+        "unregistered",
+        "--scope-refusal"
       ],
       "requests": [
         {
@@ -6260,8 +6273,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314263
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -6816,6 +6829,7 @@
         "188",
         "1",
         "unregistered",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -6832,8 +6846,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 126,
-        "digest": 10721616146549570842
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -6876,6 +6890,7 @@
         "188",
         "1",
         "compact",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -6892,8 +6907,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 126,
-        "digest": 10721616146549570842
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -6906,6 +6921,7 @@
         "188",
         "1",
         "unregistered",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -6922,8 +6938,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 110,
-        "digest": 1540312472768044640
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -6966,6 +6982,7 @@
         "188",
         "1",
         "compact",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -6982,8 +6999,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 110,
-        "digest": 1540312472768044640
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -6996,6 +7013,7 @@
         "188",
         "1",
         "unregistered",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -7012,8 +7030,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 67,
-        "digest": 859282433217685188
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -7056,6 +7074,7 @@
         "188",
         "1",
         "compact",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -7072,8 +7091,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 67,
-        "digest": 859282433217685188
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -7086,6 +7105,7 @@
         "188",
         "1",
         "unregistered",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -7102,8 +7122,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 112,
-        "digest": 12568845423716213062
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -7146,6 +7166,7 @@
         "188",
         "1",
         "compact",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -7162,8 +7183,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 112,
-        "digest": 12568845423716213062
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -7176,6 +7197,7 @@
         "188",
         "1",
         "unregistered",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -7192,8 +7214,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 110,
-        "digest": 1168696234672648935
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -7236,6 +7258,7 @@
         "188",
         "1",
         "compact",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -7252,8 +7275,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 110,
-        "digest": 1168696234672648935
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -7266,6 +7289,7 @@
         "188",
         "1",
         "unregistered",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -7282,8 +7306,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 109,
-        "digest": 2346727682652398649
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -7326,6 +7350,7 @@
         "188",
         "1",
         "compact",
+        "--scope-refusal",
         "--dvb"
       ],
       "requests": [
@@ -7342,8 +7367,8 @@
       ],
       "expected": {
         "packets": 1,
-        "bytes": 109,
-        "digest": 2346727682652398649
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
