@@ -147,6 +147,10 @@ bytes are errors; nothing is replaced with U+FFFD.
 | PGS (Blu-ray) | PCS, PDS, ODS, END in packet or SUP framing; fragmented objects; palette updates; object cache; forced flags | Every packet FFmpeg decodes, malformed ones included: indexed planes and ARGB palettes, with its refusals and `forced_subs_only` |
 | DVD SPU / VobSub | SPU reassembly, control commands (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette, the canvas of the configuration's `size:` line (refused unless both sides are positive and (width + 128) × (height + 128) is below 2²⁸), the `.idx` `delay:` line, and `forced_subs_only`; out-of-range numbers read as FFmpeg built for 32-bit ARMv7 reads them |
 
+The [DVD gate](../../harness/features/subtitle-dvd/contract.json) compares the
+palette selected from the first program chain and the fallback used when its
+sector or table offset falls outside the IFO.
+
 ### Closed captions and teletext
 
 | Format | Decoded | Output |

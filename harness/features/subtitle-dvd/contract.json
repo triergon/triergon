@@ -19,13 +19,13 @@
     "aarch64-unknown-linux-gnu",
     "thumbv7neon-unknown-linux-gnueabihf"
   ],
-  "pending_module_requirements": [
-    "A VTS_PGCITI sector word of 0x00200000 addresses a table at 2^32 bytes, past the file. Triergon rejects the offset. The AArch64 reference returns a different palette, consistent with a wrapped seek."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "vobsub-ifo-palette-sector-overflow",
-      "requirement": "A VTS_PGCITI sector word of 0x00200000 addresses a table at 2^32 bytes, past the file. Triergon rejects the offset. The AArch64 reference returns a different palette, consistent with a wrapped seek.",
+      "reading": "The title-set program-chain table must fall within the IFO's sector-addressed extent",
+      "clause": "DVD-Video Part 3, VTSI_MAT VTS_PGCITI sector pointer and DVD sector size, as documented in harness/subtitles/dvd_streams.py and crates/subtitles/src/dvd/receiver.rs",
+      "candidate": "The unsigned offset is 2^32 bytes in a two-sector file. Uses the fallback palette with first rectangle entries 00000000 ff000000 ff7f7f7f fffefefe.",
+      "reference": "Publishes the same rectangle geometry with palette entries 00008800 ff008800 ff008800 ff008800, consistent with addressing a different in-file table.",
+      "cases": ["vobsub-ifo-palette-sector-overflow"],
       "targets": ["aarch64-unknown-linux-gnu"]
     }
   ],

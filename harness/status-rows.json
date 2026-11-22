@@ -742,7 +742,8 @@
         "aarch64-unknown-linux-gnu",
         "thumbv7neon-unknown-linux-gnueabihf"
       ],
-      "unmeasured": "subtitle-dvd"
+      "unmeasured": "subtitle-dvd",
+      "parity": {"aarch64-unknown-linux-gnu": "230/231 match. The [DVD contract](../harness/features/subtitle-dvd/contract.json) declares the palette difference at a 2³²-byte IFO table offset."}
     },
     {
       "area": "Subtitles, DVD host variants",
