@@ -69,8 +69,7 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
         &self.reader
     }
 
-    /// Takes the source at its current position to check the reader's input handoff.
-    #[cfg(feature = "reference-trace")]
+    /// The source at its current position, dropping the reader.
     pub fn into_inner(self) -> S {
         self.source
     }

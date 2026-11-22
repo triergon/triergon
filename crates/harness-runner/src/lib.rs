@@ -17,8 +17,6 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 use triergon_core::Budget;
-#[cfg(feature = "views")]
-pub use triergon_core::TickScale;
 use triergon_harness_protocol::digest::fold;
 use triergon_harness_protocol::push_quoted;
 
