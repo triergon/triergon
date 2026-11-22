@@ -762,6 +762,11 @@
         "codec-file-workloads-3"
       ]
     },
+    {"area": "Decoder CRC rejection", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "unmeasured (the measured workloads use the default CRC policy)"},
+    {"area": "AC-3 dither trace and noise option", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "unmeasured (comparison input generation and Off have no measured workload)"},
+    {"area": "Packed DTS decoding", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "unmeasured (no workload reads packed DTS)"},
+    {"area": "Decode sessions", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "awaiting paired collection"},
+    {"area": "Track decoder reset", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "unmeasured (the measured file workloads decode sequentially)"},
     {"area": "AAC default build", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "awaiting paired collection"},
     {"area": "HEVC SIMD build", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "text": "awaiting paired collection"},
     {
