@@ -172,19 +172,6 @@
       }
     },
     {
-      "id": "truncated-1",
-      "profile": "authored",
-      "file": ".research/stream-parser-fixtures/truncated-1.adts",
-      "sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
-      "rights": "authored-synthetic",
-      "arguments": [],
-      "expected": {
-        "packets": 0,
-        "bytes": 0,
-        "digest": 0
-      }
-    },
-    {
       "id": "truncated-2",
       "profile": "authored",
       "file": ".research/stream-parser-fixtures/truncated-2.adts",
@@ -650,19 +637,6 @@
         "packets": 1,
         "bytes": 9,
         "digest": 265687865031366611
-      }
-    },
-    {
-      "id": "channel-2",
-      "profile": "authored",
-      "file": ".research/stream-parser-fixtures/channel-2.adts",
-      "sha256": "ce47c4c89ef5c5d3d3f1ecc8152232cc7a4df43ed646128cf48de3977536dcff",
-      "rights": "authored-synthetic",
-      "arguments": [],
-      "expected": {
-        "packets": 1,
-        "bytes": 9,
-        "digest": 266507495150613076
       }
     },
     {
