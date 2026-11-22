@@ -5,6 +5,7 @@
  "candidate": "codec-worker packets mov FILE [TRACK_ID@MICROSECONDS]: every packet triergon_isobmff::Reader emits, as the reader reports it",
  "ffprobe_options": ["-f", "mov", "-fflags", "+noparse+nofillin", "-ignore_editlist", "1"],
  "compare": ["size", "position", "hash", "sync", "pts", "dts", "duration"],
+ "first_entry_colour": "Opted-in cases compare opening sample-entry source primaries, transfer, matrix and range by track ID. FFprobe unknown range corresponds to absent range. r-colour-config-change is excluded because its first entry has no colour and FFprobe aggregates the later entry.",
  "rules": [
   {
    "id": "forced-demuxer",

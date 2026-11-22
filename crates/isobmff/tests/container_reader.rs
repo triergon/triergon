@@ -10,7 +10,9 @@ use triergon_core::{
     Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceId, Step, Time,
     WorkBudget,
 };
-use triergon_isobmff::{Packet, Reader, ReaderEvent, ReaderLimits};
+use triergon_isobmff::{
+    BoxStep, BoxView, EntryLayout, Limits, Packet, Reader, ReaderEvent, ReaderLimits,
+};
 
 fn capabilities(file: &[u8]) -> SourceCapabilities {
     SourceCapabilities {
@@ -159,6 +161,180 @@ fn patched(name: &str, find: &[u8], at: usize, bytes: &[u8]) -> Vec<u8> {
     let start = file.windows(find.len()).position(|w| w == find).unwrap() + at;
     file[start..start + bytes.len()].copy_from_slice(bytes);
     file
+}
+
+#[test]
+fn colour_from_first_visual_entry_preserves_codes_and_range_presence() {
+    use triergon_core::container::{ColourRange, Origin};
+    for (name, codes, range, origin) in [
+        (
+            "r-colour-nclx",
+            (9, 16, 9),
+            ColourRange::Full,
+            Origin::Container,
+        ),
+        (
+            "r-colour-nclc",
+            (1, 1, 1),
+            ColourRange::Unspecified,
+            Origin::Absent,
+        ),
+    ] {
+        let file = CASES.iter().find(|c| c.name == name).unwrap().bytes;
+        let pool = Budget::new(16 << 20).unwrap();
+        let mut reader = open(&pool, file);
+        read(&mut reader, &pool, file, 3, 5).unwrap();
+        let colour = reader.tracks()[0].colour().unwrap();
+        assert_eq!(
+            (
+                colour.primaries.value,
+                colour.transfer.value,
+                colour.matrix.value
+            ),
+            codes,
+        );
+        assert_eq!((colour.range.value, colour.range.origin), (range, origin));
+    }
+}
+
+#[test]
+fn track_colour_does_not_take_values_from_a_later_description() {
+    let file = include_bytes!("fixtures/r-colour-config-change.mov");
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open(&pool, file);
+    let reading = read(&mut reader, &pool, file, 3, 5).unwrap();
+    let selected: Vec<_> = reading
+        .packets
+        .iter()
+        .map(|packet| packet.sample().description_index)
+        .collect();
+    assert_eq!(selected, [1, 1, 1, 2, 2, 2]);
+    let track = &reader.tracks()[0];
+    assert!(track.colour().is_none());
+    assert_eq!(track.descriptions().len(), 2);
+    assert!(
+        track.descriptions()[1]
+            .raw()
+            .bytes()
+            .windows(4)
+            .any(|kind| kind == b"colr")
+    );
+    let description = track
+        .descriptions()
+        .iter()
+        .find(|description| Some(&description.index) == selected.last())
+        .unwrap();
+    let mut children = description
+        .extensions(EntryLayout::Visual, Limits::default())
+        .unwrap();
+    let mut colour = None;
+    loop {
+        match children.poll(&mut WorkBudget::new(1)).unwrap() {
+            BoxStep::Box(child) => {
+                if let Some(found) = child.colour_parameter() {
+                    assert!(colour.replace(found).is_none());
+                }
+            }
+            BoxStep::End => break,
+            BoxStep::Yield => panic!("one unit should admit a child"),
+        }
+    }
+    let colour = colour.unwrap();
+    use triergon_core::container::{ColourRange, Origin};
+    assert_eq!(
+        (colour.primaries.value, colour.primaries.origin),
+        (9, Origin::Container)
+    );
+    assert_eq!(
+        (colour.transfer.value, colour.transfer.origin),
+        (16, Origin::Container)
+    );
+    assert_eq!(
+        (colour.matrix.value, colour.matrix.origin),
+        (9, Origin::Container)
+    );
+    assert_eq!(
+        (colour.range.value, colour.range.origin),
+        (ColourRange::Unspecified, Origin::Absent)
+    );
+    assert!(colour.chroma_siting.is_none());
+    assert!(colour.mastering.is_none());
+    assert!(colour.content_light.is_none());
+}
+
+#[test]
+fn colour_parameter_rejects_other_and_unsupported_boxes() {
+    let pool = Budget::new(1024).unwrap();
+    for bytes in [
+        &b"\0\0\0\x12freenclc\0\x09\0\x10\0\x09"[..],
+        &b"\0\0\0\x0ccolrprof"[..],
+        &b"\0\0\0\x0bcolrncl"[..],
+    ] {
+        let view = BoxView::new(Bytes::copy_from_slice(&pool, bytes).unwrap(), 0).unwrap();
+        assert!(view.colour_parameter().is_none());
+    }
+}
+
+#[test]
+fn absent_or_unsupported_colour_does_not_change_opening() {
+    let original = CASES
+        .iter()
+        .find(|c| c.name == "r-colour-nclx")
+        .unwrap()
+        .bytes;
+    let at = original.windows(4).position(|w| w == b"colr").unwrap();
+    for mutation in 0..4 {
+        let mut file = original.to_vec();
+        match mutation {
+            0 => file[at..at + 4].copy_from_slice(b"free"),
+            1 => file[at + 14] |= 1, // reserved bits
+            2 => file[at + 4..at + 8].copy_from_slice(b"prof"),
+            _ => {
+                file[at - 4..at + 4].copy_from_slice(b"\0\0\0\x08colr");
+                file[at + 4..at + 12].copy_from_slice(b"\0\0\0\x0bcolr");
+            }
+        }
+        let pool = Budget::new(16 << 20).unwrap();
+        let mut reader = open(&pool, &file);
+        read(&mut reader, &pool, &file, 3, 5).unwrap();
+        assert!(reader.tracks()[0].colour().is_none(), "mutation {mutation}");
+    }
+}
+
+#[test]
+fn a_supported_colour_box_can_follow_an_unknown_colour_type() {
+    let mut file = include_bytes!("fixtures/r-colour-nclx.mov").to_vec();
+    let extra = *b"\0\0\0\x0ccolrzzzz";
+    let added = u32::try_from(extra.len()).unwrap();
+    let position = |tag: &[u8]| file.windows(4).position(|bytes| bytes == tag).unwrap();
+    let colr = position(b"colr") - 4;
+    let chunks = position(b"stco") + 12;
+    let sizes = [
+        b"moov", b"trak", b"mdia", b"minf", b"stbl", b"stsd", b"raw ",
+    ]
+    .map(|tag| position(tag) - 4);
+    for size_at in sizes {
+        let size = u32::from_be_bytes(file[size_at..size_at + 4].try_into().unwrap());
+        file[size_at..size_at + 4].copy_from_slice(&(size + added).to_be_bytes());
+    }
+    let count = usize::try_from(u32::from_be_bytes(
+        file[chunks - 4..chunks].try_into().unwrap(),
+    ))
+    .unwrap();
+    for chunk in file[chunks..chunks + count * 4].chunks_exact_mut(4) {
+        let offset = u32::from_be_bytes((*chunk).try_into().unwrap());
+        chunk.copy_from_slice(&(offset + added).to_be_bytes());
+    }
+    file.splice(colr..colr, extra);
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open(&pool, &file);
+    read(&mut reader, &pool, &file, 3, 5).unwrap();
+    let description = reader.tracks()[0].colour().unwrap();
+    assert_eq!(description.primaries.value, 9);
+    assert_eq!(
+        description.range.value,
+        triergon_core::container::ColourRange::Full
+    );
 }
 
 #[test]

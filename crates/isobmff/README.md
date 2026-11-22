@@ -183,9 +183,13 @@ Limits of the reader:
   `Track::edits`. `compat::mov` gives FFmpeg's edited packets.
 - `TrackInfo` describes the first sample entry; `Packet::sample` names each
   sample's entry and `Track::descriptions` keeps them all.
-- Colour, chapters and other metadata have no typed field (`colour`,
-  `default_track` and `forced` are `None`); read them through `Track::descriptions`
-  and `Reader::movie_box`.
+- For known visual entries, `colour` reads the first valid `nclx` or `nclc`
+  colour box in the first sample entry. It preserves the numeric codes and
+  reports an absent range for `nclc`. For a selected description, callers can
+  walk `extensions(EntryLayout::Visual, ...)` with `BoxChildren::poll` and use
+  `BoxView::colour_parameter` to interpret each supported `colr` child on demand.
+  Unsupported or malformed colour parameters yield `None`. The descriptions
+  retain their raw boxes. Chapters and other metadata are on `Reader::movie_box`.
 - External data references and media outside an `mdat` are refused; only a `url `
   entry flagged self-contained counts as this file. An empty `traf` fails the open.
 - A fragment without `tfdt` has `None` times and cannot be a seek landing. Times
@@ -277,4 +281,6 @@ Verification: the FFmpeg comparisons are defined in
 [harness/features/isobmff-reader](../../harness/features/isobmff-reader),
 [isobmff-open-index](../../harness/features/isobmff-open-index) and
 [isobmff-seek](../../harness/features/isobmff-seek); results are in
-[docs/status.md](../../docs/status.md).
+[docs/status.md](../../docs/status.md). The reader comparison includes first-entry
+source colour on the `nclc` and `nclx` fixtures. It excludes colour on the
+configuration-change fixture because ffprobe aggregates a later entry.

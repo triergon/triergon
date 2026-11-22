@@ -159,6 +159,8 @@ type.
 Every implementation follows the same rules: no fabricated values (`None` or
 `RandomAccess::Unknown` unless the source or a documented rule supplies them), no
 sentinels, and specification defaults only with `Origin::SpecificationDefault`.
+An individually absent colour range is marked `Origin::Absent` and has the
+`ColourRange::Unspecified` value.
 `dts` is `None` where the container carries no decode time. H.273 codes stay
 numeric, and a conflict between container and bitstream colour is reported as two
 descriptions, never resolved. Readers are concrete types used through generics or
