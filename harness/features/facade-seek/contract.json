@@ -10,7 +10,7 @@
   "contract": [
     "Open the sole-program TS188 or M2TS192 entity through AnyReader. Exercise reset and Blocking::seek, which routes the request through AnyReader::request_seek.",
     "Compare the requested, landing and discard times and every selected picture packet through EOF with the unchanged MPEG-TS picture seek reference. Fold source presentation time, effective decode time, neutral random access and payload. Repeated cases seek again after EOF.",
-    "The transport report covers the sole-program single-entity cases. Explicit transport epochs and split entities require format-specific APIs. The same gate item compares Matroska and ISO BMFF seek receipts and suffixes through their unchanged native trace operations and container-pins.json."
+    "The transport report covers the sole-program single-entity cases. Explicit transport epochs and split entities require format-specific APIs. Matroska and ISO BMFF compare native seek receipts and packet suffixes with container-pins.json. For ISO BMFF, choose the prior sync sample on the unedited presentation timeline in a complete reference packet scan, then seek by its decode timestamp with the native backward seek."
   ],
   "required_profiles": [
     "avc-earliest-picture",

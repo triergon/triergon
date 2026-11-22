@@ -1,12 +1,12 @@
 //! Compares facade seek receipts and packet suffixes with the existing native trace operations.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::harness::worker;
+use crate::harness::{report, validation, worker};
 use crate::json::{self, Value};
 use crate::{python, sha256};
 
@@ -219,6 +219,62 @@ fn reference_value(case: &Case, stdout: &[u8]) -> Result<(Value, Vec<Value>)> {
     Ok((landing, packets))
 }
 
+fn reference_seek(
+    root: &Path,
+    worker: &Path,
+    case: &Case,
+    scans: &mut BTreeMap<PathBuf, Value>,
+) -> Result<worker::Finished> {
+    if case.matroska {
+        return run(root, worker, "seek-trace", case, &case.reference);
+    }
+    let scan = match scans.entry(case.input.clone()) {
+        Entry::Occupied(scan) => scan.into_mut(),
+        Entry::Vacant(scan) => {
+            let native = run(root, worker, "open-trace", case, &case.reference[4..])?;
+            let mut scan_rows = rows(&native.stdout)?;
+            if native.code != 0 || scan_rows.len() != 1 {
+                return Err(format!("{}: incomplete native source scan", case.id));
+            }
+            let complete = scan_rows.pop().ok_or("missing native source scan")?;
+            if get(&complete, "confirmed_eof")? != &Value::Bool(true) {
+                return Err(format!("{}: native source scan did not reach EOF", case.id));
+            }
+            scan.insert(complete)
+        }
+    };
+    let [track, pts, ..] = case.reference.as_slice() else {
+        return Err("missing reference seek request".into());
+    };
+    let track: i128 = track.parse().map_err(|_| "invalid reference track")?;
+    let target: i128 = pts.parse().map_err(|_| "invalid reference target")?;
+    let (mut first, mut best) = (None, None);
+    for packet in list(scan, "packets")? {
+        if number(get(packet, "pid")?)? != track || number(get(packet, "flags")?)? & 1 == 0 {
+            continue;
+        }
+        let (Some(pts), Some(dts)) = (
+            python::int(get(packet, "pts")?),
+            python::int(get(packet, "dts")?),
+        ) else {
+            continue;
+        };
+        first.get_or_insert(dts);
+        if pts <= target && best.is_none_or(|(previous, _)| pts >= previous) {
+            best = Some((pts, dts));
+        }
+    }
+    // The facade asks for a presentation time. The native backward seek takes
+    // a decode tick. Seek to the DTS of the sync sample chosen on the source timeline.
+    let dts = best
+        .map(|(_, dts)| dts)
+        .or(first)
+        .ok_or("no timed reference sync sample")?;
+    let mut arguments = case.reference.clone();
+    arguments[1] = dts.to_string();
+    run(root, worker, "seek-trace", case, &arguments)
+}
+
 fn compare(
     case: &Case,
     ours: &worker::Finished,
@@ -293,10 +349,20 @@ fn compare(
 }
 
 pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
-    let (record, candidate, output) = match args {
-        [record] if record == "--record" => (true, PathBuf::new(), None),
-        [worker, path] => (false, root.join(worker), Some(root.join(path))),
-        _ => return Err("usage: cargo xtask play-views seek --record | WORKER OUTPUT".into()),
+    let (record, candidate, output, selected) = match args {
+        [record] if record == "--record" => (true, PathBuf::new(), None, &[][..]),
+        [record, flag, selected @ ..]
+            if record == "--record" && flag == "--cases" && !selected.is_empty() =>
+        {
+            (true, PathBuf::new(), None, selected)
+        }
+        [worker, path] => (false, root.join(worker), Some(root.join(path)), &[][..]),
+        _ => {
+            return Err(
+                "usage: cargo xtask play-views seek --record [--cases ID...] | WORKER OUTPUT"
+                    .into(),
+            );
+        }
     };
     let file = root.join(MANIFEST);
     let previous = if file.exists() {
@@ -310,12 +376,43 @@ pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
         .unwrap_or_default();
     let mut open_ids = open
         .iter()
-        .map(|row| text(row, "id"))
+        .map(|row| text(row, "id").map(str::to_owned))
         .collect::<Result<BTreeSet<_>>>()?;
+    let cases = cases(root)?;
+    if let Some(deviations) = previous.get("open_deviations") {
+        let declarations = Value::object([
+            ("open_deviations", deviations.clone()),
+            (
+                "required_targets",
+                Value::Array(crate::gate::TARGETS.into_iter().map(Value::str).collect()),
+            ),
+        ]);
+        let manifest = Value::object([(
+            "cases",
+            Value::Array(
+                cases
+                    .iter()
+                    .map(|case| Value::object([("id", Value::str(&case.id))]))
+                    .collect(),
+            ),
+        )]);
+        for id in report::open_cases(&declarations, &manifest, &report::gate_target()?)? {
+            if !open_ids.insert(id.clone()) {
+                return Err(format!("{id}: listed as both an open case and a deviation"));
+            }
+        }
+    }
     let mut pins = Vec::new();
     let mut reports = Vec::new();
     let mut bad = Vec::new();
-    for case in cases(root)? {
+    let mut pending: BTreeSet<_> = selected.iter().map(String::as_str).collect();
+    let mut scans = BTreeMap::new();
+    for case in cases {
+        if !selected.is_empty() && !pending.remove(case.id.as_str()) {
+            let pin = get(get(&previous, "pins")?, &case.id)?.clone();
+            pins.push((case.id, pin));
+            continue;
+        }
         if sha256::file_hex(&case.input)
             .map_err(|error| format!("{}: {error}", case.input.display()))?
             != case.sha
@@ -327,7 +424,7 @@ pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
         } else {
             "target/harness/ffmpeg-isobmff-worker"
         });
-        let native = run(root, &reference, "seek-trace", &case, &case.reference)?;
+        let native = reference_seek(root, &reference, &case, &mut scans)?;
         if native.code != 0 {
             return Err(format!(
                 "{}: reference exited {}: {}",
@@ -364,21 +461,20 @@ pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
         reports.push(report);
     }
     if record {
-        json::write(
-            &file,
-            &Value::object([
+        if !pending.is_empty() {
+            return Err(format!("unknown selected seek case IDs: {pending:?}"));
+        }
+        let mut recorded = if previous == Value::Null {
+            Value::object([
                 ("schema", Value::int(1)),
-                ("pins", Value::Object(pins)),
-                ("open_cases", Value::Array(open.to_vec())),
-                (
-                    "open_unmeasured",
-                    previous
-                        .get("open_unmeasured")
-                        .cloned()
-                        .unwrap_or_else(|| Value::Array(Vec::new())),
-                ),
-            ]),
-        )?;
+                ("open_cases", Value::Array(Vec::new())),
+                ("open_unmeasured", Value::Array(Vec::new())),
+            ])
+        } else {
+            previous
+        };
+        validation::put(&mut recorded, "pins", Value::Object(pins))?;
+        json::write(&file, &recorded)?;
         println!("recorded {}", file.display());
     } else if let Some(output) = output {
         if let Some(parent) = output.parent() {
