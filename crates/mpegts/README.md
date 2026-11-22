@@ -888,6 +888,22 @@ Specification basis:
 
 Verification:
 
+- The PAT and PMT readers and the comparison-only catalogue projection are
+  checked against the programs and streams FFmpeg exposes after draining each
+  transport entity. The comparison covers table and stream order, PIDs, PMT
+  versions, language tags and DVB subtitle service initialization.
+  [Standalone readers](../../harness/features/ts-psi-readers/contract.json)
+  [Catalogue projection](../../harness/features/ts-catalogue/contract.json)
+- An independent H.222.0 oracle checks every AVC and HEVC video descriptor
+  field. The authored input exercises 512 flag combinations for each descriptor,
+  including both forms of the HEVC temporal-layer fields.
+  [Video descriptor comparison](../../harness/features/ts-video-descriptors/contract.json)
+- The raw packet comparison checks the TS body bytes and their physical offsets
+  at 1-, 7- and 4096-byte input windows. Its field oracle also checks the full
+  carrier, including opaque M2TS prefixes, PCR and OPCR, adaptation fields,
+  rejected-carrier ranges, truncated tails and expansion of compact null runs.
+  [Packet boundaries](../../harness/features/ts-packets/contract.json)
+  [Carrier fields](../../harness/features/ts-packet-fields/contract.json)
 - The [DTS seek comparison](../../harness/features/mpegts-dts-seek/contract.json)
   contains two DTS core history cases and 24 authored XLL cases. Twelve XLL cases
   use an extension alone and twelve carry an independently recoverable core.

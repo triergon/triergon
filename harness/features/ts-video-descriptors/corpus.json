@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "video-descriptor-flags",
+      "profile": "avc-hevc-flags",
+      "file": ".research/fixtures-transport-views/video-descriptor-flags.ts",
+      "sha256": "ca923b95a925efc82b68e9091af0ebeb79f13f9b2bfa7e3f06a8e3a765547878",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "1",
+        "unspecified",
+        "strict"
+      ],
+      "expected": {
+        "trace_sha256": "9c6358864374915ae7558636dad8d3b37879c750eeea26909288ba432b2fc1e1"
+      }
+    }
+  ]
+}

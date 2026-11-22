@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "ts-video-descriptors",
+  "gate": "required",
+  "operation": "ts-video-descriptors",
+  "candidate": "transport-views-worker",
+  "worker_operation": "ts-video-descriptors-",
+  "contract": [
+    "Compare AVC and HEVC video descriptors in accepted current PMTs against an independent H.222.0 2.6.64 and 2.6.95 oracle.",
+    "Kind 3 includes the program number, PMT version, stream PID, descriptor tag, and all decoded descriptor fields in the contract trace order. Include both presence and absence of the HEVC temporal bounds. Kind 7 marks clean end."
+  ],
+  "required_profiles": [
+    "avc-hevc-flags"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "oracle": "ts-video-descriptors",
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "video-descriptor-flags"
+      ],
+      "cause": "No reference reports the AVC and HEVC video descriptor fields."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "video-descriptor-flags"
+      ],
+      "cause": "No reference reports the AVC and HEVC video descriptor fields."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "video-descriptor-flags"
+      ],
+      "cause": "No reference reports the AVC and HEVC video descriptor fields."
+    }
+  ]
+}
