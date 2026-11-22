@@ -342,12 +342,13 @@ impl From<&TransportPacket> for CarrierLayout {
     }
 }
 
+#[repr(C)]
 #[derive(Debug)]
 struct Pending {
+    context: SourceContext,
     carrier: CarrierLayout,
     source: Bytes,
     payload: Option<Bytes>,
-    context: SourceContext,
     position: usize,
     counter_checked: bool,
     started: bool,
