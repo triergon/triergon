@@ -150,7 +150,6 @@ impl Normalizer<'_, '_> {
                 self.set_glyph(&mut info);
                 *buffer.cur_mut() = info;
                 buffer.next_glyph()?;
-                buffer.scratch.variation_selector_fallback = true;
                 let cur = buffer.cur_mut();
                 cur.unicode.set_category(unicode::GeneralCategory::Format);
                 cur.unicode.set(CharFlag::VariationSelector, true);

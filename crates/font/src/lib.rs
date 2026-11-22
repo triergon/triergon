@@ -38,6 +38,7 @@ pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
 pub use name::{Language, NameChars, NameId, NameRecord, Platform};
 pub use outline::{Outline, OutlinePoint, Point, PointKind, Segment};
+pub use postscript::standard_encoding_sid;
 pub use sized::{Band, Load, SizeMetrics, SizedFont};
 pub use store::{Built, Store, StoreKey};
 pub use synthesis::{Orientation, Synthesis};
@@ -322,6 +323,13 @@ impl Font {
                 variation_sequences: None,
             },
         };
+        // FreeType builds a Unicode charmap from the glyph names of a CFF face
+        // without a Windows BMP or Unicode-platform charmap (`cff_face_init`).
+        let unicode = cmap.unicode_variations
+            || cmap.list.iter().any(|s| {
+                s.platform() == Platform::Unicode
+                    || (s.platform() == Platform::Windows && s.encoding_id() == 1)
+            });
         let (outlines, glyph_count) = match flavor {
             Flavor::TrueType => {
                 let (glyf, count) = Glyf::new(
@@ -334,7 +342,7 @@ impl Font {
                 (Outlines::Glyf(glyf), count)
             }
             Flavor::Cff => {
-                let (table, version) = match (tables.cff, tables.cff2) {
+                let table = match (tables.cff, tables.cff2) {
                     (Some(t), _) => (t, Version::Cff1),
                     (None, Some(t)) => (t, Version::Cff2),
                     (None, None) => return Err(Error::Invalid("missing CFF table")),
@@ -343,9 +351,9 @@ impl Font {
                 let cff = Cff::parse(
                     bytes,
                     table,
-                    version,
                     head.units_per_em,
                     axes,
+                    unicode,
                     budget,
                     &mut work,
                 )?;
@@ -362,16 +370,9 @@ impl Font {
             None => Kern::new(budget),
         };
         let underline = metrics::underline(tables.post.map(|t| t.bytes(bytes)));
-        // FreeType builds a Unicode charmap from the glyph names of a CFF face
-        // without a Windows BMP or Unicode-platform charmap (`cff_face_init`).
-        let unicode = cmap.unicode_variations
-            || cmap.list.iter().any(|s| {
-                s.platform() == Platform::Unicode
-                    || (s.platform() == Platform::Windows && s.encoding_id() == 1)
-            });
         let name_map = match &outlines {
             Outlines::Cff(cff) if !unicode && cff.has_charset() => {
-                postscript::UnicodeMap::new(cff.glyph_names(bytes), budget)?
+                postscript::UnicodeMap::new(cff.glyph_name_mappings(bytes), budget)?
             }
             _ => None,
         };

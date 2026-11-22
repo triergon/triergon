@@ -154,6 +154,14 @@ reads each completed field or final partial field once.
 DTS wall time, peak heap and total RSS remain unmeasured. The 135 AVC/HEVC
 packet-framing comparisons have their own reference timing and memory results.
 
+At `a2d7aaba`, all nine `shape-extents` outputs matched HarfBuzz on both
+Linux targets. The AArch64 authored charmaps runtime upper bound was 1.02083;
+an independent run of the same executables measured 1.06578. In the combined
+build with font code at `cae5d2b7`, the AArch64 authored CFF matrix and
+charmaps upper bounds were 1.0164 and 1.0494, respectively. These exceed the
+[runtime ceiling](quality.md#gates). Every ARMv7 case met it in both
+measurements. Peak heap and total RSS were lower on both targets.
+
 ## Measured revisions
 
 Each row names the source revision a result above was measured on and, where the raw
@@ -379,6 +387,11 @@ runtime and total RSS:
 | MPEG-TS seek, free-format audio and access units, 32-bit ARMv7 | `92e9186eaff58916ba7193c45d16f946ff8bbc46` | [`766a787c42f4a8177ddbe3078405ce3793fb7987676487b0ebc0af81d188be83`](../harness/evidence/sets/gate-run-armv7-92e9186e-20261120-203131-shard-1.json) |
 | MPEG-TS PES and access units, Linux AArch64 | `c945c5e00f317b93f597146196dbe9bea8609ee0` | [`38193fc5966e1ac32bb5dc4663315ac6fae8c0225c94a951c6c7e56d52dec61b`](../harness/evidence/sets/gate-run-aarch64-c945c5e0-20261120-161518-shard-1.json) |
 | MPEG-TS PES and access units, 32-bit ARMv7 | `c945c5e00f317b93f597146196dbe9bea8609ee0` | [`acf19ba35d25678df876c6449cbb5ee144e553278208b4ede5f19e93bb50ccdf`](../harness/evidence/sets/gate-run-armv7-c945c5e0-20261120-161532-shard-1.json) |
+| Glyph extents against HarfBuzz, AArch64 Linux | Combined build with the font code at `cae5d2b7` | [`843ea6e182fa6d27647dd9727b7243101737019596f77abc724a912a5065a815`](../harness/evidence/sets/shape-extents-f4e767f6-aarch64.json) |
+| Glyph extents against HarfBuzz, 32-bit ARMv7 Linux, timing | Combined build with the font code at `cae5d2b7` | [`6ac9cc2f2dc5cb98c173aa832537f962b89b6885a405b63d674d5fe00e5d5f52`](../harness/evidence/sets/shape-extents-95d24c5a-armv7-time.json) |
+| Glyph extents against HarfBuzz, 32-bit ARMv7 Linux, grade and memory | Combined build with the font code at `cae5d2b7` | [`844c8a6375c2c42601172661183008a048473e2c21de61256532cbb271cfb1a0`](../harness/evidence/sets/shape-extents-95d24c5a-armv7-grade.json) |
+| Glyph extents against HarfBuzz, AArch64 Linux | `a2d7aaba780c472f5310f8af2604406fb3579dcf` | [`6bbfba9bb24a6d3df949493096b4d52820479f929cb2a2c20f131a9b6a987466`](../harness/evidence/sets/shape-extents-a2d7aaba-aarch64.json) |
+| Glyph extents against HarfBuzz, 32-bit ARMv7 Linux | `a2d7aaba780c472f5310f8af2604406fb3579dcf` | [`eaa8b7affe3e7d2f47f03b8d963085a11a770575e96e540f76be00024b4d5a12`](../harness/evidence/sets/shape-extents-a2d7aaba-armv7.json) |
 | Audio decoder correctness, AArch64 Linux | `4b87991e95092f65e45b6b8f61804eea20f56c20` | [`469850cc44d28e5d7c1960190daa5617095b24f763eed03a0d963aff10bdd556`](../harness/evidence/sets/gate-run-aarch64-4b87991e-20261120-085417-shard-1.json) |
 | Audio decoder correctness, 32-bit ARMv7 | `4b87991e95092f65e45b6b8f61804eea20f56c20` | [`6d7e1ae1ea014a6cca46a88dc435be134203e00dbb6479b6298f847383efd238`](../harness/evidence/sets/gate-run-armv7-4b87991e-20261120-085417-shard-1.json) |
 | MPEG-1 capture, first eight inputs, AArch64 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`1b53faf1a7d7f83e50a90e22fbac8903f7961c544ef48b3a0f58c0091c4d5bce`](../harness/evidence/sets/public-capture-low-deb6105a-aarch64.json) |

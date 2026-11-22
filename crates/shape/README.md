@@ -63,7 +63,11 @@ implementations come with the crate:
   subroutine calls, a moveto or flex with the wrong operands, a CFF charstring
   without `endchar` or a subroutine without `return`, more than 513 operands,
   its 200,000th operation, or an accented `endchar` naming a glyph the charset
-  lacks). CFF2 `blend` keeps the default values.
+  lacks). Accented components use the font reader’s StandardEncoding string IDs.
+  The CFF1 Top DICT scan collects CharStrings with the face dictionaries.
+  Complete ordered FDSelect ranges are searched in the font bytes; malformed
+  ranges retain the first readable matching interval. CFF2 `blend` keeps the
+  default values.
 - `SizedMetrics` answers as libass's FreeType-backed functions do over a face at
   a size (`triergon_font::SizedFont`): the character map libass selects, or with
   `SizedMetrics::with_charmap` the one a face has been left on, read as libass

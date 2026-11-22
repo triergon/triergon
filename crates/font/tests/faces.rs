@@ -13,6 +13,50 @@ fn parse(data: &[u8]) -> Font {
     Font::new(bytes, 0, &budget, Limits::default()).unwrap()
 }
 
+#[test]
+fn cid_charsets_are_checked_with_a_unicode_cmap_and_supply_names_without_one() {
+    // Three glyphs. The Top DICT selects a format 0 charset at byte 31,
+    // CharStrings at 36, and a single Font DICT at 46. The CIDs name B, A.
+    let cid = [
+        1, 0, 4, 4, // header
+        0, 1, 1, 1, 2, b'X', // Name INDEX
+        0, 1, 1, 1, 13, // Top DICT INDEX
+        139, 139, 139, 12, 30, 170, 15, 175, 17, 185, 12, 36, 0, 0, 0,
+        0, // empty String and Global Subrs INDEXes
+        0, 0, 35, 0, 34, // charset
+        0, 3, 1, 1, 2, 3, 4, 14, 14, 14, // CharStrings INDEX
+        0, 1, 1, 1, 1, // FDArray with one empty Font DICT
+    ];
+    for unicode in [true, false] {
+        let mut tables = cff_tables();
+        tables.retain(|(tag, _)| unicode || tag != b"cmap");
+        let index = tables.iter().position(|(tag, _)| tag == b"CFF ").unwrap();
+        tables[index].1 = cid.to_vec();
+        let face = parse(&font(b"OTTO", &tables));
+        assert!(face.is_cid_keyed());
+        assert_eq!(
+            face.glyph_index('A'),
+            Some(GlyphId(if unicode { 1 } else { 2 }))
+        );
+        assert_eq!(
+            face.glyph_index('B'),
+            Some(GlyphId(if unicode { 2 } else { 1 }))
+        );
+        assert_eq!(
+            face.charmaps()
+                .any(|map| map.kind() == CharmapKind::GlyphNames),
+            !unicode
+        );
+
+        tables[index].1[31] = 3;
+        let (pool, data) = bytes(&font(b"OTTO", &tables));
+        assert_eq!(
+            Font::new(data, 0, &pool, Limits::default()).unwrap_err(),
+            Error::Invalid("CFF charset format")
+        );
+    }
+}
+
 fn points(font: &Font, glyph: u16) -> (Vec<(i32, i32, PointKind)>, Vec<u32>, i32) {
     let budget = Budget::new(1 << 20).unwrap();
     let (outline, metrics) = font.outline(GlyphId(glyph), &budget).unwrap();

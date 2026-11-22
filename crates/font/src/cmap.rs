@@ -11,7 +11,7 @@ use crate::GlyphId;
 use crate::cff::Encoding;
 use crate::name::Platform;
 use crate::postscript::UnicodeMap;
-use crate::read::{Reader, bsearch, slice, u16_at, u24_at, u32_at};
+use crate::read::{bsearch, slice, u16_at, u24_at, u32_at};
 use crate::sfnt::Table;
 use crate::work::charge;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
@@ -160,9 +160,17 @@ fn high_byte_valid(table: &[u8], steps: &mut usize) -> Option<()> {
     fits(table.len() >= 4)?;
     let length = usize::from(u16_at(table, 2)?);
     fits(length <= table.len() && length >= 6 + 512)?;
-    let subheaders = (0..256)
-        .map(|n| u16_at(table, 6 + 2 * n).map(|key| usize::from(key >> 3)))
-        .try_fold(0, |most, key| key.map(|key| most.max(key)))?;
+    let keys = table.get(6..)?.first_chunk::<512>()?;
+    let mut highest_key = 0;
+    for block in keys.as_chunks::<16>().0 {
+        // Unused high bytes and single-byte characters have zero keys.
+        if *block != [0; 16] {
+            for key in block.as_chunks::<2>().0 {
+                highest_key = highest_key.max(u16::from_be_bytes(*key));
+            }
+        }
+    }
+    let subheaders = usize::from(highest_key >> 3);
     let glyph_ids = 518 + (subheaders + 1) * 8;
     fits(glyph_ids <= table.len())?;
     *steps += 256 + subheaders;
@@ -366,27 +374,74 @@ pub(crate) fn parse(
     };
     let records = usize::from(count).min(bytes.len().saturating_sub(4) / 8);
     charge(work, records)?;
-    let mut list = BudgetVec::new(budget);
-    list.try_reserve_exact(records)?;
-    let mut r = Reader::at(bytes, 4)?;
-    for _ in 0..records {
-        let platform = Platform::from_id(r.u16()?);
-        let encoding = r.u16()?;
-        let offset = usize::try_from(r.u32()?).map_err(|_| Error::Overflow)?;
-        if offset != 0 {
-            list.try_push((platform, encoding, offset))
-                .map_err(|e| e.error)?;
+    let entries = bytes[4..]
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .take(records)
+        .filter_map(|&[p0, p1, e0, e1, a, b, c, d]| {
+            let offset = u32::from_be_bytes([a, b, c, d]);
+            (offset != 0).then(|| {
+                Ok((
+                    Platform::from_id(u16::from_be_bytes([p0, p1])),
+                    u16::from_be_bytes([e0, e1]),
+                    usize::try_from(offset).map_err(|_| Error::Overflow)?,
+                ))
+            })
+        });
+    with_directory_slots(
+        budget,
+        records,
+        (Platform::Unicode, 0, 0),
+        entries,
+        |list| {
+            let offsets = list.iter().map(|&(_, _, offset)| Ok((offset, Kept::None)));
+            with_directory_slots(budget, list.len(), (0, Kept::None), offsets, |validated| {
+                keep_subtables(bytes, table, list, validated, &mut subtables, work)
+            })
+        },
+    )?;
+    Ok(subtables)
+}
+
+/// The two directory work arrays live only until the face's subtables are
+/// selected. Eight records fit both arrays in 256 bytes on a 64-bit host.
+/// Reserve the directory capacity before decoding entries, including skipped
+/// records, and hold it through validation and construction of the result.
+fn with_directory_slots<T: Copy>(
+    budget: &Budget,
+    count: usize,
+    empty: T,
+    entries: impl Iterator<Item = Result<T>>,
+    read: impl FnOnce(&mut [T]) -> Result<()>,
+) -> Result<()> {
+    const INLINE: usize = 8;
+    if count <= INLINE {
+        let _slots = budget.reserve(count * size_of::<T>())?;
+        let mut slots = [empty; INLINE];
+        let mut len = 0;
+        for entry in entries {
+            slots[len] = entry?;
+            len += 1;
         }
+        return read(&mut slots[..len]);
     }
-    // Each distinct subtable, validated once.
-    let mut validated: BudgetVec<(usize, Kept)> = BudgetVec::new(budget);
-    validated.try_reserve_exact(list.len())?;
-    for &(_, _, offset) in list.as_slice() {
-        validated
-            .try_push((offset, Kept::None))
-            .map_err(|e| e.error)?;
+    let mut slots = BudgetVec::new(budget);
+    slots.try_reserve_exact(count)?;
+    for entry in entries {
+        slots.try_push(entry?).map_err(|e| e.error)?;
     }
-    let validated = validated.as_mut_slice();
+    read(slots.as_mut_slice())
+}
+
+fn keep_subtables(
+    bytes: &[u8],
+    table: Table,
+    list: &[(Platform, u16, usize)],
+    validated: &mut [(usize, Kept)],
+    subtables: &mut Subtables,
+    work: &mut WorkBudget,
+) -> Result<()> {
     validated.sort_unstable_by_key(|&(offset, _)| offset);
     let mut last: Option<(usize, Kept)> = None;
     for (offset, kept) in validated.iter_mut() {
@@ -408,7 +463,7 @@ pub(crate) fn parse(
         charge(work, steps)?;
     }
     let validated = &*validated;
-    for &(platform, encoding, offset) in list.as_slice() {
+    for &(platform, encoding, offset) in list {
         let at = validated.partition_point(|&(o, _)| o < offset);
         match validated[at].1 {
             Kept::Format(format, flags) => {
@@ -438,7 +493,7 @@ pub(crate) fn parse(
             Kept::None => {}
         }
     }
-    Ok(subtables)
+    Ok(())
 }
 
 /// The charmap libass selects for text when it opens a face
@@ -1599,6 +1654,81 @@ mod tests {
         values.iter().flat_map(|v| v.to_be_bytes()).collect()
     }
 
+    #[test]
+    fn high_byte_keys_cover_every_subheader_block() {
+        let mut data = words(&[2, 534, 0]);
+        data.resize(534, 0);
+        for high_byte in [0, 7, 8, 127, 128, 254, 255] {
+            let offset = 6 + 2 * high_byte;
+            // The low three bits do not affect the subheader index.
+            data[offset..offset + 2].copy_from_slice(&15_u16.to_be_bytes());
+            let mut steps = 0;
+            assert_eq!(super::high_byte_valid(&data, &mut steps), Some(()));
+            assert_eq!(steps, 257);
+            data[offset..offset + 2].copy_from_slice(&16_u16.to_be_bytes());
+            assert_eq!(super::high_byte_valid(&data, &mut steps), None);
+            data[offset..offset + 2].fill(0);
+        }
+    }
+
+    #[test]
+    fn directory_aliases_validate_once_and_keep_record_order() {
+        for records in [7_u16, 8, 9, 16] {
+            // One absent record, one broken offset, and aliases of format 2
+            // in reverse encoding order. Only the readable subtable costs work.
+            let offset = 4 + 8 * u32::from(records);
+            let mut data = words(&[0, records]);
+            for encoding in (0..records).rev() {
+                data.extend(words(&[1, encoding]));
+                let at = match encoding {
+                    0 => 0,
+                    1 => u32::MAX,
+                    _ => offset,
+                };
+                data.extend(at.to_be_bytes());
+            }
+            data.extend(words(&[2, 534, 0]));
+            data.resize(offset as usize + 534, 0);
+            let key = offset as usize + 6;
+            data[key..key + 2].copy_from_slice(&8_u16.to_be_bytes());
+            let table = Table {
+                offset: 0,
+                len: data.len(),
+            };
+            let budget = Budget::new(1 << 16).unwrap();
+            let needed = u64::from(records) + 257;
+            let mut work = WorkBudget::new(needed);
+            let parsed = parse(&data, table, &budget, &mut work).unwrap();
+            assert_eq!(work.spent(), needed);
+            assert!(
+                parsed
+                    .list
+                    .iter()
+                    .map(Subtable::encoding_id)
+                    .eq((2..records).rev())
+            );
+            assert_eq!(
+                parse(&data, table, &budget, &mut WorkBudget::new(needed - 1)).err(),
+                Some(Error::Policy("font work"))
+            );
+
+            // The first workspace covers all directory entries. The second
+            // excludes zero offsets and stays charged alongside the first.
+            let first = usize::from(records) * size_of::<(Platform, u16, usize)>();
+            let second = usize::from(records - 1) * size_of::<(usize, super::Kept)>();
+            let control = Budget::control_storage_bytes();
+            let tight = Budget::new(control + first + second - 1).unwrap();
+            assert_eq!(
+                parse(&data, table, &tight, &mut WorkBudget::new(needed)).err(),
+                Some(Error::Backpressure {
+                    requested: second,
+                    available: second - 1
+                })
+            );
+            assert_eq!((tight.used(), tight.peak()), (control, control + first));
+        }
+    }
+
     /// A `cmap` with one Windows Unicode record pointing at `subtable`.
     fn cmap(subtable: &[u8]) -> Vec<u8> {
         let mut data = words(&[0, 1, 3, 1]);
@@ -1867,9 +1997,14 @@ mod tests {
         // an Adobe encoding charmap is neither.
         let budget = Budget::new(1 << 16).unwrap();
         let names: [Option<&[u8]>; 1] = [Some(b"A")];
-        let map = crate::postscript::UnicodeMap::new(names.into_iter(), &budget)
-            .unwrap()
-            .unwrap();
+        let map = crate::postscript::UnicodeMap::new(
+            names
+                .into_iter()
+                .map(|n| n.map(crate::postscript::NameMapping::custom)),
+            &budget,
+        )
+        .unwrap()
+        .unwrap();
         let encoding = crate::cff::Encoding {
             id: 0,
             glyphs: [0; 256],

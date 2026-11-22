@@ -1,0 +1,9 @@
+{
+ "name": "shape-extents-a2d7aaba-aarch64",
+ "path": "shape-extents-a2d7aaba-aarch64",
+ "retention": "retained",
+ "reason": "All nine glyph-extents cases against HarfBuzz 14.6.0 on AArch64 Linux, with pinned outputs and passing runtime, peak heap and total RSS grades from 30 pairs per case.",
+ "key": "evidence/architecture-review-mwo5u537/a2d7aaba780c472f5310f8af2604406fb3579dcf/aarch64/operand-harfbuzz-grade/6bbfba9bb24a6d3df949493096b4d52820479f929cb2a2c20f131a9b6a987466.tar.zst",
+ "sha256": "6bbfba9bb24a6d3df949493096b4d52820479f929cb2a2c20f131a9b6a987466",
+ "bytes": 9148849
+}

@@ -1,0 +1,9 @@
+{
+ "name": "shape-extents-a2d7aaba-armv7",
+ "path": "shape-extents-a2d7aaba-armv7",
+ "retention": "retained",
+ "reason": "All nine glyph-extents cases against HarfBuzz 14.6.0 on 32-bit ARMv7 Linux, with pinned outputs and passing runtime, peak heap and total RSS grades from 30 pairs per case.",
+ "key": "evidence/architecture-review-mwo5u537/a2d7aaba780c472f5310f8af2604406fb3579dcf/armv7/operand-harfbuzz-grade/eaa8b7affe3e7d2f47f03b8d963085a11a770575e96e540f76be00024b4d5a12.tar.zst",
+ "sha256": "eaa8b7affe3e7d2f47f03b8d963085a11a770575e96e540f76be00024b4d5a12",
+ "bytes": 4798150
+}

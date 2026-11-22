@@ -85,6 +85,11 @@ instead (`variation_sequences`). `mappings` steps through a charmap as
 through it (`ass_font_index_magic`: a Windows Symbol charmap at `0xF000 | c`);
 `glyph_index` looks a character up that way through `text_charmap`.
 
+CFF charset parsing validates CID charsets and retains CIDs when glyph-name
+synthesis needs them. StandardEncoding string IDs are available through
+`standard_encoding_sid`. Short `cmap` directories use inline work arrays for
+up to eight records and validation entries, charged to the parse budget.
+
 **Outlines.** `Font::outline_into` gives a glyph's unhinted outline in whole font
 units, y up, as FreeType loads it with `FT_LOAD_NO_SCALE`, with its advance:
 

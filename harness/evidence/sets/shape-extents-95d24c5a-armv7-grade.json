@@ -1,0 +1,9 @@
+{
+ "name": "shape-extents-95d24c5a-armv7-grade",
+ "path": "shape-extents-95d24c5a-armv7-grade",
+ "retention": "retained",
+ "reason": "Passing runtime, peak heap and total RSS grades against HarfBuzz 14.6.0 for all nine glyph-extents cases on 32-bit ARMv7 Linux in the combined build, with 30 pairs per case.",
+ "key": "evidence/architecture-review-mwo5u537/95d24c5a25a28b8e2286a2031c5888b833a485da/armv7/integrated-arm-shape-grade/844c8a6375c2c42601172661183008a048473e2c21de61256532cbb271cfb1a0.tar.zst",
+ "sha256": "844c8a6375c2c42601172661183008a048473e2c21de61256532cbb271cfb1a0",
+ "bytes": 5066603
+}

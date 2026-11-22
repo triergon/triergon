@@ -1,0 +1,9 @@
+{
+ "name": "shape-extents-95d24c5a-armv7-time",
+ "path": "shape-extents-95d24c5a-armv7-time",
+ "retention": "retained",
+ "reason": "Pinned glyph-extents outputs and paired runtime against HarfBuzz 14.6.0 for all nine cases on 32-bit ARMv7 Linux in the combined build, with 30 pairs per case.",
+ "key": "evidence/architecture-review-mwo5u537/95d24c5a25a28b8e2286a2031c5888b833a485da/armv7/integrated-arm-shape-time/6ac9cc2f2dc5cb98c173aa832537f962b89b6885a405b63d674d5fe00e5d5f52.tar.zst",
+ "sha256": "6ac9cc2f2dc5cb98c173aa832537f962b89b6885a405b63d674d5fe00e5d5f52",
+ "bytes": 4192786
+}

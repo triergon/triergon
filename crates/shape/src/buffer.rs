@@ -414,7 +414,6 @@ pub(crate) struct Scratch {
     pub(crate) fraction_slash: bool,
     pub(crate) cgj: bool,
     pub(crate) space_fallback: bool,
-    pub(crate) variation_selector_fallback: bool,
     pub(crate) arabic_stch: bool,
 }
 
