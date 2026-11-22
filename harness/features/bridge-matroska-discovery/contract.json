@@ -154,85 +154,68 @@
       "cause": "Discovery runs inside matroska-startup-seek. This operation compares the discovery and replay fields."
     }
   ],
-  "pending_module_requirements": [
-    "Resolve legacy AAC initialization for seven declared channels without an AAC channel assignment.",
-    "Resolve legacy AAC initialization when an empty CodecPrivate is explicitly present.",
-    "Resolve replay when the AC-3 track starts with a packet that fails syncframe admission.",
-    "Resolve exact CodecDelay subtraction versus the reference's Matroska tick projection.",
-    "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "aac-mpeg4-lc-ambiguous-layout",
-      "requirement": "Resolve legacy AAC initialization for seven declared channels without an AAC channel assignment."
+      "reading": "Seven declared channels do not identify a legacy AAC-LC layout",
+      "clause": "Matroska codec mappings draft 21 section 3.4.6 has no initialization for A_AAC/MPEG4/LC. RFC 9559 section 5.1.4.1.29.3 defines a channel count. ISO/IEC 14496-3 AudioSpecificConfig channel configuration 7 designates eight channels, as documented by the framing crate.",
+      "candidate": "Refuses to derive an AAC-LC initialization from the seven-channel count.",
+      "reference": "Publishes ASC 11b8 with channel configuration 7, then replays eight packets.",
+      "cases": [
+        "aac-mpeg4-lc-ambiguous-layout"
+      ]
     },
     {
-      "id": "aac-mpeg4-lc-empty-private",
-      "requirement": "Resolve legacy AAC initialization when an empty CodecPrivate is explicitly present."
+      "reading": "An explicitly supplied empty CodecPrivate cannot initialize AAC-LC",
+      "clause": "Matroska codec mappings draft 21 sections 3.4.1 and 3.4.6 distinguish ASC initialization from the legacy mapping with none. legacy_aac_lc_initialization derives a configuration only for an absent initialization.",
+      "candidate": "Preserves the supplied empty record and the ASC parser reports Truncated.",
+      "reference": "Treats the empty record as absence and derives the stereo 48000 Hz ASC 1190, then replays eight packets.",
+      "compat": "compat::matroska::legacy_aac_lc_empty_private for callers recovering legacy files with an empty codec record.",
+      "cases": [
+        "aac-mpeg4-lc-empty-private"
+      ]
     },
     {
-      "id": "audio-bad-first-discovery",
-      "requirement": "Resolve replay when the AC-3 track starts with a packet that fails syncframe admission."
+      "reading": "Matroska replay preserves the signed PGS Block timestamp",
+      "clause": "RFC 9559 section 11.2 makes the signed Block time a presentation timestamp.",
+      "candidate": "Replays the initial PGS bytes with a PTS of -1000000 ns, including when the file also contains DVB.",
+      "reference": "Leaves the negative PGS time absent on the same packets. PGS dimensions and payloads agree.",
+      "compat": "compat::matroska::omit_negative_pts for consumers reproducing the demux timestamp admission.",
+      "cases": [
+        "pgs-all-unknown",
+        "pgs-bad-first-canvas",
+        "pgs-combined-leading",
+        "pgs-duration-after-known",
+        "pgs-early-canvas",
+        "pgs-known-anchor",
+        "pgs-known-then-duration",
+        "pgs-known-zero",
+        "pgs-observed-relative",
+        "pgs-packet-cap",
+        "pgs-running-relative",
+        "matroska-dvb-source-dts"
+      ]
     },
     {
-      "id": "audio-mixed-discovery",
-      "requirement": "Resolve exact CodecDelay subtraction versus the reference's Matroska tick projection."
+      "reading": "Matroska Dolby feed refuses a damaged AC-3 first syncframe",
+      "clause": "Matroska codec mappings draft 21 section 3.4.11 requires AC-3 syncframes. ATSC A/52:2018 sections 5.3 and 5.4.1.1 require syncword 0x0b77.",
+      "candidate": "Publishes the two discovered track descriptors and refuses the first AC-3 packet before replaying it because it starts with 0x0077.",
+      "reference": "Publishes the two descriptors, replays the invalid 768-byte block and assigns it a duration of 32000000 ns.",
+      "compat": "compat::matroska::opaque_dolby_replay for consumers retrieving damaged blocks as container bytes.",
+      "cases": [
+        "audio-bad-first-discovery"
+      ]
     },
     {
-      "id": "hevc-dolby",
-      "requirement": "Resolve exact CodecDelay subtraction versus the reference's Matroska tick projection."
-    },
-    {
-      "id": "three-tracks",
-      "requirement": "Resolve exact CodecDelay subtraction versus the reference's Matroska tick projection."
-    },
-    {
-      "id": "pgs-all-unknown",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-    },
-    {
-      "id": "pgs-bad-first-canvas",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-    },
-    {
-      "id": "pgs-combined-leading",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-    },
-    {
-      "id": "pgs-duration-after-known",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-    },
-    {
-      "id": "pgs-early-canvas",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-    },
-    {
-      "id": "pgs-known-anchor",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-    },
-    {
-      "id": "pgs-known-then-duration",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-    },
-    {
-      "id": "pgs-known-zero",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-    },
-    {
-      "id": "pgs-observed-relative",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-    },
-    {
-      "id": "pgs-packet-cap",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-    },
-    {
-      "id": "pgs-running-relative",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
-    },
-    {
-      "id": "matroska-dvb-source-dts",
-      "requirement": "Resolve preservation of signed Matroska Block PTS when the reference leaves a negative presentation timestamp absent."
+      "reading": "Matroska discovery keeps CodecDelay and the Dolby syncframe duration",
+      "clause": "RFC 9559 sections 5.1.4.1.25 and 11.2 require exact nanosecond CodecDelay subtraction. ATSC A/52:2018 Annex E sections 2.3.1.4–2.3.1.5 give the E-AC-3 rate and coded audio block count.",
+      "candidate": "Subtracts exact delay, including -21333333 and -23219955 ns for AAC. Where Dolby duration is requested, returns 32000000 ns from the E-AC-3 syncframe.",
+      "reference": "Reports times on a millisecond grid, including -21000000 and -23000000 ns for AAC, and omits the E-AC-3 duration on the raw demux pass.",
+      "compat": "compat::matroska::demux_packet_clocks for consumers using the reference stream clock and duration inference.",
+      "cases": [
+        "audio-mixed-discovery",
+        "hevc-dolby",
+        "three-tracks"
+      ]
     }
   ]
 }
