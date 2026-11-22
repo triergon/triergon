@@ -363,22 +363,17 @@
     }
   ],
   "pending_module_requirements": [
-    "Distinguish an ADTS-looking word in trailing metadata from an audio frame",
-    "Retain the audio frame preceding unrelated bytes during ADTS resynchronization",
-    "Distinguish an ADTS-looking word inside the previous payload when resynchronizing after junk"
+    "Preserve the first valid frame and reject the false sync inside its payload when junk follows the frame",
+    "Preserve the valid frame immediately before inserted junk during ADTS recovery"
   ],
   "open_cases": [
     {
       "id": "adts_mid_junk.aac",
-      "requirement": "Retain the audio frame preceding unrelated bytes during ADTS resynchronization"
-    },
-    {
-      "id": "adts_tags.aac",
-      "requirement": "Distinguish an ADTS-looking word in trailing metadata from an audio frame"
+      "requirement": "Preserve the valid frame immediately before inserted junk during ADTS recovery"
     },
     {
       "id": "junk-between-frames",
-      "requirement": "Distinguish an ADTS-looking word inside the previous payload when resynchronizing after junk"
+      "requirement": "Preserve the first valid frame and reject the false sync inside its payload when junk follows the frame"
     }
   ],
   "open_deviations": [
