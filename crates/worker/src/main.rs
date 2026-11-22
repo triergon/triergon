@@ -484,8 +484,9 @@ fn entry() -> Outcome {
             println!("{{\"input_bytes\":{}}}", data.len());
             Ok(())
         }
-        "cued-aac-trace" | "cued-aac-fold" | "cued-aac-bench" | "cued-aac-memory" => {
-            cued_aac(mode, &data, words)
+        "cued-aac-trace" | "cued-aac-fold" | "cued-aac-bench" | "cued-aac-memory"
+        | "cued-ac3-trace" | "cued-ac3-fold" | "cued-ac3-bench" | "cued-ac3-memory" => {
+            cued_audio(mode, &data, words)
         }
         "seek-trace" => seek_trace(data, words, false),
         "playback-seek-trace" => seek_trace(data, words, true),
@@ -506,11 +507,19 @@ fn entry() -> Outcome {
 
 // Separate source-view record: landing, then each packet's fields and bytes, then EOF.
 #[inline(never)]
-fn cued_aac(mode: &str, data: &[u8], words: &[String]) -> Outcome {
+fn cued_audio(mode: &str, data: &[u8], words: &[String]) -> Outcome {
     use std::io::Write;
-    let bench = mode == "cued-aac-bench";
-    let memory = mode == "cued-aac-memory";
-    let trace = mode == "cued-aac-trace";
+    let (ac3, mode) = match mode.strip_prefix("cued-ac3-") {
+        Some(mode) => (true, mode),
+        None => (
+            false,
+            mode.strip_prefix("cued-aac-")
+                .ok_or("unknown cued audio mode")?,
+        ),
+    };
+    let bench = mode == "bench";
+    let memory = mode == "memory";
+    let trace = mode == "trace";
     let n: u32 = if bench {
         words.first().ok_or("missing iterations")?.parse()?
     } else {
@@ -529,7 +538,11 @@ fn cued_aac(mode: &str, data: &[u8], words: &[String]) -> Outcome {
     for _ in 0..n {
         let mut reader = Demuxer::open_seekable(Cursor::new(data), Limits::default())?;
         let cancel = AtomicBool::new(false);
-        let landing = reader.seek_cued_aac(0, target, &cancel)?;
+        let landing = if ac3 {
+            reader.seek_cued_ac3(0, target, &cancel)?
+        } else {
+            reader.seek_cued_aac(0, target, &cancel)?
+        };
         fold(&mut digest, landing.actual_ns as u64);
         if trace {
             print!("{{\"landing_ns\":{},\"packets\":[", landing.actual_ns);

@@ -344,13 +344,24 @@ impl Reader {
     /// This operation accepts AudioSpecificConfig 0x1210 and zero codec delay
     /// and seek preroll; it does not scan for uncued packets.
     pub fn seek_cued_aac(&mut self, track: usize, requested_ns: i64) -> Result<InputRequest> {
+        if !crate::matroska::typed::seek::cued_aac_profile(self.tracks(), track) {
+            self.failed = true;
+            return Err(Error::Unsupported("seek requires single-track cued AAC-LC"));
+        }
+        self.seek_cued_audio(track, requested_ns)
+    }
+    pub(crate) fn seek_cued_audio(
+        &mut self,
+        track: usize,
+        requested_ns: i64,
+    ) -> Result<InputRequest> {
         self.begin_seek(
             SeekRequest {
                 track,
                 requested_ns,
                 playback_preroll: false,
             },
-            RecoveryAudio::CuedAac,
+            RecoveryAudio::CuedAudio,
         )
     }
     pub fn seek_for_playback(&mut self, track: usize, requested_ns: i64) -> Result<InputRequest> {
@@ -369,8 +380,8 @@ impl Reader {
         audio: RecoveryAudio,
     ) -> Result<InputRequest> {
         let result = (|| {
-            let supported = if audio == RecoveryAudio::CuedAac {
-                crate::matroska::typed::seek::cued_aac_profile(self.tracks(), request.track)
+            let supported = if audio == RecoveryAudio::CuedAudio {
+                crate::matroska::typed::seek::cued_audio_profile(self.tracks(), request.track)
             } else {
                 self.tracks()
                     .get(request.track)
