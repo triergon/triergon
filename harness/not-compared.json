@@ -271,9 +271,9 @@
     "triergon-session": [
       {
         "name": "track-decoding",
-        "entry_points": ["TrackDecoder", "TrackDecoder::aac_access_units_with_layout_in", "TrackDecoder::reset", "audio_decoder", "video_decoder"],
+        "entry_points": ["TrackDecoder::reset", "audio_decoder", "video_decoder"],
         "degree": "step",
-        "needs": "The file, configured AAC and session lanes exercise these entry points. The Opus file lane checks PCM after multi-packet trim. Reset PCM differences and the session parity gaps remain open."
+        "needs": "Track construction and decoding are compared through codecs-files (including AAC MOV and Opus pre-skip across packets) and aac-access-units (fixed and program layouts). Reset PCM differences and session parity gaps remain in the codecs-sessions lanes."
       },
       {
         "name": "audio-session",
