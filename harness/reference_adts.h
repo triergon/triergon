@@ -16,9 +16,8 @@ static int adts_read(void *opaque, uint8_t *destination, int length)
     return (int)size;
 }
 
-/* The source reader retains an in-band PCE, so use the public demuxer's
- * original payload in the channel-configuration-zero branch. The derived
- * two-byte ASC prefix describes the same channel configuration. */
+/* The source reader retains an in-band PCE and exposes empty frame bodies.
+ * Use the demuxer's original payload in those cases. */
 static int adts_source_payload(ViewWork *work, const AVPacket *packet,
                                uint64_t position, uint64_t count)
 {
@@ -28,13 +27,16 @@ static int adts_source_payload(ViewWork *work, const AVPacket *packet,
     const unsigned channel = ((data[2] & 1) << 2) | (data[3] >> 6);
     const unsigned protection_absent = data[1] & 1;
     const int header_size = protection_absent ? 7 : 9;
-    if (channel || packet->size < header_size || (data[6] & 3))
+    const int declared = ((data[3] & 3) << 11) | (data[4] << 3) | (data[5] >> 5);
+    const int empty_body = packet->size == header_size && declared == header_size;
+    if (packet->size < header_size || (channel && !empty_body) || (data[6] & 3))
         return 0;
     const unsigned object = (data[2] >> 6) + 1;
     const unsigned frequency = (data[2] >> 2) & 15;
     if (!count) {
         const uint8_t asc[] = {
-            (uint8_t)((object << 3) | (frequency >> 1)), (uint8_t)(frequency << 7),
+            (uint8_t)((object << 3) | (frequency >> 1)),
+            (uint8_t)((frequency << 7) | (channel << 3)),
         };
         const uint64_t words[] = {sizeof(asc)};
         stream_record(work, 2, words, 1, asc, sizeof(asc));

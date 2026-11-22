@@ -9,7 +9,7 @@
   "reference": "ffmpeg-framing-views-native",
   "contract": [
     "Walk physical ADTS extents with inspect_adts_header and parse each with AacAdtsParser. The reference opens a raw AAC demuxer without stream discovery, reads each packet and filters it with aac_adtstoasc.",
-    "Fold kind 2 with the length and exact bytes of the candidate ASC header projection and reference ASC, initially or when the filter reports an update. Fold kind 1 with source offset, input frame length, object type, sampling index, channel configuration, protection-absent flag, payload length and exact payload bytes. For channel configuration zero, use the demuxed header's two-byte ASC projection and the original payload, including any in-band PCE. Otherwise the reference projects the configuration fields from the active ASC and the protection flag from the demuxed header.",
+    "Fold kind 2 with the length and exact bytes of the candidate ASC header projection and reference ASC, initially or when the filter reports an update. Fold kind 1 with source offset, input frame length, object type, sampling index, channel configuration, protection-absent flag, payload length and exact payload bytes. For channel configuration zero or an empty frame body, use the demuxed header's two-byte ASC projection and the original payload, including any in-band PCE. Otherwise the reference projects the configuration fields from the active ASC and the protection flag from the demuxed header.",
     "Fold kind 7 with the frame count on clean end or kind 8 with the source offset on refusal or leftover input. Operate on preloaded bytes and include parser, demuxer and filter setup and teardown."
   ],
   "required_profiles": [
@@ -23,19 +23,6 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "The wire inspector can expose the empty input extent; compare demuxed source extents independently of ADTS-to-ASC filter admission on header-only input."
-  ],
-  "open_cases": [
-    {
-      "id": "empty-payload-unprotected",
-      "requirement": "The wire inspector can expose the empty input extent; compare demuxed source extents independently of ADTS-to-ASC filter admission on header-only input."
-    },
-    {
-      "id": "empty-payload-protected",
-      "requirement": "The wire inspector can expose the empty input extent; compare demuxed source extents independently of ADTS-to-ASC filter admission on header-only input."
-    }
-  ],
   "open_deviations": [
     {
       "reading": "ADTS frame_length bounds the complete frame",

@@ -283,9 +283,9 @@
       "rights": "authored-synthetic",
       "arguments": [],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
+        "packets": 3,
+        "bytes": 2,
+        "digest": 14066927229685430257
       }
     },
     {
@@ -322,9 +322,9 @@
       "rights": "authored-synthetic",
       "arguments": [],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
+        "packets": 3,
+        "bytes": 2,
+        "digest": 14066927284710628688
       }
     },
     {
