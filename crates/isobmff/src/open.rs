@@ -792,8 +792,7 @@ impl MovieOpen {
                     return Ok(OpenStep::Yield);
                 }
                 Next::End => {
-                    // A combined reference state cost 0.33% on a playback open.
-                    let dref = p.dref.as_ref().ok_or(Error::Invalid("missing dref"))?;
+                    let dref = refs.parent();
                     if fields::u32_at(dref.payload(), 4)? as usize != self.references.len() {
                         return Err(Error::Invalid("data reference count"));
                     }
@@ -863,6 +862,7 @@ impl MovieOpen {
                     table: build.builder.finish()?,
                     edits,
                     fragments: BudgetVec::new(&self.pool),
+                    // Keeping the child walk through publication costs 0.31% on a playback open.
                     raw_dref: required(p.dref.take(), "missing dref")?,
                 },
             )?;

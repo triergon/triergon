@@ -183,6 +183,10 @@ pub struct BoxChildren {
     limits: Limits,
 }
 impl BoxChildren {
+    pub(crate) fn parent(&self) -> &BoxView {
+        &self.parent
+    }
+
     /// The next child, for one work unit. `Error::Limit` past `max_boxes` children and
     /// `Error::Truncated` for a child crossing the parent's end; a failed poll leaves the
     /// walk where it was.
