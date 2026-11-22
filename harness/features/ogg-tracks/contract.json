@@ -203,36 +203,6 @@
       "cause": "Paired runtime, heap and total RSS collection remains due on the gate hosts."
     }
   ],
-  "open_cases": [
-    {
-      "id": "chain-opus.opus",
-      "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
-    },
-    {
-      "id": "chain-vorbis.ogg",
-      "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
-    },
-    {
-      "id": "ogg-flac-chained-meta.ogg",
-      "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
-    },
-    {
-      "id": "ogg-opus-chained-meta.ogg",
-      "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
-    },
-    {
-      "id": "ogg-vorbis-chained-meta.ogg",
-      "requirement": "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration."
-    },
-    {
-      "id": "chain-speex.spx",
-      "requirement": "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open."
-    }
-  ],
-  "pending_module_requirements": [
-    "At open the candidate leaves the chain's first track end unspecified. The reference reports first-link duration.",
-    "The candidate derives the end from the Speex granule and the reference reports a different stream duration at open."
-  ],
   "open_deviations": [
     {
       "reading": "Chapter comments are still source comments",
@@ -302,6 +272,18 @@
       "compat": "compat::ogg::theora_rate_fallback",
       "cases": [
         "theora-0-0"
+      ]
+    },
+    {
+      "reading": "The first track retains the first link’s own end",
+      "clause": "RFC 3533 sections 4 and 6 separate chained logical streams and their granules. RFC 7845 sections 4.2–4.4, Xiph Vorbis I section A.2 and the Xiph Speex Ogg mapping supply the codec granule clocks.",
+      "candidate": "publishes the first link’s own end at 59232 Opus ticks, 54464 Vorbis ticks or 9872 Speex ticks, including when a later link repeats the serial",
+      "reference": "publishes 28800 Opus ticks, 26496 Vorbis ticks or 4848 Speex ticks from demux timing across the chain",
+      "compat": "compat::ogg::estimated_duration",
+      "cases": [
+        "chain-opus.opus",
+        "chain-vorbis.ogg",
+        "chain-speex.spx"
       ]
     }
   ]
