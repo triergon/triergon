@@ -91,6 +91,11 @@
       "path": "fate/mov/mov_stream_shorter_than_movie.mov",
       "sha256": "463a1c93d3cc155721fc481e4c2783b97fb4e388d571b3fdcf6972c6ce290b5b",
       "source": "https://fate-suite.ffmpeg.org/mov/mov_stream_shorter_than_movie.mov"
+    },
+    {
+      "path": "fate/mpegts/loewe.ts",
+      "sha256": "f93d2b5d78e4f04027c635e8e1dd866dcf35c233a0fa508f3bcc6a656fba286e",
+      "source": "https://fate-suite.ffmpeg.org/mpegts/loewe.ts"
     }
   ]
 }

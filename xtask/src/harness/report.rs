@@ -134,6 +134,14 @@ fn entity_input_failure(
         return Ok(None);
     }
     let args = case_arguments(case);
+    if entities.is_none()
+        && matches!(
+            (prefix, args.as_slice()),
+            (Some("ts-"), [size, _, flag]) if size == "188" && flag == "--discover-ts188"
+        )
+    {
+        return Ok(None);
+    }
     let [_, _, args @ ..] = args.as_slice() else {
         return Err("ordered transport input needs packet size and program".into());
     };
@@ -1718,6 +1726,25 @@ mod prefix_tests {
         for options in [r#""next.ts","--dts-core=256""#, r#""--dts-core=8191""#] {
             let case = parse(&format!(r#"{{"arguments":["188","1",{options}]}}"#)).unwrap();
             assert!(entity_input_failure(root, &case, Some("ts-au-")).is_err());
+        }
+    }
+
+    #[test]
+    fn ts188_discovery_accepts_only_one_unnamespaced_input() {
+        let root = Path::new(".");
+        let selected = parse(r#"{"arguments":["188","769","--discover-ts188"]}"#).unwrap();
+        assert_eq!(
+            entity_input_failure(root, &selected, Some("ts-")).unwrap(),
+            None
+        );
+        assert!(entity_input_failure(root, &selected, Some("ts-au-")).is_err());
+        for args in [
+            r#"["192","769","--discover-ts188"]"#,
+            r#"["188","769","--dvb","--discover-ts188"]"#,
+            r#"["188","769","next.ts","--discover-ts188"]"#,
+        ] {
+            let case = parse(&format!(r#"{{"arguments":{args}}}"#)).unwrap();
+            assert!(entity_input_failure(root, &case, Some("ts-")).is_err());
         }
     }
 
