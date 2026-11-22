@@ -210,6 +210,7 @@ fn audio_operation(input: &[u8], lane: Lane) -> Operation<'_> {
                     )?;
                 }
                 Lane::Dts => {
+                    refused = input.starts_with(&[0x64, 0x58, 0x20, 0x25]);
                     let mut decoder = triergon_codec_dca::Decoder::new();
                     audio_frames(input, dts_extent, |packet| {
                         frame.clear();

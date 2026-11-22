@@ -154,7 +154,16 @@ static int codec_audio_layout(ViewWork *work, AVFrame *frame)
     const int described = av_channel_layout_describe(layout, name, sizeof(name));
     if (channels < 0 || channels > 256 || described < 0 || described >= (int)sizeof(name))
         return 2;
+    const char *description = name;
     size_t name_len = strlen(name);
+    char list_prefix[32];
+    const int prefix_len = snprintf(list_prefix, sizeof(list_prefix), "%d channels (", channels);
+    if (layout->order == AV_CHANNEL_ORDER_NATIVE && prefix_len > 0 &&
+        (size_t)prefix_len < sizeof(list_prefix) && name_len > (size_t)prefix_len + 1 &&
+        !memcmp(name, list_prefix, (size_t)prefix_len) && name[name_len - 1] == ')') {
+        description += prefix_len;
+        name_len -= (size_t)prefix_len + 1;
+    }
     uint64_t fields[5 + 256] = {(uint64_t)frame->sample_rate, (uint64_t)channels, layout->order,
                               layout->order == AV_CHANNEL_ORDER_NATIVE ? layout->u.mask : 0};
     enum AVChannel speakers[256];
@@ -163,7 +172,7 @@ static int codec_audio_layout(ViewWork *work, AVFrame *frame)
         fields[4 + i] = (uint64_t)speakers[i];
     }
     fields[4 + channels] = name_len;
-    reader_record(work, 4, fields, (size_t)channels + 5, (const uint8_t *)name, name_len);
+    reader_record(work, 4, fields, (size_t)channels + 5, (const uint8_t *)description, name_len);
     codec_audio_permutations(work, speakers, (unsigned)channels);
     /* Vorbis I §4.3.9 and Opus mapping family 1 (RFC 7845 §5.1.1.2). */
     const enum AVChannel vorbis[][8] = {
@@ -360,7 +369,21 @@ static int codec_audio_decode(const ViewCase *input, ViewWork *work)
     if (track >= 0 && avcodec_parameters_to_context(context, reader.format->streams[track]->codecpar) < 0)
         goto done;
     context->thread_count = 1;
-    if (avcodec_open2(context, codec, NULL) < 0) {
+    AVDictionary *options = NULL;
+    /* Standalone ExSS has no leading core (ETSI TS 102 114 §7.2). Do not
+     * substitute the extension decoder's layout for the missing core. */
+    if (id == AV_CODEC_ID_DTS && input->size >= 4 &&
+        !memcmp(input->data, "\x64\x58\x20\x25", 4) &&
+        av_dict_set(&options, "core_only", "1", 0) < 0) {
+        av_dict_free(&options);
+        goto done;
+    }
+    const int opened = avcodec_open2(context, codec, &options);
+    const int options_consumed = av_dict_count(options) == 0;
+    av_dict_free(&options);
+    if (!options_consumed)
+        goto done;
+    if (opened < 0) {
         state.refused = 1;
         status = 0;
         goto done;

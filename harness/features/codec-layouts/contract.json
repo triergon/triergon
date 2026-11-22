@@ -8,9 +8,9 @@
   "runner": "cargo xtask report",
   "reference": "ffmpeg-codec-views-native",
   "contract": [
-    "Compare each decoded audio frame's sample rate, channel count, order, mask, speaker for every plane and exact layout description. Speaker discriminants are the public AVChannel IDs. Unknown positions have no mask.",
+    "Compare each decoded audio frame’s sample rate, channel count, order, mask, speaker for every plane and exact layout description. A generic native-order description compares its speaker list without the channel-count wrapper. Speaker discriminants are the public AVChannel IDs. Unknown positions have no mask.",
     "Compute the native plane permutation from each published order and the Vorbis I or Opus family 1 permutation for the same channel count. Fold kind 4 for geometry, positions and UTF-8 name, kind 3 for each permutation with its count, and kind 3 for effective and published stereo downmix when present.",
-    "Downmix gains use nearest 1/100000, independently of floating-point representation. Vorbis and Opus include wide authored streams with one to eight channels. The pinned AAC encoder does not produce an ADTS PCE beyond eight channels. DTS did not publish downmix information in the 7.1 probe.",
+    "Downmix gains use nearest 1/100000, independently of floating-point representation. Vorbis and Opus include wide authored streams with one to eight channels. The pinned AAC encoder does not produce an ADTS PCE beyond eight channels. DTS did not publish downmix information in the 7.1 probe. DTS compares the core operation, including a typed refusal of standalone XLL without a core.",
     "This operation adds layout facts to audio decode. Decode and output mixing are measured by the codec workloads."
   ],
   "required_profiles": [
@@ -1368,64 +1368,28 @@
   "open_cases": [
     {
       "id": "aac-al07_96.adts",
-      "requirement": "Resolve the six-channel AAC plane labels, which map to side on the candidate and back on the reference",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "aac-al15_44.adts",
-      "requirement": "Reconcile the exact layout label for this matching speaker mask and plane order",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "aac-al_sbr_cm_48_5.1.adts",
-      "requirement": "Reconcile the exact layout label for this matching speaker mask and plane order",
+      "requirement": "Resolve the side/back substitution for an explicitly back-labelled AAC program configuration element",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "aac-am05_44.adts",
-      "requirement": "Resolve the six-channel AAC plane labels, which map to side on the candidate and back on the reference",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dts-xll_51_24_48_none.core.dts",
-      "requirement": "Report audio for the DTS-XLL vector without a DTS core substream",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "flac-flac_3ch_odd_mask.flac",
-      "requirement": "Reconcile the exact layout label for this matching speaker mask and plane order",
+      "requirement": "Resolve the side/back substitution for an explicitly back-labelled AAC program configuration element",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "aac-aac-lc-5.1.aac",
-      "requirement": "Resolve the six-channel AAC plane labels, which map to side on the candidate and back on the reference",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "aac-al_sbr_cm_48_5.1.adts-codec-inputs",
-      "requirement": "Reconcile the exact layout label for this matching speaker mask and plane order",
+      "requirement": "Use the MPEG-4 Audio channel_configuration 6 speaker positions for the fixed ADTS layout",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     }
   ],
   "pending_module_requirements": [
-    "Resolve the six-channel AAC plane labels, which map to side on the candidate and back on the reference",
-    "Reconcile the exact layout label for this matching speaker mask and plane order",
-    "Report audio for the DTS-XLL vector without a DTS core substream"
+    "Resolve the side/back substitution for an explicitly back-labelled AAC program configuration element",
+    "Use the MPEG-4 Audio channel_configuration 6 speaker positions for the fixed ADTS layout"
   ]
 }
