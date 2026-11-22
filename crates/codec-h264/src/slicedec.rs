@@ -52,8 +52,8 @@ pub(crate) struct SliceCtx {
 pub(crate) struct ColInfo {
     /// Position in the decoded picture buffer of the frame store holding RefPicList1[0].
     pub(crate) idx: usize,
-    /// Parity of RefPicList1[0] (0 frame, 1 top, 2 bottom).
-    pub(crate) parity: u8,
+    /// RefPicList1[0]: a frame or one of its fields.
+    pub(crate) parity: Structure,
     pub(crate) short_term: bool,
 }
 
@@ -77,16 +77,15 @@ pub(crate) struct CurPic {
     pub(crate) decoded_mbs: usize,
     pub(crate) mbaff: bool,
     pub(crate) chroma: bool,
-    /// The picture's [`Structure`] code.
-    pub(crate) structure: u8,
+    pub(crate) structure: Structure,
 }
 
 impl CurPic {
     pub(crate) fn pic_poc(&self) -> i32 {
         match self.structure {
-            1 => self.poc[0],
-            2 => self.poc[1],
-            _ => self.poc[0].min(self.poc[1]),
+            Structure::Top => self.poc[0],
+            Structure::Bottom => self.poc[1],
+            Structure::Frame => self.poc[0].min(self.poc[1]),
         }
     }
 }
@@ -119,8 +118,8 @@ pub(crate) struct MbGeom {
     pub(crate) stride_y: usize,
     pub(crate) off_c: usize,
     pub(crate) stride_c: usize,
-    /// The MB samples belong to a field (field picture or MBAFF field MB): parity 1 top 2 bottom.
-    pub(crate) field_parity: u8,
+    /// The field the MB samples belong to (field picture or MBAFF field MB), else `Frame`.
+    pub(crate) field_parity: Structure,
 }
 
 /// Neighbouring macroblock addresses (6.4.9 / 6.4.10) of the current MB; None = unavailable.
@@ -275,7 +274,7 @@ impl<'a> SliceDecoder<'a> {
                     stride_y: sy * 2,
                     off_c: (py * 16 + bot) * sc + mbx * 8,
                     stride_c: sc * 2,
-                    field_parity: 1 + bot as u8,
+                    field_parity: Structure::FIELDS[bot],
                 }
             } else {
                 MbGeom {
@@ -285,12 +284,12 @@ impl<'a> SliceDecoder<'a> {
                     stride_y: sy,
                     off_c: (py * 16 + bot * 8) * sc + mbx * 8,
                     stride_c: sc,
-                    field_parity: 0,
+                    field_parity: Structure::Frame,
                 }
             }
         } else {
             let (mbx, mby) = p.w.split(addr);
-            if p.structure == 0 {
+            if p.structure == Structure::Frame {
                 MbGeom {
                     mbx,
                     y_pic: mby * 16,
@@ -298,10 +297,10 @@ impl<'a> SliceDecoder<'a> {
                     stride_y: sy,
                     off_c: mby * 8 * sc + mbx * 8,
                     stride_c: sc,
-                    field_parity: 0,
+                    field_parity: Structure::Frame,
                 }
             } else {
-                let par = (p.structure - 1) as usize;
+                let par = p.structure.index();
                 MbGeom {
                     mbx,
                     y_pic: mby * 16,
@@ -554,7 +553,7 @@ impl<'a> SliceDecoder<'a> {
                 self.pic.mbs[addr - 1].field
             };
         } else {
-            info.field = self.pic.structure != 0;
+            info.field = self.pic.structure.is_field();
         }
         self.pic.mbs[addr] = info;
         self.compute_nb();

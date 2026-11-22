@@ -782,7 +782,7 @@ impl Decoder {
             mbs,
             w: MbWidth::new(w),
             h,
-            structure: structure as u8,
+            structure,
             mbaff: sh.mbaff,
             poc,
             slices,

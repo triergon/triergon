@@ -191,9 +191,7 @@ impl Motion {
 }
 
 /// A coded or reference picture: a frame or one of its fields. The discriminants are the
-/// field bits of [`FrameStore::fields`] (a frame fills both). Per-macroblock state (the
-/// current picture, reference list entries, block geometry) keeps the code (`as u8`): read
-/// there per block, the bare code measured faster than the enum.
+/// field bits of [`FrameStore::fields`] (a frame fills both).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(u8)]
 pub(crate) enum Structure {
@@ -319,12 +317,17 @@ pub(crate) struct RefPic {
     pub(crate) poc: i32,
     /// Identity used to compare reference pictures (uid << 2 | field bits).
     pub(crate) id: i32,
-    /// The [`Structure`] code.
-    pub(crate) parity: u8,
+    /// The frame or the field of the store the entry is.
+    pub(crate) parity: Structure,
     pub(crate) long: bool,
 }
 
-/// The identity of field or frame `parity` ([`Structure`] code) of the store `uid`.
-pub(crate) fn ref_id(uid: u32, parity: u8) -> i32 {
-    ((uid as i32) << 2) | if parity == 0 { 3 } else { parity as i32 }
+/// The identity of field or frame `parity` of the store `uid`.
+pub(crate) fn ref_id(uid: u32, parity: Structure) -> i32 {
+    ((uid as i32) << 2)
+        | if parity == Structure::Frame {
+            3
+        } else {
+            parity as i32
+        }
 }

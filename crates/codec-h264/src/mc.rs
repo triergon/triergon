@@ -5,7 +5,7 @@
 //! coordinates (equations 8-228 / 8-229 / 8-237 / 8-238), so no per-sample clamping happens on
 //! the common path.
 
-use crate::picture::{array, array_mut};
+use crate::picture::{Structure, array, array_mut};
 
 /// A view of one reference plane: a frame, or one field of a frame (stride doubled).
 #[derive(Clone, Copy)]
@@ -18,23 +18,23 @@ pub(crate) struct PlaneRef<'a> {
 }
 
 impl<'a> PlaneRef<'a> {
-    pub(crate) fn new(data: &'a [u8], width: usize, height: usize, parity: u8) -> Self {
+    pub(crate) fn new(data: &'a [u8], width: usize, height: usize, parity: Structure) -> Self {
         match parity {
-            0 => PlaneRef {
+            Structure::Frame => PlaneRef {
                 data,
                 base: 0,
                 stride: width,
                 w: width as i32,
                 h: height as i32,
             },
-            1 => PlaneRef {
+            Structure::Top => PlaneRef {
                 data,
                 base: 0,
                 stride: width * 2,
                 w: width as i32,
                 h: (height / 2) as i32,
             },
-            _ => PlaneRef {
+            Structure::Bottom => PlaneRef {
                 data,
                 base: width,
                 stride: width * 2,
@@ -683,7 +683,7 @@ mod tests {
             seed
         };
         let data: Vec<u8> = (0..32 * 32).map(|_| rnd() as u8).collect();
-        let r = PlaneRef::new(&data, 32, 32, 0);
+        let r = PlaneRef::new(&data, 32, 32, Structure::Frame);
         for (w, h) in [(8, 8), (8, 4), (4, 8), (4, 4), (4, 2), (2, 4), (2, 2)] {
             for fx in 0..8u32 {
                 for fy in 0..8u32 {
@@ -712,7 +712,7 @@ mod tests {
     #[test]
     fn flat_plane_interpolates_flat() {
         let data = vec![77u8; 32 * 32];
-        let r = PlaneRef::new(&data, 32, 32, 0);
+        let r = PlaneRef::new(&data, 32, 32, Structure::Frame);
         for fx in 0..4 {
             for fy in 0..4 {
                 let mut d = [0u8; 256];

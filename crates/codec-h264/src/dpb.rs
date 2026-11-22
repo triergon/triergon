@@ -231,10 +231,10 @@ fn field_ref(dpb: &[View<'_, FrameStore>], idx: usize, par: Structure) -> RefPic
     let fs = dpb[idx].store();
     RefPic {
         idx,
-        parity: par as u8,
+        parity: par,
         poc: fs.poc[par.index()],
         long: dpb[idx].mark(par) == Marking::LongTerm,
-        id: ref_id(fs.uid, par as u8),
+        id: ref_id(fs.uid, par),
     }
 }
 
@@ -242,10 +242,10 @@ fn frame_ref(dpb: &[View<'_, FrameStore>], idx: usize) -> RefPic {
     let fs = dpb[idx].store();
     RefPic {
         idx,
-        parity: Structure::Frame as u8,
+        parity: Structure::Frame,
         poc: fs.frame_poc(),
         long: dpb[idx].is_long_frame(),
-        id: ref_id(fs.uid, Structure::Frame as u8),
+        id: ref_id(fs.uid, Structure::Frame),
     }
 }
 

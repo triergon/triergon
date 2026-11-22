@@ -2,7 +2,7 @@
 //! its slices are reconstructed. Supports frames, field pictures and MBAFF frames.
 
 use crate::mbinfo::{Kind, MbInfo, MbWidth, SliceDbk};
-use crate::picture::{FrameBuf, Motion, array, array_mut, copied};
+use crate::picture::{FrameBuf, Motion, Structure, array, array_mut, copied};
 use crate::slicedec::CurPic;
 use crate::tables::{ALPHA, BETA, TC0};
 use triergon_codec::{Budget, BudgetVec, StorageError};
@@ -16,7 +16,7 @@ struct PicView<'a> {
     slices: &'a [SliceDbk],
     w: MbWidth,
     motion: &'a Motion,
-    structure: u8,
+    structure: Structure,
     mbaff: bool,
     chroma: bool,
 }
@@ -56,7 +56,7 @@ fn mb_origin(pic: &PicView<'_>, addr: usize) -> (usize, usize, usize, bool) {
         }
     } else {
         let (mbx, mby) = pic.w.split(addr);
-        (mbx, mby * 16, 1, pic.structure != 0)
+        (mbx, mby * 16, 1, pic.structure.is_field())
     }
 }
 
@@ -775,9 +775,9 @@ fn advance(pic: &mut CurPic, all: bool) {
         return;
     }
     pic.dbk.next = end;
-    let field_pic = pic.structure != 0;
+    let field_pic = pic.structure.is_field();
     let (vy, vc) = if field_pic {
-        let par = (pic.structure - 1) as usize;
+        let par = pic.structure.index();
         (
             View {
                 base: par * pic.buf.width,
@@ -923,7 +923,7 @@ fn deblock_mb(
     if sp.disable_idc == 1 {
         return;
     }
-    let field_pic = pic.structure != 0;
+    let field_pic = pic.structure.is_field();
     let q_intra = q.kind.is_intra();
     let ctx = BsCtx {
         mbs: pic.mbs,

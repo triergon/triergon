@@ -194,14 +194,15 @@ impl SliceDecoder<'_> {
         let l = &self.s.ref_list[list];
         if self.pic.mbaff && self.pic.mbs[self.cur].field {
             let f = *l.get((r >> 1) as usize)?;
-            let cur_par = 1 + (self.cur & 1) as u8;
-            let par = if r & 1 == 0 { cur_par } else { 3 - cur_par };
+            // An even index is the field of the current MB's parity, an odd one the other.
+            let field = (self.cur & 1) ^ (r & 1) as usize;
+            let par = Structure::FIELDS[field];
             let st = self.refs.dpb[f.idx];
             // A frame of a frame list is short-term or long-term in both fields.
             Some(RefPic {
                 idx: f.idx,
                 parity: par,
-                poc: st.poc[(par - 1) as usize],
+                poc: st.poc[field],
                 long: f.long,
                 id: ref_id(st.uid, par),
             })
@@ -449,7 +450,7 @@ impl SliceDecoder<'_> {
             .ok_or(SliceError::Invalid("direct prediction without RefPicList1"))?;
         // colZeroFlag only matters for a list whose refIdx is 0 (8-190 / 8-191).
         let mut colz: u16 = 0;
-        let frm_frm = self.pic.structure == 0
+        let frm_frm = self.pic.structure == Structure::Frame
             && !self.pic.mbaff
             && self.refs.dpb[col.idx].coding == Coding::Frame;
         if col.short_term
@@ -581,7 +582,7 @@ impl SliceDecoder<'_> {
             .col
             .ok_or(SliceError::Invalid("direct prediction without RefPicList1"))?;
         let st = &self.refs.dpb[col.idx];
-        if self.pic.structure == 0 && !self.pic.mbaff && st.coding == Coding::Frame {
+        if self.pic.structure == Structure::Frame && !self.pic.mbaff && st.coding == Coding::Frame {
             // FRM / FRM: co-located MB is CurrMbAddr, yM = yCol, One_To_One (Table 8-8).
             let motion = &st.motion[0];
             let mb_col = self.cur;
@@ -620,11 +621,11 @@ impl SliceDecoder<'_> {
             let b = (st.poc[1] - cur_poc).abs();
             t < b
         };
-        if self.pic.structure != 0 {
+        if self.pic.structure.is_field() {
             // Current is a field.
             match st.coding {
                 Coding::Fields => {
-                    motion = &st.motion[(col.parity.max(1) - 1) as usize];
+                    motion = &st.motion[usize::from(col.parity == Structure::Bottom)];
                     mb_col = cur;
                     ym = ycol;
                     vs = VertScale::One;
@@ -643,7 +644,7 @@ impl SliceDecoder<'_> {
                         ym = (2 * ycol) % 16;
                         vs = VertScale::FrmToFld;
                     } else {
-                        mb_col = 2 * cur + (self.pic.structure as usize - 1);
+                        mb_col = 2 * cur + self.pic.structure.index();
                         ym = ycol;
                         vs = VertScale::One;
                     }
@@ -782,7 +783,7 @@ impl SliceDecoder<'_> {
         let l0 = &self.s.ref_list[0];
         let uid = id >> 2;
         let st_code = id & 3;
-        let field_pic = self.pic.structure != 0;
+        let field_pic = self.pic.structure.is_field();
         let cur_field_mb = self.pic.mbaff && self.pic.mbs[self.cur].field;
         let find = |pred: &dyn Fn(&RefPic) -> bool| -> Option<i32> {
             l0.iter().position(pred).map(|p| p as i32)
@@ -1183,7 +1184,7 @@ struct ListPos<'r> {
     yc: i32,
     cfx: u32,
     cfy: u32,
-    parity: u8,
+    parity: Structure,
 }
 
 fn list_pos<'r>(g: &MbGeom, p: &PartMv, list: usize, rp: &RefPic, fb: &'r FrameBuf) -> ListPos<'r> {
@@ -1192,12 +1193,10 @@ fn list_pos<'r>(g: &MbGeom, p: &PartMv, list: usize, rp: &RefPic, fb: &'r FrameB
     let ya = g.y_pic as i32 + p.y;
     // Chroma vertical offset between fields of opposite parity (Table 8-9 / 8-10).
     let mut mvcy = mvy;
-    if g.field_parity != 0 && rp.parity != 0 {
-        if rp.parity == 1 && g.field_parity == 2 {
-            mvcy += 2;
-        } else if rp.parity == 2 && g.field_parity == 1 {
-            mvcy -= 2;
-        }
+    match (rp.parity, g.field_parity) {
+        (Structure::Top, Structure::Bottom) => mvcy += 2,
+        (Structure::Bottom, Structure::Top) => mvcy -= 2,
+        _ => {}
     }
     ListPos {
         fb,
