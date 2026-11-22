@@ -5,7 +5,7 @@
 /// Two-level Huffman lookup: `(symbol, len)`; `len > 0` leaf with total code length,
 /// `len < 0` subtable at offset `symbol` indexed by the next `-len` bits.
 #[derive(Debug)]
-pub(crate) struct HuffBook { pub(crate) primary_bits: u32, pub(crate) max_len: u32, pub(crate) lut: &'static [(i16, i8)] }
+pub(crate) struct HuffBook { pub(crate) primary_bits: u32, #[expect(dead_code, reason = "retains the source table maximum code length")] pub(crate) max_len: u32, pub(crate) lut: &'static [(i16, i8)] }
 
 /// ETSI TS 102 114 Annex D.5 Table A3.
 pub(crate) static HUFF_A3: HuffBook = HuffBook { primary_bits: 2, max_len: 2, lut: &[

@@ -172,7 +172,7 @@ w('')
 w('/// Two-level Huffman lookup: `(symbol, len)`; `len > 0` leaf with total code length,')
 w('/// `len < 0` subtable at offset `symbol` indexed by the next `-len` bits.')
 w('#[derive(Debug)]')
-w('pub(crate) struct HuffBook { pub(crate) primary_bits: u32, pub(crate) max_len: u32, pub(crate) lut: &\'static [(i16, i8)] }')
+w('pub(crate) struct HuffBook { pub(crate) primary_bits: u32, #[expect(dead_code, reason = "retains the source table maximum code length")] pub(crate) max_len: u32, pub(crate) lut: &\'static [(i16, i8)] }')
 w('')
 for name in order:
     pb, ml, table = build_lut(books[name])
