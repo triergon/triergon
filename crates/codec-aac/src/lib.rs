@@ -20,10 +20,12 @@
 )]
 pub mod adts;
 mod cce;
+mod compact;
 mod decoder;
 mod error;
 mod fft;
 mod filterbank;
+mod filterbank_960;
 mod huffman;
 mod huffman_probed;
 mod huffman_tables;
@@ -35,6 +37,7 @@ mod sbr;
 mod tables;
 
 pub use adts::AdtsHeader;
+pub use compact::RawCompactLcDecoder;
 pub use error::{DecodeError, Feature};
 pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 

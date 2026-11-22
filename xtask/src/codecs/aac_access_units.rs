@@ -10,13 +10,14 @@ use super::correctness::{Rules, channel_stats};
 
 const OPERATION: &str = "audio-aac-access-units";
 const COMPAT_OPERATION: &str = "audio-aac-access-units-compat";
+const COMPACT_OPERATION: &str = "audio-aac-access-units-compact";
 const FEATURE: &str = "harness/features/aac-access-units";
+const COMPACT_FEATURE: &str = "harness/features/aac-compact-access-units";
 const PARITY_FILE: &str = "parity.json";
 const FFPROBE: &str = "install/bin/ffprobe";
 const NUMERIC_RULES: &str = "harness/codecs/numeric-rules.json";
 const PADDING: [u8; 64] = [0; 64];
 const HEADER_BYTES: usize = 4 * size_of::<u32>();
-const PLANE_BYTES: usize = 1024 * size_of::<f32>();
 const MAX_PACKET: usize = 64 << 10;
 
 fn string<'a>(object: &'a Value, key: &str) -> Result<&'a str, String> {
@@ -51,10 +52,15 @@ struct Comparison {
 }
 
 impl Comparison {
-    fn load(root: &Path, paths: Option<(&Path, &Path)>) -> Result<Self, String> {
-        let contract_path = root.join(FEATURE).join("contract.json");
+    fn load(
+        root: &Path,
+        feature: &str,
+        operation: &str,
+        paths: Option<(&Path, &Path)>,
+    ) -> Result<Self, String> {
+        let contract_path = root.join(feature).join("contract.json");
         let contract = checks::read_json(&contract_path)?;
-        if string(&contract, "operation")? != OPERATION {
+        if string(&contract, "operation")? != operation {
             return Err("invalid AAC worker operation".into());
         }
         let identity = checks::read_json(&root.join("target/harness/identity.json"))?;
@@ -115,6 +121,12 @@ impl Comparison {
     }
 }
 
+/// Resolve the same compact worker pair used for the original packet comparison.
+pub(super) fn compact_workers(root: &Path) -> Result<(PathBuf, PathBuf), String> {
+    let comparison = Comparison::load(root, COMPACT_FEATURE, COMPACT_OPERATION, None)?;
+    Ok((comparison.candidate, comparison.reference))
+}
+
 pub(super) struct MeasurementParity {
     pub sha256: String,
     workers: Value,
@@ -144,18 +156,33 @@ pub(super) fn measurement_parity(
         .get("workloads")
         .and_then(Value::as_array)
         .unwrap_or_default();
-    if !cases.iter().any(|case| {
-        matches!(
-            case.get("operation").and_then(Value::as_str),
-            Some(OPERATION | COMPAT_OPERATION)
-        )
-    }) {
+    let compact = cases
+        .iter()
+        .any(|case| case.get("operation").and_then(Value::as_str) == Some(COMPACT_OPERATION));
+    if !compact
+        && !cases.iter().any(|case| {
+            matches!(
+                case.get("operation").and_then(Value::as_str),
+                Some(OPERATION | COMPAT_OPERATION)
+            )
+        })
+    {
         return Ok(None);
     }
-    if *manifest != checks::read_json(&root.join(FEATURE).join("corpus.json"))? {
+    let (feature, operation) = if compact {
+        (COMPACT_FEATURE, COMPACT_OPERATION)
+    } else {
+        (FEATURE, OPERATION)
+    };
+    if *manifest != checks::read_json(&root.join(feature).join("corpus.json"))? {
         return Err("AAC measurement requires the complete pinned workload set".into());
     }
-    let comparison = Comparison::load(root, Some((candidates.of(OPERATION), reference)))?;
+    let comparison = Comparison::load(
+        root,
+        feature,
+        operation,
+        Some((candidates.of(operation), reference)),
+    )?;
     let parity_path = inputs.join(PARITY_FILE);
     let bytes = read(&parity_path)?;
     let parity = json::parse(std::str::from_utf8(&bytes).map_err(|error| error.to_string())?)
@@ -239,9 +266,11 @@ fn compare_pcm(
     reference: &[u8],
     channels: usize,
     packets: usize,
+    samples: usize,
     rules: &Rules,
 ) -> Result<(bool, Value), String> {
-    let frame_bytes = channels * PLANE_BYTES;
+    let plane_bytes = samples * size_of::<f32>();
+    let frame_bytes = channels * plane_bytes;
     let expected = frame_bytes
         .checked_mul(packets)
         .ok_or("AAC output size overflow")?;
@@ -253,9 +282,9 @@ fn compare_pcm(
         ));
     }
     let collect_plane = |pcm: &[u8], channel: usize| {
-        let start = channel * PLANE_BYTES;
+        let start = channel * plane_bytes;
         pcm.chunks_exact(frame_bytes)
-            .flat_map(|frame| &frame[start..start + PLANE_BYTES])
+            .flat_map(|frame| &frame[start..start + plane_bytes])
             .copied()
             .collect::<Vec<_>>()
     };
@@ -320,32 +349,86 @@ fn vectors(manifest: &Value) -> Result<&[Value], String> {
 }
 
 pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
+    run_cases(root, out, record, None)
+}
+
+pub fn run_compact(root: &Path, out: &Path, record: bool, source: &Path) -> Result<(), String> {
+    run_cases(root, out, record, Some(source))
+}
+
+fn run_cases(
+    root: &Path,
+    out: &Path,
+    record: bool,
+    compact_source: Option<&Path>,
+) -> Result<(), String> {
     let quicktime = checks::read_json(&root.join("harness/codecs/aac/mov-manifest.json"))?;
-    let feature = root.join(FEATURE);
+    let feature_name = if compact_source.is_some() {
+        COMPACT_FEATURE
+    } else {
+        FEATURE
+    };
+    let feature = root.join(feature_name);
     let authored = checks::read_json(&feature.join("sources.json"))?;
-    let sources = vectors(&quicktime)?
-        .iter()
-        .map(|source| (source, OPERATION))
-        .chain(
-            vectors(&authored)?
-                .iter()
-                .map(|source| (source, COMPAT_OPERATION)),
-        );
+    if compact_source.is_some() {
+        let contract = checks::read_json(&feature.join("contract.json"))?;
+        if vectors(&authored)?.len() != 1
+            || vectors(&authored)?[0].get("sha256") != contract.get("source_sha256")
+        {
+            return Err("compact AAC source pin differs from contract".into());
+        }
+    }
+    let sources: Vec<_> = if compact_source.is_some() {
+        vectors(&authored)?
+            .iter()
+            .map(|source| (source, COMPACT_OPERATION))
+            .collect()
+    } else {
+        vectors(&quicktime)?
+            .iter()
+            .map(|source| (source, OPERATION))
+            .chain(
+                vectors(&authored)?
+                    .iter()
+                    .map(|source| (source, COMPAT_OPERATION)),
+            )
+            .collect()
+    };
     fs::create_dir(out).map_err(|error| format!("{}: {error}", out.display()))?;
     let mut workloads = Vec::new();
     let mut results = Vec::new();
     let rules = Rules::load(root)?;
-    let comparison = Comparison::load(root, None)?;
+    let comparison = Comparison::load(
+        root,
+        feature_name,
+        if compact_source.is_some() {
+            COMPACT_OPERATION
+        } else {
+            OPERATION
+        },
+        None,
+    )?;
     let mut accepted = true;
     for (vector, operation) in sources {
         let name = string(vector, "name")?;
         let id = name
-            .strip_suffix(".mov")
+            .strip_suffix(if compact_source.is_some() {
+                ".mp4"
+            } else {
+                ".mov"
+            })
             .filter(|id| {
-                !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+                !id.is_empty()
+                    && id.bytes().all(|b| {
+                        b.is_ascii_alphanumeric()
+                            || b == b'-'
+                            || (compact_source.is_some() && b == b'_')
+                    })
             })
             .ok_or("invalid AAC source name")?;
-        let source_path = if operation == OPERATION {
+        let source_path = if let Some(source) = compact_source {
+            source.to_path_buf()
+        } else if operation == OPERATION {
             root.join(string(vector, "path")?)
         } else {
             feature.join("inputs").join(name)
@@ -378,6 +461,9 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
             ],
         )?;
         let (mut input, rate, channels, count) = access_units(&source, &probe)?;
+        if operation == COMPACT_OPERATION && (rate, channels, count) != (48_000, 1, 386) {
+            return Err(format!("{id}: compact AAC source shape differs"));
+        }
         let configuration_byte = &mut input[HEADER_BYTES + 1];
         let configuration = *configuration_byte >> 3 & 15;
         if operation == COMPAT_OPERATION {
@@ -443,6 +529,11 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
             &reference_pcm,
             channels as usize,
             count as usize,
+            if operation == COMPACT_OPERATION {
+                960
+            } else {
+                1024
+            },
             &rules,
         )?;
         accepted &= layout && pcm;
@@ -462,12 +553,22 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
         ("schema", Value::str("triergon.codecs.workloads.v1")),
         ("workloads", Value::Array(workloads)),
     ]);
-    if Comparison::load(root, Some((&comparison.candidate, &comparison.reference)))?.binding
+    if Comparison::load(
+        root,
+        feature_name,
+        if compact_source.is_some() {
+            COMPACT_OPERATION
+        } else {
+            OPERATION
+        },
+        Some((&comparison.candidate, &comparison.reference)),
+    )?
+    .binding
         != comparison.binding
     {
         return Err("AAC comparison tools or rules changed during parity".into());
     }
-    let pinned = root.join(FEATURE).join("corpus.json");
+    let pinned = feature.join("corpus.json");
     if !record && checks::read_json(&pinned)? != workloads {
         return Err("AAC access-unit workload differs from its pins".into());
     }
@@ -491,6 +592,31 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compact_comparison_checks_the_last_sample_and_exact_shape() {
+        let rules = Rules {
+            rms: 0.0,
+            abs: 0.0,
+            lsb: 0,
+            exact: Vec::new(),
+        };
+        let reference = vec![0; 960 * 4 * 2];
+        let mut candidate = reference.clone();
+        assert!(
+            compare_pcm(&candidate, &reference, 1, 2, 960, &rules)
+                .unwrap()
+                .0
+        );
+        let end = candidate.len();
+        candidate[end - 4..].copy_from_slice(&1.0_f32.to_le_bytes());
+        assert!(
+            !compare_pcm(&candidate, &reference, 1, 2, 960, &rules)
+                .unwrap()
+                .0
+        );
+        assert!(compare_pcm(&candidate, &reference, 1, 2, 1024, &rules).is_err());
+    }
 
     #[test]
     fn only_the_single_fixed_surround_pair_accepts_different_labels() {

@@ -10,7 +10,7 @@ pub enum Feature {
     SsrGainControl,
     /// Audio object types outside Main / LC / LTP (+ implicit SBR / PS). Carries the AOT.
     ObjectType(u8),
-    /// 960-sample frames (not expressible in ADTS).
+    /// A 960-sample configuration or element outside the supported raw profile.
     FrameLength960,
     /// An in-band SBR payload in a raw access unit configured for AAC-LC.
     RawSbr,

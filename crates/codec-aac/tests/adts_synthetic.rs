@@ -1,7 +1,7 @@
 //! Self-contained ADTS tests with synthetic (self-authored) bitstreams.
 use triergon_codec::Budget;
 use triergon_codec_aac::{
-    AudioFrame, DecodeError, Decoder, Feature, Limits, RawLcDecoder, Speaker,
+    AudioFrame, DecodeError, Decoder, Feature, Limits, RawCompactLcDecoder, RawLcDecoder, Speaker,
 };
 
 struct Bw {
@@ -782,4 +782,85 @@ fn a_refused_ps_start_leaves_the_decoder_as_it_was() {
     let first = budget.peak() - idle;
     let units = [&sbr, &plain, &plain].map(Vec::clone);
     a_refusal_with_spare_is_as_if_the_access_unit_never_arrived(&units, 0, first);
+}
+
+#[test]
+fn raw_960_transaction_reset_and_budget() {
+    use triergon_codec::AudioDecoder;
+    let program = [0x04, 0xc4, 0x00, 0x20, 0x01, 0xe0, 0x00];
+    let budget = Budget::new(4 << 20).unwrap();
+    assert!(RawCompactLcDecoder::with_program_config_in(4, &program, &budget).is_err());
+    let mut tested = RawCompactLcDecoder::with_program_config_in(3, &program, &budget).unwrap();
+    let mut reference = RawCompactLcDecoder::with_program_config_in(3, &program, &budget).unwrap();
+    let packet = noise_block(false, false, false);
+    let mut actual = AudioFrame::default();
+    let mut expected = AudioFrame::default();
+    tested.decode(&packet, &mut actual).unwrap();
+    reference.decode(&packet, &mut expected).unwrap();
+    let used = budget.used();
+    for n in 0..packet.len() {
+        assert!(tested.decode(&packet[..n], &mut actual).is_err());
+        assert_eq!(budget.used(), used);
+    }
+    let mut trailing = packet.clone();
+    trailing.push(0);
+    assert!(tested.decode(&trailing, &mut actual).is_err());
+    assert_eq!(budget.used(), used);
+    for id in [1_u8, 2, 3, 5] {
+        assert!(tested.decode(&[id << 5], &mut actual).is_err());
+        assert_eq!(budget.used(), used);
+    }
+    assert!(
+        tested
+            .decode(&noise_block(false, false, true), &mut actual)
+            .is_err()
+    );
+    assert_eq!(budget.used(), used);
+    let pressure = budget.reserve(budget.available()).unwrap();
+    let mut larger = AudioFrame {
+        planes: vec![Vec::with_capacity(2048)],
+        ..AudioFrame::default()
+    };
+    let pressured = budget.used();
+    assert!(matches!(
+        tested.decode(&packet, &mut larger),
+        Err(DecodeError::Budget(_))
+    ));
+    assert_eq!(budget.used(), pressured);
+    drop(pressure);
+    tested.decode(&packet, &mut actual).unwrap();
+    reference.decode(&packet, &mut expected).unwrap();
+    assert_eq!(actual.samples_per_channel, 960);
+    assert_eq!(actual.planes, expected.planes);
+    AudioDecoder::reset(&mut tested);
+    let mut fresh = RawCompactLcDecoder::with_program_config_in(3, &program, &budget).unwrap();
+    tested.decode(&packet, &mut actual).unwrap();
+    fresh.decode(&packet, &mut expected).unwrap();
+    assert_eq!(actual.planes, expected.planes);
+}
+
+#[test]
+fn raw_960_rejects_other_programs_and_releases_failed_construction() {
+    let budget = Budget::new(4 << 20).unwrap();
+    let idle = budget.used();
+    for groups in [
+        [&[(true, 0)][..], &[][..], &[][..]],
+        [&[(false, 0), (false, 1)][..], &[][..], &[][..]],
+        [&[][..], &[(false, 0)][..], &[][..]],
+    ] {
+        let mut bits = Bw::new();
+        program_config(&mut bits, groups, &[]);
+        let mut program = bits.bytes();
+        program[0] &= 0xfc;
+        program[1] = (program[1] & 0x3f) | 0xc0; // 48 kHz
+        assert!(RawCompactLcDecoder::with_program_config_in(3, &program, &budget).is_err());
+        assert_eq!(budget.used(), idle);
+    }
+    let program = [0x04, 0xc4, 0x00, 0x20, 0x01, 0xe0, 0x00];
+    let pressure = budget.reserve(budget.available() - 1024).unwrap();
+    let used = budget.used();
+    assert!(RawCompactLcDecoder::with_program_config_in(3, &program, &budget).is_err());
+    assert_eq!(budget.used(), used);
+    drop(pressure);
+    assert_eq!(budget.used(), idle);
 }

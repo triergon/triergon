@@ -76,6 +76,22 @@ pub(crate) fn swb_short(sf_index: usize) -> &'static [u16] {
     }
 }
 
+// The 48 kHz 960 profile uses the existing boundaries with a shorter endpoint.
+const fn with_endpoint<const N: usize>(mut values: [u16; N], end: u16) -> [u16; N] {
+    values[N - 1] = end;
+    values
+}
+const SWB_LONG_960_48: [u16; 50] = with_endpoint(SWB_LONG_48, 960);
+const SWB_SHORT_960_48: [u16; 15] = with_endpoint(SWB_SHORT_48, 120);
+pub(crate) fn swb_long_960(index: usize) -> &'static [u16] {
+    assert_eq!(index, 3);
+    &SWB_LONG_960_48
+}
+pub(crate) fn swb_short_960(index: usize) -> &'static [u16] {
+    assert_eq!(index, 3);
+    &SWB_SHORT_960_48
+}
+
 /// TNS_MAX_BANDS for Main/LC profile, ISO/IEC 14496-3 Table 4.156 (long, short).
 pub(crate) const TNS_MAX_BANDS_LONG: [u8; 13] =
     [31, 31, 34, 40, 42, 51, 46, 46, 42, 42, 42, 39, 39];

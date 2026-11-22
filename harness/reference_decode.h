@@ -363,7 +363,11 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
 }
 
 static int configured_aac_operation(const char *name, int video) {
+#ifdef TRIERGON_AAC_COMPACT_REFERENCE
+    return !video && !strcmp(name, "aac-access-units-compact");
+#else
     return !video && (!strcmp(name, "aac-access-units") || !strcmp(name, "aac-access-units-compat"));
+#endif
 }
 
 static void pass(const char *name, const AVCodecParameters *par, const uint8_t *data, size_t size, int video,

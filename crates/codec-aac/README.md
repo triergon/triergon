@@ -32,8 +32,7 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
 
 `examples/decode_aac.rs IN.aac OUT.f32` writes interleaved f32le and prints a JSON summary.
 
-`RawLcDecoder` decodes one complete raw data block of at most 64 KiB to 1024 samples
-per channel, configured from a checked AudioSpecificConfig. `new_in` takes the indexed
+`RawLcDecoder` decodes one complete raw data block of at most 64 KiB, configured from a checked AudioSpecificConfig. Its ordinary constructors produce 1024 samples per channel. `new_in` takes the indexed
 core rate and fixed channel configuration 1–7, 11, 12 or 14, whose audible elements
 follow Table 1.19, including the distinct 7.1 Front, Back and Top layouts
 ([ISO/IEC 14496-3:2009/Amd.4](https://standards.iteh.ai/catalog/standards/iso/c0071f4c-5db7-4cf4-a32e-6b75c874d46d/iso-iec-14496-3-2009-amd-4-2013)).
@@ -44,9 +43,19 @@ channel configuration zero: up to eight channels with distinct speaker positions
 elements matched by type and tag, height information applied when its extension is
 complete and its CRC-8 valid, and `Feature::RawProgramLayout` for an ambiguous mapping
 ([ISO/IEC 14496-3:2001/Cor.2:2004, 4.5.1](https://standards.iteh.ai/catalog/standards/iso/09c0e8dc-4b21-438e-a1f1-665e44bfb859/iso-iec-14496-3-2001-cor-2-2004)).
-That program stays in effect when a packet carries its own PCE. The configuration must
-use 1024-sample frames; a packet carrying SBR is refused (`Feature::RawSbr`). The raw
-decoder synthesizes directly into the caller's reserved planes and reuses them.
+That program stays in effect when a 1024-sample packet carries its own PCE. A packet
+carrying SBR is refused (`Feature::RawSbr`). The raw decoder synthesizes directly into
+the caller's reserved planes and reuses them.
+
+`RawCompactLcDecoder::with_program_config_in` accepts an out-of-band PCE for
+48 kHz mono AAC-LC with one front SCE. It decodes one SCE per packet into
+960 samples and accepts ancillary data and fill elements. It reserves the
+output before advancing overlap and random state.
+
+The [compact access-unit comparison](../../harness/features/aac-compact-access-units/README.md)
+matches all 386 packets of the original FATE clip and checks the boundary bins
+of all 49 long and 14 short bands against a direct inverse transform. Native
+runtime and memory qualification remain open.
 
 ## Features
 
@@ -75,7 +84,7 @@ unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormals to zero.
 
 - `Decoder::decode` takes exactly one ADTS frame including its header. It clears and
   refills `out`, reusing capacity, because rate and layout can change between frames
-  (implicit SBR/PS, a new PCE). A frame yields 1024 samples per raw data block, 2048 with
+  (implicit SBR/PS, a new PCE). An ADTS frame yields 1024 samples per raw data block, 2048 with
   SBR.
 - On error `out` is empty and the decoder stays usable. Errors are typed:
   `Unsupported(Feature)`, `InvalidData(&str)` naming the syntax element,
