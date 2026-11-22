@@ -12,6 +12,7 @@
 //! refusals are recorded per vector as they happen. Selection (in set or not)
 //! is applied afterwards by the summary, never by skipping inputs here.
 
+mod play;
 mod session;
 mod video;
 
@@ -77,6 +78,9 @@ pub fn session_vector_lanes(lane: &str) -> &'static [&'static str] {
 
 /// The pinned inputs of a lane that does not reuse the base manifest.
 pub fn variant_manifest(lane: &str) -> Option<&'static str> {
+    if play::lane(lane) {
+        return Some(play::MANIFEST);
+    }
     damage::recipe_manifest(lane).or_else(|| {
         (lane.starts_with("session-") || lane == "track-reset").then_some(session::CASES)
     })
@@ -174,7 +178,11 @@ fn example(lane: &str) -> Option<&'static str> {
 
 /// Whether the correctness runner can grade this lane.
 pub fn is_lane(lane: &str) -> bool {
-    example(lane).is_some()
+    example(lane).is_some() || play::lane(lane)
+}
+
+pub(super) fn output_only_lane(lane: &str) -> bool {
+    play::lane(lane)
 }
 
 fn operation(lane: &str) -> Option<&'static str> {
@@ -560,6 +568,7 @@ fn audio_decoder(
         audio_format(&media_lane)?
     };
     let reject = crc_reject(lane);
+    let coreless = lane == "dts-packed" && vector.get("coreless") == Some(&Value::Bool(true));
     let (_, stream) = probe(&a.ffprobe, path, format, true)?;
     let (reference_path, ours_path) = (tmp.join("ref.f32"), tmp.join("ours.f32"));
     let mut reference_argv: Vec<String> = [
@@ -577,6 +586,9 @@ fn audio_decoder(
     }
     if let Some(decoder) = reference_decoder(&media_lane) {
         reference_argv.extend(["-c:a".to_owned(), decoder.to_owned()]);
+    }
+    if coreless {
+        reference_argv.extend(["-core_only", "1"].map(String::from));
     }
     if lane == "aac-mov" {
         // Compare the complete decoder packets from the neutral MOV view.
@@ -769,6 +781,18 @@ fn audio_decoder(
     let status = |row: &mut Vec<(String, Value)>, status: &str| {
         row.push(("status".into(), Value::str(status)));
     };
+    if coreless {
+        let both_refuse = candidate.is_empty()
+            && reference.is_empty()
+            && ours_run.code == 0
+            && info.get("frames").and_then(python::int) == Some(0)
+            && reference_run.code > 0
+            && reference_run
+                .stderr
+                .contains("No valid DCA sub-stream found");
+        status(&mut row, if both_refuse { "pass" } else { "fail" });
+        return Ok(Value::Object(row));
+    }
     if initialized_aac
         && !complete_single_sce_stereo(
             size_of::<f32>(),
@@ -1062,10 +1086,12 @@ fn observation(value: Result<Value, Stop>, lane: &str) -> Result<Value, String> 
     match value {
         Ok(value) => Ok(value),
         Err(Stop::Timeout(argv)) => Ok(timeout_row(argv)),
-        Err(Stop::Fatal(message)) if lane.starts_with("session-") => Ok(Value::object([
-            ("status", Value::str("operation-error")),
-            ("message", Value::str(message)),
-        ])),
+        Err(Stop::Fatal(message)) if lane.starts_with("session-") || play::lane(lane) => {
+            Ok(Value::object([
+                ("status", Value::str("operation-error")),
+                ("message", Value::str(message)),
+            ]))
+        }
         Err(Stop::Fatal(message)) => Err(message),
     }
 }
@@ -1247,6 +1273,11 @@ pub fn grade(a: &Grade) -> Result<(), String> {
             row.push(("status".into(), Value::str("input-missing")));
         } else if Some(file_sha(&path)?.as_str()) != v.get("sha256").and_then(Value::as_str) {
             row.push(("status".into(), Value::str("input-hash-mismatch")));
+        } else if play::lane(&lane) {
+            row.push((
+                "output".into(),
+                observation(play::grade(a, &path, &tmp.0, v), &lane)?,
+            ));
         } else {
             let path = python::path(&path);
             let sha256 = text(v, "sha256")?;
@@ -1282,7 +1313,9 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                 row.push(("output".into(), output));
             }
         }
-        let comparison_started = row.iter().any(|(key, _)| key == "decoder");
+        let comparison_started = row
+            .iter()
+            .any(|(key, _)| key == "decoder" || play::lane(&lane) && key == "output");
         let infrastructure_error = row.iter().any(|(_, value)| {
             matches!(
                 value.get("status").and_then(Value::as_str),

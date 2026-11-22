@@ -1,11 +1,6 @@
 {
   "schema": "triergon.codecs.correctness-manifest.v1",
-  "note": "Whole-stream repackings made with the independent DTS fixture packer. The coreless XLL control is retained in each requested packing as a refusal control, using its original bytes because it has no core to repack.",
-  "open_cases": [
-    "xll_51_24_48_none.core-be14.dts",
-    "xll_51_24_48_none.core-le14.dts",
-    "xll_51_24_48_none.core-le16.dts"
-  ],
+  "note": "Whole-stream repackings made with the independent DTS fixture packer. The coreless XLL control compares core-only refusal once on its original bytes.",
   "vectors": [
     {
       "lane": "dts-packed",
@@ -444,21 +439,7 @@
       "name": "xll_51_24_48_none.core-be14.dts",
       "path": ".research/codec-derived/dts/xll_51_24_48_none.core.dts",
       "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6",
-      "unsupported_packing": "be14"
-    },
-    {
-      "lane": "dts-packed",
-      "name": "xll_51_24_48_none.core-le14.dts",
-      "path": ".research/codec-derived/dts/xll_51_24_48_none.core.dts",
-      "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6",
-      "unsupported_packing": "le14"
-    },
-    {
-      "lane": "dts-packed",
-      "name": "xll_51_24_48_none.core-le16.dts",
-      "path": ".research/codec-derived/dts/xll_51_24_48_none.core.dts",
-      "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6",
-      "unsupported_packing": "le16"
+      "coreless": true
     },
     {
       "lane": "dts-packed",
@@ -622,10 +603,5 @@
       "source_sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4",
       "packing": "le16"
     }
-  ],
-  "open_case_readings": {
-    "xll_51_24_48_none.core-be14.dts": "The source has no DTS core syncframe in which to express this packing. The candidate emits no core PCM and FFmpeg decodes the XLL extension.",
-    "xll_51_24_48_none.core-le14.dts": "The source has no DTS core syncframe in which to express this packing. The candidate emits no core PCM and FFmpeg decodes the XLL extension.",
-    "xll_51_24_48_none.core-le16.dts": "The source has no DTS core syncframe in which to express this packing. The candidate emits no core PCM and FFmpeg decodes the XLL extension."
-  }
+  ]
 }
