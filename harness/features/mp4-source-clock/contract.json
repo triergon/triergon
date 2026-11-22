@@ -7,7 +7,7 @@
   "worker_operation": "source-view-",
   "contract": [
     "Compare MP4 media time before movie edits. The independent ISO/IEC 14496-12 oracle expands stts and ctts in decode order, treats ctts and trun offsets according to their box version, reads fragment decode bases and durations, and keeps media times on the mdhd timescale across edits.",
-    "Emit kind 3 with track ID, time-base numerator and denominator, PTS, DTS and duration in per-track decode order by ascending track ID. Emit kind 7 on clean end or kind 8 on refusal. The authored timing-policy controls also compare the explicitly bounded prefix policy."
+    "Emit kind 3 with track ID, time-base numerator and denominator, PTS, DTS and duration in per-track decode order by ascending track ID. Emit kind 7 on clean end or kind 8 on refusal. For the malformed timing controls, compare strict source indexing separately from the compatibility index with the explicit BoundedPrefix opener. Both project source ticks through PacketInfo."
   ],
   "required_profiles": [
     "mp4",
@@ -112,8 +112,7 @@
     }
   ],
   "pending_module_requirements": [
-    "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved.",
-    "The timing opener admits surplus runs with BoundedPrefix but source player indexing requires exact coverage. ISO/IEC 14496-12 defines the sample timeline from the declared samples and timing runs; the bounded ingest policy is an extension."
+    "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved."
   ],
   "open_cases": [
     {
@@ -133,20 +132,6 @@
     {
       "id": "progressive-unknown-clock-terminal",
       "requirement": "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-timing-policy-bad-ctts-count-mismatch",
-      "requirement": "The timing opener admits surplus runs with BoundedPrefix but source player indexing requires exact coverage. ISO/IEC 14496-12 defines the sample timeline from the declared samples and timing runs; the bounded ingest policy is an extension.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-timing-policy-bad-stts-count-mismatch",
-      "requirement": "The timing opener admits surplus runs with BoundedPrefix but source player indexing requires exact coverage. ISO/IEC 14496-12 defines the sample timeline from the declared samples and timing runs; the bounded ingest policy is an extension.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

@@ -222,7 +222,12 @@ mod worker {
                 };
                 while !matches!(opener.advance(&mut work(), &cancel)?, OpenProgress::Ready) {}
                 let opened = opener.finish()?;
-                let mut index = Mp4IndexJob::new(&opened.movie, PlanLimits::default())?;
+                let limits = PlanLimits::default();
+                let mut index = if layout == Layout::TimingPolicy && views.clock_only {
+                    triergon_playback::compat::mov::index(&opened.movie, limits)?
+                } else {
+                    Mp4IndexJob::new(&opened.movie, limits)?
+                };
                 while !index.poll(&mut work(), &cancel)? {}
                 let mut plan = index.finish()?;
                 while !plan.identify_tracks(ConfigurationLimits::default(), &mut work())? {}

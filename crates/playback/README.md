@@ -133,7 +133,9 @@ the three TS188 sync positions before the playback probe has enough bytes to sel
 The [source-view comparison](../../harness/features/playback-source-view/contract.json)
 checks direct-player track metadata and complete forward packet streams.
 The [MP4 clock oracle](../../harness/features/mp4-source-clock/contract.json)
-checks sample decode and composition times before the movie's edit list.
+checks sample decode and composition times before the movie's edit list. For
+surplus timing runs, it checks strict indexing and the bounded compatibility
+index as separate operations.
 
 ## Supported
 
