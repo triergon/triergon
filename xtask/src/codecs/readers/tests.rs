@@ -341,7 +341,7 @@ fn the_repository_rules_load() {
         .iter()
         .filter_map(|case| case.open.as_ref())
         .partition(|entry| entry.declared);
-    assert_eq!((deviations.len(), defects.len()), (30, 1));
+    assert_eq!((deviations.len(), defects.len()), (30, 0));
 }
 
 /// The committed manifests' case counts, raised with every case added.
