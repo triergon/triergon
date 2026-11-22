@@ -14,6 +14,7 @@
 //! picture counts of each listed vector. Strict video summaries require a
 //! registration for every non-pass from a pinned manifest.
 
+use std::collections::{BTreeMap, btree_map::Entry};
 use std::fs;
 use std::path::Path;
 
@@ -380,6 +381,36 @@ fn class_of(row: &Value, lane: &str) -> Result<String, String> {
     }
 }
 
+fn variant_reading<'a>(
+    documents: &'a mut BTreeMap<&'static str, Value>,
+    lane: &str,
+    name: &str,
+) -> Result<Option<&'a str>, String> {
+    let Some(path) = super::correctness::variant_manifest(lane) else {
+        return Ok(None);
+    };
+    let document = match documents.entry(path) {
+        Entry::Occupied(entry) => entry.into_mut(),
+        Entry::Vacant(entry) => entry.insert(json::read(Path::new(path))?),
+    };
+    let listed = document
+        .get("open_cases")
+        .and_then(Value::as_array)
+        .is_some_and(|cases| cases.iter().any(|case| case.as_str() == Some(name)));
+    let reading = document
+        .get("open_case_readings")
+        .and_then(|readings| readings.get(name))
+        .and_then(Value::as_str)
+        .filter(|reading| !reading.trim().is_empty() && !reading.contains('\n'));
+    if listed && reading.is_some() {
+        Ok(reading)
+    } else {
+        Err(format!(
+            "{path}: {name} needs a registered open-case disposition"
+        ))
+    }
+}
+
 /// `summarize RUN.jsonl OUT.json`: classify every row, write the summary and
 /// print the per-lane counts and each failure. Fails when a listed open case
 /// does not fail or has no disposition, and with `require_pass` when any other
@@ -395,6 +426,7 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
     let mut listed = Vec::new();
     let mut closed = Vec::new();
     let mut changed = Vec::new();
+    let mut variant_manifests = BTreeMap::new();
     for row in &rows {
         let lane = text(get(row, "lane")).ok_or("row without lane")?.to_owned();
         let name = get(row, "name").cloned().unwrap_or(Value::Null);
@@ -451,8 +483,18 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
         }
         let status = |v: &Value| get(v, "status").cloned().unwrap_or(Value::Null);
         if c == "FAIL" || c == "open" {
+            let reading = if c == "open" {
+                variant_reading(
+                    &mut variant_manifests,
+                    &lane,
+                    name.as_str().unwrap_or_default(),
+                )?
+            } else {
+                None
+            };
             let disposition = expected
                 .map(|expected| expected.reason)
+                .or(reading)
                 .or_else(|| text(Some(&name)).and_then(disposition))
                 .or_else(|| disposition(&lane));
             if c == "open" && disposition.is_none() {
