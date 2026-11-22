@@ -6,7 +6,7 @@
   "candidate": "playback-views-worker",
   "worker_operation": "source-view-",
   "contract": [
-    "Open Matroska, indexed MP4, progressive MP4 and one MPEG-TS program through the direct player. Use source clocks and read every selected packet. For ordered transport entities, continue the same player to the second entity and explicitly finish the logical source. The reference reads the same concatenated byte stream.",
+    "Open Matroska, indexed MP4, progressive MP4 and one MPEG-TS program through the direct player. Use source clocks and read every selected packet. The explicit bounded timing controls use the bounded opener and compatibility index while retaining source PacketInfo clocks. For ordered transport entities, continue the same player to the second entity and explicitly finish the logical source. The reference reads the same concatenated byte stream.",
     "The reference calls avformat_open_input and av_read_frame without stream discovery. Set ignore_editlist=1 for MOV and suppress elementary parsing and filling for MPEG-TS PES. Select the named PIDs of program 1 when the case declares PIDs. Matroska timestamps are in nanoseconds, MP4 in media timescale ticks, and transport in raw 90 kHz PES ticks.",
     "Fold kind 2 with each initial track ID, media kind, framed codec name, source codec tag, configuration, optional language and tri-state default and forced flags. The reference uses the public stream ID or the one-based stream ordinal if it has no positive ID. A Matroska CodecID string and an unavailable numeric codec_tag remain distinguishable.",
     "Fold kind 1 with the shared packet row: track ID, optional PTS and DTS, duration, flags, size and every payload byte. Fold 7 on clean end or 8 on data refusal. Trace the candidate demux clock and trim for diagnosis.",
@@ -578,7 +578,7 @@
     "The MP4 source and MOV reference expose differing sample flags, sample entry configuration or track defaults. ISO/IEC 14496-12 defines the wire tables and source sample clock. AVStream exposes the demux projection.",
     "The Matroska source track publishes its native CodecID string and metadata; the public FFmpeg track has a numeric or absent codec_tag and a disposition projection. Compare Block timing separately when deciding packet differences.",
     "The transport source reports declared PMT tracks and PES fields. FFmpeg projects disposition and can fill DTS from PTS or deliver different PES boundaries. H.222.0 permits PTS without a coded DTS.",
-    "The strict source opener and MOV demuxer disagree on admission of the authored file. Read its box and table extents against ISO/IEC 14496-12; the gate has no recovery rule for this case."
+    "The explicit BoundedPrefix opener and compatibility index expose the source PacketInfo clocks of the six samples. The comparison still needs to align raw sample-entry metadata with the decoder configuration and defaults exposed by the MOV demuxer."
   ],
   "open_cases": [
     {
@@ -1667,29 +1667,43 @@
       ]
     },
     {
-      "id": "mp4-bad-ctts-count-mismatch",
-      "requirement": "The strict source opener and MOV demuxer disagree on admission of the authored file. Read its box and table extents against ISO/IEC 14496-12; the gate has no recovery rule for this case.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "mp4-timing-policy-bad-ctts-count-mismatch",
-      "requirement": "The strict source opener and MOV demuxer disagree on admission of the authored file. Read its box and table extents against ISO/IEC 14496-12; the gate has no recovery rule for this case.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "mp4-bad-stts-count-mismatch",
-      "requirement": "The strict source opener and MOV demuxer disagree on admission of the authored file. Read its box and table extents against ISO/IEC 14496-12; the gate has no recovery rule for this case.",
+      "requirement": "The explicit BoundedPrefix opener and compatibility index expose the source PacketInfo clocks of the six samples. The comparison still needs to align raw sample-entry metadata with the decoder configuration and defaults exposed by the MOV demuxer.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "mp4-timing-policy-bad-stts-count-mismatch",
-      "requirement": "The strict source opener and MOV demuxer disagree on admission of the authored file. Read its box and table extents against ISO/IEC 14496-12; the gate has no recovery rule for this case.",
+      "requirement": "The explicit BoundedPrefix opener and compatibility index expose the source PacketInfo clocks of the six samples. The comparison still needs to align raw sample-entry metadata with the decoder configuration and defaults exposed by the MOV demuxer.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "Surplus composition timing entries make a strict sample table inadmissible",
+      "clause": "ISO/IEC 14496-12:2015 §§8.6.1.3.1–8.6.1.3.3 and §8.7.3.2.2 define one timing fact per sample described by the size table. This fixture writes 12 timing occurrences for six samples.",
+      "candidate": "The strict source opener refuses the inconsistent sample table.",
+      "reference": "The MOV demuxer opens and emits the six samples using the readable timing prefix.",
+      "compat": "A caller needing bounded prefix recovery selects TimingRunPolicy::BoundedPrefix and the compat::mov index.",
+      "cases": [
+        "mp4-bad-ctts-count-mismatch"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "reading": "Surplus decode timing entries make a strict sample table inadmissible",
+      "clause": "ISO/IEC 14496-12:2015 §§8.6.1.2.1–8.6.1.2.3 and §8.7.3.2.2 define one timing fact per sample described by the size table. This fixture writes 7 timing occurrences for six samples.",
+      "candidate": "The strict source opener refuses the inconsistent sample table.",
+      "reference": "The MOV demuxer opens and emits the six samples using the readable timing prefix.",
+      "compat": "A caller needing bounded prefix recovery selects TimingRunPolicy::BoundedPrefix and the compat::mov index.",
+      "cases": [
+        "mp4-bad-stts-count-mismatch"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
