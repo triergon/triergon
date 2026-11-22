@@ -25,6 +25,8 @@ pub enum DiagnosticKind {
     UnsupportedVpVersion(u8),
     /// A `vpcC` child shorter than 5 bytes; it fails the open.
     EmptyVpConfiguration,
+    /// A `dOps` child with a nonzero version; it fails the open.
+    UnsupportedOpusVersion,
     /// A `ddts` child whose `ChannelLayout`, carried here, is above 255.
     UnsupportedDtsLayout(u16),
     /// A `ddts` child whose sampling frequency, read as signed and carried here, is not
@@ -46,6 +48,7 @@ impl fmt::Display for DiagnosticKind {
                 write!(f, "Unsupported VP Codec Configuration box version {v}")
             }
             Self::EmptyVpConfiguration => write!(f, "Empty VP Codec Configuration box"),
+            Self::UnsupportedOpusVersion => write!(f, "unsupported OpusSpecificBox version"),
             Self::UnsupportedDtsLayout(_) => write!(f, "Unsupported DTS audio channel layout"),
             Self::InvalidDtsRate(v) => write!(f, "Invalid sample rate {v}"),
             Self::AttemptedChildOverread { atom, bytes } => {
@@ -291,7 +294,7 @@ impl PrivateDiagnosticJob {
         }
     }
     /// Walks further children. Fails with `Error::Unsupported` for a child whose effect is
-    /// not modelled: a `dOps` shorter than 11 bytes, of nonzero version or after other
+    /// not modelled: a version-zero `dOps` shorter than 11 bytes, or a `dOps` after other
     /// configuration, a `vpcC` of version 1, or an `esds` whose ES descriptor is followed
     /// by a decoder configuration descriptor.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
@@ -415,7 +418,20 @@ impl PrivateDiagnosticJob {
                     }
                 }
                 k if k == *b"dOps" => {
-                    if body.len() < 11 || body[0] != 0 || self.demux_size != 0 {
+                    if self.demux_size != 0 {
+                        return Err(Error::Unsupported("private diagnostic Opus context"));
+                    }
+                    if body[0] != 0 {
+                        self.emitting[0] = Some(self.event(
+                            &raw,
+                            DiagnosticKind::UnsupportedOpusVersion,
+                            None,
+                            false,
+                        ));
+                        self.demux_failure = Some(-1_094_995_529);
+                        continue;
+                    }
+                    if body.len() < 11 {
                         return Err(Error::Unsupported("private diagnostic Opus context"));
                     }
                     self.demux_size = 19;

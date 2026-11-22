@@ -6,12 +6,43 @@ use triergon_isobmff::{
     BuildStatus, Limits,
     compat::mov::packets::StreamView,
     movie::TrackHeader,
+    reference_trace::mov::diagnostics::{DiagnosticKind, PrivateDiagnosticJob},
     reference_trace::mov::sample_entry::{
         PrivateCatalogueProfile, PrivateConfigCause, PrivateConfiguration, PrivateConfigurationJob,
     },
     table::SampleTable,
 };
 const BASE: &[u8] = include_bytes!("fixtures/private-catalogue/dOps-only-size-11.mov");
+
+#[test]
+fn unsupported_opus_version_reports_the_child_and_refuses_open() {
+    let mut bytes = BASE.to_vec();
+    let version = bytes.windows(4).position(|kind| kind == b"dOps").unwrap() + 4;
+    bytes[version] = 1;
+    let source = Source::new(&bytes);
+    let cancel = AtomicBool::new(false);
+    for quantum in [1, 4096] {
+        let mut job =
+            PrivateDiagnosticJob::new(&source.table, &source.pool, Limits::default()).unwrap();
+        while job.poll(&mut WorkBudget::new(quantum), &cancel).unwrap() == BuildStatus::Yield {}
+        let result = job.try_finish(&cancel).unwrap();
+        let [event] = result.events.as_slice() else {
+            panic!("expected one Opus diagnostic");
+        };
+        assert_eq!(event.kind, DiagnosticKind::UnsupportedOpusVersion);
+        assert_eq!(
+            event.kind.to_string(),
+            "unsupported OpusSpecificBox version"
+        );
+        assert_eq!(event.child_ordinal, 1);
+        assert_eq!(event.raw.header().kind, *b"dOps");
+        assert_eq!(event.raw.payload(), &bytes[version..version + 11]);
+        assert!(event.inspected_parent_span.is_none());
+        assert!(!event.source_child_truncated);
+        assert_eq!(result.demux_open_result, Some(-1_094_995_529));
+    }
+}
+
 struct Source {
     pool: Budget,
     header: TrackHeader,

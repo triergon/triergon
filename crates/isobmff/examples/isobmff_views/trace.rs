@@ -369,6 +369,7 @@ impl RawMovie {
                     let level = match entry.kind {
                         DiagnosticKind::IgnoredAdditionalConfiguration => 24,
                         DiagnosticKind::InvalidDtsRate(_)
+                        | DiagnosticKind::UnsupportedOpusVersion
                         | DiagnosticKind::EmptyVpConfiguration => 16,
                         _ => 24,
                     };
