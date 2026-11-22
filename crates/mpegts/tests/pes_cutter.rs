@@ -284,11 +284,11 @@ fn formats_are_detected_by_repeated_sync_bytes() {
 }
 
 #[test]
-#[ignore = "requires the pinned TS188 comparison ffprobe"]
+#[ignore = "requires the prepared formats ffprobe"]
 fn authored_reference_clock_and_terminal_controls() {
     use std::process::Command;
     let reference = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../.research/ts188-comparison-reference/ffprobe");
+        .join("../../.research/reference-formats/install/bin/ffprobe");
     let mut ts = Vec::new();
     fn section(pid: u16, mut section: Vec<u8>) -> Vec<u8> {
         let mut crc = u32::MAX;

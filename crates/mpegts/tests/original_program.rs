@@ -967,7 +967,7 @@ fn original_terminal_pes_compatibility() {
 }
 
 #[test]
-#[ignore = "requires hash-pinned original mpegts/loewe.ts"]
+#[ignore = "requires hash-pinned original mpegts/loewe.ts and the prepared formats ffprobe"]
 fn original_registered_observer_metadata() {
     use triergon_mpegts::compat::pes::{
         DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, RegisteredCarriage, SourceContext,
@@ -985,7 +985,7 @@ fn original_registered_observer_metadata() {
         .collect();
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let output =
-        std::process::Command::new(root.join(".research/ts188-comparison-reference/ffprobe"))
+        std::process::Command::new(root.join(".research/reference-formats/install/bin/ffprobe"))
             .args([
                 "-v",
                 "error",

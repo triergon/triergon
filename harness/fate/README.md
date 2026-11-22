@@ -72,11 +72,13 @@ candidate PES operation requires a program-level reader on both sources. The
 candidate access-unit operation reports a PSI diagnostic for `pmtchange.ts` and
 a transport diagnostic for `loewe.ts`. These comparisons remain open.
 
-Run the source-only program reader controls with the hash-pinned originals in
-`.research/fate-samples/mpegts`:
+Run the program reader and reference clock controls with the hash-pinned
+originals in `.research/fate-samples/mpegts` and the prepared formats probe.
 
 ```sh
+CARGO_INCREMENTAL=0 cargo xtask prepare-ffmpeg --profile formats
 CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test original_program -- --ignored
+CARGO_INCREMENTAL=0 cargo test -p triergon-mpegts --test pes_cutter authored_reference_clock_and_terminal_controls -- --ignored
 ```
 
 The controls assert the same source events for one-byte and 32 KiB delivery.
