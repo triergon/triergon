@@ -49,6 +49,7 @@ impl Retain {
 
     pub(super) fn other(&mut self, event: ReaderEvent, tracks_present: bool) -> bool {
         if let ReaderEvent::Source(source) = &event {
+            #[allow(clippy::needless_bool, reason = "A map from another epoch rejects the entire event.")]
             let table = match source.event() {
                 TraceEvent::ProgramMap {
                     active: true,
