@@ -283,6 +283,122 @@ fn framed_free_format_bounds_crc_lsf_and_backpressure() {
     ));
 }
 
+// One allocated mono subband, with twelve nonzero samples; the rest is ancillary.
+fn layer_one_free_frame(padded: bool) -> Vec<u8> {
+    let mut frame = vec![0; 136 + usize::from(padded) * 4];
+    let header = 0xffff_00c0u32 | (u32::from(padded) << 9);
+    frame[..4].copy_from_slice(&header.to_be_bytes());
+    frame[4] = 0x10; // subband 0 uses two bits per sample
+    // The scalefactor is zero; twelve samples have the bit pattern 10.
+    for bit in 0..12 {
+        let offset = 32 + 128 + 6 + bit * 2;
+        frame[offset / 8] |= 1 << (7 - offset % 8);
+    }
+    frame
+}
+
+#[test]
+fn free_layer_one_source_delivery_and_pcm() {
+    use triergon::PacketInfo;
+    let frames: Vec<_> = (0..6).map(|i| layer_one_free_frame(i % 2 == 1)).collect();
+    let stream = frames.concat();
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = triergon::open_blocking(std::io::Cursor::new(&stream), &pool).unwrap();
+    let mut decoder = Decoder::new_in(&pool);
+    let mut ordinary = Decoder::new();
+    let mut out = AudioFrame::default();
+    let mut expected = AudioFrame::default();
+    let mut signal = false;
+    for source in &frames {
+        let packet = reader.next_packet().unwrap().unwrap();
+        assert_eq!(packet.payload(), source);
+        decoder.decode(packet.payload(), &mut out).unwrap();
+        let mut conventional = source.clone();
+        conventional[2] |= 0x40; // 128 kbit/s gives the same 136/140 byte extent
+        assert_eq!(
+            frame_header(&conventional).unwrap().frame_bytes(),
+            Some(source.len())
+        );
+        ordinary.decode_frame(&conventional, &mut expected).unwrap();
+        assert_eq!(out.planes, expected.planes);
+        assert_eq!((out.sample_rate, out.samples_per_channel), (44_100, 384));
+        signal |= out.planes[0].iter().any(|&sample| sample != 0.0);
+    }
+    assert!(reader.next_packet().unwrap().is_none());
+    assert!(signal);
+    for length in [0, 3, 5, 4097] {
+        let mut frame = layer_one_free_frame(false);
+        frame.resize(length, 0);
+        assert!(matches!(
+            decoder.decode_framed(&frame, &mut out),
+            Err(DecodeError::Invalid(_))
+        ));
+    }
+}
+
+#[test]
+#[ignore = "requires mpg123 1.33.7; PCM comparison currently fails"]
+fn free_layer_one_matches_mpg123() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    use triergon::PacketInfo;
+
+    let program = std::env::var_os("TRIERGON_MPG123").unwrap();
+    let version = Command::new(&program).arg("--version").output().unwrap();
+    assert!(String::from_utf8_lossy(&version.stdout).contains("mpg123 1.33.7"));
+    let frames: Vec<_> = (0..6).map(|i| layer_one_free_frame(i % 2 == 1)).collect();
+    let stream = frames.concat();
+    let declared: Vec<u8> = frames
+        .into_iter()
+        .flat_map(|mut frame| {
+            frame[2] |= 0x40;
+            assert_eq!(
+                frame_header(&frame).unwrap().frame_bytes(),
+                Some(frame.len())
+            );
+            frame
+        })
+        .collect();
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = triergon::open_blocking(std::io::Cursor::new(&stream), &pool).unwrap();
+    let mut decoder = Decoder::new_in(&pool);
+    let mut frame = AudioFrame::default();
+    let mut candidate = Vec::new();
+    while let Some(packet) = reader.next_packet().unwrap() {
+        decoder.decode(packet.payload(), &mut frame).unwrap();
+        candidate.extend_from_slice(&frame.planes[0]);
+    }
+    assert_eq!(candidate.len(), 6 * 384);
+
+    for (label, input) in [
+        ("declared bitrate", &declared),
+        ("original headers", &stream),
+    ] {
+        let mut child = Command::new(&program)
+            .args(["--no-gapless", "--float", "-q", "-s", "-"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(input).unwrap();
+        let reference = child.wait_with_output().unwrap();
+        assert!(reference.status.success());
+        assert_eq!(reference.stdout.len(), candidate.len() * 4);
+        let mut peak = 0.0_f64;
+        let mut squared = 0.0_f64;
+        for (&value, bytes) in candidate.iter().zip(reference.stdout.chunks_exact(4)) {
+            let expected = f32::from_ne_bytes(bytes.try_into().unwrap());
+            let difference = f64::from(value) - f64::from(expected);
+            assert!(difference.is_finite());
+            peak = peak.max(difference.abs());
+            squared += difference * difference;
+        }
+        let rms = (squared / candidate.len() as f64).sqrt();
+        println!("{label}: 6 frames, RMS {rms:.3e}, peak {peak:.3e}");
+        assert!(rms <= 1e-6 && peak <= 1e-5, "{label}");
+    }
+}
+
 const FREE_FORMAT_MONO: &str = "harness/fixtures/mpegts/free-format-mono.mp3";
 
 fn free_format_frames(bytes: &[u8], channels: usize, mut visit: impl FnMut(&AudioFrame)) -> usize {

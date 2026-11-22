@@ -29,15 +29,16 @@ All four formats run one frame-stream engine: leading ID3v2 tags, the format's
 opening, a sync confirmed by the frames after it, then access units until a trailing
 ID3v1 or APEv2 tag or the end. Packet times are samples (`1/sample_rate`); every frame
 is a random-access point. Tags are kept as bounded opaque bytes (`Reader::tags`).
-Probing free-format Layer III at the start of the audio needs three headers that
-agree on the frame length after accounting for each header's padding bit. The
-reader retains that length through packet delivery and seeking, so a header-like
-sequence inside main data does not split the frame.
+Probing free-format Layer I and III at the start of the audio needs three
+headers with consistent unpadded frame lengths. A padding slot is four bytes
+in Layer I and one byte in Layer III. The reader retains the confirmed length
+through packet delivery and seeking, including when main data contains
+header-like bytes.
 
 | Format | Frame end | Bytes between frames | Configuration | Codec tag |
 |---|---|---|---|---|
 | FLAC | next header with a valid CRC-8 that the frame's CRC-16 confirms, or that numbers on from a damaged frame | part of the frame before | `fLaC` + STREAMINFO + VORBIS_COMMENT (FFmpeg keeps STREAMINFO and honours the comment's `WAVEFORMATEXTENSIBLE_CHANNEL_MASK`) | `fLaC` |
-| MPEG audio | header length; confirmed free-format Layer III spacing, or the next header where spacing is unknown | prepended to the next packet | none | `mp1`, `mp2`, `mp3` |
+| MPEG audio | header length; confirmed free-format Layer I or III spacing, or the next header where spacing is unknown | prepended to the next packet | none | `mp1`, `mp2`, `mp3` |
 | ADTS | `frame_length` | dropped | none (packets keep their ADTS header) | `adts` |
 | AC-3, E-AC-3 | `frmsiz`; an access unit adds the dependent and further substreams after substream 0 | appended to the packet before | none | `ac-3`, `ec-3` |
 

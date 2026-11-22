@@ -16,7 +16,7 @@ pub enum Kind {
 /// The elementary stream `bytes` holds, after any ID3v2 tag: native FLAC by its marker,
 /// MPEG audio, ADTS and AC-3 by two frames that follow each other from the first byte,
 /// and FLAC without its marker by a frame header the next header numbers on from.
-/// Free-format Layer III needs three headers at one unpadded frame length.
+/// Free-format Layer I and III need three headers at one unpadded frame length.
 /// MPEG audio and marker-less FLAC may also start later, as FFmpeg's probe allows: MPEG
 /// audio then needs three frames, FLAC a first frame its CRC-16 confirms. `None` when
 /// `bytes` is too short to tell, including an ID3v2 tag that does not fit in it.
@@ -37,7 +37,7 @@ pub fn probe(bytes: &[u8]) -> Option<Kind> {
     if flac_frames(bytes, false) {
         return Some(Kind::Flac);
     }
-    if free_layer_three(bytes) {
+    if free_format(bytes) {
         return Some(Kind::MpegAudio);
     }
     let later = (1..bytes.len()).filter(|&at| bytes[at] == 0xff);
@@ -113,7 +113,7 @@ fn mpeg_frame(b: &[u8]) -> Option<(MpegAudioHeader, usize)> {
 
 /// Confirm two spans of the same unpadded length. One later sync could be payload.
 #[cold]
-fn free_layer_three(bytes: &[u8]) -> bool {
+fn free_format(bytes: &[u8]) -> bool {
     let mut probe = FreeFormatProbe::default();
     let mut work = WorkBudget::new(bytes.len() as u64);
     probe.step(bytes, bytes.len() / 2, true, &mut work);

@@ -1,6 +1,6 @@
 //! MPEG-1, MPEG-2 and MPEG-2.5 audio, Layer I, II and III (ISO/IEC 11172-3, 13818-3).
 //!
-//! Frames follow the header length. Free-format Layer III can infer an unpadded
+//! Frames follow the header length. Free-format Layer I and III can infer an unpadded
 //! frame length from three consecutive headers. A first Layer III frame carrying
 //! a Xing, Info or VBRI description is not delivered. Bytes between frames go
 //! into the packet of the frame after them. Bytes after the last frame form a
@@ -89,13 +89,21 @@ impl FreeFormatProbe {
         let Some(first) = MpegAudioHeader::from_bytes(bytes) else {
             return Prelude::Done;
         };
-        if first.bitrate_kbps != 0 || first.layer != MpegLayer::III {
+        if first.bitrate_kbps != 0 || first.layer == MpegLayer::II {
             return Prelude::Done;
         }
-        let header_bytes = |h: &MpegAudioHeader| 4 + usize::from(h.crc) * 2 + h.side_info_bytes();
+        let prefix_bytes = |h: &MpegAudioHeader| {
+            let side = if h.layer == MpegLayer::III {
+                h.side_info_bytes()
+            } else {
+                0
+            };
+            4 + usize::from(h.crc) * 2 + side
+        };
         let same_stream = |h: &MpegAudioHeader| h.bitrate_kbps == 0 && first.same_stream(h);
-        let first_padding = usize::from(first.padding);
-        self.second = self.second.max(header_bytes(&first));
+        let slot = if first.layer == MpegLayer::I { 4 } else { 1 };
+        let first_padding = usize::from(first.padding) * slot;
+        self.second = self.second.max(prefix_bytes(&first) + first_padding);
         // Both complete spans and the third header must fit the address space.
         let maximum = maximum.min((usize::MAX - 4) / 2);
         while self.second <= maximum {
@@ -124,9 +132,12 @@ impl FreeFormatProbe {
                 MpegAudioHeader::from_bytes(&bytes[self.second..]).filter(same_stream)
             {
                 let base = self.second - first_padding;
-                let next_length = base + usize::from(second.padding);
+                let next_length = base + usize::from(second.padding) * slot;
                 let third = self.second + next_length;
-                if next_length >= header_bytes(&second) && next_length <= maximum {
+                if base.is_multiple_of(slot)
+                    && base >= prefix_bytes(&second)
+                    && next_length <= maximum
+                {
                     if bytes.len() < third + 4 && !at_end {
                         return Prelude::Need(third + 4);
                     }
@@ -234,10 +245,13 @@ impl Syntax for MpegAudio {
     fn length(&self, header: &MpegAudioHeader) -> Length {
         match header.frame_bytes() {
             Some(len) => Length::Known(len),
-            None if header.layer == MpegLayer::III
+            None if header.layer != MpegLayer::II
                 && let Some(base) = self.free_format.base() =>
             {
-                Length::Known(base + usize::from(header.padding))
+                Length::Known(
+                    base + usize::from(header.padding)
+                        * if header.layer == MpegLayer::I { 4 } else { 1 },
+                )
             }
             None => Length::Search {
                 minimum: 4 + usize::from(header.crc) * 2,
