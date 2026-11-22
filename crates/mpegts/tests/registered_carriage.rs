@@ -205,8 +205,6 @@ fn constructor(case: Case) {
     let before = budget.used();
     let admitted = observer(case, &budget);
     assert_eq!(admitted.scope(), scope(case));
-    #[cfg(feature = "reference-trace")]
-    assert_eq!(admitted.profile(), DemuxProfile::PesPackets);
     assert_eq!(
         budget.used(),
         before,

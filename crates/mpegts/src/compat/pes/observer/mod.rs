@@ -652,16 +652,6 @@ impl DemuxObserver {
         self.entity_first = false;
     }
 
-    /// The demux profile packets are cut under.
-    #[cfg(feature = "reference-trace")]
-    pub fn profile(&self) -> DemuxProfile {
-        self.profile
-    }
-    /// The operation name the observer's packets are recorded under in comparison traces.
-    #[cfg(feature = "reference-trace")]
-    pub fn operation(&self) -> &'static str {
-        "demux-pes-packets"
-    }
     /// The selected program and PID this observer cuts.
     pub fn scope(&self) -> DemuxScope {
         self.scope

@@ -5,8 +5,6 @@
 //! comparison, and they are absent from default builds. With the feature enabled,
 //! [`DemuxProfile`](crate::compat::pes::DemuxProfile) also names the reference
 //! build and its options, and these are also available:
-//! [`DemuxObserver::profile`](crate::compat::pes::DemuxObserver::profile),
-//! [`DemuxObserver::operation`](crate::compat::pes::DemuxObserver::operation),
 //! [`DemuxClock::project_encoded_header`](crate::compat::pes::DemuxClock::project_encoded_header),
 //! [`DemuxClock::project_diagnostic_header`](crate::compat::pes::DemuxClock::project_diagnostic_header),
 //! [`InputContext::basis`](crate::compat::input::InputContext::basis) and

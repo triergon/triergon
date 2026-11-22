@@ -705,7 +705,7 @@ impl RecoveryObserver {
                     );
                     return Ok(AssemblyStep::Output(DemuxObservation::FromRejectedCarrier(
                         RecoveredPacket {
-                            profile: self.inner.profile(),
+                            profile: DemuxProfile::PesPackets,
                             program: scope.program,
                             pid: scope.pid,
                             source_origin: SourceLocation {

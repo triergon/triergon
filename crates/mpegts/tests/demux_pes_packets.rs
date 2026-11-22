@@ -692,7 +692,7 @@ fn unproven_stream_profile_is_an_explicit_nonpass() {
 fn demux_profile_keeps_exact_original_reference_contract() {
     let budget = Budget::new(4096).unwrap();
     let observer = observer(&budget);
-    let profile = observer.profile();
+    let profile = DemuxProfile::PesPackets;
     assert_eq!(
         profile.worker_sha256(),
         "19c06e53c62852b409eec9771cb11d9d7f5164b4618545a449d7e993f99346df"

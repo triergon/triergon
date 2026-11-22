@@ -677,7 +677,7 @@ impl RecoveryObserver {
                     let scope = self.inner.scope();
                     return Ok(AssemblyStep::Output(
                         DemuxObservation::FromSelectedDiagnostic(DiagnosticPacket {
-                            profile: self.inner.profile(),
+                            profile: DemuxProfile::PesPackets,
                             program: scope.program,
                             pid: scope.pid,
                             source_origin: SourceLocation {
