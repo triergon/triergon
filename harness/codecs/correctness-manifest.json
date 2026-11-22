@@ -1,11 +1,7 @@
 {
  "schema": "triergon.codecs.correctness-manifest.v1",
  "open_cases": [
-  "01 - changing samplerate.flac",
-  "02 - increasing number of channels.flac",
-  "03 - decreasing number of channels.flac",
   "flac_3ch_odd_mask.flac",
-  "he_mode.bit",
   "FM1_BT_B.h264",
   "FM1_FT_E.264",
   "FM2_SVA_B.264",
@@ -3694,6 +3690,7 @@
   {
    "lane": "flac",
    "name": "01 - changing samplerate.flac",
+   "native_frames": true,
    "path": ".research/flac-test-files/uncommon/01 - changing samplerate.flac",
    "bytes": 1086457,
    "sha256": "9fa8f7c57186be8708f42620885a71d4c4871767ff55cfe063eb1cf3bad8d0a5"
@@ -3701,6 +3698,7 @@
   {
    "lane": "flac",
    "name": "02 - increasing number of channels.flac",
+   "native_frames": true,
    "path": ".research/flac-test-files/uncommon/02 - increasing number of channels.flac",
    "bytes": 263297,
    "sha256": "fe70d5e324bea56e9569d4ff9d4b6fa9c33d3f763e7fec5b1f27904e648a0482"
@@ -3708,6 +3706,7 @@
   {
    "lane": "flac",
    "name": "03 - decreasing number of channels.flac",
+   "native_frames": true,
    "path": ".research/flac-test-files/uncommon/03 - decreasing number of channels.flac",
    "bytes": 359869,
    "sha256": "8e3c451d835cd9a0ef8914e027cf93c98985bd1bb4d7eea59deb15996b97be3b"
@@ -4590,6 +4589,7 @@
   {
    "lane": "mp3",
    "name": "he_mode.bit",
+   "native_frames": true,
    "path": ".research/fate-samples/mp3-conformance/he_mode.bit",
    "bytes": 53498,
    "sha256": "fb90396d9bb13311be35284d061e19196830d213d823e05297b18172c88d90ce"

@@ -12,6 +12,7 @@
 //! refusals are recorded per vector as they happen. Selection (in set or not)
 //! is applied afterwards by the summary, never by skipping inputs here.
 
+mod native_audio;
 mod play;
 mod session;
 mod video;
@@ -1209,6 +1210,7 @@ pub fn grade(a: &Grade) -> Result<(), String> {
             .map(str::to_owned)
             .ok_or_else(|| format!("vector without {key}"))
     };
+    let mut native_reference = None;
     for (v, lane) in scheduled.filter(|(_, lane)| lane.is_some() && in_lanes(*lane)) {
         let lane = lane.ok_or("vector without lane")?.to_owned();
         let relative = text(v, "path")?;
@@ -1278,6 +1280,22 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                 "output".into(),
                 observation(play::grade(a, &path, &tmp.0, v), &lane)?,
             ));
+        } else if native_audio::selected(&lane, v) {
+            if native_reference.is_none() {
+                let directory = TempDir::new(a.scratch.as_deref())?;
+                let executable = native_audio::build(&directory.0, &a.ffmpeg)?;
+                native_reference = Some((directory, executable));
+            }
+            let executable = &native_reference
+                .as_ref()
+                .ok_or("missing native audio runner")?
+                .1;
+            match native_audio::grade(a, &lane, &python::path(&path), &tmp.0, executable) {
+                Ok((decoder, output)) => {
+                    row.extend([("decoder".into(), decoder), ("output".into(), output)])
+                }
+                Err(error) => row.push(("decoder".into(), observation(Err(error), &lane)?)),
+            }
         } else {
             let path = python::path(&path);
             let sha256 = text(v, "sha256")?;

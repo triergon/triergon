@@ -108,11 +108,10 @@ including both timed FLAC inputs.
   output against each stream's STREAMINFO MD5 and the float output against it.
 - `cargo xtask codecs grade` decodes them through the container readers and compares the
   output with the pinned FFmpeg's byte for byte (the `flac` lane, under the lossless
-  section of the numeric rules; [harness/codecs/STATUS.md](../../harness/codecs/STATUS.md)). On the gate
-  build 183/187 pass, bit-exact. Open: `01 - changing samplerate`, `02 - increasing
-  number of channels` and `03 - decreasing number of channels` change format mid-stream,
-  and FFmpeg's CLI converts them to the first frame's format (each decodes exactly on its
-  own); `flac_3ch_odd_mask` matches FFmpeg's decoder, but FFmpeg refuses its layout on the
+  section of the numeric rules; [harness/codecs/STATUS.md](../../harness/codecs/STATUS.md)).
+  The three vectors with sample-rate or channel-count changes compare complete runs of
+  decoded frames at each native format and stereo output at each native sample rate.
+  `flac_3ch_odd_mask` matches FFmpeg's decoder, but FFmpeg refuses its layout on the
   stereo output. Runtime and memory against the [gates](../../docs/quality.md#gates):
   [status](../../docs/status.md).
 

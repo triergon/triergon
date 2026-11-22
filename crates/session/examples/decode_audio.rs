@@ -2,7 +2,7 @@
 //! container is recognised from its first bytes, the decoder chosen from the track, and
 //! the container's trims applied.
 //!
-//! usage: decode_audio INPUT OUTPUT.f32 [--crc reject] [--reset-at N,...]
+//! usage: decode_audio INPUT OUTPUT.f32 [--native-frames] [--crc reject] [--reset-at N,...]
 //!
 //! Prints one JSON line to stderr: sample rate, channels, layout, frames, samples.
 use std::io::Write;
@@ -25,7 +25,9 @@ struct Summary {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let [_, input, output, options @ ..] = args.as_slice() else {
-        eprintln!("usage: decode_audio INPUT OUTPUT.f32 [--crc reject] [--reset-at N,...]");
+        eprintln!(
+            "usage: decode_audio INPUT OUTPUT.f32 [--native-frames] [--crc reject] [--reset-at N,...]"
+        );
         std::process::exit(2);
     };
     let options = Options::parse(options).expect("decode options");
@@ -60,11 +62,18 @@ fn main() {
 struct Options {
     reject_crc: bool,
     reset_at: Vec<usize>,
+    native_frames: bool,
 }
 
 impl Options {
     fn parse(args: &[String]) -> Result<Self, String> {
         let mut options = Self::default();
+        let args = if args.first().is_some_and(|arg| arg == "--native-frames") {
+            options.native_frames = true;
+            &args[1..]
+        } else {
+            args
+        };
         let mut pairs = args.chunks_exact(2);
         for pair in &mut pairs {
             match (pair[0].as_str(), pair[1].as_str()) {
@@ -179,11 +188,11 @@ fn decode(
         }
         packet_index += 1;
         let decoded = decoder.decode(&packet, &mut frame);
-        summary.write(decoded, &frame, &mut bytes, out)?;
+        summary.write(decoded, &frame, &mut bytes, out, options.native_frames)?;
     }
     if let Some((_, Decoder::Track(decoder), _)) = decoder.as_mut() {
         let flushed = decoder.flush(&mut frame).map_err(|e| format!("{e:?}"));
-        summary.write(flushed, &frame, &mut bytes, out)?;
+        summary.write(flushed, &frame, &mut bytes, out, options.native_frames)?;
     }
     Ok(())
 }
@@ -196,6 +205,7 @@ impl Summary {
         frame: &AudioFrame,
         bytes: &mut Vec<u8>,
         out: &mut impl Write,
+        native_frames: bool,
     ) -> Result<(), String> {
         match decoded {
             Ok(_) if frame.samples_per_channel == 0 => {}
@@ -204,6 +214,15 @@ impl Summary {
                 self.frame_samples.push(frame.samples_per_channel);
                 self.samples += frame.samples_per_channel as u64;
                 self.format.get_or_insert((frame.sample_rate, frame.layout));
+                if native_frames {
+                    eprintln!(
+                        "{{\"rate\":{},\"channels\":{},\"layout\":\"{}\",\"samples\":{}}}",
+                        frame.sample_rate,
+                        frame.layout.channels(),
+                        frame.layout.name(),
+                        frame.samples_per_channel
+                    );
+                }
                 bytes.clear();
                 for i in 0..frame.samples_per_channel {
                     for plane in &frame.planes {
