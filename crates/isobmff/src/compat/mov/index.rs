@@ -283,11 +283,9 @@ impl<'a> IndexCursor<'a> {
                 }
                 let next = self.next.checked_add(1).ok_or(Error::Overflow)?;
                 bound(next, self.max_entries)?;
-                let source_run = self.cursor.ready_source_run()?;
-                let occurrence = self
-                    .cursor
-                    .occurrence()
-                    .ok_or(Error::Invalid("no ready packet"))?;
+                let ready = self.cursor.indexed_occurrence()?;
+                let occurrence = ready.packet;
+                let source_run = ready.source_run;
                 // Public AVIndexEntry has key/discard bits, independently of
                 // AVPacket's disposable hint. Preserve that hint on the retained
                 // occurrence, while the separately typed index keeps its own ABI.

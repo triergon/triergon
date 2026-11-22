@@ -166,6 +166,11 @@ pub struct PacketOccurrence {
     pub scheduling_clock: SchedulingClock,
 }
 
+pub(super) struct IndexedOccurrence<'a> {
+    pub(super) packet: &'a PacketOccurrence,
+    pub(super) source_run: Option<(usize, usize, u32)>,
+}
+
 /// Whether `contender` comes before `incumbent`, the best next packet so far in a
 /// scan of the tracks in catalogue order, as FFmpeg's MOV demuxer picks packets on
 /// a seekable input: by decode time when the two are more than one second apart,
@@ -1242,22 +1247,22 @@ impl<'a> PacketCursor<'a> {
         }
         Ok(skipped)
     }
-    /// Provenance of the currently held source run, accessed before take. O(1)
-    /// in the selected single-track index cursor; no run/sample array expansion.
-    pub(crate) fn ready_source_run(&self) -> Result<Option<(usize, usize, u32)>> {
-        let (slot, ready) = self
+    pub(super) fn indexed_occurrence(&self) -> Result<IndexedOccurrence<'_>> {
+        let (slot, packet) = self
             .ready_slot()
             .ok_or(Error::Invalid("no ready occurrence"))?;
-        if ready.source.fragment_flags.is_none() {
-            return Ok(None);
-        }
-        let (fragment, run) = slot.append_run.ok_or(Error::Invalid("source run absent"))?;
-        let index = slot
-            .track
-            .fragments
-            .get(fragment)
-            .ok_or(Error::Invalid("source fragment absent"))?;
-        Ok(Some((fragment, run, index.run_flags(run)?)))
+        let source_run = if packet.source.fragment_flags.is_some() {
+            let (fragment, run) = slot.append_run.ok_or(Error::Invalid("source run absent"))?;
+            let index = slot
+                .track
+                .fragments
+                .get(fragment)
+                .ok_or(Error::Invalid("source fragment absent"))?;
+            Some((fragment, run, index.run_flags(run)?))
+        } else {
+            None
+        };
+        Ok(IndexedOccurrence { packet, source_run })
     }
     /// The ready packet, without taking it.
     pub fn occurrence(&self) -> Option<&PacketOccurrence> {
