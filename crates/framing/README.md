@@ -111,8 +111,10 @@ its result, and names the FFmpeg revision it reproduces.
 **Input model.** Incremental readers own a core `InputCursor` and accept same-pool
 windows of any size with the exact token, source and offset. An empty window is
 starvation; a known length is not EOF. Truncation, transport failure and cancellation
-are sticky errors, never a synthetic end. A new source or reset needs a new reader.
-Record parsers take a complete pool-owned record (box payload, no size/type header);
+are sticky errors, never a synthetic end. The ADTS stream and carrier readers and the
+DTS normal, 14-bit sync and 14-bit carrier readers restart on the same source at an
+offset with `reset`, under a new token generation; every other reader needs a new
+reader for a new source or position. Record parsers take a complete pool-owned record (box payload, no size/type header);
 sample jobs take one complete container sample.
 
 **Source preservation.** Outputs keep exact source bytes, offsets, source ID and
