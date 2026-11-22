@@ -85,9 +85,12 @@ fn execute(
     if mode == "memory" {
         marker(&mut output, b"TRIERGON_END_V1\n")?;
     }
+    let refusal = total.unsupported.map_or_else(String::new, |detail| {
+        format!(",\"unsupported\":{}", triergon_harness_protocol::quoted(detail))
+    });
     writeln!(
         output,
-        "{{\"schema\":1,\"operation\":\"{}\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
+        "{{\"schema\":1,\"operation\":\"{}\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true{refusal}}}",
         operation.name, total.packets, total.bytes, total.digest,
     )
     .map_err(|error| error.to_string())

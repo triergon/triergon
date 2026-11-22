@@ -8,6 +8,7 @@ pub mod build;
 pub(crate) mod comparison;
 pub mod diff;
 pub mod features;
+mod fold_refusal;
 pub mod gate_build;
 pub mod grade;
 pub mod link_corpus;

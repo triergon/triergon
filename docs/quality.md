@@ -352,6 +352,13 @@ resource limit becomes an explicit, reviewed rule for that case.
   they hold open cases, a case may be listed only once, and each counts in
   `harness/gate-exceptions.json`. A deviation is decided; a case nobody has decided
   stays an open case.
+- **Registered decoder refusals.** A prefix comparison can register unsupported
+  inputs under `open_refusals`. Each entry names the specification clause, the
+  first typed unsupported detail and each case's input hash and complete candidate
+  fold. The report checks those values and the existing reference pin against
+  both live folds. It reports matching refusals separately from matching output.
+  A changed refusal, incomplete fold or input that now decodes identically
+  fails the comparison.
 - **Bounds.** `cargo xtask grade` fails on a case whose runtime bound is above the
   ceiling, or whose heap or total RSS bound is not below 1, or whose measurement of
   either is not valid, and prints one line per failing bound and case, as the codec

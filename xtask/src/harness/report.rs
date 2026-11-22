@@ -1111,6 +1111,7 @@ pub(crate) fn collect(
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
     let target = gate_target()?;
     let open = open_cases(&contract, &manifest, &target)?;
+    let fold_refusals = super::fold_refusal::read(&contract, &target)?;
     let unmeasured = super::bounds::Unmeasured::read(&contract, &manifest, &target)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
@@ -1189,6 +1190,14 @@ pub(crate) fn collect(
         .get("cases")
         .and_then(Value::as_array)
         .unwrap_or_default();
+    for (id, refusal) in &fold_refusals {
+        let case = cases.iter().find(|case| s(case, "id") == Some(id));
+        if open.iter().any(|open_id| open_id == id)
+            || !refusal.binds_input(case.and_then(|case| s(case, "sha256")))
+        {
+            return Err(format!("{id}: registered refusal overlaps an open case or has no pinned input"));
+        }
+    }
     reserve_case_outputs(&options.output, cases)?;
     let mut rows: Vec<Value> = Vec::new();
     let mut memory_jobs = Vec::new();
@@ -1286,6 +1295,13 @@ pub(crate) fn collect(
             ));
             let per_target = crate::generators::pinned_per_target(&contract);
             let expected = expected_for(case, &target);
+            let refusal = fold_refusals.get(id.as_str());
+            if refusal.is_some() {
+                timed = None;
+                if expected.is_none() {
+                    return Err(format!("{id}: registered refusal has no reference fold"));
+                }
+            }
             let ran = parity::feed_parity(
                 &run,
                 (prefix, reference_prefix.unwrap_or(prefix)),
@@ -1293,6 +1309,7 @@ pub(crate) fn collect(
                 expected.unwrap_or(&Value::Null),
                 &work_fields,
                 per_target,
+                refusal,
             )?;
             if expected.is_some() {
                 ran
@@ -1688,11 +1705,23 @@ pub(crate) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
     let reported = ids(&unpinned);
     let still_open = ids(&|row| !passed(row) && listed(row));
     let closed = ids(&|row| passed(row) && listed(row));
+    let refused = ids(&|row| {
+        passed(row)
+            && row.get("parity").and_then(|proof| s(proof, "comparison"))
+                == Some(super::fold_refusal::COMPARISON)
+    });
+    let passing = rows.iter().filter(|row| passed(row)).count() - refused.len();
     println!(
-        "{label}: {} of {} cases pass",
-        rows.iter().filter(|row| passed(row)).count(),
+        "{label}: {passing} of {} cases pass",
         rows.len()
     );
+    if !refused.is_empty() {
+        println!(
+            "{label}: {} registered refusals: {}",
+            refused.len(),
+            refused.join(", ")
+        );
+    }
     if !still_open.is_empty() {
         println!(
             "{label}: {} open failures, as listed: {}",

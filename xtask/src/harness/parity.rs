@@ -727,19 +727,37 @@ pub fn seek_parity(
 /// C leaves to the target) passes only in a feature pinned per target
 /// (`pinned_per_target`), on a case whose pin for this target carries the same
 /// flag; elsewhere the case fails as `host-dependent-reference`.
-pub fn feed_parity(
+pub(super) fn feed_parity(
     run: &Run<'_>,
     prefixes: (&str, &str),
     arguments: &[OsString],
     expected: &Value,
     work_fields: &[String],
     per_target: bool,
+    refusal: Option<&super::fold_refusal::Refusal<'_>>,
 ) -> Result<Value, String> {
     let (prefix, reference_prefix) = prefixes;
     let mode = format!("{prefix}fold");
-    let left = run.candidate(&mode, arguments);
+    let left = if refusal.is_some() {
+        let mut arguments = arguments.to_vec();
+        arguments.push(super::fold_refusal::REQUEST.into());
+        run.candidate(&mode, &arguments)
+    } else {
+        run.candidate(&mode, arguments)
+    };
     let right = run.exec(run.reference, &format!("{reference_prefix}fold"), arguments);
-    let result = feed_result(&left, &right, expected, work_fields, per_target);
+    let mut result = feed_result(&left, &right, expected, work_fields, per_target);
+    if let Some(refusal) = refusal {
+        let proof = refusal.proof(&left, &right, expected, work_fields);
+        set(&mut result, "status", status_of(proof.is_some()));
+        set(&mut result, "source_timing_status", status_of(proof.is_some()));
+        if let Some(proof) = proof {
+            set(&mut result, "comparison", Value::str(super::fold_refusal::COMPARISON));
+            set(&mut result, "refusal_proof", proof);
+        } else {
+            set(&mut result, "reason", Value::str("registered refusal evidence changed"));
+        }
+    }
     run.write(
         &mode,
         &Value::object([("candidate", left), ("reference", right)]),

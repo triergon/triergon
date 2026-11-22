@@ -590,6 +590,12 @@ pub(crate) fn acceptance_iter(
     let registered = registered_refusals(contract)
         .map_err(|error| reasons.push(error))
         .unwrap_or_default();
+    let fold_refusals = super::fold_refusal::read(contract, target)
+        .map_err(|error| reasons.push(error))
+        .unwrap_or_default();
+    let fields = super::comparison::work_fields(contract)
+        .map_err(|error| reasons.push(error))
+        .unwrap_or_default();
     let mut ids = BTreeSet::new();
     let mut passed = BTreeSet::new();
     let mut refusals = BTreeSet::new();
@@ -611,7 +617,22 @@ pub(crate) fn acceptance_iter(
             reasons.push("duplicate case identities".into());
         }
         all_parity &= parity_passes(&row);
-        if let Some(spec) = registered.get(id) {
+        if let Some(spec) = fold_refusals.get(id) {
+            let expected = row.get("parity").and_then(|parity| parity.get("expected"));
+            if parity_passes(&row)
+                && expected.is_some_and(|expected| spec.matches_row(&row, expected, &fields))
+            {
+                refusals.insert(id.to_owned());
+                if let Some(profile) = s(&row, "profile") {
+                    passed.insert(profile.to_owned());
+                }
+            } else {
+                reasons.push(format!("{id}: registered fold refusal proof missing or invalid"));
+            }
+            if let Err(error) = validate_case_evidence(&row, identity, s(contract, "id")) {
+                reasons.push(format!("{id}: {error}"));
+            }
+        } else if let Some(spec) = registered.get(id) {
             if refusal_valid(&row, spec, contract) {
                 refusals.insert(id.to_owned());
                 passed.insert(spec.profile.to_owned());
@@ -623,7 +644,10 @@ pub(crate) fn acceptance_iter(
             }
         } else {
             if s(&row, "outcome") == Some("refusal")
-                || row.get("parity").and_then(|proof| s(proof, "comparison")) == Some("refusal")
+                || matches!(
+                    row.get("parity").and_then(|proof| s(proof, "comparison")),
+                    Some("refusal" | super::fold_refusal::COMPARISON)
+                )
             {
                 reasons.push(format!("{id}: unregistered refusal"));
             }
@@ -649,7 +673,11 @@ pub(crate) fn acceptance_iter(
     if ids.is_empty() || !all_parity {
         reasons.push("selected-feature parity incomplete or failing".into());
     }
-    for id in registered.keys().filter(|id| !refusals.contains(**id)) {
+    for id in registered
+        .keys()
+        .chain(fold_refusals.keys())
+        .filter(|id| !refusals.contains(**id))
+    {
         reasons.push(format!("{id}: required refusal missing or invalid"));
     }
     let missing = missing_profiles(contract, &passed);

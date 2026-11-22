@@ -5,6 +5,7 @@ pub(crate) struct Work {
     pub packets: u64,
     pub bytes: u64,
     pub digest: u64,
+    pub unsupported: Option<&'static str>,
 }
 
 impl Work {
@@ -24,5 +25,6 @@ impl Work {
         self.packets += once.packets;
         self.bytes += once.bytes;
         fold(&mut self.digest, once.digest);
+        self.unsupported = self.unsupported.or(once.unsupported);
     }
 }

@@ -3,7 +3,7 @@ use std::io::Write;
 use std::sync::atomic::AtomicBool;
 
 use triergon::framing::nal::{self, RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
-use triergon::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget};
+use triergon::{Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget};
 use triergon_codec_h264 as h264;
 use triergon_codec_hevc as hevc;
 use triergon_harness_protocol::{digest::signed, interleaved::InterleavedDigest, md5};
@@ -145,6 +145,10 @@ fn decode_operation<'a>(
     args: &[OsString],
 ) -> Result<Operation<'a>, String> {
     let properties = prefix == "picture-props-";
+    let (proof, args) = match args.split_last() {
+        Some((last, args)) if last == "--report-refusal" => (true, args),
+        _ => (false, args),
+    };
     let (codec, feed) = match args {
         [codec] if properties => (codec, Feed::AccessUnit),
         [codec, feed] if !properties && feed == "nal" => (codec, Feed::Nal),
@@ -166,10 +170,13 @@ fn decode_operation<'a>(
         },
         run: Box::new(move |work, mut trace| {
             let mut scratch = Vec::new();
-            let refused = decode(input, codec, feed, |picture| {
+            let error = decode(input, codec, feed, |picture| {
                 output_picture(&picture, properties, work, &mut trace, &mut scratch)
             })?;
-            if refused && work.packets == 0 {
+            if proof && let Some(Error::Unsupported(detail)) = error {
+                work.unsupported = Some(detail);
+            }
+            if error.is_some() && work.packets == 0 {
                 work.record(8, &[], &[]);
                 if let Some(trace) = trace {
                     writeln!(trace, "8").map_err(|error| error.to_string())?;
@@ -184,7 +191,7 @@ fn units(
     input: &[u8],
     codec: nal::Codec,
     mut receive: impl FnMut(RawAccessUnit) -> Result<(), String>,
-) -> Result<bool, String> {
+) -> Result<Option<Error>, String> {
     let source = SourceId(0);
     let caps = SourceCapabilities {
         length: Some(input.len() as u64),
@@ -216,19 +223,14 @@ fn units(
                     .map_err(|error| error.to_string())?;
             }
             Ok(Step::Yield) => work = WorkBudget::new(64 << 10),
-            Ok(Step::End(_)) => return Ok(false),
+            Ok(Step::End(_)) => return Ok(None),
             Ok(Step::Backpressure(never)) => match never {},
-            Err(error)
-                if matches!(
-                    error,
-                    triergon::Error::Allocation | triergon::Error::Backpressure(_)
-                ) =>
-            {
+            Err(error) if matches!(error, Error::Allocation | Error::Backpressure(_)) => {
                 return Err(error.to_string());
             }
             Err(error) => {
                 eprintln!("framing: {error}");
-                return Ok(true);
+                return Ok(Some(error));
             }
         }
     }
@@ -333,8 +335,8 @@ fn send_avc_chunks(
     unit: &RawAccessUnit,
     ordinal: i64,
     seed: &mut u32,
-) -> bool {
-    let mut refused = false;
+    error: &mut Option<Error>,
+) {
     let mut start = unit.range.start as usize;
     let mut arrived = start;
     let end = unit.range.end as usize;
@@ -362,13 +364,18 @@ fn send_avc_chunks(
             chunk_end = end;
         }
         if chunk_end > start {
-            refused |= decoder
-                .send_nals(&input[start..chunk_end], chunk_pts)
-                .is_err();
+            record_first_error(error, decoder.send_nals(&input[start..chunk_end], chunk_pts));
             start = chunk_end;
         }
     }
-    refused
+}
+
+fn record_first_error(first: &mut Option<Error>, result: Result<(), impl Into<Error>>) {
+    if let Err(error) = result
+        && first.is_none()
+    {
+        *first = Some(error.into());
+    }
 }
 
 fn decode(
@@ -376,8 +383,8 @@ fn decode(
     codec: nal::Codec,
     feed: Feed,
     mut output: impl FnMut(Picture) -> Result<(), String>,
-) -> Result<bool, String> {
-    let mut refused = false;
+) -> Result<Option<Error>, String> {
+    let mut error = None;
     let mut pts = 0_i64;
     if codec == nal::Codec::Avc {
         let mut decoder = h264::Decoder::new();
@@ -385,7 +392,7 @@ fn decode(
         let framing = units(input, codec, |unit| {
             let data = &input[unit.range.start as usize..unit.range.end as usize];
             match feed {
-                Feed::AccessUnit => refused |= decoder.send(data, Some(pts)).is_err(),
+                Feed::AccessUnit => record_first_error(&mut error, decoder.send(data, Some(pts))),
                 Feed::Nal => {
                     let mut timestamp = Some(pts);
                     for nal in unit.nals() {
@@ -394,43 +401,44 @@ fn decode(
                         } else {
                             None
                         };
-                        refused |= decoder.send_nal(nal.bytes().as_ref(), nal_pts).is_err();
+                        record_first_error(&mut error, decoder.send_nal(nal.bytes().as_ref(), nal_pts));
                     }
                 }
                 Feed::Split => {
-                    refused |= send_avc_chunks(&mut decoder, input, &unit, pts, &mut seed);
+                    send_avc_chunks(&mut decoder, input, &unit, pts, &mut seed, &mut error);
                 }
             }
             pts += 1;
             drain(&mut decoder, &mut output)
         })?;
-        refused |= framing;
+        error = error.or(framing);
         decoder.flush();
         drain(&mut decoder, &mut output)?;
     } else {
         let mut decoder = hevc::Decoder::new();
         if matches!(feed, Feed::AccessUnit) {
             for unit in AccessUnitSplitter::new(input) {
-                refused |= decoder.send(unit, Some(pts)).is_err();
+                record_first_error(&mut error, decoder.send(unit, Some(pts)));
                 pts += 1;
                 drain(&mut decoder, &mut output)?;
             }
         } else {
             let framing = units(input, codec, |unit| {
                 for (index, nal) in unit.nals().iter().enumerate() {
-                    refused |= decoder
-                        .send_nal(nal.bytes().as_ref(), (index == 0).then_some(pts))
-                        .is_err();
+                    record_first_error(
+                        &mut error,
+                        decoder.send_nal(nal.bytes().as_ref(), (index == 0).then_some(pts)),
+                    );
                 }
                 pts += 1;
                 drain(&mut decoder, &mut output)
             })?;
-            refused |= framing;
+            error = error.or(framing);
         }
         decoder.flush();
         drain(&mut decoder, &mut output)?;
     }
-    Ok(refused)
+    Ok(error)
 }
 
 fn sar((num, den): (u32, u32)) -> (u64, u64) {
