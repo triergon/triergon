@@ -281,13 +281,13 @@
         "name": "fault-and-completion-facts",
         "entry_points": ["compat::pes::PesFaultHeader", "compat::pes::TransportFaultHeader", "compat::pes::TransportTailConfirmation", "compat::pes::PacketCompletion", "compat::pes::NoMediaConfirmation", "compat::pes::MalformedInputCompletion::new", "compat::pes::MalformedInputFact", "compat::pes::NoPacketsConfirmation", "compat::opaque_video::RecoveredOpaque", "compat::UnboundedPes", "compat::PesPacket"],
         "degree": "step",
-        "needs": "the facts each recovery and completion policy returns folded beside the packets mpegts-pes and mpegts-access-units compare (header bytes and timing flags against the reference packet's pts and corrupt flag, confirmed ranges against its positions); the policies run there but their facts are not folded"
+        "needs": "ts-fault-facts compares raw headers, projected packet fields and the EOF consequences of the proof policies. Resolve its open differences in admission, physical boundaries and recovery."
       },
       {
         "name": "demux-clock-header-projections",
         "entry_points": ["compat::pes::DemuxClock::project_encoded_header", "compat::pes::DemuxClock::project_diagnostic_header", "compat::pes::DemuxClock::selected_program"],
         "degree": "unit-tests",
-        "needs": "a PES operation over damaged-header carriers folding the projected times against the pts and dts of the reference's packets for the same carriers"
+        "needs": "ts-recovery-trace compares the encoded-header and diagnostic-header clocks on emitted packets. Resolve its open recovery inputs before closing the comparison."
       },
       {
         "name": "demux-profile-metadata",
@@ -299,25 +299,13 @@
         "name": "reader-views",
         "entry_points": ["Track", "Track::configuration_epoch", "Packet", "reader::Ac3AccessUnit::syncframes", "reader::Ac3AccessUnit::crc2_word", "reader::DvbSubtitleUnit::segment_count", "reader::DvbSubtitleUnit::truncated_tail", "reader::IncompleteVideo::elementary_range", "reader::UnframedAudio::carriage", "reader::UnframedAudio::elementary_range"],
         "degree": "step",
-        "needs": "the access-unit fold extended with each track's kind, tag, codec and configuration (against AVStream codec_id, codec_tag and extradata), the packet time base, and each unit's syncframes, DVB segment count and truncated tail (against the reference parser's frame and segment boundaries)"
-      },
-      {
-        "name": "single-entity-epoch-index-seek",
-        "entry_points": ["Reader::request_seek_in_epoch_and_index"],
-        "degree": "unit-tests",
-        "needs": "mpegts-previous-picture's single-entity cases repeated through the indexed epoch seek and folded as that contract folds"
+        "needs": "ts-reader-views compares track configuration and time bases, AC-3 syncframes, DVB segments and opaque ranges. Review the open differences in packet and track projections."
       },
       {
         "name": "continuity-reader-container-view",
         "entry_points": ["compat::annex_b::ContinuityReader", "compat::annex_b::ContinuityReader::request", "compat::annex_b::ContinuityReader::close", "compat::annex_b::ContinuityResidue::source_end", "compat::annex_b::ContinuityResidue::evidence"],
         "degree": "step",
-        "needs": "mpegts-access-units cases read through ContinuityReader's ContainerReader implementation with the residue's source end and evidence folded; compared today through step_with_carriers only"
-      },
-      {
-        "name": "bounded-source-time",
-        "entry_points": ["clock::SourceTimePolicy", "clock::SourceClockAnchor", "clock::source_timestamp"],
-        "degree": "unit-tests",
-        "needs": "access-unit cases read under SourceTimePolicy::Bounded with authored wraps, folding lifted times and ambiguity refusals against the reference's unwrapped timestamps; the gated operations select only Unanchored and RelativeEpochZero"
+        "needs": "ts-reader-container drives the ContainerReader implementation and compares packet output and residue evidence. Resolve the open damage and continuity cases."
       },
       {
         "name": "reference-trace-catalogue",
@@ -329,7 +317,7 @@
         "name": "reference-trace-recovery",
         "entry_points": ["reference_trace::recovery::RecoveryObserver", "reference_trace::recovery::RecoveredPacket", "reference_trace::recovery::EncodedHeader", "reference_trace::recovery::PatSelection", "reference_trace::recovery::PmtBindingJob", "reference_trace::recovery::DiagnosticPacket"],
         "degree": "unit-tests",
-        "needs": "a worker operation running the recovery observer over damaged-carrier inputs against the packets the reference emits for them (pts, dts, pos, flags, bytes); no worker runs it"
+        "needs": "ts-recovery-trace compares registered, selected-AVC, private-audio and DVB recovery. Combined faults, invalid timing prefixes and incomplete PES remain open."
       },
       {
         "name": "mux-single-program",
