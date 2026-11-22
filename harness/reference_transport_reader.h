@@ -304,6 +304,15 @@ done:
 
 /* A wire projection for the carrier that precedes a counter diagnostic.
  * Demux packet bytes and positions are compared independently of this record. */
+static int transport_reader_same_carrier(const uint8_t *a, const uint8_t *b)
+{
+    if ((a[3] & 0x20) && a[4] >= 7 && (a[5] & 0x10) &&
+        (a[10] & 0x7e) == 0x7e && (b[10] & 0x7e) == 0x7e &&
+        ((a[10] & 1) * 256 + a[11]) < 300 && ((b[10] & 1) * 256 + b[11]) < 300)
+        return !memcmp(a, b, 6) && !memcmp(a + 12, b + 12, 188 - 12);
+    return !memcmp(a, b, 188);
+}
+
 static int transport_reader_evidence(ViewWork *work, const TsEntities *entities,
                                      size_t size, unsigned pid)
 {
@@ -311,7 +320,8 @@ static int transport_reader_evidence(ViewWork *work, const TsEntities *entities,
         return 0;
     const uint8_t *data = entities->entities[0].bytes;
     const size_t end = entities->entities[0].size, prefix = size == 192 ? 4 : 0;
-    int previous = -1;
+    const uint8_t *previous = NULL;
+    int saw_copy = 0;
     size_t offsets[16], count = 0;
     for (size_t offset = 0; offset + size <= end; offset += size) {
         const uint8_t *carrier = data + offset + prefix;
@@ -319,12 +329,23 @@ static int transport_reader_evidence(ViewWork *work, const TsEntities *entities,
             !(carrier[3] & 16))
             continue;
         int counter = carrier[3] & 15;
-        if (previous >= 0 && counter != (previous + 1) % 16) {
-            if (count == sizeof(offsets) / sizeof(*offsets))
-                return 0;
+        if (previous && counter != ((previous[3] & 15) + 1) % 16) {
+            const int duplicate = transport_reader_same_carrier(previous, carrier);
+            const int discontinuity = (carrier[3] & 0x20) && carrier[4] &&
+                                      (carrier[5] & 0x80);
+            /* An unpermitted change contributes the discontinuity observation
+             * and its confirming source diagnostic at the same carrier. */
+            size_t copies = duplicate ? 1u + (unsigned)saw_copy : 2u - (unsigned)discontinuity;
+            if (copies > sizeof(offsets) / sizeof(*offsets) - count)
+                return AVERROR_INVALIDDATA;
             offsets[count++] = offset;
+            if (copies == 2)
+                offsets[count++] = offset;
+            saw_copy = duplicate;
+        } else {
+            saw_copy = 0;
         }
-        previous = counter;
+        previous = carrier;
     }
     if (count) {
         const uint64_t terminal[] = {end, count};
@@ -481,8 +502,11 @@ static int transport_reader_views(const ViewCase *view, ViewWork *work)
                 }
             }
         }
-        if (opaque_pid >= 0)
-            transport_reader_evidence(work, source, carrier_size, (unsigned)opaque_pid);
+        if (opaque_pid >= 0) {
+            status = transport_reader_evidence(work, source, carrier_size, (unsigned)opaque_pid);
+            if (status < 0)
+                goto done;
+        }
         transport_view_row(work, 7, NULL, 0, NULL, 0);
         status = 0;
     } else if (status == AVERROR_EOF) {

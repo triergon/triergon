@@ -11,7 +11,7 @@
     "Drive ContinuityReader through its ContainerReader implementation, verify the source capabilities and initial request, enumerate the announced tracks, and close after EOF.",
     "Read the complete mpegts-access-units corpus through the selected program, advancing ordered entities and flushing at a declared discontinuity. The reference uses the public parser-enabled MPEG-TS demuxer with NOFILLIN, without stream discovery.",
     "The packet record compares stream index, PID, demux PTS and DTS, duration, position, flags, payload length and bytes, and time base. A following record compares each side-data element in order. Clean end requires consuming the last physical entity.",
-    "Compare the packet consequence of a continuity residue. The candidate appends the source end and the ordered carriers that admitted the observation. The reference derives the corresponding wire check from counter gaps and copies in the original single entity when it emits an opaque AVC or HEVC packet."
+    "Compare the packet consequence of a continuity residue. The candidate appends the source end and the ordered carriers that admitted the observation. The reference derives the corresponding wire check from counter gaps and copies and their confirming fault diagnostics in the original single entity when it emits an opaque AVC or HEVC packet."
   ],
   "required_profiles": [
     "ts188-basic",
@@ -758,147 +758,173 @@
       "cause": "Run paired runtime and memory collections on the two isolated gate hosts."
     }
   ],
-  "pending_module_requirements": [
-    "Review the transport continuity projection and resulting opaque payload",
-    "Review the scope of the ordered continuity evidence records",
-    "Review demux packets emitted outside the strict source reader’s admitted run"
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "cc-one-duplicate",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
+      "reading": "A legal duplicate does not add elementary bytes",
+      "clause": "H.222.0 \u00a72.4.3.3 permits one byte-identical consecutive copy on a PID except for PCR. The M2TS prefix is outside the TS packet.",
+      "candidate": "Publishes only the original payload, with the original clock and source range.",
+      "reference": "Includes extra elementary bytes from the duplicate and can combine them with the original run.",
+      "compat": "compat::pes::DuplicatePayloadDelivery",
+      "cases": [
+        "cc-one-duplicate",
+        "cc-duplicate-pcr-update",
+        "di-duplicate-complete",
+        "di-duplicate-start",
+        "partial-start-duplicate",
+        "partial-middle-duplicate",
+        "interleaved-other-pid-duplicate",
+        "m2ts-prefix-only-duplicate",
+        "duplicate-middle-low-occupancy-finite",
+        "duplicate-middle-low-occupancy-unbounded"
+      ]
     },
     {
-      "id": "cc-third-copy",
-      "requirement": "Review the scope of the ordered continuity evidence records"
+      "reading": "The third copy damages the byte run",
+      "clause": "H.222.0 \u00a72.4.3.3 permits only two copies of a transport packet of the same PID.",
+      "candidate": "Drops the affected strict byte run and reports only a later clean unit when present.",
+      "reference": "Publishes the extra duplicate bytes in the opaque unframed run.",
+      "compat": "compat::pes::DuplicatePayloadDelivery",
+      "cases": [
+        "third-middle-copy-then-clean"
+      ]
     },
     {
-      "id": "cc-same-counter-changed-payload",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
+      "reading": "Changed bytes under a repeated counter break continuity",
+      "clause": "H.222.0 \u00a72.4.3.3 exempts only changed PCR bytes in a duplicate; new payload and changed OPCR are continuity faults.",
+      "candidate": "Starts the next intact run at its own carrier offset, without the faulted prefix.",
+      "reference": "Merges prefix bytes from the earlier carrier into the same opaque packet.",
+      "compat": "compat::pes::DeliverCorruptPrefix",
+      "cases": [
+        "cc-same-counter-changed-payload",
+        "opcr-change-is-not-duplicate"
+      ]
     },
     {
-      "id": "cc-duplicate-pcr-update",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
+      "reading": "Lost continuity separates byte runs",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.7 define per-PID continuity and the PES extent.",
+      "candidate": "Does not deliver the interrupted run as an intact packet; publishes the subsequent admitted run when present.",
+      "reference": "Returns bytes spanning the broken run, carrying its first clock and position.",
+      "compat": "compat::pes::DeliverCorruptPrefix",
+      "cases": [
+        "cc-loss-clean-pusi",
+        "loss-then-clean-pusi",
+        "loss-at-clean-pusi"
+      ]
     },
     {
-      "id": "cc-loss-mid-pes",
-      "requirement": "Review the scope of the ordered continuity evidence records"
+      "reading": "A PCR discontinuity starts a new source-clock epoch",
+      "clause": "H.222.0 \u00a72.4.3.5 identifies system time-base discontinuity on the PCR PID.",
+      "candidate": "Reports the new run at position 564 and PTS 10.",
+      "reference": "Merges the runs into a 30-byte opaque packet at position 376 and PTS 90000.",
+      "compat": "compat::pes::MergeAcrossClockBoundary",
+      "cases": [
+        "pcr-timeline-discontinuity"
+      ]
     },
     {
-      "id": "cc-loss-clean-pusi",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
+      "reading": "A PCR extension lies outside the clock modulus",
+      "clause": "H.222.0 \u00a72.4.3.5 limits the PCR extension to the system-clock count modulo 300.",
+      "candidate": "Does not publish the affected opaque access unit.",
+      "reference": "Publishes 27 bytes at PTS 90000.",
+      "compat": "compat::pes::IgnoreInvalidPcrExtension",
+      "cases": [
+        "pcr-extension-invalid"
+      ]
     },
     {
-      "id": "pcr-timeline-discontinuity",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
+      "reading": "A TEI carrier has untrustworthy payload",
+      "clause": "H.222.0 \u00a72.4.3.3 defines TEI as a detected uncorrectable error.",
+      "candidate": "Does not publish the affected opaque access unit.",
+      "reference": "Publishes 27 bytes at PTS 90000.",
+      "compat": "compat::pes::DeliverTeiPayload",
+      "cases": [
+        "transport-tei"
+      ]
     },
     {
-      "id": "pcr-extension-invalid",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
+      "reading": "Scrambled carriers require an explicit interpretation",
+      "clause": "H.222.0 \u00a72.4.3.3 Table 2-4 distinguishes unscrambled and user-defined scrambling.",
+      "candidate": "Does not publish the affected opaque access unit.",
+      "reference": "Publishes 27 bytes at PTS 90000.",
+      "compat": "compat::pes::DeliverScrambledPayload",
+      "cases": [
+        "transport-scrambled"
+      ]
     },
     {
-      "id": "transport-tei",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
+      "reading": "A short final transport carrier breaks the unframed source run",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.1\u20132.4.3.2 require a complete 188-byte packet. ReaderLimits reports unframed runs only at logical EOF.",
+      "candidate": "Does not deliver the incomplete opaque run across the source fault.",
+      "reference": "Exposes a 27-byte opaque packet from the complete prefix.",
+      "compat": "compat::input::DiscardPartialCarrier",
+      "cases": [
+        "transport-partial-final-packet"
+      ]
     },
     {
-      "id": "transport-scrambled",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
+      "reading": "A missing sync byte breaks the unframed source run",
+      "clause": "H.222.0 \u00a72.4.3.3 requires sync byte 0x47. ReaderLimits reports unframed runs only at logical EOF.",
+      "candidate": "Does not deliver the incomplete opaque run across the source fault.",
+      "reference": "Exposes a 27-byte opaque packet from the intact portion.",
+      "compat": "compat::input::ResyncTransport",
+      "cases": [
+        "transport-sync-loss"
+      ]
     },
     {
-      "id": "transport-partial-final-packet",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
+      "reading": "A PTS marker bit is zero",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.6\u20132.4.3.7 Table 2-21 requires the timestamp marker bits.",
+      "candidate": "Does not publish the opaque payload of that invalid PES.",
+      "reference": "Publishes 27 bytes at PTS 90000.",
+      "compat": "compat::pes::IgnoreTimestampMarkers",
+      "cases": [
+        "pes-timestamp-marker"
+      ]
     },
     {
-      "id": "transport-sync-loss",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
+      "reading": "PES timestamp flag 01 is forbidden",
+      "clause": "H.222.0 \u00a72.4.3.7 prohibits PTS_DTS_flags 01.",
+      "candidate": "Does not publish the opaque bytes of the invalid PES.",
+      "reference": "Publishes 27 bytes with neither clock.",
+      "compat": "compat::pes::IgnoreForbiddenTimeFlags",
+      "cases": [
+        "pes-forbidden-time-flags"
+      ]
     },
     {
-      "id": "pes-timestamp-marker",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
+      "reading": "An incomplete finite PES cannot supply an access unit",
+      "clause": "H.222.0 \u00a72.4.3.7 defines the exact PES extent.",
+      "candidate": "Does not publish the opaque bytes of the truncated PES.",
+      "reference": "Publishes the available 24-byte packet.",
+      "compat": "compat::pes::DeliverCorruptPrefix",
+      "cases": [
+        "pes-finite-truncated-eof"
+      ]
     },
     {
-      "id": "pes-forbidden-time-flags",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
+      "reading": "An OPCR field requires a PCR in the same transport packet",
+      "clause": "H.222.0 \u00a72.4.3.5 allows OPCR only in a packet carrying PCR.",
+      "candidate": "Does not publish an opaque run across the rejected carrier.",
+      "reference": "Combines both source payloads into 54 opaque bytes.",
+      "compat": "compat::pes::IgnoreUnpairedOpcr",
+      "cases": [
+        "opcr-without-pcr-invalid"
+      ]
     },
     {
-      "id": "pes-finite-truncated-eof",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
-    },
-    {
-      "id": "pes-finite-extra-payload",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
-    },
-    {
-      "id": "di-duplicate-complete",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "di-duplicate-start",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "partial-start-duplicate",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "partial-middle-duplicate",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "interleaved-other-pid-duplicate",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "m2ts-prefix-only-duplicate",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "loss-then-clean-pusi",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "loss-at-clean-pusi",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "opcr-change-is-not-duplicate",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "third-middle-copy-then-clean",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "opcr-without-pcr-invalid",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-finite",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "duplicate-middle-low-occupancy-unbounded",
-      "requirement": "Review the transport continuity projection and resulting opaque payload"
-    },
-    {
-      "id": "finite-continuation-body-401",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
-    },
-    {
-      "id": "finite-continuation-body-408",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
-    },
-    {
-      "id": "finite-continuation-body-409",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
-    },
-    {
-      "id": "finite-continuation-body-414",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
-    },
-    {
-      "id": "finite-continuation-body-415",
-      "requirement": "Review demux packets emitted outside the strict source reader’s admitted run"
+      "reading": "Physical payload extends beyond the finite PES length",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.7 define one PES start in the PUSI carrier and the exact extent after PES_packet_length.",
+      "candidate": "Does not publish an opaque packet from the malformed run.",
+      "reference": "Publishes a declared prefix of 27 bytes or the full 401\u2013415-byte recovered run.",
+      "compat": "compat::pes::RecoverFiniteSurplus",
+      "cases": [
+        "pes-finite-extra-payload",
+        "finite-continuation-body-401",
+        "finite-continuation-body-408",
+        "finite-continuation-body-409",
+        "finite-continuation-body-414",
+        "finite-continuation-body-415"
+      ]
     }
   ]
 }
