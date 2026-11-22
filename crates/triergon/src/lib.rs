@@ -67,7 +67,11 @@ pub use triergon_subtitles as subtitles;
 /// Decoder traits and decoded-picture and PCM vocabulary.
 #[cfg(feature = "session")]
 pub mod codec {
-    pub use triergon_codec::*;
+    pub use triergon_codec::{
+        AudioCodec, AudioDecoder, AudioFrame, ChannelLayout, Colour, DecodeError, DownmixLevels,
+        DynAudioDecoder, DynVideoDecoder, PictureView, Plane, SampleFormat, Speaker,
+        SurroundEncoding, VideoCodec, VideoDecoder,
+    };
     /// Pixel formats, colour conversion and letterboxing.
     pub use triergon_pixel as pixel;
 
