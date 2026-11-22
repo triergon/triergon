@@ -167,7 +167,7 @@ pub(crate) struct RecoveryCutoff {
 
 fn keep_recovery_packet(kind: u64, packet: &Packet, cutoff: RecoveryCutoff) -> Result<bool> {
     let lower = cutoff.lower_ns;
-    if kind == 2
+    if kind == Track::AUDIO
         && let Some(cutoff_ticks) = cutoff.block_start_ticks
     {
         let timing = packet.timing;
@@ -180,8 +180,8 @@ fn keep_recovery_packet(kind: u64, packet: &Packet, cutoff: RecoveryCutoff) -> R
     let Some(pts) = packet.pts_ns else {
         return Ok(true);
     };
-    if kind != 2 {
-        return Ok(kind == 17 || pts >= lower);
+    if kind != Track::AUDIO {
+        return Ok(kind == Track::SUBTITLE || pts >= lower);
     }
     let mut timing = packet.timing;
     let zero_block_duration = timing.duration_ticks == Some(0);

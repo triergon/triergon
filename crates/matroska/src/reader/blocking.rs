@@ -60,7 +60,10 @@ pub fn seek_initial_trim<R: Read>(
     let time = i128::from(landing.actual_ns) + i128::from(video.codec_delay_ns);
     let scale = reader.timestamp_scale_ns();
     let mut delay = 0;
-    for audio in tracks.iter().filter(|track| track.kind == 2) {
+    for audio in tracks
+        .iter()
+        .filter(|track| track.kind == crate::track::Track::AUDIO)
+    {
         delay = delay.max(RecoveryAudio::BlockStart.delay_ns(audio, scale)?);
     }
     Ok(delay != 0 && time < i128::from(delay))

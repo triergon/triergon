@@ -4,6 +4,7 @@
 use super::Cue;
 use crate::configuration::Configuration;
 use crate::step::{ParseStep, Required, check};
+use crate::track::Track;
 use crate::{Error, Result};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{CodecId, TrackInfo};
@@ -43,7 +44,7 @@ pub(crate) enum RecoveryAudio {
 }
 
 impl RecoveryAudio {
-    pub(crate) fn delay_ns(self, track: &crate::track::Track, scale_ns: u64) -> Result<u64> {
+    pub(crate) fn delay_ns(self, track: &Track, scale_ns: u64) -> Result<u64> {
         if self == Self::Overlap || track.codec_delay_ns == 0 {
             return Ok(track.codec_delay_ns);
         }
@@ -129,7 +130,7 @@ impl SeekPlanJob {
         if configuration
             .tracks()
             .get(track)
-            .is_none_or(|t| t.kind != 1)
+            .is_none_or(|t| t.kind != Track::VIDEO)
         {
             return Err(Error::Unsupported("seek requires video track"));
         }
@@ -195,8 +196,8 @@ impl SeekPlanJob {
                     if self.preroll && self.at < self.configuration.tracks().len() {
                         let track = &self.configuration.tracks()[self.at];
                         self.roll = self.roll.max(track.seek_preroll_ns);
-                        self.subtitle_tracks |= track.kind == 17;
-                        if track.kind == 2 && track.sample_rate != 0.0 {
+                        self.subtitle_tracks |= track.kind == Track::SUBTITLE;
+                        if track.kind == Track::AUDIO && track.sample_rate != 0.0 {
                             self.audio_delay_ns = self
                                 .audio_delay_ns
                                 .max(self.recovery_audio.delay_ns(track, self.scale)?);

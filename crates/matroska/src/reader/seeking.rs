@@ -407,7 +407,7 @@ impl Reader {
             if self
                 .tracks()
                 .get(request.track)
-                .is_none_or(|track| track.kind != 1)
+                .is_none_or(|track| track.kind != crate::track::Track::VIDEO)
             {
                 return Err(Error::Unsupported("seek requires video track"));
             }

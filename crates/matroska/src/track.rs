@@ -99,6 +99,13 @@ pub struct Track {
 }
 
 impl Track {
+    /// The TrackType of a video track.
+    pub(crate) const VIDEO: u64 = 1;
+    /// The TrackType of an audio track.
+    pub(crate) const AUDIO: u64 = 2;
+    /// The TrackType of a subtitle track.
+    pub(crate) const SUBTITLE: u64 = 17;
+
     /// LanguageBCP47 when present, otherwise the Language element (`eng` when absent).
     pub fn effective_language(&self) -> &str {
         self.language_bcp47.as_deref().unwrap_or(&self.language)
@@ -116,7 +123,7 @@ impl Track {
 
     /// The profile signalled by a deprecated AAC CodecID on an audio track.
     pub fn legacy_aac_profile(&self) -> Option<LegacyAacProfile> {
-        if self.kind == 2 {
+        if self.kind == Self::AUDIO {
             LegacyAacProfile::from_codec_id(&self.codec)
         } else {
             None

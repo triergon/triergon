@@ -89,7 +89,7 @@ impl CueValidationJob {
         if configuration
             .tracks()
             .get(track)
-            .is_none_or(|t| t.kind != 1)
+            .is_none_or(|t| t.kind != crate::track::Track::VIDEO)
         {
             return Err(Error::Unsupported("seek requires video track"));
         }
