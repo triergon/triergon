@@ -107,70 +107,72 @@
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     }
   ],
-  "pending_module_requirements": [
-    "Source samples follow each referenced description. MOV demuxing retains the initial frame width and publishes the rate from the final description.",
-    "The candidate rejects the version 0 compression and packet-size fields while the reference reads PCM.",
-    "The candidate refuses a partial source frame and the demuxer emits the configured frame width.",
-    "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo.",
-    "The candidate refuses a zero source channel count. The demuxer exposes the zero count and emits the payload.",
-    "Sound description versions 1 and 2 remain outside the version 0 reader."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "pcm-description-1-2-1-unused3",
-      "requirement": "Source samples follow each referenced description. MOV demuxing retains the initial frame width and publishes the rate from the final description."
+      "reading": "Version 0 descriptions outside the QuickTime PCM layout",
+      "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’: version 0 describes raw 8-bit offset-binary or twos 16-bit two’s complement PCM with one or two channels",
+      "candidate": "refuses the out-of-layout version 0 description",
+      "reference": "publishes PCM for wider layouts and other encodings, including 16-, 24- and 32-bit sowt and 8-, 24- and 32-bit twos",
+      "compat": "compat::mov::pcm extended_version_zero_pcm would accept wider layouts as the demuxer does",
+      "cases": [
+        "raw-16bit-4ch",
+        "raw-8bit-3ch",
+        "sowt-16bit-2ch",
+        "sowt-24bit-7ch",
+        "sowt-32bit-8ch",
+        "twos-24bit-5ch",
+        "twos-32bit-6ch",
+        "twos-8bit-1ch"
+      ]
     },
     {
-      "id": "compression-and-packet-size",
-      "requirement": "The candidate rejects the version 0 compression and packet-size fields while the reference reads PCM."
+      "reading": "Zero channels in a version 0 description",
+      "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’: the supported channel counts are 1 and 2",
+      "candidate": "refuses the zero-channel description",
+      "reference": "reports a zero channel count and reads 16 payload bytes",
+      "cases": [
+        "raw-8bit-0ch"
+      ]
     },
     {
-      "id": "partial-frame",
-      "requirement": "The candidate refuses a partial source frame and the demuxer emits the configured frame width."
+      "reading": "Compressed-audio fields carried in a version 0 PCM entry",
+      "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’ requires compression ID zero; Apple QuickTime File Format ‘Sound sample description version 1 (stsd)’ uses -2 for redefined sample tables",
+      "candidate": "refuses version 0 compression ID -2 with packet size 7",
+      "reference": "reads 32 bytes as ordinary PCM",
+      "cases": [
+        "compression-and-packet-size"
+      ]
     },
     {
-      "id": "raw-16bit-4ch",
-      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
+      "reading": "A sample that ends inside a PCM frame",
+      "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’ defines the sample width and interleaved layout; Apple QuickTime File Format ‘Sound sample description version 1 (stsd)’ defines one frame as one sample from each channel; ISO/IEC 14496-12:2015 §8.7.3.2.2 fixes each sample extent",
+      "candidate": "refuses the one-byte sample in a 16-bit mono track",
+      "reference": "reads a full configured width and emits 32 PCM bytes from the file",
+      "compat": "compat::mov::pcm configured_width_reads would use the configured width in place of the source sample extent",
+      "cases": [
+        "partial-frame"
+      ]
     },
     {
-      "id": "raw-8bit-0ch",
-      "requirement": "The candidate refuses a zero source channel count. The demuxer exposes the zero count and emits the payload."
+      "reading": "PCM sound descriptions version 1 and 2",
+      "clause": "Apple QuickTime File Format ‘Sound sample description version 1 (stsd)’ and Apple QuickTime File Format ‘Sound sample description version 2 (stsd)’ extend the layout. The version 0 PCM API only admits the version 0 layout",
+      "candidate": "refuses the two versions as unsupported by the PCM reader or packet profile",
+      "reference": "opens both and reads 32 bytes of PCM per case",
+      "compat": "compat::mov::pcm extended_sound_descriptions would admit uncompressed versions 1 and 2",
+      "cases": [
+        "sound-v1",
+        "sound-v2"
+      ]
     },
     {
-      "id": "raw-8bit-3ch",
-      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
-    },
-    {
-      "id": "sound-v1",
-      "requirement": "Sound description versions 1 and 2 remain outside the version 0 reader."
-    },
-    {
-      "id": "sound-v2",
-      "requirement": "Sound description versions 1 and 2 remain outside the version 0 reader."
-    },
-    {
-      "id": "sowt-16bit-2ch",
-      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
-    },
-    {
-      "id": "sowt-24bit-7ch",
-      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
-    },
-    {
-      "id": "sowt-32bit-8ch",
-      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
-    },
-    {
-      "id": "twos-24bit-5ch",
-      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
-    },
-    {
-      "id": "twos-32bit-6ch",
-      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
-    },
-    {
-      "id": "twos-8bit-1ch",
-      "requirement": "The candidate's version 0 PCM layout is limited to 8-bit raw and 16-bit twos, mono or stereo."
+      "reading": "A sample-description change within a PCM track",
+      "clause": "ISO/IEC 14496-12:2015 §§8.5.2.1 and 8.7.4.3 and Apple QuickTime File Format ‘Sample-to-chunk table’: each chunk uses its own indexed description",
+      "candidate": "uses the description selected for each sample and reports 16 frames from 56 bytes; the track starts at 48000 Hz",
+      "reference": "uses the initial frame width for 16 frames from 64 bytes and reports 44100 Hz from the last description",
+      "compat": "compat::mov::pcm initial_packet_width is the packet view; use it for the demuxer’s grouping",
+      "cases": [
+        "pcm-description-1-2-1-unused3"
+      ]
     }
   ]
 }
