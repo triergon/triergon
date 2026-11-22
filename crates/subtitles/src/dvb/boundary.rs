@@ -99,8 +99,8 @@ pub struct ClockValue {
 
 impl ClockValue {
     /// The exact time of `ticks` at `clock`; `Error::Overflow` when it does
-    /// not fit a `Time`.
-    pub fn to_time(self, clock: SourceClock) -> Result<Time> {
+    /// not fit.
+    pub(crate) fn to_time(self, clock: SourceClock) -> Result<Time> {
         Time::from_ticks(self.ticks, clock.time_base())
     }
 }
@@ -290,8 +290,8 @@ impl SourceConfiguration {
     /// Binds `payload` and its timing to this configuration without
     /// allocating, stripping or rescaling; an unknown time stays unknown.
     /// `Error::ForeignPool` when the configuration or `payload` belongs to
-    /// another pool than `budget`; a PTS that does not convert fails as
-    /// [`ClockValue::to_time`] does.
+    /// another pool than `budget`; `Error::Overflow` for a PTS that does not
+    /// fit a `Time`.
     pub fn packet(
         &self,
         budget: &Budget,

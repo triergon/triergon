@@ -1,4 +1,5 @@
-//! Original byte-resumable scalar decoding from RFC 3629 / RFC 2781.
+//! Scalar decoding of UTF-8 (RFC 3629), UTF-16 (RFC 2781) and the multibyte
+//! profiles, resumable at every byte.
 use super::{
     Encoding,
     charset::multibyte::{DecodeStep, MultibyteDecoder},

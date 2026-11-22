@@ -53,7 +53,7 @@ pub enum Codec {
 impl Codec {
     /// A NAL unit's `nal_unit_type`.
     #[must_use]
-    pub fn nal_type(self, nal: &[u8]) -> Option<u8> {
+    pub(crate) fn nal_type(self, nal: &[u8]) -> Option<u8> {
         let &first = nal.first()?;
         Some(match self {
             Self::H264 => first & 0x1f,
@@ -71,18 +71,9 @@ impl Codec {
         nal.get(header..).unwrap_or_default()
     }
 
-    /// True for a coded slice.
-    #[must_use]
-    pub fn is_slice(self, nal_type: u8) -> bool {
-        match self {
-            Self::H264 => matches!(nal_type, 1..=5),
-            Self::Hevc => hevc::is_slice(nal_type),
-        }
-    }
-
     /// True for an SEI NAL unit (HEVC: prefix or suffix).
     #[must_use]
-    pub fn is_sei(self, nal_type: u8) -> bool {
+    pub(crate) fn is_sei(self, nal_type: u8) -> bool {
         match self {
             Self::H264 => nal_type == avc::SEI,
             Self::Hevc => matches!(nal_type, hevc::PREFIX_SEI | hevc::SUFFIX_SEI),

@@ -1,5 +1,6 @@
-//! Original bounded tx3g envelope and Matroska WebVTT addition carriage.
-//! Modifier bodies remain original opaque ranges, without style interpretation.
+//! The tx3g sample envelope (text length, text and modifier boxes) and the
+//! fields of a Matroska WebVTT block addition. Modifier boxes are kept as byte
+//! ranges; nothing in them is interpreted.
 use super::{
     Encoding, Field, FieldOwner, Limits, Modifier,
     emit::Fields,

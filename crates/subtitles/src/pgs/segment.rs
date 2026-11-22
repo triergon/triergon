@@ -257,7 +257,7 @@ impl<'a> ObjectFragment<'a> {
 
     /// Reads an ODS body given without its segment header, failing as
     /// [`parse`](Self::parse) does apart from the type check.
-    pub fn parse_payload(payload: &'a [u8]) -> Result<Self> {
+    pub(crate) fn parse_payload(payload: &'a [u8]) -> Result<Self> {
         let mut c = Cursor {
             input: payload,
             at: 0,

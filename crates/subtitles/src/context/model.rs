@@ -70,18 +70,19 @@ pub struct Metadata {
 /// Resource bounds of one context. Exceeding one is `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
-    /// Attachments per context.
+    /// Attachments per context; 128 by default.
     pub max_attachments: usize,
-    /// Metadata records per context.
+    /// Metadata records per context; 256 by default.
     pub max_metadata: usize,
-    /// Bytes of [`Header::codec_private`].
+    /// Bytes of [`Header::codec_private`]; 1 MiB by default.
     pub max_config_bytes: usize,
     /// Bytes of each other header field, attachment name, media type and
-    /// description, and metadata key and value.
+    /// description, and metadata key and value; 64 KiB by default.
     pub max_label_bytes: usize,
-    /// Bytes of each attachment's data.
+    /// Bytes of each attachment's data; 32 MiB by default.
     pub max_attachment_bytes: usize,
-    /// Bytes of all fields together, as [`Context::visible_bytes`] counts them.
+    /// Bytes of all fields together, as [`Context::visible_bytes`] counts
+    /// them; 64 MiB by default.
     pub max_visible_bytes: usize,
 }
 impl Default for Limits {
@@ -120,7 +121,8 @@ impl Context {
     pub fn metadata(&self) -> &[Metadata] {
         self.metadata.as_slice()
     }
-    /// Logical lengths, counting each offered field. This is not live heap.
+    /// The lengths of all fields added up, each field counted even where
+    /// fields share storage; not the memory the context holds.
     pub fn visible_bytes(&self) -> usize {
         self.visible_bytes
     }

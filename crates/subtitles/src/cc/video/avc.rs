@@ -8,7 +8,7 @@ use triergon_framing::avc::{
 };
 
 /// The largest `max_num_reorder_frames` of a sequence the reference takes; an
-/// SPS above it is not taken (case `h264-reorder-ts`, probe p15).
+/// SPS above it is not taken (case `h264-reorder-ts`).
 const MOST_REORDER_FRAMES: u32 = 16;
 
 /// A sequence parameter set and the cycle of its type 1 order counts.

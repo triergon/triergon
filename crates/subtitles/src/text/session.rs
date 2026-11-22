@@ -1,4 +1,5 @@
-//! Resumable per-input operation; repeated loops perform actual parsing.
+//! The resumable reading of one input, phase by phase, from its envelope to
+//! its cue.
 use super::{
     Cue, Encoding, Format, Input, Limits,
     emit::{Emitter, Fields, Plan, TextSpan, Times},

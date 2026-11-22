@@ -1,4 +1,6 @@
-//! Native receiver configuration, separate from strict source ConfigJob.
+//! The extradata as the `mov_text` decoder reads it: default style, font
+//! table and the ASS header written from them. The specification reading of
+//! a sample description is [`crate::text::tx3g_config`].
 use super::{
     Funding, Limits, Options,
     write::{Fixed, Writer},

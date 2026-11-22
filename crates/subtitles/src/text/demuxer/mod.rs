@@ -50,11 +50,13 @@ pub enum TimestampFieldWidth {
 /// Resource bounds of one document.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Document bytes, and for a UTF-16 SubRip document its UTF-8 conversion.
+    /// Document bytes, and for a UTF-16 SubRip document its UTF-8
+    /// conversion; 16 MiB by default.
     pub document_bytes: usize,
-    /// Cues read from the document.
+    /// Cues read from the document; 65536 by default.
     pub cues: usize,
-    /// Bytes of SubRip cue text, which the reader assembles from its lines.
+    /// Bytes of SubRip cue text, which the reader assembles from its lines;
+    /// 16 MiB by default.
     pub text_bytes: usize,
 }
 
@@ -77,9 +79,10 @@ pub struct Cue {
     pub duration_ms: i64,
     /// The packet bytes: the cue text, unvalidated.
     pub text: Bytes,
-    /// The WebVTT cue identifier.
+    /// The WebVTT cue identifier, the line before the timing line; `None`
+    /// when the cue starts with its timing line, and for SubRip.
     pub identifier: Option<Bytes>,
-    /// The WebVTT cue settings.
+    /// The WebVTT cue settings; `None` when empty and for SubRip.
     pub settings: Option<Bytes>,
     /// Where the cue was read in the parsed text: the start of its SubRip
     /// timing line, or the end of its WebVTT block.
@@ -183,7 +186,10 @@ pub struct Reader {
 }
 
 impl Reader {
-    /// Read `document` with the 32-bit timestamp field policy on every target.
+    /// A reader of `document` that reads out-of-range time fields as FFmpeg
+    /// on 32-bit ARMv7 does ([`TimestampFieldWidth::Bits32`]), on every
+    /// target. `Error::Limit` when the document is longer than
+    /// `limits.document_bytes`.
     pub fn new(pool: &Budget, document: Bytes, syntax: Syntax, limits: Limits) -> Result<Self> {
         Self::with_timestamp_field_width(
             pool,
@@ -194,7 +200,7 @@ impl Reader {
         )
     }
 
-    /// Read `document` with the selected timestamp field width.
+    /// [`new`](Self::new), reading time fields at `timestamp_width`.
     pub fn with_timestamp_field_width(
         pool: &Budget,
         document: Bytes,
