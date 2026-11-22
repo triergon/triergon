@@ -189,12 +189,13 @@ pub(super) fn run(
                                 )
                                 .map_err(explain)?;
                             }
-                        } else if packets == 0 {
-                            return Err("empty observation has no completion proof".into());
                         }
                         observer.end_of_source().map_err(explain)?;
                     }
                     packets += drain(observer, &mut clock, &cancel, out, finished)?;
+                    if finished && packets == 0 && completion.discarded_carriers() == 0 {
+                        return Err("empty observation has no completion proof".into());
+                    }
                 } else if finished {
                     return Err("missing selected PMT at EOF".into());
                 }

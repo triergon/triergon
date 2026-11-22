@@ -415,122 +415,177 @@
       "cause": "The PES and access-unit contracts measure the underlying policies. This operation adds fact folds."
     }
   ],
-  "pending_module_requirements": [
-    "Review sole-fault admission for malformed TS and PES headers",
-    "Review packet output across a finite PES length or physical EOF violation",
-    "Review the complete-entity requirement after transport sync loss",
-    "Review the selected-program admission requirement",
-    "Review the required source evidence for an empty packet result",
-    "Review the bounded TS188 or M2TS192 input-position probe"
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "pcr-and-stuffing",
-      "requirement": "Review sole-fault admission for malformed TS and PES headers"
+      "reading": "Invalid PCR and invalid adaptation stuffing",
+      "clause": "H.222.0 \u00a72.4.3.5 requires conforming PCR fields and 0xFF stuffing in the adaptation field.",
+      "candidate": "Refuses a rejected clock carrier with an additional adaptation fault.",
+      "reference": "Delivers 17 payload bytes at 180000 ticks.",
+      "compat": "compat::pes::RecoverCompoundFaults",
+      "cases": [
+        "pcr-and-stuffing"
+      ]
     },
     {
-      "id": "scrambling-and-forbidden",
-      "requirement": "Review sole-fault admission for malformed TS and PES headers"
+      "reading": "Scrambled payload with forbidden timestamp flags",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.7 distinguish scrambled payload and disallow timing flag value 01.",
+      "candidate": "Refuses a scrambled carrier with an additional PES header fault.",
+      "reference": "Delivers 17 payload bytes with no timestamps.",
+      "compat": "compat::pes::RecoverCompoundFaults",
+      "cases": [
+        "scrambling-and-forbidden"
+      ]
     },
     {
-      "id": "tei-and-marker",
-      "requirement": "Review sole-fault admission for malformed TS and PES headers"
+      "reading": "TEI plus a zero PES timestamp marker",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.7 identify an uncorrectable carrier error and require PES timestamp marker bits.",
+      "candidate": "Refuses the TEI carrier with an additional timestamp fault.",
+      "reference": "Delivers 17 payload bytes at 180000 ticks.",
+      "compat": "compat::pes::RecoverCompoundFaults",
+      "cases": [
+        "tei-and-marker"
+      ]
     },
     {
-      "id": "tei-and-scrambling",
-      "requirement": "Review sole-fault admission for malformed TS and PES headers"
+      "reading": "TEI plus scrambling",
+      "clause": "H.222.0 \u00a72.4.3.3 defines TEI and distinct clear and scrambled payload modes.",
+      "candidate": "Refuses the carrier with both transport faults.",
+      "reference": "Delivers 17 payload bytes at 180000 ticks.",
+      "compat": "compat::pes::RecoverCompoundFaults",
+      "cases": [
+        "tei-and-scrambling"
+      ]
     },
     {
-      "id": "tei-incomplete-finite",
-      "requirement": "Review packet output across a finite PES length or physical EOF violation"
+      "reading": "The PTS-only timestamp carries another prefix",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.6\u20132.4.3.7 Table 2-21 requires prefix 0010 for PTS without DTS.",
+      "candidate": "Refuses the timestamp header when the prefix does not match its flags.",
+      "reference": "Delivers 17 payload bytes at 180000 ticks.",
+      "compat": "compat::pes::IgnoreTimestampPrefix",
+      "cases": [
+        "wrong-time-prefix"
+      ]
     },
     {
-      "id": "wrong-time-prefix",
-      "requirement": "Review sole-fault admission for malformed TS and PES headers"
+      "reading": "TEI and an incomplete finite PES",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.7 define TEI and the exact finite PES packet length. The fault recovery policy requires the entire PES.",
+      "candidate": "Refuses without a complete finite PES.",
+      "reference": "Delivers the available 17 bytes with a corrupt flag.",
+      "compat": "compat::pes::DeliverCorruptPrefix",
+      "cases": [
+        "tei-incomplete-finite"
+      ]
     },
     {
-      "id": "valid-transport-sync-loss-then-valid",
-      "requirement": "Review the complete-entity requirement after transport sync loss"
+      "reading": "A zero-length PES belongs to a selected audio PID",
+      "clause": "H.222.0 \u00a72.4.3.7 allows PES_packet_length zero only for video elementary payload in TS, and the fault adapter is scoped to AVC.",
+      "candidate": "Refuses the AAC route for this recovery profile.",
+      "reference": "Returns the nonconforming 27-byte audio payload.",
+      "compat": "compat::pes::AllowUnboundedAudio",
+      "cases": [
+        "pes-audio-zero-length-invalid"
+      ]
     },
     {
-      "id": "inactive-pat-then-unrouted-pes",
-      "requirement": "Review the selected-program admission requirement"
+      "reading": "A terminal transport error has carriers after it",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.2\u20132.4.3.3 define fixed transport packet geometry. The terminal fault policy requires the damaged carrier to reach the physical end.",
+      "candidate": "Publishes the initial intact packet and refuses confirmation of terminal transport loss while more physical input follows.",
+      "reference": "Publishes the same packet and ends cleanly.",
+      "compat": "compat::input::ResyncTransport",
+      "cases": [
+        "valid-transport-sync-loss-then-valid"
+      ]
     },
     {
-      "id": "pes-on-declared-pmt-pid",
-      "requirement": "Review the required source evidence for an empty packet result"
+      "reading": "No applicable PAT routes the following PES",
+      "clause": "H.222.0 \u00a7\u00a72.4.4.6 and 2.4.4.10 require current association and map information for a selected-program route.",
+      "candidate": "Refuses packet publication in the absence of its selected route.",
+      "reference": "Publishes 27 bytes inferred from the PID alone.",
+      "compat": "compat::psi::InferUnboundPes",
+      "cases": [
+        "inactive-pat-then-unrouted-pes"
+      ]
     },
     {
-      "id": "physical-truncated-tail",
-      "requirement": "Review the required source evidence for an empty packet result"
+      "reading": "PES-looking payload on a PMT PID cannot certify an empty control entity",
+      "clause": "H.222.0 \u00a7\u00a72.4.4.3 and 2.4.4.9 require PSI section syntax on a PMT PID.",
+      "candidate": "Refuses to certify an empty control-only source.",
+      "reference": "Ends with zero packets.",
+      "compat": "compat::psi::AcceptUnprovedEmpty",
+      "cases": [
+        "pes-on-declared-pmt-pid"
+      ]
     },
     {
-      "id": "pmt-control-truncated-section",
-      "requirement": "Review the required source evidence for an empty packet result"
+      "reading": "An incomplete carrier cannot certify physical control coverage",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.1\u20132.4.3.2 require a complete 188-byte transport packet.",
+      "candidate": "Refuses incomplete physical coverage.",
+      "reference": "Ends with zero packets.",
+      "compat": "compat::input::DiscardPartialCarrier",
+      "cases": [
+        "physical-truncated-tail"
+      ]
     },
     {
-      "id": "tei-rejected-control",
-      "requirement": "Review the required source evidence for an empty packet result"
+      "reading": "An unfinished section cannot certify control-only coverage",
+      "clause": "H.222.0 \u00a7\u00a72.4.4.3 and 2.4.4.10 define PSI section boundaries and declared length.",
+      "candidate": "Refuses the incomplete PMT.",
+      "reference": "Ends with zero packets.",
+      "compat": "compat::psi::AcceptUnprovedEmpty",
+      "cases": [
+        "pmt-control-truncated-section"
+      ]
     },
     {
-      "id": "unanchored-pmt-control",
-      "requirement": "Review the required source evidence for an empty packet result"
+      "reading": "An errored control carrier cannot certify its content",
+      "clause": "H.222.0 \u00a72.4.3.3 defines TEI as an uncorrectable carrier error.",
+      "candidate": "Refuses to certify the unreadable carrier as control-only.",
+      "reference": "Ends with zero packets.",
+      "compat": "compat::psi::AcceptUnprovedEmpty",
+      "cases": [
+        "tei-rejected-control"
+      ]
     },
     {
-      "id": "unknown-pid-continuation-after-control",
-      "requirement": "Review the required source evidence for an empty packet result"
+      "reading": "A PMT continuation lacks its section start",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.4.3 locate section starts with PUSI and pointer_field.",
+      "candidate": "Refuses to certify the unanchored control bytes.",
+      "reference": "Ends with zero packets.",
+      "compat": "compat::psi::AcceptUnprovedEmpty",
+      "cases": [
+        "unanchored-pmt-control"
+      ]
     },
     {
-      "id": "unknown-pid-pes-after-pat-control",
-      "requirement": "Review the required source evidence for an empty packet result"
+      "reading": "Unknown physical payload is not proof of no media",
+      "clause": "H.222.0 \u00a7\u00a72.4.4.6 and 2.4.4.10 map elementary PIDs through valid PSI.",
+      "candidate": "Refuses control-only proof while an unclassified PID has payload.",
+      "reference": "Ends with zero packets.",
+      "compat": "compat::psi::AcceptUnprovedEmpty",
+      "cases": [
+        "unknown-pid-continuation-after-control",
+        "unknown-pid-pes-after-pat-control"
+      ]
     },
     {
-      "id": "pat-atomic-two-sections",
-      "requirement": "Review the required source evidence for an empty packet result"
+      "reading": "Two plausible carrier grids prevent bounded input admission",
+      "clause": "H.222.0 \u00a7\u00a72.4.3.2\u20132.4.3.3 define the TS body and its sync byte; the finite-source API requires an unambiguous supplied grid.",
+      "candidate": "Refuses the competing TS188 sync grid on the M2TS192 input.",
+      "reference": "Ends with zero packets.",
+      "compat": "compat::input::PreferDemuxSyncGrid",
+      "cases": [
+        "false188-7"
+      ]
     },
     {
-      "id": "pes-audio-zero-length-invalid",
-      "requirement": "Review packet output across a finite PES length or physical EOF violation"
-    },
-    {
-      "id": "pes-finite-truncated-eof",
-      "requirement": "Review packet output across a finite PES length or physical EOF violation"
-    },
-    {
-      "id": "pes-unbounded-definitive-eof",
-      "requirement": "Review packet output across a finite PES length or physical EOF violation"
-    },
-    {
-      "id": "pmt-descriptor-overrun",
-      "requirement": "Review the required source evidence for an empty packet result"
-    },
-    {
-      "id": "pmt-opaque-language-descriptors",
-      "requirement": "Review the required source evidence for an empty packet result"
-    },
-    {
-      "id": "pmt-version-wrap-retypes-pid",
-      "requirement": "Review the required source evidence for an empty packet result"
-    },
-    {
-      "id": "psi-pointer-finishes-old-starts-new",
-      "requirement": "Review the required source evidence for an empty packet result"
-    },
-    {
-      "id": "psi-pointer-overrun",
-      "requirement": "Review the required source evidence for an empty packet result"
-    },
-    {
-      "id": "psi-two-sections-one-payload",
-      "requirement": "Review the required source evidence for an empty packet result"
-    },
-    {
-      "id": "false188-7",
-      "requirement": "Review the bounded TS188 or M2TS192 input-position probe"
-    },
-    {
-      "id": "seventh-sync-zero",
-      "requirement": "Review the bounded TS188 or M2TS192 input-position probe"
+      "reading": "A carrier in the claimed grid lacks sync",
+      "clause": "H.222.0 \u00a72.4.3.3 requires sync byte 0x47.",
+      "candidate": "Refuses the damaged M2TS192 grid.",
+      "reference": "Publishes the four-byte PES at physical sync offset 388.",
+      "compat": "compat::input::ResyncTransport",
+      "cases": [
+        "seventh-sync-zero"
+      ]
     }
   ]
 }
