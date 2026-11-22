@@ -90,6 +90,13 @@ pub struct Skip {
 /// Runs `command`, a `cargo test`, with its standard error passed through line by line,
 /// and returns its exit code and the checks its test binaries left out.
 pub fn run(command: &mut Command) -> Result<(i32, Vec<Skip>), String> {
+    run_with_stderr(command, &mut std::io::stderr())
+}
+
+fn run_with_stderr(
+    command: &mut Command,
+    through: &mut impl Write,
+) -> Result<(i32, Vec<Skip>), String> {
     let mut child = command
         .stderr(Stdio::piped())
         .spawn()
@@ -98,7 +105,6 @@ pub fn run(command: &mut Command) -> Result<(i32, Vec<Skip>), String> {
         .stderr
         .take()
         .ok_or("cargo test without a standard error")?;
-    let mut through = std::io::stderr();
     let mut executable = String::new();
     let mut skips = Vec::new();
     let mut reader = BufReader::new(errors);
@@ -274,9 +280,13 @@ echo '     Running tests/vectors.rs (target/debug/deps/vectors-1b)' >&2
 echo 'skipped: the AC-3 vector checks: .research/fate-samples/ac3 absent' >&2
 printf 'skipped: the AC-3 corruption test: x absent' >&2
 exit 3";
-        let (code, skips) = run(Command::new("sh")
-            .args(["-c", script])
-            .stdout(Stdio::null()))
+        // Synthetic Cargo diagnostics must stay out of the enclosing test run's skip log.
+        let (code, skips) = run_with_stderr(
+            Command::new("sh")
+                .args(["-c", script])
+                .stdout(Stdio::null()),
+            &mut std::io::sink(),
+        )
         .unwrap();
         assert_eq!(code, 3);
         assert_eq!(
