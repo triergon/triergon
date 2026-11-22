@@ -883,26 +883,6 @@
       }
     },
     {
-      "id": "capsule-mov-text-clear",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-clear.mp4",
-      "sha256": "12cdaf461f39965949c27e71aa5e1ab95e16f2021171cfe3330991990cff597c",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 279
-      }
-    },
-    {
       "id": "capsule-mov-text-config-invalid-font-size",
       "profile": "text-mov-tx3g",
       "file": "harness/features/text-extraction/inputs/capsule-mov-text-config-invalid-font-size.mp4",
@@ -1080,26 +1060,6 @@
         "packets": 2,
         "bytes": 4,
         "digest": 27566572767864788
-      }
-    },
-    {
-      "id": "capsule-mov-text-empty-event",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-empty-event.mp4",
-      "sha256": "db7ed691cb18f68644ae384b05bba4d66f43c9c651818be2e87c5f59c6b456fe",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 29849420430
       }
     },
     {
@@ -1420,26 +1380,6 @@
         "packets": 2,
         "bytes": 1,
         "digest": 925332147968
-      }
-    },
-    {
-      "id": "capsule-mov-text-one-byte",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-one-byte.mp4",
-      "sha256": "ae2e3d2529a96e4bb93908bfc65c0eab8e56b8fb99fb655f6d4ee7a978a3d5ac",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 279
       }
     },
     {
@@ -1823,46 +1763,6 @@
       }
     },
     {
-      "id": "capsule-mov-text-two-packets",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-two-packets.mp4",
-      "sha256": "5cb4968793ca051efdfc4bd4c132f651b79dbbe64ad56707dabad6886ba81dd0",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 2,
-        "digest": 8044759290745430352
-      }
-    },
-    {
-      "id": "capsule-mov-text-tx3g-basic",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-basic.mp4",
-      "sha256": "f34cd78cae8ec168a5b5c6573a40c32f462c11616c6d615600950c0bea167ecc",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 8,
-        "digest": 1805322624446297728
-      }
-    },
-    {
       "id": "capsule-mov-text-tx3g-box-overrun",
       "profile": "text-mov-tx3g",
       "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-box-overrun.mp4",
@@ -1883,86 +1783,6 @@
       }
     },
     {
-      "id": "capsule-mov-text-tx3g-byte-not-character-count",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-byte-not-character-count.mp4",
-      "sha256": "94f8cdb89f74756a732b2cba19ff97e212c232b40b0f74df65fc8df86c9c7727",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 7,
-        "digest": 9579194067971965031
-      }
-    },
-    {
-      "id": "capsule-mov-text-tx3g-embedded-nul",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-embedded-nul.mp4",
-      "sha256": "febe7b556dc15101db0f505b6d0a0133728df5854c22124611ac8f08518168e7",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 925332147968
-      }
-    },
-    {
-      "id": "capsule-mov-text-tx3g-empty-sample",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-empty-sample.mp4",
-      "sha256": "12cdaf461f39965949c27e71aa5e1ab95e16f2021171cfe3330991990cff597c",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 279
-      }
-    },
-    {
-      "id": "capsule-mov-text-tx3g-empty-with-modifier",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-empty-with-modifier.mp4",
-      "sha256": "db7ed691cb18f68644ae384b05bba4d66f43c9c651818be2e87c5f59c6b456fe",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 0,
-        "digest": 29849420430
-      }
-    },
-    {
       "id": "capsule-mov-text-tx3g-extended-box-gap",
       "profile": "text-mov-tx3g",
       "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-extended-box-gap.mp4",
@@ -1980,26 +1800,6 @@
         "packets": 2,
         "bytes": 1,
         "digest": 924408649071
-      }
-    },
-    {
-      "id": "capsule-mov-text-tx3g-line-codepoints-exact",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-line-codepoints-exact.mp4",
-      "sha256": "e64557506ca156ea14e94df20c40d941de77b3f24c80073e141765038f8ad615",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 6,
-        "digest": 8044733983860834104
       }
     },
     {
@@ -2043,26 +1843,6 @@
       }
     },
     {
-      "id": "capsule-mov-text-tx3g-modifier-order",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-modifier-order.mp4",
-      "sha256": "deccf957997834f662bb1d2467213819910bf88ade4bc2ac834f55c21511d93d",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 3,
-        "digest": 889244254202367
-      }
-    },
-    {
       "id": "capsule-mov-text-tx3g-short-box",
       "profile": "text-mov-tx3g",
       "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-short-box.mp4",
@@ -2080,26 +1860,6 @@
         "packets": 1,
         "bytes": 0,
         "digest": 279
-      }
-    },
-    {
-      "id": "capsule-mov-text-tx3g-style-highlight-raw",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-style-highlight-raw.mp4",
-      "sha256": "ff843f47d5ae059508e8354207d568c703f6d807a17489431009a123be3b4d39",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 3,
-        "digest": 889244254202367
       }
     },
     {
@@ -2123,70 +1883,10 @@
       }
     },
     {
-      "id": "capsule-mov-text-tx3g-u16-byte-count-boundary",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-u16-byte-count-boundary.mp4",
-      "sha256": "281d9643ed4dfc118eea14a90510e9295134f35971352edce78a894558ca81b9",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 65535,
-        "digest": 5989296508274698466
-      }
-    },
-    {
-      "id": "capsule-mov-text-tx3g-unknown-modifier",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-unknown-modifier.mp4",
-      "sha256": "ed2643878babc9fd4b4500721fe9ceb74cb1e17c2e2d6ee225138680a7cfc58d",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 925332170071
-      }
-    },
-    {
       "id": "capsule-mov-text-tx3g-utf16-odd",
       "profile": "text-mov-tx3g",
       "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-utf16-odd.mp4",
       "sha256": "a621ab02a622dce6bc769f0bb1f5218e28d29370073cbdd06662e1f45900d12c",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 279
-      }
-    },
-    {
-      "id": "capsule-mov-text-tx3g-utf16be-bom",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-mov-text-tx3g-utf16be-bom.mp4",
-      "sha256": "e4fd01dd530b821ef5e7a04ac6401fb8def97ca15dccfce7cf9d1d29068125ca",
       "rights": "authored-synthetic",
       "source": null,
       "arguments": [
@@ -3503,26 +3203,6 @@
       }
     },
     {
-      "id": "capsule-tx3g-output_is_taken_once_and_old_owners_survive_job_drop",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-tx3g-output_is_taken_once_and_old_owners_survive_job_drop.mp4",
-      "sha256": "b059a7f10048ea4bdb62737c6cef7d2565f477f452cdeb7125e0a352c71199b1",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 1386169149071
-      }
-    },
-    {
       "id": "capsule-tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors",
       "profile": "text-mov-tx3g",
       "file": "harness/features/text-extraction/inputs/capsule-tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors.mp4",
@@ -4083,26 +3763,6 @@
       }
     },
     {
-      "id": "capsule-tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors.mp4",
-      "sha256": "c7a5e766981240a5002c0feae2a665eaa11569002638b989485289d42dadd695",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 1,
-        "digest": 1386169149071
-      }
-    },
-    {
       "id": "capsule-tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges",
       "profile": "text-mov-tx3g",
       "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges.mp4",
@@ -4247,26 +3907,6 @@
       "profile": "text-mov-tx3g",
       "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_length_style_records_are_preserved_and_apply_to_no_character.mp4",
       "sha256": "077b32c5bfdc1660a65049717cb3552adc9dce9dad43563e791c8e4e7e1955b7",
-      "rights": "authored-synthetic",
-      "source": null,
-      "arguments": [
-        "text",
-        "mov",
-        "tx3g",
-        "0",
-        "0"
-      ],
-      "expected": {
-        "packets": 2,
-        "bytes": 3,
-        "digest": 1332108591021367
-      }
-    },
-    {
-      "id": "capsule-tx3g-zero_work_semantics_performs_no_progress_or_allocation",
-      "profile": "text-mov-tx3g",
-      "file": "harness/features/text-extraction/inputs/capsule-tx3g-zero_work_semantics_performs_no_progress_or_allocation.mp4",
-      "sha256": "4591f6f3a16dc641057226e89e818a79b3023414be7c155dbfee06138360edd6",
       "rights": "authored-synthetic",
       "source": null,
       "arguments": [

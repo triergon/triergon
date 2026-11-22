@@ -74,7 +74,6 @@
         "capsule-mov-text-bom",
         "capsule-mov-text-box-refusal-then-good",
         "capsule-mov-text-clear-then-good",
-        "capsule-mov-text-clear",
         "capsule-mov-text-config-invalid-font-size",
         "capsule-mov-text-config-one-dimension",
         "capsule-mov-text-config-too-short",
@@ -84,7 +83,6 @@
         "capsule-mov-text-cr-lf-markup",
         "capsule-mov-text-duplicate-fonts",
         "capsule-mov-text-duplicate-wrap",
-        "capsule-mov-text-empty-event",
         "capsule-mov-text-empty-physical",
         "capsule-mov-text-extended-short",
         "capsule-mov-text-extended-wrap",
@@ -101,7 +99,6 @@
         "capsule-mov-text-negative-half",
         "capsule-mov-text-noncharacter-fffe",
         "capsule-mov-text-nul-invalid-tail",
-        "capsule-mov-text-one-byte",
         "capsule-mov-text-overflow-clock",
         "capsule-mov-text-overrun-box",
         "capsule-mov-text-overstated",
@@ -121,25 +118,13 @@
         "capsule-mov-text-style-reversed",
         "capsule-mov-text-style-unicode",
         "capsule-mov-text-style-zero-after-good",
-        "capsule-mov-text-two-packets",
-        "capsule-mov-text-tx3g-basic",
         "capsule-mov-text-tx3g-box-overrun",
-        "capsule-mov-text-tx3g-byte-not-character-count",
-        "capsule-mov-text-tx3g-embedded-nul",
-        "capsule-mov-text-tx3g-empty-sample",
-        "capsule-mov-text-tx3g-empty-with-modifier",
         "capsule-mov-text-tx3g-extended-box-gap",
-        "capsule-mov-text-tx3g-line-codepoints-exact",
         "capsule-mov-text-tx3g-lone-surrogate",
         "capsule-mov-text-tx3g-missing-length",
-        "capsule-mov-text-tx3g-modifier-order",
         "capsule-mov-text-tx3g-short-box",
-        "capsule-mov-text-tx3g-style-highlight-raw",
         "capsule-mov-text-tx3g-text-overrun",
-        "capsule-mov-text-tx3g-u16-byte-count-boundary",
-        "capsule-mov-text-tx3g-unknown-modifier",
         "capsule-mov-text-tx3g-utf16-odd",
-        "capsule-mov-text-tx3g-utf16be-bom",
         "capsule-mov-text-understated",
         "capsule-mov-text-unicode",
         "capsule-mov-text-unknown-clock",
@@ -205,7 +190,6 @@
         "capsule-tx3g-missing_duration_does_not_invent_a_time_bound_or_next_packet_end",
         "capsule-tx3g-original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_ambiguity",
         "capsule-tx3g-original_style_highlight_fixture_resolves_requested_style_and_colour_authority",
-        "capsule-tx3g-output_is_taken_once_and_old_owners_survive_job_drop",
         "capsule-tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors",
         "capsule-tx3g-overlapping_styles_across_separate_boxes_are_not_last_wins",
         "capsule-tx3g-overlaps_within_highlights_links_and_blinks_are_rejected",
@@ -234,7 +218,6 @@
         "capsule-tx3g-unknown_time_with_only_zero_duration_karaoke_has_no_possible_dynamic_extent",
         "capsule-tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
         "capsule-tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes",
-        "capsule-tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors",
         "capsule-tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges",
         "capsule-tx3g-zero_duration_karaoke_events_are_source_records_but_never_active",
         "capsule-tx3g-zero_duration_only_events_need_no_invented_continuous_context_for_conflicts",
@@ -243,7 +226,6 @@
         "capsule-tx3g-zero_duration_tail_never_extends_a_continuous_conflict_prefix",
         "capsule-tx3g-zero_font_id_and_sparse_high_ids_do_not_use_truthiness_as_knownness",
         "capsule-tx3g-zero_length_style_records_are_preserved_and_apply_to_no_character",
-        "capsule-tx3g-zero_work_semantics_performs_no_progress_or_allocation",
         "fragmented-subtitle-edit",
         "fragmented-subtitles",
         "r-subtitle-tx3g"
@@ -297,7 +279,6 @@
         "capsule-mov-text-bom",
         "capsule-mov-text-box-refusal-then-good",
         "capsule-mov-text-clear-then-good",
-        "capsule-mov-text-clear",
         "capsule-mov-text-config-invalid-font-size",
         "capsule-mov-text-config-one-dimension",
         "capsule-mov-text-config-too-short",
@@ -307,7 +288,6 @@
         "capsule-mov-text-cr-lf-markup",
         "capsule-mov-text-duplicate-fonts",
         "capsule-mov-text-duplicate-wrap",
-        "capsule-mov-text-empty-event",
         "capsule-mov-text-empty-physical",
         "capsule-mov-text-extended-short",
         "capsule-mov-text-extended-wrap",
@@ -324,7 +304,6 @@
         "capsule-mov-text-negative-half",
         "capsule-mov-text-noncharacter-fffe",
         "capsule-mov-text-nul-invalid-tail",
-        "capsule-mov-text-one-byte",
         "capsule-mov-text-overflow-clock",
         "capsule-mov-text-overrun-box",
         "capsule-mov-text-overstated",
@@ -344,25 +323,13 @@
         "capsule-mov-text-style-reversed",
         "capsule-mov-text-style-unicode",
         "capsule-mov-text-style-zero-after-good",
-        "capsule-mov-text-two-packets",
-        "capsule-mov-text-tx3g-basic",
         "capsule-mov-text-tx3g-box-overrun",
-        "capsule-mov-text-tx3g-byte-not-character-count",
-        "capsule-mov-text-tx3g-embedded-nul",
-        "capsule-mov-text-tx3g-empty-sample",
-        "capsule-mov-text-tx3g-empty-with-modifier",
         "capsule-mov-text-tx3g-extended-box-gap",
-        "capsule-mov-text-tx3g-line-codepoints-exact",
         "capsule-mov-text-tx3g-lone-surrogate",
         "capsule-mov-text-tx3g-missing-length",
-        "capsule-mov-text-tx3g-modifier-order",
         "capsule-mov-text-tx3g-short-box",
-        "capsule-mov-text-tx3g-style-highlight-raw",
         "capsule-mov-text-tx3g-text-overrun",
-        "capsule-mov-text-tx3g-u16-byte-count-boundary",
-        "capsule-mov-text-tx3g-unknown-modifier",
         "capsule-mov-text-tx3g-utf16-odd",
-        "capsule-mov-text-tx3g-utf16be-bom",
         "capsule-mov-text-understated",
         "capsule-mov-text-unicode",
         "capsule-mov-text-unknown-clock",
@@ -428,7 +395,6 @@
         "capsule-tx3g-missing_duration_does_not_invent_a_time_bound_or_next_packet_end",
         "capsule-tx3g-original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_ambiguity",
         "capsule-tx3g-original_style_highlight_fixture_resolves_requested_style_and_colour_authority",
-        "capsule-tx3g-output_is_taken_once_and_old_owners_survive_job_drop",
         "capsule-tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors",
         "capsule-tx3g-overlapping_styles_across_separate_boxes_are_not_last_wins",
         "capsule-tx3g-overlaps_within_highlights_links_and_blinks_are_rejected",
@@ -457,7 +423,6 @@
         "capsule-tx3g-unknown_time_with_only_zero_duration_karaoke_has_no_possible_dynamic_extent",
         "capsule-tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
         "capsule-tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes",
-        "capsule-tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors",
         "capsule-tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges",
         "capsule-tx3g-zero_duration_karaoke_events_are_source_records_but_never_active",
         "capsule-tx3g-zero_duration_only_events_need_no_invented_continuous_context_for_conflicts",
@@ -466,7 +431,6 @@
         "capsule-tx3g-zero_duration_tail_never_extends_a_continuous_conflict_prefix",
         "capsule-tx3g-zero_font_id_and_sparse_high_ids_do_not_use_truthiness_as_knownness",
         "capsule-tx3g-zero_length_style_records_are_preserved_and_apply_to_no_character",
-        "capsule-tx3g-zero_work_semantics_performs_no_progress_or_allocation",
         "fragmented-subtitle-edit",
         "fragmented-subtitles",
         "r-subtitle-tx3g"
@@ -520,7 +484,6 @@
         "capsule-mov-text-bom",
         "capsule-mov-text-box-refusal-then-good",
         "capsule-mov-text-clear-then-good",
-        "capsule-mov-text-clear",
         "capsule-mov-text-config-invalid-font-size",
         "capsule-mov-text-config-one-dimension",
         "capsule-mov-text-config-too-short",
@@ -530,7 +493,6 @@
         "capsule-mov-text-cr-lf-markup",
         "capsule-mov-text-duplicate-fonts",
         "capsule-mov-text-duplicate-wrap",
-        "capsule-mov-text-empty-event",
         "capsule-mov-text-empty-physical",
         "capsule-mov-text-extended-short",
         "capsule-mov-text-extended-wrap",
@@ -547,7 +509,6 @@
         "capsule-mov-text-negative-half",
         "capsule-mov-text-noncharacter-fffe",
         "capsule-mov-text-nul-invalid-tail",
-        "capsule-mov-text-one-byte",
         "capsule-mov-text-overflow-clock",
         "capsule-mov-text-overrun-box",
         "capsule-mov-text-overstated",
@@ -567,25 +528,13 @@
         "capsule-mov-text-style-reversed",
         "capsule-mov-text-style-unicode",
         "capsule-mov-text-style-zero-after-good",
-        "capsule-mov-text-two-packets",
-        "capsule-mov-text-tx3g-basic",
         "capsule-mov-text-tx3g-box-overrun",
-        "capsule-mov-text-tx3g-byte-not-character-count",
-        "capsule-mov-text-tx3g-embedded-nul",
-        "capsule-mov-text-tx3g-empty-sample",
-        "capsule-mov-text-tx3g-empty-with-modifier",
         "capsule-mov-text-tx3g-extended-box-gap",
-        "capsule-mov-text-tx3g-line-codepoints-exact",
         "capsule-mov-text-tx3g-lone-surrogate",
         "capsule-mov-text-tx3g-missing-length",
-        "capsule-mov-text-tx3g-modifier-order",
         "capsule-mov-text-tx3g-short-box",
-        "capsule-mov-text-tx3g-style-highlight-raw",
         "capsule-mov-text-tx3g-text-overrun",
-        "capsule-mov-text-tx3g-u16-byte-count-boundary",
-        "capsule-mov-text-tx3g-unknown-modifier",
         "capsule-mov-text-tx3g-utf16-odd",
-        "capsule-mov-text-tx3g-utf16be-bom",
         "capsule-mov-text-understated",
         "capsule-mov-text-unicode",
         "capsule-mov-text-unknown-clock",
@@ -651,7 +600,6 @@
         "capsule-tx3g-missing_duration_does_not_invent_a_time_bound_or_next_packet_end",
         "capsule-tx3g-original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_ambiguity",
         "capsule-tx3g-original_style_highlight_fixture_resolves_requested_style_and_colour_authority",
-        "capsule-tx3g-output_is_taken_once_and_old_owners_survive_job_drop",
         "capsule-tx3g-overlapping_and_out_of_order_style_records_are_explicit_errors",
         "capsule-tx3g-overlapping_styles_across_separate_boxes_are_not_last_wins",
         "capsule-tx3g-overlaps_within_highlights_links_and_blinks_are_rejected",
@@ -680,7 +628,6 @@
         "capsule-tx3g-unknown_time_with_only_zero_duration_karaoke_has_no_possible_dynamic_extent",
         "capsule-tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
         "capsule-tx3g-wrap_known_modes_and_reserved_modes_have_distinct_outcomes",
-        "capsule-tx3g-zero_clock_and_missing_explicit_description_source_are_constructor_errors",
         "capsule-tx3g-zero_duration_applicability_does_not_relax_source_record_order_or_ranges",
         "capsule-tx3g-zero_duration_karaoke_events_are_source_records_but_never_active",
         "capsule-tx3g-zero_duration_only_events_need_no_invented_continuous_context_for_conflicts",
@@ -689,7 +636,6 @@
         "capsule-tx3g-zero_duration_tail_never_extends_a_continuous_conflict_prefix",
         "capsule-tx3g-zero_font_id_and_sparse_high_ids_do_not_use_truthiness_as_knownness",
         "capsule-tx3g-zero_length_style_records_are_preserved_and_apply_to_no_character",
-        "capsule-tx3g-zero_work_semantics_performs_no_progress_or_allocation",
         "fragmented-subtitle-edit",
         "fragmented-subtitles",
         "r-subtitle-tx3g"
@@ -697,466 +643,291 @@
       "cause": "Paired native measurements are pending on the two gate hosts."
     }
   ],
-  "pending_module_requirements": [
-    "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-    "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
-    "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-    "The text cue carries the source's signed or explicitly zero clock. FFmpeg's demux view clamps the negative start or reports duration as unknown.",
-    "The source bridge emits an empty or source-preserved sample before the following visible cue. FFmpeg's decoder skips it and first emits the later cue.",
-    "The source cue retains the unsigned 32-bit sample-table duration. FFmpeg's demuxer returns the shorter duration inferred from the track."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "tx3g-utf16be-bom",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
+      "reading": "A zero-length timed-text string has a source cue extent",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes.",
+      "candidate": "Emits a zero-byte cue at the listed sample time and retains any subsequent cues.",
+      "reference": "Suppresses the empty sample. In one two-packet case the next visible cue is b at 1001000 us.",
+      "compat": "compat::text::suppress_empty_tx3g for consumers that only want visible cues.",
+      "cases": [
+        "tx3g-empty-sample",
+        "capsule-tx3g-empty_text_has_no_runs_and_no_queryable_character",
+        "capsule-mov-text-clear-then-good",
+        "fragmented-subtitles",
+        "r-subtitle-tx3g"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "tx3g-empty-sample",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
+      "reading": "Opaque ASS source bytes survive demux",
+      "clause": "RFC 9559 section 10.1 defines Block data. Matroska codec mappings draft 21 sections 3.5.7 and 5.3 store ASS event fields in that data.",
+      "candidate": "Exposes the zero-byte block or the unchanged legacy or invalid-UTF-8 ASS bytes to the client.",
+      "reference": "Publishes no decoded subtitle for these packets.",
+      "compat": "compat::text::decoded_ass_events for clients that require decoder admission before receiving an event.",
+      "cases": [
+        "ass-empty-not-clear",
+        "ass-invalid-utf8-unvalidated",
+        "ass-unknown-charset-opaque"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "tx3g-embedded-nul",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
+      "reading": "Byte-counted text preserves line and nonprinting scalars",
+      "clause": "ETSI TS 126 245 V19.0.0 sections 5.1–5.2 and 5.17 define the UTF-8 or BOM-marked UTF-16 string as a byte-counted field.",
+      "candidate": "Keeps CR, LF and U+0000 in the extracted UTF-8 string, including a NUL between a and b and a leading NUL before tail.",
+      "reference": "Stops the published string at NUL or changes the line breaks in the display-text projection.",
+      "compat": "compat::text::c_string_display for callers that need the reference display string.",
+      "cases": [
+        "tx3g-embedded-nul",
+        "tx3g-line-codepoints-exact",
+        "capsule-mov-text-wrap-nul",
+        "capsule-mov-text-tags-ranges",
+        "capsule-mov-text-tags-nul-transitions",
+        "capsule-tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "tx3g-line-codepoints-exact",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
+      "reading": "Timed-text bytes remain separate from presentation modifiers",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes. Section 5.17.1.1 stores styles as modifier records.",
+      "candidate": "For the markup fixture preserves all 13 source bytes. For the font-table case returns abcdef.",
+      "reference": "The decoded display projection normalizes the markup fixture to six bytes and returns a literal closing brace in a}bcdef.",
+      "cases": [
+        "capsule-mov-text-cr-lf-markup",
+        "capsule-mov-text-tags-font-table"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "tx3g-missing-length",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
+      "reading": "BOM-marked big-endian UTF-16 decodes to Unicode scalars",
+      "clause": "ETSI TS 126 245 V19.0.0 sections 5.1–5.2 and 5.17 define the UTF-8 or BOM-marked UTF-16 string as a byte-counted field.",
+      "candidate": "Returns full decoded UTF-8, including the ASCII, Hangul and supplementary-plane controls.",
+      "reference": "Returns no cue for the four valid UTF-16 samples.",
+      "cases": [
+        "tx3g-utf16be-bom",
+        "capsule-mov-text-utf16be",
+        "capsule-tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
+        "capsule-tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "tx3g-text-overrun",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
+      "reading": "Physical timed-text box layouts remain bounded by the sample",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes. ISO/IEC 14496-12:2015 section 4.2 defines compact, extended and end-of-file box sizes.",
+      "candidate": "Accepts the valid bounded modifier layouts and retains abcd or x.",
+      "reference": "Suppresses the cue on the complete sample with these layouts.",
+      "cases": [
+        "capsule-mov-text-size0",
+        "capsule-tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "tx3g-utf16-odd",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
+      "reading": "A truncated timed-text length field supplies no string",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes.",
+      "candidate": "Reports a source refusal before emitting any cue.",
+      "reference": "Emits no cue and completes successfully.",
+      "cases": [
+        "tx3g-missing-length",
+        "capsule-mov-text-bad-two",
+        "capsule-mov-text-empty-physical",
+        "capsule-mov-text-tx3g-missing-length"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "tx3g-lone-surrogate",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
+      "reading": "A sample does not cover the bytes claimed by its string length",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes.",
+      "candidate": "Refuses before publishing text rather than treating a partial string as complete.",
+      "reference": "Publishes the available prefix, such as xy, ab or xy in the short controls.",
+      "compat": "compat::text::recover_truncated_tx3g for consumers showing a partial source string.",
+      "cases": [
+        "tx3g-text-overrun",
+        "capsule-mov-text-overstated",
+        "capsule-mov-text-tx3g-text-overrun"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "tx3g-short-box",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
+      "reading": "A malformed modifier cannot extend past its sample",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes. ISO/IEC 14496-12:2015 section 4.2 defines the length of each complete box.",
+      "candidate": "Refuses the invalid suffix after the length-delimited text.",
+      "reference": "Ignores the invalid box extent and emits x, abcd or a, or suppresses a sample with an incomplete box header.",
+      "compat": "compat::text::ignore_invalid_tx3g_modifiers for consumers needing prefix text from broken modifiers.",
+      "cases": [
+        "tx3g-short-box",
+        "tx3g-box-overrun",
+        "capsule-mov-text-extended-short",
+        "capsule-mov-text-overrun-box",
+        "capsule-mov-text-short-box",
+        "capsule-mov-text-tx3g-box-overrun",
+        "capsule-mov-text-tx3g-short-box",
+        "capsule-mov-text-understated"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "tx3g-box-overrun",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
+      "reading": "A timed-text string must be well-formed in its signaled encoding",
+      "clause": "ETSI TS 126 245 V19.0.0 sections 5.1–5.2 and 5.17 define the UTF-8 or BOM-marked UTF-16 string as a byte-counted field. RFC 3629 sections 3–4 forbid overlong UTF-8 and surrogate encodings. TS 126 245 section 5.1 makes byte-reversed UTF-16 support optional.",
+      "candidate": "Refuses malformed UTF-8, unpaired or incomplete UTF-16, or the unsupported reverse BOM.",
+      "reference": "Suppresses the sample without the source refusal, or decodes a valid prefix before NUL. It continues to a later cue in the two-packet malformed UTF-8 control.",
+      "compat": "compat::text::skip_invalid_tx3g for clients that need to resume after malformed string data.",
+      "cases": [
+        "tx3g-utf16-odd",
+        "tx3g-lone-surrogate",
+        "capsule-mov-text-invalid-overlong",
+        "capsule-mov-text-invalid-tail",
+        "capsule-mov-text-nul-invalid-tail",
+        "capsule-mov-text-tx3g-lone-surrogate",
+        "capsule-mov-text-tx3g-utf16-odd",
+        "capsule-mov-text-utf16le",
+        "capsule-mov-text-utf8-refusal-then-good"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "utf8-packet-markup",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
+      "reading": "Matroska UTF-8 extraction retains the complete Block text",
+      "clause": "Matroska codec mappings draft 21 sections 3.5.11 and 5.2 store the UTF-8 subtitle text in the Block data. RFC 3629 section 3 encodes U+0000 as one byte and does not assign it a string-terminator role.",
+      "candidate": "Retains the UTF-8 BOM, embedded NUL and later bytes, or the literal angle-bracket markup.",
+      "reference": "Stops at NUL or strips apparent markup in the display projection.",
+      "compat": "compat::text::decoded_utf8_display for clients needing the normalized display string.",
+      "cases": [
+        "utf8-packet-bom-nul-content",
+        "utf8-packet-markup"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "utf8-packet-known-zero-duration",
-      "requirement": "The text cue carries the source's signed or explicitly zero clock. FFmpeg's demux view clamps the negative start or reports duration as unknown.",
+      "reading": "Matroska UTF-8 rejects a scalar above U+10FFFF",
+      "clause": "Matroska codec mappings draft 21 sections 3.5.11 and 5.2 store the UTF-8 subtitle text in the Block data. RFC 3629 section 3 confines the encoded scalar range to U+0000 through U+10FFFF.",
+      "candidate": "Refuses the text call on invalid UTF-8.",
+      "reference": "Emits no cue and completes successfully.",
+      "cases": [
+        "utf8-packet-too-large-scalar"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "utf8-packet-negative-start",
-      "requirement": "The text cue carries the source's signed or explicitly zero clock. FFmpeg's demux view clamps the negative start or reports duration as unknown.",
+      "reading": "A known zero source duration remains a value",
+      "clause": "ISO/IEC 14496-12:2015 section 8.6.1.2.1 stores sample deltas, including zero. RFC 9559 section 5.1.3.5.3 defines explicit BlockDuration in Track Ticks.",
+      "candidate": "Emits duration zero, with presence retained.",
+      "reference": "Supplies no duration when its packet duration field is zero.",
+      "cases": [
+        "capsule-mov-text-known-zero-duration",
+        "capsule-mov-text-negative-half",
+        "utf8-packet-known-zero-duration"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "utf8-packet-bom-nul-content",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
+      "reading": "Signed Matroska subtitle Block time is preserved",
+      "clause": "RFC 9559 section 11.2 defines the signed relative Block timestamp and presentation arithmetic.",
+      "candidate": "Returns the source cue at -715000 us with a duration of 333000 us.",
+      "reference": "Reports the same cue and duration with PTS zero.",
+      "compat": "compat::matroska::clamp_negative_subtitle_pts for callers needing the reference projected time.",
+      "cases": [
+        "utf8-packet-negative-start"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "utf8-packet-too-large-scalar",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
+      "reading": "Timed text retains the unsigned stts delta",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.6.1.2.2–8.6.1.2.3 define sample_delta as an unsigned 32-bit count.",
+      "candidate": "Reports 4294967295000000 us for the coded 4294967295-tick duration at one tick per second.",
+      "reference": "Reports 1000000 us for the same one-byte cue.",
+      "cases": [
+        "capsule-mov-text-overflow-clock"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "mkv-vtt-relative-inline-time",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
+      "reading": "WebVTT payload carries its inline timestamp syntax",
+      "clause": "Matroska codec mappings draft 21 sections 5.4.3 and 5.4.5.2–5.4.5.5 define cue payload carriage including transformed inline timestamps.",
+      "candidate": "Returns all 19 bytes of the payload including the relative inline timestamp.",
+      "reference": "Returns only the eight bytes of the visible word relative.",
+      "cases": [
+        "mkv-vtt-relative-inline-time"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "mkv-vtt-truncated-addition",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
+      "reading": "A WebVTT BlockAdditional needs its settings and identifier lines",
+      "clause": "Matroska codec mappings draft 21 section 5.4.4 defines newline-delimited settings and identifier records in type-1 BlockAdditional.",
+      "candidate": "Refuses the incomplete additional record at the source boundary.",
+      "reference": "Decodes and publishes the four-byte cue body without the invalid additional fields.",
+      "cases": [
+        "mkv-vtt-truncated-addition"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "ass-unknown-charset-opaque",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
+      "reading": "An empty timed-text sample preserves its source interval",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 permits a zero string byte count. ISO/IEC 14496-12:2015 sections 8.6.1.2 and 8.8.8 keep the sample interval.",
+      "candidate": "Emits empty cues at 0 and 2600000 us around the nonempty 2400000-us cue.",
+      "reference": "Publishes only the nonempty cue at 200000 us.",
+      "compat": "compat::text::suppress_empty_tx3g for consumers that only want visible cues.",
+      "cases": [
+        "fragmented-subtitle-edit"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "ass-empty-not-clear",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
+      "reading": "A noncharacter is valid in a well-formed text string",
+      "clause": "Unicode Corrigendum 9 and RFC 3629 sections 3–4 distinguish noncharacters from invalid UTF-8. ETSI TS 126 245 V19.0.0 section 5.1 defines character decoding.",
+      "candidate": "Returns the UTF-8 scalar U+FFFE as efbfbe.",
+      "reference": "Suppresses the cue.",
+      "cases": [
+        "capsule-mov-text-noncharacter-fffe"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "id": "ass-invalid-utf8-unvalidated",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-bad-two",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-box-refusal-then-good",
-      "requirement": "The source bridge emits an empty or source-preserved sample before the following visible cue. FFmpeg's decoder skips it and first emits the later cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-clear-then-good",
-      "requirement": "The source bridge emits an empty or source-preserved sample before the following visible cue. FFmpeg's decoder skips it and first emits the later cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-clear",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-cr-lf-markup",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-empty-physical",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-extended-short",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-invalid-overlong",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-invalid-tail",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-known-zero-duration",
-      "requirement": "The text cue carries the source's signed or explicitly zero clock. FFmpeg's demux view clamps the negative start or reports duration as unknown.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-negative-half",
-      "requirement": "The text cue carries the source's signed or explicitly zero clock. FFmpeg's demux view clamps the negative start or reports duration as unknown.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-noncharacter-fffe",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-nul-invalid-tail",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-one-byte",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-overflow-clock",
-      "requirement": "The source cue retains the unsigned 32-bit sample-table duration. FFmpeg's demuxer returns the shorter duration inferred from the track.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-overrun-box",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-overstated",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-short-box",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-size0",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-box-overrun",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-embedded-nul",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-empty-sample",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-line-codepoints-exact",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-lone-surrogate",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-missing-length",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-short-box",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-text-overrun",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-utf16-odd",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tx3g-utf16be-bom",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-understated",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-utf16be",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-utf16le",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-utf8-refusal-then-good",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-wrap-nul",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-font-table",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-nul-transitions",
-      "requirement": "The bounded source extractor refuses an incomplete sample, child box, addition or Unicode sequence. FFmpeg's decoder may emit its usable prefix or advance without a cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-mov-text-tags-ranges",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets",
-      "requirement": "The source bridge keeps NULs, markup or inline timestamps in the cue. The reference text decoder projects these bytes into styled or NUL-terminated display text.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-empty_text_has_no_runs_and_no_queryable_character",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "capsule-tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
-      "requirement": "The source bridge emits the TX3G Unicode text or opaque ASS packet, including empty or uninterpreted bytes. The reference reader or decoder emits no rectangle for this packet.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-subtitle-edit",
-      "requirement": "The source bridge emits an empty or source-preserved sample before the following visible cue. FFmpeg's decoder skips it and first emits the later cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-subtitles",
-      "requirement": "The source bridge emits an empty or source-preserved sample before the following visible cue. FFmpeg's decoder skips it and first emits the later cue.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "r-subtitle-tx3g",
-      "requirement": "The source bridge emits an empty or source-preserved sample before the following visible cue. FFmpeg's decoder skips it and first emits the later cue.",
+      "reading": "A bounded unknown modifier leaves timed text readable",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 skips unrecognized modifier boxes. ISO/IEC 14496-12:2015 section 4.2 defines a size-zero box extending through the enclosing end.",
+      "candidate": "Keeps cue a at 0 and cue b at 1001000 us. The unknown zzzz modifier only occupies the remaining bytes of the first sample.",
+      "reference": "Refuses the first sample with an invalid box size and publishes only b.",
+      "cases": [
+        "capsule-mov-text-box-refusal-then-good"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
