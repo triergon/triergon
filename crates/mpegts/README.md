@@ -97,6 +97,10 @@ a DVB namespace, by the first descriptor that names one; others stay
 polls (`poll_feed`, `poll_feed_carriers`, `poll_feed_with_payload_runs`) hand PES
 continuations directly to a `compat::pes::DemuxObserver`.
 
+The [PSI gate](../../harness/features/ts-psi-readers/contract.json) compares the
+standalone section and table readers with FFmpeg on TS188 and M2TS192, including
+current table versions, program membership, language flags and DVB services.
+
 ## Access units
 
 `Reader::new(&pool, source, capabilities, ReaderLimits::default(), input_window)`

@@ -153,12 +153,6 @@
     "triergon-matroska": [],
     "triergon-mpegts": [
       {
-        "name": "psi-catalogue",
-        "entry_points": ["psi::PatReader", "psi::PmtReader::new", "psi::PatCollector", "psi::SectionAssembler", "psi::ElementaryStream", "psi::Descriptor::languages", "psi::DvbSubtitling::services", "psi::DvbSubtitlingService::has_dvb_subtitling_type"],
-        "degree": "step",
-        "needs": "The standalone PAT and PMT comparison records the strict table, namespace and terminal readings. The paired bounds for equivalent live comparisons remain due."
-      },
-      {
         "name": "source-stream-polling",
         "entry_points": ["stream::TransportStream::new", "stream::TransportStream::poll_feed", "stream::TransportStream::poll_feed_carriers", "stream::TransportStream::poll_compact", "stream::TransportStream::poll_compact_observed", "stream::TransportStream::active_program", "stream::ActiveProgram", "stream::ProgramStream", "stream::ObservedTrace::into_event"],
         "degree": "unit-tests",
