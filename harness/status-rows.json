@@ -516,6 +516,10 @@
         "hls-segments"
       ]
     },
+    {"area": "HLS packet views", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hls-unit-packets"},
+    {"area": "HLS AAC segment clocks", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hls-aac-clocks"},
+    {"area": "HLS compact access-unit readers", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hls-compact-push"},
+    {"area": "HLS segment push input", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "hls-push-input"},
     {
       "area": "Packet framing",
       "targets": [
