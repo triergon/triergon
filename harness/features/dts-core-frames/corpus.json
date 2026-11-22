@@ -717,23 +717,6 @@
       }
     },
     {
-      "id": "matrix-channel-2",
-      "profile": "matrix",
-      "file": "matrix-channel-2.dts",
-      "sha256": "4817ea9899a6ea91710df293277dc92c17139e89e2d237881a2701270b7ce680",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 5984522446152110501
-      }
-    },
-    {
       "id": "matrix-channel-3",
       "profile": "matrix",
       "file": "matrix-channel-3.dts",
@@ -1193,23 +1176,6 @@
       }
     },
     {
-      "id": "matrix-pcm-0",
-      "profile": "matrix",
-      "file": "matrix-pcm-0.dts",
-      "sha256": "4817ea9899a6ea91710df293277dc92c17139e89e2d237881a2701270b7ce680",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 5984522446152110501
-      }
-    },
-    {
       "id": "matrix-pcm-1",
       "profile": "matrix",
       "file": "matrix-pcm-1.dts",
@@ -1598,23 +1564,6 @@
         "packets": 3,
         "bytes": 192,
         "digest": 2911395802245878503
-      }
-    },
-    {
-      "id": "matrix-rate-13-blocks-15",
-      "profile": "matrix",
-      "file": "matrix-rate-13-blocks-15.dts",
-      "sha256": "4817ea9899a6ea91710df293277dc92c17139e89e2d237881a2701270b7ce680",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 5984522446152110501
       }
     },
     {
@@ -2264,23 +2213,6 @@
       }
     },
     {
-      "id": "matrix-sampling-code-1",
-      "profile": "matrix",
-      "file": "matrix-sampling-code-1.dts",
-      "sha256": "352ab9c93d68e19b2ac4db0b93d85c554cb8193d18f2837c00ba327b0cf91c27",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 14471361292508905733
-      }
-    },
-    {
       "id": "matrix-sampling-code-10",
       "profile": "matrix",
       "file": "matrix-sampling-code-10.dts",
@@ -2295,57 +2227,6 @@
         "packets": 3,
         "bytes": 192,
         "digest": 8867471393583645453
-      }
-    },
-    {
-      "id": "matrix-sampling-code-11",
-      "profile": "matrix",
-      "file": "matrix-sampling-code-11.dts",
-      "sha256": "6d26f55e991be7d80f0f44d0dd611eca62a1d4a039d6a90fa65d2beb5c958c2c",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 3590536952466720501
-      }
-    },
-    {
-      "id": "matrix-sampling-code-12",
-      "profile": "matrix",
-      "file": "matrix-sampling-code-12.dts",
-      "sha256": "f8cc9281e90985736ed152bfc41e5e609d9463684940de7dc4cc1420187bee69",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 17843584852030131421
-      }
-    },
-    {
-      "id": "matrix-sampling-code-13",
-      "profile": "matrix",
-      "file": "matrix-sampling-code-13.dts",
-      "sha256": "4817ea9899a6ea91710df293277dc92c17139e89e2d237881a2701270b7ce680",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 5984522446152110501
       }
     },
     {
@@ -2383,40 +2264,6 @@
       }
     },
     {
-      "id": "matrix-sampling-code-2",
-      "profile": "matrix",
-      "file": "matrix-sampling-code-2.dts",
-      "sha256": "750e4a1ded09aab11004debb2952577744d47bbf3d0f328cd31d8a4e4dd27d68",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 534957813133690701
-      }
-    },
-    {
-      "id": "matrix-sampling-code-3",
-      "profile": "matrix",
-      "file": "matrix-sampling-code-3.dts",
-      "sha256": "c24bc82d491d3bc97f28184568c3b01589b531d694fdef2d7d210fed2a69b08a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 6083968944216624341
-      }
-    },
-    {
       "id": "matrix-sampling-code-4",
       "profile": "matrix",
       "file": "matrix-sampling-code-4.dts",
@@ -2448,57 +2295,6 @@
         "packets": 3,
         "bytes": 192,
         "digest": 9955865179364499429
-      }
-    },
-    {
-      "id": "matrix-sampling-code-6",
-      "profile": "matrix",
-      "file": "matrix-sampling-code-6.dts",
-      "sha256": "8d740adc87b46f985e54f595993fa7e5e84f405c963d0a2981296f8b2ee16d4d",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 12565147223598925694
-      }
-    },
-    {
-      "id": "matrix-sampling-code-7",
-      "profile": "matrix",
-      "file": "matrix-sampling-code-7.dts",
-      "sha256": "625e0bf03154289059b3a64d03d5fed97b51d6596d3ceb736fbd38b042d586c6",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 16257667534804136215
-      }
-    },
-    {
-      "id": "matrix-sampling-code-8",
-      "profile": "matrix",
-      "file": "matrix-sampling-code-8.dts",
-      "sha256": "470ecbda212d4f8cfa97210a9542999da55d3f8e048c09d21ab100040b4f2b21",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 1724294025919266113
       }
     },
     {
@@ -2856,23 +2652,6 @@
         "packets": 3,
         "bytes": 190,
         "digest": 9182083522992224102
-      }
-    },
-    {
-      "id": "matrix-size-95",
-      "profile": "matrix",
-      "file": "matrix-size-95.dts",
-      "sha256": "4817ea9899a6ea91710df293277dc92c17139e89e2d237881a2701270b7ce680",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 192,
-        "digest": 5984522446152110501
       }
     },
     {
@@ -3335,91 +3114,6 @@
       }
     },
     {
-      "id": "truncated-1",
-      "profile": "authored",
-      "file": "truncated-1.dts",
-      "sha256": "620bfdaa346b088fb49998d92f19a7eaf6bfc2fb0aee015753966da1028cb731",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 2,
-        "digest": 788509732218664648
-      }
-    },
-    {
-      "id": "truncated-3",
-      "profile": "authored",
-      "file": "truncated-3.dts",
-      "sha256": "edaacab5bd7c3e560d5c1e7a383081a8e2cb90c71d58bc354a6da44acf75cd62",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 6,
-        "digest": 16449964991182493642
-      }
-    },
-    {
-      "id": "truncated-4",
-      "profile": "authored",
-      "file": "truncated-4.dts",
-      "sha256": "cef535f9b83e4c4b6a5c9de61a6bc56f9e30311f6e3bf8dc5519f832d18b1c42",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 5,
-        "digest": 7253889519534038692
-      }
-    },
-    {
-      "id": "truncated-10",
-      "profile": "authored",
-      "file": "truncated-10.dts",
-      "sha256": "960eaaa35666378fddd9be0db545654f1b3d0b84ce4d87a9e2f7599dca0fc64c",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 20,
-        "digest": 13078084780145788819
-      }
-    },
-    {
-      "id": "truncated-12",
-      "profile": "authored",
-      "file": "truncated-12.dts",
-      "sha256": "4bbe61b2b37c39495e77d15130c29e3cc7400d3d5daa35d51babe872c4696188",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 24,
-        "digest": 17699941346518372835
-      }
-    },
-    {
       "id": "truncated-13",
       "profile": "authored",
       "file": "truncated-13.dts",
@@ -3468,261 +3162,6 @@
         "packets": 3,
         "bytes": 190,
         "digest": 3309013769326637446
-      }
-    },
-    {
-      "id": "header-prefix-00",
-      "profile": "boundaries",
-      "file": "header-prefix-00.dts",
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7
-      }
-    },
-    {
-      "id": "header-prefix-01",
-      "profile": "boundaries",
-      "file": "header-prefix-01.dts",
-      "sha256": "620bfdaa346b088fb49998d92f19a7eaf6bfc2fb0aee015753966da1028cb731",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 2,
-        "digest": 788509732218664648
-      }
-    },
-    {
-      "id": "header-prefix-02",
-      "profile": "boundaries",
-      "file": "header-prefix-02.dts",
-      "sha256": "1d8c0d6a3470c686d4d804f952b787e9a4064cd2b77d0963010e367b35120c6e",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 4,
-        "digest": 2255262975878781065
-      }
-    },
-    {
-      "id": "header-prefix-03",
-      "profile": "boundaries",
-      "file": "header-prefix-03.dts",
-      "sha256": "edaacab5bd7c3e560d5c1e7a383081a8e2cb90c71d58bc354a6da44acf75cd62",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 6,
-        "digest": 16449964991182493642
-      }
-    },
-    {
-      "id": "header-prefix-04",
-      "profile": "boundaries",
-      "file": "header-prefix-04.dts",
-      "sha256": "cef535f9b83e4c4b6a5c9de61a6bc56f9e30311f6e3bf8dc5519f832d18b1c42",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 5,
-        "digest": 7253889519534038692
-      }
-    },
-    {
-      "id": "header-prefix-05",
-      "profile": "boundaries",
-      "file": "header-prefix-05.dts",
-      "sha256": "c9e1177b885ba30ba5e9e041a90118370af04211cd53ed78bac8a67d94334ae2",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 6,
-        "digest": 4137074419976970537
-      }
-    },
-    {
-      "id": "header-prefix-06",
-      "profile": "boundaries",
-      "file": "header-prefix-06.dts",
-      "sha256": "08f93b9a7e455001ced703eb7c6c3363f4ac1fbfcde2ef61dfae6cdd5e04c55d",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 7,
-        "digest": 125628589509870114
-      }
-    },
-    {
-      "id": "header-prefix-07",
-      "profile": "boundaries",
-      "file": "header-prefix-07.dts",
-      "sha256": "8274e481566533ecd3cf983c1685c7eb3424aa28b908ef7770431d8dc4669228",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 8,
-        "digest": 16557174871324505012
-      }
-    },
-    {
-      "id": "header-prefix-08",
-      "profile": "boundaries",
-      "file": "header-prefix-08.dts",
-      "sha256": "ca78bb5233d9a22c91cbbf46325321e03f4bccd4c481973957bd73ad19a3b23a",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 16,
-        "digest": 9276059807877246507
-      }
-    },
-    {
-      "id": "header-prefix-09",
-      "profile": "boundaries",
-      "file": "header-prefix-09.dts",
-      "sha256": "abf36ce7560c6312bab6575128af02df629149743c778c0e6ae604c5c690c01f",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 18,
-        "digest": 1938305985637258928
-      }
-    },
-    {
-      "id": "header-prefix-10",
-      "profile": "boundaries",
-      "file": "header-prefix-10.dts",
-      "sha256": "960eaaa35666378fddd9be0db545654f1b3d0b84ce4d87a9e2f7599dca0fc64c",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 20,
-        "digest": 13078084780145788819
-      }
-    },
-    {
-      "id": "header-prefix-11",
-      "profile": "boundaries",
-      "file": "header-prefix-11.dts",
-      "sha256": "5900925895739a0cdec7968f741db602d09ba0a8265858c58f2311dd1e545d1f",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 22,
-        "digest": 2978015594452472978
-      }
-    },
-    {
-      "id": "header-prefix-12",
-      "profile": "boundaries",
-      "file": "header-prefix-12.dts",
-      "sha256": "4bbe61b2b37c39495e77d15130c29e3cc7400d3d5daa35d51babe872c4696188",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 24,
-        "digest": 17699941346518372835
-      }
-    },
-    {
-      "id": "header-prefix-13",
-      "profile": "boundaries",
-      "file": "header-prefix-13.dts",
-      "sha256": "179e3ed59d642a1e77032f466d38db8925bcef93527ca0861fc33383a89704e8",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 26,
-        "digest": 13929861609773586388
-      }
-    },
-    {
-      "id": "header-prefix-14",
-      "profile": "boundaries",
-      "file": "header-prefix-14.dts",
-      "sha256": "4829dbec966c57dfd1a33667f410578723819050a14243c1be35a80f58e72340",
-      "rights": "authored-synthetic",
-      "arguments": [
-        "4096",
-        "16384",
-        "frames"
-      ],
-      "expected": {
-        "packets": 3,
-        "bytes": 28,
-        "digest": 15409013922003893731
       }
     },
     {
@@ -3943,7 +3382,7 @@
       "expected": {
         "packets": 502,
         "bytes": 1006000,
-        "digest": 16889126678087089194
+        "digest": 3529827482666548265
       }
     },
     {
@@ -4079,7 +3518,7 @@
       "expected": {
         "packets": 14,
         "bytes": 24144,
-        "digest": 15472485860353803050
+        "digest": 13309085046459962921
       }
     },
     {
@@ -4181,7 +3620,7 @@
       "expected": {
         "packets": 14,
         "bytes": 24144,
-        "digest": 6806618166108315856
+        "digest": 4643217352214475727
       }
     },
     {
@@ -4249,7 +3688,7 @@
       "expected": {
         "packets": 14,
         "bytes": 12288,
-        "digest": 13273195580657939658
+        "digest": 11616482009014689225
       }
     },
     {
@@ -4383,9 +3822,9 @@
         "decoded"
       ],
       "expected": {
-        "packets": 4,
-        "bytes": 136,
-        "digest": 375087726570888084
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -4555,7 +3994,7 @@
       "expected": {
         "packets": 14,
         "bytes": 12288,
-        "digest": 13883395849023254110
+        "digest": 12226682277380003677
       }
     },
     {

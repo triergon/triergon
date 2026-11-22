@@ -72,10 +72,18 @@ static int dts_frames_run(const ViewCase *input, ViewWork *work)
             goto done;
     }
     if (test->decoded) {
+        /* The core header is compared with the core's decoded layout: core_only keeps
+           the extensions inside the frame (XCh, X96, XXCh) from adding channels. */
         const AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_DTS);
+        AVDictionary *options = NULL;
         decoder = avcodec_alloc_context3(codec);
         frame = av_frame_alloc();
-        if (!codec || !decoder || !frame || avcodec_open2(decoder, codec, NULL) < 0)
+        const int opened = codec && decoder && frame
+                           && av_dict_set(&options, "core_only", "1", 0) >= 0
+                           && avcodec_open2(decoder, codec, &options) >= 0
+                           && av_dict_count(options) == 0;
+        av_dict_free(&options);
+        if (!opened)
             goto done;
     }
 

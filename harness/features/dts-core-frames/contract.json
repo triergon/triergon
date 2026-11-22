@@ -9,7 +9,7 @@
     "Drive DtsCoreFrameReader and the public dca parser with the window in argument one, and apply the same core packet byte limit in argument two. The parser is opened at offset zero with default flags and drained at EOF.",
     "Fold kind 1 with source offset, packet byte count, the declared sizes from DtsHeaderInspector and inspect_header_bits, probe_frame_extent size, source sample rate and coded duration, and the packet bytes. The reference uses dca_core output length for the three sizes and the parser clock for rate and duration.",
     "Fold kind 1 with core byte count and all core bytes, from the bounded core prefix on the candidate and the dca_core output on the reference. Fold kind 7 at clean EOF or kind 8 at refusal, retaining any frames already emitted.",
-    "The decoded mode adds one kind 3 row before the first packet. It compares core channel count and arrangement, nominal bit rate and absent raw depth with the first decoded frame's layout and codec context. A decoded extension may add channels or expose a raw depth.",
+    "The decoded mode adds one kind 3 row before the first packet. It compares core channel count and arrangement, nominal bit rate and absent raw depth with the layout and codec context of the first frame the reference decodes with its core_only option, so the extensions inside a core frame add no channels.",
     "Input loading and argument parsing are outside the operation. Reader or parser setup, both packet folds, the reference filter, and teardown are inside. The decoded cases are parity only."
   ],
   "required_profiles": [
@@ -29,421 +29,101 @@
   "reference": "ffmpeg-framing-views-native",
   "runner": "cargo xtask report",
   "pending_module_requirements": [
-    "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush",
-    "The source header gives a coded rate and sample count for AMODE codes for which FFmpeg publishes no parser clock",
-    "The aligned core reader refuses extension substreams while FFmpeg can pass or extract them as DTS packets",
-    "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet",
-    "The source core clock follows each frame header while FFmpeg latches the first rate",
-    "Decoded extensions add channels beyond the core header arrangement"
+    "Termination frames (FTYPE 0 with SHORT 0 to 30, ETSI TS 102 114 V1.6.1 Tables 5-2 and 5-3) are valid input that the core frame readers refuse until crates/framing reads them",
+    "A core frame followed by an extension substream (ETSI TS 102 114 V1.6.1 clause 7.2) is valid DTS-HD input that the aligned core reader refuses until crates/framing steps over the substream"
   ],
   "open_cases": [
     {
-      "id": "matrix-bad-sync",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-bitrate-25",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-bitrate-26",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-bitrate-27",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-bitrate-28",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-bitrate-30",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-bitrate-31",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-channel-10",
-      "requirement": "The source header gives a coded rate and sample count for AMODE codes for which FFmpeg publishes no parser clock"
-    },
-    {
-      "id": "matrix-channel-11",
-      "requirement": "The source header gives a coded rate and sample count for AMODE codes for which FFmpeg publishes no parser clock"
-    },
-    {
-      "id": "matrix-channel-12",
-      "requirement": "The source header gives a coded rate and sample count for AMODE codes for which FFmpeg publishes no parser clock"
-    },
-    {
-      "id": "matrix-channel-13",
-      "requirement": "The source header gives a coded rate and sample count for AMODE codes for which FFmpeg publishes no parser clock"
-    },
-    {
-      "id": "matrix-channel-14",
-      "requirement": "The source header gives a coded rate and sample count for AMODE codes for which FFmpeg publishes no parser clock"
-    },
-    {
-      "id": "matrix-channel-15",
-      "requirement": "The source header gives a coded rate and sample count for AMODE codes for which FFmpeg publishes no parser clock"
-    },
-    {
-      "id": "matrix-channel-16",
-      "requirement": "The source header gives a coded rate and sample count for AMODE codes for which FFmpeg publishes no parser clock"
-    },
-    {
-      "id": "matrix-channel-63",
-      "requirement": "The source header gives a coded rate and sample count for AMODE codes for which FFmpeg publishes no parser clock"
-    },
-    {
-      "id": "matrix-extension-1",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-extension-3",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-extension-4",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-extension-5",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-extension-7",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-fixed-one",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-invalid-blocks-0",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-invalid-blocks-4",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-invalid-blocks-5",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-invalid-blocks-6",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-lfe-invalid",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-normal-short-zero",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-pcm-4",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-pcm-7",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-reserved-extension-sync",
-      "requirement": "The aligned core reader refuses extension substreams while FFmpeg can pass or extract them as DTS packets"
-    },
-    {
-      "id": "matrix-sampling-code-0",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-sampling-code-10",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-sampling-code-14",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-sampling-code-15",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-sampling-code-4",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-sampling-code-5",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-sampling-code-9",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-1",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-10",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-11",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-12",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-2",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-3",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-4",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-5",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-6",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-7",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-8",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-0-bytes-9",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-1-bytes-10",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-1-bytes-11",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-1-bytes-12",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-1-bytes-13",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-short-header-cpf-1-bytes-14",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "matrix-size-0",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-size-94",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
       "id": "matrix-termination-raw",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-version-10",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-version-11",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-version-12",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-version-13",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-version-14",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-version-15",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-version-8",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "matrix-version-9",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "two-frames",
-      "requirement": "The source core clock follows each frame header while FFmpeg latches the first rate"
-    },
-    {
-      "id": "good-then-short",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "good-then-invalid",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
+      "requirement": "Termination frames (FTYPE 0 with SHORT 0 to 30, ETSI TS 102 114 V1.6.1 Tables 5-2 and 5-3) are valid input that the core frame readers refuse until crates/framing reads them"
     },
     {
       "id": "good-then-extension",
-      "requirement": "The aligned core reader refuses extension substreams while FFmpeg can pass or extract them as DTS packets"
+      "requirement": "A core frame followed by an extension substream (ETSI TS 102 114 V1.6.1 clause 7.2) is valid DTS-HD input that the aligned core reader refuses until crates/framing steps over the substream"
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "Header codes the specification rules out",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: SFREQ 0, 4, 5, 9, 10, 14 and 15 (Table 5-5), RATE other than 0 to 24 and 29 (Table 5-7), LFF 3 (Table 5-14) and PCMR 4 and 7 (Table 5-17) are invalid, FSIZE 0 to 94 and NBLKS 0 to 4 are invalid, a normal frame has SHORT 31 (Table 5-3) and NBLKS 7, 15, 31, 63 or 127, and FixedBit is 0",
+      "candidate": "refuses the stream with Invalid at the frame whose header breaks the clause",
+      "reference": "the dca parser returns the frame's bytes as a packet, with no clock, with the 48000 Hz and 512 samples it reads despite a RATE code, or with 96000 or 192000 Hz for SFREQ 14 and 15",
+      "cases": [
+        "matrix-bitrate-25", "matrix-bitrate-26", "matrix-bitrate-27", "matrix-bitrate-28",
+        "matrix-bitrate-30", "matrix-bitrate-31", "matrix-sampling-code-0", "matrix-sampling-code-4",
+        "matrix-sampling-code-5", "matrix-sampling-code-9", "matrix-sampling-code-10", "matrix-sampling-code-14",
+        "matrix-sampling-code-15", "matrix-size-0", "matrix-size-94", "below-minimum-fsize",
+        "matrix-invalid-blocks-0", "matrix-invalid-blocks-4", "matrix-invalid-blocks-5", "matrix-invalid-blocks-6",
+        "matrix-normal-short-zero", "matrix-fixed-one", "matrix-lfe-invalid", "matrix-pcm-4",
+        "matrix-pcm-7"
+      ]
     },
     {
-      "id": "truncated-1",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
+      "reading": "Encoder revisions and extension codes the present document does not define",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: VERNUM 8 to 15 are future revisions incompatible with the present document, which a decoder not designed for them mutes (Table 5-16), and EXT_AUDIO_ID 1, 3, 4, 5 and 7 are reserved (Table 5-11)",
+      "candidate": "refuses the stream with Unsupported at that frame",
+      "reference": "the dca parser returns the frame's bytes as a packet with the 48000 Hz, 512-sample clock its header codes",
+      "compat": "a consumer that wants such frames passed on as opaque core frames would use a compat::dts policy that frames them (not built)",
+      "cases": [
+        "matrix-version-8", "matrix-version-9", "matrix-version-10", "matrix-version-11",
+        "matrix-version-12", "matrix-version-13", "matrix-version-14", "matrix-version-15",
+        "matrix-extension-1", "matrix-extension-3", "matrix-extension-4", "matrix-extension-5",
+        "matrix-extension-7"
+      ]
     },
     {
-      "id": "truncated-3",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
+      "reading": "Bytes that are not a frame where one is due",
+      "clause": "ETSI TS 102 114 V1.6.1 clauses 5.3 and 5.4.2: a frame begins with SYNC 0x7FFE8001 and spans FSIZE + 1 bytes, so bytes without SYNC belong to no frame",
+      "candidate": "returns the frames before those bytes, then refuses with Invalid where a frame is due and SYNC is absent; the aligned reader documents that it does not search",
+      "reference": "the dca parser returns the bytes as a packet of their own or appends them to the previous frame's packet (112 and 100 bytes for 96-byte frames), then resumes at the next SYNC",
+      "cases": [
+        "matrix-bad-sync", "good-then-invalid", "interframe-garbage"
+      ]
     },
     {
-      "id": "truncated-4",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
+      "reading": "A stream that begins with an extension substream has no core frame there",
+      "clause": "ETSI TS 102 114 V1.6.1 clauses 5.4.2 and 7.2: a core frame begins with SYNC 0x7FFE8001; an extension substream begins with 0x64582025 and may stand without a core substream",
+      "candidate": "refuses with Unsupported at the extension substream sync word",
+      "reference": "the dca parser returns the extension substream bytes as a packet with no clock or the 48000 Hz, 1024-sample clock of the XLL asset, and its dca_core filter then refuses the coreless one",
+      "cases": [
+        "matrix-reserved-extension-sync", "xll_51_24_48_none"
+      ]
     },
     {
-      "id": "truncated-10",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
+      "reading": "Coded clock of arrangements the parser has no layout for",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: SFREQ gives the core sampling frequency (Table 5-5) and NBLKS a window of 32 x (NBLKS + 1) samples, 256 to 4096 in a normal frame, whatever AMODE says; AMODE 10 to 15 are defined arrangements and 16 to 63 user defined (Table 5-4)",
+      "candidate": "returns each frame with the rate and duration SFREQ and NBLKS code: 48000 Hz and 512 samples",
+      "reference": "the dca parser returns the same bytes with a zero rate and duration",
+      "cases": [
+        "matrix-channel-10", "matrix-channel-11", "matrix-channel-12", "matrix-channel-13",
+        "matrix-channel-14", "matrix-channel-15", "matrix-channel-16", "matrix-channel-63",
+        "user-defined-amode"
+      ]
     },
     {
-      "id": "truncated-12",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
+      "reading": "A frame the source ends inside",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: the header is 104 bits, 120 with HCRC, and FSIZE + 1 is the total byte size of the frame",
+      "candidate": "refuses with Truncated where the source ends inside a header or before FSIZE + 1 bytes, after every complete frame",
+      "reference": "the dca parser flushes the incomplete bytes as a packet, with no clock or, once 95 bytes are present, the header's clock",
+      "compat": "a consumer that wants the incomplete tail passed on, as the reference does, would use a compat::dts policy that returns it as an incomplete frame (not built)",
+      "cases": [
+        "matrix-short-header-cpf-0-bytes-1", "matrix-short-header-cpf-0-bytes-10", "matrix-short-header-cpf-0-bytes-11", "matrix-short-header-cpf-0-bytes-12",
+        "matrix-short-header-cpf-0-bytes-2", "matrix-short-header-cpf-0-bytes-3", "matrix-short-header-cpf-0-bytes-4", "matrix-short-header-cpf-0-bytes-5",
+        "matrix-short-header-cpf-0-bytes-6", "matrix-short-header-cpf-0-bytes-7", "matrix-short-header-cpf-0-bytes-8", "matrix-short-header-cpf-0-bytes-9",
+        "matrix-short-header-cpf-1-bytes-10", "matrix-short-header-cpf-1-bytes-11", "matrix-short-header-cpf-1-bytes-12", "matrix-short-header-cpf-1-bytes-13",
+        "matrix-short-header-cpf-1-bytes-14", "good-then-short", "truncated-13", "truncated-14",
+        "truncated-95"
+      ]
     },
     {
-      "id": "truncated-13",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "truncated-14",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "truncated-95",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-01",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-02",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-03",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-04",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-05",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-06",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-07",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-08",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-09",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-10",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-11",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-12",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-13",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "header-prefix-14",
-      "requirement": "The aligned core reader requires FSIZE bytes and FFmpeg can flush incomplete bytes as a packet"
-    },
-    {
-      "id": "below-minimum-fsize",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "rate-change",
-      "requirement": "The source core clock follows each frame header while FFmpeg latches the first rate"
-    },
-    {
-      "id": "interframe-garbage",
-      "requirement": "The aligned core reader refuses invalid sync, termination, reserved codes or unsupported versions that the FFmpeg parser can still flush"
-    },
-    {
-      "id": "dts_es-decoded",
-      "requirement": "Decoded extensions add channels beyond the core header arrangement"
-    },
-    {
-      "id": "x96_xch_61_24_96_3840-decoded",
-      "requirement": "Decoded extensions add channels beyond the core header arrangement"
-    },
-    {
-      "id": "xbr_xch_61_24_48_3840-decoded",
-      "requirement": "Decoded extensions add channels beyond the core header arrangement"
-    },
-    {
-      "id": "xch_61_24_48_768-decoded",
-      "requirement": "Decoded extensions add channels beyond the core header arrangement"
-    },
-    {
-      "id": "xll_51_24_48_none",
-      "requirement": "The aligned core reader refuses extension substreams while FFmpeg can pass or extract them as DTS packets"
-    },
-    {
-      "id": "xll_51_24_48_none-decoded",
-      "requirement": "The aligned core reader refuses extension substreams while FFmpeg can pass or extract them as DTS packets"
-    },
-    {
-      "id": "xll_xch_61_24_48_768-decoded",
-      "requirement": "Decoded extensions add channels beyond the core header arrangement"
-    },
-    {
-      "id": "user-defined-amode",
-      "requirement": "The source header gives a coded rate and sample count for AMODE codes for which FFmpeg publishes no parser clock"
+      "reading": "Each frame's own sampling frequency",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: every frame header codes SFREQ, the core sampling frequency of that frame (Table 5-5), and NBLKS, its window of 32 x (NBLKS + 1) samples",
+      "candidate": "reports the second frame's own 44100 Hz and 512 samples",
+      "reference": "the dca parser keeps the first frame's 48000 Hz and rescales the second frame's duration to 557 samples",
+      "compat": "a consumer that needs one stream-wide rate, as the reference publishes, would use a compat::dts policy that latches the first frame's rate (not built)",
+      "cases": [
+        "two-frames", "rate-change"
+      ]
     }
   ],
   "open_unmeasured": [
@@ -460,58 +140,50 @@
         "matrix-bitrate-5", "matrix-bitrate-6", "matrix-bitrate-7", "matrix-bitrate-8",
         "matrix-bitrate-9", "matrix-channel-0", "matrix-channel-1", "matrix-channel-10",
         "matrix-channel-11", "matrix-channel-12", "matrix-channel-13", "matrix-channel-14",
-        "matrix-channel-15", "matrix-channel-16", "matrix-channel-2", "matrix-channel-3",
-        "matrix-channel-4", "matrix-channel-5", "matrix-channel-6", "matrix-channel-63",
-        "matrix-channel-7", "matrix-channel-8", "matrix-channel-9", "matrix-extension-0",
-        "matrix-extension-1", "matrix-extension-2", "matrix-extension-3", "matrix-extension-4",
-        "matrix-extension-5", "matrix-extension-6", "matrix-extension-7", "matrix-fixed-one",
-        "matrix-hcrc-0", "matrix-hcrc-57005", "matrix-invalid-blocks-0", "matrix-invalid-blocks-4",
-        "matrix-invalid-blocks-5", "matrix-invalid-blocks-6", "matrix-lfe-128", "matrix-lfe-64",
-        "matrix-lfe-invalid", "matrix-normal-short-zero", "matrix-pcm-0", "matrix-pcm-1",
-        "matrix-pcm-2", "matrix-pcm-3", "matrix-pcm-4", "matrix-pcm-5",
-        "matrix-pcm-6", "matrix-pcm-7", "matrix-rate-1-blocks-127", "matrix-rate-1-blocks-15",
-        "matrix-rate-1-blocks-31", "matrix-rate-1-blocks-63", "matrix-rate-1-blocks-7", "matrix-rate-11-blocks-127",
-        "matrix-rate-11-blocks-15", "matrix-rate-11-blocks-31", "matrix-rate-11-blocks-63", "matrix-rate-11-blocks-7",
-        "matrix-rate-12-blocks-127", "matrix-rate-12-blocks-15", "matrix-rate-12-blocks-31", "matrix-rate-12-blocks-63",
-        "matrix-rate-12-blocks-7", "matrix-rate-13-blocks-127", "matrix-rate-13-blocks-15", "matrix-rate-13-blocks-31",
-        "matrix-rate-13-blocks-63", "matrix-rate-13-blocks-7", "matrix-rate-2-blocks-127", "matrix-rate-2-blocks-15",
-        "matrix-rate-2-blocks-31", "matrix-rate-2-blocks-63", "matrix-rate-2-blocks-7", "matrix-rate-3-blocks-127",
-        "matrix-rate-3-blocks-15", "matrix-rate-3-blocks-31", "matrix-rate-3-blocks-63", "matrix-rate-3-blocks-7",
-        "matrix-rate-6-blocks-127", "matrix-rate-6-blocks-15", "matrix-rate-6-blocks-31", "matrix-rate-6-blocks-63",
-        "matrix-rate-6-blocks-7", "matrix-rate-7-blocks-127", "matrix-rate-7-blocks-15", "matrix-rate-7-blocks-31",
-        "matrix-rate-7-blocks-63", "matrix-rate-7-blocks-7", "matrix-rate-8-blocks-127", "matrix-rate-8-blocks-15",
-        "matrix-rate-8-blocks-31", "matrix-rate-8-blocks-63", "matrix-rate-8-blocks-7", "matrix-raw-flag-audio_sync",
-        "matrix-raw-flag-auxiliary", "matrix-raw-flag-dynamic", "matrix-raw-flag-filter", "matrix-raw-flag-hdcd",
-        "matrix-raw-flag-sum_front", "matrix-raw-flag-sum_surround", "matrix-raw-flag-timestamp", "matrix-reserved-extension-sync",
-        "matrix-sampling-code-0", "matrix-sampling-code-1", "matrix-sampling-code-10", "matrix-sampling-code-11",
-        "matrix-sampling-code-12", "matrix-sampling-code-13", "matrix-sampling-code-14", "matrix-sampling-code-15",
-        "matrix-sampling-code-2", "matrix-sampling-code-3", "matrix-sampling-code-4", "matrix-sampling-code-5",
-        "matrix-sampling-code-6", "matrix-sampling-code-7", "matrix-sampling-code-8", "matrix-sampling-code-9",
+        "matrix-channel-15", "matrix-channel-16", "matrix-channel-3", "matrix-channel-4",
+        "matrix-channel-5", "matrix-channel-6", "matrix-channel-63", "matrix-channel-7",
+        "matrix-channel-8", "matrix-channel-9", "matrix-extension-0", "matrix-extension-1",
+        "matrix-extension-2", "matrix-extension-3", "matrix-extension-4", "matrix-extension-5",
+        "matrix-extension-6", "matrix-extension-7", "matrix-fixed-one", "matrix-hcrc-0",
+        "matrix-hcrc-57005", "matrix-invalid-blocks-0", "matrix-invalid-blocks-4", "matrix-invalid-blocks-5",
+        "matrix-invalid-blocks-6", "matrix-lfe-128", "matrix-lfe-64", "matrix-lfe-invalid",
+        "matrix-normal-short-zero", "matrix-pcm-1", "matrix-pcm-2", "matrix-pcm-3",
+        "matrix-pcm-4", "matrix-pcm-5", "matrix-pcm-6", "matrix-pcm-7",
+        "matrix-rate-1-blocks-127", "matrix-rate-1-blocks-15", "matrix-rate-1-blocks-31", "matrix-rate-1-blocks-63",
+        "matrix-rate-1-blocks-7", "matrix-rate-11-blocks-127", "matrix-rate-11-blocks-15", "matrix-rate-11-blocks-31",
+        "matrix-rate-11-blocks-63", "matrix-rate-11-blocks-7", "matrix-rate-12-blocks-127", "matrix-rate-12-blocks-15",
+        "matrix-rate-12-blocks-31", "matrix-rate-12-blocks-63", "matrix-rate-12-blocks-7", "matrix-rate-13-blocks-127",
+        "matrix-rate-13-blocks-31", "matrix-rate-13-blocks-63", "matrix-rate-13-blocks-7", "matrix-rate-2-blocks-127",
+        "matrix-rate-2-blocks-15", "matrix-rate-2-blocks-31", "matrix-rate-2-blocks-63", "matrix-rate-2-blocks-7",
+        "matrix-rate-3-blocks-127", "matrix-rate-3-blocks-15", "matrix-rate-3-blocks-31", "matrix-rate-3-blocks-63",
+        "matrix-rate-3-blocks-7", "matrix-rate-6-blocks-127", "matrix-rate-6-blocks-15", "matrix-rate-6-blocks-31",
+        "matrix-rate-6-blocks-63", "matrix-rate-6-blocks-7", "matrix-rate-7-blocks-127", "matrix-rate-7-blocks-15",
+        "matrix-rate-7-blocks-31", "matrix-rate-7-blocks-63", "matrix-rate-7-blocks-7", "matrix-rate-8-blocks-127",
+        "matrix-rate-8-blocks-15", "matrix-rate-8-blocks-31", "matrix-rate-8-blocks-63", "matrix-rate-8-blocks-7",
+        "matrix-raw-flag-audio_sync", "matrix-raw-flag-auxiliary", "matrix-raw-flag-dynamic", "matrix-raw-flag-filter",
+        "matrix-raw-flag-hdcd", "matrix-raw-flag-sum_front", "matrix-raw-flag-sum_surround", "matrix-raw-flag-timestamp",
+        "matrix-reserved-extension-sync", "matrix-sampling-code-0", "matrix-sampling-code-10", "matrix-sampling-code-14",
+        "matrix-sampling-code-15", "matrix-sampling-code-4", "matrix-sampling-code-5", "matrix-sampling-code-9",
         "matrix-short-header-cpf-0-bytes-1", "matrix-short-header-cpf-0-bytes-10", "matrix-short-header-cpf-0-bytes-11", "matrix-short-header-cpf-0-bytes-12",
         "matrix-short-header-cpf-0-bytes-2", "matrix-short-header-cpf-0-bytes-3", "matrix-short-header-cpf-0-bytes-4", "matrix-short-header-cpf-0-bytes-5",
         "matrix-short-header-cpf-0-bytes-6", "matrix-short-header-cpf-0-bytes-7", "matrix-short-header-cpf-0-bytes-8", "matrix-short-header-cpf-0-bytes-9",
         "matrix-short-header-cpf-1-bytes-10", "matrix-short-header-cpf-1-bytes-11", "matrix-short-header-cpf-1-bytes-12", "matrix-short-header-cpf-1-bytes-13",
         "matrix-short-header-cpf-1-bytes-14", "matrix-size-0", "matrix-size-16383", "matrix-size-94",
-        "matrix-size-95", "matrix-size-96", "matrix-termination-raw", "matrix-version-0",
-        "matrix-version-1", "matrix-version-10", "matrix-version-11", "matrix-version-12",
-        "matrix-version-13", "matrix-version-14", "matrix-version-15", "matrix-version-2",
-        "matrix-version-3", "matrix-version-4", "matrix-version-5", "matrix-version-6",
-        "matrix-version-7", "matrix-version-8", "matrix-version-9", "empty",
-        "minimum", "hcrc-raw-zero", "hcrc-raw-nonzero", "maximum",
-        "two-frames", "good-then-short", "good-then-invalid", "good-then-extension",
-        "truncated-1", "truncated-3", "truncated-4", "truncated-10",
-        "truncated-12", "truncated-13", "truncated-14", "truncated-95",
-        "header-prefix-00", "header-prefix-01", "header-prefix-02", "header-prefix-03",
-        "header-prefix-04", "header-prefix-05", "header-prefix-06", "header-prefix-07",
-        "header-prefix-08", "header-prefix-09", "header-prefix-10", "header-prefix-11",
-        "header-prefix-12", "header-prefix-13", "header-prefix-14", "user-defined-amode",
-        "below-minimum-fsize", "rate-change", "interframe-garbage", "core_51_24_48_768_0",
-        "core_51_24_48_768_1", "dts", "dts_es", "dtsx_7.1.4_24bit",
-        "master_audio_7.1_24bit", "x96_51_24_96_1509", "x96_xch_61_24_96_3840", "x96_xxch_71_24_96_3840",
-        "xbr_51_24_48_3840", "xbr_xch_61_24_48_3840", "xbr_xxch_71_24_48_3840", "xch_61_24_48_768",
-        "xll_51_16_192_768_0", "xll_51_16_192_768_1", "xll_51_24_48_768", "xll_51_24_48_none",
-        "xll_71_24_48_768_0", "xll_71_24_48_768_1", "xll_71_24_96_768", "xll_x96_51_24_96_1509",
-        "xll_xch_61_24_48_768", "xxch_71_24_48_2046"
+        "matrix-size-96", "matrix-termination-raw", "matrix-version-0", "matrix-version-1",
+        "matrix-version-10", "matrix-version-11", "matrix-version-12", "matrix-version-13",
+        "matrix-version-14", "matrix-version-15", "matrix-version-2", "matrix-version-3",
+        "matrix-version-4", "matrix-version-5", "matrix-version-6", "matrix-version-7",
+        "matrix-version-8", "matrix-version-9", "empty", "minimum",
+        "hcrc-raw-zero", "hcrc-raw-nonzero", "maximum", "two-frames",
+        "good-then-short", "good-then-invalid", "good-then-extension", "truncated-13",
+        "truncated-14", "truncated-95", "user-defined-amode", "below-minimum-fsize",
+        "rate-change", "interframe-garbage", "core_51_24_48_768_0", "core_51_24_48_768_1",
+        "dts", "dts_es", "dtsx_7.1.4_24bit", "master_audio_7.1_24bit",
+        "x96_51_24_96_1509", "x96_xch_61_24_96_3840", "x96_xxch_71_24_96_3840", "xbr_51_24_48_3840",
+        "xbr_xch_61_24_48_3840", "xbr_xxch_71_24_48_3840", "xch_61_24_48_768", "xll_51_16_192_768_0",
+        "xll_51_16_192_768_1", "xll_51_24_48_768", "xll_51_24_48_none", "xll_71_24_48_768_0",
+        "xll_71_24_48_768_1", "xll_71_24_96_768", "xll_x96_51_24_96_1509", "xll_xch_61_24_48_768",
+        "xxch_71_24_48_2046"
       ],
       "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
     },
@@ -528,58 +200,50 @@
         "matrix-bitrate-5", "matrix-bitrate-6", "matrix-bitrate-7", "matrix-bitrate-8",
         "matrix-bitrate-9", "matrix-channel-0", "matrix-channel-1", "matrix-channel-10",
         "matrix-channel-11", "matrix-channel-12", "matrix-channel-13", "matrix-channel-14",
-        "matrix-channel-15", "matrix-channel-16", "matrix-channel-2", "matrix-channel-3",
-        "matrix-channel-4", "matrix-channel-5", "matrix-channel-6", "matrix-channel-63",
-        "matrix-channel-7", "matrix-channel-8", "matrix-channel-9", "matrix-extension-0",
-        "matrix-extension-1", "matrix-extension-2", "matrix-extension-3", "matrix-extension-4",
-        "matrix-extension-5", "matrix-extension-6", "matrix-extension-7", "matrix-fixed-one",
-        "matrix-hcrc-0", "matrix-hcrc-57005", "matrix-invalid-blocks-0", "matrix-invalid-blocks-4",
-        "matrix-invalid-blocks-5", "matrix-invalid-blocks-6", "matrix-lfe-128", "matrix-lfe-64",
-        "matrix-lfe-invalid", "matrix-normal-short-zero", "matrix-pcm-0", "matrix-pcm-1",
-        "matrix-pcm-2", "matrix-pcm-3", "matrix-pcm-4", "matrix-pcm-5",
-        "matrix-pcm-6", "matrix-pcm-7", "matrix-rate-1-blocks-127", "matrix-rate-1-blocks-15",
-        "matrix-rate-1-blocks-31", "matrix-rate-1-blocks-63", "matrix-rate-1-blocks-7", "matrix-rate-11-blocks-127",
-        "matrix-rate-11-blocks-15", "matrix-rate-11-blocks-31", "matrix-rate-11-blocks-63", "matrix-rate-11-blocks-7",
-        "matrix-rate-12-blocks-127", "matrix-rate-12-blocks-15", "matrix-rate-12-blocks-31", "matrix-rate-12-blocks-63",
-        "matrix-rate-12-blocks-7", "matrix-rate-13-blocks-127", "matrix-rate-13-blocks-15", "matrix-rate-13-blocks-31",
-        "matrix-rate-13-blocks-63", "matrix-rate-13-blocks-7", "matrix-rate-2-blocks-127", "matrix-rate-2-blocks-15",
-        "matrix-rate-2-blocks-31", "matrix-rate-2-blocks-63", "matrix-rate-2-blocks-7", "matrix-rate-3-blocks-127",
-        "matrix-rate-3-blocks-15", "matrix-rate-3-blocks-31", "matrix-rate-3-blocks-63", "matrix-rate-3-blocks-7",
-        "matrix-rate-6-blocks-127", "matrix-rate-6-blocks-15", "matrix-rate-6-blocks-31", "matrix-rate-6-blocks-63",
-        "matrix-rate-6-blocks-7", "matrix-rate-7-blocks-127", "matrix-rate-7-blocks-15", "matrix-rate-7-blocks-31",
-        "matrix-rate-7-blocks-63", "matrix-rate-7-blocks-7", "matrix-rate-8-blocks-127", "matrix-rate-8-blocks-15",
-        "matrix-rate-8-blocks-31", "matrix-rate-8-blocks-63", "matrix-rate-8-blocks-7", "matrix-raw-flag-audio_sync",
-        "matrix-raw-flag-auxiliary", "matrix-raw-flag-dynamic", "matrix-raw-flag-filter", "matrix-raw-flag-hdcd",
-        "matrix-raw-flag-sum_front", "matrix-raw-flag-sum_surround", "matrix-raw-flag-timestamp", "matrix-reserved-extension-sync",
-        "matrix-sampling-code-0", "matrix-sampling-code-1", "matrix-sampling-code-10", "matrix-sampling-code-11",
-        "matrix-sampling-code-12", "matrix-sampling-code-13", "matrix-sampling-code-14", "matrix-sampling-code-15",
-        "matrix-sampling-code-2", "matrix-sampling-code-3", "matrix-sampling-code-4", "matrix-sampling-code-5",
-        "matrix-sampling-code-6", "matrix-sampling-code-7", "matrix-sampling-code-8", "matrix-sampling-code-9",
+        "matrix-channel-15", "matrix-channel-16", "matrix-channel-3", "matrix-channel-4",
+        "matrix-channel-5", "matrix-channel-6", "matrix-channel-63", "matrix-channel-7",
+        "matrix-channel-8", "matrix-channel-9", "matrix-extension-0", "matrix-extension-1",
+        "matrix-extension-2", "matrix-extension-3", "matrix-extension-4", "matrix-extension-5",
+        "matrix-extension-6", "matrix-extension-7", "matrix-fixed-one", "matrix-hcrc-0",
+        "matrix-hcrc-57005", "matrix-invalid-blocks-0", "matrix-invalid-blocks-4", "matrix-invalid-blocks-5",
+        "matrix-invalid-blocks-6", "matrix-lfe-128", "matrix-lfe-64", "matrix-lfe-invalid",
+        "matrix-normal-short-zero", "matrix-pcm-1", "matrix-pcm-2", "matrix-pcm-3",
+        "matrix-pcm-4", "matrix-pcm-5", "matrix-pcm-6", "matrix-pcm-7",
+        "matrix-rate-1-blocks-127", "matrix-rate-1-blocks-15", "matrix-rate-1-blocks-31", "matrix-rate-1-blocks-63",
+        "matrix-rate-1-blocks-7", "matrix-rate-11-blocks-127", "matrix-rate-11-blocks-15", "matrix-rate-11-blocks-31",
+        "matrix-rate-11-blocks-63", "matrix-rate-11-blocks-7", "matrix-rate-12-blocks-127", "matrix-rate-12-blocks-15",
+        "matrix-rate-12-blocks-31", "matrix-rate-12-blocks-63", "matrix-rate-12-blocks-7", "matrix-rate-13-blocks-127",
+        "matrix-rate-13-blocks-31", "matrix-rate-13-blocks-63", "matrix-rate-13-blocks-7", "matrix-rate-2-blocks-127",
+        "matrix-rate-2-blocks-15", "matrix-rate-2-blocks-31", "matrix-rate-2-blocks-63", "matrix-rate-2-blocks-7",
+        "matrix-rate-3-blocks-127", "matrix-rate-3-blocks-15", "matrix-rate-3-blocks-31", "matrix-rate-3-blocks-63",
+        "matrix-rate-3-blocks-7", "matrix-rate-6-blocks-127", "matrix-rate-6-blocks-15", "matrix-rate-6-blocks-31",
+        "matrix-rate-6-blocks-63", "matrix-rate-6-blocks-7", "matrix-rate-7-blocks-127", "matrix-rate-7-blocks-15",
+        "matrix-rate-7-blocks-31", "matrix-rate-7-blocks-63", "matrix-rate-7-blocks-7", "matrix-rate-8-blocks-127",
+        "matrix-rate-8-blocks-15", "matrix-rate-8-blocks-31", "matrix-rate-8-blocks-63", "matrix-rate-8-blocks-7",
+        "matrix-raw-flag-audio_sync", "matrix-raw-flag-auxiliary", "matrix-raw-flag-dynamic", "matrix-raw-flag-filter",
+        "matrix-raw-flag-hdcd", "matrix-raw-flag-sum_front", "matrix-raw-flag-sum_surround", "matrix-raw-flag-timestamp",
+        "matrix-reserved-extension-sync", "matrix-sampling-code-0", "matrix-sampling-code-10", "matrix-sampling-code-14",
+        "matrix-sampling-code-15", "matrix-sampling-code-4", "matrix-sampling-code-5", "matrix-sampling-code-9",
         "matrix-short-header-cpf-0-bytes-1", "matrix-short-header-cpf-0-bytes-10", "matrix-short-header-cpf-0-bytes-11", "matrix-short-header-cpf-0-bytes-12",
         "matrix-short-header-cpf-0-bytes-2", "matrix-short-header-cpf-0-bytes-3", "matrix-short-header-cpf-0-bytes-4", "matrix-short-header-cpf-0-bytes-5",
         "matrix-short-header-cpf-0-bytes-6", "matrix-short-header-cpf-0-bytes-7", "matrix-short-header-cpf-0-bytes-8", "matrix-short-header-cpf-0-bytes-9",
         "matrix-short-header-cpf-1-bytes-10", "matrix-short-header-cpf-1-bytes-11", "matrix-short-header-cpf-1-bytes-12", "matrix-short-header-cpf-1-bytes-13",
         "matrix-short-header-cpf-1-bytes-14", "matrix-size-0", "matrix-size-16383", "matrix-size-94",
-        "matrix-size-95", "matrix-size-96", "matrix-termination-raw", "matrix-version-0",
-        "matrix-version-1", "matrix-version-10", "matrix-version-11", "matrix-version-12",
-        "matrix-version-13", "matrix-version-14", "matrix-version-15", "matrix-version-2",
-        "matrix-version-3", "matrix-version-4", "matrix-version-5", "matrix-version-6",
-        "matrix-version-7", "matrix-version-8", "matrix-version-9", "empty",
-        "minimum", "hcrc-raw-zero", "hcrc-raw-nonzero", "maximum",
-        "two-frames", "good-then-short", "good-then-invalid", "good-then-extension",
-        "truncated-1", "truncated-3", "truncated-4", "truncated-10",
-        "truncated-12", "truncated-13", "truncated-14", "truncated-95",
-        "header-prefix-00", "header-prefix-01", "header-prefix-02", "header-prefix-03",
-        "header-prefix-04", "header-prefix-05", "header-prefix-06", "header-prefix-07",
-        "header-prefix-08", "header-prefix-09", "header-prefix-10", "header-prefix-11",
-        "header-prefix-12", "header-prefix-13", "header-prefix-14", "user-defined-amode",
-        "below-minimum-fsize", "rate-change", "interframe-garbage", "core_51_24_48_768_0",
-        "core_51_24_48_768_1", "dts", "dts_es", "dtsx_7.1.4_24bit",
-        "master_audio_7.1_24bit", "x96_51_24_96_1509", "x96_xch_61_24_96_3840", "x96_xxch_71_24_96_3840",
-        "xbr_51_24_48_3840", "xbr_xch_61_24_48_3840", "xbr_xxch_71_24_48_3840", "xch_61_24_48_768",
-        "xll_51_16_192_768_0", "xll_51_16_192_768_1", "xll_51_24_48_768", "xll_51_24_48_none",
-        "xll_71_24_48_768_0", "xll_71_24_48_768_1", "xll_71_24_96_768", "xll_x96_51_24_96_1509",
-        "xll_xch_61_24_48_768", "xxch_71_24_48_2046"
+        "matrix-size-96", "matrix-termination-raw", "matrix-version-0", "matrix-version-1",
+        "matrix-version-10", "matrix-version-11", "matrix-version-12", "matrix-version-13",
+        "matrix-version-14", "matrix-version-15", "matrix-version-2", "matrix-version-3",
+        "matrix-version-4", "matrix-version-5", "matrix-version-6", "matrix-version-7",
+        "matrix-version-8", "matrix-version-9", "empty", "minimum",
+        "hcrc-raw-zero", "hcrc-raw-nonzero", "maximum", "two-frames",
+        "good-then-short", "good-then-invalid", "good-then-extension", "truncated-13",
+        "truncated-14", "truncated-95", "user-defined-amode", "below-minimum-fsize",
+        "rate-change", "interframe-garbage", "core_51_24_48_768_0", "core_51_24_48_768_1",
+        "dts", "dts_es", "dtsx_7.1.4_24bit", "master_audio_7.1_24bit",
+        "x96_51_24_96_1509", "x96_xch_61_24_96_3840", "x96_xxch_71_24_96_3840", "xbr_51_24_48_3840",
+        "xbr_xch_61_24_48_3840", "xbr_xxch_71_24_48_3840", "xch_61_24_48_768", "xll_51_16_192_768_0",
+        "xll_51_16_192_768_1", "xll_51_24_48_768", "xll_51_24_48_none", "xll_71_24_48_768_0",
+        "xll_71_24_48_768_1", "xll_71_24_96_768", "xll_x96_51_24_96_1509", "xll_xch_61_24_48_768",
+        "xxch_71_24_48_2046"
       ],
       "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
     },
@@ -596,58 +260,50 @@
         "matrix-bitrate-5", "matrix-bitrate-6", "matrix-bitrate-7", "matrix-bitrate-8",
         "matrix-bitrate-9", "matrix-channel-0", "matrix-channel-1", "matrix-channel-10",
         "matrix-channel-11", "matrix-channel-12", "matrix-channel-13", "matrix-channel-14",
-        "matrix-channel-15", "matrix-channel-16", "matrix-channel-2", "matrix-channel-3",
-        "matrix-channel-4", "matrix-channel-5", "matrix-channel-6", "matrix-channel-63",
-        "matrix-channel-7", "matrix-channel-8", "matrix-channel-9", "matrix-extension-0",
-        "matrix-extension-1", "matrix-extension-2", "matrix-extension-3", "matrix-extension-4",
-        "matrix-extension-5", "matrix-extension-6", "matrix-extension-7", "matrix-fixed-one",
-        "matrix-hcrc-0", "matrix-hcrc-57005", "matrix-invalid-blocks-0", "matrix-invalid-blocks-4",
-        "matrix-invalid-blocks-5", "matrix-invalid-blocks-6", "matrix-lfe-128", "matrix-lfe-64",
-        "matrix-lfe-invalid", "matrix-normal-short-zero", "matrix-pcm-0", "matrix-pcm-1",
-        "matrix-pcm-2", "matrix-pcm-3", "matrix-pcm-4", "matrix-pcm-5",
-        "matrix-pcm-6", "matrix-pcm-7", "matrix-rate-1-blocks-127", "matrix-rate-1-blocks-15",
-        "matrix-rate-1-blocks-31", "matrix-rate-1-blocks-63", "matrix-rate-1-blocks-7", "matrix-rate-11-blocks-127",
-        "matrix-rate-11-blocks-15", "matrix-rate-11-blocks-31", "matrix-rate-11-blocks-63", "matrix-rate-11-blocks-7",
-        "matrix-rate-12-blocks-127", "matrix-rate-12-blocks-15", "matrix-rate-12-blocks-31", "matrix-rate-12-blocks-63",
-        "matrix-rate-12-blocks-7", "matrix-rate-13-blocks-127", "matrix-rate-13-blocks-15", "matrix-rate-13-blocks-31",
-        "matrix-rate-13-blocks-63", "matrix-rate-13-blocks-7", "matrix-rate-2-blocks-127", "matrix-rate-2-blocks-15",
-        "matrix-rate-2-blocks-31", "matrix-rate-2-blocks-63", "matrix-rate-2-blocks-7", "matrix-rate-3-blocks-127",
-        "matrix-rate-3-blocks-15", "matrix-rate-3-blocks-31", "matrix-rate-3-blocks-63", "matrix-rate-3-blocks-7",
-        "matrix-rate-6-blocks-127", "matrix-rate-6-blocks-15", "matrix-rate-6-blocks-31", "matrix-rate-6-blocks-63",
-        "matrix-rate-6-blocks-7", "matrix-rate-7-blocks-127", "matrix-rate-7-blocks-15", "matrix-rate-7-blocks-31",
-        "matrix-rate-7-blocks-63", "matrix-rate-7-blocks-7", "matrix-rate-8-blocks-127", "matrix-rate-8-blocks-15",
-        "matrix-rate-8-blocks-31", "matrix-rate-8-blocks-63", "matrix-rate-8-blocks-7", "matrix-raw-flag-audio_sync",
-        "matrix-raw-flag-auxiliary", "matrix-raw-flag-dynamic", "matrix-raw-flag-filter", "matrix-raw-flag-hdcd",
-        "matrix-raw-flag-sum_front", "matrix-raw-flag-sum_surround", "matrix-raw-flag-timestamp", "matrix-reserved-extension-sync",
-        "matrix-sampling-code-0", "matrix-sampling-code-1", "matrix-sampling-code-10", "matrix-sampling-code-11",
-        "matrix-sampling-code-12", "matrix-sampling-code-13", "matrix-sampling-code-14", "matrix-sampling-code-15",
-        "matrix-sampling-code-2", "matrix-sampling-code-3", "matrix-sampling-code-4", "matrix-sampling-code-5",
-        "matrix-sampling-code-6", "matrix-sampling-code-7", "matrix-sampling-code-8", "matrix-sampling-code-9",
+        "matrix-channel-15", "matrix-channel-16", "matrix-channel-3", "matrix-channel-4",
+        "matrix-channel-5", "matrix-channel-6", "matrix-channel-63", "matrix-channel-7",
+        "matrix-channel-8", "matrix-channel-9", "matrix-extension-0", "matrix-extension-1",
+        "matrix-extension-2", "matrix-extension-3", "matrix-extension-4", "matrix-extension-5",
+        "matrix-extension-6", "matrix-extension-7", "matrix-fixed-one", "matrix-hcrc-0",
+        "matrix-hcrc-57005", "matrix-invalid-blocks-0", "matrix-invalid-blocks-4", "matrix-invalid-blocks-5",
+        "matrix-invalid-blocks-6", "matrix-lfe-128", "matrix-lfe-64", "matrix-lfe-invalid",
+        "matrix-normal-short-zero", "matrix-pcm-1", "matrix-pcm-2", "matrix-pcm-3",
+        "matrix-pcm-4", "matrix-pcm-5", "matrix-pcm-6", "matrix-pcm-7",
+        "matrix-rate-1-blocks-127", "matrix-rate-1-blocks-15", "matrix-rate-1-blocks-31", "matrix-rate-1-blocks-63",
+        "matrix-rate-1-blocks-7", "matrix-rate-11-blocks-127", "matrix-rate-11-blocks-15", "matrix-rate-11-blocks-31",
+        "matrix-rate-11-blocks-63", "matrix-rate-11-blocks-7", "matrix-rate-12-blocks-127", "matrix-rate-12-blocks-15",
+        "matrix-rate-12-blocks-31", "matrix-rate-12-blocks-63", "matrix-rate-12-blocks-7", "matrix-rate-13-blocks-127",
+        "matrix-rate-13-blocks-31", "matrix-rate-13-blocks-63", "matrix-rate-13-blocks-7", "matrix-rate-2-blocks-127",
+        "matrix-rate-2-blocks-15", "matrix-rate-2-blocks-31", "matrix-rate-2-blocks-63", "matrix-rate-2-blocks-7",
+        "matrix-rate-3-blocks-127", "matrix-rate-3-blocks-15", "matrix-rate-3-blocks-31", "matrix-rate-3-blocks-63",
+        "matrix-rate-3-blocks-7", "matrix-rate-6-blocks-127", "matrix-rate-6-blocks-15", "matrix-rate-6-blocks-31",
+        "matrix-rate-6-blocks-63", "matrix-rate-6-blocks-7", "matrix-rate-7-blocks-127", "matrix-rate-7-blocks-15",
+        "matrix-rate-7-blocks-31", "matrix-rate-7-blocks-63", "matrix-rate-7-blocks-7", "matrix-rate-8-blocks-127",
+        "matrix-rate-8-blocks-15", "matrix-rate-8-blocks-31", "matrix-rate-8-blocks-63", "matrix-rate-8-blocks-7",
+        "matrix-raw-flag-audio_sync", "matrix-raw-flag-auxiliary", "matrix-raw-flag-dynamic", "matrix-raw-flag-filter",
+        "matrix-raw-flag-hdcd", "matrix-raw-flag-sum_front", "matrix-raw-flag-sum_surround", "matrix-raw-flag-timestamp",
+        "matrix-reserved-extension-sync", "matrix-sampling-code-0", "matrix-sampling-code-10", "matrix-sampling-code-14",
+        "matrix-sampling-code-15", "matrix-sampling-code-4", "matrix-sampling-code-5", "matrix-sampling-code-9",
         "matrix-short-header-cpf-0-bytes-1", "matrix-short-header-cpf-0-bytes-10", "matrix-short-header-cpf-0-bytes-11", "matrix-short-header-cpf-0-bytes-12",
         "matrix-short-header-cpf-0-bytes-2", "matrix-short-header-cpf-0-bytes-3", "matrix-short-header-cpf-0-bytes-4", "matrix-short-header-cpf-0-bytes-5",
         "matrix-short-header-cpf-0-bytes-6", "matrix-short-header-cpf-0-bytes-7", "matrix-short-header-cpf-0-bytes-8", "matrix-short-header-cpf-0-bytes-9",
         "matrix-short-header-cpf-1-bytes-10", "matrix-short-header-cpf-1-bytes-11", "matrix-short-header-cpf-1-bytes-12", "matrix-short-header-cpf-1-bytes-13",
         "matrix-short-header-cpf-1-bytes-14", "matrix-size-0", "matrix-size-16383", "matrix-size-94",
-        "matrix-size-95", "matrix-size-96", "matrix-termination-raw", "matrix-version-0",
-        "matrix-version-1", "matrix-version-10", "matrix-version-11", "matrix-version-12",
-        "matrix-version-13", "matrix-version-14", "matrix-version-15", "matrix-version-2",
-        "matrix-version-3", "matrix-version-4", "matrix-version-5", "matrix-version-6",
-        "matrix-version-7", "matrix-version-8", "matrix-version-9", "empty",
-        "minimum", "hcrc-raw-zero", "hcrc-raw-nonzero", "maximum",
-        "two-frames", "good-then-short", "good-then-invalid", "good-then-extension",
-        "truncated-1", "truncated-3", "truncated-4", "truncated-10",
-        "truncated-12", "truncated-13", "truncated-14", "truncated-95",
-        "header-prefix-00", "header-prefix-01", "header-prefix-02", "header-prefix-03",
-        "header-prefix-04", "header-prefix-05", "header-prefix-06", "header-prefix-07",
-        "header-prefix-08", "header-prefix-09", "header-prefix-10", "header-prefix-11",
-        "header-prefix-12", "header-prefix-13", "header-prefix-14", "user-defined-amode",
-        "below-minimum-fsize", "rate-change", "interframe-garbage", "core_51_24_48_768_0",
-        "core_51_24_48_768_1", "dts", "dts_es", "dtsx_7.1.4_24bit",
-        "master_audio_7.1_24bit", "x96_51_24_96_1509", "x96_xch_61_24_96_3840", "x96_xxch_71_24_96_3840",
-        "xbr_51_24_48_3840", "xbr_xch_61_24_48_3840", "xbr_xxch_71_24_48_3840", "xch_61_24_48_768",
-        "xll_51_16_192_768_0", "xll_51_16_192_768_1", "xll_51_24_48_768", "xll_51_24_48_none",
-        "xll_71_24_48_768_0", "xll_71_24_48_768_1", "xll_71_24_96_768", "xll_x96_51_24_96_1509",
-        "xll_xch_61_24_48_768", "xxch_71_24_48_2046"
+        "matrix-size-96", "matrix-termination-raw", "matrix-version-0", "matrix-version-1",
+        "matrix-version-10", "matrix-version-11", "matrix-version-12", "matrix-version-13",
+        "matrix-version-14", "matrix-version-15", "matrix-version-2", "matrix-version-3",
+        "matrix-version-4", "matrix-version-5", "matrix-version-6", "matrix-version-7",
+        "matrix-version-8", "matrix-version-9", "empty", "minimum",
+        "hcrc-raw-zero", "hcrc-raw-nonzero", "maximum", "two-frames",
+        "good-then-short", "good-then-invalid", "good-then-extension", "truncated-13",
+        "truncated-14", "truncated-95", "user-defined-amode", "below-minimum-fsize",
+        "rate-change", "interframe-garbage", "core_51_24_48_768_0", "core_51_24_48_768_1",
+        "dts", "dts_es", "dtsx_7.1.4_24bit", "master_audio_7.1_24bit",
+        "x96_51_24_96_1509", "x96_xch_61_24_96_3840", "x96_xxch_71_24_96_3840", "xbr_51_24_48_3840",
+        "xbr_xch_61_24_48_3840", "xbr_xxch_71_24_48_3840", "xch_61_24_48_768", "xll_51_16_192_768_0",
+        "xll_51_16_192_768_1", "xll_51_24_48_768", "xll_51_24_48_none", "xll_71_24_48_768_0",
+        "xll_71_24_48_768_1", "xll_71_24_96_768", "xll_x96_51_24_96_1509", "xll_xch_61_24_48_768",
+        "xxch_71_24_48_2046"
       ],
       "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
     },
