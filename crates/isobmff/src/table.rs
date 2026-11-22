@@ -11,7 +11,7 @@ use crate::{
     sample::SampleSpan,
 };
 use recovery::{InitialDescriptionDiagnostic, RunCoverage, RunKind, SyncDiagnostic};
-use rows::{Offsets, Sizes, Words};
+use rows::{Ctts, Offsets, Sizes, Words};
 use std::mem;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
@@ -280,7 +280,6 @@ impl SampleTable {
 struct Parts {
     stsd: Option<BoxView>,
     stts: Option<BoxView>,
-    ctts: Option<BoxView>,
     stsc: Option<BoxView>,
     sizes: Option<BoxView>,
     offsets: Option<BoxView>,
@@ -308,7 +307,6 @@ impl Parts {
         match &raw.header().kind {
             b"stsd" => single(&mut self.stsd, raw),
             b"stts" => single(&mut self.stts, raw),
-            b"ctts" => single(&mut self.ctts, raw),
             b"stsc" => single(&mut self.stsc, raw),
             b"stsz" => single(&mut self.sizes, raw),
             b"stz2" => single(&mut self.compact, raw),
@@ -410,10 +408,14 @@ enum Stage {
 #[derive(Debug)]
 enum Children {
     /// The `stbl` children.
-    Tables(BoxChildren),
+    Tables {
+        boxes: BoxChildren,
+        ctts: Option<BoxView>,
+    },
     /// The `stsd` entries; `pending` is one parsed but not yet stored.
     Entries {
         entries: BoxChildren,
+        ctts: Option<Ctts>,
         pending: Option<SampleDescription>,
     },
 }
@@ -489,7 +491,7 @@ impl SampleTableBuilder {
             stage: Stage::Collect {
                 parts: Parts::default(),
                 descriptions: BudgetVec::new(&budget),
-                children: Children::Tables(boxes),
+                children: Children::Tables { boxes, ctts: None },
             },
             findings: Findings::default(),
         })
@@ -520,19 +522,15 @@ impl SampleTableBuilder {
                     descriptions,
                     children,
                 } => match children {
-                    Children::Tables(boxes) => match boxes.poll(work)? {
+                    Children::Tables { boxes, ctts } => match boxes.poll(work)? {
                         Next::Yield => return Ok(BuildStatus::Yield),
+                        Next::Item(raw) if raw.header().kind == *b"ctts" => single(ctts, raw)?,
                         Next::Item(raw) => parts.insert(raw)?,
                         Next::End => {
                             if parts.compact.is_some() && parts.sizes.is_some() {
                                 return Err(Error::Invalid("both stsz and stz2"));
                             }
-                            if let Some(ctts) = &parts.ctts {
-                                let (version, flags) = fields::full(ctts.payload())?;
-                                if version > 1 || flags != 0 {
-                                    return Err(Error::Unsupported("ctts version/flags"));
-                                }
-                            }
+                            let ctts = ctts.take().map(Ctts::header).transpose()?;
                             let stsd = required(parts.stsd.as_ref())?;
                             fields::full_zero(stsd.payload())?;
                             self.description_count = fields::u32_at(stsd.payload(), 4)?;
@@ -542,11 +540,16 @@ impl SampleTableBuilder {
                             policy(self.description_count, self.limits.max_descriptions)?;
                             *children = Children::Entries {
                                 entries: stsd.children(8, self.limits)?,
+                                ctts,
                                 pending: None,
                             };
                         }
                     },
-                    Children::Entries { entries, pending } => {
+                    Children::Entries {
+                        entries,
+                        ctts,
+                        pending,
+                    } => {
                         if let Some(value) = pending.take() {
                             if !work.try_charge(1) {
                                 *pending = Some(value);
@@ -582,6 +585,7 @@ impl SampleTableBuilder {
                                     self.limits,
                                     self.acceptance,
                                     parts,
+                                    ctts.take(),
                                     mem::replace(descriptions, empty),
                                 )?;
                                 self.stage = Stage::Validate {
@@ -655,6 +659,7 @@ fn build(
     limits: Limits,
     acceptance: Acceptance,
     parts: &Parts,
+    ctts: Option<Ctts>,
     descriptions: BudgetVec<SampleDescription>,
 ) -> Result<SampleTable> {
     let stts = Words::parse(required(parts.stts.as_ref())?, 8, limits)?;
@@ -667,11 +672,7 @@ fn build(
             .ok_or(Error::Invalid("missing sample size table"))?,
     )?;
     let offsets = Offsets::parse(required(parts.offsets.as_ref())?, limits)?;
-    let ctts = parts
-        .ctts
-        .clone()
-        .map(|v| Words::parse_ctts(v, limits))
-        .transpose()?;
+    let ctts = ctts.map(|table| table.rows(limits)).transpose()?;
     let sync = parts
         .sync
         .clone()

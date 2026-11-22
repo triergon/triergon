@@ -9,6 +9,26 @@
 use crate::{Limits, boxes::BoxView, fields, policy};
 use triergon_core::{Error, Result};
 
+/// A composition table with its full-box version and flags checked.
+#[derive(Debug)]
+pub(crate) struct Ctts {
+    raw: BoxView,
+    version: u8,
+}
+impl Ctts {
+    pub(crate) fn header(raw: BoxView) -> Result<Self> {
+        let (version, flags) = fields::full(raw.payload())?;
+        if version > 1 || flags != 0 {
+            return Err(Error::Unsupported("ctts version/flags"));
+        }
+        Ok(Self { raw, version })
+    }
+
+    pub(crate) fn rows(self, limits: Limits) -> Result<Words> {
+        Words::rows(self.raw, self.version, 8, limits)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Words {
     pub(crate) raw: BoxView,
@@ -22,18 +42,6 @@ impl Words {
     pub(crate) fn parse(raw: BoxView, stride: usize, limits: Limits) -> Result<Self> {
         fields::full_zero(raw.payload())?;
         Self::rows(raw, 0, stride, limits)
-    }
-    /// The `ctts` rows, whose version 1 reads the offsets as signed. Other tables go
-    /// through the constructor above, which accepts version and flags zero only.
-    pub(crate) fn parse_ctts(raw: BoxView, limits: Limits) -> Result<Self> {
-        if raw.header().kind != *b"ctts" {
-            return Err(Error::Invalid("not ctts"));
-        }
-        let (version, flags) = fields::full(raw.payload())?;
-        if version > 1 || flags != 0 {
-            return Err(Error::Unsupported("ctts version/flags"));
-        }
-        Self::rows(raw, version, 8, limits)
     }
     fn rows(raw: BoxView, version: u8, stride: usize, limits: Limits) -> Result<Self> {
         let count = fields::u32_at(raw.payload(), 4)?;
