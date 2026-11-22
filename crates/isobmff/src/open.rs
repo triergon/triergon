@@ -118,8 +118,7 @@ struct Frame {
 }
 #[derive(Debug)]
 struct Walk {
-    frames: BudgetVec<Option<Frame>>,
-    depth: usize,
+    frames: BudgetVec<Frame>,
     quicktime: bool,
     recover_legacy_data_handler: bool,
     parts: BudgetVec<Parts>,
@@ -138,18 +137,17 @@ impl Walk {
     ) -> Result<Self> {
         let mut frames = BudgetVec::new(b);
         frames.try_reserve_exact(l.depth)?;
-        for _ in 0..l.depth {
-            push(&mut frames, None)?;
-        }
-        frames.as_mut_slice()[0] = Some(Frame {
-            children: root.children(0, l.format)?,
-            track: None,
-            kind: root.header().kind,
-            data_info_seen: false,
-        });
+        push(
+            &mut frames,
+            Frame {
+                children: root.children(0, l.format)?,
+                track: None,
+                kind: root.header().kind,
+                data_info_seen: false,
+            },
+        )?;
         Ok(Self {
             frames,
-            depth: 1,
             quicktime: major_brand == Some(*b"qt  "),
             recover_legacy_data_handler,
             parts: BudgetVec::new(b),
@@ -163,9 +161,6 @@ impl Walk {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if self.depth == 0 {
-            return Ok(true);
-        }
         if let Some((raw, track)) = self.pending.as_ref() {
             if !w.try_charge(1) {
                 return Ok(false);
@@ -176,22 +171,15 @@ impl Walk {
             self.pending = None;
             return Ok(false);
         }
-        let at = self.depth - 1;
-        let track = self.frames.as_slice()[at]
-            .as_ref()
-            .ok_or(Error::Invalid("frame missing"))?
-            .track;
-        match self.frames.as_mut_slice()[at]
-            .as_mut()
-            .ok_or(Error::Invalid("frame missing"))?
-            .children
-            .poll(w)?
-        {
+        let Some(frame) = self.frames.as_mut_slice().last_mut() else {
+            return Ok(true);
+        };
+        let track = frame.track;
+        match frame.children.poll(w)? {
             Next::Yield => Ok(false),
             Next::End => {
-                self.frames.as_mut_slice()[at] = None;
-                self.depth -= 1;
-                Ok(self.depth == 0)
+                self.frames.pop();
+                Ok(self.frames.is_empty())
             }
             Next::Item(raw) => {
                 self.seen = self.seen.checked_add(1).ok_or(Error::Overflow)?;
@@ -221,13 +209,12 @@ impl Walk {
             self.descend(raw, Some(index), l)?;
             push(&mut self.parts, Parts::default())?;
         } else if [*b"mdia", *b"minf", *b"dinf", *b"edts", *b"mvex"].contains(&kind) {
-            let parent = self.depth - 1;
             self.descend(raw, track, l)?;
             if self.quicktime
                 && kind == *b"dinf"
-                && let Some(frame) = &mut self.frames.as_mut_slice()[parent]
+                && let [.., parent, _] = self.frames.as_mut_slice()
             {
-                frame.data_info_seen = true;
+                parent.data_info_seen = true;
             }
         } else if kind == *b"mvhd" {
             if self.movie.is_some() {
@@ -242,11 +229,7 @@ impl Walk {
                 });
             }
             push(&mut self.trex, Trex::parse(&raw)?)?;
-        } else if let Some(t) = track {
-            let frames = &self.frames.as_slice()[..self.depth];
-            let parent = frames[self.depth - 1]
-                .as_ref()
-                .ok_or(Error::Invalid("frame missing"))?;
+        } else if let (Some(t), frames @ [.., parent]) = (track, self.frames.as_slice()) {
             let p = &mut self.parts.as_mut_slice()[t];
             match &kind {
                 b"tkhd" => unique(&mut p.tkhd, raw)?,
@@ -258,7 +241,7 @@ impl Walk {
                     if !(self.quicktime || legacy)
                         || !matches!(
                             frames,
-                            [_, Some(trak), Some(mdia), Some(minf)]
+                            [_, trak, mdia, minf]
                                 if [trak.kind, mdia.kind, minf.kind] == [*b"trak", *b"mdia", *b"minf"]
                         )
                     {
@@ -295,20 +278,21 @@ impl Walk {
         Ok(())
     }
     fn descend(&mut self, raw: BoxView, track: Option<usize>, l: OpenLimits) -> Result<()> {
-        if self.depth >= l.depth {
+        if self.frames.len() == l.depth {
             return Err(Error::Limit {
-                requested: self.depth + 1,
+                requested: self.frames.len() + 1,
                 maximum: l.depth,
             });
         }
-        self.frames.as_mut_slice()[self.depth] = Some(Frame {
-            children: raw.children(0, l.format)?,
-            track,
-            kind: raw.header().kind,
-            data_info_seen: false,
-        });
-        self.depth += 1;
-        Ok(())
+        push(
+            &mut self.frames,
+            Frame {
+                children: raw.children(0, l.format)?,
+                track,
+                kind: raw.header().kind,
+                data_info_seen: false,
+            },
+        )
     }
 }
 /// How much of the source an open read; see [`Movie::read_scope`].
@@ -731,7 +715,7 @@ impl MovieOpen {
                 Step::Ready(BoxEvent::Skipped(header)) => Ok(OpenStep::Root(header)),
             };
         };
-        if walk.depth != 0 {
+        if !walk.frames.is_empty() {
             walk.poll(w, c, self.limits)?;
             return Ok(OpenStep::Yield);
         }
