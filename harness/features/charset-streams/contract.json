@@ -352,9 +352,6 @@
         "big5-1024",
         "big5-8192",
         "big5-65536"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -369,9 +366,6 @@
         "cp950-1024",
         "cp950-8192",
         "cp950-65536"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -382,9 +376,6 @@
       "compat": "compat::charset::glibc_shift_jis",
       "cases": [
         "shift_jis-pairs"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -395,9 +386,6 @@
       "compat": "compat::charset::windows932_private_use",
       "cases": [
         "cp932-pairs"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -409,9 +397,6 @@
       "cases": [
         "euc-kr-bytes",
         "euc-kr-pairs"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -422,9 +407,6 @@
       "compat": "compat::charset::glibc_euc_kr",
       "cases": [
         "kr-c1-pairs"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -435,9 +417,6 @@
       "compat": "compat::charset::glibc_cp949_error_offset",
       "cases": [
         "cp949-pairs"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
