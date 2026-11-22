@@ -831,384 +831,6 @@
       }
     },
     {
-      "id": "au-avc-one",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 2045,
-        "digest": 4256458061758026870
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 2045,
-        "digest": 4753204930410131174
-      }
-    },
-    {
-      "id": "au-avc-multiple-per-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 2670,
-        "digest": 18237479913512177632
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 2670,
-        "digest": 2901707930030164848
-      }
-    },
-    {
-      "id": "au-avc-header-across-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 2045,
-        "digest": 4256458061758026870
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 2045,
-        "digest": 4753204930410131174
-      }
-    },
-    {
-      "id": "au-avc-body-across-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 2045,
-        "digest": 4256458061758026870
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 2045,
-        "digest": 4753204930410131174
-      }
-    },
-    {
-      "id": "au-avc-final-au-at-eof",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 2670,
-        "digest": 8422972602777562999
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 2670,
-        "digest": 11533944693005101831
-      }
-    },
-    {
-      "id": "au-avc-truncated-final",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 2669,
-        "digest": 12206819316557203041
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 2669,
-        "digest": 11712116994509396177
-      }
-    },
-    {
-      "id": "au-avc-clock-wrap",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 2670,
-        "digest": 16750366389764671935
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 2670,
-        "digest": 6633828299847614983
-      }
-    },
-    {
-      "id": "au-avc-m2ts192",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 2670,
-        "digest": 4668423811618869224
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 2670,
-        "digest": 7779395901846408056
-      }
-    },
-    {
-      "id": "au-hevc-one",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 4295,
-        "digest": 7841102784593857107
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 4295,
-        "digest": 12975641439368779971
-      }
-    },
-    {
-      "id": "au-hevc-multiple-per-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 5432,
-        "digest": 8284136314485587433
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 5432,
-        "digest": 13278326684646622585
-      }
-    },
-    {
-      "id": "au-hevc-header-across-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 4295,
-        "digest": 7841102784593857107
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 4295,
-        "digest": 12975641439368779971
-      }
-    },
-    {
-      "id": "au-hevc-body-across-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 4295,
-        "digest": 7841102784593857107
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 4295,
-        "digest": 12975641439368779971
-      }
-    },
-    {
-      "id": "au-hevc-final-au-at-eof",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 5432,
-        "digest": 14453359213174532784
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 5432,
-        "digest": 1000805509626016320
-      }
-    },
-    {
-      "id": "au-hevc-truncated-final",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 5431,
-        "digest": 9376034342313861375
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 5431,
-        "digest": 13107474820133807983
-      }
-    },
-    {
-      "id": "au-hevc-clock-wrap",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 5432,
-        "digest": 1711614690364985080
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 5432,
-        "digest": 14601194724955097408
-      }
-    },
-    {
-      "id": "au-hevc-m2ts192",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 5432,
-        "digest": 149040313143399409
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 5432,
-        "digest": 5143230683304434561
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-one",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 2519069260726871620
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 16555830350569948468
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-multiple-per-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 4770917279879141705
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 606781640086066393
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-header-across-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 2519069260726871620
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 16555830350569948468
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-body-across-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 2519069260726871620
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 16555830350569948468
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-final-au-at-eof",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 12910583052745502072
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 8746447412952426760
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-missing-clocks",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 16032706175649559257
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 13421966569507758809
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-pts-dts",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 16385791968697379080
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 13775052362555578632
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-clock-wrap",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 4715606778403851200
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 10541251894405824520
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-m2ts192",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 17671637046694838609
-      },
-      "reference": {
-        "packets": 2,
-        "bytes": 390,
-        "digest": 10734489253454835941
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-recover-pat-pointer",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 4257311274557364488
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 18294072364400441336
-      }
-    },
-    {
-      "id": "au-adts-aac-lc-recover-pmt-pointer",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 4257311274557364488
-      },
-      "reference": {
-        "packets": 1,
-        "bytes": 195,
-        "digest": 18294072364400441336
-      }
-    },
-    {
       "id": "au-latm-aac-lc-three-frames-in-pes",
       "requirement": "H.222.0 preserves PES carriage and clock facts independently of coded access units. The strict reader only delivers admitted source access units. The reference yields opaque payload or recovers after a transport or PES diagnostic.",
       "candidate": {
@@ -1234,34 +856,6 @@
         "packets": 2,
         "bytes": 584,
         "digest": 1769109294796948231
-      }
-    },
-    {
-      "id": "au-mpeg1-layer1-multiple-per-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 3,
-        "bytes": 96,
-        "digest": 9874117384827487370
-      },
-      "reference": {
-        "packets": 3,
-        "bytes": 96,
-        "digest": 7584938453221359850
-      }
-    },
-    {
-      "id": "au-mpeg1-layer1-header-across-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 3,
-        "bytes": 96,
-        "digest": 14560930580732867219
-      },
-      "reference": {
-        "packets": 3,
-        "bytes": 96,
-        "digest": 7884658440279607035
       }
     },
     {
@@ -1291,93 +885,89 @@
         "bytes": 96,
         "digest": 8442371311439082441
       }
-    },
-    {
-      "id": "au-mpeg1-layer2-multiple-per-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 3,
-        "bytes": 576,
-        "digest": 9490004708347727220
-      },
-      "reference": {
-        "packets": 3,
-        "bytes": 576,
-        "digest": 14043593463747707764
-      }
-    },
-    {
-      "id": "au-mpeg1-layer2-header-across-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 3,
-        "bytes": 576,
-        "digest": 12214702591156482941
-      },
-      "reference": {
-        "packets": 3,
-        "bytes": 576,
-        "digest": 16768291346556463485
-      }
-    },
-    {
-      "id": "au-mpeg2-layer2-multiple-per-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 3,
-        "bytes": 576,
-        "digest": 6573524863728196620
-      },
-      "reference": {
-        "packets": 3,
-        "bytes": 576,
-        "digest": 13126905746382481532
-      }
-    },
-    {
-      "id": "au-mpeg2-layer2-header-across-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 3,
-        "bytes": 576,
-        "digest": 9298222746536952341
-      },
-      "reference": {
-        "packets": 3,
-        "bytes": 576,
-        "digest": 15851603629191237253
-      }
-    },
-    {
-      "id": "au-mpeg2-layer3-multiple-per-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 3,
-        "bytes": 288,
-        "digest": 3727455605558005942
-      },
-      "reference": {
-        "packets": 3,
-        "bytes": 288,
-        "digest": 15895778888605610054
-      }
-    },
-    {
-      "id": "au-mpeg2-layer3-header-across-pes",
-      "requirement": "H.222.0 source clock anchors and access-unit timing are distinct from computed demux clocks, inferred durations, packet positions and flags. The strict view and the native parser fold differ even where the payload counts agree.",
-      "candidate": {
-        "packets": 3,
-        "bytes": 288,
-        "digest": 7692252905564450495
-      },
-      "reference": {
-        "packets": 3,
-        "bytes": 288,
-        "digest": 10022219321387664983
-      }
     }
   ],
   "open_deviations": [
+    {
+      "reading": "The first PES timestamp is an unsigned 33-bit field",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.6\u20137 specify the 33-bit PTS and independent DTS presence",
+      "candidate": "Starts with the literal 8589933592 tick PTS and continues with the coded 2000 tick PTS, both without DTS. Ordered payloads, positions and flags match.",
+      "reference": "Publishes PTS -1000 and 2000, also copies them into DTS, and applies its video or ADTS duration convention.",
+      "compat": "compat::mpegts::signed_first_clock_epoch",
+      "cases": [
+        "au-avc-clock-wrap",
+        "au-hevc-clock-wrap",
+        "au-adts-aac-lc-clock-wrap"
+      ]
+    },
+    {
+      "reading": "An audio frame can have a duration without having any coded timestamp",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.6\u20137 distinguish PES timestamps from elementary-frame durations",
+      "candidate": "Publishes the one coded PTS at 90000, no DTS and no later PTS. Durations and all ordered payloads, positions and flags match.",
+      "reference": "Fills DTS from PTS and advances both fields by each MPEG audio frame duration, using 720, 2160 or 4320 ticks according to the stream.",
+      "compat": "compat::mpegts::interpolated_audio_packet_clocks",
+      "cases": [
+        "au-mpeg1-layer1-multiple-per-pes",
+        "au-mpeg1-layer2-multiple-per-pes",
+        "au-mpeg1-layer2-header-across-pes",
+        "au-mpeg2-layer2-multiple-per-pes",
+        "au-mpeg2-layer2-header-across-pes",
+        "au-mpeg2-layer3-multiple-per-pes"
+      ]
+    },
+    {
+      "reading": "A source M2TS carrier position includes its four prefix bytes",
+      "clause": "ITU-T H.222.0 (08/2023) section 2.4.3.2 defines the 188-byte transport packet and the facade M2TS192 profile defines the four-byte carrier prefix",
+      "candidate": "Delivers the ordered access units with positions at the start of each 192-byte source carrier and keeps only coded timestamps.",
+      "reference": "Reports selected positions four bytes later at the sync byte and synthesizes packet clocks. The ordered payloads and flags match.",
+      "compat": "compat::mpegts::sync_byte_positions",
+      "cases": [
+        "au-adts-aac-lc-m2ts192",
+        "au-mpeg1-layer1-header-across-pes",
+        "au-mpeg2-layer3-header-across-pes"
+      ]
+    },
+    {
+      "reading": "A video PES with PTS alone does not carry DTS or a packet duration",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.6 and 2.4.3.7 define PES timestamp fields and their presence flags",
+      "candidate": "Retains every present PTS, leaves DTS absent and does not report a packet duration. The ordered AU payloads, positions and flags match.",
+      "reference": "Copies each present PTS to DTS and reports 11250 ticks for each AVC packet or 7500 ticks for each HEVC packet.",
+      "compat": "compat::mpegts::inferred_video_packet_clocks",
+      "cases": [
+        "au-avc-one",
+        "au-avc-multiple-per-pes",
+        "au-avc-header-across-pes",
+        "au-avc-body-across-pes",
+        "au-avc-final-au-at-eof",
+        "au-avc-truncated-final",
+        "au-avc-m2ts192",
+        "au-hevc-one",
+        "au-hevc-multiple-per-pes",
+        "au-hevc-header-across-pes",
+        "au-hevc-body-across-pes",
+        "au-hevc-final-au-at-eof",
+        "au-hevc-truncated-final",
+        "au-hevc-m2ts192"
+      ]
+    },
+    {
+      "reading": "A single-block 48 kHz ADTS frame carries 1024 samples, independently of its PES timestamps",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.6\u20137 define PES clock presence and ISO/IEC 13818-7 sections 6.2.1\u20132 define the ADTS frame and raw data block count",
+      "candidate": "Preserves literal PES timestamp presence and reports 1920 ticks at 90 kHz for each 1024-sample frame. The ordered AU payloads, positions and flags match.",
+      "reference": "Reports no duration, and fills DTS with PTS when only PTS is present. Explicit DTS and missing-both cases keep their respective values.",
+      "compat": "compat::mpegts::demux_adts_packet_clocks",
+      "cases": [
+        "au-adts-aac-lc-one",
+        "au-adts-aac-lc-multiple-per-pes",
+        "au-adts-aac-lc-header-across-pes",
+        "au-adts-aac-lc-body-across-pes",
+        "au-adts-aac-lc-final-au-at-eof",
+        "au-adts-aac-lc-missing-clocks",
+        "au-adts-aac-lc-pts-dts",
+        "au-adts-aac-lc-recover-pat-pointer",
+        "au-adts-aac-lc-recover-pmt-pointer"
+      ]
+    },
     {
       "reading": "Private DVB descriptors require a declared private-audio namespace",
       "clause": "ITU-T H.222.0 (08/2023) section 2.4.4.10 Table 2-34 and ETSI EN 300 468 V1.17.1 Annex D define private data signalling and the DVB AC-3 and Enhanced AC-3 descriptors",
