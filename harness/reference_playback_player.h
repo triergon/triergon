@@ -68,6 +68,14 @@ static int player_packet(PacketWork *work, const PlaybackPlayerCase *player,
         duration = av_rescale_q(duration, time, ns);
         flags &= AV_PKT_FLAG_KEY;
     }
+    uint32_t tag = stream->codecpar->codec_tag;
+    if (player->operation == PLAYER_SEEK && player->seek == PLAYER_SYNC &&
+        (stream->codecpar->codec_id == AV_CODEC_ID_AV1 ||
+         tag == MKTAG('d','a','v','1') || tag == MKTAG('a','v','0','1'))) {
+        if (work->trace && (flags & AV_PKT_FLAG_DISPOSABLE))
+            fprintf(stderr, "AV1 demux marked sample at %" PRId64 " disposable\n", packet->pos);
+        flags &= ~(uint64_t)AV_PKT_FLAG_DISPOSABLE;
+    }
     packet_fold(work, player_track(player->format, stream), pts, dts,
                 duration > 0 ? (uint64_t)duration : 0, flags, packet->data,
                 (size_t)packet->size);
@@ -164,6 +172,108 @@ static int player_read(AVFormatContext *format, AVPacket *packet,
     return rc == AVERROR_EOF && count <= 0 ? 0 : rc;
 }
 
+/* Range playback uses a usable mvhd duration or the latest media packet end
+ * on the presentation clock. The demuxer's estimated duration remains visible. */
+static int player_range_duration(const ViewCase *input, const PlaybackPlayerCase *player,
+                                int64_t *duration)
+{
+    Mp4View movie = mp4_box((Mp4View){input->data, input->size}, MKBETAG('m','o','o','v'));
+    Mp4View header = mp4_box(movie, MKBETAG('m','v','h','d'));
+    if (header.size < 20 || header.data[0] > 1 || (header.data[0] == 1 && header.size < 32))
+        return AVERROR_INVALIDDATA;
+    const int wide = header.data[0] == 1;
+    uint32_t scale = AV_RB32(header.data + (wide ? 20 : 12));
+    uint64_t ticks = wide ? AV_RB64(header.data + 24) : AV_RB32(header.data + 16);
+    if (!scale)
+        return AVERROR_INVALIDDATA;
+    if (ticks && ticks != (wide ? UINT64_MAX : UINT32_MAX) && ticks <= INT64_MAX) {
+        int64_t declared = av_rescale_rnd((int64_t)ticks, AV_TIME_BASE, scale, AV_ROUND_NEAR_INF);
+        if (declared > 0) {
+            *duration = declared;
+            return 0;
+        }
+    }
+
+    PacketInput reader = {input->data, (int64_t)input->size, 0, player->window};
+    AVFormatContext *format = NULL;
+    AVPacket *packet = av_packet_alloc();
+    if (!packet)
+        return AVERROR(ENOMEM);
+    *duration = 0;
+    int rc = player_open(&format, &reader, player);
+    if (rc < 0)
+        goto done;
+    while ((rc = av_read_frame(format, packet)) >= 0) {
+        const AVStream *stream = format->streams[packet->stream_index];
+        if (stream->codecpar->codec_type != AVMEDIA_TYPE_DATA && packet->pts != AV_NOPTS_VALUE) {
+            if (packet->duration < 0 || packet->pts > INT64_MAX - packet->duration) {
+                rc = AVERROR_INVALIDDATA;
+                goto done;
+            }
+            int64_t end = av_rescale_q(packet->pts + packet->duration, stream->time_base,
+                                       AV_TIME_BASE_Q);
+            if (end > *duration)
+                *duration = end;
+        }
+        av_packet_unref(packet);
+    }
+    if (rc == AVERROR_EOF)
+        rc = 0;
+done:
+    av_packet_free(&packet);
+    packet_close(&format);
+    return rc;
+}
+
+/* ISO BMFF edit durations are on the movie clock. An empty interval has
+ * no packet landing, even if the demuxer can seek past it. */
+static int player_movie_empty(Mp4View input, uint32_t track_id, int64_t timestamp)
+{
+    Mp4View movie = mp4_box(input, MKBETAG('m','o','o','v'));
+    Mp4View mvhd = mp4_box(movie, MKBETAG('m','v','h','d'));
+    uint32_t kind;
+    Mp4View track;
+    while (mp4_box_next(&movie, &kind, &track)) {
+        if (kind != MKBETAG('t','r','a','k'))
+            continue;
+        Mp4View tkhd = mp4_box(track, MKBETAG('t','k','h','d'));
+        size_t offset = tkhd.size && tkhd.data[0] == 1 ? 20 : 12;
+        if (tkhd.size < offset + 4 || AV_RB32(tkhd.data + offset) != track_id)
+            continue;
+        Mp4View edits = mp4_box(mp4_box(track, MKBETAG('e','d','t','s')), MKBETAG('e','l','s','t'));
+        if (!edits.data)
+            return 0;
+        Mp4View mdhd = mp4_box(mp4_box(track, MKBETAG('m','d','i','a')), MKBETAG('m','d','h','d'));
+        const size_t movie_scale_at = mvhd.size && mvhd.data[0] == 1 ? 20 : 12;
+        const size_t media_scale_at = mdhd.size && mdhd.data[0] == 1 ? 20 : 12;
+        if (mvhd.size < movie_scale_at + 4 || mdhd.size < media_scale_at + 4 ||
+            mvhd.data[0] > 1 || mdhd.data[0] > 1 || edits.size < 8 || edits.data[0] > 1)
+            return AVERROR_INVALIDDATA;
+        uint32_t movie_scale = AV_RB32(mvhd.data + movie_scale_at);
+        uint32_t media_scale = AV_RB32(mdhd.data + media_scale_at);
+        if (!movie_scale || !media_scale)
+            return AVERROR_INVALIDDATA;
+        int64_t target = av_rescale_rnd(timestamp, movie_scale, media_scale, AV_ROUND_DOWN);
+        const int wide = edits.data[0] == 1;
+        const unsigned size = wide ? 20 : 12;
+        const uint32_t count = AV_RB32(edits.data + 4);
+        if (count > (edits.size - 8) / size)
+            return AVERROR_INVALIDDATA;
+        if (target < 0)
+            return 0;
+        uint64_t remaining = (uint64_t)target;
+        const uint8_t *row = edits.data + 8;
+        for (uint32_t n = 0; n < count; ++n, row += size) {
+            uint64_t length = wide ? AV_RB64(row) : AV_RB32(row);
+            if (remaining < length)
+                return wide ? AV_RB64(row + 8) == UINT64_MAX : AV_RB32(row + 4) == UINT32_MAX;
+            remaining -= length;
+        }
+        return 0;
+    }
+    return AVERROR_STREAM_NOT_FOUND;
+}
+
 static int player_seek(AVFormatContext *format, AVPacket *packet,
                        const ViewCase *input, const PlaybackPlayerCase *player,
                        PacketWork *work)
@@ -179,7 +289,13 @@ static int player_seek(AVFormatContext *format, AVPacket *packet,
         for (unsigned i = 0; i < format->nb_streams; ++i)
             if (format->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_DATA)
                 format->streams[i]->discard = AVDISCARD_ALL;
-        player_field(work, 3, (uint64_t)format->duration);
+        int64_t duration;
+        int result = player_range_duration(input, player, &duration);
+        if (result < 0)
+            return result;
+        if (work->trace)
+            fprintf(stderr, "demux duration estimate: %" PRId64 " us\n", format->duration);
+        player_field(work, 3, (uint64_t)duration);
     }
     if (player->seek == PLAYER_OPEN)
         return player_read(format, packet, player, work, -1, -1, -1, 1);
@@ -189,6 +305,16 @@ static int player_seek(AVFormatContext *format, AVPacket *packet,
     int result = player_read(format, packet, player, NULL, 1, -1, -1, 1);
     if (result < 0)
         return result;
+    if (player->seek == PLAYER_MOVIE) {
+        result = player_movie_empty((Mp4View){input->data, input->size},
+                                    (uint32_t)format->streams[video]->id, player->timestamp);
+        if (result < 0)
+            return result;
+        if (result) {
+            player_field(work, 3, 0);
+            return 0;
+        }
+    }
     if (player->seek == PLAYER_OPUS_ROLL) {
         Mp4RollLanding landing = {0};
         int audio = player_stream(format, PLAYER_MOV, AVMEDIA_TYPE_AUDIO, -1);

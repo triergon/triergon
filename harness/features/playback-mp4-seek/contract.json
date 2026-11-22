@@ -9,9 +9,10 @@
   "reference": "ffmpeg-playback-views-native",
   "contract": [
     "Read the first packet before each backward seek and compare the landed video position and complete packet suffix.",
-    "Source sync seeks use sample composition time and demux seeks use the projected video clock. The reference seeks backward in the public MOV demux clock.",
+    "Source sync seeks use sample composition time and demux seeks use the projected video clock. The reference uses the public backward MOV demux seek for the packet suffix.",
+    "A movie-time request inside an empty edit emits an empty mapping and no packets. The AV1 source seek compares the coded sync flag and traces the demuxer disposable assertion.",
     "Compare track, PTS, DTS, duration, flags, size, payload, position, time base and encoded trim. Preserve every original range case, including start-up and Opus roll recovery.",
-    "For range playback compare the presentation duration in microseconds. Release seek checkpoints before the checkpoint control and compare the resulting seek.",
+    "For range playback compare the nonzero usable MovieHeaderBox duration in microseconds, or the maximum packet presentation endpoint of the playable tracks when the header has no usable duration. Preserve the reference stream-info estimate in the trace. Release seek checkpoints before the checkpoint control and compare the resulting seek.",
     "Preload input outside the measurement window."
   ],
   "required_profiles": [
@@ -450,11 +451,8 @@
   "pending_module_requirements": [
     "Compare source composition time, sync samples and the secondary-track prefix under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The source seek and FFmpeg's demux-clock seek can land at different samples or retain different preroll.",
     "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-    "Check source sync signalling against demux flags under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The AV1 sample extents and clocks match, while the reference marks a packet disposable.",
     "Check MOV edit-list and track admission under ISO/IEC 14496-12 sections 8.3 and 8.6. The candidate rejects a plan or seek which the public MOV demuxer accepts.",
     "Compare edit-list occurrence order, duration and encoded trim under ISO/IEC 14496-12 section 8.6. The demux seek lands and returns packets, but the selected suffix, edit endpoint or skip-samples side data differs.",
-    "Check the first eligible sync sample under ISO/IEC 14496-12 section 8.6.2. The source seek refuses with no preceding sync in the target configuration while the reference emits packets.",
-    "Verify the empty edit under ISO/IEC 14496-12 section 8.6.6. The movie seek reports an empty mapping and emits no packets, while FFmpeg's demux seek falls back to media.",
     "Check the movie-to-media edit mapping under ISO/IEC 14496-12 section 8.6.6. Movie seek applies the mapped request and replays source state, while FFmpeg starts a demux packet suffix."
   ],
   "open_cases": [
@@ -669,49 +667,7 @@
       ]
     },
     {
-      "id": "fragmented-open",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-rescaled-open",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "opus-trim-end",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "opus-trim-rescaled",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "opus-crop-open",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "fragmented-subtitles-seek-after-cue",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fragmented-subtitle-edit-open",
       "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
       "targets": [
         "aarch64-unknown-linux-gnu"
@@ -720,48 +676,6 @@
     {
       "id": "fragmented-subtitle-edit-seek-after-cue",
       "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "unrepresentable-video-edit-audio-only",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "signed-video-edit-endpoint-audio-only",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "leading-video-edit-short-reordered",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fate-non-sync-prefix-open",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "fate-shorter-track-open",
-      "requirement": "Compare the presentation extent in the movie and track declarations under ISO/IEC 14496-12 sections 8.2 and 8.6 with AVFormatContext.duration after stream discovery. Both readers deliver packets but report different presentation durations.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "dav1-seek",
-      "requirement": "Check source sync signalling against demux flags under ISO/IEC 14496-12 sections 8.6.1 and 8.6.2. The AV1 sample extents and clocks match, while the reference marks a packet disposable.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
@@ -837,22 +751,23 @@
       ]
     },
     {
-      "id": "fate-non-sync-prefix-seek",
-      "requirement": "Check the first eligible sync sample under ISO/IEC 14496-12 section 8.6.2. The source seek refuses with no preceding sync in the target configuration while the reference emits packets.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "movie-leading-empty-edit",
-      "requirement": "Verify the empty edit under ISO/IEC 14496-12 section 8.6.6. The movie seek reports an empty mapping and emits no packets, while FFmpeg's demux seek falls back to media.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
       "id": "movie-mapped-edit",
       "requirement": "Check the movie-to-media edit mapping under ISO/IEC 14496-12 section 8.6.6. Movie seek applies the mapped request and replays source state, while FFmpeg starts a demux packet suffix.",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "A backward source seek has no preceding sync sample in the configuration",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.6.2 and 8.6.6 describe declared sync samples and edit preroll. Mp4SyncSeekJob requires a preceding sync sample in the target configuration.",
+      "candidate": "Refuses the backward request with no MP4 sync in target configuration at source time 91091 ticks.",
+      "reference": "Logs that it cannot find a preceding index entry, then starts at the first available video key with PTS 93093 and an audio prefix.",
+      "compat": "compat::mov::seek_first_later_sync for consumers that recover with a later point instead of a strict backward seek.",
+      "cases": [
+        "fate-non-sync-prefix-seek"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
