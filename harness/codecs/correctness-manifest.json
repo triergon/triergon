@@ -3193,6 +3193,7 @@
   {
    "lane": "dts",
    "name": "xll_51_24_48_none.core.dts",
+   "coreless": true,
    "path": ".research/codec-derived/dts/xll_51_24_48_none.core.dts",
    "bytes": 34164,
    "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6"

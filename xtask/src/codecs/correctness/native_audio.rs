@@ -10,8 +10,10 @@ use crate::python;
 
 use super::{Grade, RUN_TIMEOUT, channel_stats, json_lines};
 
-pub(super) fn selected(lane: &str, vector: &Value) -> bool {
-    matches!(lane, "flac" | "mp3") && vector.get("native_frames") == Some(&Value::Bool(true))
+pub(super) fn selected<'a>(lane: &'a str, vector: &Value) -> Option<&'a str> {
+    let base = lane.strip_prefix("session-").unwrap_or(lane);
+    (matches!(base, "flac" | "mp3") && vector.get("native_frames") == Some(&Value::Bool(true)))
+        .then_some(base)
 }
 
 pub(super) fn build(bin: &Path, ffmpeg: &str) -> Result<PathBuf, String> {
@@ -68,19 +70,19 @@ struct Segment {
     samples: usize,
 }
 
-fn segments(diagnostics: &[Value]) -> Option<Vec<Segment>> {
+fn segments(diagnostics: &[Value], rate_field: &str, samples_field: &str) -> Option<Vec<Segment>> {
     let mut segments: Vec<Segment> = Vec::new();
     for row in diagnostics
         .iter()
-        .filter(|row| row.get("samples").is_some())
+        .filter(|row| row.get(samples_field).is_some())
     {
         let number = |key| u64::try_from(python::int(row.get(key)?)?).ok();
         let format = Format {
-            rate: number("rate")?,
+            rate: number(rate_field)?,
             layout: row.get("layout")?.as_str()?.to_owned(),
             channels: usize::try_from(number("channels")?).ok()?,
         };
-        let samples = usize::try_from(number("samples")?).ok()?;
+        let samples = usize::try_from(number(samples_field)?).ok()?;
         if format.rate == 0 || format.channels == 0 || samples == 0 {
             return None;
         }
@@ -149,6 +151,7 @@ pub(super) fn grade(
     path: &str,
     tmp: &Path,
     executable: &Path,
+    session: Option<&Value>,
 ) -> Result<(Value, Value), Stop> {
     let path_in = |name| python::path(&tmp.join(name));
     let (ours_pcm, ref_pcm) = (path_in("ours.f32"), path_in("ref.f32"));
@@ -163,19 +166,25 @@ pub(super) fn grade(
         ],
         RUN_TIMEOUT,
     )?;
-    let ours = run_text(
-        &[
+    let ours_args = if let Some(vector) = session {
+        super::session::args(a, lane, path, &ours_pcm, tmp, vector, "planar")?
+    } else {
+        vec![
             a.example(lane)?,
             path.into(),
             ours_pcm.clone(),
             "--native-frames".into(),
-        ],
-        RUN_TIMEOUT,
-    )?;
+        ]
+    };
+    let ours = run_text(&ours_args, RUN_TIMEOUT)?;
     let ours_rows = json_lines(&ours.stderr);
     let reference_rows = json_lines(&reference.stderr);
-    let candidate = segments(&ours_rows);
-    let expected = segments(&reference_rows);
+    let candidate = if session.is_some() {
+        segments(&ours_rows, "sample_rate", "nb_samples")
+    } else {
+        segments(&ours_rows, "rate", "samples")
+    };
+    let expected = segments(&reference_rows, "rate", "samples");
     let read = |file: &str| fs::read(file).unwrap_or_default();
     let mut complete = false;
     let mut checked = Vec::new();
@@ -195,11 +204,18 @@ pub(super) fn grade(
                 .all(|row| row.get("matches") == Some(&Value::Bool(true)));
     }
     let status = |pass| Value::str(if pass { "pass" } else { "fail" });
+    let timeline = session
+        .map(|_| super::session::timeline(a, path, lane, &ours_rows, None))
+        .transpose()?;
+    let same_timeline = timeline
+        .as_ref()
+        .is_none_or(|v| v.get("status").and_then(Value::as_str) == Some("pass"));
     let decoder = Value::object([
         (
             "status",
             status(
                 complete
+                    && same_timeline
                     && ours.code == 0
                     && reference.code == 0
                     && ours_rows
@@ -218,6 +234,7 @@ pub(super) fn grade(
             Value::int(expected.as_ref().map_or(0, Vec::len) as u64),
         ),
         ("segments", Value::Array(checked)),
+        ("timeline", timeline.unwrap_or(Value::Null)),
         (
             "candidate_tail",
             Value::str(python::tail(&ours.stderr, 500)),
@@ -227,16 +244,18 @@ pub(super) fn grade(
             Value::str(python::tail(&reference.stderr, 500)),
         ),
     ]);
-    let operation = super::operation(lane).ok_or_else(|| super::unknown(lane))?;
-    let device = run_text(
-        &[
+    let device_args = if let Some(vector) = session {
+        super::session::args(a, lane, path, &ours_device, tmp, vector, "device")?
+    } else {
+        let operation = super::operation(lane).ok_or_else(|| super::unknown(lane))?;
+        vec![
             python::path(a.codec_workers.of(operation)),
             format!("{operation}-raw"),
             path.into(),
             ours_device.clone(),
-        ],
-        RUN_TIMEOUT,
-    )?;
+        ]
+    };
+    let device = run_text(&device_args, RUN_TIMEOUT)?;
     let (c, r) = (read(&ours_device), read(&ref_device));
     let max = c
         .chunks_exact(2)

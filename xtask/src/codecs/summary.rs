@@ -7,7 +7,7 @@
 //! is not a pass at both levels is a failure and is listed with its numbers;
 //! known dispositions are attached, never used to drop a row.
 //!
-//! A row of a vector its manifest lists in `open_cases` (`"open_case": true`)
+//! A row of a vector its manifest lists in `open_cases` or `open_deviations` (`"open_case": true`)
 //! must fail, and is counted as `open`; it needs a disposition saying what is
 //! not recovered. A listed vector that no longer fails fails the summary, so
 //! the list only shrinks. The video lanes also pin the exact disposition and
@@ -396,6 +396,20 @@ fn variant_reading<'a>(
         Entry::Occupied(entry) => entry.into_mut(),
         Entry::Vacant(entry) => entry.insert(json::read(Path::new(path))?),
     };
+    if let Some(deviation) = super::correctness::deviations(document)
+        .iter()
+        .find(|item| {
+            item.get("cases")
+                .and_then(Value::as_array)
+                .is_some_and(|cases| cases.iter().any(|case| case.as_str() == Some(name)))
+        })
+    {
+        return deviation
+            .get("reading")
+            .and_then(Value::as_str)
+            .map(Some)
+            .ok_or_else(|| format!("{path}: {name} needs a deviation reading"));
+    }
     let listed = document
         .get("open_cases")
         .and_then(Value::as_array)

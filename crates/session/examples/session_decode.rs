@@ -3,7 +3,10 @@
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_blocking};
+use triergon::{
+    AnyReader, Budget, ContainerReader, MediaKind, PacketInfo, SourceId, open_blocking,
+};
+use triergon_core::blocking::{Blocking, seekable_capabilities};
 use triergon_core::{BudgetVec, Rounding};
 use triergon_session::mix::Downmix;
 use triergon_session::{
@@ -174,11 +177,14 @@ impl AudioOutput {
         let count = F::emit(&block.samples, sink)?;
         if count != 0 {
             let (channels, layout) = F::layout(&block.samples);
-            self.format
-                .get_or_insert((block.sample_rate, channels, layout));
+            let pts = block.pts.map_or_else(|| "null".into(), |v| v.to_string());
+            let rate = block.sample_rate;
+            eprintln!(
+                "{{\"pts_ns\":{pts},\"sample_rate\":{rate},\"nb_samples\":{count},\"channels\":{channels},\"layout\":{layout:?}}}"
+            );
+            self.format.get_or_insert((rate, channels, layout));
             self.blocks += 1;
             self.samples += count;
-            report(block.pts, block.sample_rate, count);
         }
         if let SessionState::Failed(error) = session.state() {
             return Err(error.into());
@@ -265,8 +271,33 @@ fn audio<F: OutputForm>(
         })?;
         return run.finish();
     }
-    let file = std::fs::File::open(input)?;
-    let mut source = open_blocking(std::io::BufReader::new(file), &pool)?;
+    let mut source = std::io::BufReader::new(std::fs::File::open(input)?);
+    let mut source = if matches!(options.lane, "aac" | "eac3") {
+        // Use the elementary format named by the reference comparison. Leading
+        // bytes may prevent the facade from recognizing a valid suffix.
+        let capabilities = seekable_capabilities(&mut source)?;
+        let limits = triergon::elementary::Limits::default();
+        let reader = if options.lane == "aac" {
+            AnyReader::Adts(triergon::elementary::AdtsReader::new(
+                &pool,
+                SourceId(1),
+                capabilities,
+                limits,
+                64 * 1024,
+            )?)
+        } else {
+            AnyReader::Ac3(triergon::elementary::Ac3Reader::new(
+                &pool,
+                SourceId(1),
+                capabilities,
+                limits,
+                64 * 1024,
+            )?)
+        };
+        Blocking::seekable(reader, source, &pool)
+    } else {
+        open_blocking(source, &pool)?
+    };
     let first = source.next_packet()?.ok_or("audio source has no packets")?;
     let reader = source.reader();
     let track = (0..reader.track_count())

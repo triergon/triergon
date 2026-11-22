@@ -569,7 +569,8 @@ fn audio_decoder(
         audio_format(&media_lane)?
     };
     let reject = crc_reject(lane);
-    let coreless = lane == "dts-packed" && vector.get("coreless") == Some(&Value::Bool(true));
+    let coreless = matches!(lane, "dts-packed" | "session-dts")
+        && vector.get("coreless") == Some(&Value::Bool(true));
     let (_, stream) = probe(&a.ffprobe, path, format, true)?;
     let (reference_path, ours_path) = (tmp.join("ref.f32"), tmp.join("ours.f32"));
     let mut reference_argv: Vec<String> = [
@@ -783,15 +784,19 @@ fn audio_decoder(
         row.push(("status".into(), Value::str(status)));
     };
     if coreless {
-        let both_refuse = candidate.is_empty()
-            && reference.is_empty()
-            && ours_run.code == 0
-            && info.get("frames").and_then(python::int) == Some(0)
-            && reference_run.code > 0
-            && reference_run
-                .stderr
-                .contains("No valid DCA sub-stream found");
-        status(&mut row, if both_refuse { "pass" } else { "fail" });
+        let ours_refused = if through_session {
+            ours_run.code > 0 && ours_run.stderr.contains("no DTS core sync")
+        } else {
+            ours_run.code == 0 && info.get("frames").and_then(python::int) == Some(0)
+        };
+        let both_refuse =
+            candidate.is_empty() && ours_refused && no_dts_core(&reference_run, &reference);
+        let result = match (both_refuse, through_session) {
+            (true, true) => "ffmpeg-refused",
+            (true, false) => "pass",
+            (false, _) => "fail",
+        };
+        status(&mut row, result);
         return Ok(Value::Object(row));
     }
     if initialized_aac
@@ -965,6 +970,12 @@ fn audio_decoder(
     Ok(Value::Object(row))
 }
 
+fn no_dts_core(reference: &crate::process::Text, pcm: &[u8]) -> bool {
+    pcm.is_empty()
+        && reference.code > 0
+        && reference.stderr.contains("No valid DCA sub-stream found")
+}
+
 fn output_path(
     a: &Grade,
     lane: &str,
@@ -1014,9 +1025,54 @@ fn output_path(
         vec![worker, op.clone(), path.to_owned(), python::path(&o)]
     };
     let po = run_text(&ours_argv, RUN_TIMEOUT)?;
+    let coreless = lane == "session-dts" && vector.get("coreless") == Some(&Value::Bool(true));
     let reference_argv =
         session::reference_args(a, &media_lane, path, &python::path(&r), vector, "device")
-            .unwrap_or_else(|| vec![a.reference.clone(), op, path.to_owned(), python::path(&r)]);
+            .unwrap_or_else(|| {
+                if through_session && (media_lane == "mp3" || coreless) {
+                    // The CLI uses the same decoder selection as the PCM grade.
+                    // For MP3, it discovers the complete gapless trim before decoding.
+                    let mut args = [
+                        a.ffmpeg.as_str(),
+                        "-nostdin",
+                        "-v",
+                        "error",
+                        "-threads",
+                        "1",
+                        "-filter_threads",
+                        "1",
+                        "-f",
+                        if coreless { "dts" } else { "mp3" },
+                        "-c:a",
+                        if coreless { "dca" } else { "mp3float" },
+                    ]
+                    .map(String::from)
+                    .to_vec();
+                    if coreless {
+                        args.extend(["-core_only", "1"].map(String::from));
+                    }
+                    args.extend(
+                        [
+                            "-i",
+                            path,
+                            "-map",
+                            "0:a:0",
+                            "-af",
+                            "aformat=sample_fmts=s16:channel_layouts=stereo",
+                            "-f",
+                            "s16le",
+                            "-c:a",
+                            "pcm_s16le",
+                            "-y",
+                            &python::path(&r),
+                        ]
+                        .map(String::from),
+                    );
+                    args
+                } else {
+                    vec![a.reference.clone(), op, path.to_owned(), python::path(&r)]
+                }
+            });
     let pr = run_text(&reference_argv, RUN_TIMEOUT)?;
     let co = fs::read(&o).unwrap_or_default();
     let cr = fs::read(&r).unwrap_or_default();
@@ -1038,6 +1094,19 @@ fn output_path(
         && !complete_single_sce_stereo(size_of::<i16>(), [(po.code, co.len()), (pr.code, cr.len())])
     {
         row.push(("status".into(), Value::str("fail")));
+        return Ok(Value::Object(row));
+    }
+    if coreless {
+        let both_refuse = co.is_empty()
+            && po.code > 0
+            && po.stderr.contains("no DTS core sync")
+            && no_dts_core(&pr, &cr);
+        let result = if both_refuse {
+            "reference-produced-nothing"
+        } else {
+            "fail"
+        };
+        row.push(("status".into(), Value::str(result)));
         return Ok(Value::Object(row));
     }
     if cr.is_empty() {
@@ -1106,16 +1175,15 @@ fn vector_name(lane: &str, vector: &Value) -> Option<String> {
     }
 }
 
-/// The vector names a manifest lists in `open_cases`: vectors that fail today and
-/// that `summarize` requires to keep failing. Every name must be a vector of it.
+/// Vectors that differ as listed, with either an open case or a declared deviation.
+/// Every name must be a vector of the manifest.
 fn open_cases<'a>(manifest: &'a Value, vectors: &[Value]) -> Result<Vec<&'a str>, String> {
     let mut open = Vec::new();
-    for case in manifest
-        .get("open_cases")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-    {
+    let mut admit = |case: &'a Value| -> Result<(), String> {
         let name = case.as_str().ok_or("an open case is a vector name")?;
+        if open.contains(&name) {
+            return Err(format!("open case {name}: listed twice"));
+        }
         if !vectors.iter().any(|v| {
             v.get("name").and_then(Value::as_str) == Some(name)
                 || v.get("lane")
@@ -1128,8 +1196,49 @@ fn open_cases<'a>(manifest: &'a Value, vectors: &[Value]) -> Result<Vec<&'a str>
             return Err(format!("open case {name}: not a vector of the manifest"));
         }
         open.push(name);
+        Ok(())
+    };
+    for case in manifest
+        .get("open_cases")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        admit(case)?;
+    }
+    for deviation in deviations(manifest) {
+        let line = |key| {
+            deviation
+                .get(key)
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.trim().is_empty() && !value.contains('\n'))
+        };
+        let cases = deviation
+            .get("cases")
+            .and_then(Value::as_array)
+            .unwrap_or_default();
+        if cases.is_empty()
+            || !["reading", "clause", "candidate", "reference"]
+                .into_iter()
+                .all(line)
+            || deviation.get("compat").is_some() && !line("compat")
+            || deviation.get("targets").is_some()
+        {
+            return Err(
+                "a codec deviation needs its reading, clause, both results and cases".into(),
+            );
+        }
+        for case in cases {
+            admit(case)?;
+        }
     }
     Ok(open)
+}
+
+pub(super) fn deviations(manifest: &Value) -> &[Value] {
+    manifest
+        .get("open_deviations")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
 }
 
 fn all_vectors(manifests: &[Value]) -> Result<Vec<Value>, String> {
@@ -1280,7 +1389,7 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                 "output".into(),
                 observation(play::grade(a, &path, &tmp.0, v), &lane)?,
             ));
-        } else if native_audio::selected(&lane, v) {
+        } else if let Some(base) = native_audio::selected(&lane, v) {
             if native_reference.is_none() {
                 let directory = TempDir::new(a.scratch.as_deref())?;
                 let executable = native_audio::build(&directory.0, &a.ffmpeg)?;
@@ -1290,9 +1399,10 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                 .as_ref()
                 .ok_or("missing native audio runner")?
                 .1;
-            match native_audio::grade(a, &lane, &python::path(&path), &tmp.0, executable) {
+            let session = (lane != base).then_some(v);
+            match native_audio::grade(a, base, &python::path(&path), &tmp.0, executable, session) {
                 Ok((decoder, output)) => {
-                    row.extend([("decoder".into(), decoder), ("output".into(), output)])
+                    row.extend([("decoder".into(), decoder), ("output".into(), output)]);
                 }
                 Err(error) => row.push(("decoder".into(), observation(Err(error), &lane)?)),
             }
@@ -1371,6 +1481,26 @@ pub fn grade(a: &Grade) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn declared_codec_deviations_join_the_open_case_ratchet() {
+        let vectors = json::parse(r#"[{"name":"one"},{"name":"two"}]"#).unwrap();
+        let vectors = vectors.as_array().unwrap();
+        let manifest = |name, clause| {
+            json::parse(&format!(
+                r#"{{"open_cases":["one"],"open_deviations":[{{"reading":"reading",
+                "clause":"{clause}","candidate":"ours","reference":"theirs","cases":["{name}"]}}]}}"#
+            ))
+            .unwrap()
+        };
+        assert_eq!(
+            open_cases(&manifest("two", "§4"), vectors).unwrap(),
+            ["one", "two"]
+        );
+        assert!(open_cases(&manifest("one", "§4"), vectors).is_err());
+        assert!(open_cases(&manifest("other", "§4"), vectors).is_err());
+        assert!(open_cases(&manifest("two", ""), vectors).is_err());
+    }
 
     #[test]
     fn initialized_aac_reference_requires_the_pinned_input() {
