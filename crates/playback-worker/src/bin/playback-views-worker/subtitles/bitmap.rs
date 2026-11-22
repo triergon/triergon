@@ -1,7 +1,10 @@
 use super::{ABSENT, CANCEL, Case, Codec, GRANT, PACKET_LIMIT, Records, next};
 use playback_worker::runner::Result;
 use triergon_bridge::{
-    bitmap::{BitmapInput, DvdBridgeConfig, DvdReceiver, DvdReceiverStep, PgsBridge, PgsStep},
+    bitmap::{
+        BitmapInput, DvdBridgeConfig, DvdReceiver, DvdReceiverStep, PgsBridge, PgsOutput,
+        PgsQueueAction, PgsStep,
+    },
     matroska::{MatroskaBitmapClockProbe, MatroskaBitmapTrack, MatroskaDvbPacket, MatroskaDvbStep},
     mp4_dvd::Mp4DvdSetup,
     ts::{
@@ -9,7 +12,7 @@ use triergon_bridge::{
         pgs::{PgsTsStep, PgsTsTrack},
     },
 };
-use triergon_core::{Budget, Rounding, TimeBase, WorkBudget, container::CodecId};
+use triergon_core::{Budget, Error, Rounding, TimeBase, WorkBudget, container::CodecId};
 use triergon_isobmff::config::ConfigurationLimits;
 use triergon_mpegts::stream::TraceEvent;
 use triergon_playback::{ByteSource, Event, Output, Player, TrackKey, mp4::Mp4Event};
@@ -76,6 +79,99 @@ fn pgs_receiver<M>(
     )?)
 }
 
+fn reset_input<M>(input: &BitmapInput<M>) -> BitmapInput<()> {
+    BitmapInput {
+        scope: input.scope,
+        sequence: input.sequence,
+        raw: input.raw.clone(),
+        clock: input.clock,
+        duration: input.duration,
+        metadata: (),
+    }
+}
+
+fn check_pgs_reset<M>(case: &Case<'_>, pool: &Budget, input: &BitmapInput<M>) -> Result<()> {
+    let old = input.scope;
+    let mut new = old;
+    new.generation = old.generation.checked_add(1).ok_or(Error::Overflow)?;
+    let mut receiver = pgs_receiver(case, pool, old)?;
+    receiver
+        .provide(reset_input(input))
+        .map_err(|failure| failure.error)?;
+    if receiver.reset(new, &mut WorkBudget::new(0), &CANCEL)?
+        || !receiver.reset(new, &mut WorkBudget::new(GRANT), &CANCEL)?
+    {
+        return Err("PGS receiver did not respect the reset work grant".into());
+    }
+    let refusal = receiver
+        .provide(reset_input(input))
+        .err()
+        .ok_or("PGS receiver accepted a previous-generation packet")?;
+    if refusal.error
+        != (Error::StaleGeneration {
+            expected: new.generation,
+            received: old.generation,
+        })
+        || refusal.input.raw.as_ref() != input.raw.as_ref()
+        || refusal.input.scope != old
+        || !matches!(
+            receiver.step(&mut WorkBudget::new(GRANT), &CANCEL)?,
+            PgsStep::NeedPacket
+        )
+    {
+        return Err(
+            "PGS reset did not discard a pending packet and preserve the refused input".into(),
+        );
+    }
+    let mut current = refusal.input;
+    current.scope = new;
+    receiver.provide(current).map_err(|failure| failure.error)?;
+    Ok(())
+}
+
+fn check_dvd_reset<M>(
+    pool: &Budget,
+    config: DvdBridgeConfig,
+    input: &BitmapInput<M>,
+) -> Result<()> {
+    let old = input.scope;
+    let mut new = old;
+    new.generation = old.generation.checked_add(1).ok_or(Error::Overflow)?;
+    let mut receiver = DvdReceiver::new(pool, old, config.clone())?;
+    receiver
+        .provide(reset_input(input))
+        .map_err(|failure| failure.error)?;
+    if receiver.reset(new, config.clone(), &mut WorkBudget::new(0), &CANCEL)?
+        || !receiver.reset(new, config, &mut WorkBudget::new(GRANT), &CANCEL)?
+    {
+        return Err("DVD receiver did not respect the reset work grant".into());
+    }
+    let refusal = receiver
+        .provide(reset_input(input))
+        .err()
+        .ok_or("DVD receiver accepted a previous-generation packet")?;
+    if refusal.error
+        != (Error::StaleGeneration {
+            expected: new.generation,
+            received: old.generation,
+        })
+        || refusal.input.raw.as_ref() != input.raw.as_ref()
+        || refusal.input.scope != old
+        || !matches!(
+            receiver.step(&mut WorkBudget::new(GRANT), &CANCEL)?,
+            DvdReceiverStep::NeedPacket
+        )
+    {
+        return Err(
+            "DVD reset did not discard a pending packet and preserve the refused input".into(),
+        );
+    }
+    let mut current = refusal.input;
+    current.scope = new;
+    receiver.provide(current).map_err(|failure| failure.error)?;
+    Ok(())
+}
+
 fn pgs<M>(bridge: &mut PgsBridge<M>, input: BitmapInput<M>, records: &mut Records) -> Result<()> {
     bridge.provide(input).map_err(|failure| failure.error)?;
     drain_pgs(bridge, records)
@@ -101,15 +197,9 @@ fn drain_pgs<M>(bridge: &mut PgsBridge<M>, records: &mut Records) -> Result<()> 
     loop {
         match bridge.step(&mut WorkBudget::new(GRANT), &CANCEL)? {
             PgsStep::Output(output) => {
+                let queue_start = checked_pgs_queue(&output)?;
                 if records.trace {
-                    println!(
-                        "# PGS queue {:?}",
-                        output.packet_clock_action()?.map(|action| match action {
-                            triergon_bridge::bitmap::PgsQueueAction::Clear { at_ns } => at_ns,
-                            triergon_bridge::bitmap::PgsQueueAction::Show(picture) =>
-                                picture.start_ns,
-                        })
-                    );
+                    println!("# PGS queue {queue_start:?}");
                 }
                 if let Some(event) = output.decoded.receiver_output() {
                     picture(
@@ -143,6 +233,74 @@ fn drain_pgs<M>(bridge: &mut PgsBridge<M>, records: &mut Records) -> Result<()> 
             PgsStep::Yield => {}
             PgsStep::NeedPacket | PgsStep::Finished => return Ok(()),
         }
+    }
+}
+
+fn checked_pgs_queue<M>(output: &PgsOutput<M>) -> Result<Option<i64>> {
+    let action = output.packet_clock_action()?;
+    let Some(event) = output.decoded.receiver_output() else {
+        return if action.is_none() {
+            Ok(None)
+        } else {
+            Err("PGS queue received an action without a decoder event".into())
+        };
+    };
+    let clock = output.packet.input().clock;
+    let stamp = clock
+        .pts
+        .into_iter()
+        .chain(clock.dts)
+        .find(|&value| value > i64::MIN);
+    let timestamp = stamp.map_or(0, |value| {
+        let numerator = i128::from(value) * i128::from(clock.timebase.numerator());
+        let denominator = i128::from(clock.timebase.denominator());
+        let whole = numerator / denominator;
+        let fraction =
+            ((numerator % denominator).abs() * 1_000_000_000 + denominator / 2) / denominator;
+        whole
+            .checked_mul(1_000_000_000)
+            .and_then(|ns| ns.checked_add(numerator.signum() * fraction))
+            .and_then(|ns| i64::try_from(ns).ok())
+            .unwrap_or(i64::MIN)
+    });
+    let rectangles = event.rectangles();
+    let displayable: Vec<_> = rectangles
+        .iter()
+        .take(8)
+        .filter(|rect| {
+            let (width, height, stride) = (rect.width, rect.height, rect.stride);
+            (1..=8192).contains(&width)
+                && (1..=8192).contains(&height)
+                && stride >= width
+                && rect.pixels().len()
+                    >= usize::from(stride) * (usize::from(height) - 1) + usize::from(width)
+        })
+        .collect();
+    match action {
+        None if !rectangles.is_empty() && displayable.is_empty() => Ok(None),
+        Some(PgsQueueAction::Clear { at_ns }) if rectangles.is_empty() && at_ns == timestamp => {
+            Ok(Some(at_ns))
+        }
+        Some(PgsQueueAction::Show(picture)) if !displayable.is_empty() => {
+            let dimensions = output.decoded.context_canvas;
+            let canvas = dimensions
+                .iter()
+                .all(|side| (160..=8192).contains(side))
+                .then_some(dimensions);
+            let observed: Vec<_> = picture.rectangles().collect();
+            if picture.start_ns != timestamp
+                || picture.canvas != canvas
+                || observed.len() != displayable.len()
+                || !observed
+                    .into_iter()
+                    .zip(displayable)
+                    .all(|(actual, expected)| std::ptr::eq(actual, expected))
+            {
+                return Err("PGS queue picture differs from its packet and decoder event".into());
+            }
+            Ok(Some(picture.start_ns))
+        }
+        _ => Err("PGS queue action disagrees with the decoder event".into()),
     }
 }
 
@@ -215,11 +373,7 @@ fn mkv_dvb(
     if records.trace {
         println!(
             "# Matroska DVB source DTS {:?}",
-            packet
-                .packet
-                .source
-                .as_ref()
-                .and_then(|source| source.timing().dts)
+            packet.source.packet.packet.dts_ns
         );
     }
     loop {
@@ -232,6 +386,63 @@ fn mkv_dvb(
             MatroskaDvbStep::Decoded => return Ok(()),
         }
     }
+}
+
+fn mkv_dvb_clock(
+    track: &MatroskaBitmapTrack,
+    player: &mut Player<ByteSource>,
+    records: &mut Records,
+) -> Result<()> {
+    let mut prefix = Vec::new();
+    while let Some(output) = next(player)? {
+        let selected = track.dvb_packet(&output, 0)?.is_some();
+        prefix.push(output);
+        if selected {
+            break;
+        }
+        if prefix.len() >= 65_536 {
+            return Err("Matroska DVB clock prefix limit".into());
+        }
+    }
+    let mut probe = MatroskaBitmapClockProbe::new(track, &prefix, prefix.len())?;
+    while !probe.poll(&mut WorkBudget::new(GRANT), &CANCEL)? {}
+    let mut decoder = track.dvb_decoder()?;
+    let mut sequence = 0;
+    let mut consume = |output: &Output,
+                       packet: Option<MatroskaDvbPacket>,
+                       sequence|
+     -> Result<u64> {
+        let original = track.dvb_packet(output, sequence)?;
+        match (original, packet) {
+            (None, None) => Ok(sequence),
+            (Some(original), Some(clocked)) => {
+                if original.packet.payload.as_ref() != clocked.packet.payload.as_ref()
+                    || original.packet.generation != clocked.packet.generation
+                    || original.packet.sequence != clocked.packet.sequence
+                    || original.packet.envelope != clocked.packet.envelope
+                    || original.source.delivery != clocked.source.delivery
+                    || original
+                        .packet
+                        .pts
+                        .is_some_and(|pts| Some(pts) != clocked.packet.pts)
+                {
+                    return Err("Matroska DVB probe changed the packet or its known clock".into());
+                }
+                mkv_dvb(&clocked, &mut decoder, records)?;
+                Ok(sequence + 1)
+            }
+            _ => Err("Matroska DVB probe changed packet selection".into()),
+        }
+    };
+    for (ordinal, output) in prefix.iter().enumerate() {
+        sequence = consume(output, probe.dvb_packet(ordinal, sequence)?, sequence)?;
+    }
+    let mut live = probe.into_live()?;
+    drop(prefix);
+    while let Some(output) = next(player)? {
+        sequence = consume(&output, live.dvb_packet(&output, sequence)?, sequence)?;
+    }
+    Ok(())
 }
 
 fn mp4_dvd(
@@ -267,6 +478,9 @@ fn mp4_dvd(
         let mut sequence = 0;
         while let Some(output) = current {
             if let Some(input) = track.packet(&output, sequence)? {
+                if sequence == 0 {
+                    check_dvd_reset(pool, track.config(), &input)?;
+                }
                 dvd(&mut bridge, input, records)?;
                 sequence += 1;
             }
@@ -348,16 +562,7 @@ fn matroska(
             return drain_pgs(&mut receiver, records);
         }
         match case.codec {
-            Codec::Dvb => {
-                let mut decoder = track.dvb_decoder()?;
-                let mut sequence = 0;
-                while let Some(output) = next(player)? {
-                    if let Some(packet) = track.dvb_packet(&output, sequence)? {
-                        mkv_dvb(&packet, &mut decoder, records)?;
-                        sequence += 1;
-                    }
-                }
-            }
+            Codec::Dvb => mkv_dvb_clock(&track, player, records)?,
             Codec::Pgs => {
                 let mut receiver = pgs_receiver(case, pool, track.scope())?;
                 let mut sequence = 0;
@@ -482,6 +687,9 @@ fn ts_pgs(
                 match track.poll(&mut WorkBudget::new(GRANT))? {
                     PgsTsStep::Yield => {}
                     PgsTsStep::Packet(input) => {
+                        if input.sequence == 0 {
+                            check_pgs_reset(case, pool, &input)?;
+                        }
                         pgs(&mut receiver, input, records)?;
                         break;
                     }

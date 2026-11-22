@@ -15,12 +15,6 @@
     "triergon-bitstream": [],
     "triergon-bridge": [
       {
-        "name": "bitmap-subtitle-bridges",
-        "entry_points": ["bitmap::PgsBridge", "bitmap::DvdReceiver", "matroska::MatroskaBitmapTrack", "matroska::MatroskaBitmapClockProbe", "mp4_dvd::Mp4DvdSetup", "mp4_dvd::Mp4DvdTrack", "ts::dvb::DvbTsBridge", "ts::pgs::PgsTsTrack"],
-        "degree": "unit-tests",
-        "needs": "bridge-bitmap-subtitles compares container-to-picture playback. A comparison still needs to exercise Matroska DVB startup and live clock packets, bitmap receiver reset and the PGS packet-clock queue action."
-      },
-      {
         "name": "compact-replay-prefix",
         "entry_points": ["matroska::MatroskaReplayPrefix", "matroska::MatroskaReplayPrefix::feed_packet"],
         "degree": "step",

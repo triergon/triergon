@@ -10,6 +10,8 @@
   "contract": [
     "Play Matroska, MOV/MP4, TS188 and M2TS192 through Player and the PGS, DVD and DVB subtitle bridges. The pinned FFmpeg subtitles build demuxes the same track and calls avcodec_decode_subtitle2. The plain link serves future measurement.",
     "Fold each published bitmap event, its presentation clock, rectangle count, geometry, forced flag, every declared ARGB palette entry and every visible index row. DVD also compares start and end display offsets. The DVB queue exposes its presentation clock without a display duration; Matroska block DTS is absent at the source boundary, so the reference's inferred DTS is diagnostic only.",
+    "For Matroska DVB, buffer through the first selected packet, replay it through the startup clock, then continue with the live clock. Require matching selection, packet identity, payload and known presentation time against the direct Matroska binding. Decode and grade the clock-projected packets.",
+    "Check the PGS queue action against the paired decoder event and original packet clock, including show and clear. Check PGS and DVD resets with a pending real packet, a zero work grant, refusal and return of the previous-generation packet, and admission of the new generation.",
     "Compare DVB through the bitmap queue boundary: the first eight decoder rectangles in order, zero for the unanchored queue clock, and the first encoded 33-bit epoch for transport DVB. The trace retains the uncapped decoded event and its clock.",
     "Unprobed Matroska PGS playback compares clocks before generic stream discovery and timestamp fill-in.",
     "Compare MP4 DVD packet clocks on the sample-table timeline with edit mapping disabled in the reference.",

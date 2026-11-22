@@ -113,6 +113,8 @@ reference decoder normalizes or suppresses it.
 The [text bridge control comparison](../../harness/features/bridge-text-control/contract.json)
 checks reset with a pending packet, stale generation refusal, and the
 container packet and document accessors against their original inputs.
+The bitmap comparison also checks the Matroska DVB startup and live clocks,
+DVD and PGS receiver resets, and PGS show and clear actions on the packet clock.
 
 The integration tests (`tests/it`) read the fixtures of `crates/playback/tests/fixtures`.
 Fixture provenance: [AV1](../playback/tests/fixtures/av1/README.md),
