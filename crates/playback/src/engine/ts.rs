@@ -95,30 +95,34 @@ pub(crate) enum Entities {
     AtEnd(ts::stream::MediaEntityEnd),
 }
 
-/// Where a TS engine's stream is in its life. The discriminants are bit sets
-/// (2 drains, 1 ended), so each test is one bit test, as two flags were.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u8)]
-pub(crate) enum Life {
-    /// Reading the source.
-    Reading = 0,
-    /// The source ended; the stream and the tracks drain.
-    Draining = 2,
-    /// The stream reported its end, which it does only while draining.
-    Ended = 3,
+pub(super) enum Completion {
+    Pending,
+    Ended,
+}
+
+// The 0/1 tag also supplies the active-observer option tag while draining.
+#[derive(Clone, Copy, Debug)]
+#[repr(u8)]
+pub(super) enum Life {
+    Reading,
+    Draining(Completion),
 }
 
 impl Life {
-    /// Whether the source ended, so the stream and the tracks drain.
     #[inline]
     const fn drains(self) -> bool {
-        !matches!(self, Self::Reading)
+        matches!(self, Self::Draining(_))
     }
 
-    /// Whether the stream reported its end.
     #[inline]
     const fn ended(self) -> bool {
-        self as u8 & 1 != 0
+        matches!(self, Self::Draining(Completion::Ended))
+    }
+
+    fn finish(&mut self) {
+        *self = Self::Draining(Completion::Ended);
     }
 }
 
@@ -149,12 +153,16 @@ pub struct TsEngine {
     pub(crate) pcr_pid: Option<u16>,
     pub(crate) program: u16,
     pub(crate) format: ts::PacketFormat,
-    pub(crate) life: Life,
+    pub(super) life: Life,
     pub(crate) namespace: DescriptorNamespace,
     pub(crate) delivery: Delivery,
 }
 
 impl TsEngine {
+    pub(super) fn start_draining(&mut self) {
+        self.life = Life::Draining(Completion::Pending);
+    }
+
     /// Starts replaying the stream from its start with fresh tables, clocks and observers.
     pub(crate) fn begin_seek(&mut self, intent: &SeekIntent) -> Result<()> {
         if self.delivery.discovers_tracks() {
@@ -639,7 +647,7 @@ impl TsEngine {
             return Err(Error::Invalid("TS segment ended without an active PMT"));
         }
         self.stream.end_of_source()?;
-        self.life = Life::Draining;
+        self.start_draining();
         for track in self.pes_tracks.as_mut_slice() {
             if let Some(observer) = track.observer.as_mut() {
                 observer.end_of_source()?;
@@ -816,7 +824,7 @@ impl TsEngine {
                     TraceEvent::Pes(_) if self.program == 0 => {
                         return Err(Error::Invalid("TS PES before program discovery"));
                     }
-                    TraceEvent::Finished => self.life = Life::Ended,
+                    TraceEvent::Finished => self.life.finish(),
                     _ => {}
                 }
                 self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
@@ -1018,7 +1026,7 @@ impl TsEngine {
         }
         self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
         if matches!(event, TraceEvent::Finished) {
-            self.life = Life::Ended;
+            self.life.finish();
         }
         T::project(FeedStep::Event(TsEvent {
             source: event,
