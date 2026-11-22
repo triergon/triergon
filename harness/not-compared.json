@@ -49,19 +49,13 @@
         "name": "text-subtitle-bridge",
         "entry_points": ["text::TextBridge", "text::TextSource"],
         "degree": "unit-tests",
-        "needs": "a worker operation playing Matroska and MP4 text tracks through TextBridge, folding each cue against the reference's decoded subtitles of the same track"
+        "needs": "bridge-text-subtitles compares container-to-cue playback. A comparison still needs to exercise TextBridge reset and the TextSource packet accessors."
       },
       {
         "name": "bitmap-subtitle-bridges",
         "entry_points": ["bitmap::PgsBridge", "bitmap::DvdReceiver", "matroska::MatroskaBitmapTrack", "matroska::MatroskaBitmapClockProbe", "mp4_dvd::Mp4DvdSetup", "mp4_dvd::Mp4DvdTrack", "ts::dvb::DvbTsBridge", "ts::pgs::PgsTsTrack"],
         "degree": "unit-tests",
-        "needs": "worker operations playing a container through each bridge, folding its pictures and clocks against the reference's avcodec_decode_subtitle2 output for the demuxer's packets; the subtitle contracts compare the receivers on extracted packets, not the playback handoff"
-      },
-      {
-        "name": "caption-and-teletext-bridges",
-        "entry_points": ["caption::CaptionBridge", "ts::teletext::TeletextTsBridge"],
-        "degree": "unit-tests",
-        "needs": "worker operations playing video with captions and TS teletext through each bridge, folding cues and pages against the reference's cc_dec and libzvbi decode of the same packets"
+        "needs": "bridge-bitmap-subtitles compares container-to-picture playback. A comparison still needs to exercise Matroska DVB startup and live clock packets, bitmap receiver reset and the PGS packet-clock queue action."
       },
       {
         "name": "legacy-aac-initialization",
@@ -81,7 +75,7 @@
         "name": "session-configuration",
         "entry_points": ["SessionConfig::gop", "SessionConfig::max_rate", "SessionConfig::vbv_bits", "SessionConfig::bit_rate", "SessionConfig::mux"],
         "degree": "step",
-        "needs": "the capture qualification cases compare configured GOP, rates, VBV and multiplex settings. The one-bit VBV case, which both encoders refuse at open, stays open until the comparison records a candidate refusal"
+        "needs": "ARMv7 parity for the capture configuration cases, which compare configured GOP, rates, VBV and multiplex settings, including a matching refusal for a one-bit buffer on AArch64"
       }
     ],
     "triergon-codec": [
@@ -199,7 +193,7 @@
         "name": "encoder",
         "entry_points": ["Encoder", "Encoder::encode", "EncoderConfig"],
         "degree": "step",
-        "needs": "capture qualification compares construction and encoding at additional geometries, rates, VBV sizes and GOP lengths. The budget-taking entry points need separate comparison"
+        "needs": "capture qualification compares construction and encoding at additional geometries, rates, VBV sizes and GOP lengths, including the refusal of an undersized VBV buffer. The budget-taking entry points need separate comparison"
       }
     ],
     "triergon-codec-opus": [],
