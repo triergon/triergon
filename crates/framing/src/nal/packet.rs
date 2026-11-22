@@ -10,7 +10,7 @@ use crate::inline_storage::InlineStorage;
 use crate::nal::annexb::START_CODE;
 use crate::nal::header::NalHeaderError;
 use crate::{
-    BuildStep,
+    BuildStep, SlotProgress,
     avc::{AvcConfigArrayKind, AvcConfiguration},
     hevc::HvcConfiguration,
     nal::{Codec, LengthSize},
@@ -783,18 +783,6 @@ pub enum NalPacketOrigin {
         source_range: Range<usize>,
     },
 }
-/// Progress of [`NalPacketJob::step_into`], which publishes into a
-/// caller-provided slot.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NalPacketProgress {
-    /// The work budget is spent and the slot stays empty; call again with more.
-    Yield,
-    /// The output was placed in the slot.
-    Ready,
-    /// The output was already published; the slot stays empty.
-    Complete,
-}
-
 /// One NAL unit of a [`NalPacketOutput`]: the source range it is copied from
 /// and where it lies in the output.
 ///
@@ -1471,11 +1459,7 @@ impl<M> NalPacketJob<'_, M> {
     ) -> Result<BuildStep<NalPacketOutput<M>>> {
         let mut ready = None;
         let progress = self.step_into(work, cancel, &mut ready)?;
-        Ok(match ready {
-            Some(output) => BuildStep::Ready(output),
-            None if progress == NalPacketProgress::Complete => BuildStep::Complete,
-            None => BuildStep::Yield,
-        })
+        Ok(progress.into_build_step(ready))
     }
     /// Publish a complete output directly into an empty caller-owned slot.
     /// Occupied slots are rejected before any job, work or owner change and do
@@ -1499,7 +1483,7 @@ impl<M> NalPacketJob<'_, M> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         ready: &mut Option<NalPacketOutput<M>>,
-    ) -> Result<NalPacketProgress> {
+    ) -> Result<SlotProgress> {
         if ready.is_some() {
             return Err(Error::Invalid("packet output sink occupied"));
         }

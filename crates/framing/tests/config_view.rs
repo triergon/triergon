@@ -8,7 +8,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::compat::nal::*;
 use triergon_framing::{
-    BuildStep, ConfigProgress,
+    BuildStep, SlotProgress,
     avc::{
         AvcConfigArray, AvcConfigArrayKind, AvcConfigFields, AvcConfigLimits, AvcConfigNal,
         AvcConfigParser, AvcConfigSource, AvcConfiguration,
@@ -36,7 +36,7 @@ trait Drive {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         ready: &mut Option<Self::Out>,
-    ) -> Outcome<ConfigProgress>;
+    ) -> Outcome<SlotProgress>;
 }
 macro_rules! drive {
     ($($parser:ty => $out:ty),* $(,)?) => {$(
@@ -54,7 +54,7 @@ macro_rules! drive {
                 work: &mut WorkBudget,
                 cancel: &AtomicBool,
                 ready: &mut Option<$out>,
-            ) -> Outcome<ConfigProgress> {
+            ) -> Outcome<SlotProgress> {
                 self.step_into(work, cancel, ready)
             }
         }
@@ -78,13 +78,13 @@ impl<P: Drive> Drive for Slots<P> {
     ) -> Outcome<BuildStep<Self::Out>> {
         let mut ready = None;
         let progress = self.0.drive_into(work, cancel, &mut ready);
-        if progress != Ok(ConfigProgress::Ready) {
+        if progress != Ok(SlotProgress::Ready) {
             assert!(ready.is_none());
         }
         match progress? {
-            ConfigProgress::Ready => Ok(BuildStep::Ready(ready.unwrap())),
-            ConfigProgress::Yield => Ok(BuildStep::Yield),
-            ConfigProgress::Complete => Ok(BuildStep::Complete),
+            SlotProgress::Ready => Ok(BuildStep::Ready(ready.unwrap())),
+            SlotProgress::Yield => Ok(BuildStep::Yield),
+            SlotProgress::Complete => Ok(BuildStep::Complete),
         }
     }
 
@@ -93,7 +93,7 @@ impl<P: Drive> Drive for Slots<P> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         ready: &mut Option<Self::Out>,
-    ) -> Outcome<ConfigProgress> {
+    ) -> Outcome<SlotProgress> {
         self.0.drive_into(work, cancel, ready)
     }
 }
@@ -1380,7 +1380,7 @@ fn occupied_configuration_slots_are_inert_and_cancellation_stays_sticky() {
         let retained = ready.take().unwrap();
         assert_eq!(
             parser.drive_into(&mut WorkBudget::new(0), &NO, &mut ready),
-            Ok(ConfigProgress::Yield)
+            Ok(SlotProgress::Yield)
         );
         let value = run(&mut Slots(parser), 1).1.unwrap();
         drop(value);

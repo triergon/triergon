@@ -3,12 +3,12 @@
 //! `Step::Continue` re-enters the loop and `Step::Break` returns.
 use super::{
     AvcState, ConfigurationRef, EmissionPhase, Injection, NalPacket, NalPacketJob, NalPacketOutput,
-    NalPacketProgress, NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketInput,
-    PacketPhase, PacketPlan, PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_segment,
+    NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketInput, PacketPhase,
+    PacketPlan, PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_segment,
     copy_annex_b_whole, empty_packet_segments, freeze_annex_b_output, start_annex_b_output,
 };
 use crate::nal::header::NalHeaderError;
-use crate::started;
+use crate::{SlotProgress, started};
 use crate::{
     avc::{self, AvcConfigArrayKind},
     nal::{Codec, LengthSize, NalHeader},
@@ -18,9 +18,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Bytes, Error, Result, SourceId, SourceLocation, WorkBudget};
 
 /// Outcome of one phase step.
-type Step = ControlFlow<NalPacketProgress>;
+type Step = ControlFlow<SlotProgress>;
 const NEXT: Step = Step::Continue(());
-const YIELD: Step = Step::Break(NalPacketProgress::Yield);
+const YIELD: Step = Step::Break(SlotProgress::Yield);
 
 pub(super) struct AvcBufferingLookahead {
     offset: usize,
@@ -51,13 +51,13 @@ impl<M> NalPacketJob<'_, M> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         ready: &mut Option<NalPacketOutput<M>>,
-    ) -> Result<NalPacketProgress> {
+    ) -> Result<SlotProgress> {
         loop {
             match &mut self.phase {
                 PacketPhase::Prepare(plan) => {
                     // A job no longer holding its source has published it.
                     let Some(packet) = &self.source else {
-                        return Ok(NalPacketProgress::Complete);
+                        return Ok(SlotProgress::Complete);
                     };
                     let input = PacketInput {
                         bytes: &packet.bytes,
@@ -91,7 +91,7 @@ impl PacketPlan {
         input: PacketInput<'_>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<NalPacketProgress>> {
+    ) -> Result<Option<SlotProgress>> {
         loop {
             if matches!(self.phase, PlanPhase::Reserve) {
                 return Ok(None);
@@ -711,7 +711,7 @@ impl PacketEmission {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         ready: &mut Option<NalPacketOutput<M>>,
-    ) -> Result<NalPacketProgress> {
+    ) -> Result<SlotProgress> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -720,14 +720,14 @@ impl PacketEmission {
                 // A job no longer holding its source has published it.
                 EmissionPhase::Reserve => match source {
                     Some(packet) => self.reserve_output(state, &packet.bytes, work)?,
-                    None => return Ok(NalPacketProgress::Complete),
+                    None => return Ok(SlotProgress::Complete),
                 },
                 EmissionPhase::Copy => match source {
                     Some(packet) => self.copy_output(state, &packet.bytes, work, cancel)?,
-                    None => return Ok(NalPacketProgress::Complete),
+                    None => return Ok(SlotProgress::Complete),
                 },
                 EmissionPhase::Freeze => self.freeze_output(state, source, work, ready)?,
-                EmissionPhase::Complete => return Ok(NalPacketProgress::Complete),
+                EmissionPhase::Complete => return Ok(SlotProgress::Complete),
             };
             if let Step::Break(status) = step {
                 return Ok(status);
@@ -814,7 +814,7 @@ impl PacketEmission {
             return Ok(YIELD);
         }
         let Some(packet) = source.take() else {
-            return Ok(Step::Break(NalPacketProgress::Complete));
+            return Ok(Step::Break(SlotProgress::Complete));
         };
         let bytes = if state.length_width.is_none() {
             packet.bytes.clone()
@@ -861,7 +861,7 @@ impl PacketEmission {
             receiver_epoch: state.epoch,
             forward_new_extradata,
         });
-        Ok(Step::Break(NalPacketProgress::Ready))
+        Ok(Step::Break(SlotProgress::Ready))
     }
 }
 

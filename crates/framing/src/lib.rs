@@ -156,19 +156,20 @@ pub enum BuildStep<T> {
     Complete,
 }
 
-/// Progress of a configuration parser publishing into a caller-provided slot.
+/// Progress of a job that publishes its output into a caller-provided slot
+/// (`step_into` of the AVC and HEVC record parsers and of [`nal::NalPacketJob`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConfigProgress {
-    /// A complete configuration was placed in the previously empty slot.
-    Ready,
-    /// More work is needed; the slot remains empty.
+pub enum SlotProgress {
+    /// The work budget is spent and the slot stays empty; call again with more.
     Yield,
-    /// The configuration was already published; the slot remains empty.
+    /// The output was placed in the previously empty slot.
+    Ready,
+    /// The output was already published; the slot stays empty.
     Complete,
 }
 
-impl ConfigProgress {
-    /// The [`BuildStep`] of a parser that published into `ready`: the value the slot
+impl SlotProgress {
+    /// The [`BuildStep`] of a job that published into `ready`: the value the slot
     /// received, or the progress without one.
     pub(crate) fn into_build_step<T>(self, ready: Option<T>) -> BuildStep<T> {
         match ready {

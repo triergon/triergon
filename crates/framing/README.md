@@ -14,10 +14,10 @@ Every record job, packet job and incremental reader takes a core `Budget` pool, 
 `BuildStep::{Yield, Ready, Complete}`; incremental readers return core `Step::{NeedInput,
 Yield, Ready, End}` and are fed with `provide` and closed with `finish` or `fail`.
 
-AVC and HEVC record parsers, including their compatibility wrappers, also offer
-`step_into` with an empty output slot and `ConfigProgress`. This publishes the
-configuration directly into caller storage. Occupied slots are rejected without
-advancing the parser; `step` retains the same progress and error behaviour.
+The AVC and HEVC record parsers, their compatibility wrappers and the packet job also
+offer `step_into`, which publishes the output into an empty caller-provided slot and
+returns `SlotProgress`. An occupied slot is refused without advancing the job; `step`
+has the same progress and errors.
 
 ```rust
 use std::sync::atomic::AtomicBool;

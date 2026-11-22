@@ -9,13 +9,12 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, WorkBudget};
 use triergon_framing::compat::nal::*;
 use triergon_framing::{
-    BuildStep,
+    BuildStep, SlotProgress,
     avc::{AvcConfigLimits, AvcConfigParser, AvcConfigSource, AvcConfiguration},
     hevc::{HvcConfigLimits, HvcConfigParser, HvcConfigSource},
     nal::{
         Codec, NalPacket, NalPacketConfiguration, NalPacketFields, NalPacketJob, NalPacketLimits,
-        NalPacketOutput, NalPacketProgress, NalPacketReceiverErrorKind, NalPacketSegment,
-        NalPacketSession,
+        NalPacketOutput, NalPacketReceiverErrorKind, NalPacketSegment, NalPacketSession,
     },
 };
 
@@ -104,17 +103,17 @@ fn avc_session(pool: &Budget) -> NalPacketSession {
     NalPacketSession::new(pool, NalPacketConfiguration::Avc(config), limits()).unwrap()
 }
 
-type Polls = Vec<(u64, Result<NalPacketProgress, Error>)>;
+type Polls = Vec<(u64, Result<SlotProgress, Error>)>;
 fn drive<O>(
     plan: &[u64],
-    mut next: impl FnMut(&mut WorkBudget, &mut Option<O>) -> Result<NalPacketProgress, Error>,
+    mut next: impl FnMut(&mut WorkBudget, &mut Option<O>) -> Result<SlotProgress, Error>,
 ) -> (Polls, Option<O>) {
     let mut ready = None;
     let mut polls = Vec::new();
     for at in 0..10_000 {
         let mut work = WorkBudget::new(plan[at % plan.len()]);
         let status = next(&mut work, &mut ready);
-        let ended = !matches!(status, Ok(NalPacketProgress::Yield));
+        let ended = !matches!(status, Ok(SlotProgress::Yield));
         polls.push((work.remaining(), status));
         if ended {
             return (polls, ready);
@@ -164,16 +163,16 @@ fn poll(
     cancel: &AtomicBool,
     ready: &mut Option<NalPacketOutput>,
     direct: bool,
-) -> Result<NalPacketProgress, Error> {
+) -> Result<SlotProgress, Error> {
     if direct {
         job.step_into(work, cancel, ready)
     } else {
         match job.step(work, cancel)? {
-            BuildStep::Yield => Ok(NalPacketProgress::Yield),
-            BuildStep::Complete => Ok(NalPacketProgress::Complete),
+            BuildStep::Yield => Ok(SlotProgress::Yield),
+            BuildStep::Complete => Ok(SlotProgress::Complete),
             BuildStep::Ready(value) => {
                 *ready = Some(value);
-                Ok(NalPacketProgress::Ready)
+                Ok(SlotProgress::Ready)
             }
         }
     }
@@ -196,13 +195,13 @@ fn trace(framed: bool, raw: &[u8], plan: &[u64], direct: bool) -> Vec<String> {
         let result = poll(&mut job, &mut work, &cancel, &mut ready, direct);
         events.push(format!("{result:?}:{}:{}", work.remaining(), pool.used()));
         match result {
-            Ok(NalPacketProgress::Yield) => assert!(ready.is_none()),
-            Ok(NalPacketProgress::Ready) => {
+            Ok(SlotProgress::Yield) => assert!(ready.is_none()),
+            Ok(SlotProgress::Ready) => {
                 assert!(ready.is_some());
                 finished = true;
                 break;
             }
-            Ok(NalPacketProgress::Complete) => panic!("output disappeared"),
+            Ok(SlotProgress::Complete) => panic!("output disappeared"),
             Err(error) => {
                 assert!(ready.is_none());
                 let mut retry_work = WorkBudget::new(17);
@@ -250,7 +249,7 @@ fn trace(framed: bool, raw: &[u8], plan: &[u64], direct: bool) -> Vec<String> {
                 &mut ready,
                 direct
             ),
-            Ok(NalPacketProgress::Complete)
+            Ok(SlotProgress::Complete)
         );
         assert!(ready.is_none());
         drop(job);
@@ -296,7 +295,7 @@ fn passthrough_output(pool: &Budget, raw: &[u8]) -> NalPacketOutput {
             &AtomicBool::new(false),
             &mut ready
         ),
-        Ok(NalPacketProgress::Ready)
+        Ok(SlotProgress::Ready)
     );
     ready.unwrap()
 }
@@ -329,7 +328,7 @@ fn occupied_sink_is_preserved_without_work_job_or_cancel_side_effects() {
             &AtomicBool::new(false),
             &mut ready
         ),
-        Ok(NalPacketProgress::Ready)
+        Ok(SlotProgress::Ready)
     );
     assert_eq!(ready.unwrap().bytes().as_ref(), &[0x61, 9]);
 }
@@ -348,7 +347,7 @@ fn zero_work_never_publishes_and_cancellation_is_sticky() {
     let before = pool.used();
     assert_eq!(
         job.step_into(&mut WorkBudget::new(0), &AtomicBool::new(false), &mut ready),
-        Ok(NalPacketProgress::Yield)
+        Ok(SlotProgress::Yield)
     );
     assert!(ready.is_none());
     assert_eq!(pool.used(), before);
@@ -397,7 +396,7 @@ fn recoverable_pressure_keeps_sink_empty_and_retry_keeps_all_source_facts() {
             &AtomicBool::new(false),
             &mut ready
         ),
-        Ok(NalPacketProgress::Ready)
+        Ok(SlotProgress::Ready)
     );
     let output = ready.take().unwrap();
     assert_eq!(output.bytes().as_ref(), &[0, 0, 0, 1, 0x61]);
@@ -439,7 +438,7 @@ fn non_copy_caller_metadata_moves_once_and_outlives_the_job_and_session() {
             &AtomicBool::new(false),
             &mut ready
         ),
-        Ok(NalPacketProgress::Ready)
+        Ok(SlotProgress::Ready)
     );
     drop(job);
     drop(session);
@@ -485,7 +484,7 @@ fn pressure_then_cancellation_on_an_injecting_packet_keeps_the_sink_empty() {
     let mut ready = None;
     assert_eq!(
         job.step_into(&mut WorkBudget::new(0), &AtomicBool::new(false), &mut ready),
-        Ok(NalPacketProgress::Yield)
+        Ok(SlotProgress::Yield)
     );
     let hold = pool.reserve(pool.limit() - pool.used()).unwrap();
     assert!(matches!(
@@ -587,7 +586,7 @@ fn long_update_and_payload_keep_owners_across_pressure_zero_work_and_cancellatio
                 let quantum = [0, 1, 13, 4096][index % 4];
                 let before = pool.used();
                 match job.step_into(&mut WorkBudget::new(quantum), &cancel, &mut ready) {
-                    Ok(NalPacketProgress::Yield) => {
+                    Ok(SlotProgress::Yield) => {
                         if quantum == 0 {
                             assert_eq!(pool.used(), before);
                         }
@@ -611,13 +610,13 @@ fn long_update_and_payload_keep_owners_across_pressure_zero_work_and_cancellatio
             drop(hold);
             assert_eq!(
                 job.step_into(&mut WorkBudget::new(31), &cancel, &mut ready),
-                Ok(NalPacketProgress::Yield)
+                Ok(SlotProgress::Yield)
             );
             assert!(ready.is_none());
             let before = pool.used();
             assert_eq!(
                 job.step_into(&mut WorkBudget::new(0), &cancel, &mut ready),
-                Ok(NalPacketProgress::Yield)
+                Ok(SlotProgress::Yield)
             );
             assert_eq!(pool.used(), before);
             if cancel_copy {
@@ -635,7 +634,7 @@ fn long_update_and_payload_keep_owners_across_pressure_zero_work_and_cancellatio
                 drop(session);
             } else {
                 let (polls, ready) = drive(plan, |work, out| job.step_into(work, &cancel, out));
-                assert_eq!(polls.last().unwrap().1, Ok(NalPacketProgress::Ready));
+                assert_eq!(polls.last().unwrap().1, Ok(SlotProgress::Ready));
                 let output = ready.unwrap();
                 drop(job);
                 assert_eq!(session.receiver_epoch(), 1);

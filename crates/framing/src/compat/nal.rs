@@ -20,7 +20,7 @@
 use crate::avc::config::profile_extension_required;
 use crate::nal::packet::NalConfigurationRefusal;
 use crate::{
-    BuildStep, ConfigProgress,
+    BuildStep, SlotProgress,
     avc::{
         AvcConfigArray, AvcConfigFields, AvcConfigLimits, AvcConfigNal, AvcConfigParser,
         AvcConfigSource, AvcConfiguration,
@@ -326,7 +326,7 @@ impl ReceiverAvcConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         ready: &mut Option<ReceiverAvcConfiguration>,
-    ) -> Result<ConfigProgress> {
+    ) -> Result<SlotProgress> {
         self.inner.step_into_with(work, cancel, ready, |inner| {
             let record = ReceiverAvcConfiguration::from_record(inner);
             self.refusal = record.refusal();
@@ -412,7 +412,7 @@ impl ReceiverHevcConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         ready: &mut Option<ReceiverHevcConfiguration>,
-    ) -> Result<ConfigProgress> {
+    ) -> Result<SlotProgress> {
         self.inner
             .step_into_with(work, cancel, ready, |inner| ReceiverHevcConfiguration {
                 inner,

@@ -5,7 +5,7 @@ use crate::check_limit;
 use crate::inline_storage::InlineStorage;
 use crate::retryable;
 use crate::{
-    BuildStep, ConfigProgress,
+    BuildStep, SlotProgress,
     nal::{Codec, LengthSize, NalHeader},
 };
 use std::{
@@ -433,7 +433,7 @@ impl HvcConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         ready: &mut Option<HvcConfiguration>,
-    ) -> Result<ConfigProgress> {
+    ) -> Result<SlotProgress> {
         self.step_into_with(work, cancel, ready, |record| record)
     }
 
@@ -445,7 +445,7 @@ impl HvcConfigParser {
         cancel: &AtomicBool,
         ready: &mut Option<T>,
         wrap: impl FnOnce(HvcConfiguration) -> T,
-    ) -> Result<ConfigProgress> {
+    ) -> Result<SlotProgress> {
         if ready.is_some() {
             return Err(Error::Invalid("configuration output sink occupied"));
         }
@@ -466,12 +466,12 @@ impl HvcConfigParser {
                         understood_end: self.understood_end,
                         first_unsupported_array: self.first_unsupported_array,
                     }));
-                    ConfigProgress::Ready
+                    SlotProgress::Ready
                 }
-                None => ConfigProgress::Complete,
+                None => SlotProgress::Complete,
             },
-            Walked::Yield => ConfigProgress::Yield,
-            Walked::Complete => ConfigProgress::Complete,
+            Walked::Yield => SlotProgress::Yield,
+            Walked::Complete => SlotProgress::Complete,
         });
         if let Err(error) = result
             && !retryable(error)

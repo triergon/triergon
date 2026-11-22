@@ -6,12 +6,12 @@ use triergon_core::{
 };
 use triergon_framing::compat::nal::*;
 use triergon_framing::{
-    BuildStep, ConfigProgress,
+    BuildStep, SlotProgress,
     avc::{AvcConfigLimits, AvcConfigSource},
     hevc::{HvcConfigLimits, HvcConfigSource},
     nal::{
         Codec, NalPacket, NalPacketConfigWriter, NalPacketConfiguration, NalPacketLimits,
-        NalPacketOutput, NalPacketProgress, NalPacketSession,
+        NalPacketOutput, NalPacketSession,
     },
 };
 
@@ -43,9 +43,9 @@ fn avc_into(
     .map_err(|e| (e, None))?;
     loop {
         match parser.step_into(&mut WorkBudget::new(QUANTUM), &CANCEL, ready) {
-            Ok(ConfigProgress::Ready) => return Ok(()),
-            Ok(ConfigProgress::Yield) => (),
-            Ok(ConfigProgress::Complete) => {
+            Ok(SlotProgress::Ready) => return Ok(()),
+            Ok(SlotProgress::Yield) => (),
+            Ok(SlotProgress::Complete) => {
                 return Err((Error::Invalid("configuration missing"), None));
             }
             Err(e) => {
@@ -104,14 +104,14 @@ fn configuration_into(case: &Case, ready: &mut Option<NalPacketConfiguration>) -
             let mut record = None;
             loop {
                 match parser.step_into(&mut WorkBudget::new(QUANTUM), &CANCEL, &mut record)? {
-                    ConfigProgress::Ready => {
+                    SlotProgress::Ready => {
                         *ready = Some(NalPacketConfiguration::ReceiverHevc(
                             record.ok_or(Error::Invalid("configuration missing"))?,
                         ));
                         return Ok(());
                     }
-                    ConfigProgress::Yield => (),
-                    ConfigProgress::Complete => {
+                    SlotProgress::Yield => (),
+                    SlotProgress::Complete => {
                         return Err(Error::Invalid("configuration missing"));
                     }
                 }
@@ -349,11 +349,11 @@ fn operation(case: &Case) -> Result<Outcome> {
         let slot = kept.slot();
         loop {
             match job.step_into(&mut WorkBudget::new(QUANTUM), &CANCEL, slot) {
-                Ok(NalPacketProgress::Yield) => (),
-                Ok(NalPacketProgress::Complete) => {
+                Ok(SlotProgress::Yield) => (),
+                Ok(SlotProgress::Complete) => {
                     return Err(Error::Invalid("packet publication missing"));
                 }
-                Ok(NalPacketProgress::Ready) => {
+                Ok(SlotProgress::Ready) => {
                     let packet = kept.keep(&case.pool, &case.events[index + 1..])?;
                     packet_digest(
                         &mut outcome.digest,

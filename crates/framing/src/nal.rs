@@ -35,8 +35,8 @@ pub use declared_config::{
 pub use header::{Codec, NalHeader, ParameterSetKind};
 pub use packet::{
     NalPacket, NalPacketConfiguration, NalPacketFields, NalPacketJob, NalPacketLimits,
-    NalPacketOrigin, NalPacketOutput, NalPacketProgress, NalPacketReceiverErrorKind,
-    NalPacketRejection, NalPacketSegment, NalPacketSession,
+    NalPacketOrigin, NalPacketOutput, NalPacketReceiverErrorKind, NalPacketRejection,
+    NalPacketSegment, NalPacketSession,
 };
 pub use packet_config::{NalPacketConfigOutput, NalPacketConfigRejection, NalPacketConfigWriter};
 pub use raw_annex_b::{RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
