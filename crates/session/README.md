@@ -160,9 +160,11 @@ The `aac-access-units` comparison exercises
 speaker order.
 
 The `codecs-sessions` comparison grades planar PCM and stereo s16 audio,
-RGBA video, and the output timestamps and counts. It also compares decoder
-resets at selected packet indices with FFmpeg flushing its decoder at the
-same indices.
+RGBA video, and the output timestamps and counts. It also checks the decoded
+prefix and refusal when FLAC changes bit depth or declares blocks above its
+STREAMINFO maximum. The [session contract](../../harness/codecs/session-cases.json)
+records where a fresh AAC or AC-3 signal state differs from flushing the
+reference decoder and where the reference repeats a packet clock on Opus drain.
 
 The letterbox and downmix rules are native observations of FFmpeg 9.0.2,
 recorded as `RGBA-CONTRACT.json` and `DOWNMIX-CONTRACT.json` in the research

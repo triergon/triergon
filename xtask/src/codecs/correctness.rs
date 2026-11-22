@@ -835,6 +835,34 @@ fn audio_decoder(
         same_frames = timeline.get("status").and_then(Value::as_str) == Some("pass");
         row.push(("timeline".into(), timeline));
     }
+    if lane == "session-flac" && session::flac_depth_refusal(&ours_run, &reference_run) {
+        // Keep the entire decoded prefix, its frame clocks and the named refusal.
+        let same = same_frames && !candidate.is_empty() && candidate == reference;
+        row.push(("terminal".into(), Value::str("flac-bit-depth-change")));
+        status(&mut row, if same { "pass" } else { "fail" });
+        return Ok(Value::Object(row));
+    }
+    if lane == "session-flac"
+        && vector.get("on_refusal").and_then(Value::as_str) == Some("skip")
+        && reference_run.stderr.contains("Decode error rate")
+    {
+        // Compare the skipped frames and PCM independently of the CLI's error-rate ceiling.
+        let reference_refusals = session::flac_block_refusals(&reference_run);
+        if reference_refusals != 0 {
+            let ours_refusals = info.get("errors").and_then(python::int);
+            let same = ours_run.code == 0
+                && same_frames
+                && ours_refusals == Some(reference_refusals as i128)
+                && !candidate.is_empty()
+                && candidate == reference;
+            row.push((
+                "reference_block_refusals".into(),
+                Value::int(reference_refusals as u64),
+            ));
+            status(&mut row, if same { "pass" } else { "fail" });
+            return Ok(Value::Object(row));
+        }
+    }
     if reject {
         let format = format.ok_or_else(|| "CRC lane needs an explicit format".to_owned())?;
         let (code, frames, errors) = reference_frames(a, path, format)?;
@@ -1113,7 +1141,11 @@ fn output_path(
         row.push(("status".into(), Value::str("reference-produced-nothing")));
         return Ok(Value::Object(row));
     }
-    if co.len() != cr.len() || through_session && (po.code != 0 || pr.code != 0) {
+    let same_refusal = lane == "session-flac" && session::flac_depth_refusal(&po, &pr);
+    if same_refusal {
+        row.push(("terminal".into(), Value::str("flac-bit-depth-change")));
+    }
+    if co.len() != cr.len() || through_session && !same_refusal && (po.code != 0 || pr.code != 0) {
         row.push(("status".into(), Value::str("fail")));
         return Ok(Value::Object(row));
     }

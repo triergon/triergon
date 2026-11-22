@@ -3,12 +3,45 @@ use std::fs;
 use std::path::Path;
 
 use crate::json::Value;
-use crate::process::{Stop, run_text};
+use crate::process::{Stop, Text, run_text};
 use crate::python;
 
 use super::{Grade, PROBE_TIMEOUT, audio_format};
 
 pub(super) const CASES: &str = "harness/codecs/session-cases.json";
+
+/// Both decoders explicitly report the same mid-stream FLAC format refusal.
+/// The reference device command can return success after reporting it.
+pub(super) fn flac_depth_refusal(ours: &Text, reference: &Text) -> bool {
+    ours.code > 0
+        && ours.stderr.lines().last().is_some_and(|line| {
+            line == "Error: Unsupported(\"sample size change within a stream\")"
+        })
+        && reference
+            .stderr
+            .contains("switching bps mid-stream is not supported")
+}
+
+/// Count the reference decoder's explicit STREAMINFO block-limit refusals.
+pub(super) fn flac_block_refusals(reference: &Text) -> usize {
+    reference
+        .stderr
+        .lines()
+        .zip(reference.stderr.lines().skip(2))
+        // The stream-discovery decoder also prints size diagnostics. Only
+        // count those followed by the input stream's packet refusal.
+        .filter(|(_, outcome)| outcome.contains("Error submitting packet to decoder: Invalid data"))
+        .filter_map(|(line, _)| line.split_once("] blocksize "))
+        .filter_map(|(_, values)| values.split_once(" > "))
+        .filter(|(actual, maximum)| {
+            actual
+                .parse::<u32>()
+                .ok()
+                .zip(maximum.parse::<u32>().ok())
+                .is_some_and(|(actual, maximum)| actual > maximum)
+        })
+        .count()
+}
 
 pub(super) fn lane(base: &str) -> Option<&'static str> {
     Some(match base {
