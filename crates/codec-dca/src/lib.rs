@@ -9,9 +9,6 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// The subband and history clears keep their `for_each` loops: `fill` changes the
-// generated code of the synthesis path and is adopted only with a timing run.
-#![allow(clippy::needless_for_each)]
 mod bits;
 mod books;
 mod dct;

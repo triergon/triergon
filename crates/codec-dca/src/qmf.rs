@@ -43,7 +43,7 @@ impl<const LEN: usize> QmfState<LEN> {
     }
 
     pub(crate) fn reset(&mut self) {
-        self.ring.iter_mut().for_each(|v| *v = 0.0);
+        self.ring.fill(0.0);
         self.pos = 0;
     }
 }

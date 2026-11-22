@@ -152,7 +152,7 @@ impl FrameDecoder {
             };
             let tb = &mut self.tbuf[..blocks * bands];
             if sb < bands {
-                tb.iter_mut().for_each(|v| *v = 0.0);
+                tb.fill(0.0);
             }
             for b in 0..sb {
                 let row = &srcbuf.row(ch, b)[HIST..HIST + blocks];

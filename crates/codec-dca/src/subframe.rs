@@ -334,9 +334,7 @@ pub(crate) fn decode_subframe(
     for ch in 0..nch {
         for b in hdr.nsubs[ch] as usize..32 {
             let row = buf.row_mut(slot0 + ch, b);
-            row[HIST + t0..HIST + t0 + nsamp]
-                .iter_mut()
-                .for_each(|v| *v = 0.0);
+            row[HIST + t0..HIST + t0 + nsamp].fill(0.0);
         }
     }
     for ch in 0..nch {

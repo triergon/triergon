@@ -227,9 +227,7 @@ pub(crate) fn decode_subframe(
     for ch in 0..nch {
         for b in 0..64 {
             let row = buf.row_mut(ch, b);
-            row[HIST + t0..HIST + t0 + nsamp]
-                .iter_mut()
-                .for_each(|v| *v = 0.0);
+            row[HIST + t0..HIST + t0 + nsamp].fill(0.0);
         }
     }
     // High-frequency VQ (ABITS96 = 1): one 10-bit index per 16 samples; elements 0..16.
