@@ -100,7 +100,9 @@ The [text subtitle comparison](../../harness/features/bridge-text-subtitles/cont
 and [caption and teletext comparison](../../harness/features/bridge-captions-teletext/contract.json)
 feed real container packets from `Player` through the bridges. They compare
 cue bytes, bitmap geometry and pixels, palettes, and presentation clocks
-against the corresponding FFmpeg decoder outputs.
+against the corresponding FFmpeg decoder outputs. MP4 captions use
+sample-table time before applying movie edits. Teletext clear events carry a
+timestamp and cues also carry their display duration when known.
 
 The integration tests (`tests/it`) read the fixtures of `crates/playback/tests/fixtures`.
 Fixture provenance: [AV1](../playback/tests/fixtures/av1/README.md),

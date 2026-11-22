@@ -241,8 +241,11 @@ static int subtitle_bridge_decode(BridgeDecode *run, AVPacket *packet)
     } else if (got && (run->codec == AV_CODEC_ID_EIA_608 || run->codec == AV_CODEC_ID_DVB_TELETEXT)) {
         uint64_t duration = event.end_display_time == UINT32_MAX ? BRIDGE_ABSENT :
                             (uint64_t)(event.end_display_time - event.start_display_time) * 1000;
+        /* A teletext clear is an instant. Keep the decoder's display interval
+         * in the diagnostic event above and compare durations on cues. */
+        uint64_t clear_duration = run->codec == AV_CODEC_ID_DVB_TELETEXT ? BRIDGE_ABSENT : duration;
         if (!event.num_rects) {
-            uint64_t fields[] = {(uint64_t)event.pts, duration};
+            uint64_t fields[] = {(uint64_t)event.pts, clear_duration};
             subtitle_bridge_record(run->work, 11, fields, 2, NULL, 0);
         }
         for (unsigned i = 0; i < event.num_rects; ++i) {
@@ -250,7 +253,7 @@ static int subtitle_bridge_decode(BridgeDecode *run, AVPacket *packet)
             if (rect->ass || rect->text)
                 subtitle_bridge_cue(run->work, (uint64_t)event.pts, duration, rect->ass ? rect->ass : rect->text);
             else {
-                uint64_t fields[] = {(uint64_t)event.pts, duration};
+                uint64_t fields[] = {(uint64_t)event.pts, clear_duration};
                 subtitle_bridge_record(run->work, 11, fields, 2, NULL, 0);
             }
         }
@@ -374,12 +377,15 @@ static int subtitle_bridge_consume(const ViewCase *input, ViewWork *work)
     AVPacket *packet = av_packet_alloc(), *caption = av_packet_alloc();
     AVFrame *frame = NULL;
     AVDictionary *options = NULL;
+    AVDictionary *demux_options = NULL;
     int rc = AVERROR(ENOMEM);
     if (!format || !io || !packet || !caption)
         goto done;
     format->pb = io;
     format->flags |= AVFMT_FLAG_CUSTOM_IO;
     const char *carrier = input->argv[1];
+    enum AVCodecID codec = subtitle_bridge_codec(input->argv[2]);
+    int from_video = codec == AV_CODEC_ID_EIA_608;
     const char *family = !strcmp(carrier, "mov") ? "mov" :
                          !strcmp(carrier, "mkv") ? "matroska" : "mpegts";
     const AVInputFormat *demuxer = av_find_input_format(family);
@@ -387,12 +393,18 @@ static int subtitle_bridge_consume(const ViewCase *input, ViewWork *work)
         rc = AVERROR_DEMUXER_NOT_FOUND;
         goto done;
     }
-    if ((rc = avformat_open_input(&format, NULL, demuxer, NULL)) < 0)
+    /* The MOV caption bridge consumes sample-table clocks. */
+    if (!strcmp(carrier, "mov") && from_video &&
+        (rc = av_dict_set(&demux_options, "ignore_editlist", "1", 0)) < 0)
         goto done;
+    if ((rc = avformat_open_input(&format, NULL, demuxer, &demux_options)) < 0)
+        goto done;
+    if (av_dict_count(demux_options)) {
+        rc = AVERROR_OPTION_NOT_FOUND;
+        goto done;
+    }
     if ((rc = avformat_find_stream_info(format, NULL)) < 0)
         goto done;
-    enum AVCodecID codec = subtitle_bridge_codec(input->argv[2]);
-    int from_video = codec == AV_CODEC_ID_EIA_608;
     int selected = subtitle_bridge_select(format, codec, from_video, strtol(input->argv[3], NULL, 10), strtol(input->argv[4], NULL, 10));
     if (selected < 0) {
         rc = selected;
@@ -465,6 +477,7 @@ done:
     av_packet_free(&packet);
     av_packet_free(&caption);
     av_dict_free(&options);
+    av_dict_free(&demux_options);
     avformat_close_input(&format);
     if (io) {
         av_freep(&io->buffer);
