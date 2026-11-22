@@ -117,14 +117,18 @@ impl SliceDecoder<'_> {
 
     /// 8.4.1.3 from already derived neighbours A, B, C.
     #[inline]
+    #[expect(
+        clippy::map_unwrap_or,
+        reason = "this form measured fewer instructions"
+    )]
     fn mvp_from(abc: (NbMv, NbMv, NbMv), ref_idx: i32, shape: u8, p: usize) -> [i32; 2] {
         let (a, b, c) = abc;
-        let ra = a.map_or(-1, |v| v.1);
-        let rb = b.map_or(-1, |v| v.1);
-        let rc = c.map_or(-1, |v| v.1);
-        let ma = a.map_or([0, 0], |v| v.0);
-        let mb = b.map_or([0, 0], |v| v.0);
-        let mc = c.map_or([0, 0], |v| v.0);
+        let ra = a.map(|v| v.1).unwrap_or(-1);
+        let rb = b.map(|v| v.1).unwrap_or(-1);
+        let rc = c.map(|v| v.1).unwrap_or(-1);
+        let ma = a.map(|v| v.0).unwrap_or([0, 0]);
+        let mb = b.map(|v| v.0).unwrap_or([0, 0]);
+        let mc = c.map(|v| v.0).unwrap_or([0, 0]);
         if shape == 1 {
             if p == 0 && rb == ref_idx {
                 return mb;
@@ -1348,7 +1352,11 @@ fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf, O: McOut>(
         }
         return;
     }
-    let list = usize::from(p.refs[0].is_none());
+    #[expect(
+        clippy::bool_to_int_with_if,
+        reason = "the branch form measured fewer instructions"
+    )]
+    let list = if p.refs[0].is_some() { 0 } else { 1 };
     let Some(rp) = &p.refs[list] else { return };
     let lp = list_pos(&g, p, list, rp, refbuf(rp.idx));
     let fb = lp.fb;
