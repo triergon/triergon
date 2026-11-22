@@ -73,6 +73,9 @@ static int codec_dolby_header(const uint8_t *data, size_t count, DolbyHeader *he
 static int codec_ac3_header_packet(AVCodecContext *context, const AVCodecParserContext *parser,
                                    const uint8_t *data, size_t size, void *opaque)
 {
+    (void)context;
+    static const unsigned rates[] = {48000, 44100, 32000, 0};
+    static const unsigned block_counts[] = {1, 2, 3, 6};
     ViewWork *work = opaque;
     if (size < 2 || data[0] != 0x0b || data[1] != 0x77)
         return 0;
@@ -86,17 +89,18 @@ static int codec_ac3_header_packet(AVCodecContext *context, const AVCodecParserC
         const size_t actual = header.extent < size - offset ? header.extent : size - offset;
         if (!header.extent)
             return 2;
-        /* Groups can carry more than one dependent header. Context facts are
-         * for the independent syncframe; dependent rate/blocks use Annex E. */
-        unsigned rate = (unsigned)context->sample_rate;
-        unsigned blocks = (unsigned)parser->duration / 256;
-        if (offset && header.bsid > 10) {
-            const unsigned rates[] = {48000, 44100, 32000, 0};
-            const unsigned block_counts[] = {1, 2, 3, 6};
-            const uint8_t code = data[offset + 4];
-            const unsigned fscod = code >> 6, second = (code >> 4) & 3u;
+        /* A/52 sections 5.3 and 5.4.1, and Annex E sections 2.3.1.4–5:
+         * read each syncframe's coded clock, including packets emitted at drain. */
+        const uint8_t code = data[offset + 4];
+        const unsigned fscod = code >> 6;
+        unsigned rate = rates[fscod];
+        unsigned blocks = 6;
+        if (header.bsid > 10) {
+            const unsigned second = (code >> 4) & 3u;
             rate = fscod == 3 ? rates[second] / 2 : rates[fscod];
             blocks = fscod == 3 ? 6 : block_counts[second];
+        } else if (header.bsid > 8) {
+            rate >>= header.bsid - 8;
         }
         const uint64_t fields[] = {position, header.bsid > 10, header.bsid,
                                    header.extent, rate, blocks, header.acmod, header.lfe, actual};
