@@ -274,12 +274,6 @@ impl Ac3AccessUnit {
                 .flat_map(|frames| frames.as_slice().iter().map(|frame| frame.facts)),
         )
     }
-
-    /// The primary syncframe’s last two bytes as a big-endian word.
-    pub fn crc2_word(&self) -> u16 {
-        let end = self.first.header.frame_bytes;
-        u16::from_be_bytes([self.bytes[end - 2], self.bytes[end - 1]])
-    }
 }
 
 /// The complete segment envelopes carried by one DVB subtitle PES.

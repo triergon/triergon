@@ -50,7 +50,8 @@ Everything else lives in its module:
   source events and clocks (`SourceEvent`, `PacketClock`, `PayloadSource`) and
   access units (`Ac3AccessUnit`, `DtsAudioFrame`, `DtsExtensionFrame`,
   `DvbSubtitleUnit`, `LoasFrame`, `MpegAudioFrame`, `IncompleteVideo`,
-  `UnframedAudio`).
+  `UnframedAudio`). `Ac3AccessUnit::bytes` exposes the complete source syncframes,
+  including checksum bytes.
 - `clock`: raw timestamps lifted to exact time (`source_timestamp`, `SourceTimePolicy`).
 - `mux`: the single-program writer ([Writing TS](#writing-ts)).
 - `compat`: FFmpeg-compatible policies, one module per family: `pes`, `stream`,
