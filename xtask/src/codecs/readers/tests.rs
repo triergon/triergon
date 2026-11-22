@@ -337,7 +337,11 @@ fn the_repository_rules_load() {
         ogg_seeks += usize::from(lane == Some("reader-ogg"));
     }
     assert_eq!(ogg_seeks, 26);
-    assert_eq!(seeks.iter().filter(|case| case.open.is_some()).count(), 33);
+    let (deviations, defects): (Vec<_>, Vec<_>) = seeks
+        .iter()
+        .filter_map(|case| case.open.as_ref())
+        .partition(|entry| entry.declared);
+    assert_eq!((deviations.len(), defects.len()), (30, 1));
 }
 
 /// The committed manifests' case counts, raised with every case added.
