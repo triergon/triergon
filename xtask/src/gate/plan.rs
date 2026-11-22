@@ -100,6 +100,7 @@ pub(super) const COVERED: &[(&str, Coverage)] = &[
     ("rbsp-unescape", Coverage::Item("oracle-compare")),
     ("core-budgets", Coverage::Item("oracle-compare")),
     ("core-reader-protocol", Coverage::Item("oracle-compare")),
+    ("video-session-clock", Coverage::Item("oracle-compare")),
     ("source-signatures", Coverage::Item("oracle-compare")),
     ("facade-source-control", Coverage::Item("oracle-compare")),
     ("facade-mpegts-controls", Coverage::Item("oracle-compare")),

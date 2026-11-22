@@ -16,6 +16,8 @@ use triergon_harness_protocol::digest::fold_bytes;
 
 use super::protocol::{Operation, Work};
 
+mod session_clock;
+
 pub(super) fn operation<'a>(
     prefix: &str,
     input: &'a [u8],
@@ -24,6 +26,7 @@ pub(super) fn operation<'a>(
     match prefix {
         "hevc-access-units-" => access_units(input, arguments),
         "h264-inspect-" => inspect(input, arguments),
+        "video-session-clock-" => session_clock::prepare(input, arguments),
         "picture-props-" | "video-nal-" => decode_operation(prefix, input, arguments),
         _ => Err(format!("usage: {prefix} operation is unavailable")),
     }

@@ -44,6 +44,7 @@ TRACE_ORACLES = {
     "opus-final-range": ("harness.opus_range_oracle", "ranges"),
     "core-budgets": ("harness.core_budget_oracle", "budget_trace"),
     "core-reader-protocol": ("harness.core_reader_oracle", "trace"),
+    "video-session-clock": ("harness.video_session_clock_oracle", "trace"),
     "source-signatures": ("harness.signature_oracle", "trace"),
     "facade-source-control": ("harness.oracles", "facade_source_control"),
     "facade-mpegts-controls": ("harness.ts_facade_oracle", "trace"),

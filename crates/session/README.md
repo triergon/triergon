@@ -119,6 +119,11 @@ input).
 
 ## Conformance
 
+The [clocked video comparison](../../harness/features/video-session-clock/contract.json)
+checks AVC and HEVC picture order, exact clock release and retained RGBA canvas
+bytes, plus queue and decoder refusals, flush and stop. The existing session
+grades compare decoded output and the declared mid-GOP reset behaviour.
+
 The letterbox and downmix rules are native observations of FFmpeg 9.0.2, recorded in
 [rgba-contract.json](../../harness/codecs/rgba-contract.json) and
 [downmix-contract.json](../../harness/codecs/downmix-contract.json). Codec conformance

@@ -33,6 +33,7 @@ impl Kind {
             "divide",
             "core-budgets",
             "core-reader-protocol",
+            "video-session-clock",
             "source-signatures",
             "facade-source-control",
             "facade-mpegts-controls",

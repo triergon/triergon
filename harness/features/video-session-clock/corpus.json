@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "avc-single",
+      "profile": "avc",
+      "file": "crates/playback/tests/fixtures/raw-video/avc-short.h264",
+      "sha256": "db2b0296e6e3fff980f9d79f201cdec1a9d55b77138c1b07ef0e0b0d7550bd3f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "avc",
+        "16",
+        "16",
+        "0"
+      ],
+      "expected": {
+        "trace_sha256": "fcbd6a42cabc6a123da6ed875d4cadf2eff3d2b79422bd5d927edb17fecc4671"
+      }
+    },
+    {
+      "id": "avc-reordered",
+      "profile": "avc",
+      "file": "crates/framing/fixtures/raw-annex-b/avc-aud0.h264",
+      "sha256": "96d3d39385d7a86463410e0e4f00377062a815532134805e2a552549954b6796",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "avc",
+        "64",
+        "64",
+        "0,2670,2983,2045,3304,5474,5829,4875,6260,7945,8897,8461"
+      ],
+      "expected": {
+        "trace_sha256": "2dcb4113ca6fc08281ffdbf1d899909da68357a11f30a1a9b0b5ef8c171c8cf3"
+      }
+    },
+    {
+      "id": "hevc-reordered",
+      "profile": "hevc",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-aud0.hevc",
+      "sha256": "7c076acbe5c6cf3db1939534527b1d52fd7f4c31a2063f537440f51c75b08f70",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "hevc",
+        "160",
+        "96",
+        "0,5850,5432,4295,8026,7406,6160,9876,9420,8511,15316,10257"
+      ],
+      "expected": {
+        "trace_sha256": "9dec2e465f163034e6bc4529d925ec584c1de8e1275553bb77c83b5496493513"
+      }
+    }
+  ]
+}

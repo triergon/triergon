@@ -31,6 +31,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
     ("ogg-pages-", readers::operation),
     ("picture-props-", video::operation),
     ("h264-inspect-", video::operation),
+    ("video-session-clock-", video::operation),
     ("hevc-access-units-", video::operation),
     ("video-nal-", video::operation),
     ("adts-sync-", audio::operation),

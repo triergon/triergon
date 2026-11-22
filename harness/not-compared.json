@@ -117,12 +117,6 @@
         "entry_points": ["AudioSession", "PcmBlock", "StreamSelection", "QueueLimits", "Discard", "OnRefusal"],
         "degree": "step",
         "needs": "The session lanes compare PCM, device output and block clocks. Damaged input, trim and drain timestamps, rate changes and reset behaviour have open parity cases."
-      },
-      {
-        "name": "video-session",
-        "entry_points": ["VideoSession", "VideoSession::latest", "VideoSession::canvas"],
-        "degree": "step",
-        "needs": "The session lanes compare RGBA output and reported timestamps. Unsupported profiles and an AVC mid-GOP reset remain open. Clocked video with defined input PTS still needs coverage."
       }
     ],
     "triergon-shape": [],

@@ -976,6 +976,7 @@
     },
     {"area": "Core reader protocol", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "Source requests, input windows, EOF, backpressure and blocking drivers", "unmeasured": "core-reader-protocol", "parity": {"aarch64-unknown-linux-gnu": "All three controls match byte ranges, lifecycle outcomes and original ADTS packets and clocks after driver retry or seek."}},
     {"area": "Raw video configuration", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "Active Annex B parameter sets, cropped raster and coded SPS timing", "unmeasured": "raw-video-configuration", "parity": {"aarch64-unknown-linux-gnu": "6/6 match the original parameter sets and their active changes, cropped dimensions, VUI timing fields and HEVC startup chain."}},
+    {"area": "Clocked video sessions", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "implemented": "Clocked AVC and HEVC publication, canvas, refusal and replay", "unmeasured": "video-session-clock", "parity": {"aarch64-unknown-linux-gnu": "3/3 controls match native picture order and the clock, canvas and lifecycle contracts, including reordered AVC and HEVC."}},
     {
       "area": "Inverse MDCT and DCT-IV",
       "targets": [
