@@ -694,6 +694,13 @@ impl Reader {
                         audio,
                     )))));
                 }
+                LaneStep::Unsupported(error) => {
+                    let track = self.lanes.as_slice()[index].track.clone();
+                    return Ok(Some(Step::Ready(Event::Other(ReaderEvent::Unsupported {
+                        track,
+                        error,
+                    }))));
+                }
                 LaneStep::Yield => return Ok(Some(Step::Yield)),
                 LaneStep::DeferredFragment => {
                     self.deferred_fragment = true;

@@ -147,6 +147,8 @@ original carrier ranges, clocks and payload bytes. The access-unit reader groups
 layer zero pictures with explicit headers across PES and carrier boundaries.
 It preserves original bytes, clocks and PES extents and leaves random-access
 status unknown. A source discontinuity discards an unfinished picture.
+If the stream resumes inside a picture, the reader reports a VVC framing
+error on that track and continues delivering the other selected tracks.
 
 With the original inputs and prepared probe described in the
 [framing comparison](../framing/README.md#behaviour-and-limits), verify clocks

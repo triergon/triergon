@@ -213,3 +213,54 @@ fn original_vvc_pictures_wrapped_in_transport_match_the_reference() {
         );
     }
 }
+
+#[test]
+fn clock_anchors_at_the_start_code_after_leading_padding() {
+    let mut ts = Transport::new();
+    ts.tables(&[(0x33, PID, &[])], 0);
+    ts.pes(PID, 0xe0, &[0], None, None);
+    ts.pes(PID, 0xe0, NEXT, Some(90_000), Some(88_000));
+    let output = collect(&ts, 1, 1);
+    assert_eq!(output.len(), 1);
+    assert_eq!(output[0].payload(), [&[0][..], NEXT].concat());
+    assert_eq!(output[0].elementary_range(), 0..8);
+    assert_eq!(output[0].sources().len(), 2);
+    assert_eq!(output[0].pts(), Some(90_000));
+    assert_eq!(output[0].dts(), Some(88_000));
+}
+
+#[test]
+fn a_mid_picture_restart_reports_vvc_failure_and_keeps_audio() {
+    use super::{ReaderEvent, adts};
+
+    let mut ts = Transport::new();
+    ts.tables(&[(0x33, PID, &[]), (0x0f, PID + 1, &[])], 0);
+    ts.pes(PID, 0xe0, NEXT, Some(90_000), None);
+    let mut boundary = [0xff; 188];
+    boundary[..6].copy_from_slice(&[0x47, (PID >> 8) as u8, PID as u8, 0x28, 183, 0x80]);
+    ts.bytes.extend_from_slice(&boundary);
+    ts.counters[usize::from(PID)] = 9;
+    ts.pes(PID, 0xe0, &[0x80, 0x55, 0x33], Some(180_000), None);
+    let audio = adts(b"independent audio");
+    ts.pes(PID + 1, 0xc0, &audio, Some(192_000), None);
+
+    let mut drive = Drive::new(&ts.bytes, ReaderLimits::default(), 7, 1);
+    let mut reports = 0;
+    let mut packets = 0;
+    while let Some(event) = drive.next().unwrap() {
+        match event {
+            Event::Other(ReaderEvent::Unsupported { track, error }) => {
+                assert_eq!(track.stream().pid, PID);
+                assert!(matches!(error, super::Error::Invalid(_)));
+                reports += 1;
+            }
+            Event::Packet(packet) => {
+                assert_eq!(packet.track_info().stream().pid, PID + 1);
+                assert_eq!(packet.payload(), audio);
+                packets += 1;
+            }
+            _ => {}
+        }
+    }
+    assert_eq!((reports, packets), (1, 1));
+}

@@ -1121,6 +1121,7 @@ pub(super) enum LaneStep {
     IncompleteVideo(IncompleteVideo),
     LatmPes(latm::PesPacket),
     UnframedAudio(UnframedAudio),
+    Unsupported(Error),
     NeedPayload,
     Yield,
     End,
@@ -1560,6 +1561,17 @@ impl Lane {
                     self.incomplete = Some(Incomplete::new(FragmentKind::Audio, range, &self.pool));
                     self.framer = None;
                     continue;
+                }
+                Err(error @ (Error::Invalid(_) | Error::Truncated | Error::Unsupported(_)))
+                    if matches!(framer, Framer::Vvc(_)) =>
+                {
+                    // A damaged restart can begin inside a picture. Stop
+                    // framing this track until a source boundary rebuilds it.
+                    self.framer = None;
+                    self.input = None;
+                    self.pieces = BudgetVec::new(&self.pool);
+                    self.published = self.supplied;
+                    return Ok(LaneStep::Unsupported(error));
                 }
                 result => result?,
             };

@@ -14,6 +14,8 @@ use triergon_core::{
 pub struct VvcStreamAccessUnit {
     pub source: SourceId,
     pub range: Range<u64>,
+    /// First start code including its required zero byte, after leading padding.
+    pub first_start: u64,
     pub bytes: Bytes,
 }
 
@@ -48,6 +50,7 @@ struct Nal {
 #[derive(Clone, Copy, Debug, Default)]
 struct Scan {
     picture: PictureState,
+    first_start: Option<usize>,
     nal: Option<Nal>,
     zeroes: usize,
     unit_nals: usize,
@@ -247,6 +250,9 @@ impl VvcAnnexBReader {
         }
         let begin = self.start;
         let end = begin.checked_add(split as u64).ok_or(Error::Overflow)?;
+        let first_start = begin
+            .checked_add(self.scan.first_start.ok_or(Error::Truncated)? as u64)
+            .ok_or(Error::Overflow)?;
         let tail = &self.bytes.as_slice()[split..];
         let mut next = BudgetVec::new(self.input.budget());
         next.try_extend_from_slice(tail)?;
@@ -268,6 +274,7 @@ impl VvcAnnexBReader {
         Ok(VvcStreamAccessUnit {
             source: self.input.source(),
             range: begin..end,
+            first_start,
             bytes,
         })
     }
@@ -304,6 +311,8 @@ impl Scan {
                 let padding = self.zeroes.saturating_sub(2 + usize::from(zero_byte));
                 Self::check_limit(padding, limits.nal.maximum_padding_bytes)?;
             }
+            self.first_start
+                .get_or_insert(at - 2 - usize::from(zero_byte));
             self.nal = Some(Nal {
                 start: at + 1,
                 zero_byte,

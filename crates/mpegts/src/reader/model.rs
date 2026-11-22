@@ -462,8 +462,7 @@ impl AccessUnit {
                         }
                     })
             }
-            // VVC's first byte includes the access-unit zero byte even when
-            // the remaining three-byte code starts in the next PES.
+            Self::Vvc(unit) => unit.first_start,
             _ => self.range().start,
         }
     }
