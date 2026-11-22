@@ -492,12 +492,11 @@ fn trace(corpus: &mut Corpus<'_>) -> R<()> {
             let mut bytes = base.clone();
             bytes[stco..stco + 4].copy_from_slice(&at.to_be_bytes());
             let file = corpus.write(&id, &bytes)?;
-            corpus.add(
-                &id,
-                "initial",
-                &file,
-                vec!["initial".into(), read.to_string(), "1".into()],
-            )?;
+            let mut arguments = vec!["initial".into(), read.to_string(), "1".into()];
+            if (read, at) == (64, 33497) {
+                arguments.push("409".into());
+            }
+            corpus.add(&id, "initial", &file, arguments)?;
         }
     }
     // The root-walk tests construct trailers around the same front movie.

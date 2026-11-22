@@ -9,7 +9,7 @@
   "reference": "ffmpeg-isobmff-views-native",
   "contract": [
     "Run one model with the supplied read maximum and work quantum. FFmpeg opens the same preloaded source with +noparse+nofillin and a 32768-byte custom AVIO buffer.",
-    "Receiver compares track ID and public signed PTS and DTS on every packet in delivery order, including the no-timestamp bits. Initial compares the first av_read_frame return code using the rejected-seek job and the modeled packet disposition for the other outcomes.",
+    "Receiver compares track ID and public signed PTS and DTS on every packet in delivery order, including the no-timestamp bits. Initial compares the first av_read_frame return code using the rejected-seek job and the modeled packet disposition for the other outcomes. A first-read case may supply an absolute rewind anchor; the reference checks the first successful absolute seek during open and the candidate uses the same rewind.",
     "Diagnostics compares warning and error log level and message bytes in order during open. Configuration and header compare the open result and every installed extradata byte. For dOps the header job identifies the source box and its bytes are projected to the public Opus identification layout.",
     "Transport compares each data read as byte offset, requested length and return value, and each seek as whence, argument and returned offset, then the final logical position. Length inquiries do not change the physical position. The optional rewind anchor is fixed in the candidate fixture geometry and the reference determines its own seek destination.",
     "Kind 1 is a timestamp or read row, kind 2 is a byte count followed by configuration, and kind 3 is a seek row or log level and byte count followed by the message. Kinds 7 and 8 report success or refusal, with the signed return code where the model exposes one."
@@ -611,36 +611,26 @@
     }
   ],
   "pending_module_requirements": [
-    "Distinguish forward-discard EOF when a possible rewind window has insufficient buffered data",
-    "Model the diagnostics for an unsupported OpusSpecificBox version",
-    "Model the enclosing MOV header error after a private child rejects the open",
-    "The modeled root walk is bounded to 16 root boxes"
+    "Report the unsupported OpusSpecificBox version and the open refusal in PrivateDiagnosticJob without reading unknown-version fields."
   ],
   "open_cases": [
     {
       "id": "diagnostics-opus-version",
-      "requirement": "Model the diagnostics for an unsupported OpusSpecificBox version",
+      "requirement": "Report the unsupported OpusSpecificBox version and the open refusal in PrivateDiagnosticJob without reading unknown-version fields.",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
-    },
+    }
+  ],
+  "open_deviations": [
     {
-      "id": "diagnostics-dts-zero-rate",
-      "requirement": "Model the enclosing MOV header error after a private child rejects the open",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "initial-64-33497",
-      "requirement": "Distinguish forward-discard EOF when a possible rewind window has insufficient buffered data",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "transport-footer-0-14",
-      "requirement": "The modeled root walk is bounded to 16 root boxes",
+      "reading": "Transport model stops at its root-box bound",
+      "clause": "ISO/IEC 14496-12:2015 §§4.2 and 8.1.2.1 allow any number of free-space boxes. RootWalkTransportBuilder sets a documented 16-root resource limit for this comparison model",
+      "candidate": "refuses at 17 roots",
+      "reference": "walks all roots and produces 945 callback/access rows, ending at logical position 859",
+      "cases": [
+        "transport-footer-0-14"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]

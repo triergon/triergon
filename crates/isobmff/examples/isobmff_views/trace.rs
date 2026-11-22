@@ -51,7 +51,7 @@ enum Model {
     Diagnostics,
     Configuration,
     Header,
-    Initial,
+    Initial(Option<u64>),
     Transport(Option<u64>),
 }
 
@@ -75,7 +75,10 @@ pub(super) fn operation<'a>(
         ("diagnostics", []) => Model::Diagnostics,
         ("configuration", []) => Model::Configuration,
         ("header", []) => Model::Header,
-        ("initial", []) => Model::Initial,
+        ("initial", []) => Model::Initial(None),
+        ("initial", [anchor]) => {
+            Model::Initial(Some(anchor.parse().map_err(|_| "invalid rewind offset")?))
+        }
         ("transport", ["entry"]) => Model::Transport(None),
         ("transport", [anchor]) => {
             Model::Transport(Some(anchor.parse().map_err(|_| "invalid rewind offset")?))
@@ -335,7 +338,7 @@ impl RawMovie {
     ) -> Result<()> {
         let cancel = AtomicBool::new(false);
         let limits = Limits::default();
-        if matches!(model, Model::Initial | Model::Transport(_)) {
+        if matches!(model, Model::Initial(_) | Model::Transport(_)) {
             let mut job = DescriptionRecoveryBuilder::new(
                 self.table.clone(),
                 self.pool.clone(),
@@ -371,6 +374,10 @@ impl RawMovie {
                     };
                     let text = entry.kind.to_string();
                     out.row(3, &[level, text.len() as u64], text.as_bytes())?;
+                }
+                if result.demux_open_result.is_some() {
+                    let text = b"error reading header";
+                    out.row(3, &[16, text.len() as u64], text)?;
                 }
                 out.result(result.demux_open_result.map_or(0, i64::from))
             }
@@ -442,8 +449,10 @@ impl RawMovie {
             },
             RootWalkTransportProfile,
         )?;
-        if let Model::Transport(rewind) = model {
-            builder = builder.with_fixed_rewind(rewind)?;
+        match model {
+            Model::Transport(rewind) => builder = builder.with_fixed_rewind(rewind)?,
+            Model::Initial(Some(rewind)) => builder = builder.with_fixed_rewind(Some(rewind))?,
+            _ => (),
         }
         while builder.poll(&mut WorkBudget::new(quantum), cancel)? == BuildStatus::Yield {}
         builder.finish()

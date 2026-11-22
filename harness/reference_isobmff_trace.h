@@ -17,6 +17,7 @@ typedef struct {
 typedef struct {
     MovTraceKind kind;
     int read_max, track;
+    int64_t initial_rewind;
     size_t count;
     MovLanding landings[TRACE_MAX_LANDINGS];
 } MovTrace;
@@ -24,6 +25,7 @@ typedef struct {
 typedef struct {
     PacketInput input;
     ViewWork *work;
+    int64_t first_seek;
 } MovTraceIO;
 
 static void mov_trace_row(ViewWork *work, uint64_t kind, const uint64_t *words,
@@ -59,6 +61,8 @@ static int64_t mov_trace_seek(void *opaque, int64_t offset, int whence)
 {
     MovTraceIO *source = opaque;
     const int64_t result = packet_input_seek(&source->input, offset, whence);
+    if (whence == SEEK_SET && result >= 0 && source->first_seek < 0)
+        source->first_seek = result;
     if (source->work && !(whence & AVSEEK_SIZE)) {
         const uint64_t fields[] = {(uint64_t)whence, (uint64_t)offset, (uint64_t)result};
         mov_trace_row(source->work, 3, fields, 3, NULL, 0);
@@ -160,12 +164,18 @@ static int mov_trace_models(const ViewCase *input, ViewWork *work)
     MovTraceIO source = {
         .input = {.data = input->data, .size = (int64_t)input->size, .quantum = operation->read_max},
         .work = operation->kind == TRACE_TRANSPORT ? work : NULL,
+        .first_seek = -1,
     };
     AVFormatContext *format = NULL;
     AVIOContext *io = NULL;
     int result = mov_trace_open(&format, &io, &source, operation, work);
     if (result < 0 || operation->kind == TRACE_DIAGNOSTICS) {
         mov_trace_result(work, result);
+        goto done;
+    }
+    if (operation->kind == TRACE_INITIAL && operation->initial_rewind >= 0 &&
+        source.first_seek != operation->initial_rewind) {
+        result = AVERROR_BUG;
         goto done;
     }
     switch (operation->kind) {
@@ -307,7 +317,7 @@ static int mov_trace_number(const char *text, uint64_t max, uint64_t *value)
 
 static int isobmff_trace_prepare(ViewCase *input)
 {
-    MovTrace operation = {.read_max = 65536};
+    MovTrace operation = {.read_max = 65536, .initial_rewind = -1};
     uint64_t number;
     if (!strcmp(input->prefix, "index-landings-")) {
         if (input->argc < 8 || (input->argc - 5) % 3
@@ -352,7 +362,11 @@ static int isobmff_trace_prepare(ViewCase *input)
             operation.kind = TRACE_TRANSPORT;
         else
             return 2;
-        if (input->argc != (operation.kind == TRACE_TRANSPORT ? 4 : 3))
+        if (operation.kind == TRACE_INITIAL && input->argc == 4) {
+            if (!mov_trace_number(input->argv[3], input->size, &number))
+                return 2;
+            operation.initial_rewind = (int64_t)number;
+        } else if (input->argc != (operation.kind == TRACE_TRANSPORT ? 4 : 3))
             return 2;
         input->name = "mov-reference-trace";
         input->run = mov_trace_models;
