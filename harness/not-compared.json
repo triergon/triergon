@@ -3,14 +3,7 @@
   "crates": {
     "codec-worker": [],
     "playback-worker": [],
-    "triergon": [
-      {
-        "name": "any-reader-mpegts",
-        "entry_points": ["AnyOther::MpegTs"],
-        "degree": "step",
-        "needs": "Facade-mpegts compares admission and packet delivery. Facade-mpegts-controls compares carrier, ordinary continuity, PSI, PES and EOF events through AnyOther. Loss, clock discontinuity, interrupted PES, header-only video and unsupported-framer events need checked results."
-      }
-    ],
+    "triergon": [],
     "triergon-ass": [],
     "triergon-bitstream": [],
     "triergon-bridge": [],

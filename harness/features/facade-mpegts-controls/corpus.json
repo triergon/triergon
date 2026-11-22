@@ -66,6 +66,76 @@
       "expected": {
         "trace_sha256": "a1f0f845ef753fb6a60d509a9c79af9487e9a43fbdc8912a96f760b95c678560"
       }
+    },
+    {
+      "id": "clock-interrupted-adts",
+      "profile": "ts188",
+      "file": "harness/features/facade-mpegts-controls/inputs/clock-interrupted-adts.ts",
+      "sha256": "3f8c51347acbc3eb58d07867f182a807d619432c9b9a9ab0b371bce691f7df88",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "boundary"
+      ],
+      "expected": {
+        "trace_sha256": "122a34abc638aced3c4866dc56ed5b03734c0e6412015406d82f00ea059e96f1"
+      }
+    },
+    {
+      "id": "hevc-headers-only",
+      "profile": "ts188",
+      "file": "harness/features/facade-mpegts-controls/inputs/hevc-headers-only.ts",
+      "sha256": "d86c0cfb67729c12bc52a6def6f3a3a7dabae7e7723b82e95ba784683130fc62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "boundary"
+      ],
+      "expected": {
+        "trace_sha256": "86ce2190151ea1e0853c91d175c26252515da736e99117415a257ec82dc14d21"
+      }
+    },
+    {
+      "id": "loss-interrupted-adts",
+      "profile": "ts188",
+      "file": "harness/features/facade-mpegts-controls/inputs/loss-interrupted-adts.ts",
+      "sha256": "01e83cb87c30737fc7df16bd8efc9cab5d050efed611885d3a42a68d1240a14a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "boundary"
+      ],
+      "expected": {
+        "trace_sha256": "8373491ccf9cf7eb600fae90862d330724a7158bdc47d6df4e496307f379b76f"
+      }
+    },
+    {
+      "id": "opaque-transport-stream-type",
+      "profile": "ts188",
+      "file": "harness/features/facade-mpegts-controls/inputs/opaque-transport-stream-type.ts",
+      "sha256": "df6c5e368ec2b4d1dc6239414b67220d5fe88fdddecbdb421e195502ba9ad71d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "boundary"
+      ],
+      "expected": {
+        "trace_sha256": "fb92cbde5e02ff271292635eaada3f6411d74eb15c36d3463f8bdf7a4bdd4bdc"
+      }
+    },
+    {
+      "id": "pcr-rebind-crossing-pes",
+      "profile": "ts188",
+      "file": "harness/features/facade-mpegts-controls/inputs/pcr-rebind-crossing-pes.ts",
+      "sha256": "6a5f37ebe824c2cddc4e5e51737cb316de18ecec5034a7db863e49085b9f646c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "boundary"
+      ],
+      "expected": {
+        "trace_sha256": "8acbf680cb7a3421b3b0b3e2418e2dbcc8455ad66ecd1ee70de877d0c5a96ce6"
+      }
     }
   ]
 }

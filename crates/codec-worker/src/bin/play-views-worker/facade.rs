@@ -507,6 +507,7 @@ pub(super) fn operation<'a>(
         ("facade-probe-", args) => probe::prepare(input, args),
         ("any-ts-au-" | "ts-au-", args) => access_units(input, args),
         ("any-ts-controls-", [size]) => ts_controls::prepare(input, size),
+        ("any-ts-controls-", [size, "boundary"]) => ts_controls::prepare_boundary(input, size),
         ("ts-seek-", args) | ("any-seek-", ["ts", args @ ..]) => transport_seek(input, args),
         ("any-seek-", ["mkv", args @ ..]) => container_seek(input, Probe::Matroska, args),
         ("any-seek-", ["mp4", args @ ..]) => container_seek(input, Probe::Isobmff, args),

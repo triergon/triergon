@@ -167,3 +167,234 @@ pub(super) fn prepare<'a>(input: &'a [u8], size: &str) -> Result<Operation<'a>, 
         }),
     })
 }
+
+fn fault_fields(fault: &triergon::mpegts::stream::TraceFault) -> Result<[u64; 3], String> {
+    use triergon::Error;
+    use triergon::mpegts::stream::FaultKind;
+
+    let pid = fault.pid.ok_or("continuity diagnostic has no PID")?;
+    if fault.kind != FaultKind::Continuity
+        || fault.error != Error::Invalid("TS continuity loss")
+        || fault.rejected.is_some()
+    {
+        return Err(format!("unexpected control diagnostic: {fault:?}"));
+    }
+    Ok([
+        u64::from(pid),
+        fault.location.source.0,
+        fault.location.offset,
+    ])
+}
+
+fn boundary_source(
+    event: &TraceEvent,
+    work: &mut Work,
+    trace: &mut Option<&mut dyn Write>,
+) -> Result<(), String> {
+    match event {
+        TraceEvent::Continuity { pid, outcome } => continuity(work, trace, *pid, *outcome),
+        TraceEvent::Timeline {
+            program,
+            clock_epoch,
+        } => row(work, trace, 10, &[u64::from(*program), *clock_epoch], &[]),
+        TraceEvent::Diagnostic(fault) => row(work, trace, 11, &fault_fields(fault)?, &[]),
+        TraceEvent::Finished => row(work, trace, 7, &[], &[]),
+        // Private carriage remains inspectable through its validated source PES
+        // even though the reader cannot publish a complete access unit for it.
+        TraceEvent::Pes(pes) if pes.header.stream_id == 0xbd => {
+            let span = pes
+                .header_source_ranges
+                .as_slice()
+                .first()
+                .ok_or("private PES has no span")?;
+            row(
+                work,
+                trace,
+                19,
+                &[u64::from(pes.pid), span.entity.0, span.offset],
+                pes.header.as_bytes(),
+            )?;
+            let payload: Vec<_> = pes.payload().flatten().copied().collect();
+            row(work, trace, 20, &[], &payload)
+        }
+        TraceEvent::Pat(_)
+        | TraceEvent::Section(_)
+        | TraceEvent::ProgramMap { .. }
+        | TraceEvent::Pes(_) => Ok(()),
+        other => Err(format!(
+            "unexpected source event at transport boundary: {other:?}"
+        )),
+    }
+}
+
+fn interrupted_access_unit(
+    track: &triergon::mpegts::Track,
+    range: std::ops::Range<u64>,
+    cause: &TraceEvent,
+    work: &mut Work,
+    trace: &mut Option<&mut dyn Write>,
+) -> Result<(), String> {
+    let prefix = [u64::from(track.stream().pid), range.start, range.end];
+    match cause {
+        TraceEvent::Diagnostic(fault) => {
+            let [pid, source, offset] = fault_fields(fault)?;
+            let [track, from, to] = prefix;
+            row(
+                work,
+                trace,
+                12,
+                &[track, from, to, pid, source, offset],
+                &[],
+            )
+        }
+        TraceEvent::Timeline {
+            program,
+            clock_epoch,
+        } => {
+            let [track, from, to] = prefix;
+            row(
+                work,
+                trace,
+                13,
+                &[track, from, to, u64::from(*program), *clock_epoch],
+                &[],
+            )
+        }
+        other => Err(format!("unexpected access-unit interruption: {other:?}")),
+    }
+}
+
+fn interrupted_pes(
+    source: &TraceEvent,
+    boundary: &TraceEvent,
+    work: &mut Work,
+    trace: &mut Option<&mut dyn Write>,
+) -> Result<(), String> {
+    let (
+        TraceEvent::Pes(pes),
+        TraceEvent::ProgramMap {
+            map,
+            active: true,
+            configuration_epoch,
+        },
+    ) = (source, boundary)
+    else {
+        return Err(format!(
+            "expected a PES crossing a current PMT: {source:?} / {boundary:?}"
+        ));
+    };
+    let span = pes
+        .header_source_ranges
+        .as_slice()
+        .first()
+        .ok_or("interrupted PES has no span")?;
+    row(
+        work,
+        trace,
+        14,
+        &[
+            u64::from(pes.pid),
+            span.entity.0,
+            span.offset,
+            pes.elementary_offset,
+            pes.epochs.configuration,
+            pes.epochs.clock,
+            *configuration_epoch,
+            u64::from(map.pcr_pid),
+            u64::from(map.header.version),
+        ],
+        pes.header.as_bytes(),
+    )?;
+    let payload: Vec<_> = pes.payload().flatten().copied().collect();
+    row(work, trace, 15, &[], &payload)
+}
+
+fn packet_boundary(
+    kind: u64,
+    packet: &triergon::mpegts::Packet,
+    work: &mut Work,
+    trace: &mut Option<&mut dyn Write>,
+) -> Result<(), String> {
+    use triergon::PacketInfo;
+
+    let range = packet.elementary_range();
+    row(
+        work,
+        trace,
+        kind,
+        &[
+            packet.track().0,
+            range.start,
+            range.end,
+            packet.epochs().clock,
+        ],
+        packet.payload(),
+    )
+}
+
+pub(super) fn prepare_boundary<'a>(input: &'a [u8], size: &str) -> Result<Operation<'a>, String> {
+    use triergon::{AnyPacket, Error};
+
+    let (_, format) = transport_size(size)?;
+    let pool = Budget::new(64 << 20).map_err(|error| error.to_string())?;
+    Ok(Operation {
+        name: "facade-mpegts-controls",
+        run: Box::new(move |work, mut trace| {
+            let reader = reader(input, &pool, format)?;
+            let mut driver = Blocking::seekable(reader, Cursor::new(input), &pool);
+            while let Some(event) = driver.next_event().map_err(|error| error.to_string())? {
+                match event {
+                    Event::Other(AnyOther::MpegTs(ReaderEvent::Source(source))) => {
+                        boundary_source(source.event(), work, &mut trace)?;
+                    }
+                    Event::Other(AnyOther::MpegTs(ReaderEvent::Interrupted {
+                        track,
+                        elementary_range,
+                        cause,
+                    })) => interrupted_access_unit(
+                        &track,
+                        elementary_range,
+                        cause.event(),
+                        work,
+                        &mut trace,
+                    )?,
+                    Event::Other(AnyOther::MpegTs(ReaderEvent::InterruptedPes {
+                        source,
+                        boundary,
+                    })) => {
+                        interrupted_pes(source.event(), boundary.event(), work, &mut trace)?;
+                    }
+                    Event::Other(AnyOther::MpegTs(ReaderEvent::VideoHeaders(packet))) => {
+                        packet_boundary(16, &packet, work, &mut trace)?;
+                    }
+                    Event::Other(AnyOther::MpegTs(ReaderEvent::Unsupported {
+                        track,
+                        error:
+                            Error::Unsupported("MPEG-TS carriage has no admitted access-unit framer"),
+                    })) => {
+                        let stream = track.stream();
+                        row(
+                            work,
+                            &mut trace,
+                            17,
+                            &[u64::from(stream.pid), u64::from(stream.stream_type)],
+                            &stream.descriptor_bytes,
+                        )?;
+                    }
+                    Event::Packet(AnyPacket::MpegTs(packet)) => {
+                        packet_boundary(18, &packet, work, &mut trace)?;
+                    }
+                    Event::Other(AnyOther::MpegTs(
+                        ReaderEvent::Transport(_) | ReaderEvent::Continuity { .. },
+                    )) => {}
+                    other => {
+                        return Err(format!(
+                            "unexpected facade event at transport boundary: {other:?}"
+                        ));
+                    }
+                }
+            }
+            Ok(())
+        }),
+    })
+}
