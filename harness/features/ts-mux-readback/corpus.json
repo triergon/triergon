@@ -1,0 +1,454 @@
+{
+  "schema": 1,
+  "id": "ts-mux-readback",
+  "cases": [
+    {
+      "id": "default",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "single-program",
+      "arguments": [
+        "default"
+      ],
+      "expected": {
+        "packets": 41,
+        "bytes": 1175,
+        "digest": 15441297065170326380
+      }
+    },
+    {
+      "id": "program-42",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "single-program",
+      "arguments": [
+        "7",
+        "9",
+        "42",
+        "512",
+        "768",
+        "1",
+        "Test Lab",
+        "Capture Test"
+      ],
+      "expected": {
+        "packets": 41,
+        "bytes": 1178,
+        "digest": 16953301507326846517
+      }
+    },
+    {
+      "id": "program-65535",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "single-program",
+      "arguments": [
+        "65535",
+        "65534",
+        "65535",
+        "4097",
+        "8186",
+        "2",
+        "Capture Lab",
+        "Second Service"
+      ],
+      "expected": {
+        "packets": 41,
+        "bytes": 1183,
+        "digest": 813697500725442212
+      }
+    },
+    {
+      "id": "sdt-full",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "single-program",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "32",
+        "8190",
+        "2",
+        "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP",
+        "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
+      ],
+      "expected": {
+        "packets": 41,
+        "bytes": 1316,
+        "digest": 17936926239918193583
+      }
+    },
+    {
+      "id": "sdt-empty",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "single-program",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "4096",
+        "256",
+        "1",
+        "",
+        ""
+      ],
+      "expected": {
+        "packets": 41,
+        "bytes": 1158,
+        "digest": 1046253818029692395
+      }
+    },
+    {
+      "id": "default-continuation",
+      "file": "capture-continuation.bin",
+      "sha256": "359e24da4e6bcda44535cc5c169962bc1601c770c7ceda680cd8bc6ca2f340de",
+      "rights": "authored-synthetic",
+      "profile": "single-program",
+      "arguments": [
+        "default"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 245,
+        "digest": 13611441412023951367
+      }
+    },
+    {
+      "id": "program-42-continuation",
+      "file": "capture-continuation.bin",
+      "sha256": "359e24da4e6bcda44535cc5c169962bc1601c770c7ceda680cd8bc6ca2f340de",
+      "rights": "authored-synthetic",
+      "profile": "single-program",
+      "arguments": [
+        "7",
+        "9",
+        "42",
+        "512",
+        "768",
+        "1",
+        "Test Lab",
+        "Capture Test"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 248,
+        "digest": 16019433526285766074
+      }
+    },
+    {
+      "id": "program-65535-continuation",
+      "file": "capture-continuation.bin",
+      "sha256": "359e24da4e6bcda44535cc5c169962bc1601c770c7ceda680cd8bc6ca2f340de",
+      "rights": "authored-synthetic",
+      "profile": "single-program",
+      "arguments": [
+        "65535",
+        "65534",
+        "65535",
+        "4097",
+        "8186",
+        "2",
+        "Capture Lab",
+        "Second Service"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 253,
+        "digest": 262592990836228409
+      }
+    },
+    {
+      "id": "sdt-full-continuation",
+      "file": "capture-continuation.bin",
+      "sha256": "359e24da4e6bcda44535cc5c169962bc1601c770c7ceda680cd8bc6ca2f340de",
+      "rights": "authored-synthetic",
+      "profile": "single-program",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "32",
+        "8190",
+        "2",
+        "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP",
+        "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 386,
+        "digest": 13988429985225594038
+      }
+    },
+    {
+      "id": "sdt-empty-continuation",
+      "file": "capture-continuation.bin",
+      "sha256": "359e24da4e6bcda44535cc5c169962bc1601c770c7ceda680cd8bc6ca2f340de",
+      "rights": "authored-synthetic",
+      "profile": "single-program",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "4096",
+        "256",
+        "1",
+        "",
+        ""
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 228,
+        "digest": 9921177629040784368
+      }
+    },
+    {
+      "id": "refuse-program-zero",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "mux-config-refusal",
+      "arguments": [
+        "1",
+        "65281",
+        "0",
+        "4096",
+        "256",
+        "1",
+        "Triergon",
+        "Service01"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "refuse-pmt-low",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "mux-config-refusal",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "31",
+        "256",
+        "1",
+        "Triergon",
+        "Service01"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "refuse-pmt-null",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "mux-config-refusal",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "8191",
+        "256",
+        "1",
+        "Triergon",
+        "Service01"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "refuse-video-low",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "mux-config-refusal",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "4096",
+        "31",
+        "1",
+        "Triergon",
+        "Service01"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "refuse-video-null",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "mux-config-refusal",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "4096",
+        "8191",
+        "1",
+        "Triergon",
+        "Service01"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "refuse-pid-collision",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "mux-config-refusal",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "256",
+        "256",
+        "1",
+        "Triergon",
+        "Service01"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "refuse-stream-type",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "mux-config-refusal",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "4096",
+        "256",
+        "27",
+        "Triergon",
+        "Service01"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "refuse-provider-control",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "mux-config-refusal",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "4096",
+        "256",
+        "1",
+        "Test\tLab",
+        "Service01"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "refuse-service-non-ascii",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "mux-config-refusal",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "4096",
+        "256",
+        "1",
+        "Triergon",
+        "Caf\u00e9"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "refuse-name-too-long",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "mux-config-refusal",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "4096",
+        "256",
+        "1",
+        "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP",
+        "Service01"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "refuse-sdt-overflow",
+      "file": "capture.bin",
+      "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+      "rights": "authored-synthetic",
+      "profile": "mux-config-refusal",
+      "arguments": [
+        "1",
+        "65281",
+        "1",
+        "4096",
+        "256",
+        "1",
+        "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP",
+        "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    }
+  ]
+}

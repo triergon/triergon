@@ -798,8 +798,8 @@ assert_eq!(out.len() % 188, 0);
 - PES: stream_id 0xE0, unbounded length, PTS and DTS. The first packet's
   adaptation field carries PCR = DTS·300 and, on key pictures, the
   random_access_indicator. Stuffing goes into the final packet's adaptation field.
-  `TransportStream` does not read this output back: its source view accepts
-  unbounded PES only on video streams (0x01, 0x02, 0x1b, 0x24).
+  Both writer stream types (0x01 and 0x02) are accepted as unbounded video PES
+  by `TransportStream`.
 - `MuxConfig::default()`: transport_stream_id 1, original_network_id 0xFF01,
   program 1, PMT PID 0x1000, video PID 0x0100, stream type 0x01, provider
   "Triergon", service "Service01".
@@ -816,6 +816,12 @@ assert_eq!(out.len() % 188, 0);
 `tests/mux.rs` checks SDT size limits and CRC, name encoding, PID and program
 validation. The written stream is compared with FFmpeg's through the capture
 pipeline ([triergon-capture](../capture/README.md#conformance)).
+The [mux read-back comparison](../../harness/features/ts-mux-readback/contract.json)
+reads the same emitted TS with `TransportStream` and FFmpeg. It compares the
+program and stream identifiers, SDT names, and each PES packet's clocks, flags,
+first carrier offset and payload bytes. The contract records the difference
+between the transport random-access indicator and the reference's packet key
+flag. Invalid configurations produce a typed refusal before any TS is emitted.
 
 ## Supported
 

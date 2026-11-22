@@ -1,0 +1,201 @@
+{
+  "schema": 1,
+  "id": "ts-mux-readback",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "candidate": "transport-views-worker",
+  "worker_operation": "ts-mux-",
+  "reference": "ffmpeg-transport-views-native",
+  "operation": "ts-mux-readback",
+  "corpus_directory": ".research/mux-views",
+  "required_profiles": [
+    "single-program",
+    "mux-config-refusal"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "contract": [
+    "The candidate calls Muxer::new and write_picture for every authored picture, then polls TransportStream to logical EOF over the resulting TS188 bytes. The reference demuxes those same muxed bytes with the pinned FFmpeg formats profile's MPEG-TS demuxer and +noparse+nofillin.",
+    "Each case supplies default or decimal TSID, ONID, program, PMT PID, video PID and stream type followed by provider and service names. Each input picture has big-endian signed 64-bit PTS and DTS in 90 kHz ticks, a one-byte key indicator, a big-endian 32-bit payload length and the coded picture bytes.",
+    "Packet rows (kind 1) fold PID, optional PTS and DTS, flags, first carrier offset and payload length and all payload bytes, in order. Candidate clocks are raw period-zero PES values. Candidate flags carry the TS random-access indicator as bit 0. The reference folds AVPacket.flags.",
+    "After draining, catalogue rows (kind 5) fold the program number and PMT PID, each stream PID and tag, then the provider and service tags with presence, length and bytes. The candidate reads the names from the emitted SDT service descriptor. A clean EOF adds kind 7.",
+    "A refused MuxConfig emits one kind 8 row. No TS is produced and the reference supplies zero rows. The refusal cases cover zero program number, reserved or colliding PIDs, unsupported stream type, non-printable or non-ASCII names, and both name length and combined SDT capacity."
+  ],
+  "pin_note": "Pins are recorded by transport-views manifest --record from the formats demuxer reading the candidate writer's TS output.",
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "default",
+        "program-42",
+        "program-65535",
+        "sdt-full",
+        "sdt-empty",
+        "default-continuation",
+        "program-42-continuation",
+        "program-65535-continuation",
+        "sdt-full-continuation",
+        "sdt-empty-continuation"
+      ],
+      "cause": "The capture pipeline measures muxing and this reference demuxes"
+    },
+    {
+      "bound": "runtime",
+      "cases": [
+        "refuse-program-zero",
+        "refuse-pmt-low",
+        "refuse-pmt-null",
+        "refuse-video-low",
+        "refuse-video-null",
+        "refuse-pid-collision",
+        "refuse-stream-type",
+        "refuse-provider-control",
+        "refuse-service-non-ascii",
+        "refuse-name-too-long",
+        "refuse-sdt-overflow"
+      ],
+      "cause": "A refused configuration produces no TS to demux"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "default",
+        "program-42",
+        "program-65535",
+        "sdt-full",
+        "sdt-empty",
+        "default-continuation",
+        "program-42-continuation",
+        "program-65535-continuation",
+        "sdt-full-continuation",
+        "sdt-empty-continuation"
+      ],
+      "cause": "The capture pipeline measures muxing and this reference demuxes"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "refuse-program-zero",
+        "refuse-pmt-low",
+        "refuse-pmt-null",
+        "refuse-video-low",
+        "refuse-video-null",
+        "refuse-pid-collision",
+        "refuse-stream-type",
+        "refuse-provider-control",
+        "refuse-service-non-ascii",
+        "refuse-name-too-long",
+        "refuse-sdt-overflow"
+      ],
+      "cause": "A refused configuration produces no TS to demux"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "default",
+        "program-42",
+        "program-65535",
+        "sdt-full",
+        "sdt-empty",
+        "default-continuation",
+        "program-42-continuation",
+        "program-65535-continuation",
+        "sdt-full-continuation",
+        "sdt-empty-continuation"
+      ],
+      "cause": "The capture pipeline measures muxing and this reference demuxes"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "refuse-program-zero",
+        "refuse-pmt-low",
+        "refuse-pmt-null",
+        "refuse-video-low",
+        "refuse-video-null",
+        "refuse-pid-collision",
+        "refuse-stream-type",
+        "refuse-provider-control",
+        "refuse-service-non-ascii",
+        "refuse-name-too-long",
+        "refuse-sdt-overflow"
+      ],
+      "cause": "A refused configuration produces no TS to demux"
+    }
+  ],
+  "pending_module_requirements": [
+    "Review the transport random-access indicator against FFmpeg's packet key flag.",
+    "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+  ],
+  "open_cases": [
+    {
+      "id": "default",
+      "requirement": "Review the transport random-access indicator against FFmpeg's packet key flag."
+    },
+    {
+      "id": "program-42",
+      "requirement": "Review the transport random-access indicator against FFmpeg's packet key flag."
+    },
+    {
+      "id": "program-65535",
+      "requirement": "Review the transport random-access indicator against FFmpeg's packet key flag."
+    },
+    {
+      "id": "sdt-full",
+      "requirement": "Review the transport random-access indicator against FFmpeg's packet key flag."
+    },
+    {
+      "id": "sdt-empty",
+      "requirement": "Review the transport random-access indicator against FFmpeg's packet key flag."
+    },
+    {
+      "id": "refuse-program-zero",
+      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+    },
+    {
+      "id": "refuse-pmt-low",
+      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+    },
+    {
+      "id": "refuse-pmt-null",
+      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+    },
+    {
+      "id": "refuse-video-low",
+      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+    },
+    {
+      "id": "refuse-video-null",
+      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+    },
+    {
+      "id": "refuse-pid-collision",
+      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+    },
+    {
+      "id": "refuse-stream-type",
+      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+    },
+    {
+      "id": "refuse-provider-control",
+      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+    },
+    {
+      "id": "refuse-service-non-ascii",
+      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+    },
+    {
+      "id": "refuse-name-too-long",
+      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+    },
+    {
+      "id": "refuse-sdt-overflow",
+      "requirement": "MuxConfig rejects the configuration before there is a transport stream for the reference to read."
+    }
+  ]
+}
