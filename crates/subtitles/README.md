@@ -185,6 +185,8 @@ offset is an open case against FFmpeg on AArch64.
 Matroska startup discovery reads the PGS segment kind and raw length and checks
 the composition width and height. With a PGS track present, the startup comparison
 folds the selected video packet timing, sizes and payloads.
+The separate Matroska discovery comparison is specified to check the discovered
+PGS dimensions and the cutoff through the replayed packets.
 [`matroska-startup-seek`](../../harness/features/matroska-startup-seek/contract.json)
 The segment oracle compares the parsed fields directly.
 [`pgs-segments`](../../harness/features/pgs-segments/contract.json)

@@ -7,7 +7,8 @@
   "worker_operation": "pgs-segments-",
   "oracle": "pgs-segments",
   "contract": [
-    "Compare each packet or SUP envelope and every typed composition, palette, object fragment and window field. The independent oracle encodes the public HDMV presentation graphics description at https://www.blu-ray.org.uk/2025/11/presentation-graphics.html and uses the pinned formats ffprobe only for container packet extraction. Includes raw clocks, complete segment bytes, payload lengths, unknown kinds and truncations."
+    "Compare each packet or SUP envelope and every typed composition, palette, object fragment and window field. The independent oracle encodes the public HDMV presentation graphics description at https://www.blu-ray.org.uk/2025/11/presentation-graphics.html and uses the pinned formats ffprobe only for container packet extraction. Includes raw clocks, complete segment bytes, payload lengths, unknown kinds and truncations.",
+    "Matroska discovery consumes the segment kind, raw length and composition dimensions. The Matroska discovery comparison covers the discovered PGS dimensions and checks the discovery cutoff through replayed packets."
   ],
   "required_profiles": [
     "capsule",
