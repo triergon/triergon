@@ -183,6 +183,15 @@ The [local comparison](../../harness/features/matroska-cued-ac3/README.md)
 checks an encoded packet suffix through EOF. Cue structure follows RFC 9559
 §§5.1.5 and 22; AC-3 syncframe timing follows ATSC A/52:2018.
 
+The neutral reader also admits a single stereo 48 kHz `A_OPUS` track with a
+version-1 family-0 OpusHead, pre-skip 312, 48 kHz input rate, zero gain,
+CodecDelay 7 ms and SeekPreRoll 80 ms. `PreviousRandomAccess` selects a
+validated preceding Cue using the requested presentation time and CodecDelay.
+`PlaybackPreroll` also subtracts SeekPreRoll and decodes earlier packets
+before presentation. When preroll reaches before the first Cue, that Cue is
+used only if it is at or before the requested time. The reader delivers the
+complete packet suffix in both modes.
+
 The `media-worker` and public libavformat reference expose the `cued-aac-`, `cued-ac3-` and `cued-eac3-`
 worker protocol. The reference uses a backward `av_seek_frame` and public flags
 that preserve demuxed fields. `trace`, `fold` and `memory` take a file and a

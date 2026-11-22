@@ -266,7 +266,11 @@ impl ContainerReader for Reader {
                     "seek requires supported single-track cued audio",
                 ));
             }
-            return self.seek_cued_audio(track, requested_ns);
+            return self.seek_cued_audio(
+                track,
+                requested_ns,
+                request.policy == SeekPolicy::PlaybackPreroll,
+            );
         }
         match request.policy {
             SeekPolicy::PreviousRandomAccess => self.seek_previous(track, requested_ns),

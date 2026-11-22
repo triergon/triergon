@@ -1757,6 +1757,78 @@ fn coded_cued_aac_playback_seek_invalidates_queue_and_feeds_indexed_suffix() {
     }
 }
 
+#[test]
+fn coded_cued_opus_player_seek_preserves_preroll() {
+    let fixture = include_bytes!("../../media/tests/fixtures/seek/cued-opus.mka");
+    // CueTime ticks are 0, 81, 181, 281, 381, ... at 1 ms per tick.
+    // Select floor((target - 80 + 7) / 1 ms), then subtract the 7 ms delay.
+    for (target_ms, expected_ms) in [
+        (0, -7),
+        (80, -7),
+        (100, -7),
+        (153, -7),
+        (154, 74),
+        (180, 74),
+        (250, 74),
+        (500, 374),
+    ] {
+        let (mut player, _) = player_with_input(fixture, 256);
+        let cancel = AtomicBool::new(false);
+        loop {
+            player.advance(&mut WorkBudget::new(100), &cancel).unwrap();
+            if let Some(output) = player.pop()
+                && matches!(output.event(), RawEvent::Matroska(Event::Packet(_)))
+            {
+                break;
+            }
+        }
+        let target = Time::new(target_ms, 1000).unwrap();
+        assert!(
+            player
+                .seek_and_select(
+                    TrackKey::Matroska(1),
+                    target,
+                    Selection::All,
+                    &mut WorkBudget::new(100),
+                    &cancel
+                )
+                .unwrap()
+        );
+        let outputs = collect_with_work(&mut player, 100);
+        let landing = outputs
+            .iter()
+            .find_map(|o| match o.event() {
+                RawEvent::Matroska(Event::Seek(landing)) => Some(landing),
+                _ => None,
+            })
+            .unwrap();
+        let packets: Vec<_> = outputs
+            .iter()
+            .filter_map(|o| match o.event() {
+                RawEvent::Matroska(Event::Packet(packet)) => {
+                    Some((packet.packet.pts_ns, o.delivery()))
+                }
+                _ => None,
+            })
+            .collect();
+        assert!(landing.used_index);
+        assert_eq!(landing.preroll_ns, 80_000_000);
+        assert_eq!(landing.actual_ns, expected_ms * 1_000_000);
+        assert_eq!(packets.first().unwrap().0, Some(expected_ms * 1_000_000));
+        for (pts, delivery) in packets {
+            let pts = pts.unwrap();
+            assert_eq!(
+                delivery,
+                if i128::from(pts) < target_ms * 1_000_000 {
+                    Delivery::DecodeOnly { until: target }
+                } else {
+                    Delivery::Present
+                }
+            );
+        }
+    }
+}
+
 fn check_cued_dolby_player_seek(fixture: &[u8]) {
     let (mut player, pool) = player_with_input(fixture, 7);
     let cancel = AtomicBool::new(false);
