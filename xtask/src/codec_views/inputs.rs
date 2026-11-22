@@ -5,7 +5,7 @@ use std::fmt::Write as _;
 use std::path::{Component, Path};
 
 use crate::fetch::{self, Network, Source};
-use crate::harness::{features, manifest, preflight};
+use crate::harness::features;
 
 const FATE: &str = ".research/fate-samples";
 const SUBTITLE_FATE: &str = ".research/subtitle-corpus/fate";
@@ -15,21 +15,8 @@ const FLAC_RELEASE: &str = "aa7b0c6cf32994c106ae517a08134c28a96ff5b2";
 /// Fetch exactly the public files named by required contracts, using the
 /// corpus pins for both the download cache and the upstream files.
 pub(super) fn prepare(root: &Path) -> Result<(), String> {
-    let mut args = Vec::new();
-    for contract in features::required(root)? {
-        if let Some(directory) = contract
-            .document
-            .get("corpus_directory")
-            .and_then(crate::json::Value::as_str)
-        {
-            args.extend(["--corpus".into(), format!("{}={directory}", contract.id)]);
-        }
-        args.extend(["--feature".into(), contract.id]);
-    }
     let mut files = BTreeMap::new();
-    for input in preflight::inputs(root, &args, &|path| {
-        manifest::read(root, path).map(|(document, _)| document)
-    })? {
+    for input in features::required_inputs(root)? {
         let Some(pin) = input.sha256 else {
             continue;
         };

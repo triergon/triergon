@@ -121,6 +121,30 @@ pub(crate) fn required(root: &Path) -> Result<Vec<Contract>, String> {
     Ok(required)
 }
 
+/// The input pins of required report and trace-oracle cases.
+pub(crate) fn required_inputs(root: &Path) -> Result<Vec<super::preflight::Input>, String> {
+    let mut args = Vec::new();
+    for contract in required(root)? {
+        if super::manifest::configured_aac_runner(&contract.document)
+            || contract.document.get("runner").and_then(Value::as_str)
+                == Some("cargo xtask codecs dsp")
+        {
+            continue;
+        }
+        if let Some(directory) = contract
+            .document
+            .get("corpus_directory")
+            .and_then(Value::as_str)
+        {
+            args.extend(["--corpus".into(), format!("{}={directory}", contract.id)]);
+        }
+        args.extend(["--feature".into(), contract.id]);
+    }
+    super::preflight::inputs(root, &args, &|path| {
+        super::manifest::read(root, path).map(|(document, _)| document)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
