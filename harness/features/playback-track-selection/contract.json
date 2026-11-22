@@ -85,9 +85,6 @@
       "compat": "compat::matroska::demux_packet_duration for consumers needing the reference millisecond durations.",
       "cases": [
         "mkv-reordered-video"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
@@ -99,9 +96,6 @@
       "cases": [
         "mkv-video-and-audio",
         "mkv-switch-audio"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ]
