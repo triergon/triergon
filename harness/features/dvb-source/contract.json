@@ -772,195 +772,42 @@
       "cause": "paired runtime, heap and total RSS collections are pending on isolated gate hosts"
     }
   ],
-  "pending_module_requirements": [
-    "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison."
-  ],
-  "open_cases": [
+  "open_deviations": [
     {
-      "id": "dds-window-mkv",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "default-clut4-text-mkv",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "depth4-runs-mkv",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "long-text-mkv",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "page-timeouts-clear-mkv",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "pages-ancillary-mkv",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "regions-objects-mkv",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "sequence-mkv",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-ancillary-eod-native-v1-observed--ancillary-end-nonempty",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-ancillary-eod-native-v1-observed--composition-end-control",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-ancillary-eod-native-v1-observed--foreign-end-filter-control",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-ancillary-eod-native-v1-observed--shared-ancillary-end",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-ancillary-eod-native-v1-observed--shared-composition-end-compat",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb2-literal-flag0",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb2-literal-flag1",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb2-run-flag0",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb2-run-flag1",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb4-literal-flag0",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb4-literal-flag1",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb4-run-flag0",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb4-run-flag1",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb8-literal-flag0",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb8-literal-flag1",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb8-run-flag0",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-dvb-nonmodifying-observed--dvb8-run-flag1",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-mkv-bitmap-dvb-v1--carrier",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
-      "targets": [
-        "aarch64-unknown-linux-gnu"
-      ]
-    },
-    {
-      "id": "research-mkv-bitmap-dvb-v1--valid-video-carrier",
-      "requirement": "SourceConfiguration binds the timing carried by Matroska without a DTS. The reference copies PTS to DTS; the source clock and complete DVB segment bytes remain in the comparison.",
+      "reading": "Matroska subtitle block timing does not carry a separate decode timestamp",
+      "clause": "RFC 9559 \u00a7\u00a710.1, 10.2 and 11.2: a Block or SimpleBlock carries one timestamp, the presentation timestamp",
+      "candidate": "keeps the block PTS and leaves DTS absent, with the complete DVB segment payload",
+      "reference": "returns the same PTS and DVB segments but copies PTS into DTS",
+      "compat": "compat::dvb::matroska_pts_as_dts",
+      "cases": [
+        "dds-window-mkv",
+        "default-clut4-text-mkv",
+        "depth4-runs-mkv",
+        "long-text-mkv",
+        "page-timeouts-clear-mkv",
+        "pages-ancillary-mkv",
+        "regions-objects-mkv",
+        "sequence-mkv",
+        "research-dvb-ancillary-eod-native-v1-observed--ancillary-end-nonempty",
+        "research-dvb-ancillary-eod-native-v1-observed--composition-end-control",
+        "research-dvb-ancillary-eod-native-v1-observed--foreign-end-filter-control",
+        "research-dvb-ancillary-eod-native-v1-observed--shared-ancillary-end",
+        "research-dvb-ancillary-eod-native-v1-observed--shared-composition-end-compat",
+        "research-dvb-nonmodifying-observed--dvb2-literal-flag0",
+        "research-dvb-nonmodifying-observed--dvb2-literal-flag1",
+        "research-dvb-nonmodifying-observed--dvb2-run-flag0",
+        "research-dvb-nonmodifying-observed--dvb2-run-flag1",
+        "research-dvb-nonmodifying-observed--dvb4-literal-flag0",
+        "research-dvb-nonmodifying-observed--dvb4-literal-flag1",
+        "research-dvb-nonmodifying-observed--dvb4-run-flag0",
+        "research-dvb-nonmodifying-observed--dvb4-run-flag1",
+        "research-dvb-nonmodifying-observed--dvb8-literal-flag0",
+        "research-dvb-nonmodifying-observed--dvb8-literal-flag1",
+        "research-dvb-nonmodifying-observed--dvb8-run-flag0",
+        "research-dvb-nonmodifying-observed--dvb8-run-flag1",
+        "research-mkv-bitmap-dvb-v1--carrier",
+        "research-mkv-bitmap-dvb-v1--valid-video-carrier"
+      ],
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
