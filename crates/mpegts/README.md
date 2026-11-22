@@ -819,9 +819,9 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
 The [mux read-back comparison](../../harness/features/ts-mux-readback/contract.json)
 reads the same emitted TS with `TransportStream` and FFmpeg. It compares the
 program and stream identifiers, SDT names, and each PES packet's clocks, flags,
-first carrier offset and payload bytes. The contract records the difference
-between the transport random-access indicator and the reference's packet key
-flag. Invalid configurations produce a typed refusal before any TS is emitted.
+first carrier offset and payload bytes. The comparison reads the transport
+random-access indicator at the first carrier on both sides. Configuration
+probes compare the typed refusal with the reference muxer's admission or refusal.
 
 ## Supported
 
@@ -898,6 +898,9 @@ Verification:
   checked against the programs and streams FFmpeg exposes after draining each
   transport entity. The comparison covers table and stream order, PIDs, PMT
   versions, language tags and DVB subtitle service initialization.
+  The selected catalogue compares the whole PAT and the selected program's PMT.
+  The standalone catalogue compares the published registration identifier where
+  the demuxer uses it as the codec tag.
   [Standalone readers](../../harness/features/ts-psi-readers/contract.json)
   [Catalogue projection](../../harness/features/ts-catalogue/contract.json)
 - An independent H.222.0 oracle checks every AVC and HEVC video descriptor
@@ -905,7 +908,9 @@ Verification:
   including both forms of the HEVC temporal-layer fields.
   [Video descriptor comparison](../../harness/features/ts-video-descriptors/contract.json)
 - The raw packet comparison checks the TS body bytes and their physical offsets
-  at 1-, 7- and 4096-byte input windows. Its field oracle also checks the full
+  at 1-, 7- and 4096-byte input windows. It reads clock-admitted inputs through
+  the raw TS demuxer and uses the public raw data reader on the supplied carrier
+  grid for short or clockless inputs. Its field oracle also checks the full
   carrier, including opaque M2TS prefixes, PCR and OPCR, adaptation fields,
   rejected-carrier ranges, truncated tails and expansion of compact null runs.
   [Packet boundaries](../../harness/features/ts-packets/contract.json)
@@ -953,7 +958,9 @@ Verification:
   the DVB namespace. The comparison opts in to reporting the subtitle prefix.
 - The [reader views](../../harness/features/ts-reader-views/contract.json) compare
   track identity and configuration, packet time bases, AC-3 syncframes, DVB
-  subtitle segment boundaries and opaque elementary ranges. The
+  subtitle decoder initialization and segment boundaries, and opaque elementary
+  ranges. AC-3 comparisons distinguish complete syncframes from an incomplete
+  residual extent at EOF. The
   [continuity reader comparison](../../harness/features/ts-reader-container/contract.json)
   also checks the packet outcome and carrier evidence of an opaque residue.
 - The [fault facts](../../harness/features/ts-fault-facts/contract.json) and
@@ -1003,10 +1010,12 @@ Verification:
   [standalone PES assembly](../../harness/features/ts-pes-assembler/contract.json)
   and [demux observer](../../harness/features/ts-observer-forms/contract.json)
   comparisons use every input from the PES packet corpus. They exercise five
-  source poll forms, four payload chunk sizes and three observer forms. The
+  source poll forms, four work grants over complete transport payloads and three
+  observer forms. The
   strict source comparisons preserve encoded timestamp absence, period-zero
   ticks and physical carrier positions. The observer comparison uses projected
-  demux clocks. The contracts list the outstanding differences and the
+  demux clocks and checks constructor and compact delivery scope refusals.
+  The contracts list the declared deviations and the
   runtime and memory bounds awaiting native measurements.
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
