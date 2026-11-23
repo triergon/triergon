@@ -526,6 +526,155 @@ struct TrackBuild {
     description_at: usize,
 }
 
+struct TrackIndexing<'a> {
+    part: &'a mut Parts,
+    tracks: &'a mut BudgetVec<MovieTrack>,
+    at: &'a mut usize,
+    build: &'a mut Option<TrackBuild>,
+    references: &'a mut BudgetVec<bool>,
+    pool: &'a Budget,
+    limits: Limits,
+    timing_policy: TimingRunPolicy,
+    recovery: bool,
+}
+
+impl TrackIndexing<'_> {
+    // A separate track-building frame increases open instructions by about 10%.
+    #[inline(always)]
+    fn poll(self, w: &mut WorkBudget) -> Result<OpenStep> {
+        let p = self.part;
+        if self.build.is_none() {
+            if !w.try_charge(1) {
+                return Ok(OpenStep::Yield);
+            }
+            let raw = required(p.stbl.clone(), "missing sample table")?;
+            let mut builder = SampleTableBuilder::with_timing_policy(
+                raw,
+                self.pool.clone(),
+                self.limits,
+                self.timing_policy,
+            )?;
+            if self.recovery {
+                builder.allow_legacy_dependency_flags();
+            }
+            let dref = p
+                .dref
+                .as_ref()
+                .ok_or(Error::Invalid("missing source data references"))?;
+            if fields::u32_at(dref.payload(), 0)? != 0 {
+                return Err(Error::Unsupported("data reference flags"));
+            }
+            *self.build = Some(TrackBuild {
+                builder,
+                refs: Some(dref.children(8, self.limits)?),
+                pending_reference: None,
+                description_at: 0,
+            });
+            p.stbl = None;
+        }
+        let Some(build) = self.build.as_mut() else {
+            return Ok(OpenStep::Yield);
+        };
+        if let Some(value) = build.pending_reference {
+            if !w.try_charge(1) {
+                return Ok(OpenStep::Yield);
+            }
+            push(self.references, value)?;
+            build.pending_reference = None;
+            return Ok(OpenStep::Yield);
+        }
+        if let Some(refs) = build.refs.as_mut() {
+            match refs.poll(w)? {
+                Next::Yield => return Ok(OpenStep::Yield),
+                Next::Item(raw) => {
+                    if self.references.len() >= self.limits.max_descriptions as usize {
+                        return Err(Error::Limit {
+                            requested: self.references.len() + 1,
+                            maximum: self.limits.max_descriptions as usize,
+                        });
+                    }
+                    build.pending_reference =
+                        Some(raw.header().kind == *b"url " && raw.payload() == [0, 0, 0, 1]);
+                    return Ok(OpenStep::Yield);
+                }
+                Next::End => {
+                    let dref = refs.parent();
+                    if fields::u32_at(dref.payload(), 4)? as usize != self.references.len() {
+                        return Err(Error::Invalid("data reference count"));
+                    }
+                    build.refs = None;
+                }
+            }
+        }
+        build.builder.poll(w)?;
+        let Some(table) = build.builder.built() else {
+            return Ok(OpenStep::Yield);
+        };
+        if let Some(desc) = table.descriptions().get(build.description_at) {
+            if !w.try_charge(1) {
+                return Ok(OpenStep::Yield);
+            }
+            let at = usize::from(desc.data_reference_index)
+                .checked_sub(1)
+                .ok_or(Error::Invalid("zero reference"))?;
+            match self.references.as_slice().get(at) {
+                Some(true) => {}
+                Some(false) => {
+                    return Err(Error::Unsupported("external source data reference"));
+                }
+                None => return Err(Error::Invalid("dangling source data reference")),
+            }
+            build.description_at += 1;
+            return Ok(OpenStep::Yield);
+        }
+        if !w.try_charge(1) {
+            return Ok(OpenStep::Yield);
+        }
+        let tkhd = p.tkhd.as_ref().ok_or(Error::Invalid("missing tkhd"))?;
+        let mdhd = p.mdhd.as_ref().ok_or(Error::Invalid("missing mdhd"))?;
+        let hdlr = p.hdlr.as_ref().ok_or(Error::Invalid("missing hdlr"))?;
+        let header = if self.recovery {
+            crate::compat::mov::field_recovery::RecoveryTrackHeader::parse(tkhd, mdhd, hdlr)?
+                .into_source()
+        } else {
+            TrackHeader::parse(tkhd, mdhd, hdlr)?
+        };
+        if self
+            .tracks
+            .as_slice()
+            .iter()
+            .any(|t| t.header.track_id == header.track_id)
+        {
+            return Err(Error::Invalid("duplicate source track ID"));
+        }
+        let edits = p
+            .elst
+            .clone()
+            .map(|b| EditList::parse(b, self.limits))
+            .transpose()?;
+        self.tracks.try_reserve_exact(1)?;
+        let next_ordinal = table.sample_count().checked_add(1).ok_or(Error::Overflow)?;
+        if let Some(build) = self.build.take() {
+            push(
+                self.tracks,
+                MovieTrack {
+                    header,
+                    next_ordinal,
+                    table: build.builder.finish()?,
+                    edits,
+                    fragments: BudgetVec::new(self.pool),
+                    // Moving the reference into the child walk costs 0.15% on a playback open.
+                    raw_dref: required(p.dref.take(), "missing dref")?,
+                },
+            )?;
+        }
+        p.elst = None;
+        self.references.clear();
+        *self.at += 1;
+        Ok(OpenStep::Yield)
+    }
+}
+
 /// An opened track as a fragment's admission sees it: the opener holds one bare, the
 /// neutral reader inside its reading state.
 pub(crate) trait FragmentTrack {
@@ -663,7 +812,10 @@ impl MoofWalk {
 
 #[derive(Debug)]
 #[repr(u8)]
-#[allow(clippy::large_enum_variant)] // Keep the builder inline without a per-fragment allocation.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep the builder inline without a per-fragment allocation"
+)]
 enum TrafStage {
     Next,
     Scan {
@@ -875,153 +1027,25 @@ impl MovieOpen {
             walk.poll(w, c, self.limits)?;
             return Ok(OpenStep::Yield);
         }
-        if self.track_at < walk.parts.len() {
-            return self.track(w);
+        if let Some(part) = walk.parts.as_mut_slice().get_mut(self.track_at) {
+            return TrackIndexing {
+                part,
+                tracks: &mut self.tracks,
+                at: &mut self.track_at,
+                build: &mut self.track_build,
+                references: &mut self.references,
+                pool: &self.pool,
+                limits: self.limits.format,
+                timing_policy: self.timing_policy,
+                recovery: self.mode == OpenMode::Recovery,
+            }
+            .poll(w);
         }
         if self.fragment_moof < self.moofs.len() {
             return self.fragment(w);
         }
         self.ready = true;
         Ok(OpenStep::Ready)
-    }
-    // A frame of its own adds about 10% to the instructions of an open.
-    #[inline(always)]
-    fn track(&mut self, w: &mut WorkBudget) -> Result<OpenStep> {
-        let p = &mut self
-            .walk
-            .as_mut()
-            .ok_or(Error::Invalid("walk missing"))?
-            .parts
-            .as_mut_slice()[self.track_at];
-        if self.track_build.is_none() {
-            if !w.try_charge(1) {
-                return Ok(OpenStep::Yield);
-            }
-            let raw = required(p.stbl.clone(), "missing sample table")?;
-            let mut builder = SampleTableBuilder::with_timing_policy(
-                raw,
-                self.pool.clone(),
-                self.limits.format,
-                self.timing_policy,
-            )?;
-            if self.mode == OpenMode::Recovery {
-                builder.allow_legacy_dependency_flags();
-            }
-            let dref = p
-                .dref
-                .as_ref()
-                .ok_or(Error::Invalid("missing source data references"))?;
-            if fields::u32_at(dref.payload(), 0)? != 0 {
-                return Err(Error::Unsupported("data reference flags"));
-            }
-            self.track_build = Some(TrackBuild {
-                builder,
-                refs: Some(dref.children(8, self.limits.format)?),
-                pending_reference: None,
-                description_at: 0,
-            });
-            p.stbl = None;
-        }
-        let Some(build) = &mut self.track_build else {
-            return Ok(OpenStep::Yield);
-        };
-        if let Some(value) = build.pending_reference {
-            if !w.try_charge(1) {
-                return Ok(OpenStep::Yield);
-            }
-            push(&mut self.references, value)?;
-            build.pending_reference = None;
-            return Ok(OpenStep::Yield);
-        }
-        if let Some(refs) = build.refs.as_mut() {
-            match refs.poll(w)? {
-                Next::Yield => return Ok(OpenStep::Yield),
-                Next::Item(raw) => {
-                    if self.references.len() >= self.limits.format.max_descriptions as usize {
-                        return Err(Error::Limit {
-                            requested: self.references.len() + 1,
-                            maximum: self.limits.format.max_descriptions as usize,
-                        });
-                    }
-                    build.pending_reference =
-                        Some(raw.header().kind == *b"url " && raw.payload() == [0, 0, 0, 1]);
-                    return Ok(OpenStep::Yield);
-                }
-                Next::End => {
-                    let dref = refs.parent();
-                    if fields::u32_at(dref.payload(), 4)? as usize != self.references.len() {
-                        return Err(Error::Invalid("data reference count"));
-                    }
-                    build.refs = None;
-                }
-            }
-        }
-        build.builder.poll(w)?;
-        let Some(table) = build.builder.built() else {
-            return Ok(OpenStep::Yield);
-        };
-        if let Some(desc) = table.descriptions().get(build.description_at) {
-            if !w.try_charge(1) {
-                return Ok(OpenStep::Yield);
-            }
-            let at = usize::from(desc.data_reference_index)
-                .checked_sub(1)
-                .ok_or(Error::Invalid("zero reference"))?;
-            match self.references.as_slice().get(at) {
-                Some(true) => {}
-                Some(false) => {
-                    return Err(Error::Unsupported("external source data reference"));
-                }
-                None => return Err(Error::Invalid("dangling source data reference")),
-            }
-            build.description_at += 1;
-            return Ok(OpenStep::Yield);
-        }
-        if !w.try_charge(1) {
-            return Ok(OpenStep::Yield);
-        }
-        let tkhd = p.tkhd.as_ref().ok_or(Error::Invalid("missing tkhd"))?;
-        let mdhd = p.mdhd.as_ref().ok_or(Error::Invalid("missing mdhd"))?;
-        let hdlr = p.hdlr.as_ref().ok_or(Error::Invalid("missing hdlr"))?;
-        let header = if self.mode == OpenMode::Recovery {
-            crate::compat::mov::field_recovery::RecoveryTrackHeader::parse(tkhd, mdhd, hdlr)?
-                .into_source()
-        } else {
-            TrackHeader::parse(tkhd, mdhd, hdlr)?
-        };
-        if self
-            .tracks
-            .as_slice()
-            .iter()
-            .any(|t| t.header.track_id == header.track_id)
-        {
-            return Err(Error::Invalid("duplicate source track ID"));
-        }
-        let edits = p
-            .elst
-            .clone()
-            .map(|b| EditList::parse(b, self.limits.format))
-            .transpose()?;
-        self.tracks.try_reserve_exact(1)?;
-        let next_ordinal = table.sample_count().checked_add(1).ok_or(Error::Overflow)?;
-        if let Some(build) = self.track_build.take() {
-            push(
-                &mut self.tracks,
-                MovieTrack {
-                    header,
-                    next_ordinal,
-                    table: build.builder.finish()?,
-                    edits,
-                    fragments: BudgetVec::new(&self.pool),
-                    // Moving the reference into the child walk costs 0.15% on a playback open.
-                    raw_dref: required(p.dref.take(), "missing dref")?,
-                },
-            )?;
-        }
-        p.elst = None;
-        self.references.clear();
-        self.track_at += 1;
-        Ok(OpenStep::Yield)
     }
     fn metadata(&mut self, w: &mut WorkBudget) -> Result<OpenStep> {
         if !w.try_charge(1) {
