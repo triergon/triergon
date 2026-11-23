@@ -260,6 +260,22 @@ impl Recent {
     }
 }
 
+/// H.264: the first intra picture of a stream decoded before it recovers.
+#[derive(Clone, Copy, Debug)]
+struct Key {
+    /// Its order count, until the pictures above it recover the stream.
+    poc: Option<i32>,
+    /// The pictures above it decoded since.
+    above: u32,
+    /// Where it is stored.
+    id: Option<PictureId>,
+    /// Whether it is kept when the stream recovers at depth 0: the stream's
+    /// first picture, with a `frame_num` other than 0.
+    kept: bool,
+    /// Whether it is a reference picture.
+    reference: bool,
+}
+
 /// H.264 output state between pictures.
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct AvcState {
@@ -282,16 +298,8 @@ pub(super) struct AvcState {
     recovered: bool,
     /// The `frame_num` a recovery point SEI names.
     target: Option<u32>,
-    /// An intra picture has been decoded before recovery, its order count
-    /// and the pictures above it decoded since.
-    keyed: bool,
-    key_poc: Option<i32>,
-    above_key: u32,
-    /// The first intra picture and whether it is kept when the stream
-    /// recovers at depth 0.
-    key_id: Option<PictureId>,
-    key_kept: bool,
-    key_reference: bool,
+    /// The first intra picture decoded before recovery.
+    key: Option<Key>,
     /// Pictures above the first intra picture were counted during the start
     /// hold, their recovery not yet decided.
     pub(super) deferred: bool,
@@ -324,7 +332,8 @@ impl AvcState {
     /// Whether the first intra picture can recover the stream: a reference
     /// picture, or one kept at depth 0.
     fn key_recovers(&self) -> bool {
-        self.key_reference || self.key_kept && self.recovery_depth() == 0
+        self.key
+            .is_some_and(|key| key.reference || key.kept && self.recovery_depth() == 0)
     }
 
     /// The reorder depth that decides recovery: at least 1 after a B picture
@@ -661,7 +670,7 @@ impl NalDecode {
         // stream's first picture with `frame_num` other than 0.
         let key = header.intra() && slice.reference;
         let first_key = !state.recovered
-            && !state.keyed
+            && state.key.is_none()
             && header.intra()
             && (slice.reference || state.decoded == 1 && header.frame_num != 0);
         // The reference picture a recovery point names, and the first intra
@@ -669,22 +678,28 @@ impl NalDecode {
         let target = !state.recovered
             && slice.reference
             && state.target == Some(u32::from(header.frame_num));
-        let key_poc = state.key_poc;
+        let key_poc = state.key.and_then(|first| first.poc);
         let deferring = state.holds && !state.early.ended;
         if state.deferred && !deferring {
             self.resolve_recovery();
         }
         let state = &mut self.progress.avc;
         let mut unrecovered = false;
-        if !state.recovered && !first_key && state.key_poc.is_some_and(|key| order > key) {
-            state.above_key = state.above_key.saturating_add(1);
-            held.above = state.above_key;
+        let recovered = state.recovered;
+        if !recovered
+            && !first_key
+            && let Some(first) = &mut state.key
+            && first.poc.is_some_and(|poc| order > poc)
+        {
+            first.above = first.above.saturating_add(1);
+            let above = first.above;
+            held.above = above;
             if deferring {
                 state.deferred = true;
             } else {
                 let depth = state.recovery_depth();
-                unrecovered = state.above_key <= depth;
-                if state.above_key >= depth.max(1) {
+                unrecovered = above <= depth;
+                if above >= depth.max(1) {
                     self.recover_above_key();
                 }
             }
@@ -692,17 +707,17 @@ impl NalDecode {
         let state = &mut self.progress.avc;
         if (!state.recovered || unrecovered) && (key || first_key) {
             held.key = true;
-            if !state.keyed {
-                state.keyed = true;
-                state.floor = Some(order);
-            }
         }
         if first_key {
             held.first_key = true;
-            state.key_reference = slice.reference;
-            state.key_poc = Some(order);
-            state.above_key = 0;
-            state.key_kept = state.decoded == 1 && header.frame_num != 0;
+            state.floor = Some(order);
+            state.key = Some(Key {
+                poc: Some(order),
+                above: 0,
+                id: None,
+                kept: state.decoded == 1 && header.frame_num != 0,
+                reference: slice.reference,
+            });
         }
         if target {
             state.target = None;
@@ -770,8 +785,8 @@ impl NalDecode {
         let Ok(id) = self.pictures.store(new, held) else {
             return;
         };
-        if first_key {
-            self.progress.avc.key_id = Some(id);
+        if first_key && let Some(key) = &mut self.progress.avc.key {
+            key.id = Some(id);
         }
         if let Some(parity) = parity {
             self.progress.avc.first_field = Some(FirstField {
@@ -785,12 +800,13 @@ impl NalDecode {
 
     /// Decides the recovery of the pictures above the first intra picture
     /// counted during the start hold, by the reorder depth at its end: those
-    /// up to the depth are not recovered.
+    /// up to the depth are not recovered. Out of line, as `choose_start`.
+    #[inline(never)]
     pub(super) fn resolve_recovery(&mut self) {
         let state = &mut self.progress.avc;
         state.deferred = false;
         let depth = state.recovery_depth();
-        if state.above_key < depth.max(1) {
+        if state.key.map_or(0, |key| key.above) < depth.max(1) {
             return;
         }
         if !state.key_recovers() {
@@ -810,20 +826,22 @@ impl NalDecode {
     /// at depth 0 the intra picture is dropped unless it is kept.
     fn recover_above_key(&mut self) {
         let state = &mut self.progress.avc;
-        state.key_poc = None;
         if !state.key_recovers() {
             // A non-reference intra picture recovers the stream only when it
             // is kept at depth 0; otherwise the next intra picture is the
             // first (one with `frame_num` 0, or one at reorder depth 1,
             // outputs nothing).
-            state.keyed = false;
+            let id = state.key.take().and_then(|key| key.id);
             state.floor = None;
-            if let Some(id) = state.key_id
+            if let Some(id) = id
                 && let Some(mut entry) = self.pictures.entry(id)
             {
                 entry.picture_mut().key = false;
             }
             return;
+        }
+        if let Some(key) = &mut state.key {
+            key.poc = None;
         }
         state.recovered = true;
         if state.recovery_depth() == 0 {
@@ -838,10 +856,10 @@ impl NalDecode {
     /// Drops the first intra picture unless it is kept.
     fn drop_key(&mut self) {
         let state = &self.progress.avc;
-        if state.key_kept {
+        if state.key.is_some_and(|key| key.kept) {
             return;
         }
-        if let Some(id) = state.key_id
+        if let Some(id) = state.key.and_then(|key| key.id)
             && let Some(mut entry) = self.pictures.entry(id)
         {
             entry.picture_mut().key = false;
