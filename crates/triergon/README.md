@@ -7,14 +7,30 @@ model is always available.
 
 ## Usage
 
-With `playback,codecs,render`, open the source with `playback::probe::Probe` and
+Open a file and read its packets, with the default `matroska` feature or any other
+reader feature:
+
+```rust,no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use triergon::{Budget, PacketInfo, open_blocking};
+
+let pool = Budget::new(64 << 20)?;
+let mut source = open_blocking(std::fs::File::open("movie.mkv")?, &pool)?;
+while let Some(packet) = source.next_packet()? {
+    let (track, pts, bytes) = (packet.track(), packet.pts(), packet.payload().len());
+    # let _ = (track, pts, bytes);
+}
+# Ok(())
+# }
+```
+
+To decode and render as well, with `playback,codecs,render`, open the source with
+`playback::probe::Probe` and
 read outputs from a `playback::Player`. Look up the packet's track with
 `Engine::track`, load the audio and video sessions with the matching decoders,
 and step `AccessUnits::for_track` once per selected track to obtain its framer.
 For indexed MP4, finish `PreparedMp4::identify_tracks` before selecting tracks
 or creating framers so their codec identities and sample descriptions are available.
-On the source media clock, the playback pipeline caps AAC output at the sample's
-declared duration before publishing PCM.
 Here `ready` supplies a fresh work budget when the framing job yields.
 
 ```rust,no_run
@@ -73,7 +89,7 @@ then supply the ranges requested by `ContainerReader::step`. After
 `open_blocking(source, &pool)` does the probing and input handling for a
 `std::io::Read + Seek` source and returns a `Blocking` driver with `next_event`,
 `next_packet` and `seek`; `open_sequential` does the same for a pipe, which the readers
-then treat as FFmpeg treats one (no seeking, no known length). Both adapters stop
+read without seeking or a known length. Both adapters stop
 reading as soon as a fixed container signature selects the format, by the rules under
 [Behaviour and limits](#behaviour-and-limits). A native FLAC marker also suffices once
 higher-priority container signatures are ruled out. Frame-based and ID3-prefixed
@@ -181,45 +197,17 @@ The meaning of each type is documented in
 
 ## Conformance
 
-The facade adds no parsing; format semantics and their FFmpeg comparisons live in
-the format crates, and the rules every reader follows are the
-[container contract](../../docs/architecture.md#container-contract).
-`tests/any_reader.rs` checks that `probe` classifies the three container families,
-that an authored Matroska file reads through `AnyReader` with the expected track and
-packet, and that a disabled MPEG-TS feature is refused. `tests/any_reader_mpegts.rs`
-checks TS188/M2TS192 dispatch, full source AUs and unchanged PES payload bytes.
-`tests/any_reader_isobmff.rs` reads and seeks an
-authored MP4 through `AnyReader`; `tests/any_reader_ogg.rs` and
-`tests/any_reader_elementary.rs` read authored Ogg Opus, MPEG audio and headerless FLAC
-streams with their trims. `tests/blocking_probe.rs` checks short reads, interruptions,
-reader features, container precedence and budgeted prefix replay.
-`tests/play.rs` runs the example pipeline with the tracked AVC/AAC and ASS
-fixtures under plain `cargo test`.
-
-The playback comparisons run the example's demux, framing and decode loop over
-Matroska, MP4 and MPEG-TS, checking packet fields and payloads, ordered RGBA
-pictures with presentation times, and stereo PCM. Matroska and MP4 use
-`Player`. The Matroska grade checks the exact Block clocks independently
-and compares the selected AAC output from presentation time zero. MPEG-TS uses
-its source access-unit reader. After the three-track Matroska decode, the
-same example renders an external ASS script with its embedded font at 640×360.
-The grade checks image order, geometry, colour and every alpha byte against
-libass, with a frame while the subtitle is visible and one at expiry.
-The facade also has
-separate comparisons for strict MPEG-TS access units and seek delivery.
-The MPEG-TS comparison records source admission differences for private
-audio carriage and for video delimiters without a coded picture. It checks
-short-input and multi-program refusals and compares LOAS and MPEG audio
-frame boundaries across PES packets. The MPEG Layer I cases also compare
-exact fractional frame durations.
-The [transport control comparison](../../harness/features/facade-mpegts-controls/contract.json)
-checks carrier bytes and positions, PAT and PMT selection, continuity loss,
-clock changes, interrupted access units and PES, header-only HEVC, and
-unsupported carriage through `AnyOther::MpegTs`.
-The Matroska seek comparison verifies earlier audio and subtitle packets
-against a sequential read and checks their exact Block clocks.
-The [source lifecycle comparison](../../harness/features/facade-source-control/contract.json)
-checks source capabilities, restart requests and sticky input failures for Matroska,
-ISO BMFF, TS188 and M2TS192 alongside the native seek comparisons.
-See the [play corpus](../../harness/codecs/play-manifest.json) and
-[quality gates](../../docs/quality.md).
+The facade adds no parsing: format semantics and their comparisons with FFmpeg live in
+the format crates, and every reader follows the
+[container contract](../../docs/architecture.md#container-contract). The facade's own
+comparisons check what it adds: probing and the two adapters
+([facade-probe](../../harness/features/facade-probe/contract.json)), source capabilities,
+restarts and sticky failures through `AnyReader`
+([facade-source-control](../../harness/features/facade-source-control/contract.json)),
+MPEG-TS access units and transport events through `AnyOther::MpegTs`
+([facade-mpegts](../../harness/features/facade-mpegts/contract.json),
+[facade-mpegts-controls](../../harness/features/facade-mpegts-controls/contract.json)),
+seeking ([facade-seek](../../harness/features/facade-seek/contract.json)), and the play
+example's decoded pictures, PCM and rendered subtitle images
+([play corpus](../../harness/codecs/play-manifest.json)). The gates are in
+[docs/quality.md](../../docs/quality.md).

@@ -90,8 +90,7 @@ start trim carrying into the next packet when it is longer than one.
 clock-paced session. `examples/decode_audio.rs` decodes the first audio track of any
 file `triergon::open_blocking` opens.
 
-Supporting modules: `mix` (stereo downmix and s16 conversion), `queue` (bounded
-input).
+The `mix` module holds the stereo downmix and the s16 conversion.
 
 ## Behaviour and limits
 

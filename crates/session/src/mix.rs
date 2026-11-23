@@ -1,4 +1,4 @@
-//! Stereo downmix and 16-bit PCM for the device path (`-ac 2` to Pulse/ALSA).
+//! Stereo downmix and 16-bit PCM for an audio device.
 //!
 //! The coefficients are the conventional matrix (front pair unity, centre and
 //! surrounds at -3 dB, LFE omitted) normalised so no output row can exceed
@@ -372,7 +372,7 @@ mod tests {
         }
     }
 
-    // Native observations (DOWNMIX-ADDENDUM-heights.json): al22_chCfg0PCE_44's
+    // Native observations (harness/codecs/downmix-heights.json): al22_chCfg0PCE_44's
     // 5.1.2(back) layout, and a lavfi superset with every id the decoders emit.
     #[test]
     fn matches_observed_height_matrices() {
@@ -409,8 +409,8 @@ mod tests {
         close(&m, &[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
     }
 
-    // Reference matrices as FFmpeg 9.0.2 reports them for actual vectors
-    // (development observation; the native freeze is DOWNMIX-CONTRACT.json).
+    // Reference matrices as FFmpeg 9.0.2 reports them for actual vectors, as
+    // harness/codecs/downmix-contract.json records them.
     #[test]
     fn matches_observed_reference_matrices() {
         let ac3_51 = DownmixLevels {

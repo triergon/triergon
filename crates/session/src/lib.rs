@@ -127,10 +127,10 @@ pub fn audio_codec(codec: triergon_core::container::CodecId) -> Option<AudioCode
     })
 }
 
-/// The canonical configuration [`audio_decoder`] takes, from the configuration bytes a
-/// container track carries (`TrackInfo::configuration`): Matroska CodecPrivate, an ISO
-/// BMFF `dfLa` or `dOps` payload, or the headers an Ogg reader collects. Empty for codecs
-/// that take none.
+/// The canonical configuration `audio_decoder` (`codecs` feature) takes, from the
+/// configuration bytes a container track carries (`TrackInfo::configuration`): Matroska
+/// CodecPrivate, an ISO BMFF `dfLa` or `dOps` payload, or the headers an Ogg reader
+/// collects. Empty for codecs that take none.
 pub fn audio_configuration(
     codec: AudioCodec,
     track_configuration: &[u8],

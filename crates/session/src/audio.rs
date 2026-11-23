@@ -18,8 +18,8 @@ use triergon_codec::{AudioFrame, ChannelLayout, DownmixLevels, DynAudioDecoder, 
 pub struct PcmBlock<S = Vec<i16>> {
     /// Samples per second per channel; meaningful while `samples` is not empty.
     pub sample_rate: u32,
-    /// The first retained sample's PTS in nanoseconds, from its caller PTS and leading
-    /// trim. `None` when the caller PTS is unknown or the block holds only drain samples.
+    /// The first retained sample's PTS in nanoseconds, from its access unit's PTS and
+    /// leading trim. `None` when the caller PTS is unknown or the block holds only drain samples.
     pub pts: Option<i64>,
     /// The samples; for the default form left and right samples in turn.
     pub samples: S,
@@ -189,7 +189,8 @@ impl<F: PcmForm> AudioSession<F> {
     pub fn generation(&self) -> u64 {
         self.generation
     }
-    /// Queue one access unit with its caller PTS (`None` when unknown). Refused without a
+    /// Queue one access unit with its PTS in nanoseconds on the caller's clock (`None`
+    /// when unknown), the clock [`pull`](Self::pull) is given. Refused without a
     /// decoder or after a failure ([`FeedError::Idle`]), after
     /// [`end_of_stream`](Self::end_of_stream) or for an empty or oversized unit
     /// ([`FeedError::Invalid`]), and while the queue is full ([`FeedError::Backpressure`]:

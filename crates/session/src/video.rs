@@ -20,7 +20,7 @@ pub struct Published {
     pub sequence: u64,
     /// The session's [`generation`](VideoSession::generation) when it was published.
     pub generation: u64,
-    /// The caller PTS of the picture's access unit.
+    /// The PTS of the picture's access unit, in nanoseconds on the caller's clock.
     pub pts: Option<i64>,
     /// The letterboxed picture: the session's [`Canvas`] of RGBA, rows top to bottom, no
     /// padding.
@@ -120,7 +120,8 @@ impl VideoSession {
     pub fn generation(&self) -> u64 {
         self.generation
     }
-    /// Queue one Annex-B access unit with its caller PTS (`None` when unknown). Refused as
+    /// Queue one Annex-B access unit with its PTS in nanoseconds on the caller's clock
+    /// (`None` when unknown), the clock [`step`](Self::step) is given. Refused as
     /// [`AudioSession::feed`](crate::AudioSession::feed) refuses.
     pub fn feed(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
         self.phase.admit(self.decoder.is_some())?;
