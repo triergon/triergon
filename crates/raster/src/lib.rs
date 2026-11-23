@@ -9,8 +9,6 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// The negated float comparisons are libass's: they treat NaN as failing the test.
-#![allow(clippy::neg_cmp_op_on_partial_ord)]
 
 mod bitmap;
 mod blur;

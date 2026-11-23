@@ -103,7 +103,7 @@ impl Blur {
         work: &mut WorkBudget,
     ) -> Result<()> {
         let mx = Method::new(r2x);
-        #[allow(clippy::float_cmp)] // libass reuses the method for equal variances
+        #[allow(clippy::float_cmp, reason = "identical variances share a blur method")]
         let my = if r2y == r2x { mx } else { Method::new(r2y) };
         let (w, h) = (bitmap.width(), bitmap.height());
         if w == 0 || h == 0 {

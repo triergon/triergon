@@ -265,7 +265,7 @@ impl Canvas {
             return storage;
         }
         let (cw, ch) = self.content;
-        #[allow(clippy::float_cmp)] // libass's test for exactly square pixels
+        #[allow(clippy::float_cmp, reason = "the pixel aspect must be exactly square")]
         let Some(par) = self
             .pixel_aspect()
             .filter(|&par| par != 1.0 && cw != 0 && ch != 0)

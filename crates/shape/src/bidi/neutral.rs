@@ -142,7 +142,10 @@ impl Storage {
 /// BD16 and N0 over a paragraph whose weak types are resolved: `levels` are
 /// the explicit levels, `sequence_of` the isolating run sequence of each
 /// character and `absorbed` the characters W1 joined to a run before marks.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the paragraph and run data live in separate slices"
+)]
 pub(super) fn resolve_brackets(
     storage: &mut Storage,
     types: &mut [BidiClass],
@@ -193,7 +196,10 @@ pub(super) fn resolve_brackets(
 /// BD16 as FriBidi pairs brackets: the pairs, in order of their opening
 /// brackets, into `storage.pairs`. Only brackets of class ON that W1 did not
 /// join to another run pair.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "pairing reads paragraph and run data separately"
+)]
 fn pair(
     storage: &mut Storage,
     types: &[BidiClass],

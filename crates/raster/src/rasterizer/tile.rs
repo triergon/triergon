@@ -72,7 +72,10 @@ pub(super) fn fill_halfplane(tile: &mut TileMut<'_>, a: i32, b: i32, c: i64, sca
 
 /// Adds the antialiased top or bottom edge of a trapezoid, covering the
 /// sub-row span `up..dn` (in 1/64 pixel), to `res`.
-#[allow(clippy::too_many_arguments)] // the edge's precomputed terms
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the tile loop takes the edge terms by value"
+)]
 #[inline(always)]
 fn update_border_line(
     res: &mut [i16; TILE],

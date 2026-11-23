@@ -256,7 +256,7 @@ pub(in super::super) fn compute_segments(
 /// Merges segment `current`, which ends at `point`, with `previous`, which
 /// ended where it starts: with identical directions the two become one;
 /// otherwise the longer one stays, in `previous`'s place.
-#[expect(clippy::too_many_arguments, reason = "the state of the segment walk")]
+#[allow(clippy::too_many_arguments, reason = "the state of the segment walk")]
 fn merge_segments(
     segments: &mut [Segment],
     previous: usize,

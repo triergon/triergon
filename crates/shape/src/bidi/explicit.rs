@@ -125,7 +125,10 @@ pub(super) const MAX_ISOLATE_DEPTH: u8 = 124;
 ///   leaves the depth as it is.
 /// - A PDI keeps its class inside an override.
 /// - A PDI that closes no isolate becomes ON.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the pass fills distinct output slices"
+)]
 pub(super) fn levels(
     classes: &[BidiClass],
     end: usize,

@@ -55,7 +55,7 @@ pub enum Load {
 /// hinting keeps between loads. CFF faces need nothing: their hinter keeps
 /// no state, and their advances are the unhinted ones.
 #[derive(Debug)]
-#[expect(
+#[allow(
     clippy::large_enum_variant,
     reason = "one per face, read in place by every load"
 )]

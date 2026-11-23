@@ -133,6 +133,10 @@ impl BitmapTransform {
     /// Quantises `m` for an outline with control box `cbox`, placed against the
     /// remainder of the run it continues (`None` for a run's first bitmap, or a
     /// bitmap of its own). `None` when the transform is degenerate or too large.
+    #[allow(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "NaN centres fail the quantization bound"
+    )]
     pub(crate) fn quantize(
         m: &Matrix,
         cbox: &Rect,

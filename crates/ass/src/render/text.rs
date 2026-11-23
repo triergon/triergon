@@ -146,7 +146,7 @@ impl GlyphStyle {
 
     /// Whether `self` and `other` differ in a way that starts a style run;
     /// libass compares the values exactly.
-    #[allow(clippy::float_cmp)]
+    #[allow(clippy::float_cmp, reason = "any change in style starts a new run")]
     fn differs(&self, other: &Self) -> bool {
         self.size != other.size
             || self.colours != other.colours

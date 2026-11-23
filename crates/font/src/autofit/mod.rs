@@ -85,7 +85,7 @@ struct Globals {
 
 /// A style's metrics in font units, as its writing system measures them.
 #[derive(Debug)]
-#[expect(clippy::large_enum_variant, reason = "kept boxed, one per style")]
+#[allow(clippy::large_enum_variant, reason = "kept boxed, one per style")]
 enum StyleMetrics {
     Latin(latin::Metrics),
     Cjk(cjk::Metrics),
@@ -93,7 +93,7 @@ enum StyleMetrics {
 
 /// What hints a glyph at a size.
 #[derive(Debug)]
-#[expect(clippy::large_enum_variant, reason = "one per load, on the stack")]
+#[allow(clippy::large_enum_variant, reason = "one per load, on the stack")]
 enum Hinter {
     Dummy,
     /// The style's metrics, scaled.
