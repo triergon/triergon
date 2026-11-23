@@ -107,19 +107,9 @@ impl AudioFrame {
         charge: &mut Reservation,
     ) -> Result<(), Error> {
         self.planes.truncate(channels);
-        let planes = |count: usize| {
-            count
-                .checked_mul(size_of::<Vec<f32>>())
-                .ok_or(Error::Overflow)
-        };
-        let samples = |count: usize| count.checked_mul(size_of::<f32>()).ok_or(Error::Overflow);
-        let mut bytes = planes(self.planes.capacity().max(channels))?;
-        for i in 0..channels {
-            let capacity = self.planes.get(i).map_or(0, Vec::capacity).max(len);
-            bytes = bytes
-                .checked_add(samples(capacity)?)
-                .ok_or(Error::Overflow)?;
-        }
+        let capacities =
+            (0..channels).map(|i| self.planes.get(i).map_or(0, Vec::capacity).max(len));
+        let bytes = plane_storage_bytes(self.planes.capacity().max(channels), capacities)?;
         charge.resize_to(bytes)?;
         let mut grew = false;
         if channels > self.planes.len() {
@@ -139,16 +129,27 @@ impl AudioFrame {
             plane.resize(len, 0.0);
         }
         if grew {
-            let mut bytes = planes(self.planes.capacity())?;
-            for plane in &self.planes {
-                bytes = bytes
-                    .checked_add(samples(plane.capacity())?)
-                    .ok_or(Error::Overflow)?;
-            }
+            let capacities = self.planes.iter().map(Vec::capacity);
+            let bytes = plane_storage_bytes(self.planes.capacity(), capacities)?;
             charge.resize_to(bytes)?;
         }
         Ok(())
     }
+}
+
+fn plane_storage_bytes(
+    planes: usize,
+    mut capacities: impl Iterator<Item = usize>,
+) -> Result<usize, Error> {
+    let headers = planes
+        .checked_mul(size_of::<Vec<f32>>())
+        .ok_or(Error::Overflow)?;
+    capacities.try_fold(headers, |bytes, samples| {
+        let plane = samples
+            .checked_mul(size_of::<f32>())
+            .ok_or(Error::Overflow)?;
+        bytes.checked_add(plane).ok_or(Error::Overflow)
+    })
 }
 
 /// Stereo downmix parameters a stream carries (AC-3/E-AC-3 centre/surround/LFE mix
