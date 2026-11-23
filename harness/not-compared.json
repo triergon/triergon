@@ -72,16 +72,10 @@
     "triergon-pixel": [],
     "triergon-playback": [
       {
-        "name": "demux-view-entry-points-outside-the-gated-operations",
-        "entry_points": ["compat::mov::index", "compat::mov::index_encoded_range", "compat::pes::open_private_audio", "compat::pes::open_segment", "compat::pes::startup::Startup::new"],
-        "degree": "recorded",
-        "needs": "Resolve the reordered-edit admission in playback-mov-index. The finite startup and independent segment packet gates are in playback-ts-open."
-      },
-      {
         "name": "player-mp4-seeks",
         "entry_points": ["Player::prepare_mp4_sync_seek", "Player::apply_mp4_sync_seek", "Player::prepare_mp4_demux_seek", "Player::apply_mp4_demux_seek", "Player::prepare_mp4_progressive_sync_seek", "Player::prepare_mp4_progressive_demux_seek", "mp4::PreparedMp4::movie_seek", "Player::apply_movie_seek"],
         "degree": "recorded",
-        "needs": "Resolve edit-aware demux seek admission, encoded preroll and terminal trim in playback-mp4-seek."
+        "needs": "Start each track of a movie-time demux replay at its own landing; one playback-mp4-seek case remains open."
       },
       {
         "name": "fifo-delivery-and-pump",

@@ -182,7 +182,7 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | FFmpeg-compatible packets | `compat::mov::packets::{PacketCursor, StreamView}`, `compat::mov::edits::EditCursor` |
 | FFmpeg-compatible seek | `compat::mov::seek::{IndexCursor, SeekJob, GlobalSeekJob}` |
 | FFmpeg-compatible recovery | `compat::mov::recovery::{RecoveryTrackHeader, RunRecoveryBuilder, PartialSampleReader}` |
-| Encoded tracks | `compat::mov::encoded::EncodedStreamJob`, `compat::mov::edits::EncodedEditJob` |
+| Encoded tracks | `compat::mov::encoded::EncodedStreamJob`, `compat::mov::edits::EncodedEditJob`; `compat::mov::edits::DemuxEditsJob` plans every edited audio and video track of a movie once and the movie keeps the plans |
 
 `SampleReader::new_with_shared_window` returns a view of a complete sample in an
 existing shared input window and retains the window's budget charge; samples split

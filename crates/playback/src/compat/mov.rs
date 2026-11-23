@@ -22,7 +22,11 @@ pub fn forward_encoded_edits<'a>(
 }
 
 /// Index `movie` in the MOV demux packet view: FFmpeg's packet order and clocks,
-/// with the recovery of an opener made by `Mp4Open::new_recovery`.
+/// with the recovery of an opener made by `Mp4Open::new_recovery`. On a complete
+/// source opened without recovery the job first reads the encoded edits of the edited
+/// audio and video tracks
+/// ([`DemuxEditsJob`](triergon_isobmff::compat::mov::edits::DemuxEditsJob)), which then
+/// govern their packets, skip samples and seeks as on [`index_encoded_range`].
 pub fn index(movie: &Movie, limits: PlanLimits) -> Result<Mp4IndexJob<'_>> {
     Mp4IndexJob::demux(movie, limits)
 }

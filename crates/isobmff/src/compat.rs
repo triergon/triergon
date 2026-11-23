@@ -11,6 +11,7 @@ pub mod mov {
 
     pub(crate) mod clocks;
     pub(crate) mod cursor;
+    pub(crate) mod demux_edits;
     pub(crate) mod edit_list;
     pub(crate) mod encoded_configs;
     pub(crate) mod encoded_contexts;
@@ -54,6 +55,7 @@ pub mod mov {
         //! [`PacketCursor::new_encoded_regular`](super::packets::PacketCursor::new_encoded_regular)
         //! or [`PacketCursor::new_front_with_encoded_edits`](super::packets::PacketCursor::new_front_with_encoded_edits).
         pub use super::cursor::EditIdentity;
+        pub use super::demux_edits::DemuxEditsJob;
         pub use super::edit_list::{DurationBasis, EditCursor, EditLimits, EditOccurrence};
         pub use super::encoded_edits::{
             EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,

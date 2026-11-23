@@ -400,7 +400,7 @@ impl PreparedMp4 {
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 enum IndexPhase {
     Tracks = 0,
@@ -411,6 +411,9 @@ enum IndexPhase {
     FragmentTrim = 5,
     FrontTracks = 6,
     Ready = 7,
+    /// Reading the encoded edits of a demux index before its tracks; ordered after
+    /// `Ready`, so the indexing phases dispatch as without it.
+    Edits = 8,
 }
 
 /// Indexes an opened movie into a [`PreparedMp4`], within work budgets.
@@ -433,6 +436,7 @@ pub struct Mp4IndexJob<'a> {
     source_sort: Option<SampleSort>,
     zero_scale_clock: Option<MediaClock>,
     first_sample_probe: Option<(SampleCursor<'a>, Error)>,
+    edits: Option<Box<iso::compat::mov::edits::DemuxEditsJob<'a>>>,
 }
 impl std::fmt::Debug for Mp4IndexJob<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -480,9 +484,24 @@ impl<'a> Mp4IndexJob<'a> {
         Self::new_inner(movie, PlanView::Source, limits, false, None, None)
     }
 
-    /// Index `movie` in the MOV demux packet view.
+    /// Index `movie` in the MOV demux packet view. A complete source opened without
+    /// recovery first reads the encoded edits of its edited tracks, which then govern
+    /// their packets and seeks as on [`Self::encoded_range`].
     pub(crate) fn demux(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
-        Self::new_inner(movie, PlanView::Demux, limits, false, None, None)
+        let mut job = Self::new_inner(movie, PlanView::Demux, limits, false, None, None)?;
+        if !movie.native_recovery()
+            && movie.read_scope() == crate::mp4::open::MetadataReadScope::CompleteEntity
+            && movie
+                .tracks()
+                .iter()
+                .any(|track| track.edits().is_some() && track.fragments().is_empty())
+        {
+            job.edits = Some(Box::new(iso::compat::mov::edits::DemuxEditsJob::new(
+                movie,
+            )?));
+            job.phase = IndexPhase::Edits;
+        }
+        Ok(job)
     }
     pub(crate) fn for_forward_encoded_edits(
         movie: &'a Movie,
@@ -846,6 +865,7 @@ impl<'a> Mp4IndexJob<'a> {
             source_sort: None,
             zero_scale_clock,
             first_sample_probe: None,
+            edits: None,
         })
     }
     /// Indexes within `w`, and returns whether the plan is complete.
@@ -853,8 +873,12 @@ impl<'a> Mp4IndexJob<'a> {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if self.phase == IndexPhase::Ready {
-            return Ok(true);
+        if self.phase >= IndexPhase::Ready {
+            return if self.phase == IndexPhase::Ready {
+                Ok(true)
+            } else {
+                self.read_edits(w, c)
+            };
         }
         if w.remaining() == 0 {
             return Ok(false);
@@ -868,7 +892,65 @@ impl<'a> Mp4IndexJob<'a> {
             IndexPhase::FragmentTrim => self.read_fragment_trim(w, c),
             IndexPhase::FrontTracks => self.project_front_tracks(w),
             IndexPhase::Ready => Ok(true),
+            IndexPhase::Edits => self.read_edits(w, c),
         }
+    }
+
+    /// Reads the encoded edits; where any track has one, indexes the packets through
+    /// them instead of the plain edit cursor.
+    #[cold]
+    #[inline(never)]
+    fn read_edits(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
+        let job = self
+            .edits
+            .as_mut()
+            .ok_or(Error::Invalid("encoded edit job missing"))?;
+        if job.poll(w, c)? == BuildStatus::Yield {
+            return Ok(false);
+        }
+        let plans = self
+            .edits
+            .take()
+            .ok_or(Error::Invalid("encoded edit job missing"))?
+            .finish()?;
+        if plans.iter().any(Option::is_some) {
+            let movie = self.movie;
+            let b = movie.pool();
+            let mut tracks = BudgetVec::new(b);
+            tracks.try_reserve_exact(movie.tracks().len())?;
+            for t in movie.tracks() {
+                push(
+                    &mut tracks,
+                    DemuxTrack {
+                        track_id: t.header().track_id,
+                        table: t.table(),
+                        fragments: t.fragments(),
+                        media_base: t.header().time_base()?,
+                        edits: t
+                            .edits()
+                            .map(|e| Ok::<_, Error>((e, movie.header().time_base()?)))
+                            .transpose()?,
+                    },
+                )?;
+            }
+            let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+            let mut retained = BudgetVec::new(b);
+            retained.try_reserve_exact(plans.len())?;
+            for plan in plans {
+                push(&mut retained, plan.clone())?;
+            }
+            self.demux = Some(PacketCursor::new_encoded_regular(
+                b,
+                tracks.as_slice(),
+                movie.media(),
+                self.limits.packet_limits(),
+                plans,
+                iso::compat::mov::edits::EncodedEditProfile,
+            )?);
+            p.encoded_edits = Some(retained);
+        }
+        self.phase = IndexPhase::Tracks;
+        Ok(false)
     }
 
     fn index_tracks(&mut self, w: &mut WorkBudget) -> Result<bool> {

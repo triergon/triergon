@@ -449,55 +449,12 @@
     }
   ],
   "pending_module_requirements": [
-    "Admit the AV1 sample dependency flags during edited demux seek. The basic EditCursor rejects the dependency table before an index or packet can be delivered.",
-    "Clip the final AAC packet in the RTP hint seek to 512 ticks and attach 512 trailing discard samples. The hint tracks now replay through their final zero decode delta.",
-    "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end.",
-    "Apply each selected track edit to the mapped movie replay so its last partial encoded packet reports the clipped duration and tail discard."
+    "Start each track of a movie-time demux replay at its own landing, as the demux seek does. The replay starts at the plan's first row and delivers the audio priming packet that precedes the video landing."
   ],
   "open_cases": [
     {
-      "id": "demux-dav1-seek",
-      "requirement": "Admit the AV1 sample dependency flags during edited demux seek. The basic EditCursor rejects the dependency table before an index or packet can be delivered."
-    },
-    {
-      "id": "demux-rtp-hints-seek",
-      "requirement": "Clip the final AAC packet in the RTP hint seek to 512 ticks and attach 512 trailing discard samples. The hint tracks now replay through their final zero decode delta."
-    },
-    {
-      "id": "demux-opus-seek",
-      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end."
-    },
-    {
-      "id": "demux-opus-seek-edit-boundary",
-      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end."
-    },
-    {
-      "id": "demux-opus-crop-seek",
-      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end."
-    },
-    {
-      "id": "demux-quicktime-aac-seek",
-      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end."
-    },
-    {
-      "id": "demux-quicktime-aac-minimal-wave-seek",
-      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end."
-    },
-    {
-      "id": "demux-aac-program-seek",
-      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end."
-    },
-    {
-      "id": "demux-leading-video-edit-overlapping-sync-seek",
-      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end."
-    },
-    {
-      "id": "demux-fate-shorter-track-seek",
-      "requirement": "Apply the MOV edit occurrence to demux seek replay. Preserve the chosen audio prefix and its mapped time, and attach the endpoint skip when an encoded packet crosses the edit end."
-    },
-    {
       "id": "movie-mapped-edit",
-      "requirement": "Apply each selected track edit to the mapped movie replay so its last partial encoded packet reports the clipped duration and tail discard."
+      "requirement": "Start each track of a movie-time demux replay at its own landing, as the demux seek does. The replay starts at the plan's first row and delivers the audio priming packet that precedes the video landing."
     }
   ]
 }

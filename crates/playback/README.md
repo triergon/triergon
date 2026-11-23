@@ -269,7 +269,10 @@ the opener read the metadata before any media
 (`MetadataReadScope::FrontMetadataBeforeMdat`, which a nonseekable source with
 a front `moov` gives), it indexes with `compat::mov::index_front`
 and reads with `compat::mov::open_front`; otherwise it indexes with
-`compat::mov::index` and reads with `Engine::mp4`. It recovers
+`compat::mov::index` and reads with `Engine::mp4`. On a complete source opened
+without recovery `compat::mov::index` first reads the encoded edits of the edited
+audio and video tracks, so their packets, skip samples and demux seeks follow those
+edits as with `compat::mov::index_encoded_range`; the movie keeps the plans. It recovers
 what FFmpeg recovers: a first sample outside the source ends the view with
 `MissingSample`, a truncated sample becomes a corrupt
 `ShortPacket` carrying the available prefix, a zero media timescale

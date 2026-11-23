@@ -413,6 +413,9 @@ pub struct Movie {
     pub(crate) raw_roots: BudgetVec<BoxView>,
     pub(crate) major_brand: Option<[u8; 4]>,
     pub(crate) pool: Budget,
+    /// The streams and plans of FFmpeg's encoded edits, once a
+    /// [`DemuxEditsJob`](crate::compat::mov::edits::DemuxEditsJob) has read them.
+    pub(crate) demux_edits: std::sync::OnceLock<Box<crate::compat::mov::demux_edits::DemuxEdits>>,
 }
 impl Movie {
     /// The major brand from the first `ftyp` read.
@@ -1154,6 +1157,7 @@ impl MovieOpen {
             raw_roots: std::mem::replace(&mut self.roots, BudgetVec::new(&self.pool)),
             major_brand: self.brand,
             pool: self.pool.clone(),
+            demux_edits: std::sync::OnceLock::new(),
         })
     }
 }

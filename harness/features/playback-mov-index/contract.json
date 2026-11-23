@@ -2287,15 +2287,6 @@
       "cause": "Both workers refuse the input before delivering packets."
     }
   ],
-  "pending_module_requirements": [
-    "Index the valid reordered MOV edit without losing its decode prefix. The basic MOV cursor refuses this composition edit before yielding any packets."
-  ],
-  "open_cases": [
-    {
-      "id": "regular-encoded-avc-aac-indexed-seek",
-      "requirement": "Index the valid reordered MOV edit without losing its decode prefix. The basic MOV cursor refuses this composition edit before yielding any packets."
-    }
-  ],
   "open_deviations": [
     {
       "reading": "A final size-zero media box ends at the confirmed source end",

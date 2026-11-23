@@ -1473,6 +1473,63 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
 }
 
 #[test]
+fn demux_index_applies_the_encoded_edits_of_a_complete_movie() {
+    // The audio edit starts inside the first packet and ends inside the last one, so
+    // the demux view trims both (ISO/IEC 14496-12 §8.6.6); its seek replays the edit
+    // from the selected video key on.
+    let raw = include_bytes!("../../../isobmff/tests/fixtures/encoded-edit/original.mp4");
+    let (mut player, movie, _, _) = native_range_player(raw);
+    let cancel = off();
+    let leading = [0xf0, 3, 0, 0, 0, 0, 0, 0, 0, 0];
+    let trailing = [0, 0, 0, 0, 0xf0, 1, 0, 0, 0, 0];
+    let trims = |output: &[Output]| {
+        output
+            .iter()
+            .filter_map(|output| match output.event() {
+                Event::Mp4(Mp4Event::Packet(packet)) => packet.encoded_skip_samples,
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    let linear = collect(&mut player, 4096).unwrap();
+    assert_eq!(trims(&linear), [leading, trailing]);
+    drop(linear);
+    let command = {
+        let mut job = player
+            .prepare_mp4_demux_seek(
+                &movie,
+                Mp4DemuxSeekRequest {
+                    video: 1,
+                    timestamp: 43_200,
+                    limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
+                },
+                Selection::All,
+            )
+            .unwrap();
+        while !job.poll(&mut WorkBudget::new(4096), &cancel).unwrap() {}
+        job.finish().unwrap()
+    };
+    assert_eq!(command.receipt().selected.timestamp, 29_328);
+    assert!(
+        player
+            .apply_mp4_demux_seek(&command, &mut WorkBudget::new(4096), &cancel)
+            .unwrap()
+    );
+    let output = collect(&mut player, 4096).unwrap();
+    let packets: Vec<_> = output
+        .iter()
+        .filter_map(|event| match event.event() {
+            Event::Mp4(Mp4Event::Packet(packet)) => Some(packet),
+            _ => None,
+        })
+        .collect();
+    let first = &packets[0].occurrence.as_ref().unwrap().demux;
+    assert_eq!(packets[0].configuration.track.track_id, 2);
+    assert_eq!((first.pts, first.dts), (Some(87_048), Some(87_048)));
+    assert_eq!(trims(&output), [trailing]);
+}
+
+#[test]
 fn native_range_seek_refusals_leave_the_current_player_untouched() {
     let (mut player, movie, calls, _) =
         native_range_player(include_bytes!("../fixtures/mp4/r-edits-repeat.mov"));
