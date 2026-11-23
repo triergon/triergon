@@ -26,7 +26,7 @@ available for finer control. The crate exposes two views of the same file:
 
 - `reference-trace` (off by default): values that only make sense when comparing
   traces with FFmpeg, such as its return codes, log lines and models of its input
-  layer, under `reference_trace::mov`. `examples/isobmff_consumer_worker.rs` needs it.
+  layer, under `reference_trace::mov`. `examples/isobmff_consumer_worker/main.rs` needs it.
 
 ## Usage
 

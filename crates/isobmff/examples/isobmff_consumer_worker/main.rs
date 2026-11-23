@@ -3,9 +3,7 @@
 //! the traces and work counts the harness compares with the reference worker.
 #![deny(unsafe_code)]
 #![cfg_attr(not(test), no_main)]
-#[path = "isobmff_consumer/model.rs"]
 mod model;
-#[path = "isobmff_consumer/protocol.rs"]
 mod protocol;
 use model::{DemuxOperation, DemuxSeekRequest, Driver, Failure, OpenPolicy, Result};
 use protocol::{Retention, Stats};
