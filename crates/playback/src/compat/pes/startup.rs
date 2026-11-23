@@ -2,8 +2,7 @@
 //! playback: a finite entity read whole through its confirmed end within one input
 //! window, or an M2TS prefix, after which the source reads on.
 use super::PidSelection;
-use crate::engine::ts::Binding;
-use crate::pes_feed::TsEngine;
+use crate::engine::ts::{Binding, TsEngine};
 use crate::{
     Engine, Format, Player, PlayerPolicy, Result, Selection, SourceOwner, probe::SelectedInput,
 };

@@ -5,14 +5,13 @@
 //! completed PES packets with their demux clock; it delivers only the rare
 //! table, clock and fault events of the source whole.
 
-use crate::engine::ts::Delivery;
+use crate::engine::ts::{Delivery, TsEngine};
 use crate::{Engine, Result};
 use std::sync::atomic::AtomicBool;
 use triergon_core::source::SourceReply;
 use triergon_core::{InputCursor, WorkBudget};
 use triergon_mpegts::{ParseLimits, clock::SourceTimePolicy, psi::DescriptorNamespace};
 
-pub use crate::engine::ts::TsEngine;
 pub use crate::engine::ts::feed::{FeedPacket, FeedStep, PesFacts, PesInput, SpentLists};
 
 /// The progressive PES feed of a single-program TS188 source: the PES of the tracks
@@ -58,19 +57,30 @@ impl ProgressiveFeed {
     }
 }
 
+/// Which PMT carriages a TS188 segment feed admits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SegmentProfile {
+    /// AVC video and ADTS AAC audio.
+    AvcAac,
+    /// AVC or HEVC video and ADTS AAC, AC-3 or E-AC-3 audio.
+    Media,
+}
+
 /// A player engine over one independent TS188 segment with an in-band PAT and
-/// PMT, delivering demux PES of the tracks its PMT names: AVC and AAC, or with
-/// `media` the HLS audio carriage rules (AC-3 and E-AC-3 as well).
-pub fn open_segment_feed(input: InputCursor, limits: ParseLimits, media: bool) -> Result<Engine> {
+/// PMT, delivering demux PES of the tracks allowed by `profile`.
+pub fn open_segment_feed(
+    input: InputCursor,
+    limits: ParseLimits,
+    profile: SegmentProfile,
+) -> Result<Engine> {
     TsEngine::segment(
         input,
         limits,
         SourceTimePolicy::Unanchored,
         DescriptorNamespace::Unspecified,
-        if media {
-            Delivery::MediaFeed
-        } else {
-            Delivery::AvcAacFeed
+        match profile {
+            SegmentProfile::AvcAac => Delivery::AvcAacFeed,
+            SegmentProfile::Media => Delivery::MediaFeed,
         },
     )
     .map(Engine::Ts)

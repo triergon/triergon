@@ -18,7 +18,8 @@ use triergon_mpegts::{
 use triergon_playback::compat::pes::AdmittedCarriage;
 use triergon_playback::{
     ClockChoice, Event, Player, PlayerPolicy, Progress, Selection, Source, SourceOwner,
-    SourceReply, State, TrackKey, pes_feed::SpentLists,
+    SourceReply, State, TrackKey,
+    pes_feed::{SegmentProfile, SpentLists},
 };
 
 mod lanes;
@@ -474,7 +475,10 @@ where
         let engine = triergon_playback::pes_feed::open_segment_feed(
             input,
             limits.transport,
-            matches!(selection, TrackSelection::Media(_)),
+            match selection {
+                TrackSelection::AvcAac(_) => SegmentProfile::AvcAac,
+                TrackSelection::Media(_) => SegmentProfile::Media,
+            },
         )?;
         let mut player = Player::new_direct(
             engine,
@@ -1159,9 +1163,12 @@ mod tests {
         )
         .unwrap();
         let bytes = Bytes::copy_from_slice(&pool, fixture).unwrap();
-        let engine =
-            triergon_playback::pes_feed::open_segment_feed(cursor, ParseLimits::default(), false)
-                .unwrap();
+        let engine = triergon_playback::pes_feed::open_segment_feed(
+            cursor,
+            ParseLimits::default(),
+            SegmentProfile::AvcAac,
+        )
+        .unwrap();
         let mut player = Player::new(
             engine,
             SourceOwner::new(ByteSource::new(source, bytes, 4096).unwrap()),
