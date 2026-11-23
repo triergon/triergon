@@ -1,10 +1,10 @@
 //! CABAC context variable layout and initialization (clause 9.3.2.2, Tables 9-5 .. 9-31)
 //! and the level binarization, over the shared arithmetic engine.
 
-use triergon_bitstream::cabac::{Engine, init_state};
+use triergon_bitstream::cabac::{Engine, WithHeadroom, init_state};
 
 /// The arithmetic decoder of a slice.
-pub(crate) type Cabac<'a> = Engine<'a, true>;
+pub(crate) type Cabac<'a> = Engine<'a, WithHeadroom>;
 
 /// Context offsets (one context variable per entry).
 pub(crate) mod ctx {

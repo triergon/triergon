@@ -1,9 +1,9 @@
 //! CABAC context layout and binarizations (clause 9.3) over the shared arithmetic engine.
 
 use crate::tables_cabac_init::CABAC_INIT_MN;
-use triergon_bitstream::cabac::{InvalidOffset, init_state};
+use triergon_bitstream::cabac::{FullRegister, InvalidOffset, init_state};
 
-type Engine<'a> = triergon_bitstream::cabac::Engine<'a, false>;
+type Engine<'a> = triergon_bitstream::cabac::Engine<'a, FullRegister>;
 
 pub(crate) const NUM_CTX: usize = 1024;
 

@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::io::Write;
 
-use triergon_bitstream::cabac::{Engine, init_state};
+use triergon_bitstream::cabac::{Engine, FullRegister, RegisterLayout, WithHeadroom, init_state};
 
 use super::{Operation, Totals, number, row, text};
 
@@ -80,8 +80,8 @@ pub(super) fn prepare<'a>(input: &[u8], arguments: &[OsString]) -> Result<Operat
         return Err("expected CABAC layout plain or headroom".into());
     };
     let execute = match layout.to_str() {
-        Some("plain") => run::<false>,
-        Some("headroom") => run::<true>,
+        Some("plain") => run::<FullRegister>,
+        Some("headroom") => run::<WithHeadroom>,
         _ => return Err("unknown CABAC layout".into()),
     };
     Ok(Operation {
@@ -90,7 +90,7 @@ pub(super) fn prepare<'a>(input: &[u8], arguments: &[OsString]) -> Result<Operat
     })
 }
 
-fn run<const HEADROOM: bool>(
+fn run<L: RegisterLayout>(
     data: &[u8],
     calls: &[Call],
     work: &mut Totals,
@@ -108,7 +108,7 @@ fn run<const HEADROOM: bool>(
         let mut kind = 3;
         match call {
             Call::New(start) => {
-                engine = Engine::<HEADROOM>::new(data, start).ok();
+                engine = Engine::<L>::new(data, start).ok();
                 if engine.is_none() {
                     kind = 8;
                 }

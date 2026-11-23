@@ -78,8 +78,8 @@ binarizations and context tables. A context is one state byte; `decision_unfille
 `refill` let a hot loop decode two bins per refill on a local copy of the engine.
 `Engine::new` and `restart` refuse an initial offset of 510 or 511 (`InvalidOffset`),
 which the specifications forbid. Every decoding process then keeps the offset below the
-range, so `bypass_bits(n)` returns at most `n` bits on any input. The `HEADROOM`
-parameter chooses a register layout; both decode every stream the same.
+range, so `bypass_bits(n)` returns at most `n` bits on any input. Choose `FullRegister` or
+`WithHeadroom` for the register layout. Both decode every stream the same.
 
 The [CABAC engine comparison](../../harness/features/cabac-engine/contract.json) checks
 both layouts against serial arithmetic decoding, including context updates, bypass
@@ -88,14 +88,14 @@ leaves every bin after the cap for the next read, as in H.264 §9.3.2.2 and
 H.265 §9.3.3.2 with a Rice parameter of zero.
 
 ```rust
-use triergon_bitstream::cabac::{Engine, InvalidOffset, init_state};
+use triergon_bitstream::cabac::{Engine, InvalidOffset, WithHeadroom, init_state};
 
 let mut state = init_state(0, 64, 26);
-let mut engine = Engine::<true>::new(&[0; 16], 0)?;
+let mut engine = Engine::<WithHeadroom>::new(&[0; 16], 0)?;
 assert_eq!(engine.decision(&mut state), 1); // the most probable symbol of this context
 assert_eq!(engine.bypass(), 0);
 assert_eq!(engine.terminate(), 0);
-assert_eq!(Engine::<true>::new(&[0xff, 0x80], 0).err(), Some(InvalidOffset));
+assert_eq!(Engine::<WithHeadroom>::new(&[0xff, 0x80], 0).err(), Some(InvalidOffset));
 # Ok::<(), InvalidOffset>(())
 ```
 

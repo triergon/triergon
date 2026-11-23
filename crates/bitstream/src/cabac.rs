@@ -141,15 +141,44 @@ type Word = u32;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InvalidOffset;
 
+mod layout {
+    pub trait Sealed {}
+}
+
+/// A supported arithmetic register layout.
+pub trait RegisterLayout: layout::Sealed + Copy + core::fmt::Debug {
+    /// Whether the register leaves one bit above the arithmetic offset.
+    const HEADROOM: bool;
+}
+
+/// Place the nine-bit arithmetic offset at the top of the register.
+#[derive(Clone, Copy, Debug)]
+pub struct FullRegister;
+
+impl layout::Sealed for FullRegister {}
+impl RegisterLayout for FullRegister {
+    const HEADROOM: bool = false;
+}
+
+/// Leave one bit above the arithmetic offset. On 64-bit targets this starts
+/// with seven bytes of look-ahead in the register instead of four.
+#[derive(Clone, Copy, Debug)]
+pub struct WithHeadroom;
+
+impl layout::Sealed for WithHeadroom {}
+impl RegisterLayout for WithHeadroom {
+    const HEADROOM: bool = true;
+}
+
 /// The arithmetic decoding engine. Reads past the end of the slice yield zero bits; a
 /// decoder bounds a corrupt stream through [`Engine::bits_read`] or [`Engine::next_byte`].
 ///
-/// `HEADROOM` keeps one bit free above the offset (and on 64-bit targets starts with seven
-/// bytes of look-ahead instead of four). Every stream decodes the same either way.
+/// Choose [`FullRegister`] or [`WithHeadroom`] for the register layout. Every stream
+/// decodes the same in both layouts.
 ///
 /// Hot loops can work on a local copy, which keeps the registers in machine registers.
 #[derive(Clone, Copy, Debug)]
-pub struct Engine<'a, const HEADROOM: bool> {
+pub struct Engine<'a, L: RegisterLayout> {
     data: &'a [u8],
     /// The next byte to load (64-bit targets) or the next bit (32-bit targets).
     next: usize,
@@ -157,11 +186,12 @@ pub struct Engine<'a, const HEADROOM: bool> {
     value: Word,
     /// Look-ahead bits below the offset.
     available: i32,
+    layout: core::marker::PhantomData<L>,
 }
 
-impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
+impl<'a, L: RegisterLayout> Engine<'a, L> {
     /// Bit of the register that holds the lowest bit of the offset.
-    const OFFSET_SHIFT: u32 = Word::BITS - 9 - HEADROOM as u32;
+    const OFFSET_SHIFT: u32 = Word::BITS - 9 - L::HEADROOM as u32;
 
     /// Initialises the engine at byte `start` of `data`: ivlCurrRange = 510 and
     /// ivlOffset = read_bits(9).
@@ -172,6 +202,7 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
             range: 510,
             value: 0,
             available: 0,
+            layout: core::marker::PhantomData,
         };
         engine.restart(start)?;
         Ok(engine)
@@ -199,7 +230,7 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
     #[cfg(target_pointer_width = "64")]
     fn start_value(&mut self, start: usize) {
         self.next = start;
-        if HEADROOM {
+        if L::HEADROOM {
             let mut bytes = 0;
             for k in 0..7 {
                 bytes = (bytes << 8) | u64::from(*self.data.get(start + k).unwrap_or(&0));
@@ -247,8 +278,8 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
     /// Loads ivlOffset and the look-ahead after it from byte `start`.
     #[cfg(not(target_pointer_width = "64"))]
     fn start_value(&mut self, start: usize) {
-        let bits = Word::BITS - HEADROOM as u32;
-        self.value = self.window(start * 8) >> HEADROOM as u32;
+        let bits = Word::BITS - L::HEADROOM as u32;
+        self.value = self.window(start * 8) >> L::HEADROOM as u32;
         self.next = start * 8 + bits as usize;
         self.available = Self::OFFSET_SHIFT as i32;
     }
@@ -328,7 +359,7 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
     pub fn bypass(&mut self) -> u32 {
         let range = Word::from(self.range);
         let bin;
-        if HEADROOM {
+        if L::HEADROOM {
             self.value <<= 1;
             let scaled = range << Self::OFFSET_SHIFT;
             bin = self.value >= scaled;
@@ -565,10 +596,10 @@ mod tests {
     }
 
     /// Both layouts, driven the same way, follow the serial process.
-    fn follows_the_serial_process<const HEADROOM: bool>() {
+    fn follows_the_serial_process<L: RegisterLayout>() {
         let mut random = noise(0x1234_5678);
         let data: Vec<u8> = (0..4096).map(|_| random() as u8).collect();
-        let mut engine = Engine::<HEADROOM>::new(&data, 0).unwrap();
+        let mut engine = Engine::<L>::new(&data, 0).unwrap();
         let mut serial = Serial::new(&data);
         let mut fast: Vec<u8> = (0..64).map(|i| init_state(i - 32, 60, 30)).collect();
         let mut slow = fast.clone();
@@ -604,8 +635,8 @@ mod tests {
 
     #[test]
     fn engine_matches_the_serial_process() {
-        follows_the_serial_process::<false>();
-        follows_the_serial_process::<true>();
+        follows_the_serial_process::<FullRegister>();
+        follows_the_serial_process::<WithHeadroom>();
     }
 
     #[test]
@@ -613,20 +644,20 @@ mod tests {
         for (data, offset) in [([0xff, 0x00], 510), ([0xff, 0x80], 511)] {
             let refused = Err(InvalidOffset);
             assert_eq!(
-                Engine::<true>::new(&data, 0).map(|_| ()),
+                Engine::<WithHeadroom>::new(&data, 0).map(|_| ()),
                 refused,
                 "{offset}"
             );
             assert_eq!(
-                Engine::<false>::new(&data, 0).map(|_| ()),
+                Engine::<FullRegister>::new(&data, 0).map(|_| ()),
                 refused,
                 "{offset}"
             );
             let data = [0, 0, data[0], data[1]];
-            let mut engine = Engine::<true>::new(&data, 0).unwrap();
+            let mut engine = Engine::<WithHeadroom>::new(&data, 0).unwrap();
             assert_eq!(engine.restart(2), refused, "{offset}");
         }
-        assert!(Engine::<true>::new(&[0xfe, 0x80], 0).is_ok());
+        assert!(Engine::<WithHeadroom>::new(&[0xfe, 0x80], 0).is_ok());
     }
 
     fn noise(mut seed: u32) -> impl FnMut() -> u32 {
@@ -641,7 +672,7 @@ mod tests {
     #[test]
     fn terminate_and_restart() {
         let mut data = [0u8; 16];
-        let mut engine = Engine::<false>::new(&data, 0).unwrap();
+        let mut engine = Engine::<FullRegister>::new(&data, 0).unwrap();
         assert_eq!(engine.terminate(), 0);
         for _ in 0..40 {
             assert_eq!(engine.bypass(), 0);
@@ -650,7 +681,7 @@ mod tests {
         // An offset of 509 is past the range a terminate leaves.
         data[3] = 0xfe;
         data[4] = 0x80;
-        let mut engine = Engine::<true>::new(&data, 3).unwrap();
+        let mut engine = Engine::<WithHeadroom>::new(&data, 3).unwrap();
         assert_eq!(engine.bits_read(), 3 * 8 + 9);
         assert_eq!(engine.terminate(), 1);
         assert_eq!(engine.aligned_byte_position(), 5);
@@ -660,7 +691,7 @@ mod tests {
 
     #[test]
     fn reads_past_the_end_yield_zero_bits() {
-        let mut engine = Engine::<false>::new(&[], 0).unwrap();
+        let mut engine = Engine::<FullRegister>::new(&[], 0).unwrap();
         for _ in 0..1000 {
             assert_eq!(engine.bypass(), 0);
         }
