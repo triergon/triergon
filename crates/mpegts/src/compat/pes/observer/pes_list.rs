@@ -82,14 +82,6 @@ impl<T> PesList<T> {
         }
         self.items.try_push(value)
     }
-    pub(super) fn try_extend_with(
-        &mut self,
-        count: usize,
-        make: impl FnMut(usize) -> T,
-    ) -> Result<()> {
-        self.try_reserve_exact(count)?;
-        self.items.try_extend_with(count, make)
-    }
     /// Room for `target` elements, prepared before a payload run commits so
     /// that a refused allocation leaves the list as it was.
     pub(super) fn prepare_growth(&self, target: usize) -> Option<ListGrowth<T>> {
@@ -169,7 +161,10 @@ mod tests {
             let growth = list.prepare_growth(12).unwrap();
             list.commit_growth(growth).unwrap();
             assert_eq!(list.capacity(), 12);
-            list.try_extend_with(3, |index| index as u64).unwrap();
+            list.try_reserve_exact(3).unwrap();
+            for index in 0..3 {
+                list.try_push(index).unwrap();
+            }
             assert_eq!(list.capacity(), 12);
             assert_eq!(list.as_slice(), [1, 0, 1, 2]);
         }

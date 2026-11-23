@@ -261,11 +261,6 @@ impl DemuxObserver {
 
     /// Commit preflighted carriers from one shared window. The arena already
     /// has room for every span, including any spans moved from a full arena.
-    // Pushing checked run spans one at a time measured +0.000000136% across the transport workloads.
-    #[expect(
-        clippy::expect_used,
-        reason = "try_extend_with takes an infallible closure; pushing span by span keeps try_push out of line, which measured +0.08% where tried"
-    )]
     pub(crate) fn append_payload_run(
         &mut self,
         bytes: Bytes,
@@ -302,20 +297,16 @@ impl DemuxObserver {
                 .map_err(|error| error.error)?;
         } else {
             // Clone each preceding view and move the original into the final span.
-            let mut views = std::iter::repeat_n(bytes, count);
-            self.spans.try_extend_with(count, |index| {
+            self.spans.try_reserve_exact(count)?;
+            for (index, bytes) in std::iter::repeat_n(bytes, count).enumerate() {
                 let at = index * TS188_BYTES;
                 let offset = start.offset + at as u64;
-                let bytes = views.next().expect("one view per admitted carrier");
                 if index + 1 == count {
-                    // Capacity is reserved before this closure runs. Record the
-                    // complete final carrier before narrowing its original view.
+                    // Record the final carrier before narrowing its original view.
                     record_last(&bytes.as_ref()[at..at + TS188_BYTES]);
                 }
-                DemuxSpan {
-                    bytes: bytes
-                        .into_slice(at + TS_PAYLOAD_START..at + TS188_BYTES)
-                        .expect("payload range inside complete carrier"),
+                let span = DemuxSpan {
+                    bytes: bytes.into_slice(at + TS_PAYLOAD_START..at + TS188_BYTES)?,
                     source: SourceRange {
                         entity: start.source,
                         offset: offset + TS_PAYLOAD_START as u64,
@@ -330,8 +321,9 @@ impl DemuxObserver {
                         source_event_ordinal: context.source_event_ordinal + 2 * index as u64,
                         ..context
                     },
-                }
-            })?;
+                };
+                self.spans.try_push(span).map_err(|refused| refused.error)?;
+            }
         }
         self.add_spans(count);
         let last = (count - 1) as u64;
