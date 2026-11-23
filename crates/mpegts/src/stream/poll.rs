@@ -217,14 +217,12 @@ impl TransportStream {
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
     ) -> Result<Step<TraceEvent>> {
+        // This mode offers literal carriers only; anything else would be emitted as it is.
         self.poll_feed_inner::<false, false>(input, work, cancel, |item, omitted, epochs, work| {
-            let FeedItem::Carrier(carrier) = item else {
-                unreachable!("literal carrier delivery");
+            let FeedItem::Carrier(FeedCarrier(FramedCarrier::Packet(packet))) = item else {
+                return Ok(FeedContinuation::Emit);
             };
-            match carrier.0 {
-                FramedCarrier::Packet(packet) => consume(packet, omitted, epochs, work),
-                FramedCarrier::Plain(_) => unreachable!("literal carrier delivery"),
-            }
+            consume(packet, omitted, epochs, work)
         })
     }
 
@@ -242,9 +240,10 @@ impl TransportStream {
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
     ) -> Result<Step<TraceEvent>> {
+        // These modes offer no payload runs; a declined run would fall back to its carriers.
         let mut single = |item: FeedItem<'_>, omitted, epochs, work: &mut WorkBudget| {
             let FeedItem::Carrier(carrier) = item else {
-                unreachable!("single carrier delivery");
+                return Ok(FeedContinuation::Emit);
             };
             consume(carrier, omitted, epochs, work)
         };
