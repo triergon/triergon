@@ -260,11 +260,10 @@ impl Control {
 /// progress, the track configuration, the segment metadata and where the reader is
 /// in a Cluster. Its steps read elements in source order; a controller decides
 /// where that order starts.
-// The fields are declared in address order: the Cluster time, the bytes every step
-// tests and the element reader first, the transaction workspace last, so that a job
-// that changes size moves no other field. The demux and seek steps were measured
-// with this layout (`reader_fields_keep_their_measured_offsets` records it); in the
-// compiler's own order they ran about 0.4% more instructions.
+// Fields in address order: the Cluster time, the bytes every step tests and the
+// element reader first, the transaction workspace last, so that a job that changes
+// size moves no other field (in the compiler's own order the demux and seek steps
+// ran 0.4% more instructions).
 #[derive(Debug)]
 #[repr(C)]
 struct Stream {
@@ -315,8 +314,10 @@ impl std::fmt::Debug for Reserve {
     }
 }
 
-/// Retained format jobs on the envelope's one InputCursor. Every lace
-/// and checksum in a packet batch validates before its first packet is emitted.
+/// An incremental Matroska and WebM reader over windows the caller supplies. Each
+/// [`step`](Self::step) returns an envelope element, a track configuration, a
+/// metadata document, a packet or a seek receipt, or what it waits for. Every lace
+/// and checksum of a block is validated before its first packet is returned.
 #[derive(Debug)]
 #[repr(C)]
 pub struct Reader {
@@ -880,9 +881,9 @@ impl Reader {
                 .map(|left| usize::try_from(left).unwrap_or(usize::MAX)),
         })
     }
-    // Engine-only supply certificate, separate from the public canonical
-    // NeedInput and the ordinary refill policy. This expanded response policy is
-    // an explicit new blocking seek contract, not an ordinary-hint override.
+    // The refill a seek's header read may be answered with over an immutable source:
+    // up to 4096 bytes within the seek's read-ahead. Only that source's adapter
+    // answers it; the public request stays the exact one.
     fn blocking_seek_header_refill(
         &self,
         request: &InputRequest,
@@ -894,8 +895,8 @@ impl Reader {
             .envelope
             .bounded_header_refill(request, left.min(4096))
     }
-    // The same engine-only certificate for a discarded body: bounded by the
-    // active stop, parent/source ends and scan allowance. Immutable sources only.
+    // The same refill for a discarded body, bounded by the active stop, the parent
+    // and source ends and the scan allowance.
     fn blocking_seek_discard_refill(
         &self,
         request: &InputRequest,
@@ -1162,8 +1163,7 @@ impl Stream {
         }
         Ok(())
     }
-    // Keep the large fallback constructor out of the ordinary small packet's
-    // call frame. This is the same complete BlockGroup constructor/context order.
+    // Out of line: the batch's constructor stays out of the SimpleBlock's frame.
     #[inline(never)]
     fn start_group_batch(
         &mut self,

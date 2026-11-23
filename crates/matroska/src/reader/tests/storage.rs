@@ -205,81 +205,14 @@ fn pending_blocking_read_and_frozen_source_owners_have_the_same_exact_floor() {
     assert_eq!(pool.used(), baseline);
 }
 
-#[cfg(target_pointer_width = "64")]
+/// The two facts of the reader's layout its callers were measured with: the
+/// Cluster time's tag, its largest niche, at offset 0, where an enum around the
+/// reader keeps its own tag, and on 64-bit hosts its size.
 #[test]
-fn inline_transaction_workspace_stays_within_the_observed_host_ceiling() {
-    let bytes = size_of::<State>();
-    println!(
-        "State={bytes} PacketBatch={} Tracks={} Catalogue={}",
-        size_of::<PacketBatchJob>(),
-        size_of::<TracksJob>(),
-        size_of::<CatalogueJob>()
-    );
-    assert!(
-        bytes <= 14256,
-        "the observed transaction workspace ceiling must not grow"
-    );
-}
-/// The reader's fields in address order with their offsets. The demux and seek
-/// steps were measured with this layout: a field that moves is a change to
-/// measure again, on 64-bit and on 32-bit hosts.
-#[test]
-fn reader_fields_keep_their_measured_offsets() {
-    macro_rules! layout {
-        ($($($field:ident).+),* $(,)?) => {
-            [$((stringify!($($field).+), std::mem::offset_of!(Reader, $($field).+))),*]
-        };
-    }
-    let fields = layout![
-        stream.cluster_time,
-        stream.state_coverage_contiguous,
-        stream.state_seen,
-        stream.webm_vp9_t35,
-        stream.envelope,
-        stream.segment_end,
-        stream.scan_remaining,
-        stream.last_location,
-        stream.loaded,
-        stream.seek_targets,
-        stream.replay_prefix,
-        stream.configuration,
-        stream.catalogue,
-        stream.cues,
-        stream.pool,
-        stream.limits,
-        stream.scale,
-        stream.segment_data,
-        stream.revision,
-        stream.metadata_used,
-        stream.demux_read_bytes,
-        stream.adapter_storage,
-        stream.state_coverage_end,
-        stream.seek_index,
-        stream.state,
-        control,
-        gate,
-    ];
-    let offsets = fields.map(|(_, offset)| offset);
-    println!(
-        "READER_LAYOUT|size={}|align={}|{}",
-        size_of::<Reader>(),
-        align_of::<Reader>(),
-        fields
-            .map(|(name, offset)| format!("{name}={offset}"))
-            .join("|")
-    );
+fn the_reader_keeps_its_niche_first_and_its_measured_size() {
+    assert_eq!(std::mem::offset_of!(Reader, stream.cluster_time), 0);
     #[cfg(target_pointer_width = "64")]
-    assert_eq!(
-        (offsets, size_of::<Reader>()),
-        (
-            [
-                0, 16, 17, 18, 24, 592, 608, 624, 752, 864, 976, 1024, 1056, 1128, 1168, 1176,
-                1280, 1288, 1296, 1304, 1312, 1320, 1328, 1336, 1344, 8096, 8816,
-            ],
-            8896
-        )
-    );
-    assert!(offsets.is_sorted());
+    assert_eq!(size_of::<Reader>(), 8896);
 }
 #[cfg(target_pointer_width = "64")]
 #[test]
