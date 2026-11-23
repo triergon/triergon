@@ -10,7 +10,7 @@
 //! index plane, the 256-entry ARGB palette and the ARGB value of every pixel. A
 //! decoder refusal ends the case with a refusal marker. The digest is the ordered
 //! fold of the byte transcript that the recorded cases under
-//! `crates/subtitles/tests/native-compatibility-gold/` store as `expected.bin`.
+//! `crates/subtitles/tests/pgs-receiver-recorded/` store as `expected.bin`.
 
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
@@ -346,7 +346,7 @@ mod tests {
     #[test]
     fn fold_equals_the_digest_of_every_recorded_transcript() {
         let gold = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../subtitles/tests/native-compatibility-gold");
+            .join("../subtitles/tests/pgs-receiver-recorded");
         let mut cases = 0;
         let mut refusals = 0;
         for entry in std::fs::read_dir(&gold).unwrap() {

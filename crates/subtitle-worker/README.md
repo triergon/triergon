@@ -72,7 +72,7 @@ byte transcript; a decoder refusal is a marker in the transcript. The input is a
 capsule (`SMBMO001`): the packet time base, the forced-only option and up to 64 records,
 each a complete PGS packet with its raw PTS and DTS or a hard reset that reopens the
 decoder. The fold is the digest of the byte transcript stored as `expected.bin` beside
-each case in `crates/subtitles/tests/native-compatibility-gold/`. The corpus is
+each case in `crates/subtitles/tests/pgs-receiver-recorded/`. The corpus is
 `harness/features/subtitle-pgs-capsules/`.
 
 ## Recording and verifying subtitle fixtures
