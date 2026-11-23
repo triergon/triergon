@@ -211,7 +211,7 @@ impl PacketCompletion {
         self.null_runs.as_slice()
     }
     /// Number of physical carriers admitted, individually and within null runs.
-    pub fn physical_carrier_count(&self) -> usize {
+    fn physical_carrier_count(&self) -> usize {
         self.carriers.len() + self.compact_carrier_count
     }
     /// Every PAT section admitted, in source order.

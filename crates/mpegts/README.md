@@ -298,7 +298,9 @@ and never reconstructing source clocks or validated PES:
 - `MalformedInputCompletion` reports AVC carriers with reserved adaptation control,
   an adaptation overrun, an invalid PES start code or an overlong PES header.
 - `PacketCompletion` confirms that an input held only control traffic
-  (`NoMediaConfirmation`).
+  (`NoMediaConfirmation`). It admits trace events or compact null runs and keeps
+  what it confirmed from: the control carriers, the null runs, every PAT section
+  and the source diagnostics.
 - `compat::annex_b::ContinuityReader` and `compat::opaque_video::OpaqueRecovery`
   report unframed video runs through continuity changes or a replayed fault.
 

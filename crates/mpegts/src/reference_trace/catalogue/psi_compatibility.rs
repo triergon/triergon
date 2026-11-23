@@ -163,7 +163,6 @@ struct PartialPatRoute {
     entity: SourceId,
     tsid: u16,
     version: u8,
-    last_section: u8,
     program: u16,
     pmt_pid: u16,
     context: SourceContext,
@@ -587,17 +586,6 @@ impl Catalogue {
             .as_ref()
             .map_or(&[], |s| s.evidence.as_slice())
     }
-    /// Whether an incomplete current PAT routes `pid` as a PMT PID, and that PAT is still pending.
-    pub fn has_psi_compatibility_route(&self, pid: u16) -> bool {
-        self.compatibility
-            .as_ref()
-            .and_then(|s| s.route)
-            .is_some_and(|route| {
-                route.pmt_pid == pid
-                    && route.last_section != 0
-                    && self.pending_pat == Some((route.tsid, route.version))
-            })
-    }
     /// Work units for admitting this event, including pending PSI and retained
     /// source ranges. A disabled policy returns `Invalid`, and an out-of-range
     /// work count returns `Overflow`.
@@ -747,7 +735,6 @@ impl Catalogue {
                     entity,
                     tsid: h.extension,
                     version: h.version,
-                    last_section: h.last_section_number,
                     program: self.program,
                     pmt_pid: entry.pid,
                     context,
