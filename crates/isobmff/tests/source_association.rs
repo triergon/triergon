@@ -1,5 +1,5 @@
 //! Original public-API regression: one allocation can describe two physical origins.
-mod common;
+use crate::common;
 use common::{child, children, roots, table};
 use std::sync::atomic::AtomicBool;
 use triergon_core::TimeBase;

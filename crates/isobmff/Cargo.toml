@@ -6,6 +6,7 @@ license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
+autotests = false
 
 [dependencies]
 triergon-core = { path = "../core" }
@@ -30,36 +31,7 @@ name = "isobmff_views_worker"
 required-features = ["reference-trace"]
 
 [[test]]
-name = "fragment_open_clock"
-required-features = ["reference-trace"]
-
-[[test]]
-name = "private_catalogue"
-required-features = ["reference-trace"]
-
-[[test]]
-name = "raw_visual_entries"
-required-features = ["reference-trace"]
-
-[[test]]
-name = "receiver_clock"
-required-features = ["reference-trace"]
-
-[[test]]
-name = "recovery_transport"
-required-features = ["reference-trace"]
-
-[[test]]
-name = "rejected_packet_seek"
-required-features = ["reference-trace"]
-
-[[test]]
-name = "root_count"
-required-features = ["reference-trace"]
-
-[[test]]
-name = "root_walk"
-required-features = ["reference-trace"]
+name = "integration"
 
 [lints]
 workspace = true

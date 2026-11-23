@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use common::child;
 use triergon_core::{Budget, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{

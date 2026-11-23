@@ -1,4 +1,3 @@
-mod common;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, InputCursor, SourceFailure, WorkBudget};
 use triergon_isobmff::{
@@ -11,7 +10,7 @@ use triergon_isobmff::{
     },
 };
 const BASE: &[u8] = include_bytes!("fixtures/encoded-dependency/dep-unreferenced.mp4");
-#[path = "support/encoded_track.rs"]
+#[path = "common/encoded_track.rs"]
 mod encoded_track;
 use encoded_track::{Source, finish, rows};
 

@@ -1,6 +1,6 @@
 //! Literal demux index tuples and independent source facts.
-mod common;
-#[path = "support/demux.rs"]
+
+#[path = "common/demux.rs"]
 mod support;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};

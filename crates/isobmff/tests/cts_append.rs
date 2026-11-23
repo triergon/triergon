@@ -1,7 +1,7 @@
 //! Source assertions precede the demux-index seam. Demux tuples are
 //! literal demux observations.
-mod common;
-#[path = "support/demux.rs"]
+
+#[path = "common/demux.rs"]
 mod support;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};

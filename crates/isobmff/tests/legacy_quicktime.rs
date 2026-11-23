@@ -1,5 +1,5 @@
 //! Legacy QuickTime metadata uses the same data-reference validation as other tracks.
-mod common;
+use crate::common;
 
 use common::{atom, child, roots};
 use std::{io::Cursor, sync::atomic::AtomicBool};

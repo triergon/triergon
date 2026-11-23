@@ -2,8 +2,8 @@
 //! from the tables. They must land where a scan of every index entry lands,
 //! refuse where that scan refuses, with the same error, and continue as a
 //! replay of every track from its beginning continues.
-mod common;
-#[path = "support/demux.rs"]
+
+#[path = "common/demux.rs"]
 mod support;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, WorkBudget};

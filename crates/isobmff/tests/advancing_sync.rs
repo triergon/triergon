@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use common::{child, fixtures::CASES};
 use std::sync::atomic::AtomicBool;

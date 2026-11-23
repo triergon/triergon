@@ -1,5 +1,4 @@
-mod common;
-#[path = "support/recovery.rs"]
+#[path = "common/recovery.rs"]
 mod wire;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, WorkBudget};

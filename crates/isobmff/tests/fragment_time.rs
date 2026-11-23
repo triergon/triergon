@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use triergon_core::{Budget, Error};
 use triergon_isobmff::{boxes::BoxView, fragment::FragmentDecodeTime};
 

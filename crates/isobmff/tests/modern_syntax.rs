@@ -1,7 +1,7 @@
 // Tiny wire fixtures and hand-authored facts, checked by an independent
 // Python wire oracle. Full brand/codec/presentation conformance and demux
 // parity are not covered here.
-mod common;
+use crate::common;
 use common::atom;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{

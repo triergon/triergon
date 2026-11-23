@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use triergon_core::{Budget, Error, Time, WorkBudget};
 use triergon_isobmff::{Limits, Next, boxes::BoxView, index::SegmentIndex};
 

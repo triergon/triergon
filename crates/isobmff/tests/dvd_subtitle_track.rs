@@ -1,6 +1,6 @@
 //! An MP4 DVD subtitle track (`subp` handler, `mp4s` entry with object type
 //! 0xE0) is named [`CodecId::VobSub`] with its colour table as configuration.
-mod common;
+use crate::common;
 use common::atom;
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{CodecId, ContainerReader, Event, MediaKind, PacketInfo, TrackInfo};

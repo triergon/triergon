@@ -1,7 +1,7 @@
 //! Resource/error-priority guard.
 //! No clock/measurement proves the bound: metadata discovery must not be needed
 //! to refuse a slice whose header count already exceeds the explicit policy.
-mod common;
+use crate::common;
 use common::{child, roots};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, WorkBudget};

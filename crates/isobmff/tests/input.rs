@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId, Step,

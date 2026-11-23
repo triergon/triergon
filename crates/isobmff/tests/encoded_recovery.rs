@@ -1,4 +1,3 @@
-mod common;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
@@ -14,7 +13,7 @@ use triergon_isobmff::{
     sample_groups::{RecoveryKind, RecoveryLimits, RecoveryLookup},
 };
 const BASE: &[u8] = include_bytes!("fixtures/encoded-recovery/roll-negative-v0.mp4");
-#[path = "support/encoded_track.rs"]
+#[path = "common/encoded_track.rs"]
 mod encoded_track;
 use encoded_track::{Source, finish, rows};
 

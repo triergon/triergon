@@ -1,6 +1,6 @@
 //! Additional demux global-seek boundaries.
-mod common;
-#[path = "support/demux.rs"]
+use crate::common;
+#[path = "common/demux.rs"]
 mod support;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};

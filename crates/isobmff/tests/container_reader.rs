@@ -1,5 +1,5 @@
 //! The neutral reader over authored files with independently computed samples.
-mod common;
+use crate::common;
 use common::fixtures::{CASES, Case};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{

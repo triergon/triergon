@@ -1,7 +1,7 @@
-mod common;
-#[path = "support/movie.rs"]
+use crate::common;
+#[path = "common/movie.rs"]
 mod fixture;
-#[path = "support/recovery.rs"]
+#[path = "common/recovery.rs"]
 mod wire;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Time, TimeBase, WorkBudget};
