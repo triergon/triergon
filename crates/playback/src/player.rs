@@ -1,7 +1,7 @@
 use crate::source::{Source, SourceReply};
 use crate::{Engine, EngineStep, Event, Result, SourceOwner};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Error, InputRequest, Time, TimeBase, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, InputRequest, Step, Time, TimeBase, WorkBudget};
 use triergon_isobmff::compat::mov::packets::PacketCursor;
 use triergon_mpegts::stream::TraceEvent;
 
@@ -1372,7 +1372,7 @@ impl<S: Source> Player<S> {
         // only an event out of it, where `?` or a temporary would move every step.
         let step = if let Engine::Matroska(matroska) = engine {
             match matroska.step(w, &self.cancel)? {
-                triergon_matroska::ParseStep::Event(event) => {
+                Step::Ready(event) => {
                     let source = engine.source();
                     return self.accept_event::<READY>(
                         source,

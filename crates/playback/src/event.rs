@@ -3,13 +3,13 @@
 use crate::compat::pes::AdmittedCarriage;
 use crate::{Result, SeekIntent, TrackKey, mp4::plan::Mp4Configuration};
 use triergon_core::container::{PacketInfo, RandomAccess, TrackId, Trim};
-use triergon_core::{Error, InputRequest, SourceLocation, Time, TimeBase};
+use triergon_core::{Backpressure, Error, InputRequest, SourceLocation, Step, Time, TimeBase};
 use triergon_isobmff::{
     Access,
     compat::mov::{front::FrontReadBoundary, packets::PacketOccurrence, recovery::ShortSample},
     payload::SourcePacket,
 };
-use triergon_matroska::{Event as MkvEvent, ParseStep};
+use triergon_matroska::Event as MkvEvent;
 use triergon_mpegts::stream::TraceEvent;
 use triergon_mpegts::{
     self as ts,
@@ -170,19 +170,19 @@ pub(crate) enum EngineStep {
 }
 
 impl EngineStep {
-    pub(crate) fn from_matroska(step: ParseStep<MkvEvent>) -> Self {
+    pub(crate) fn from_matroska(step: Step<MkvEvent, Backpressure>) -> Self {
         match step {
-            ParseStep::Event(event) => Self::Event(Event::Matroska(event)),
-            ParseStep::NeedInput(request) => Self::NeedInput(request),
-            ParseStep::Yield => Self::Yield,
-            ParseStep::Backpressure {
+            Step::Ready(event) => Self::Event(Event::Matroska(event)),
+            Step::NeedInput(request) => Self::NeedInput(request),
+            Step::Yield => Self::Yield,
+            Step::Backpressure(Backpressure {
                 requested,
                 available,
-            } => Self::Backpressure {
+            }) => Self::Backpressure {
                 requested,
                 available,
             },
-            ParseStep::Finished => Self::End,
+            Step::End(_) => Self::End,
         }
     }
 }

@@ -1,10 +1,10 @@
-//! The Matroska engine: the reader's own parse steps.
+//! The Matroska engine: the reader's own steps.
 
 use crate::{Result, SeekIntent, TrackKey};
 use std::sync::atomic::AtomicBool;
 use triergon_core::Error;
-use triergon_core::{SourceId, WorkBudget};
-use triergon_matroska::{Event as MkvEvent, ParseStep, Reader};
+use triergon_core::{Backpressure, SourceId, Step, WorkBudget};
+use triergon_matroska::{Event as MkvEvent, Reader};
 /// The Matroska reader as an engine: the engine of
 /// [`Engine::Matroska`](crate::Engine::Matroska).
 #[derive(Debug)]
@@ -18,8 +18,8 @@ impl MkvEngine {
         &mut self,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> Result<ParseStep<MkvEvent>> {
-        self.reader.step_parse(w, c)
+    ) -> Result<Step<MkvEvent, Backpressure>> {
+        self.reader.step(w, c)
     }
     /// Repositions the reader at the Cue of the video track before the target.
     pub(crate) fn begin_seek(&mut self, intent: &SeekIntent) -> Result<()> {
