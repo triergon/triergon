@@ -676,6 +676,14 @@ enum TrafStage {
     },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+enum OpenMode {
+    Complete,
+    Progressive,
+    Recovery,
+}
+
 /// The resumable opener over a caller-driven [`InputCursor`]: it walks the root
 /// boxes, the movie and every fragment, and validates each track.
 #[derive(Debug)]
@@ -704,9 +712,10 @@ pub struct MovieOpen {
     top_count: usize,
     track_at: usize,
     fragment_moof: usize,
-    recovery: bool,
+    mode: OpenMode,
     timing_policy: TimingRunPolicy,
-    prefer_front: bool,
+    // Leave the following fields at the same offsets.
+    reserved: [u8; 1],
     brand: Option<[u8; 4]>,
     ready: bool,
 }
@@ -714,7 +723,7 @@ impl MovieOpen {
     /// An opener reading every root box from the cursor's position; `Error::Invalid` for
     /// limits outside the ranges [`OpenLimits`] states.
     pub fn new(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
-        Self::new_inner(input, limits, false, false)
+        Self::new_inner(input, limits, OpenMode::Complete)
     }
 
     /// Sets the surplus timing policy for tables whose build has yet to start.
@@ -725,27 +734,26 @@ impl MovieOpen {
     /// Opens a metadata-first movie through the first media header, even on a
     /// seekable source. The caller reads later fragments. Limits are as in [`Self::new`].
     pub fn new_progressive(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
-        Self::new_inner(input, limits, false, true)
+        Self::new_inner(input, limits, OpenMode::Progressive)
     }
 
     /// The open a source's capabilities call for: [`new`](Self::new) with random
     /// access, [`new_progressive`](Self::new_progressive) without.
     pub(crate) fn for_source(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
-        Self::new_inner(input, limits, false, !input.capabilities().random_access)
+        if input.capabilities().random_access {
+            Self::new(input, limits)
+        } else {
+            Self::new_progressive(input, limits)
+        }
     }
 
     /// Opens with terminal media declarations preserved and legacy QuickTime
     /// data handlers and dependency flags admitted. Limits are as in [`Self::new`].
     pub fn new_recovery(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
-        Self::new_inner(input, limits, true, false)
+        Self::new_inner(input, limits, OpenMode::Recovery)
     }
 
-    fn new_inner(
-        input: &InputCursor,
-        limits: OpenLimits,
-        recovery: bool,
-        prefer_front: bool,
-    ) -> Result<Self> {
+    fn new_inner(input: &InputCursor, limits: OpenLimits, mode: OpenMode) -> Result<Self> {
         if limits.tracks == 0
             || limits.tracks > 64
             || limits.depth == 0
@@ -755,12 +763,12 @@ impl MovieOpen {
             return Err(Error::Invalid("MP4 adapter open limits"));
         }
         let pool = input.budget().clone();
-        let reader = box_reader(input, limits.metadata_bytes, recovery)?;
+        let reader = box_reader(input, limits.metadata_bytes, mode == OpenMode::Recovery)?;
         Ok(Self {
             reader,
-            recovery,
+            mode,
             timing_policy: TimingRunPolicy::default(),
-            prefer_front,
+            reserved: [0],
             limits,
             pool: pool.clone(),
             roots: BudgetVec::new(&pool),
@@ -816,7 +824,11 @@ impl MovieOpen {
                     push(&mut self.media_cache, cached)?;
                     self.pending_media = None;
                     // The cursor is at the next top-level header after the retained MDAT.
-                    self.reader = box_reader(input, self.limits.metadata_bytes, self.recovery)?;
+                    self.reader = box_reader(
+                        input,
+                        self.limits.metadata_bytes,
+                        self.mode == OpenMode::Recovery,
+                    )?;
                     Ok(OpenStep::Yield)
                 }
                 Step::NeedInput(r) => Ok(OpenStep::NeedInput(r)),
@@ -836,7 +848,7 @@ impl MovieOpen {
                         &self.pool,
                         self.limits,
                         self.brand,
-                        self.recovery,
+                        self.mode == OpenMode::Recovery,
                     )?;
                     self.walk = Some(walk);
                     Ok(OpenStep::Yield)
@@ -892,7 +904,7 @@ impl MovieOpen {
                 self.limits.format,
                 self.timing_policy,
             )?;
-            if self.recovery {
+            if self.mode == OpenMode::Recovery {
                 builder.allow_legacy_dependency_flags();
             }
             let dref = p
@@ -971,7 +983,7 @@ impl MovieOpen {
         let tkhd = p.tkhd.as_ref().ok_or(Error::Invalid("missing tkhd"))?;
         let mdhd = p.mdhd.as_ref().ok_or(Error::Invalid("missing mdhd"))?;
         let hdlr = p.hdlr.as_ref().ok_or(Error::Invalid("missing hdlr"))?;
-        let header = if self.recovery {
+        let header = if self.mode == OpenMode::Recovery {
             crate::compat::mov::field_recovery::RecoveryTrackHeader::parse(tkhd, mdhd, hdlr)?
                 .into_source()
         } else {
@@ -1077,19 +1089,22 @@ impl MovieOpen {
                     maximum: self.limits.roots,
                 });
             }
-            if self.prefer_front && self.moov.is_none() {
+            if self.mode == OpenMode::Progressive && self.moov.is_none() {
                 return Err(Error::Unsupported("progressive MP4 needs front metadata"));
             }
-            let front =
-                (self.prefer_front || !input.capabilities().random_access) && self.moov.is_some();
-            let file_end =
-                if self.recovery && input.capabilities().random_access && self.moov.is_some() {
-                    h.end()?
-                        .zip(input.capabilities().length)
-                        .and_then(|(declared, physical)| (declared > physical).then_some(physical))
-                } else {
-                    None
-                };
+            let front = ((self.mode == OpenMode::Progressive)
+                || !input.capabilities().random_access)
+                && self.moov.is_some();
+            let file_end = if self.mode == OpenMode::Recovery
+                && input.capabilities().random_access
+                && self.moov.is_some()
+            {
+                h.end()?
+                    .zip(input.capabilities().length)
+                    .and_then(|(declared, physical)| (declared > physical).then_some(physical))
+            } else {
+                None
+            };
             let terminal = if h.size.is_none() {
                 if !front || !self.media.is_empty() {
                     return Err(Error::Unsupported(
@@ -1107,7 +1122,7 @@ impl MovieOpen {
                     &self.pool,
                     self.limits,
                     self.brand,
-                    self.recovery,
+                    self.mode == OpenMode::Recovery,
                 )?)
             } else {
                 None
@@ -1136,7 +1151,11 @@ impl MovieOpen {
                 // The checked declaration extends past the physical entity.
                 // Still obtain a matching End before completing the open.
                 input.request_range(end)?;
-                self.reader = box_reader(input, self.limits.metadata_bytes, self.recovery)?;
+                self.reader = box_reader(
+                    input,
+                    self.limits.metadata_bytes,
+                    self.mode == OpenMode::Recovery,
+                )?;
             } else {
                 self.reader.skip(input)?;
             }
@@ -1166,7 +1185,7 @@ impl MovieOpen {
             defaults,
             &self.pool,
             self.limits.format,
-            self.recovery,
+            self.mode == OpenMode::Recovery,
             w,
         )? {
             self.fragment_walk = None;
@@ -1183,7 +1202,7 @@ impl MovieOpen {
         let walk = self.walk.take().ok_or(Error::Invalid("walk missing"))?;
         Ok(Movie {
             read_scope: self.read_scope,
-            recovery: self.recovery,
+            recovery: self.mode == OpenMode::Recovery,
             source: input.source(),
             generation: input.generation(),
             source_length: input.capabilities().length,
