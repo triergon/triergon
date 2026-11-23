@@ -160,6 +160,7 @@ impl PcmStream {
                 track_id: header.track_id,
                 codec: match layout.encoding() {
                     PcmEncoding::Unsigned8 => "pcm_u8",
+                    PcmEncoding::Signed8 => "pcm_s8",
                     PcmEncoding::Signed16BigEndian => "pcm_s16be",
                 },
                 media_type: 1,
@@ -176,7 +177,7 @@ impl PcmStream {
             initial,
         })
     }
-    /// The stream: `pcm_u8` or `pcm_s16be`, audio, in the media time base, with no
+    /// The stream: `pcm_u8`, `pcm_s8` or `pcm_s16be`, audio, in the media time base, with no
     /// codec private data and a zero vendor code.
     pub fn demux(&self) -> &StreamView {
         &self.demux

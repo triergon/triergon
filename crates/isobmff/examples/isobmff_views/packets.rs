@@ -316,6 +316,7 @@ fn sound_descriptions(movie: &Movie, out: &mut Output<'_, '_>) -> triergon_core:
             let (encoding, frame_bytes) = sound.pcm_layout().map_or((0, 0), |layout| {
                 let (id, width) = match layout.encoding() {
                     PcmEncoding::Unsigned8 => (1, 1),
+                    PcmEncoding::Signed8 => (8, 1),
                     PcmEncoding::Signed16BigEndian => (2, 2),
                 };
                 (id, width * u64::from(layout.channels()))
@@ -439,6 +440,7 @@ fn pcm_samples(
         let encoding = match layout.encoding() {
             PcmEncoding::Unsigned8 => 1,
             PcmEncoding::Signed16BigEndian => 2,
+            PcmEncoding::Signed8 => 8,
         };
         let bits = u64::from(sound.sample_bits());
         let channels = u64::from(layout.channels());

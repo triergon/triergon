@@ -47,7 +47,8 @@
         "sowt-32bit-8ch",
         "twos-24bit-5ch",
         "twos-32bit-6ch",
-        "twos-8bit-1ch"
+        "twos-8bit-1ch",
+        "twos-8bit-1ch-adjacent"
       ],
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     },
@@ -74,7 +75,8 @@
         "sowt-32bit-8ch",
         "twos-24bit-5ch",
         "twos-32bit-6ch",
-        "twos-8bit-1ch"
+        "twos-8bit-1ch",
+        "twos-8bit-1ch-adjacent"
       ],
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     },
@@ -101,20 +103,16 @@
         "sowt-32bit-8ch",
         "twos-24bit-5ch",
         "twos-32bit-6ch",
-        "twos-8bit-1ch"
+        "twos-8bit-1ch",
+        "twos-8bit-1ch-adjacent"
       ],
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     }
   ],
   "pending_module_requirements": [
-    "compat::mov::pcm::PcmCursor refuses 8-bit twos samples in a version 0 description (Unsupported: QT v0 PCM other than 8-bit raw or 16-bit twos), which the demuxer reads. Version 0 admits twos with 8 or 16 bits per sample, and QuickTime File Format (2001) Table 3-3 gives twos 8-bit samples the range -128 to 127.",
     "compat::mov::pcm::PcmCursor refuses sound sample description versions 1 and 2 (Unsupported: QT sound description version1/2), which the demuxer reads as PCM. Both extend version 0 for uncompressed audio (Apple QuickTime File Format 'Sound sample description version 1' and 'version 2')."
   ],
   "open_cases": [
-    {
-      "id": "twos-8bit-1ch",
-      "requirement": "compat::mov::pcm::PcmCursor refuses 8-bit twos samples in a version 0 description (Unsupported: QT v0 PCM other than 8-bit raw or 16-bit twos), which the demuxer reads. Version 0 admits twos with 8 or 16 bits per sample, and QuickTime File Format (2001) Table 3-3 gives twos 8-bit samples the range -128 to 127."
-    },
     {
       "id": "sound-v1",
       "requirement": "compat::mov::pcm::PcmCursor refuses sound sample description versions 1 and 2 (Unsupported: QT sound description version1/2), which the demuxer reads as PCM. Both extend version 0 for uncompressed audio (Apple QuickTime File Format 'Sound sample description version 1' and 'version 2')."
@@ -128,7 +126,7 @@
     {
       "reading": "A version 0 description outside the version 0 layout",
       "clause": "Apple QuickTime File Format 'Sound sample description version 0 (stsd)': version 0 is uncompressed raw or twos audio with one or two channels, 8 or 16 bits per sample and compression ID 0; this description lies outside it (more than two channels, or sowt byte order)",
-      "candidate": "refuses the description (Unsupported: QT v0 PCM channel count other than 1 or 2; Unsupported: QT v0 PCM other than 8-bit raw or 16-bit twos)",
+      "candidate": "refuses the description (Unsupported: QT v0 PCM channel count other than 1 or 2; Unsupported: QT v0 PCM other than 8-bit raw or 8- or 16-bit twos)",
       "reference": "reads it as PCM: 3 to 8 channels, 16- to 32-bit sowt and 24- and 32-bit twos",
       "cases": [
         "raw-16bit-4ch",
@@ -174,6 +172,15 @@
       "reference": "reads 32 bytes as PCM at an integer 48000 Hz from the 48000.5 Hz rate field",
       "cases": [
         "fractional-rate"
+      ]
+    },
+    {
+      "reading": "A chunk stored in the Movie Box",
+      "clause": "ISO/IEC 14496-12:2015 6.1.3: the media data of a file is contained within its Media Data Boxes; stco places the second chunk of eight one-byte samples at offset 44, where the Movie Box starts (the mdat payload is 28..44)",
+      "candidate": "reads the eight samples of the first chunk and refuses the second packet (Unsupported: PCM packet read outside the media extent)",
+      "reference": "reads the first eight bytes of the Movie Box as the second packet, at position 44",
+      "cases": [
+        "twos-8bit-1ch"
       ]
     }
   ]

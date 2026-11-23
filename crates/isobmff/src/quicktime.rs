@@ -33,6 +33,8 @@ pub struct SoundDescriptionV0 {
 pub enum PcmEncoding {
     /// 8-bit unsigned samples, entry code `raw `.
     Unsigned8,
+    /// 8-bit signed samples, entry code `twos`.
+    Signed8,
     /// 16-bit signed big-endian samples, entry code `twos`.
     Signed16BigEndian,
 }
@@ -131,9 +133,9 @@ impl SoundDescriptionV0 {
     pub fn sample_rate_fraction(&self) -> (u32, u32) {
         (self.sample_rate_16_16, 65536)
     }
-    /// The PCM layout of an uncompressed mono or stereo entry of 8-bit `raw ` or 16-bit
-    /// `twos` samples. `Error::Unsupported` for anything else, `Error::Invalid` for a zero
-    /// sample rate.
+    /// The PCM layout of an uncompressed mono or stereo entry of 8-bit `raw ` samples or
+    /// of 8- or 16-bit `twos` samples. `Error::Unsupported` for anything else,
+    /// `Error::Invalid` for a zero sample rate.
     pub fn pcm_layout(&self) -> Result<PcmLayout> {
         if self.compression_id != 0 || self.packet_size != 0 {
             return Err(Error::Unsupported("QT v0 compressed/nonzero packet layout"));
@@ -148,10 +150,11 @@ impl SoundDescriptionV0 {
         }
         let (encoding, bytes) = match (&self.entry.format, self.sample_bits) {
             (b"raw ", 8) => (PcmEncoding::Unsigned8, 1_usize),
+            (b"twos", 8) => (PcmEncoding::Signed8, 1_usize),
             (b"twos", 16) => (PcmEncoding::Signed16BigEndian, 2_usize),
             _ => {
                 return Err(Error::Unsupported(
-                    "QT v0 PCM other than 8-bit raw or 16-bit twos",
+                    "QT v0 PCM other than 8-bit raw or 8- or 16-bit twos",
                 ));
             }
         };

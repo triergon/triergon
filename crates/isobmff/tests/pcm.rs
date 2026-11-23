@@ -208,9 +208,42 @@ fn whole_and_work_one_plans_are_identical() {
     };
     assert_eq!(collect(1), collect(4096));
 }
+/// `MONO` with the entry code `twos` in place of `raw `: 8-bit signed samples.
+fn twos_mono() -> Vec<u8> {
+    let p = Parsed::new(MONO);
+    let at = p.table.descriptions()[0].raw().header().start as usize + 4;
+    let mut raw = MONO.to_vec();
+    raw[at..at + 4].copy_from_slice(b"twos");
+    raw
+}
+#[test]
+fn eight_bit_twos_packets_are_those_of_the_same_bytes_as_raw() {
+    let twos = twos_mono();
+    let rows = |raw: &[u8]| {
+        let p = Parsed::new(raw);
+        let mut input = p.input();
+        let mut cursor = p.cursor(&input);
+        let mut rows = Vec::new();
+        while let Some(packet) = next(&mut cursor, &mut input, 1).unwrap() {
+            rows.push((
+                packet.dts(),
+                packet.duration(),
+                packet.demux_range().clone(),
+            ));
+        }
+        rows
+    };
+    assert!(!rows(&twos).is_empty());
+    assert_eq!(rows(&twos), rows(MONO));
+}
 #[test]
 fn initial_demux_catalogue_retains_exact_source_entry() {
-    for (raw, codec) in [(MONO, "pcm_u8"), (STEREO, "pcm_s16be")] {
+    let twos = twos_mono();
+    for (raw, codec) in [
+        (MONO, "pcm_u8"),
+        (STEREO, "pcm_s16be"),
+        (twos.as_slice(), "pcm_s8"),
+    ] {
         let p = Parsed::new(raw);
         let s = PcmStream::new(&p.header, &p.table, Some(*b"qt  "), PcmProfile).unwrap();
         assert_eq!(s.demux().codec, codec);

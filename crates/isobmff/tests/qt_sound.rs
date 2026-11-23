@@ -138,6 +138,39 @@ fn mutate(field: usize, bytes: &[u8]) -> Vec<u8> {
     raw[at..at + bytes.len()].copy_from_slice(bytes);
     raw
 }
+/// `MONO` with the entry code `twos` in place of `raw `: 8-bit signed samples.
+fn twos_mono() -> Vec<u8> {
+    let s = Parsed::new(MONO);
+    let at = s.tracks[0].1.descriptions()[0].raw().header().start as usize + 4;
+    let mut raw = MONO.to_vec();
+    raw[at..at + 4].copy_from_slice(b"twos");
+    raw
+}
+#[test]
+fn eight_bit_twos_samples_are_signed_one_byte_frames() {
+    let raw = twos_mono();
+    let s = Parsed::new(&raw);
+    let d = s.sound(0);
+    assert_eq!((d.source().format, d.sample_bits()), (*b"twos", 8));
+    let layout = d.pcm_layout().unwrap();
+    assert_eq!(layout.encoding(), PcmEncoding::Signed8);
+    assert_eq!(layout.channels(), 1);
+    let mut input = s.input();
+    let mut job = s.job(&mut input);
+    let packet = read(&mut job, &mut input, &raw, 1, 1).unwrap();
+    assert_eq!(packet.layout(), layout);
+    assert_eq!(packet.complete_frames(), packet.packet().payload.len());
+    // The same bytes under `raw ` are unsigned samples.
+    let unsigned = Parsed::new(MONO);
+    let mut input = unsigned.input();
+    let mut job = unsigned.job(&mut input);
+    let other = read(&mut job, &mut input, MONO, 1, 1).unwrap();
+    assert_eq!(other.layout().encoding(), PcmEncoding::Unsigned8);
+    assert_eq!(
+        other.packet().payload.as_ref(),
+        packet.packet().payload.as_ref()
+    );
+}
 #[test]
 fn original_sound_fields_and_exact_fixed_rate_are_retained() {
     for (raw, channels, bits, rate, encoding) in [

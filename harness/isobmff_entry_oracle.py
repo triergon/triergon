@@ -58,7 +58,7 @@ def qt_sound(path, _window, _quantum):
             if ref == 0:
                 rows.append(row(8, track, index))
                 continue
-            codec = {(b"raw ", 8): 1, (b"twos", 16): 2}.get((tag, bits), 0)
+            codec = {(b"raw ", 8): 1, (b"twos", 8): 8, (b"twos", 16): 2}.get((tag, bits), 0)
             if not (channels in (1, 2) and not compression and not packet and rate):
                 codec = 0
             rows.append(row(3, track, index, int.from_bytes(tag, "big"), revision, vendor,

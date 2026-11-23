@@ -293,7 +293,7 @@
         "4096"
       ],
       "expected": {
-        "trace_sha256": "ac18cc10fc05b5ec5d8e400d5ded2c75029df32e2ad140e4a7b5fe1ca7b26733"
+        "trace_sha256": "ddb5e8a0443d7532dfae7bc74b00cf97e4a741efe7d79d4dbdb211e92a746f00"
       }
     }
   ]

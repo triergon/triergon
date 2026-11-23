@@ -48,7 +48,8 @@
         "sowt-32bit-8ch",
         "twos-24bit-5ch",
         "twos-32bit-6ch",
-        "twos-8bit-1ch"
+        "twos-8bit-1ch",
+        "twos-8bit-1ch-adjacent"
       ],
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     },
@@ -75,7 +76,8 @@
         "sowt-32bit-8ch",
         "twos-24bit-5ch",
         "twos-32bit-6ch",
-        "twos-8bit-1ch"
+        "twos-8bit-1ch",
+        "twos-8bit-1ch-adjacent"
       ],
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     },
@@ -102,28 +104,13 @@
         "sowt-32bit-8ch",
         "twos-24bit-5ch",
         "twos-32bit-6ch",
-        "twos-8bit-1ch"
+        "twos-8bit-1ch",
+        "twos-8bit-1ch-adjacent"
       ],
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     }
   ],
   "open_refusals": [
-    {
-      "reason": "8-bit twos PCM in a version 0 sound description",
-      "clause": "Apple QuickTime File Format 'Sound sample description version 0 (stsd)' and QuickTime File Format (2001) Table 3-3 admit twos with 8-bit samples; the crate README reads v0 unsigned 8-bit and signed 16-bit big-endian PCM only",
-      "detail": "QT v0 PCM other than 8-bit raw or 16-bit twos",
-      "cases": [
-        {
-          "id": "twos-8bit-1ch",
-          "sha256": "72aed84a8dd3cee02ae63bc462527d0ad94501d3eeb1cd64924a72687e485094",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
-      ]
-    },
     {
       "reason": "Sound sample descriptions version 1 and 2",
       "clause": "Apple QuickTime File Format 'Sound sample description version 1 (stsd)' and 'version 2' extend version 0 for uncompressed audio; the crate README reads QuickTime sound through SoundDescriptionV0 and PCM in version 0 only",
@@ -154,7 +141,7 @@
     {
       "reading": "A version 0 description outside the version 0 layout",
       "clause": "Apple QuickTime File Format 'Sound sample description version 0 (stsd)': version 0 is uncompressed raw or twos audio with one or two channels, 8 or 16 bits per sample and compression ID 0; this description lies outside it (more than two channels, or sowt byte order)",
-      "candidate": "refuses the description (Unsupported: QT v0 PCM channel count other than 1 or 2; Unsupported: QT v0 PCM other than 8-bit raw or 16-bit twos)",
+      "candidate": "refuses the description (Unsupported: QT v0 PCM channel count other than 1 or 2; Unsupported: QT v0 PCM other than 8-bit raw or 8- or 16-bit twos)",
       "reference": "reads it as PCM: 3 to 8 channels, 16- to 32-bit sowt and 24- and 32-bit twos",
       "cases": [
         "raw-16bit-4ch",
@@ -201,6 +188,15 @@
       "compat": "compat::mov::pcm::PcmCursor",
       "cases": [
         "pcm-description-1-2-1-unused3"
+      ]
+    },
+    {
+      "reading": "A chunk stored in the Movie Box",
+      "clause": "ISO/IEC 14496-12:2015 6.1.3: the media data of a file is contained within its Media Data Boxes; stco places the second chunk of eight one-byte samples at offset 44, where the Movie Box starts (the mdat payload is 28..44)",
+      "candidate": "refuses the track, whose second chunk lies outside the media data (Invalid: sample range outside media)",
+      "reference": "reads 16 bytes as PCM, the last eight of them the start of the Movie Box",
+      "cases": [
+        "twos-8bit-1ch"
       ]
     }
   ]

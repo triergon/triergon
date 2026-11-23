@@ -391,6 +391,27 @@
         "packets": 2,
         "bytes": 16,
         "digest": 15039606362219062475
+      },
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
+      }
+    },
+    {
+      "id": "twos-8bit-1ch-adjacent",
+      "profile": "pcm",
+      "file": "harness/features/quicktime-pcm-samples/variants/twos-8bit-1ch-adjacent.mov",
+      "sha256": "9621640380f28541b665c91ebd42c252b421255909ad7d11fa0816aa9134efd7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "65536",
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 16,
+        "digest": 15039606590539095811
       }
     }
   ]

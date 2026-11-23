@@ -148,6 +148,16 @@ fn pcm_variants(template: &[u8], variants: &mut Variants) -> Result<()> {
         let width = u32::from(channels).max(1) * u32::from(bits) / 8;
         variants.push((PCM, name, pcm_movie(template, tag, &sound, width, false)?));
     }
+    // Eight one-byte samples a chunk, the second chunk following the first in `mdat`:
+    // the loop's variants keep the template's chunk offsets, which put the second
+    // chunk of `twos-8bit-1ch` behind the media data.
+    let mut adjacent = pcm_movie(template, *b"twos", &sound(0, 1, 8, 48_000 << 16), 1, false)?;
+    let mut path = STSD.to_vec();
+    *path.last_mut().ok_or("empty sample-table path")? = *b"stco";
+    let field = locate(&adjacent, &path)?.pop().ok_or("missing stco")?.start + 16;
+    let second = word(&adjacent, field) + 8;
+    adjacent[field + 4..field + 8].copy_from_slice(&second.to_be_bytes());
+    variants.push((PCM, "twos-8bit-1ch-adjacent".into(), adjacent));
     let mut fractional = sound(0, 1, 16, (48_000 << 16) + 32_768);
     fractional[10..12].copy_from_slice(&37_u16.to_be_bytes());
     fractional[12..16].copy_from_slice(b"test");
