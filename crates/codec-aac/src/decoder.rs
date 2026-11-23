@@ -848,12 +848,11 @@ impl Core {
             None => e.sbr.insert(new_sbr(&self.budget, self.sf_index, e.kind)?),
         };
         let start = br.position();
-        if sbr.parse(br, crc, bits, is_cpe).is_err() {
-            // A payload that does not parse is skipped, as a decoder without SBR skips the
-            // extension: the core is output through the SBR banks as in a frame without
-            // SBR data (observed behaviour: `ps-open-sbr-truncated` in harness/codecs/aac,
-            // a payload cut to its first 30 bits, matches the reference bit-identically).
-            br.seek(start + bits);
+        match sbr.parse(br, crc, bits, is_cpe) {
+            Ok(_) => {}
+            // The fill element bounds the damaged extension, so the core still decodes.
+            Err(DecodeError::Invalid(_)) => br.seek(start + bits),
+            Err(error) => return Err(error),
         }
         if to_stereo {
             self.ps_active = true;

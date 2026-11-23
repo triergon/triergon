@@ -76,7 +76,8 @@ unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormals to zero.
 - `Decoder::decode` takes exactly one ADTS frame including its header. It clears and
   refills `out`, reusing capacity, because rate and layout can change between frames
   (implicit SBR/PS, a new PCE). A frame yields 1024 samples per raw data block, 2048 with
-  SBR.
+  SBR. A malformed SBR payload in a bounded fill element is skipped without replacing
+  the last accepted SBR header or time grid. The core audio remains available.
 - On error `out` is empty and the decoder stays usable. Errors are typed:
   `Unsupported(Feature)`, `InvalidData(&str)` naming the syntax element,
   `ResourceLimit(&str)`, `Truncated`, `Budget(StorageError)`.
