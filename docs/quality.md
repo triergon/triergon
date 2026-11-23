@@ -97,7 +97,13 @@ contract's `required_targets` only, and the cases must pass elsewhere.
   passes; a listed case that passes fails the step until it leaves the list, so the
   lists only shrink. A deviation is a decision, not a defect: write its reading from
   the clause, and implement the reference's result, if a consumer needs it, as the
-  `compat` policy the entry names. Additional-coverage features (`shape-text`,
+  `compat` policy the entry names; `cargo xtask check-design` fails on a `compat`
+  path no crate's `compat` module defines. A deviating case holds only between two
+  runs that finished, and only while each side gives its pin: the reference's
+  `expected` and the candidate's `candidate_expected`, which the recorder writes for
+  every listed case. A case without a candidate pin, or one compared by a comparison
+  that pins the reference alone, is reported as `deviation-unpinned` and stays open;
+  check-design lists those contracts. Additional-coverage features (`shape-text`,
   `shape-text-all`) do not block their module.
 - **Registered refusals.** The report checks the input hash, that the candidate stops
   with exactly `detail` after exactly the registered fold, and that the reference
