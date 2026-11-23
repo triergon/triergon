@@ -1,4 +1,5 @@
-//! Composed selected-program TS -> PSI -> PES source operation. No codec AU work.
+//! The source view of a transport stream: [`TransportStream`], its events and its feed
+//! interfaces.
 mod clock;
 mod end;
 pub(crate) mod entity;
@@ -197,9 +198,11 @@ impl TransportStream {
         Ok(stream)
     }
 
-    /// A sequential feed publishes PES carriers after continuity validation.
-    /// PAT, PMT, continuity breaks, clock transitions and faults remain visible. The
-    /// constructor and program validation follow [`Self::new_single_program_segment`].
+    /// Read a sequential TS188 input for a progressive feed: continuation carriers of a PES
+    /// are offered to the feed once their continuity is checked
+    /// ([`Self::poll_feed_carriers`]); PAT, PMT, continuity breaks, clock transitions and
+    /// faults are published as events. Limits and program selection follow
+    /// [`Self::new_single_program_segment`].
     pub fn new_single_program_progressive_feed(
         budget: Budget,
         limits: ParseLimits,
@@ -285,8 +288,8 @@ impl TransportStream {
             configuration: self.config_epoch,
         }
     }
-    /// Invalid signalling keeps its raw facts/diagnostics but cannot supply a
-    /// trusted clock interpretation until an explicit format discontinuity/reset.
+    /// Whether invalid PCR signalling has quarantined the program clock: timestamps keep their
+    /// raw values but are not interpreted until [`Self::discontinuity`].
     pub fn clock_is_quarantined(&self) -> bool {
         self.clock_quarantined
     }
@@ -294,8 +297,9 @@ impl TransportStream {
         self.pmt_source.is_some()
     }
 
-    /// A fresh in-band map re-establishes this profile's transport state. Only
-    /// its separately proved concatenated elementary coordinate needs restoring.
+    /// Sets the elementary offset of the single route of a stream that a seek checkpoint
+    /// restarts, after its in-band PMT; `SourceMismatch` unless the route and clock state are
+    /// those of that restart.
     pub(crate) fn resume_elementary_offset(&mut self, pid: u16, offset: u64) -> Result<()> {
         let [route] = self.routes.as_mut_slice() else {
             return Err(Error::SourceMismatch);

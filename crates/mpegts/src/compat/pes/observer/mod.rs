@@ -251,8 +251,8 @@ impl DemuxPacket {
     }
 }
 
-/// An explicitly compact packet with the same causal header and logical
-/// carrier facts as `DemuxPacket`. Its payload exposes borrowed range views.
+/// A [`DemuxPacket`] whose payload stores runs of whole TS188 carriers as one record each
+/// ([`CompactPayload`]); it reports the same header, spans and carrier facts.
 #[derive(Debug)]
 pub struct CompactDemuxPacket {
     /// The program number of the observed scope.
@@ -455,8 +455,10 @@ const _: () = assert!(size_of::<PayloadExtent>() == size_of::<usize>());
 const _: () = assert!(align_of::<PayloadExtent>() == align_of::<usize>());
 const _: () = assert!(size_of::<PayloadFormat>() == size_of::<bool>());
 
-/// Opt-in, charged, one-transport-input mailbox. Caller keeps the strict source
-/// operation and causal events; this observer cannot replace or suppress them.
+/// Cuts the transport packets of one selected PID into the packets FFmpeg's demuxer emits
+/// ([`DemuxPacket`]), beside the caller's strict source view: the caller pushes each carrier
+/// of that PID with its [`SourceContext`] and polls for packets. It holds one pushed carrier
+/// at a time, charged to its budget, and changes nothing in the source view.
 // `repr(C)` keeps the field offsets the compiler chose for the hot assembly paths;
 // `follow` and `time_base` take bytes of the trailing padding.
 #[derive(Debug)]

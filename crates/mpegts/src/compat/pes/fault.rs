@@ -1,7 +1,10 @@
-//! Opt-in finite PES extraction from explicitly damaged or opaque transport.
+//! The packets the demuxer still cuts from a finite PES that the source view refuses: a
+//! carrier with the transport error indicator or scrambling set, a timing-header fault,
+//! a rejected clock field, or a final partial carrier.
 //!
-//! H.222.0 (08/2023) 2.4.3.3: TEI denotes an uncorrectable error; scrambling
-//! does not establish clear payload. Neither flag is cleared or repaired here.
+//! H.222.0 (08/2023) §2.4.3.3: the transport error indicator marks an uncorrectable error and
+//! scrambling a payload that is not clear. The packets keep both flags and the source's
+//! diagnostic; nothing is repaired.
 use crate::compat::pes::observer::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, SourceContext,
 };
@@ -23,7 +26,7 @@ pub use malformed::{
     MalformedSourceEvent, NoPacketsConfirmation,
 };
 
-/// The sole transport fault admitted by this compatibility policy.
+/// The transport fault of a carrier [`TransportFaultRecovery`] extracts a packet from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransportFaultKind {
     /// The carrier has its transport error indicator set.
@@ -32,7 +35,8 @@ pub enum TransportFaultKind {
     Scrambling,
 }
 
-/// Additional finite-PES recovery choices. Source validation stays strict.
+/// Which further source faults [`TransportFaultRecovery`] extracts a finite PES across; the
+/// default extracts across a transport error or scrambling only.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PesFaultPolicy {
     /// Admit a finite PES whose PTS has bad marker bits or whose timing flags are forbidden, after
@@ -85,7 +89,7 @@ impl PesFaultKind {
     }
 }
 
-/// The unchanged accepted or rejected carrier. No accepted packet is forged.
+/// The faulted carrier as the source view saw it: accepted, or rejected by transport checks.
 #[derive(Debug)]
 pub enum PesFaultCarrier {
     /// An accepted transport packet.
@@ -131,7 +135,8 @@ impl PesFaultCarrier {
     }
 }
 
-/// Raw encoding and its applicability in the separate compatibility view.
+/// The PES header bytes of a [`PesFaultPacket`] as encoded, with the PTS the demuxer reads from
+/// them.
 #[derive(Debug)]
 pub struct PesFaultHeader {
     bytes: Bytes,
@@ -166,8 +171,9 @@ impl PesFaultHeader {
     }
 }
 
-/// Nonempty finite PES bytes beside the actual source refusal. This is not
-/// validated source PES, a codec AU, or a source PCR/PTS/DTS anchor.
+/// A finite PES the demuxer cuts from a carrier the source view refused for a timing-header or
+/// clock-field fault, with that refusal. Its header and clocks are not validated source
+/// facts.
 #[derive(Debug)]
 pub struct PesFaultPacket {
     /// The program number of the observed scope.
@@ -211,7 +217,8 @@ impl PesFaultPacket {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }
 }
-/// Checked encoding in damaged or opaque bytes, never a validated source header.
+/// The PES header bytes of a [`TransportFaultPacket`] as encoded in the faulted carrier, with
+/// the PTS the demuxer reads from them.
 #[derive(Debug)]
 pub struct TransportFaultHeader {
     bytes: Bytes,
@@ -236,8 +243,8 @@ impl TransportFaultHeader {
     }
 }
 
-/// A compatibility packet retaining its real source fault and unchanged carrier.
-/// Payload bytes may be damaged or scrambled; this is neither source PES nor an AU.
+/// A finite PES the demuxer cuts from a carrier with a transport error or scrambling, with the
+/// source's diagnostic and the carrier as it was; its payload may be damaged or scrambled.
 #[derive(Debug)]
 pub struct TransportFaultPacket {
     /// The program number of the observed scope.
@@ -282,7 +289,7 @@ impl TransportFaultPacket {
     }
 }
 
-/// Accepted assembly and faulted extraction remain distinct results.
+/// One output of [`TransportFaultRecovery::poll`].
 #[derive(Debug)]
 pub enum RecoveredPes {
     /// A packet of ordinary input, from the wrapped observer.
@@ -293,16 +300,16 @@ pub enum RecoveredPes {
     PesFault(PesFaultPacket),
 }
 
-/// Add explicit TEI/scrambling handling to an ordinary PES observer.
+/// A [`DemuxObserver`] that also cuts the demuxer's packet from a finite AVC PES in a TS188
+/// carrier with a transport error or scrambling, and with [`PesFaultPolicy`] from the further
+/// faults it names.
 ///
-/// Ordinary input uses the existing assembler unchanged. Default faulted input requires
-/// drained AVC carriage, TS188 PUSI, a single complete nonempty finite PES with
-/// PTS-only encoding, no other transport/header fault, and the actual matching
-/// source diagnostic. Other contexts remain unsupported. Drain `poll` after each
-/// input; `NeedPayload` while awaiting a diagnostic does not release the carrier.
-/// `with_policy` adds the explicit finite source-fault choices in `PesFaultPolicy`.
-/// There is no implicit entity or configuration transition. A clock transition
-/// requires the actual source Timeline through `confirm_source_timeline`.
+/// Ordinary carriers go to the wrapped observer. A faulted carrier must start a payload unit
+/// and hold one complete nonempty finite PES with a PTS only and no other fault; its packet
+/// waits for the source's own diagnostic of the fault ([`Self::confirm_source_fault`]). Other
+/// faulted input is `Unsupported`. Drain [`Self::poll`] after each input: `NeedPayload` while
+/// a diagnostic is awaited keeps the carrier. A clock boundary waits for the source's
+/// `Timeline` ([`Self::confirm_source_timeline`]).
 #[derive(Debug)]
 pub struct TransportFaultRecovery {
     inner: DemuxObserver,

@@ -16,8 +16,7 @@ use triergon_core::{
 const HISTORY: usize = 16;
 const UNOBSERVED: Error = Error::Unsupported("unobserved video continuity context");
 
-/// Original evidence that admitted a continuity change. The carrier includes
-/// its complete original bytes and the event retains any strict diagnostic.
+/// The carrier and source event at which a continuity change was observed.
 #[derive(Debug)]
 pub struct ContinuityEvidence {
     /// The last selected carrier before the change, with its complete original bytes.
@@ -30,7 +29,8 @@ pub struct ContinuityEvidence {
     pub context: SourceContext,
 }
 
-/// One nonempty unframed video run at the original logical EOF.
+/// The unframed video bytes the demuxer joins across the continuity changes of a track,
+/// reported at the logical end of the source.
 #[derive(Debug)]
 pub struct ContinuityResidue(Charged<Box<ResidueData>>);
 

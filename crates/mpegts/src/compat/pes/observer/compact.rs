@@ -6,8 +6,8 @@ use crate::transport::carrier::{PLAIN_PAYLOAD_BYTES, TS_PAYLOAD_START, TS188_BYT
 use std::ops::Range;
 use triergon_core::{Budget, BudgetVec, BudgetVecIntoIter, BytesView};
 
-/// One logical payload span. The byte range borrows its packet or cursor;
-/// independent retention uses `bytes.into_bytes()`.
+/// One payload span of a packet, borrowed from the packet or cursor; `bytes.into_bytes()`
+/// keeps it beyond that borrow.
 #[derive(Clone, Copy, Debug)]
 pub struct DemuxSpanView<'a> {
     /// The span's bytes, borrowed from the carrier or cursor.
@@ -89,9 +89,9 @@ fn view(span: &DemuxSpan, index: usize, run: bool) -> DemuxSpanView<'_> {
     }
 }
 
-/// The same logical carrier spans with one backing handle per stored run.
-/// Capacity remains charged for every logical `DemuxSpan`, including slots
-/// represented by a run, so grouping does not change admission headroom.
+/// The payload spans of a [`CompactDemuxPacket`](super::CompactDemuxPacket), a run of
+/// whole carriers stored as one record with one backing. Every span is charged as if stored
+/// alone, so storage limits are those of the plain packet.
 #[derive(Debug)]
 pub struct CompactPayload {
     records: BudgetVec<DemuxSpan>,
@@ -169,7 +169,8 @@ impl CompactPayload {
     }
 }
 
-/// Borrowed traversal of every logical source/transport/context record.
+/// The spans of a [`CompactPayload`] in order, each with its source and carrier ranges and
+/// context.
 #[derive(Debug)]
 pub struct DemuxSpanViews<'a> {
     records: std::slice::Iter<'a, DemuxSpan>,
@@ -219,8 +220,8 @@ impl<'a> Iterator for DemuxSpanViews<'a> {
 }
 impl ExactSizeIterator for DemuxSpanViews<'_> {}
 
-/// A consuming payload cursor. Retiring the last range of a run releases its
-/// backing handle at that range's ordinary retirement boundary.
+/// Takes the spans of a [`CompactPayload`] in order; the backing of a stored run is released
+/// with the run's last span.
 #[derive(Debug)]
 pub struct PayloadCursor {
     records: BudgetVecIntoIter<DemuxSpan>,

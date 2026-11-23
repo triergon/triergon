@@ -1,9 +1,6 @@
-//! Explicit control-only packet completion from physical source facts.
-//!
-//! H.222.0 (08/2023) 2.4.3.3 and 2.4.4 distinguish control PIDs/sections
-//! from PES payload. No validated PES scope, source table, timestamp or clock
-//! can be constructed from this operation's confirmation. Non-control payload needs
-//! the existing real-scope observer; it can never select an empty fallback.
+//! The confirmation that an input carried only control traffic (H.222.0 (08/2023) §§2.4.3.3
+//! and 2.4.4 tell control PIDs and sections from PES payload). Any other payload needs a
+//! scoped [`DemuxObserver`](super::DemuxObserver) and rules the confirmation out.
 use crate::compat::pes::observer::SourceContext;
 use crate::pes::START_CODE_PREFIX;
 use crate::psi::{PatReader, Section, SectionAssembler, TableStep};

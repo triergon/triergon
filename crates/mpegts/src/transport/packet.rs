@@ -1,4 +1,4 @@
-//! H.222.0 (08/2023), 2.4.3.1-5. No implementation source was used.
+//! Transport packets and their adaptation fields (H.222.0 (08/2023) §§2.4.3.1 to 2.4.3.5).
 use super::SYNC;
 use crate::compat::pes::PcrPolicy;
 use std::ops::Range;

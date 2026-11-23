@@ -20,8 +20,8 @@ pub enum TimestampOrigin {
     PtsOnlyCompatibility,
 }
 
-/// Why this separate view selected a representative. This is reference-context
-/// state, never a source anchor or a clock/configuration/I/O epoch.
+/// The first timestamp a [`DemuxClock`] saw and the 2³³-tick interval it opened. Not a
+/// source clock epoch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ClockOrigin {
     /// The program's first 33-bit timestamp, in 90 kHz ticks, which opened the interval.
@@ -117,11 +117,11 @@ fn representative(raw: Option<u64>, origin: Option<ClockOrigin>) -> Result<Optio
     Ok(Some(start + (i128::from(raw) - start).rem_euclid(PERIOD90)))
 }
 
-/// One explicitly selected program, complete PES source order, one unchanged
-/// reference context. Source epochs do not themselves reset a demux context.
-/// The caller supplies every accepted PES for this one program in source order;
-/// program sharing, parser/AU output and seek/reset operations require their own
-/// profile/evidence. This view allocates nothing and does not affect TransportStream.
+/// Places the timestamps of one program's PES in the demuxer's 33-bit interval, which its
+/// first timestamp fixes, beside the raw values ([`ClockOrigin`]).
+///
+/// Give it every PES of the program in source order; a source clock epoch does not reset
+/// it. It allocates nothing and does not affect the source view.
 #[derive(Debug)]
 pub struct DemuxClock {
     program: u16,
@@ -347,7 +347,8 @@ impl DemuxClock {
     }
 }
 
-/// Optional encoded time for a rejected source header, never source PTS/DTS.
+/// The PTS encoded in a header the source view rejected, placed as the demuxer places it;
+/// not a source timestamp.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DiagnosticTimeView {
     /// The PTS as encoded in the rejected header, 33 bits, when present.

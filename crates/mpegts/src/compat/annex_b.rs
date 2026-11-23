@@ -30,22 +30,21 @@ pub enum VideoEofPolicy {
     ReportUnframed,
 }
 
-/// Events from the original reader and the additional continuity observation.
+/// One step of [`ContinuityReader`].
 #[derive(Debug)]
 pub enum ContinuityEvent {
     /// An unchanged event from the source reader.
     Source(ReaderEvent),
-    /// An original interruption or diagnostic with a pending continuity proof.
-    /// The source event remains valid even if the proof later produces no residue.
+    /// A source interruption or diagnostic that a residue at the end of the source may
+    /// cover; the event stands whether or not a residue follows.
     Pending(ReaderEvent),
     /// One unframed run proved at the original logical EOF.
     Residue(ContinuityResidue),
 }
 
-/// Observe opaque video through continuity changes in one entity with one
-/// selected AVC or HEVC track. Owns the source reader and uses its original
-/// cursor, transport carriers and clock transitions. Neutral packets and source
-/// events remain those of that reader.
+/// A [`Reader`] of one entity with one selected AVC or HEVC track that also reports, at the
+/// logical end of the source, the unframed bytes the demuxer joins across the track's
+/// continuity changes ([`ContinuityResidue`]). Packets and source events are the reader's.
 ///
 /// The source reader uses [VideoEofPolicy::ReportUnframed], so the run before each
 /// continuity change arrives as its own `IncompleteVideo`; the residue at EOF holds

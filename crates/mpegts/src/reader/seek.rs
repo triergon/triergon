@@ -551,8 +551,8 @@ impl Reader {
 
     /// Seek within the exact source clock and configuration pair reported by
     /// [Packet::epochs] in this entity. Only access units with this pair compete
-    /// for the landing, even when other epochs have overlapping timestamps.
-    /// The existing timestamp-only seek still refuses epoch changes.
+    /// for the landing, even when other epochs have overlapping timestamps;
+    /// [`Self::request_seek`] refuses a scan that crosses epochs.
     ///
     /// Scans and replays one length-known, seekable entity from its start,
     /// reconstructing transport state and original provenance. Replay publishes

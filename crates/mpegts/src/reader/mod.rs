@@ -1,4 +1,5 @@
-//! Source access units composed from the transport reader and existing framers.
+//! Complete access units read from a transport stream with the framers of
+//! `triergon-framing`, beside every source event.
 mod advance;
 mod lane;
 mod limits;
@@ -91,9 +92,9 @@ impl Stream {
     }
 }
 
-/// Incremental TS188/M2TS192 reader delivering complete source AUs, separately
-/// from every original transport event. This performs no I/O or decoder-feed
-/// injection. Unsupported carriages retain source facts and report a typed gap.
+/// Reads complete access units from a TS188 or M2TS192 transport stream, beside every source
+/// event of the stream. It does no I/O. A stream with no framer is reported once
+/// ([`ReaderEvent::Unsupported`]); its PMT and PES still arrive as source events.
 pub struct Reader {
     pool: Budget,
     source: SourceId,
@@ -409,8 +410,7 @@ impl Reader {
     /// Reports that the current request failed; the reader stops with `Transport` or `Cancelled`.
     ///
     /// Fails with the stopping error once the reader has stopped, and when `source` and `token` do
-    /// not
-    /// match the current request.
+    /// not match the current request.
     pub fn fail(
         &mut self,
         source: SourceId,

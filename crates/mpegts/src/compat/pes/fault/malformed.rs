@@ -1,6 +1,6 @@
-//! Explicit discards beside unchanged H.222.0 source refusals (2.4.3.3, 2.4.3.6).
-//! The completion accounts for every carrier and the original cursor's EOF,
-//! including empty physical input.
+//! The AVC carriers the demuxer discards for malformed transport or PES syntax (H.222.0
+//! §§2.4.3.3, 2.4.3.6), each reported beside the source view's own refusal, and the
+//! confirmation that an input held no packet once every carrier is accounted for.
 use super::{SourceContext, TransportFaultRecovery};
 use crate::compat::pes::observer::DemuxScope;
 use crate::pes::{START_CODE_PREFIX, stream_id};
@@ -51,8 +51,8 @@ enum DiscardedCarrier {
     Rejected(Bytes),
 }
 
-/// One reported discard. Rejected carriers stay in the unchanged source fault;
-/// an accepted carrier with invalid PES syntax remains separately inspectable.
+/// One reported discard: what was malformed, the carrier (rejected by transport checks, or
+/// accepted with invalid PES syntax) and the context it was read in.
 #[derive(Debug)]
 pub struct MalformedInputFact {
     kind: MalformedInputKind,
@@ -94,8 +94,7 @@ impl MalformedInputFact {
     }
 }
 
-/// Apply to the original event: forward it unchanged, await its real diagnostic,
-/// or deliver a reported discard. This never represents a codec/PES packet.
+/// What to do with an event [`MalformedInputCompletion`] issued.
 #[derive(Debug)]
 #[expect(
     clippy::large_enum_variant,
@@ -170,8 +169,8 @@ impl MalformedSourceEvent<'_> {
     }
 }
 
-/// Completion after fully accounted controls/discards, not absence of media.
-/// Malformed facts were delivered individually through `Reported`.
+/// Confirmation that an input produced no packet: every carrier was control traffic or a
+/// reported discard. The discards themselves came as `Reported` dispositions.
 #[derive(Debug)]
 pub struct NoPacketsConfirmation {
     end: MediaEntityEnd,
@@ -210,16 +209,14 @@ struct Pending {
     kind: MalformedInputKind,
 }
 
-/// Opt into reported malformed input, keeping the strict source view unchanged.
+/// Reads one TS188 entity with one selected AVC stream and reports each carrier the demuxer
+/// discards for reserved adaptation control, an adaptation overrun, an invalid PES start code
+/// or an overlong PES header, once the source view has reported the same fault.
 ///
-/// One TS188 entity, a real selected single-AVC PMT, drained assembly, and
-/// self-contained PAT/PMT control sections are admitted. Invalid transport and
-/// PES headers are discarded only with their actual source diagnostics. Other
-/// selected payload still goes to the observer; it prevents zero-packet proof.
-/// Construction binds the original core cursor before its first byte. Advance
-/// the source with [`Self::poll_source`] and observe each issued event before
-/// advancing again. Seal physical End and signal logical EOF on this operation,
-/// then observe its Finished event. EOF confirmation checks the original cursor.
+/// Create it before the cursor's first byte. Advance the source with [`Self::poll_source`]
+/// and handle each issued event before advancing again; other selected payload goes to the
+/// wrapped observer and rules out a [`NoPacketsConfirmation`]. At the end, seal the physical
+/// end and the logical end of the source here, then handle its `Finished` event.
 #[derive(Debug)]
 pub struct MalformedInputCompletion {
     stream: TransportStream,

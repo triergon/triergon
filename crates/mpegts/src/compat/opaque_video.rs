@@ -1,9 +1,8 @@
-//! Source-confirmed opaque AVC recovery for one TS188 entity.
+//! The unframed AVC byte run the demuxer cuts from one TS188 entity across a fault the source
+//! view refuses: replay the entity through [`OpaqueRecovery`] on a fresh cursor, and the run
+//! is reported once the source reaches its physical and logical end.
 //!
-//! A caller can replay a strict source refusal through a fresh sequential
-//! cursor. The proof retains the original transport observations and admits
-//! one unframed byte run only after the source reaches physical End and
-//! Finished. The reference is FFmpeg revision `d32b387f` on the 9.0 branch.
+//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
 
 use super::pes::{
     DemuxBoundary, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope, DemuxSpan,
@@ -71,8 +70,8 @@ impl RecoveryTrigger {
     }
 }
 
-/// A proved opaque byte run with its original source and PES observations.
-/// The charged spans remain valid after the recovery and cursor are dropped.
+/// The unframed byte run an [`OpaqueRecovery`] reports, with the fault it was cut across and
+/// the source observations; its charged spans outlive the recovery and the cursor.
 #[derive(Debug)]
 pub struct RecoveredOpaque {
     fault: TraceFault,
@@ -191,7 +190,8 @@ enum Phase {
     Done(SourceLocation),
 }
 
-/// A cooperative proof bound to one fresh sequential TS188 cursor.
+/// Replays one TS188 entity on a fresh sequential cursor and reports the unframed run the
+/// demuxer cuts across a named source fault ([`RecoveredOpaque`]).
 ///
 /// Supply requested windows and real EOF on that cursor. Polling advances the
 /// cursor and preserves the current event or span across short work grants.
