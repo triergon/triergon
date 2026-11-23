@@ -49,6 +49,7 @@ pub(super) fn operation<'a>(
                             let policy = Policy {
                                 opening_boxes,
                                 ogg: allow_ogg,
+                                short_audio_prefix: false,
                                 transport_tie,
                             };
                             let (kind, need) = match select(prefix, &policy) {

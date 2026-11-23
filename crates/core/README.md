@@ -61,7 +61,7 @@ assert_eq!(base.rescale(183_003, TimeBase::MILLISECONDS, Rounding::Floor)?, 2033
 | Storage | `Budget`, `Reservation`, `Charged<T>`, `Bytes`, `BytesWriter`, `BudgetVec<T>`, `BudgetVecIntoIter`, `BytesView`, `OwnedInputBytes`, `ByteStorageAddress`, `nonzero_prefix_len` |
 | Input | `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure` |
 | Sources | module `source`: `Source` (a caller's transport, polled without blocking), `SourceReply` and `provide_to`, `Provide` (what takes replies: `InputCursor` or a reader), `SourceOwner`, `ByteSource` |
-| Source signatures | Module `signature` exposes the EBML and Ogg markers, the opening box type and the three sync bytes for each transport packet spacing. Each caller chooses its accepted boxes and how to resolve ambiguous transport. |
+| Source signatures | Module `signature` exposes the EBML and Ogg markers, the opening box type and the three sync bytes for each transport packet spacing. Each caller chooses its accepted boxes, how to resolve ambiguous transport and whether four-byte audio markers request a fifth byte. |
 | Steps | `Step<T, B>`, `Backpressure` |
 | Blocking I/O | module `blocking`: `Blocking` drives a `ContainerReader` from a `std::io::Read` (and `Seek`) source, `Feed` supplies an `InputCursor`, `seekable_capabilities` |
 | Work | `WorkBudget` |

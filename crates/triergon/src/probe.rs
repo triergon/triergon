@@ -81,7 +81,7 @@ pub(crate) const POLICY: signature::Policy = signature::Policy {
         *b"ftyp", *b"styp", *b"moov", *b"moof", *b"mdat", *b"free", *b"skip", *b"sidx", *b"wide",
     ],
     ogg: true,
-    flac_prefix: true,
+    short_audio_prefix: true,
     transport_tie: TransportTie::Ts188,
 };
 
