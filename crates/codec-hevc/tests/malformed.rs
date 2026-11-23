@@ -22,3 +22,29 @@ fn a_refused_slice_leaves_later_slices_of_its_picture_decodable() {
     decoder.flush();
     while decoder.receive().is_some() {}
 }
+
+#[test]
+fn a_refused_first_irap_allows_trailing_pictures_but_suppresses_rasl() {
+    let trail = bare_nal(1, &[0xc0]); // first slice, PPS 0
+    let rasl = bare_nal(8, &[0xc0]);
+    let cra = bare_nal(21, &[0xa0]); // first slice, no_output_of_prior_pics = 0, PPS 0
+    let eos = bare_nal(36, &[0x80]);
+    let mut decoder = Decoder::new();
+
+    assert_eq!(decoder.send_nal(&trail, None), Ok(()));
+    let missing_pps = Err(DecodeError::MissingParameterSet("PPS"));
+    assert_eq!(decoder.send_nal(&cra, None), missing_pps);
+    assert_eq!(decoder.send_nal(&rasl, None), Ok(()));
+    assert_eq!(decoder.send_nal(&trail, None), missing_pps);
+    assert_eq!(decoder.send_nal(&eos, None), Ok(()));
+    assert_eq!(decoder.send_nal(&rasl, None), Ok(()));
+    assert_eq!(decoder.send_nal(&trail, None), missing_pps);
+    decoder.flush();
+    assert!(decoder.receive().is_none());
+
+    decoder.reset();
+    assert_eq!(decoder.send_nal(&trail, None), Ok(()));
+    assert_eq!(decoder.send_nal(&cra, None), missing_pps);
+    assert_eq!(decoder.send_nal(&rasl, None), Ok(()));
+    assert_eq!(decoder.send_nal(&trail, None), missing_pps);
+}
