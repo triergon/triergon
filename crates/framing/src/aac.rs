@@ -11,6 +11,7 @@
 mod adts;
 mod config;
 mod config_views;
+mod program;
 
 pub use adts::{
     AacAdtsCarrier, AacAdtsCarrierBoundary, AacAdtsCarrierLimits, AacAdtsCarrierReader,
@@ -28,3 +29,4 @@ pub use config_views::{
     AacDecoderChannelView, AacDecoderConfigDecision, AacDecoderConfigPolicy,
     AacDecoderConfigRefusal, decoder_channel_view, decoder_configuration_view,
 };
+pub use program::AacProgramElement;

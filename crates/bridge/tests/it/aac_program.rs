@@ -3,12 +3,10 @@
 //! 1.A.4.3), written from the syntax of 4.4.1.1 independently of the bridges.
 use crate::framing::ready;
 use crate::support::{View, byte_input, collect, index_job, off, packets, run_index, run_open};
-use triergon_bridge::{
-    aac::AacBridge,
-    access::{AccessUnitLimits, AccessUnits},
-};
+use triergon_bridge::aac::AacBridge;
 use triergon_core::container::{CodecId, MediaKind, PacketInfo, RandomAccess, TrackId, TrackInfo};
 use triergon_core::{Budget, Error, SourceCapabilities, SourceId, TimeBase, WorkBudget};
+use triergon_framing::access::{AccessUnitLimits, AccessUnits};
 use triergon_framing::{
     BuildStep,
     aac::{AacAscParser, AacConfigLimits, AacSource},

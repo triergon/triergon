@@ -39,7 +39,22 @@ pub use video_seek::MatroskaVideoSeekGate;
 // The demux clock and track binding the subtitle half reads Matroska packets with.
 pub(crate) use probe_clock::{DemuxPacketTiming, PacketClock, ProbeTimeline, Timeline};
 use superseded_aac::superseded_aac_lc_parameters;
-pub(crate) use superseded_aac::superseded_aac_lc_track_parameters;
+use superseded_aac::superseded_aac_lc_track_parameters;
+use triergon_framing::access::{AccessUnitLimits, AccessUnits, AccessUnitsSetup};
+
+/// Creates a framer from a Matroska track's configuration. For the superseded
+/// AAC-LC codec IDs, uses the Audio element's sample rate and channel count.
+/// Refuses an unsupported layout or an invalid configuration record.
+pub fn access_units(
+    pool: &Budget,
+    track: &triergon_matroska::Track,
+    limits: AccessUnitLimits,
+) -> Result<AccessUnitsSetup> {
+    match superseded_aac_lc_track_parameters(track)? {
+        Some(parameters) => Ok(AccessUnits::from_adts_parameters(pool, parameters, limits)),
+        None => AccessUnits::for_track(pool, track, limits),
+    }
+}
 
 /// Bounds of a Matroska AVC or AAC feed.
 #[derive(Clone, Copy, Debug)]

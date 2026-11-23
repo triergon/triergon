@@ -42,7 +42,7 @@ pub use triergon_core::{
 };
 
 #[cfg(feature = "playback")]
-/// Adapt container packets to decoder access units.
+/// Bind playback outputs to decoder feeds and subtitle receivers.
 pub use triergon_bridge as bridge;
 #[cfg(feature = "elementary")]
 /// Readers for native FLAC, MPEG audio, ADTS and AC-3 streams.
@@ -50,6 +50,9 @@ pub use triergon_elementary as elementary;
 #[cfg(feature = "framing")]
 /// Codec configuration readers and packet framing adapters.
 pub use triergon_framing as framing;
+#[cfg(feature = "framing")]
+/// Frame container packets for decoders using neutral packet and track information.
+pub use triergon_framing::access;
 
 /// Run a framing job to its next output, supplying a fresh work budget on each
 /// yield. Returns `None` when the job completes without another output. The job's

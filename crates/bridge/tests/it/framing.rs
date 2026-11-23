@@ -1,7 +1,7 @@
 //! Annex B framing of MP4 samples through `triergon-framing`, the path [`AccessUnits`]
 //! is checked against.
 //!
-//! [`AccessUnits`]: triergon_bridge::access::AccessUnits
+//! [`AccessUnits`]: triergon_framing::access::AccessUnits
 use crate::support::off;
 use triergon_core::{Budget, SourceLocation, WorkBudget};
 use triergon_framing::{

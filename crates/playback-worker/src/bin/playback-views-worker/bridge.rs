@@ -3,7 +3,6 @@ use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measu
 use std::sync::atomic::AtomicBool;
 use triergon_bridge::{
     aac::AacBridge,
-    access::{AccessUnitLimits, AccessUnits},
     av1::{Av1Bridge, Av1BridgeSetup, Av1Input},
     matroska::{
         MatroskaCompactDiscovery, MatroskaDiscovery, MatroskaDiscoveryLimits,
@@ -19,6 +18,7 @@ use triergon_core::container::{CodecId, MediaKind, PacketInfo, RandomAccess, Tra
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, Rounding, SourceCapabilities, SourceId, Time, WorkBudget,
 };
+use triergon_framing::access::{AccessUnitLimits, AccessUnits};
 use triergon_framing::{
     BuildStep,
     aac::{AacAscParser, AacConfigLimits, AacSource},
@@ -408,7 +408,7 @@ fn access(pool: &Budget, track: Track<'_>, config: Framing) -> Result<AccessBind
     let mut setup = match track {
         // The declared configuration of the authored 48 kHz stereo legacy files.
         _ if config.record => AccessUnits::with_record(pool, &track, &[0x11, 0x90], limits)?,
-        Track::Matroska(track) => AccessUnits::for_matroska(pool, track, limits)?,
+        Track::Matroska(track) => triergon_bridge::matroska::access_units(pool, track, limits)?,
         _ => AccessUnits::for_track(pool, &track, limits)?,
     };
     Ok(AccessBinding {

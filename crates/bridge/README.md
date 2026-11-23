@@ -6,7 +6,7 @@ subtitle receivers.
 
 | Area | Entry points |
 |---|---|
-| Access units | `access::AccessUnits` from a container track's `TrackInfo` and its packets' `PacketInfo`: AVC and HEVC as Annex B, AAC with an AudioSpecificConfig as ADTS, other codecs and tracks without a record as they are; `for_matroska` for a Matroska track entry, `with_record` for a record that comes from elsewhere |
+| Access units | `triergon_framing::access::AccessUnits` from a container track's `TrackInfo` and its packets' `PacketInfo`: AVC and HEVC as Annex B, AAC with an AudioSpecificConfig as ADTS, other codecs and tracks without a record as they are; `matroska::access_units` for a Matroska track entry, `with_record` for a record that comes from elsewhere |
 | MP4 packets | `aac::AacBridge` (MP4 AAC as ADTS, bound to one plan's track and configuration revision), `av1::Av1Bridge` (MP4 `av01` and `dav1`, Matroska `V_AV1`, as low-overhead temporal units) |
 | Matroska feeds | `matroska::MatroskaFeedSetup` (AVC Annex B, AAC ADTS), `MatroskaHevcDolbySetup` (HEVC Annex B, AC-3 and E-AC-3), `MatroskaDiscovery`, `MatroskaCompactDiscovery`, `MatroskaVideoSeekGate` |
 | Matroska clocks | feed methods `demux_avc_clock`, `demux_aac_clock_probe` (`MatroskaTrackFeed`), `demux_hevc_clock`, `demux_dolby_clock_probe` (`MatroskaHevcDolbyFeed`); the audio probes are `MatroskaClockProbe`s |
@@ -19,12 +19,12 @@ readers in `triergon-hls`, `triergon-raw-video` and `triergon-mpegts` already
 frame Annex B and ADTS. For a decoder that takes contiguous input, join a sliced
 unit through `contiguous_feed` or `segments`. `Event::DemuxPes` and PES carried
 in `Event::Ts` have no packet view. `AccessUnits::for_track` refuses Matroska
-AAC without CodecPrivate; `AccessUnits::for_matroska` frames it from the
+AAC without CodecPrivate; `matroska::access_units` frames it from the
 Matroska track entry.
 
 ```rust
 use std::sync::atomic::AtomicBool;
-use triergon_bridge::access::AccessUnits;
+use triergon_framing::access::AccessUnits;
 use triergon_core::container::{PacketInfo, TrackInfo};
 use triergon_core::{Budget, Error, Result, WorkBudget};
 use triergon_framing::BuildStep;
@@ -62,7 +62,7 @@ block already opens with one. A job dropped before it publishes leaves the eleme
 to the next; a framing made afresh, after a seek for example, sends it again.
 
 **Superseded Matroska AAC IDs.** Discovery, `MatroskaFeedSetup` and
-`AccessUnits::for_matroska` accept `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`, which
+`matroska::access_units` accept `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`, which
 the codec mappings supersede by `A_AAC` (sections 3.4.2 to 3.4.10). They carry
 no initialization record (a zero-length CodecPrivate is none), so the ADTS
 parameters come from the Audio element's indexed sampling frequency and a count

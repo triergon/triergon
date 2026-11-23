@@ -7,7 +7,7 @@ use std::{
 use triergon::{
     AnyReader, Backpressure, Blocking, Budget, BudgetVec, Bytes, CodecId, ContainerReader, Error,
     PacketInfo, Result, Rounding, SourceCapabilities, SourceId, TimeBase, TrackInfo, WorkBudget,
-    bridge::access::{AccessUnitLimits, AccessUnits},
+    access::{AccessUnitLimits, AccessUnits},
     framing::BuildStep,
     isobmff::config::ConfigurationLimits,
     matroska,

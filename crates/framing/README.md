@@ -7,6 +7,10 @@ samples; it returns source-preserving views, decoder-ready Annex-B/ADTS/temporal
 output and typed refusals. It depends on `triergon-core` and `triergon-bitstream`, does
 no I/O and does not decode audio or video.
 
+`access::AccessUnits` frames a container track's packets using its `TrackInfo`
+and their `PacketInfo`. It emits AVC and HEVC as Annex B and wraps raw AAC in
+ADTS when the configuration is known. Other packets retain their original payload.
+
 ## Usage
 
 Every record job, packet job and incremental reader takes a core `Budget` pool, a

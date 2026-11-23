@@ -10,7 +10,6 @@
     clippy::expect_used
 )]
 pub mod aac;
-pub mod access;
 pub mod av1;
 pub mod matroska;
 pub mod subtitles;

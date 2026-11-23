@@ -12,6 +12,7 @@
 
 pub mod aac;
 pub mod ac3;
+pub mod access;
 pub mod av1;
 pub mod avc;
 pub mod compat;

@@ -1,7 +1,7 @@
 use std::{fs::File, io::Read, path::Path, sync::atomic::AtomicBool};
 use triergon::{
     AnyReader, Budget, BudgetVec, ContainerReader, Error, PacketInfo, Result, TrackInfo,
-    bridge::access::{AccessUnitLimits, AccessUnits},
+    access::{AccessUnitLimits, AccessUnits},
     open_blocking,
     render::ass::{Fonts, Options, Renderer, Script, Settings, Size},
     run_build,

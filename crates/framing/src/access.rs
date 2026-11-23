@@ -2,21 +2,21 @@
 //! AVC and HEVC become Annex B, AAC with a configuration record becomes ADTS (the
 //! first frame carrying the record's program config element when it has one), and
 //! other codecs pass through. Work and storage use the caller's budgets.
-use crate::aac::{opening_block, raw_block_program};
-use crate::matroska::superseded_aac_lc_track_parameters;
-use std::sync::atomic::AtomicBool;
-use triergon_core::container::{CodecId, PacketInfo, RandomAccess, TrackId, TrackInfo, Trim};
-use triergon_core::{Budget, Bytes, Error, Result, SourceId, SourceLocation, TimeBase, WorkBudget};
-use triergon_framing::{
+use crate::{
     BuildStep,
-    aac::{AacAdtsParameters, AacAdtsWriter, AacAscParser, AacConfigLimits, AacSource},
+    aac::{
+        AacAdtsParameters, AacAdtsWriter, AacAscParser, AacConfigLimits, AacProgramElement,
+        AacSource,
+    },
     avc::{AvcConfigLimits, AvcConfigParser, AvcConfigSource},
     compat::nal::{
         NalPacket, NalPacketConfiguration, NalPacketJob, NalPacketLimits, NalPacketSession,
     },
     hevc::{HvcConfigLimits, HvcConfigParser, HvcConfigSource},
 };
-use triergon_matroska::Track as MatroskaTrack;
+use std::sync::atomic::AtomicBool;
+use triergon_core::container::{CodecId, PacketInfo, RandomAccess, TrackId, TrackInfo, Trim};
+use triergon_core::{Budget, Bytes, Error, Result, SourceId, SourceLocation, TimeBase, WorkBudget};
 
 /// The source the framing jobs report: packets come through [`PacketInfo`], which
 /// carries no source, so diagnostics name this one at offset zero.
@@ -66,7 +66,7 @@ enum Framing {
     /// the configuration's program config element.
     AdtsProgram {
         parameters: AacAdtsParameters,
-        program: Bytes,
+        program: AacProgramElement,
     },
     Packet,
 }
@@ -111,9 +111,9 @@ pub struct AccessUnitsSetup {
 impl AccessUnits {
     /// Uses the track's configuration record and charges buffers to `pool`.
     /// Fails with `Limit` if the record exceeds `limits`, and with `Unsupported`
-    /// for a Matroska AAC track without a record, which
-    /// [`for_matroska`](Self::for_matroska) frames. Annex B and ADTS tracks can
-    /// pass through with an empty record.
+    /// for Matroska AAC without a record. Use [`Self::from_adts_parameters`] when
+    /// the parameters come from the track's audio fields. Annex B and ADTS tracks
+    /// can pass through with an empty record.
     pub fn for_track(
         pool: &Budget,
         track: &dyn TrackInfo,
@@ -122,25 +122,16 @@ impl AccessUnits {
         Self::with_record(pool, track, track.configuration(), limits)
     }
 
-    /// [`for_track`](Self::for_track) for a Matroska track. An AAC-LC codec ID that
-    /// `A_AAC` supersedes (`A_AAC/MPEG2/LC`, `A_AAC/MPEG4/LC`) carries raw access units and no
-    /// initialization record (a zero-length CodecPrivate is none): their ADTS headers
-    /// take the indexed sampling frequency and a count of one to six channels from the
-    /// track's Audio element, as [`MatroskaFeedSetup`](crate::matroska::MatroskaFeedSetup)'s
-    /// do. Fails with `Unsupported` for such a track whose rate or channel count ADTS
-    /// cannot index, and as `for_track` does.
-    pub fn for_matroska(
+    /// Wraps raw AAC packets in ADTS using already validated header parameters.
+    pub fn from_adts_parameters(
         pool: &Budget,
-        track: &MatroskaTrack,
+        parameters: AacAdtsParameters,
         limits: AccessUnitLimits,
-    ) -> Result<AccessUnitsSetup> {
-        match superseded_aac_lc_track_parameters(track)? {
-            Some(parameters) => Ok(AccessUnitsSetup {
-                pool: pool.clone(),
-                limits,
-                setup: Setup::Ready(Some(Framing::Adts(parameters))),
-            }),
-            None => Self::for_track(pool, track, limits),
+    ) -> AccessUnitsSetup {
+        AccessUnitsSetup {
+            pool: pool.clone(),
+            limits,
+            setup: Setup::Ready(Some(Framing::Adts(parameters))),
         }
     }
 
@@ -278,11 +269,11 @@ impl AccessUnits {
 fn program_writer(
     pool: &Budget,
     parameters: AacAdtsParameters,
-    program: &[u8],
+    program: &AacProgramElement,
     payload: &[u8],
     unit_bytes: usize,
 ) -> Result<AacAdtsWriter> {
-    let block = match opening_block(pool, program, payload)? {
+    let block = match program.prepend(payload)? {
         Some(block) => block,
         None => Bytes::copy_from_slice(pool, payload)?,
     };
@@ -323,10 +314,10 @@ impl AccessUnitsSetup {
             Setup::Aac(parser) => match parser.step(work, cancel)? {
                 BuildStep::Ready(record) => {
                     let parameters = AacAdtsParameters::from_asc(record.facts())?;
-                    match record.program_config() {
+                    match AacProgramElement::from_config(&self.pool, &record)? {
                         Some(program) => Framing::AdtsProgram {
                             parameters,
-                            program: raw_block_program(&self.pool, record.source_bytes(), program)?,
+                            program,
                         },
                         None => Framing::Adts(parameters),
                     }

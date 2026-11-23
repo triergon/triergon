@@ -29,6 +29,9 @@ opening events, `source.reader().track_count()` can be zero. ISO BMFF publishes
 its tracks with `ReaderEvent::Movie`. `next_event` lets you inspect the opening
 events before pulling packets.
 
+Use `triergon::access::AccessUnits` with `framing` or `codecs` when you have
+track metadata and packets from a container reader.
+
 To decode and render as well, with `playback,codecs,render`, open the source with
 `playback::probe::Probe` and
 read outputs from a `playback::Player`. Look up the packet's track with
@@ -43,7 +46,7 @@ budget each time it yields.
 # #[cfg(all(feature = "playback", feature = "codecs", feature = "render"))]
 # fn play_one(
 #     track: &dyn triergon::TrackInfo, packet: &impl triergon::PacketInfo,
-#     units: &mut triergon::bridge::access::AccessUnits,
+#     units: &mut triergon::access::AccessUnits,
 #     cancel: &std::sync::atomic::AtomicBool, video: &mut triergon::session::VideoSession,
 #     audio: &mut triergon::session::AudioSession, pcm: &mut triergon::session::PcmBlock,
 #     renderer: &mut triergon::render::ass::Renderer, script: &mut triergon::render::ass::Script,

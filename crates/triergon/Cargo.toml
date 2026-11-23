@@ -60,7 +60,7 @@ playback = [
 ]
 session = ["dep:triergon-session", "dep:triergon-codec", "dep:triergon-pixel"]
 codecs = [
-    "session", "triergon-session/codecs", "dep:triergon-codec-aac", "dep:triergon-codec-ac3",
+    "framing", "session", "triergon-session/codecs", "dep:triergon-codec-aac", "dep:triergon-codec-ac3",
     "dep:triergon-codec-dca", "dep:triergon-codec-flac", "dep:triergon-codec-h264",
     "dep:triergon-codec-hevc", "dep:triergon-codec-mp3", "dep:triergon-codec-opus",
     "dep:triergon-codec-vorbis",

@@ -263,8 +263,8 @@ fn superseded_aac_lc_tracks_discover_and_frame_every_packet() {
 
 #[test]
 fn access_units_frame_superseded_aac_lc_from_the_matroska_track_or_a_supplied_record() {
-    use triergon_bridge::access::{AccessUnitLimits, AccessUnits};
     use triergon_core::container::PacketInfo;
+    use triergon_framing::access::{AccessUnitLimits, AccessUnits};
 
     // The neutral track view has no Audio element; the Matroska configuration has.
     let cancel = AtomicBool::new(false);
@@ -292,7 +292,7 @@ fn access_units_frame_superseded_aac_lc_from_the_matroska_track_or_a_supplied_re
                     // AAC-LC, 48000 Hz, stereo
                     AccessUnits::with_record(&pool, track, &[0x11, 0x90], limits)
                 } else {
-                    AccessUnits::for_matroska(&pool, track, limits)
+                    triergon_bridge::matroska::access_units(&pool, track, limits)
                 }
                 .unwrap();
                 units = Some(crate::framing::ready(|work| {
@@ -316,7 +316,7 @@ fn access_units_frame_superseded_aac_lc_from_the_matroska_track_or_a_supplied_re
 
 #[test]
 fn superseded_aac_lc_refuses_a_channel_count_without_an_adts_layout() {
-    use triergon_bridge::access::{AccessUnitLimits, AccessUnits};
+    use triergon_framing::access::AccessUnitLimits;
 
     let input = include_bytes!(
         "../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-ambiguous-layout.mkv"
@@ -336,7 +336,7 @@ fn superseded_aac_lc_refuses_a_channel_count_without_an_adts_layout() {
         refusal
     );
     assert_eq!(
-        AccessUnits::for_matroska(
+        triergon_bridge::matroska::access_units(
             &pool,
             &configuration.tracks()[0],
             AccessUnitLimits::default()

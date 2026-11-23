@@ -1,9 +1,9 @@
 use crate::framing::{annex_b, annex_b_session, ready};
 use crate::support::{View, byte_input, collect, index_job, off, run_index, run_open};
-use triergon_bridge::access::{AccessUnitLimits, AccessUnits};
 use triergon_core::container::{CodecId, PacketInfo, TrackInfo};
 use triergon_core::{Budget, SourceCapabilities, SourceId, WorkBudget};
 use triergon_framing::BuildStep;
+use triergon_framing::access::{AccessUnitLimits, AccessUnits};
 use triergon_isobmff::config::ConfigurationLimits;
 use triergon_playback::{
     Engine, Event, Player, PlayerPolicy, Selection,
