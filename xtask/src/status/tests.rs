@@ -385,3 +385,25 @@ fn the_listed_table_counts_each_form_once_per_case_and_target() {
         ["docs/status.md: no heading Listed differences"]
     );
 }
+
+#[test]
+fn writing_status_counts_feature_corpora_and_generated_pins() {
+    let root = repository("status-feature-case-counts");
+    for (feature, filename, contents, count) in [
+        ("file-cases", "corpus.json", r#"{"cases": [{}, {}]}"#, 2),
+        ("generated", "pins.json", r#"{"pins":{"a":{}}}"#, 1),
+    ] {
+        let directory = root.join("harness/features").join(feature);
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join(filename), contents).unwrap();
+        fs::write(
+            directory.join("contract.json"),
+            r#"{"open_cases":[{"id":"a","requirement":"parity"}]}"#,
+        )
+        .unwrap();
+        let table = listed_table(&registry_files(&root).unwrap());
+        let row = table.iter().find(|line| line.contains(feature)).unwrap();
+        assert!(row.ends_with(&format!("| {count} |")), "{row}");
+    }
+    fs::remove_dir_all(root).unwrap();
+}

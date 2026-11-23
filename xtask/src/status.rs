@@ -989,7 +989,9 @@ fn registry_files(root: &Path) -> Result<Vec<(String, Value)>, String> {
             .map_err(|e| e.to_string())?
             .display()
             .to_string();
-        if comparison(&rel).is_some() {
+        let feature_cases = rel.starts_with("harness/features/")
+            && (rel.ends_with("/corpus.json") || rel.ends_with("/pins.json"));
+        if comparison(&rel).is_some() || feature_cases {
             files.push((rel, json::read(&path)?));
         }
     }
