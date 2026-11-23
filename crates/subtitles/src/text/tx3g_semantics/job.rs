@@ -61,25 +61,42 @@ struct Found {
 enum Phase {
     /// Parsing the sample description.
     Description(ConfigJob),
-    /// Converting the description's font names, from the font at `at`.
-    Fonts { at: usize, font: FontStep },
+    /// Converting the description's font names.
+    Fonts(Fonts),
     /// Counting the text's characters.
     Count(Cursor),
-    /// Reading the description's `disp` boxes, from the box at `at`.
-    DescriptionBoxes { at: usize, open: Option<Reader> },
-    /// Reading the sample's modifier boxes, from the box at `at`, and
-    /// committing their records one by one.
-    Boxes {
-        at: usize,
-        open: Option<Reader>,
-        record: Option<Record>,
-    },
+    /// Reading the description's `disp` boxes.
+    DescriptionBoxes(DescriptionBoxes),
+    /// Reading the sample's modifier boxes and committing their records one
+    /// by one.
+    Boxes(Boxes),
     /// Checking static highlights and links against karaoke.
     Conflicts(Conflicts),
     /// Cutting the text into runs.
     Runs(Runs),
     /// The semantics, ready to take.
     Ready,
+}
+
+/// What a phase's step did.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "The next phase is handed over once per phase, on a path no worker times."
+)]
+enum Flow {
+    /// The status to return.
+    Return(SemanticStatus),
+    /// The phase goes on.
+    Stay,
+    /// The phase is over; the next one.
+    Next(Phase),
+}
+
+/// The font names from the font at `at`.
+#[derive(Debug)]
+struct Fonts {
+    at: usize,
+    font: FontStep,
 }
 
 #[derive(Debug)]
@@ -94,6 +111,22 @@ enum FontStep {
     Convert(CharsetJob),
     /// The font, to enter in the font table; whether its unit is paid.
     Commit { font: SemanticFont, paid: bool },
+}
+
+/// The description's boxes from the box at `at`, and the one open.
+#[derive(Debug)]
+struct DescriptionBoxes {
+    at: usize,
+    open: Option<Reader>,
+}
+
+/// The sample's boxes from the box at `at`, the one open and the record read
+/// from it but not yet committed.
+#[derive(Debug)]
+struct Boxes {
+    at: usize,
+    open: Option<Reader>,
+    record: Option<Record>,
 }
 
 /// A record read but not yet committed, and whether its unit is paid.
@@ -270,10 +303,10 @@ impl SemanticJob {
                         Status::Cue(cue) => {
                             let phase = match description.take() {
                                 Some(job) => Phase::Description(job),
-                                None => Phase::Fonts {
+                                None => Phase::Fonts(Fonts {
                                     at: 0,
                                     font: FontStep::Open,
-                                },
+                                }),
                             };
                             self.state = State::Resolving(Resolution {
                                 found: Found::new(cue, *context, &self.pool),
@@ -323,12 +356,11 @@ impl Resolution {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<SemanticStatus>> {
-        const PENDING: Option<SemanticStatus> = Some(SemanticStatus::Pending);
         let found = &mut self.found;
-        match &mut self.phase {
+        let flow = match &mut self.phase {
             Phase::Description(job) => {
                 if job.poll(work, cancel)? == ConfigStatus::Pending {
-                    return Ok(PENDING);
+                    return Ok(Some(SemanticStatus::Pending));
                 }
                 let description = job.take_output(cancel)?;
                 let semantics = &mut found.semantics;
@@ -336,189 +368,35 @@ impl Resolution {
                     Some(DisplayIntent::new(description.defaults.display_flags));
                 semantics.context.description_parsed = true;
                 semantics.description = Some(description);
-                self.phase = Phase::Fonts {
+                Flow::Next(Phase::Fonts(Fonts {
                     at: 0,
                     font: FontStep::Open,
-                };
+                }))
             }
-            Phase::Fonts { at, font } => {
-                let description = found.semantics.description.as_ref();
-                let Some((d, record)) =
-                    description.and_then(|d| Some((d, d.fonts.as_slice().get(*at)?)))
-                else {
-                    if let Some(d) = description {
-                        found.reference_font(d.defaults.style.font_id)?;
-                    }
-                    let (text, encoding) = found.text()?;
-                    self.phase = Phase::Count(Cursor::new(text, encoding));
-                    return Ok(None);
-                };
-                match font {
-                    FontStep::Open => {
-                        if !work.try_charge(1) {
-                            return Ok(PENDING);
-                        }
-                        let bytes = d.raw.slice(record.name_range.clone())?;
-                        let charset = if bytes.as_ref().starts_with(&[0xfe, 0xff]) {
-                            Charset::Utf16Bom
-                        } else {
-                            Charset::Utf8
-                        };
-                        *font = FontStep::Convert(CharsetJob::new(
-                            &bytes,
-                            None,
-                            charset,
-                            pool,
-                            limits.text,
-                        )?);
-                    }
-                    FontStep::Convert(job) => {
-                        if job.poll(work, cancel)? == CharsetStatus::Pending {
-                            return Ok(PENDING);
-                        }
-                        let name = job.take_output(cancel)?;
-                        *font = FontStep::Commit {
-                            font: SemanticFont {
-                                id: record.id,
-                                raw_name: record.name_range.clone(),
-                                name_utf8: name.utf8,
-                                utf16_bom: name.charset == Charset::Utf16Bom,
-                            },
-                            paid: false,
-                        };
-                    }
-                    FontStep::Commit {
-                        font: pending,
-                        paid,
-                    } => {
-                        if found.commit_font(pending, paid, work)? {
-                            *at += 1;
-                            *font = FontStep::Open;
-                        }
-                    }
-                }
-            }
+            Phase::Fonts(fonts) => fonts.step(found, pool, limits.text, work, cancel)?,
             Phase::Count(cursor) => {
                 let payload = found.semantics.source.input.payload.as_ref();
                 match cursor.poll(payload, work, cancel)? {
-                    Poll::Yield => return Ok(PENDING),
+                    Poll::Yield => Flow::Return(SemanticStatus::Pending),
                     Poll::Ready(_) => {
                         let characters = &mut found.semantics.characters;
                         *characters = characters.checked_add(1).ok_or(Error::Overflow)?;
+                        Flow::Stay
                     }
-                    Poll::End => {
-                        self.phase = Phase::DescriptionBoxes { at: 0, open: None };
-                    }
-                }
-            }
-            Phase::DescriptionBoxes { at, open } => {
-                let Some(d) = found
-                    .semantics
-                    .description
-                    .as_ref()
-                    .filter(|d| *at < d.boxes.len())
-                else {
-                    self.phase = Phase::Boxes {
+                    Poll::End => Flow::Next(Phase::DescriptionBoxes(DescriptionBoxes {
                         at: 0,
                         open: None,
-                        record: None,
-                    };
-                    return Ok(None);
-                };
-                let reader = if let Some(reader) = open {
-                    reader
-                } else {
-                    if !work.try_charge(1) {
-                        return Ok(PENDING);
-                    }
-                    let modifier = &d.boxes.as_slice()[*at];
-                    // Of the description's boxes only `disp` is read.
-                    let reader = if modifier.kind == *b"disp" {
-                        Reader::new(d.raw.as_ref(), modifier, *at)?
-                    } else {
-                        None
-                    };
-                    let Some(reader) = reader else {
-                        *at += 1;
-                        return Ok(None);
-                    };
-                    open.insert(reader)
-                };
-                match reader.poll(d.raw.as_ref(), work, cancel)? {
-                    Poll::Yield => return Ok(PENDING),
-                    Poll::Ready(Item::Disparity(_, value)) => {
-                        let disparity = &mut found.semantics.globals.description_disparity;
-                        if disparity.is_some() {
-                            return Err(Error::Invalid("duplicate tx3g description disparity"));
-                        }
-                        *disparity = Some(value);
-                    }
-                    Poll::Ready(_) => {
-                        return Err(Error::Invalid("unexpected description semantic field"));
-                    }
-                    Poll::End => {
-                        *open = None;
-                        *at += 1;
-                    }
+                    })),
                 }
             }
-            Phase::Boxes { at, open, record } => {
-                if let Some(pending) = record {
-                    if !pending.paid {
-                        if !work.try_charge(1) {
-                            return Ok(PENDING);
-                        }
-                        pending.paid = true;
-                    }
-                    if found.records >= limits.maximum_records {
-                        return Err(Error::Limit {
-                            requested: found.records.checked_add(1).ok_or(Error::Overflow)?,
-                            maximum: limits.maximum_records,
-                        });
-                    }
-                    found.commit(&pending.item)?;
-                    *record = None;
-                    return Ok(None);
-                }
-                let cue = &found.semantics.source;
-                let Some(modifier) = cue.modifiers.as_slice().get(*at) else {
-                    found.finish_globals();
-                    self.phase = Phase::Conflicts(Conflicts {
-                        checked: Checked::Highlights,
-                        at: 0,
-                        event: 0,
-                    });
-                    return Ok(None);
-                };
-                let payload = cue.input.payload.as_ref();
-                let reader = if let Some(reader) = open {
-                    reader
-                } else {
-                    if !work.try_charge(1) {
-                        return Ok(PENDING);
-                    }
-                    // A box no record is read from has no effect.
-                    let Some(reader) = Reader::new(payload, modifier, *at)? else {
-                        *at += 1;
-                        return Ok(None);
-                    };
-                    open.insert(reader)
-                };
-                match reader.poll(payload, work, cancel)? {
-                    Poll::Yield => return Ok(PENDING),
-                    Poll::Ready(item) => *record = Some(Record { item, paid: false }),
-                    Poll::End => {
-                        *open = None;
-                        *at += 1;
-                    }
-                }
-            }
+            Phase::DescriptionBoxes(boxes) => boxes.step(found, work, cancel)?,
+            Phase::Boxes(boxes) => boxes.step(found, limits.maximum_records, work, cancel)?,
             Phase::Conflicts(conflicts) => match conflicts.step(found, work)? {
-                Scan::Pending => return Ok(PENDING),
-                Scan::Stepped => {}
+                Scan::Pending => Flow::Return(SemanticStatus::Pending),
+                Scan::Stepped => Flow::Stay,
                 Scan::Done => {
                     let (text, encoding) = found.text()?;
-                    self.phase = Phase::Runs(Runs {
+                    Flow::Next(Phase::Runs(Runs {
                         position: 0,
                         sweep: [0; 4],
                         character: 0,
@@ -526,64 +404,204 @@ impl Resolution {
                         utf8: 0,
                         cursor: Cursor::new(text, encoding),
                         run: RunStep::Prepare,
-                    });
+                    }))
                 }
             },
-            Phase::Runs(runs) => match &mut runs.run {
-                RunStep::Prepare => {
-                    if runs.position == found.semantics.characters {
-                        self.phase = Phase::Ready;
-                        return Ok(None);
-                    }
-                    match runs.prepare(found, work)? {
-                        Prepared::Pending => return Ok(PENDING),
-                        Prepared::Swept => {}
-                        Prepared::Run(run) => runs.run = RunStep::Text(run),
-                    }
+            Phase::Runs(runs) => runs.step(found, limits.maximum_runs, work, cancel)?,
+            Phase::Ready => Flow::Return(SemanticStatus::Ready),
+        };
+        Ok(match flow {
+            Flow::Return(status) => Some(status),
+            Flow::Stay => None,
+            Flow::Next(phase) => {
+                self.phase = phase;
+                None
+            }
+        })
+    }
+}
+
+impl Fonts {
+    /// Converts the next font name and enters it in the font table; once
+    /// every font is in, checks the default style's font and counts the
+    /// text.
+    fn step(
+        &mut self,
+        found: &mut Found,
+        pool: &Budget,
+        limits: Limits,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Flow> {
+        let description = found.semantics.description.as_ref();
+        let Some((d, record)) =
+            description.and_then(|d| Some((d, d.fonts.as_slice().get(self.at)?)))
+        else {
+            if let Some(d) = description {
+                found.reference_font(d.defaults.style.font_id)?;
+            }
+            let (text, encoding) = found.text()?;
+            return Ok(Flow::Next(Phase::Count(Cursor::new(text, encoding))));
+        };
+        match &mut self.font {
+            FontStep::Open => {
+                if !work.try_charge(1) {
+                    return Ok(Flow::Return(SemanticStatus::Pending));
                 }
-                RunStep::Text(run) => {
-                    if runs.character == run.characters.end {
-                        run.source_bytes.end = runs.source;
-                        run.utf8_bytes.end = runs.utf8;
-                        runs.run = RunStep::Commit {
-                            run: run.clone(),
-                            paid: false,
-                        };
-                        return Ok(None);
-                    }
-                    let payload = found.semantics.source.input.payload.as_ref();
-                    match runs.cursor.poll(payload, work, cancel)? {
-                        Poll::Yield => return Ok(PENDING),
-                        Poll::End => return Err(Error::Truncated),
-                        Poll::Ready(scalar) => {
-                            runs.character += 1;
-                            runs.source = scalar.end;
-                            runs.utf8 = scalar.decoded_end;
-                        }
-                    }
+                let bytes = d.raw.slice(record.name_range.clone())?;
+                let charset = if bytes.as_ref().starts_with(&[0xfe, 0xff]) {
+                    Charset::Utf16Bom
+                } else {
+                    Charset::Utf8
+                };
+                self.font =
+                    FontStep::Convert(CharsetJob::new(&bytes, None, charset, pool, limits)?);
+            }
+            FontStep::Convert(job) => {
+                if job.poll(work, cancel)? == CharsetStatus::Pending {
+                    return Ok(Flow::Return(SemanticStatus::Pending));
                 }
-                RunStep::Commit { run, paid } => {
-                    if !*paid {
-                        if !work.try_charge(1) {
-                            return Ok(PENDING);
-                        }
-                        *paid = true;
-                    }
-                    let resolved = &mut found.semantics.runs;
-                    if resolved.len() >= limits.maximum_runs {
-                        return Err(Error::Limit {
-                            requested: resolved.len() + 1,
-                            maximum: limits.maximum_runs,
-                        });
-                    }
-                    resolved.try_push(run.clone()).map_err(|e| e.error)?;
-                    runs.position = run.characters.end;
-                    runs.run = RunStep::Prepare;
+                let name = job.take_output(cancel)?;
+                self.font = FontStep::Commit {
+                    font: SemanticFont {
+                        id: record.id,
+                        raw_name: record.name_range.clone(),
+                        name_utf8: name.utf8,
+                        utf16_bom: name.charset == Charset::Utf16Bom,
+                    },
+                    paid: false,
+                };
+            }
+            FontStep::Commit { font, paid } => {
+                if found.commit_font(font, paid, work)? {
+                    self.at += 1;
+                    self.font = FontStep::Open;
                 }
-            },
-            Phase::Ready => return Ok(Some(SemanticStatus::Ready)),
+            }
         }
-        Ok(None)
+        Ok(Flow::Stay)
+    }
+}
+
+impl DescriptionBoxes {
+    /// Reads the description's next `disp` box; once every box is read, the
+    /// sample's boxes.
+    fn step(
+        &mut self,
+        found: &mut Found,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Flow> {
+        let Some(d) = found
+            .semantics
+            .description
+            .as_ref()
+            .filter(|d| self.at < d.boxes.len())
+        else {
+            return Ok(Flow::Next(Phase::Boxes(Boxes {
+                at: 0,
+                open: None,
+                record: None,
+            })));
+        };
+        let reader = if let Some(reader) = &mut self.open {
+            reader
+        } else {
+            if !work.try_charge(1) {
+                return Ok(Flow::Return(SemanticStatus::Pending));
+            }
+            let modifier = &d.boxes.as_slice()[self.at];
+            // Of the description's boxes only `disp` is read.
+            let reader = if modifier.kind == *b"disp" {
+                Reader::new(d.raw.as_ref(), modifier, self.at)?
+            } else {
+                None
+            };
+            let Some(reader) = reader else {
+                self.at += 1;
+                return Ok(Flow::Stay);
+            };
+            self.open.insert(reader)
+        };
+        match reader.poll(d.raw.as_ref(), work, cancel)? {
+            Poll::Yield => return Ok(Flow::Return(SemanticStatus::Pending)),
+            Poll::Ready(Item::Disparity(_, value)) => {
+                let disparity = &mut found.semantics.globals.description_disparity;
+                if disparity.is_some() {
+                    return Err(Error::Invalid("duplicate tx3g description disparity"));
+                }
+                *disparity = Some(value);
+            }
+            Poll::Ready(_) => return Err(Error::Invalid("unexpected description semantic field")),
+            Poll::End => {
+                self.open = None;
+                self.at += 1;
+            }
+        }
+        Ok(Flow::Stay)
+    }
+}
+
+impl Boxes {
+    /// Commits the record read, or reads the next record of the sample's
+    /// boxes; once every box is read, resolves the sample-wide values and
+    /// checks the conflicts.
+    fn step(
+        &mut self,
+        found: &mut Found,
+        maximum_records: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Flow> {
+        if let Some(pending) = &mut self.record {
+            if !pending.paid {
+                if !work.try_charge(1) {
+                    return Ok(Flow::Return(SemanticStatus::Pending));
+                }
+                pending.paid = true;
+            }
+            if found.records >= maximum_records {
+                return Err(Error::Limit {
+                    requested: found.records.checked_add(1).ok_or(Error::Overflow)?,
+                    maximum: maximum_records,
+                });
+            }
+            found.commit(&pending.item)?;
+            self.record = None;
+            return Ok(Flow::Stay);
+        }
+        let cue = &found.semantics.source;
+        let Some(modifier) = cue.modifiers.as_slice().get(self.at) else {
+            found.finish_globals();
+            return Ok(Flow::Next(Phase::Conflicts(Conflicts {
+                checked: Checked::Highlights,
+                at: 0,
+                event: 0,
+            })));
+        };
+        let payload = cue.input.payload.as_ref();
+        let reader = if let Some(reader) = &mut self.open {
+            reader
+        } else {
+            if !work.try_charge(1) {
+                return Ok(Flow::Return(SemanticStatus::Pending));
+            }
+            // A box no record is read from has no effect.
+            let Some(reader) = Reader::new(payload, modifier, self.at)? else {
+                self.at += 1;
+                return Ok(Flow::Stay);
+            };
+            self.open.insert(reader)
+        };
+        match reader.poll(payload, work, cancel)? {
+            Poll::Yield => return Ok(Flow::Return(SemanticStatus::Pending)),
+            Poll::Ready(item) => self.record = Some(Record { item, paid: false }),
+            Poll::End => {
+                self.open = None;
+                self.at += 1;
+            }
+        }
+        Ok(Flow::Stay)
     }
 }
 
@@ -938,6 +956,69 @@ impl Conflicts {
 }
 
 impl Runs {
+    /// Cuts the next run, maps its characters to its byte ranges and appends
+    /// it; once every character is in a run, the semantics are ready.
+    fn step(
+        &mut self,
+        found: &mut Found,
+        maximum_runs: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Flow> {
+        match &mut self.run {
+            RunStep::Prepare => {
+                if self.position == found.semantics.characters {
+                    return Ok(Flow::Next(Phase::Ready));
+                }
+                match self.prepare(found, work)? {
+                    Prepared::Pending => return Ok(Flow::Return(SemanticStatus::Pending)),
+                    Prepared::Swept => {}
+                    Prepared::Run(run) => self.run = RunStep::Text(run),
+                }
+            }
+            RunStep::Text(run) => {
+                if self.character == run.characters.end {
+                    run.source_bytes.end = self.source;
+                    run.utf8_bytes.end = self.utf8;
+                    self.run = RunStep::Commit {
+                        run: run.clone(),
+                        paid: false,
+                    };
+                    return Ok(Flow::Stay);
+                }
+                let payload = found.semantics.source.input.payload.as_ref();
+                match self.cursor.poll(payload, work, cancel)? {
+                    Poll::Yield => return Ok(Flow::Return(SemanticStatus::Pending)),
+                    Poll::End => return Err(Error::Truncated),
+                    Poll::Ready(scalar) => {
+                        self.character += 1;
+                        self.source = scalar.end;
+                        self.utf8 = scalar.decoded_end;
+                    }
+                }
+            }
+            RunStep::Commit { run, paid } => {
+                if !*paid {
+                    if !work.try_charge(1) {
+                        return Ok(Flow::Return(SemanticStatus::Pending));
+                    }
+                    *paid = true;
+                }
+                let resolved = &mut found.semantics.runs;
+                if resolved.len() >= maximum_runs {
+                    return Err(Error::Limit {
+                        requested: resolved.len() + 1,
+                        maximum: maximum_runs,
+                    });
+                }
+                resolved.try_push(run.clone()).map_err(|e| e.error)?;
+                self.position = run.characters.end;
+                self.run = RunStep::Prepare;
+            }
+        }
+        Ok(Flow::Stay)
+    }
+
     /// Cuts the next run at the first record boundary after its start,
     /// passing the records that end before it one unit at a time.
     fn prepare(&mut self, found: &Found, work: &mut WorkBudget) -> Result<Prepared> {
