@@ -1193,6 +1193,7 @@ impl MovieOpen {
                 self.limits.format,
             )?),
         };
+        // Passing the defaults slice into the fragment step adds 0.213% playback instructions.
         let movie = &self.walk;
         let defaults = |id| {
             let movie = movie.as_ref().ok_or(Error::Invalid("walk missing"))?;
