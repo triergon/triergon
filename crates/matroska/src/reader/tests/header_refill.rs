@@ -3,20 +3,18 @@
 use crate::reader::seeking::ScanState;
 use crate::reader::*;
 use crate::seek::plan::{LandingPlan, ScanPlan, SeekPlan};
+use crate::seek_scan_kit::source_reader;
+use crate::storage::PayloadOwnership;
 
 fn reader() -> Reader {
     let pool = Budget::new(128 * 1024).unwrap();
-    Reader::new(
+    source_reader(
         &pool,
-        SourceId(2103),
-        SourceCapabilities {
-            length: None,
-            random_access: true,
-        },
+        None,
         Limits::default(),
         8192,
+        PayloadOwnership::OwnedExact,
     )
-    .unwrap()
 }
 
 #[test]

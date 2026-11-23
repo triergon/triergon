@@ -312,18 +312,13 @@ fn data_owner(packet: &crate::packet::Packet) -> Bytes {
 }
 
 fn reader(pool: &Budget) -> Reader {
-    Reader::new_with_payload_ownership(
+    crate::seek_scan_kit::source_reader(
         pool,
-        SourceId(2301),
-        SourceCapabilities {
-            length: Some(RAW.len() as u64),
-            random_access: true,
-        },
+        Some(RAW.len() as u64),
         Limits::default(),
         4096,
         PayloadOwnership::SharedBounded,
     )
-    .unwrap()
 }
 
 fn packet(reader: &mut Reader, root: &Bytes) -> TypedPacket {

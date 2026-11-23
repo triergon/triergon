@@ -1,6 +1,7 @@
 //! SimpleBlock publication and the full-batch handoff yield identical wire facts.
 use crate::ebml_kit::{element as e, mkv};
 use crate::reader::*;
+use crate::seek_scan_kit::source_reader;
 use crate::storage::usage::Storage;
 use triergon_core::Bytes;
 
@@ -83,22 +84,18 @@ fn mixed() -> Vec<u8> {
     )
 }
 fn reader(pool: &Budget, raw: &[u8], shared: bool) -> Reader {
-    Reader::new_with_payload_ownership(
+    let ownership = if shared {
+        crate::storage::PayloadOwnership::SharedBounded
+    } else {
+        crate::storage::PayloadOwnership::OwnedExact
+    };
+    source_reader(
         pool,
-        SourceId(30001),
-        SourceCapabilities {
-            length: Some(raw.len() as u64),
-            random_access: true,
-        },
+        Some(raw.len() as u64),
         Limits::default(),
         8192,
-        if shared {
-            crate::storage::PayloadOwnership::SharedBounded
-        } else {
-            crate::storage::PayloadOwnership::OwnedExact
-        },
+        ownership,
     )
-    .unwrap()
 }
 fn supply(r: &mut Reader, req: InputRequest, raw: &[u8], chunk: usize, aliases: &mut Vec<Bytes>) {
     let at = req.offset as usize;

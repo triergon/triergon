@@ -7,8 +7,8 @@
 use crate::ebml_kit::{cluster, crc32, element as e, mkv, uint as u};
 use crate::timing::BlockTiming;
 use crate::{
-    Event, InitializationOrigin, Limits, ParseStep, Reader, SeekReceipt, SourcePosition,
-    TypedPacket,
+    Event, InitializationOrigin, Limits, ParseStep, PayloadOwnership, Reader, SeekReceipt,
+    SourcePosition, TypedPacket,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
@@ -221,18 +221,39 @@ impl<'a> Feed<'a> {
     }
 }
 
-pub(crate) fn new_reader(pool: &Budget, raw: &[u8], limits: Limits) -> Reader {
-    Reader::new(
+/// A push reader over a random-access source of `length` bytes (`None`: not known
+/// until the source finishes) that asks for windows of at most `window` bytes.
+pub(crate) fn source_reader(
+    pool: &Budget,
+    length: Option<u64>,
+    limits: Limits,
+    window: usize,
+    ownership: PayloadOwnership,
+) -> Reader {
+    let capabilities = SourceCapabilities {
+        length,
+        random_access: true,
+    };
+    Reader::new_with_payload_ownership(
         pool,
         SourceId(28001),
-        SourceCapabilities {
-            length: Some(raw.len() as u64),
-            random_access: true,
-        },
+        capabilities,
         limits,
-        8192,
+        window,
+        ownership,
     )
     .unwrap()
+}
+
+/// [`source_reader`] over `raw`, its length known, with 8 KiB windows and owned payloads.
+pub(crate) fn new_reader(pool: &Budget, raw: &[u8], limits: Limits) -> Reader {
+    source_reader(
+        pool,
+        Some(raw.len() as u64),
+        limits,
+        8192,
+        PayloadOwnership::OwnedExact,
+    )
 }
 
 pub(crate) fn open(reader: &mut Reader, feed: &mut Feed<'_>) -> Result<()> {

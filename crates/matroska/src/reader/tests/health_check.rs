@@ -2,20 +2,18 @@
 //! cancellation, and exact traces.
 use crate::ebml_kit::{element, mkv};
 use crate::reader::*;
+use crate::seek_scan_kit::source_reader;
+use crate::storage::PayloadOwnership;
 use triergon_core::Bytes;
 
 fn reader(pool: &Budget, length: u64) -> Reader {
-    Reader::new(
+    source_reader(
         pool,
-        SourceId(29001),
-        SourceCapabilities {
-            length: Some(length),
-            random_access: true,
-        },
+        Some(length),
         Limits::default(),
         8192,
+        PayloadOwnership::OwnedExact,
     )
-    .unwrap()
 }
 fn no_cancel() -> AtomicBool {
     AtomicBool::new(false)
@@ -207,9 +205,9 @@ fn trace(quantum: u64, chunk: usize, shared: bool, tail: Option<bool>) {
         Limits::default(),
         8192,
         if shared {
-            crate::storage::PayloadOwnership::SharedBounded
+            PayloadOwnership::SharedBounded
         } else {
-            crate::storage::PayloadOwnership::OwnedExact
+            PayloadOwnership::OwnedExact
         },
     )
     .unwrap();
