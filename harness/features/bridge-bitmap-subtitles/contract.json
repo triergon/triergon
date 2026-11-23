@@ -1563,44 +1563,10 @@
   "measurement_reference": "ffmpeg-playback-subtitle-views-plain-native",
   "open_deviations": [
     {
-      "reading": "VobSub needs its stored palette and canvas",
-      "clause": "Matroska codec mappings draft 21 section 3.5.13 puts the VobSub palette and size lines in CodecPrivate.",
-      "candidate": "Refuses the track without its initialization.",
-      "reference": "Decodes the DVD pictures with defaults, including a first picture at time zero with a 1137-ms stop.",
-      "compat": "compat::matroska::vobsub_default_canvas for consumers recovering tracks without VobSub initialization.",
-      "cases": [
-        "dvd-mkv-private-no-private"
-      ]
-    },
-    {
-      "reading": "DVB subtitle PES must have a finite length",
-      "clause": "ETSI EN 300 743 V1.6.1 section 6.2 Table 2 requires private_stream_1 PES and a specified length. ITU-T H.222.0 (08/2023) section 2.4.3.7 permits length zero only for TS video.",
-      "candidate": "Completes with no decoded event for the unbounded private PES.",
-      "reference": "Accepts the PES and publishes a picture at 1000000 us.",
-      "compat": "compat::dvb::accept_unbounded_subtitle_pes for consumers recovering malformed subtitle input.",
-      "cases": [
-        "dvb-pes-unbounded-ts"
-      ]
-    },
-    {
-      "reading": "Default DVB binding needs one unambiguous service",
-      "clause": "ETSI EN 300 743 V1.6.1 section 6.1 permits several subtitle services in one PID. EN 300 468 V1.18.1 section 6.2.41 binds the chosen service to the named composition and ancillary pages. DvbTsBridge::new requires a single service.",
-      "candidate": "Refuses implicit binding with multiple service entries or descriptors. Explicit descriptor and entry operations remain in the corpus.",
-      "reference": "Implicitly opens and selects pages, returning a picture, a clear or no event depending on the source.",
-      "compat": "compat::dvb::default_demux_service for consumers using the reference service selection.",
-      "cases": [
-        "dvb-services-two-ts",
-        "dvb-services-two-ordered-ts",
-        "dvb-source-combined-services",
-        "dvb-source-separate-descriptors"
-      ]
-    },
-    {
-      "reading": "Only the selected DVB composition and ancillary page IDs affect the queue",
-      "clause": "ETSI EN 300 468 V1.18.1 section 6.2.41 identifies the composition and ancillary pages to decode for the selected service.",
-      "candidate": "Uses the signalled ancillary data when it follows the selected composition and emits one rectangle. Emits nothing for the other-page and unsignalled-only sources.",
-      "reference": "Emits a clear with zero rectangles for the ancillary-after and other-page cases and one rectangle for the unsignalled page.",
-      "compat": "compat::dvb::demux_page_filter for clients reproducing the reference page admission.",
+      "reading": "Only the signalled service's composition and ancillary pages are decoded",
+      "clause": "ETSI EN 300 468 V1.18.1 section 6.2.41: the subtitling descriptor names the composition page and the ancillary page of each service; the PMT here signals one service.",
+      "candidate": "Uses the ancillary page that follows the signalled composition page and emits one rectangle (5 10 10 24 4 0 16); emits nothing for the other-page and unsignalled-page sources.",
+      "reference": "Without a dvb_substream option decodes every page: a clear with no rectangle for the ancillary-after and other-page sources, a picture from the unsignalled page 7/8/9. With dvb_substream=0 it agrees with the candidate on all three files.",
       "cases": [
         "dvb-pages-ancillary-after-ts",
         "dvb-pages-other-first-ts",
@@ -1608,22 +1574,76 @@
       ]
     },
     {
-      "reading": "The first DVB descriptor remains explicitly selectable",
-      "clause": "ETSI EN 300 468 V1.18.1 section 6.2.41 selects the service by its language and page IDs and does not make the last descriptor override it.",
-      "candidate": "Opens descriptor zero and emits the selected page clear at 1000000 us.",
-      "reference": "Publishes no event when asked for that service; the black-box demux exposes the later descriptor.",
+      "reading": "The first of two DVB subtitling descriptors stays selectable; the reference cannot be asked for it",
+      "clause": "ETSI EN 300 468 V1.18.1 section 6.2.41: each subtitling descriptor of the PMT signals a service; nothing makes a later descriptor replace an earlier one.",
+      "candidate": "With descriptor 0 and dvb_substream=0 decodes the first descriptor's service: clears at 1, 2, 3 and 4 s.",
+      "reference": "Keeps only the later descriptor in the stream's extradata, so dvb_substream=0 decodes the second descriptor's service, which has no events (descriptor 1 gives nothing on both sides): the two sides decode different services.",
       "cases": [
         "dvb-source-separate-descriptors-service-0"
       ]
+    }
+  ],
+  "pending_module_requirements": [
+    "A Matroska S_VOBSUB track without CodecPrivate is decoded with the DVD receiver's default canvas and palette, as triergon_subtitles::compat::dvd::Decoder decodes such a stream: Matroska codec mappings draft 21 section 3.5.13 says what CodecPrivate holds, not that it is required, and RFC 9559 makes CodecPrivate optional.",
+    "DvbTsBridge reports a DVB subtitle PES whose PES_packet_length is 0 as Error::Invalid instead of dropping it with neither output nor error: ITU-T H.222.0 (08/2023) section 2.4.3.7 allows length 0 only for video in a transport stream.",
+    "The PAT and PMT readers ignore the reserved bits before a PID and before program_info_length and ES_info_length, and a table refused for any other reason surfaces as a typed error rather than as an absent stream: ITU-T H.222.0 (08/2023) section 2.1 requires encoders to set reserved bits to 1, which constrains the bitstream, not its readers."
+  ],
+  "open_cases": [
+    {
+      "id": "dvd-mkv-private-no-private",
+      "requirement": "A Matroska S_VOBSUB track without CodecPrivate is decoded with the DVD receiver's default canvas and palette, as triergon_subtitles::compat::dvd::Decoder decodes such a stream: Matroska codec mappings draft 21 section 3.5.13 says what CodecPrivate holds, not that it is required, and RFC 9559 makes CodecPrivate optional."
     },
     {
-      "reading": "Unset reserved PID bits prevent transport catalogue admission",
-      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.4.4 and 2.4.4.9 define the reserved bits before program, PCR and elementary PIDs. The PAT reader requires those bits to be set.",
-      "candidate": "Does not admit the selected DVB stream. The input PAT encodes program_map_PID as 0010 with all reserved bits clear, and the PMT also clears them.",
-      "reference": "Accepts the signalling and publishes the DVB subtitle on PID 0x19b1, including a clear at 79679896578 us.",
-      "compat": "compat::psi::allow_zero_pid_reserved_bits for callers recovering nonconforming captured tables.",
+      "id": "dvb-pes-unbounded-ts",
+      "requirement": "DvbTsBridge reports a DVB subtitle PES whose PES_packet_length is 0 as Error::Invalid instead of dropping it with neither output nor error: ITU-T H.222.0 (08/2023) section 2.4.3.7 allows length 0 only for video in a transport stream."
+    },
+    {
+      "id": "dvb-fate-dvbsubtest_filter",
+      "requirement": "The PAT and PMT readers ignore the reserved bits before a PID and before program_info_length and ES_info_length, and a table refused for any other reason surfaces as a typed error rather than as an absent stream: ITU-T H.222.0 (08/2023) section 2.1 requires encoders to set reserved bits to 1, which constrains the bitstream, not its readers."
+    }
+  ],
+  "open_refusals": [
+    {
+      "reason": "The default DVB binding needs one subtitling service",
+      "clause": "ETSI EN 300 468 V1.18.1 section 6.2.41 lists every subtitling service of a PID and leaves the choice to the receiver; DvbTsBridge::new requires a single service descriptor for the PID and refuses otherwise with Unsupported; DvbTsBridge::new_for_service decodes one service a caller identifies.",
+      "detail": "DVB bridge requires one subtitling service",
       "cases": [
-        "dvb-fate-dvbsubtest_filter"
+        {
+          "id": "dvb-services-two-ts",
+          "sha256": "52f13b5840224f50475ab65853d48cea1103a4bd79da9685356b0be17d4538d7",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 280
+          }
+        },
+        {
+          "id": "dvb-services-two-ordered-ts",
+          "sha256": "c11b39f9956893002f65788e1a3c750a3fbf7d8e15383781c46887edb0262834",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 280
+          }
+        },
+        {
+          "id": "dvb-source-combined-services",
+          "sha256": "95cbe2f47853bc613482ecf9521995b0b64dd53c7c6b6dc34452cd44d515db32",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 280
+          }
+        },
+        {
+          "id": "dvb-source-separate-descriptors",
+          "sha256": "1a2346dc1b16f6afcb9f11f56e5c68b392d2286355ec9210b20d25ca80a93fa1",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 280
+          }
+        }
       ]
     }
   ]

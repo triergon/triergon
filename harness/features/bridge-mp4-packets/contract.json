@@ -154,15 +154,6 @@
       "cause": "Native runtime, live heap and total RSS collection are pending for the ADTS mux comparison."
     }
   ],
-  "pending_module_requirements": [
-    "Carry the AudioSpecificConfig program configuration in the first MPEG-4 ADTS raw data block when channel configuration is zero. The framing writer needs a budgeted prefix path to insert it without copying the access unit twice."
-  ],
-  "open_cases": [
-    {
-      "id": "range-avc-aac-program-1-aac",
-      "requirement": "Carry the AudioSpecificConfig program configuration in the first MPEG-4 ADTS raw data block when channel configuration is zero. The framing writer needs a budgeted prefix path to insert it without copying the access unit twice."
-    }
-  ],
   "open_deviations": [
     {
       "reading": "A fragment declares a sample past the available source",

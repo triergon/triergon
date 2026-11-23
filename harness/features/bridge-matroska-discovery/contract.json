@@ -156,30 +156,19 @@
   ],
   "open_deviations": [
     {
-      "reading": "Seven declared channels do not identify a legacy AAC-LC layout",
-      "clause": "Matroska codec mappings draft 21 section 3.4.6 has no initialization for A_AAC/MPEG4/LC. RFC 9559 section 5.1.4.1.29.3 defines a channel count. ISO/IEC 14496-3 AudioSpecificConfig channel configuration 7 designates eight channels, as documented by the framing crate.",
-      "candidate": "Refuses to derive an AAC-LC initialization from the seven-channel count.",
-      "reference": "Publishes ASC 11b8 with channel configuration 7, then replays eight packets.",
+      "reading": "Seven declared channels have no AAC-LC channel configuration of the legacy mapping",
+      "clause": "ISO/IEC 14496-3 Table 1.19: channelConfiguration 7 designates eight channels; RFC 9559 section 5.1.4.1.29.3 gives this track seven channels, and Matroska codec mappings draft 21 section 3.4.6 gives A_AAC/MPEG4/LC no initialization.",
+      "candidate": "Refuses before any descriptor with Unsupported (legacy Matroska AAC channel layout).",
+      "reference": "Publishes ASC 11b8 (channel configuration 7, eight channels) for the seven-channel track, then replays eight packets.",
       "cases": [
         "aac-mpeg4-lc-ambiguous-layout"
       ]
     },
     {
-      "reading": "An explicitly supplied empty CodecPrivate cannot initialize AAC-LC",
-      "clause": "Matroska codec mappings draft 21 sections 3.4.1 and 3.4.6 distinguish ASC initialization from the legacy mapping with none. MatroskaFeedSetup derives ADTS parameters only for absent initialization.",
-      "candidate": "Preserves the supplied empty record and the ASC parser reports Truncated.",
-      "reference": "Treats the empty record as absence and derives the stereo 48000 Hz ASC 1190, then replays eight packets.",
-      "compat": "compat::matroska::legacy_aac_lc_empty_private for callers recovering legacy files with an empty codec record.",
-      "cases": [
-        "aac-mpeg4-lc-empty-private"
-      ]
-    },
-    {
-      "reading": "Matroska replay preserves the signed PGS Block timestamp",
-      "clause": "RFC 9559 section 11.2 makes the signed Block time a presentation timestamp.",
-      "candidate": "Replays the initial PGS bytes with a PTS of -1000000 ns, including when the file also contains DVB.",
-      "reference": "Leaves the negative PGS time absent on the same packets. PGS dimensions and payloads agree.",
-      "compat": "compat::matroska::omit_negative_pts for consumers reproducing the demux timestamp admission.",
+      "reading": "A negative PGS Block time is kept on replay",
+      "clause": "RFC 9559 section 11.2: the Block timestamp is signed, it SHOULD NOT be negative, and a frame with a negative timestamp MUST be decoded but not played.",
+      "candidate": "Replays the initial PGS packets with PTS -1000000 ns, including in the file that also carries DVB.",
+      "reference": "Leaves PTS absent on the same packets; sizes, key flags and payloads agree.",
       "cases": [
         "pgs-all-unknown",
         "pgs-bad-first-canvas",
@@ -196,21 +185,19 @@
       ]
     },
     {
-      "reading": "Matroska Dolby feed refuses a damaged AC-3 first syncframe",
-      "clause": "Matroska codec mappings draft 21 section 3.4.11 requires AC-3 syncframes. ATSC A/52:2018 sections 5.3 and 5.4.1.1 require syncword 0x0b77.",
-      "candidate": "Publishes the two discovered track descriptors and refuses the first AC-3 packet before replaying it because it starts with 0x0077.",
-      "reference": "Publishes the two descriptors, replays the invalid 768-byte block and assigns it a duration of 32000000 ns.",
-      "compat": "compat::matroska::opaque_dolby_replay for consumers retrieving damaged blocks as container bytes.",
+      "reading": "Triergon's Dolby feed refuses an AC-3 Block that does not start with the syncword (recovery policy)",
+      "clause": "ATSC A/52:2018 section 5.4.1.1: a syncframe begins with syncword 0x0B77; Matroska codec mappings draft 21 section 3.4.11 carries A_AC3 as syncframes.",
+      "candidate": "Publishes both track descriptors, then refuses the first AC-3 Block (0077...) with Invalid, replaying no packet of either track.",
+      "reference": "Replays all 16 Blocks of both tracks, the damaged 768-byte Block with a 32000000 ns duration.",
       "cases": [
         "audio-bad-first-discovery"
       ]
     },
     {
-      "reading": "Matroska discovery keeps CodecDelay and the Dolby syncframe duration",
-      "clause": "RFC 9559 sections 5.1.4.1.25 and 11.2 require exact nanosecond CodecDelay subtraction. ATSC A/52:2018 Annex E sections 2.3.1.4–2.3.1.5 give the E-AC-3 rate and coded audio block count.",
-      "candidate": "Subtracts exact delay, including -21333333 and -23219955 ns for AAC. Where Dolby duration is requested, returns 32000000 ns from the E-AC-3 syncframe.",
-      "reference": "Reports times on a millisecond grid, including -21000000 and -23000000 ns for AAC, and omits the E-AC-3 duration on the raw demux pass.",
-      "compat": "compat::matroska::demux_packet_clocks for consumers using the reference stream clock and duration inference.",
+      "reading": "Matroska discovery subtracts CodecDelay exactly",
+      "clause": "RFC 9559 section 5.1.4.1.25: CodecDelay is in nanoseconds and MUST be subtracted from each frame timestamp; section 11.2 gives the exact Block presentation time.",
+      "candidate": "Subtracts the exact delay: AAC -21333333 and -23219955 ns, AC-3 and E-AC-3 -5333333 ns and 26666667 ns; in audio-mixed-discovery and hevc-dolby it also returns the E-AC-3 syncframe duration 32000000 ns (ATSC A/52:2018 Annex E: six blocks of 256 samples at 48 kHz), a value it derives.",
+      "reference": "Reports times on the stream's millisecond grid (-21000000, -23000000, -5000000 and 27000000 ns); its raw pass leaves the E-AC-3 duration unknown, since av_get_audio_frame_duration2 gives none for E-AC-3.",
       "cases": [
         "audio-mixed-discovery",
         "hevc-dolby",
