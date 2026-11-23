@@ -23,6 +23,8 @@ use std::{
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
+/// Most top-level boxes of a modelled file: one window is kept per box walked.
+const ROOT_LIMIT: usize = 64;
 const CONSUMPTION_BOUNDS: &str = "root-walk transport metadata consumption bounds";
 const PLAIN_ATOMS: &str = "root-walk transport requires bounded plain source atoms";
 const RGB24_FIELDS: &str = "root-walk transport unreviewed RGB24 entry fields";
@@ -62,7 +64,7 @@ pub struct RootWalkTransportModel {
     media: Range<u64>,
     open: ModeledOpenState,
     windows: [Window; 64],
-    root_headers: [Option<BoxHeader>; CHILD_LIMIT as usize],
+    root_headers: [Option<BoxHeader>; ROOT_LIMIT],
     absolute_seek_min: u32,
     absolute_seek_max: u32,
     accesses: Option<BudgetVec<RootWalkAccess>>,
@@ -250,7 +252,7 @@ pub struct RootWalkTransportBuilder<'a> {
 impl<'a> RootWalkTransportBuilder<'a> {
     /// Starts a model of the file with these `ftyp` and `moov` boxes, `roots` its top-level
     /// box headers in file order and `table` its track's recovered sample table. Fails with
-    /// `Error::Limit` for more than 16 top-level boxes, `Error::ForeignPool` when a box's
+    /// `Error::Limit` for more than 64 top-level boxes, `Error::ForeignPool` when a box's
     /// bytes do not belong to `pool`, and `Error::Unsupported` for a `context` read size
     /// other than 1, 2, 3, 4, 7, 64 or 65536 bytes or a file outside the accepted set.
     pub fn new(
@@ -262,10 +264,10 @@ impl<'a> RootWalkTransportBuilder<'a> {
         context: DescriptionContext,
         _profile: RootWalkTransportProfile,
     ) -> Result<Self> {
-        if roots.len() > CHILD_LIMIT as usize {
+        if roots.len() > ROOT_LIMIT {
             return Err(Error::Limit {
                 requested: roots.len(),
-                maximum: CHILD_LIMIT as usize,
+                maximum: ROOT_LIMIT,
             });
         }
         if !ftyp.bytes().belongs_to(pool)

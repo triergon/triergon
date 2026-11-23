@@ -214,7 +214,7 @@
     },
     {"area": "ISO BMFF segment indexes", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "isobmff-segment-indexes"},
     {"area": "ISO BMFF index landings", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "isobmff-index-landings"},
-    {"area": "MOV comparison models", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mov-reference-trace", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/mov-reference-trace/contract.json) lists 1 open case."}},
+    {"area": "MOV comparison models", "targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"], "unmeasured": "mov-reference-trace", "parity": {"thumbv7neon-unknown-linux-gnueabihf": "ARMv7 parity pending. The [contract](../harness/features/mov-reference-trace/contract.json) lists no open case."}},
     {
       "area": "MP4 range playback",
       "targets": [

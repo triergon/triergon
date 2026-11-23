@@ -39,9 +39,9 @@ fn excess_root_count_refuses_before_metadata_discovery_with_explicit_limit() {
     {}
     let table = table.finish().unwrap();
     for has_mdat in [false, true] {
-        let mut headers = [*ftyp.header(); 17];
+        let mut headers = [*ftyp.header(); 65];
         if has_mdat {
-            headers[16] = *mdat.header();
+            headers[64] = *mdat.header();
         }
         let before = pool.used();
         let error = RootWalkTransportBuilder::new(
@@ -61,7 +61,7 @@ fn excess_root_count_refuses_before_metadata_discovery_with_explicit_limit() {
             error,
             Error::Limit {
                 requested: headers.len(),
-                maximum: 16
+                maximum: 64
             },
             "root-count policy must precede optional/invalid metadata discovery"
         );
