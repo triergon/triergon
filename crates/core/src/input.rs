@@ -27,7 +27,7 @@ pub struct SourceCapabilities {
 /// continuation, and no two cursors share one: each takes a generation from its
 /// pool, and pools have distinct identities. An equal token therefore means the
 /// same cursor, source and request.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InputToken {
     pool: crate::budget::PoolId,
     generation: u64,
@@ -44,14 +44,6 @@ impl InputToken {
         self.request
     }
 }
-impl PartialEq for InputToken {
-    fn eq(&self, other: &Self) -> bool {
-        self.pool == other.pool
-            && self.generation == other.generation
-            && self.request == other.request
-    }
-}
-impl Eq for InputToken {}
 
 /// A byte offset in a source.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -1,8 +1,13 @@
 //! The zero-extending reader of the decoders' inner loops.
 
-/// How a [`Reader`] gets the bits at its position. [`Direct`] and [`Cached`] are the two
-/// implementations.
-pub trait Window: Copy {
+mod sealed {
+    /// Keeps [`Window`](super::Window) to this crate's implementations.
+    pub trait Sealed {}
+}
+
+/// How a [`Reader`] gets the bits at its position. [`Direct`] and [`Cached`] are its only
+/// implementations: the trait is sealed.
+pub trait Window: Copy + sealed::Sealed {
     /// The window of a reader starting at bit `position` of `data`.
     fn new(data: &[u8], position: usize) -> Self;
 
@@ -22,6 +27,8 @@ pub trait Window: Copy {
 /// a short tail here instead costs AC-3 about 1% more instructions.
 #[derive(Clone, Copy, Debug)]
 pub struct Direct;
+
+impl sealed::Sealed for Direct {}
 
 impl Window for Direct {
     fn new(_: &[u8], _: usize) -> Self {
@@ -76,6 +83,8 @@ pub struct Cached {
     word: u64,
     start: usize,
 }
+
+impl sealed::Sealed for Cached {}
 
 impl Window for Cached {
     fn new(data: &[u8], position: usize) -> Self {

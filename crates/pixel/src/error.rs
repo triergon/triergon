@@ -4,7 +4,7 @@ use std::fmt;
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Why a picture could not be described or converted.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {
     /// A width or height that is zero, odd or above 4095, the limit of the
     /// 12-bit MPEG-1 size fields.
