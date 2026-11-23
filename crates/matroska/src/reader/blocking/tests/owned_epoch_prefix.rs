@@ -8,38 +8,14 @@ use std::{io::Cursor, sync::atomic::AtomicBool};
 use triergon_core::{Budget, OwnedInputBytes};
 
 const FIXTURES: [&[u8]; 8] = [
-    include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/seek/cues-end.mkv"
-    )),
-    include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/seek/cues-relative.mkv"
-    )),
-    include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/seek/cues-front.mkv"
-    )),
-    include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/seek/cues-preroll.mkv"
-    )),
-    include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/seek/cues-delay-preroll.mkv"
-    )),
-    include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/seek/cues-sparse.mkv"
-    )),
-    include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/seek/cues-unknown-cluster.mkv"
-    )),
-    include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/fixtures/seek/cues-missing.mkv"
-    )),
+    include_bytes!("../../../../tests/fixtures/seek/cues-end.mkv"),
+    include_bytes!("../../../../tests/fixtures/seek/cues-relative.mkv"),
+    include_bytes!("../../../../tests/fixtures/seek/cues-front.mkv"),
+    include_bytes!("../../../../tests/fixtures/seek/cues-preroll.mkv"),
+    include_bytes!("../../../../tests/fixtures/seek/cues-delay-preroll.mkv"),
+    include_bytes!("../../../../tests/fixtures/seek/cues-sparse.mkv"),
+    include_bytes!("../../../../tests/fixtures/seek/cues-unknown-cluster.mkv"),
+    include_bytes!("../../../../tests/fixtures/seek/cues-missing.mkv"),
 ];
 
 fn session<R: Read>(
@@ -82,72 +58,32 @@ fn session<R: Read>(
     rows
 }
 
-fn owned(raw: &[u8], track: usize, target: i64, playback: bool) -> Vec<String> {
-    let limits = Limits::default();
-    let pool = Budget::new(limits.live_storage_bytes).unwrap();
-    let source = OwnedInputBytes::try_from_vec(&pool, raw.to_vec()).unwrap();
-    session(
-        BlockingReader::open_in(
-            BlockingSource::owned(source).with_payload_ownership(PayloadOwnership::SharedBounded),
-            limits,
-            &pool,
-        ),
-        track,
-        target,
-        playback,
-    )
-}
-
-fn ordinary(raw: &[u8], track: usize, target: i64, playback: bool) -> Vec<String> {
-    session(
-        BlockingReader::open(
-            BlockingSource::from(Cursor::new(raw.to_vec()))
-                .with_payload_ownership(PayloadOwnership::SharedBounded),
-            Limits::default(),
-        ),
-        track,
-        target,
-        playback,
-    )
-}
-
-fn owned_with(
+#[track_caller]
+fn compare_sources(
     raw: &[u8],
     limits: Limits,
     policy: PayloadOwnership,
+    track: usize,
     target: i64,
     playback: bool,
-) -> Vec<String> {
+    case: std::fmt::Arguments<'_>,
+) {
     let pool = Budget::new(limits.live_storage_bytes).unwrap();
-    let source = OwnedInputBytes::try_from_vec(&pool, raw.to_vec()).unwrap();
-    session(
-        BlockingReader::open_in(
-            BlockingSource::owned(source).with_payload_ownership(policy),
-            limits,
-            &pool,
-        ),
-        0,
-        target,
-        playback,
-    )
-}
-
-fn ordinary_with(
-    raw: &[u8],
-    limits: Limits,
-    policy: PayloadOwnership,
-    target: i64,
-    playback: bool,
-) -> Vec<String> {
-    session(
-        BlockingReader::open(
-            BlockingSource::from(Cursor::new(raw.to_vec())).with_payload_ownership(policy),
-            limits,
-        ),
-        0,
-        target,
-        playback,
-    )
+    let input = OwnedInputBytes::try_from_vec(&pool, raw.to_vec()).unwrap();
+    let owned = BlockingReader::open_in(
+        BlockingSource::owned(input).with_payload_ownership(policy),
+        limits,
+        &pool,
+    );
+    let ordinary = BlockingReader::open(
+        BlockingSource::from(Cursor::new(raw.to_vec())).with_payload_ownership(policy),
+        limits,
+    );
+    assert_eq!(
+        session(owned, track, target, playback),
+        session(ordinary, track, target, playback),
+        "{case}"
+    );
 }
 
 fn hits() -> usize {
@@ -170,10 +106,14 @@ fn owned_prefix_shortcut_matches_the_ordinary_scan_for_every_seek() {
         ] {
             for track in [0, 1] {
                 for playback in [false, true] {
-                    assert_eq!(
-                        owned(raw, track, target, playback),
-                        ordinary(raw, track, target, playback),
-                        "target {target} track {track} playback {playback}"
+                    compare_sources(
+                        raw,
+                        Limits::default(),
+                        PayloadOwnership::SharedBounded,
+                        track,
+                        target,
+                        playback,
+                        format_args!("target {target} track {track} playback {playback}"),
                     );
                 }
             }
@@ -192,10 +132,14 @@ fn owned_prefix_shortcut_matches_at_limit_boundaries_and_both_policies() {
             PayloadOwnership::OwnedExact,
             PayloadOwnership::SharedBounded,
         ] {
-            let base = owned_with(raw, Limits::default(), policy, 7_500_000_000, true);
-            assert_eq!(
-                base,
-                ordinary_with(raw, Limits::default(), policy, 7_500_000_000, true)
+            compare_sources(
+                raw,
+                Limits::default(),
+                policy,
+                0,
+                7_500_000_000,
+                true,
+                format_args!("default limits"),
             );
             for elements in (1..140)
                 .step_by(3)
@@ -205,10 +149,14 @@ fn owned_prefix_shortcut_matches_at_limit_boundaries_and_both_policies() {
                     elements,
                     ..Limits::default()
                 };
-                assert_eq!(
-                    owned_with(raw, limits, policy, 7_500_000_000, true),
-                    ordinary_with(raw, limits, policy, 7_500_000_000, true),
-                    "elements {elements}"
+                compare_sources(
+                    raw,
+                    limits,
+                    policy,
+                    0,
+                    7_500_000_000,
+                    true,
+                    format_args!("elements {elements}"),
                 );
             }
             for scan in (0..60_000).step_by(997).chain(44_340..44_420) {
@@ -216,10 +164,14 @@ fn owned_prefix_shortcut_matches_at_limit_boundaries_and_both_policies() {
                     scan_bytes: scan,
                     ..Limits::default()
                 };
-                assert_eq!(
-                    owned_with(raw, limits, policy, 7_500_000_000, true),
-                    ordinary_with(raw, limits, policy, 7_500_000_000, true),
-                    "scan {scan}"
+                compare_sources(
+                    raw,
+                    limits,
+                    policy,
+                    0,
+                    7_500_000_000,
+                    true,
+                    format_args!("scan {scan}"),
                 );
             }
         }
@@ -241,10 +193,14 @@ fn owned_prefix_shortcut_declines_structural_changes_like_the_ordinary_scan() {
         for id in [[0xec_u8], [0xbf], [0xa0], [0xa1], [0x80]] {
             let mut changed = raw.to_vec();
             changed[at] = id[0];
-            assert_eq!(
-                owned(&changed, 0, 7_500_000_000, true),
-                ordinary(&changed, 0, 7_500_000_000, true),
-                "at {at} id {id:x?}"
+            compare_sources(
+                &changed,
+                Limits::default(),
+                PayloadOwnership::SharedBounded,
+                0,
+                7_500_000_000,
+                true,
+                format_args!("at {at} id {id:x?}"),
             );
         }
     }
@@ -255,19 +211,27 @@ fn owned_prefix_shortcut_matches_the_ordinary_scan_on_truncated_and_damaged_inpu
     for raw in FIXTURES {
         for cut in (300..raw.len()).step_by(1777) {
             let short = &raw[..cut];
-            assert_eq!(
-                owned(short, 0, 7_500_000_000, true),
-                ordinary(short, 0, 7_500_000_000, true),
-                "cut {cut}"
+            compare_sources(
+                short,
+                Limits::default(),
+                PayloadOwnership::SharedBounded,
+                0,
+                7_500_000_000,
+                true,
+                format_args!("cut {cut}"),
             );
         }
         for at in (300..raw.len()).step_by(2311) {
             let mut damaged = raw.to_vec();
             damaged[at] ^= 0xa5;
-            assert_eq!(
-                owned(&damaged, 0, 7_500_000_000, true),
-                ordinary(&damaged, 0, 7_500_000_000, true),
-                "damage {at}"
+            compare_sources(
+                &damaged,
+                Limits::default(),
+                PayloadOwnership::SharedBounded,
+                0,
+                7_500_000_000,
+                true,
+                format_args!("damage {at}"),
             );
         }
     }
