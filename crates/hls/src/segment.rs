@@ -596,9 +596,11 @@ where
     }
 
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<HlsSegmentProgress> {
-        if self.pending.is_some() {
+        if let Some(unit) = self.pending.take() {
             if work.try_charge(1) {
-                self.commit_unit()?;
+                self.commit_unit(unit)?;
+            } else {
+                self.pending = Some(unit);
             }
             return Ok(HlsSegmentProgress::Yield);
         }
@@ -801,11 +803,31 @@ where
             .is_some_and(|tracks| tracks.video == pid || tracks.audio == Some(pid))
     }
 
-    fn commit_unit(&mut self) -> Result<()> {
-        let unit = self
-            .pending
-            .as_ref()
-            .ok_or(Error::Invalid("HLS pending unit"))?;
+    /// Stores a completed unit in feed order. On failure the unit stays pending.
+    fn commit_unit(&mut self, unit: Unit<V::Unit, A::Unit>) -> Result<()> {
+        let (lane, total, video_pts) = match self.reserve_unit(&unit) {
+            Ok(reserved) => reserved,
+            Err(error) => {
+                self.pending = Some(unit);
+                return Err(error);
+            }
+        };
+        match unit {
+            Unit::Video(unit) => self.video.try_push(unit).map_err(|error| error.error)?,
+            Unit::Audio(unit) => self.audio.try_push(unit).map_err(|error| error.error)?,
+        }
+        self.order.try_push(lane).map_err(|error| error.error)?;
+        self.video_tail90 = self.video_tail90.max(video_pts);
+        self.feed_bytes = total;
+        Ok(())
+    }
+
+    /// Checks a unit against the feed limits and reserves its places: its lane, the
+    /// feed bytes with it, and a video unit's presentation tick.
+    fn reserve_unit(
+        &mut self,
+        unit: &Unit<V::Unit, A::Unit>,
+    ) -> Result<(Lane, usize, Option<i64>)> {
         let (lane, bytes, video_pts) = match unit {
             Unit::Video(unit) => (
                 Lane::Video,
@@ -829,18 +851,7 @@ where
             Lane::Video => reserve_one(&mut self.video, self.limits.maximum_access_units)?,
             Lane::Audio => reserve_one(&mut self.audio, self.limits.maximum_access_units)?,
         }
-        match self
-            .pending
-            .take()
-            .ok_or(Error::Invalid("HLS pending unit"))?
-        {
-            Unit::Video(unit) => self.video.try_push(unit).map_err(|error| error.error)?,
-            Unit::Audio(unit) => self.audio.try_push(unit).map_err(|error| error.error)?,
-        }
-        self.order.try_push(lane).map_err(|error| error.error)?;
-        self.video_tail90 = self.video_tail90.max(video_pts);
-        self.feed_bytes = total;
-        Ok(())
+        Ok((lane, total, video_pts))
     }
 
     fn seal(&mut self) -> Result<()> {
