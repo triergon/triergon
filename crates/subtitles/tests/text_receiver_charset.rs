@@ -88,12 +88,10 @@ fn cp932_user_defined_area_maps_all_1880_codes_to_private_use() {
     for lead in 0xf0..=0xf9 {
         for trail in (0x40..=0x7e).chain(0x80..=0xfc) {
             let ch = char::from_u32(0xe000 + n).unwrap();
-            for profile in [M::Windows932, M::ReceiverWindows932Pua] {
-                assert_eq!(
-                    decode(&p, &[lead, trail], profile).unwrap(),
-                    ch.to_string().as_bytes()
-                );
-            }
+            assert_eq!(
+                decode(&p, &[lead, trail], M::Windows932).unwrap(),
+                ch.to_string().as_bytes()
+            );
             n += 1;
         }
     }
@@ -471,21 +469,10 @@ fn absent_receiver_declaration_remains_unknown_while_source_is_retained() {
     assert!(v.converted().is_none());
 }
 
-fn run_glibc(p: &Budget, i: Input, q: u64) -> triergon_subtitles::compat::charset::PacketView {
-    let mut j = AssPacketJob::new_with_glibc_euc_kr(i, p, Limits::default(), 7).unwrap();
-    let c = AtomicBool::new(false);
-    for _ in 0..100000 {
-        if j.poll(&mut WorkBudget::new(q), &c).unwrap() == PacketStatus::Ready {
-            return j.take_output(&c).unwrap();
-        }
-    }
-    panic!("nonterminal glibc job")
-}
 #[test]
 fn every_euc_kr_profile_maps_a2e8_as_ks_x_1001_2002_does() {
-    use triergon_subtitles::compat::charset::receiver_charset_with_glibc_euc_kr;
     let p = Budget::new(1 << 20).unwrap();
-    for profile in [M::EucKr, M::ReceiverEucKrC1, M::ReceiverEucKrGlibc239] {
+    for profile in [M::EucKr, M::ReceiverEucKrC1] {
         assert_eq!(
             decode(&p, &[0xa2, 0xe8], profile).unwrap(),
             "\u{327e}".as_bytes()
@@ -498,8 +485,8 @@ fn every_euc_kr_profile_maps_a2e8_as_ks_x_1001_2002_does() {
         Charset::Multibyte(M::ReceiverEucKrC1)
     );
     assert_eq!(
-        receiver_charset_with_glibc_euc_kr(b"EUC-KR").unwrap(),
-        Charset::Multibyte(M::ReceiverEucKrGlibc239)
+        receiver_charset(b"EUC-KR").unwrap(),
+        Charset::Multibyte(M::ReceiverEucKrC1)
     );
     for label in [
         b"euc_kr".as_slice(),
@@ -507,14 +494,14 @@ fn every_euc_kr_profile_maps_a2e8_as_ks_x_1001_2002_does() {
         b" euc-kr",
         b"euc-kr\0",
     ] {
-        assert!(receiver_charset_with_glibc_euc_kr(label).is_err());
+        assert!(receiver_charset(label).is_err());
     }
 }
 #[test]
-fn glibc_euc_kr_packet_converts_a2e8_as_the_receiver_profile_does() {
+fn an_euc_kr_packet_converts_a2e8() {
     for q in [1, 7, 4096] {
         let p = Budget::new(1 << 20).unwrap();
-        let v = run_glibc(&p, input(&p, b"euc-kr", &[0xa2, 0xe8]), q);
+        let v = run(&p, input(&p, b"euc-kr", &[0xa2, 0xe8]), q);
         assert_eq!(v.outcome(), Outcome::Converted);
         assert_eq!(
             v.visible().unwrap(),
@@ -526,15 +513,12 @@ fn glibc_euc_kr_packet_converts_a2e8_as_the_receiver_profile_does() {
             [PREFIX, &[0xa2, 0xe8]].concat()
         );
         assert!(v.source().decoded_utf8.is_none());
-        let receiver = run(&p, input(&p, b"euc-kr", &[0xa2, 0xe8]), q);
-        assert_eq!(receiver.outcome(), Outcome::Converted);
-        assert_eq!(receiver.visible(), v.visible());
     }
 }
 #[test]
-fn glibc_euc_kr_packet_keeps_its_source_and_the_whole_conversion_past_a_nul() {
+fn an_euc_kr_packet_keeps_its_source_and_the_whole_conversion_past_a_nul() {
     let p = Budget::new(1 << 20).unwrap();
-    let v = run_glibc(&p, input(&p, b"euc-kr", &[0xa2, 0xe8, 0, 0xa2, 0xe8]), 1);
+    let v = run(&p, input(&p, b"euc-kr", &[0xa2, 0xe8, 0, 0xa2, 0xe8]), 1);
     assert_eq!(
         v.visible().unwrap(),
         [PREFIX, "\u{327e}".as_bytes()].concat()
@@ -553,11 +537,11 @@ fn glibc_euc_kr_packet_keeps_its_source_and_the_whole_conversion_past_a_nul() {
     assert_eq!(p.used(), Budget::control_storage_bytes());
 }
 #[test]
-fn glibc_euc_kr_truncated_tail_work_zero_and_cancel_keep_the_source() {
+fn an_euc_kr_truncated_tail_work_zero_and_cancel_keep_the_source() {
     let p = Budget::new(1 << 20).unwrap();
     let i = input(&p, b"euc-kr", &[0xa2, 0xe8, 0xa2]);
     let original = i.payload.clone();
-    let mut j = AssPacketJob::new_with_glibc_euc_kr(i, &p, Limits::default(), 7).unwrap();
+    let mut j = AssPacketJob::new(i, &p, Limits::default(), 7).unwrap();
     let c = AtomicBool::new(false);
     let used = p.used();
     assert_eq!(
@@ -583,7 +567,7 @@ fn glibc_euc_kr_truncated_tail_work_zero_and_cancel_keep_the_source() {
     panic!("nonterminal")
 }
 #[test]
-fn glibc_euc_kr_maps_all_8387_primary_records_and_refuses_their_neighbours() {
+fn euc_kr_c1_maps_all_8387_primary_records_and_refuses_their_neighbours() {
     use std::collections::BTreeMap;
     let p = Budget::new(1 << 20).unwrap();
     let mut expected = BTreeMap::new();
@@ -611,15 +595,15 @@ fn glibc_euc_kr_maps_all_8387_primary_records_and_refuses_their_neighbours() {
             wire.to_be_bytes().to_vec()
         };
         assert_eq!(
-            decode(&p, &raw, M::ReceiverEucKrGlibc239).unwrap(),
+            decode(&p, &raw, M::ReceiverEucKrC1).unwrap(),
             ch.to_string().as_bytes(),
             "{wire:04x}"
         );
     }
     assert!(matches!(
-        decode(&p, &[0xa2], M::ReceiverEucKrGlibc239),
+        decode(&p, &[0xa2], M::ReceiverEucKrC1),
         Err(Error::Truncated)
     ));
-    assert!(decode(&p, &[0xa2, 0x20], M::ReceiverEucKrGlibc239).is_err());
-    assert!(decode(&p, &[0xa2, 0xe9], M::ReceiverEucKrGlibc239).is_err());
+    assert!(decode(&p, &[0xa2, 0x20], M::ReceiverEucKrC1).is_err());
+    assert!(decode(&p, &[0xa2, 0xe9], M::ReceiverEucKrC1).is_err());
 }

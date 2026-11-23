@@ -277,7 +277,7 @@ fn every_receiver_big5_and_cp932_one_and_two_byte_input() {
                 .as_slice(),
         ),
         (
-            M::ReceiverWindows932Pua,
+            M::Windows932,
             include_bytes!("../src/text/charset/mapping-data/windows932.bin").as_slice(),
         ),
     ] {
@@ -306,11 +306,7 @@ fn euc_kr_single(byte: u8, single_max: u8) -> Result<String, Error> {
 
 #[test]
 fn every_euc_kr_profile_reports_exact_scalars_and_refusals() {
-    for (profile, single_max) in [
-        (M::EucKr, 0x7f),
-        (M::ReceiverEucKrC1, 0x9f),
-        (M::ReceiverEucKrGlibc239, 0x9f),
-    ] {
+    for (profile, single_max) in [(M::EucKr, 0x7f), (M::ReceiverEucKrC1, 0x9f)] {
         let pairs = mapping(M::EucKr, include_str!("multibyte-mapping-data/CP949.TXT"));
         for first in 0..=u8::MAX {
             let prefix = euc_kr_single(first, single_max);

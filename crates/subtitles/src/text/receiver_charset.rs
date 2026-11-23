@@ -37,7 +37,7 @@ pub fn receiver_charset(label: &[u8]) -> Result<Charset> {
         ("shift-jis", M::ShiftJisUnicode),
         ("sjis", M::ShiftJisUnicode),
         ("euc-kr", M::ReceiverEucKrC1),
-        ("cp932", M::ReceiverWindows932Pua),
+        ("cp932", M::Windows932),
         ("cp949", M::Windows949),
         ("cp950", M::Windows950),
     ] {
@@ -58,16 +58,6 @@ pub fn receiver_charset(label: &[u8]) -> Result<Charset> {
         }
     }
     Err(Error::Unsupported("captured receiver charset label"))
-}
-/// [`receiver_charset`], with euc-kr resolved to
-/// [`MultibyteCharset::ReceiverEucKrGlibc239`](M::ReceiverEucKrGlibc239), the
-/// same repertoire as the profile `receiver_charset` gives.
-pub fn receiver_charset_with_glibc_euc_kr(label: &[u8]) -> Result<Charset> {
-    if label.eq_ignore_ascii_case(b"euc-kr") {
-        Ok(Charset::Multibyte(M::ReceiverEucKrGlibc239))
-    } else {
-        receiver_charset(label)
-    }
 }
 /// How a packet's conversion ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -137,7 +127,6 @@ impl PacketView {
 pub struct AssPacketJob {
     pool: Budget,
     limits: Limits,
-    glibc_euc_kr: bool,
     state: State,
 }
 
@@ -187,21 +176,8 @@ impl AssPacketJob {
         Ok(Self {
             pool: pool.clone(),
             limits,
-            glibc_euc_kr: false,
             state: State::Extract(extractor),
         })
-    }
-    /// [`new`](Self::new), with the label resolved by
-    /// [`receiver_charset_with_glibc_euc_kr`].
-    pub fn new_with_glibc_euc_kr(
-        input: Input,
-        pool: &Budget,
-        limits: Limits,
-        generation: u64,
-    ) -> Result<Self> {
-        let mut result = Self::new(input, pool, limits, generation)?;
-        result.glibc_euc_kr = true;
-        Ok(result)
     }
     /// Reads, converts and scans the packet, spending `work`: the
     /// conversion's units and one per converted byte scanned for commas and
@@ -227,7 +203,6 @@ impl AssPacketJob {
                     let label = Label {
                         pool: &self.pool,
                         limits: self.limits,
-                        glibc_euc_kr: self.glibc_euc_kr,
                     };
                     match step.advance(source, label, work, cancel)? {
                         Some(outcome) => break outcome,
@@ -257,12 +232,11 @@ impl AssPacketJob {
     }
 }
 
-/// How a packet's charset label resolves, and what its conversion may use.
+/// What a packet's conversion may use.
 #[derive(Clone, Copy)]
 struct Label<'a> {
     pool: &'a Budget,
     limits: Limits,
-    glibc_euc_kr: bool,
 }
 
 impl Step {
@@ -282,9 +256,6 @@ impl Step {
                         return Ok(None);
                     }
                     let charset = match source.input.charset_label.as_ref() {
-                        Some(name) if label.glibc_euc_kr => {
-                            receiver_charset_with_glibc_euc_kr(name.as_ref())
-                        }
                         Some(name) => receiver_charset(name.as_ref()),
                         None => Err(Error::Unsupported("receiver charset declaration absent")),
                     };

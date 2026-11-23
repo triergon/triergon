@@ -3,7 +3,7 @@
 //!
 //! The decoder opens with the codec configuration, which is the subtitle
 //! header, and optionally a charset label (`sub_charenc`); a label the
-//! receiver's repertoire lacks ([`receiver_charset_with_glibc_euc_kr`])
+//! receiver's repertoire lacks ([`receiver_charset`])
 //! refuses the open. Each packet then gives at most one subtitle:
 //!
 //! - an empty packet gives none;
@@ -16,7 +16,7 @@
 use super::Limits;
 use super::charset::{Charset, CharsetJob, CharsetStatus};
 use super::decoded::{Clock, Subtitle};
-use super::receiver_charset::receiver_charset_with_glibc_euc_kr;
+use super::receiver_charset::receiver_charset;
 use super::unicode::cancelled;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, TimeBase, WorkBudget};
@@ -68,12 +68,7 @@ impl Decoder {
         limits: Limits,
     ) -> Result<Self> {
         let charset = label
-            .map(|label| {
-                Ok::<_, Error>((
-                    label.clone(),
-                    receiver_charset_with_glibc_euc_kr(label.as_ref())?,
-                ))
-            })
+            .map(|label| Ok::<_, Error>((label.clone(), receiver_charset(label.as_ref())?)))
             .transpose()?;
         Ok(Self {
             pool: pool.clone(),

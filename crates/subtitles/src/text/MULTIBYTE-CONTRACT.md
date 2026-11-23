@@ -25,11 +25,9 @@ glibc iconv when converting ASS packets (`compat::charset::AssPacketJob`).
 
 | Profile | Labels | Mapping data |
 | --- | --- | --- |
-| `GbkCp936`, `ShiftJisUnicode`, `Windows949`, `Windows950` | gbk, cp936, windows-936, shift_jis, shift-jis, sjis, cp949, cp950 | As above. |
+| `GbkCp936`, `ShiftJisUnicode`, `Windows932`, `Windows949`, `Windows950` | gbk, cp936, windows-936, shift_jis, shift-jis, sjis, cp932, cp949, cp950 | As above. |
 | `ReceiverBig5Glibc239` | big5, big-5 | GNU Big5 charmap 0.92 from glibc 2.39 (14,040 records). |
 | `ReceiverEucKrC1` | euc-kr | `EucKr` plus the 32 C1 controls; equals the glibc 2.39 EUC-KR charmap. |
-| `ReceiverEucKrGlibc239` | euc-kr (`receiver_charset_with_glibc_euc_kr` only) | The same as `ReceiverEucKrC1`. |
-| `ReceiverWindows932Pua` | cp932 | The same as `Windows932`. |
 
 `euc_kr` and `windows-932/949/950` are unavailable in this view.
 

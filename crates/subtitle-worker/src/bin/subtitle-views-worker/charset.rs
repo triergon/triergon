@@ -31,12 +31,11 @@ pub(super) fn operation<'a>(
         if mode != "packet" {
             return Err("charset-packets expects packet mode".into());
         }
-        let glibc = profile == "glibc";
         return Ok(Operation {
             name: "charset-packets",
             run: Box::new(move |work, trace| {
                 let mut records = Records { work, trace };
-                match packet_conversion(input, &label, glibc, &pool, &cancel) {
+                match packet_conversion(input, &label, &pool, &cancel) {
                     Ok(Some(text)) if input.is_empty() && text.is_empty() => {
                         records.row(9, &[], &[])
                     }
@@ -48,9 +47,8 @@ pub(super) fn operation<'a>(
     }
     let profile = match profile.to_str() {
         Some("big5-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverBig5Glibc239),
-        Some("kr-c1") => Charset::Multibyte(MultibyteCharset::ReceiverEucKrC1),
-        Some("kr-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverEucKrGlibc239),
-        Some("cp932-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverWindows932Pua),
+        Some("kr-c1" | "kr-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverEucKrC1),
+        Some("cp932-receiver") => Charset::Multibyte(MultibyteCharset::Windows932),
         Some(profile) => Charset::from_label(profile.as_bytes())
             .or_else(|_| MultibyteCharset::from_label(profile.as_bytes()).map(Charset::Multibyte))
             .map_err(|error| error.to_string())?,
@@ -92,17 +90,12 @@ pub(super) fn operation<'a>(
 fn packet_conversion(
     input: &[u8],
     label: &[u8],
-    glibc: bool,
     pool: &Budget,
     cancel: &AtomicBool,
 ) -> triergon_core::Result<Option<Vec<u8>>> {
     let mut input = packet_input(Bytes::copy_from_slice(pool, input)?, Format::OpaqueAss);
     input.charset_label = Some(Bytes::copy_from_slice(pool, label)?);
-    let mut job = if glibc {
-        AssPacketJob::new_with_glibc_euc_kr(input, pool, Limits::default(), 0)?
-    } else {
-        AssPacketJob::new(input, pool, Limits::default(), 0)?
-    };
+    let mut job = AssPacketJob::new(input, pool, Limits::default(), 0)?;
     while job.poll(&mut WorkBudget::new(1024), cancel)? == PacketStatus::Pending {}
     Ok(job.take_output(cancel)?.visible().map(<[u8]>::to_vec))
 }

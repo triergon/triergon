@@ -131,7 +131,7 @@ there is no detection from content, language or file name.
 | Unicode | UTF-8, UTF-16 with BOM, UTF-16BE, UTF-16LE, tx3g in-band (UTF-8 or FEFF UTF-16BE) |
 | Single-byte | ASCII, ISO-8859-1, Windows-1251, Windows-1252 (`Charset::from_label`) |
 | Multibyte | GBK/CP936, Big5, Shift-JIS, EUC-KR, Windows-932/949/950 (`MultibyteCharset::from_label`) |
-| FFmpeg/glibc labels | `compat::charset::receiver_charset` and `receiver_charset_with_glibc_euc_kr` map ASS charset labels to the repertoire the reference build accepts |
+| FFmpeg/glibc labels | `compat::charset::receiver_charset` maps ASS charset labels to the repertoire the reference build accepts |
 
 `charset::CharsetJob` counts the output first, allocates it exactly, then encodes.
 

@@ -34,13 +34,9 @@ pub enum MultibyteCharset {
     /// The GNU Big5 charmap 0.92 as glibc 2.39 has it, the repertoire FFmpeg
     /// converts with glibc `iconv`.
     ReceiverBig5Glibc239,
-    /// [`EucKr`](Self::EucKr) plus bytes 0x80–0x9F as the C1 controls.
+    /// [`EucKr`](Self::EucKr) plus bytes 0x80–0x9F as the C1 controls: the
+    /// glibc 2.39 EUC-KR charmap.
     ReceiverEucKrC1,
-    /// The CP932 glibc converts, which is [`Windows932`](Self::Windows932).
-    ReceiverWindows932Pua,
-    /// The glibc 2.39 EUC-KR charmap, which is
-    /// [`ReceiverEucKrC1`](Self::ReceiverEucKrC1).
-    ReceiverEucKrGlibc239,
 }
 
 impl MultibyteCharset {
@@ -89,7 +85,7 @@ impl MultibyteCharset {
             Self::GbkCp936 => include_bytes!("mapping-data/gbk.bin"),
             Self::Big5Unicode => include_bytes!("mapping-data/big5.bin"),
             Self::ShiftJisUnicode => include_bytes!("mapping-data/shift_jis.bin"),
-            Self::EucKr | Self::ReceiverEucKrC1 | Self::ReceiverEucKrGlibc239 => {
+            Self::EucKr | Self::ReceiverEucKrC1 => {
                 if let Ok(byte) = u8::try_from(code) {
                     // ASCII in every profile, plus the receiver profiles' C1 controls.
                     let last = if self == Self::EucKr { 0x7f } else { 0x9f };
@@ -97,7 +93,7 @@ impl MultibyteCharset {
                 }
                 include_bytes!("mapping-data/euc_kr.bin")
             }
-            Self::Windows932 | Self::ReceiverWindows932Pua => {
+            Self::Windows932 => {
                 include_bytes!("mapping-data/windows932.bin")
             }
             Self::Windows949 => include_bytes!("mapping-data/windows949.bin"),
@@ -127,11 +123,11 @@ impl MultibyteCharset {
     fn lead(self, byte: u8) -> bool {
         match self {
             Self::ShiftJisUnicode => matches!(byte, 0x81..=0x9f | 0xe0..=0xef),
-            Self::Windows932 | Self::ReceiverWindows932Pua => {
+            Self::Windows932 => {
                 matches!(byte, 0x81..=0x9f | 0xe0..=0xfc)
             }
             Self::Big5Unicode | Self::ReceiverBig5Glibc239 => matches!(byte, 0xa1..=0xf9),
-            Self::EucKr | Self::ReceiverEucKrC1 | Self::ReceiverEucKrGlibc239 => {
+            Self::EucKr | Self::ReceiverEucKrC1 => {
                 matches!(byte, 0xa1..=0xfe)
             }
             Self::GbkCp936 | Self::Windows949 | Self::Windows950 => matches!(byte, 0x81..=0xfe),
@@ -140,14 +136,14 @@ impl MultibyteCharset {
 
     fn trail(self, byte: u8) -> bool {
         match self {
-            Self::ShiftJisUnicode | Self::Windows932 | Self::ReceiverWindows932Pua => {
+            Self::ShiftJisUnicode | Self::Windows932 => {
                 matches!(byte, 0x40..=0x7e | 0x80..=0xfc)
             }
             Self::GbkCp936 => matches!(byte, 0x40..=0x7e | 0x80..=0xfe),
             Self::Big5Unicode | Self::Windows950 | Self::ReceiverBig5Glibc239 => {
                 matches!(byte, 0x40..=0x7e | 0xa1..=0xfe)
             }
-            Self::EucKr | Self::ReceiverEucKrC1 | Self::ReceiverEucKrGlibc239 => {
+            Self::EucKr | Self::ReceiverEucKrC1 => {
                 matches!(byte, 0xa1..=0xfe)
             }
             Self::Windows949 => matches!(byte, 0x41..=0x5a | 0x61..=0x7a | 0x81..=0xfe),

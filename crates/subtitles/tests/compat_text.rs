@@ -423,11 +423,11 @@ fn an_ass_conversion_beyond_its_limits_is_an_error_not_a_refusal() {
 /// refused: `compat::document` reads the cues, `CharsetJob` converts each
 /// with the repertoire the reference build accepts.
 fn recoded(source: &[u8], label: &[u8]) -> Vec<Option<Vec<u8>>> {
-    use triergon_subtitles::compat::charset::receiver_charset_with_glibc_euc_kr;
+    use triergon_subtitles::compat::charset::receiver_charset;
     use triergon_subtitles::text::Limits;
     use triergon_subtitles::text::charset::{CharsetJob, CharsetStatus};
     let pool = Budget::new(1 << 20).unwrap();
-    let charset = receiver_charset_with_glibc_euc_kr(label).unwrap();
+    let charset = receiver_charset(label).unwrap();
     let label = Bytes::copy_from_slice(&pool, label).unwrap();
     let cancel = AtomicBool::new(false);
     let document = Bytes::copy_from_slice(&pool, source).unwrap();
