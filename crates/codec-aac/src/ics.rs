@@ -1,7 +1,7 @@
 //! individual_channel_stream() parsing, inverse quantisation and the spectral tools
 //! (PNS, M/S, intensity, TNS) of ISO/IEC 14496-3 subpart 4.
 
-use crate::error::{DecodeError, Result};
+use crate::error::{DecodeError, Feature, Result};
 use crate::huffman::{FAST_BITS, SpectralBook, books, fast_field};
 use crate::tables::*;
 use std::sync::OnceLock;
@@ -38,10 +38,26 @@ pub(crate) const NOISE_HCB: u8 = 13;
 pub(crate) const INTENSITY_HCB2: u8 = 14;
 pub(crate) const INTENSITY_HCB: u8 = 15;
 
-/// Audio object types handled by the core.
-pub(crate) const AOT_MAIN: u8 = 1;
-pub(crate) const AOT_LC: u8 = 2;
-pub(crate) const AOT_LTP: u8 = 4;
+/// Core audio object types (ISO/IEC 14496-3 Table 1.17).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum ObjectType {
+    Main = 1,
+    Lc = 2,
+    Ltp = 4,
+}
+
+impl ObjectType {
+    pub(crate) fn from_code(code: u8) -> Result<Self> {
+        match code {
+            1 => Ok(Self::Main),
+            2 => Ok(Self::Lc),
+            3 => Err(DecodeError::Unsupported(Feature::SsrGainControl)),
+            4 => Ok(Self::Ltp),
+            _ => Err(DecodeError::Unsupported(Feature::ObjectType(code))),
+        }
+    }
+}
 
 pub(crate) const MAX_SFB: usize = 64;
 
@@ -159,7 +175,7 @@ impl ChannelData {
 
 /// Shared decode context for the core.
 pub(crate) struct CoreCfg {
-    pub aot: u8,
+    pub aot: ObjectType,
     pub sf_index: usize,
 }
 
@@ -233,7 +249,7 @@ pub(crate) fn parse_ics_info(
         info.predictor_data_present = br.bit();
         if info.predictor_data_present {
             match cfg.aot {
-                AOT_MAIN => {
+                ObjectType::Main => {
                     if br.bit() {
                         info.predictor_reset_group = br.read(5) as u8;
                         if info.predictor_reset_group == 0 || info.predictor_reset_group > 30 {
@@ -247,7 +263,7 @@ pub(crate) fn parse_ics_info(
                     }
                     rest.fill(false);
                 }
-                AOT_LTP => {
+                ObjectType::Ltp => {
                     info.ltp[0].present = br.bit();
                     if info.ltp[0].present {
                         parse_ltp(br, info.max_sfb, &mut info.ltp[0]);
@@ -259,7 +275,7 @@ pub(crate) fn parse_ics_info(
                         }
                     }
                 }
-                _ => return Err(DecodeError::Invalid("predictor_data_present in LC")),
+                ObjectType::Lc => return Err(DecodeError::Invalid("predictor_data_present in LC")),
             }
         }
     }
@@ -324,9 +340,7 @@ pub(crate) fn parse_ics(
             parse_tns(br, cfg, ch)?;
         }
         if br.bit() {
-            return Err(DecodeError::Unsupported(
-                crate::error::Feature::SsrGainControl,
-            ));
+            return Err(DecodeError::Unsupported(Feature::SsrGainControl));
         }
     }
     ch.pulse_used = npulse > 0;
@@ -439,7 +453,7 @@ fn parse_tns(br: &mut CachedBitReader<'_>, cfg: &CoreCfg, ch: &mut ChannelData) 
     let (nf_bits, len_bits, ord_bits, max_order) = if short {
         (1, 4, 3, 7u8)
     } else {
-        (2, 6, 5, if cfg.aot == AOT_MAIN { 20 } else { 12 })
+        (2, 6, 5, if cfg.aot == ObjectType::Main { 20 } else { 12 })
     };
     ch.tns.present = true;
     for w in 0..info.num_windows {

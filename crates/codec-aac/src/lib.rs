@@ -181,7 +181,7 @@ impl RawLcDecoder {
         }
         let mut core = decoder::Core::new(budget);
         core.configure(
-            2,
+            ics::ObjectType::Lc,
             frequency_index,
             channel_configuration,
             decoder::FixedLayout::Raw(layout),
@@ -281,7 +281,7 @@ fn decode_adts(
         return Err(DecodeError::Truncated);
     }
     core.configure(
-        h.profile + 1,
+        ics::ObjectType::from_code(h.profile + 1)?,
         h.sf_index,
         h.channel_config,
         decoder::FixedLayout::Adts,

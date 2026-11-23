@@ -58,7 +58,7 @@ impl CceState {
         })
     }
 
-    pub(crate) fn reset(&mut self, _aot: u8) {
+    pub(crate) fn reset(&mut self) {
         self.overlap.fill(0.0);
         self.prev_shape = WindowShape::Sine;
     }

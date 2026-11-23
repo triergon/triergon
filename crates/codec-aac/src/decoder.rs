@@ -64,16 +64,16 @@ pub(crate) struct ChannelState {
 }
 
 impl ChannelState {
-    fn new(budget: &Budget, aot: u8) -> Result<ChannelState> {
+    fn new(budget: &Budget, aot: ObjectType) -> Result<ChannelState> {
         Ok(ChannelState {
             overlap: [0.0; 1024],
             prev_shape: WindowShape::Sine,
-            pred: if aot == AOT_MAIN {
+            pred: if aot == ObjectType::Main {
                 Some(pred::PredState::new(budget)?)
             } else {
                 None
             },
-            ltp: if aot == AOT_LTP {
+            ltp: if aot == ObjectType::Ltp {
                 Some(ltp::LtpState::new(budget)?)
             } else {
                 None
@@ -130,7 +130,7 @@ pub(crate) struct ElementState {
 }
 
 impl ElementState {
-    fn new(budget: &Budget, aot: u8, kind: ElementId, tag: u8) -> Result<ElementState> {
+    fn new(budget: &Budget, aot: ObjectType, kind: ElementId, tag: u8) -> Result<ElementState> {
         Ok(ElementState {
             kind,
             tag,
@@ -186,7 +186,7 @@ impl ElementState {
 
 #[derive(Debug)]
 pub(crate) struct Core {
-    pub aot: u8,
+    pub aot: ObjectType,
     pub sf_index: usize,
     pub channel_config: u8,
     pub slots: Vec<Slot>,
@@ -222,7 +222,7 @@ pub(crate) struct Core {
 impl Core {
     pub(crate) fn new(budget: &Budget) -> Core {
         Core {
-            aot: AOT_LC,
+            aot: ObjectType::Lc,
             sf_index: 4,
             channel_config: 0,
             slots: Vec::new(),
@@ -257,7 +257,7 @@ impl Core {
             }
         }
         for c in &mut self.cce {
-            c.reset(self.aot);
+            c.reset();
         }
     }
 
@@ -273,16 +273,11 @@ impl Core {
     /// Select the audio object type, indexed rate and channel configuration.
     pub(crate) fn configure(
         &mut self,
-        aot: u8,
+        aot: ObjectType,
         sf_index: u8,
         channel_config: u8,
         layout: FixedLayout,
     ) -> Result<()> {
-        match aot {
-            AOT_MAIN | AOT_LC | AOT_LTP => {}
-            3 => return Err(DecodeError::Unsupported(Feature::SsrGainControl)),
-            _ => return Err(DecodeError::Unsupported(Feature::ObjectType(aot))),
-        }
         if sf_index > 12 {
             return Err(DecodeError::Unsupported(Feature::SampleRateIndex(sf_index)));
         }
@@ -331,7 +326,7 @@ impl Core {
                 frequency_index,
             )));
         }
-        if program.object_type != AOT_LC - 1 || program.sf_index != frequency_index {
+        if program.object_type != ObjectType::Lc as u8 - 1 || program.sf_index != frequency_index {
             return Err(DecodeError::Invalid("raw AAC program profile or rate"));
         }
         let channels = program
@@ -367,7 +362,7 @@ impl Core {
         if core.layout.mask() == 0 {
             return Err(DecodeError::Unsupported(Feature::RawProgramLayout));
         }
-        core.elements = core.build_elements(AOT_LC, &core.slots, false, &[])?;
+        core.elements = core.build_elements(ObjectType::Lc, &core.slots, false, &[])?;
         core.configured = true;
         Ok(core)
     }
@@ -377,7 +372,7 @@ impl Core {
     /// applies so that a refused charge applies nothing.
     fn build_elements(
         &self,
-        aot: u8,
+        aot: ObjectType,
         slots: &[Slot],
         sbr: bool,
         existing: &[Charged<Box<ElementState>>],
@@ -781,7 +776,7 @@ impl Core {
         if common && ms_present != 0 {
             apply_ms(&mut a[0], &mut b[0], &ms_mask);
         }
-        if cfg.aot == AOT_MAIN {
+        if cfg.aot == ObjectType::Main {
             if let Some(p) = &mut e.ch[0].pred {
                 pred::apply(p, &mut a[0], cfg);
             }
@@ -1429,7 +1424,7 @@ pub(crate) mod tests {
     #[test]
     fn a_renewed_element_is_a_new_one() {
         let budget = Budget::new(1 << 30).unwrap();
-        for aot in [AOT_LC, AOT_MAIN, AOT_LTP] {
+        for aot in [ObjectType::Lc, ObjectType::Main, ObjectType::Ltp] {
             for kind in [ElementId::Sce, ElementId::Cpe] {
                 let fresh = || {
                     let mut e = ElementState::new(&budget, aot, kind, 3).unwrap();
@@ -1443,7 +1438,11 @@ pub(crate) mod tests {
                 (e.decoded, e.nch, e.bs_tag, e.ch_decoded) = (true, 2, 9, [true; 2]);
                 e.cd[0].global_gain = 120;
                 e.renew();
-                assert_eq!(without_pools(&e), without_pools(&fresh()), "{aot} {kind:?}");
+                assert_eq!(
+                    without_pools(&e),
+                    without_pools(&fresh()),
+                    "{aot:?} {kind:?}"
+                );
             }
         }
     }
@@ -1455,7 +1454,7 @@ pub(crate) mod tests {
         // CPEs, 16 LFEs): a switch reuses what both have. Each element here is the largest
         // one: it carries SBR (with PS's synthesis where it applies) in the kind and profile
         // with the largest state.
-        let element = [AOT_MAIN, AOT_LTP]
+        let element = [ObjectType::Main, ObjectType::Ltp]
             .into_iter()
             .flat_map(|aot| [ElementId::Sce, ElementId::Cpe].map(|kind| (aot, kind)))
             .map(|(aot, kind)| {
