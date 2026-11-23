@@ -43,32 +43,34 @@ fn build_ps_input(root: &Path) -> Result<PathBuf, String> {
         .current_dir(root)
         .env("CARGO_INCREMENTAL", "0")
         .args([
-            "test",
+            "build",
             "--release",
             "-p",
             "triergon-codec-aac",
-            "--lib",
-            "--no-run",
+            "--example",
+            "ps_input",
+            "--features",
+            "reference-trace",
             "--message-format=json-render-diagnostics",
         ])
         .stderr(Stdio::inherit())
         .output()
-        .map_err(|e| format!("build AAC unit tests: {e}"))?;
+        .map_err(|e| format!("build the AAC QMF input example: {e}"))?;
     if !output.status.success() {
-        return Err(format!("build AAC unit tests: {}", output.status));
+        return Err(format!("build the AAC QMF input example: {}", output.status));
     }
     String::from_utf8_lossy(&output.stdout)
         .lines()
         .filter_map(|line| json::parse(line).ok())
         .find_map(|artifact| {
             let name = artifact.get("target")?.get("name")?.as_str()?;
-            if name == "triergon_codec_aac" {
+            if name == "ps_input" {
                 artifact.get("executable")?.as_str().map(PathBuf::from)
             } else {
                 None
             }
         })
-        .ok_or_else(|| "cargo did not report the AAC library test executable".into())
+        .ok_or_else(|| "cargo did not report the AAC QMF input executable".into())
 }
 
 pub(super) fn main(root: &Path, opts: &Options) -> Result<i32, String> {

@@ -370,7 +370,7 @@ pub(crate) struct Sbr {
     stereo: Option<ps::Stereo>,
     // scratch
     x: BudgetVec<[Cpx; 64]>,
-    #[cfg(test)]
+    #[cfg(feature = "reference-trace")]
     pub(crate) ps_input: Vec<f32>,
 }
 
@@ -391,7 +391,7 @@ impl Sbr {
             ps_seen: false,
             stereo: (!pair).then(|| ps::Stereo::new(budget)).transpose()?,
             x: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
-            #[cfg(test)]
+            #[cfg(feature = "reference-trace")]
             ps_input: Vec::new(),
         })
     }
@@ -421,7 +421,7 @@ impl Sbr {
             ps_seen,
             stereo,
             x,
-            #[cfg(test)]
+            #[cfg(feature = "reference-trace")]
                 ps_input: _,
         } = self; // the core rate, and so fs, is the same for every element of a layout
         *hdr = Header::default();
@@ -781,7 +781,7 @@ impl Sbr {
                         row[k] = ch.xl[k][i + T_HFADJ];
                     }
                 }
-                #[cfg(test)]
+                #[cfg(feature = "reference-trace")]
                 {
                     self.ps_input.clear();
                     self.ps_input

@@ -11,6 +11,7 @@ publish.workspace = true
 # Explicit std::simd forms of the SBR QMF banks (requires a nightly toolchain). The same
 # operations in the same order as the default code; ARMv7 NEON flushes subnormals to zero.
 simd = []
+reference-trace = []
 
 [dependencies]
 triergon-bitstream = { path = "../bitstream" }
@@ -19,6 +20,10 @@ triergon-codec = { path = "../codec" }
 [dev-dependencies]
 triergon-codec = { path = "../codec", features = ["reference-trace"] }
 triergon-harness-protocol = { path = "../harness-protocol" }
+
+[[example]]
+name = "ps_input"
+required-features = ["reference-trace"]
 
 [lints]
 workspace = true

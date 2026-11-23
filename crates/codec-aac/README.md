@@ -53,6 +53,7 @@ decoder synthesizes directly into the caller's reserved planes and reuses them.
 | Feature | Default | Effect |
 |---|---|---|
 | `simd` | off | `std::simd` forms of the DCT-IV passes (SBR QMF banks and IMDCT), the SBR QMF windowing, the HF-generation covariance sums and the Parametric Stereo hybrid filters. Requires a nightly toolchain (`portable_simd`); `cargo xtask check-simd` uses the pinned one. |
+| `reference-trace` | off | Captures the QMF samples supplied to Parametric Stereo for comparison. |
 
 Without `simd` the crate builds on stable and uses the scalar code. Each vector lane
 performs the scalar operations in the same order, so output is identical where the vector

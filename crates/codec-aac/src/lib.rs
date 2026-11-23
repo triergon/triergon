@@ -21,11 +21,11 @@ mod huffman;
 mod huffman_probed;
 mod huffman_tables;
 mod ics;
-#[cfg(test)]
-mod inspect;
 mod ltp;
 mod pce;
 mod pred;
+#[cfg(feature = "reference-trace")]
+pub mod reference_trace;
 mod sbr;
 mod tables;
 
